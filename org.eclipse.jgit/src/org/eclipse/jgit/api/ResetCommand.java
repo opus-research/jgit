@@ -47,6 +47,7 @@ import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.LinkedList;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
@@ -54,7 +55,6 @@ import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
@@ -150,7 +150,7 @@ public class ResetCommand extends GitCommand<Ref> {
 			// resolve the ref to a commit
 			final ObjectId commitId;
 			try {
-				commitId = repo.resolve(ref + "^{commit}");
+				commitId = repo.resolve(ref);
 				if (commitId == null) {
 					// @TODO throw an InvalidRefNameException. We can't do that
 					// now because this would break the API
@@ -312,27 +312,35 @@ public class ResetCommand extends GitCommand<Ref> {
 	}
 
 	private void resetIndex(RevCommit commit) throws IOException {
-		DirCache dc = repo.lockDirCache();
+		DirCache dc = null;
 		try {
+			dc = repo.lockDirCache();
 			dc.clear();
 			DirCacheBuilder dcb = dc.builder();
 			dcb.addTree(new byte[0], 0, repo.newObjectReader(),
 					commit.getTree());
 			dcb.commit();
+		} catch (IOException e) {
+			throw e;
 		} finally {
-			dc.unlock();
+			if (dc != null)
+				dc.unlock();
 		}
 	}
 
 	private void checkoutIndex(RevCommit commit) throws IOException {
-		DirCache dc = repo.lockDirCache();
+		DirCache dc = null;
 		try {
+			dc = repo.lockDirCache();
 			DirCacheCheckout checkout = new DirCacheCheckout(repo, dc,
 					commit.getTree());
 			checkout.setFailOnConflict(false);
 			checkout.checkout();
+		} catch (IOException e) {
+			throw e;
 		} finally {
-			dc.unlock();
+			if (dc != null)
+				dc.unlock();
 		}
 	}
 

@@ -46,10 +46,9 @@ import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
-import org.eclipse.jgit.errors.ConfigInvalidException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -58,6 +57,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.submodule.SubmoduleWalk;
+import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 
@@ -72,14 +72,15 @@ import org.eclipse.jgit.treewalk.filter.TreeFilter;
  *      href="http://www.kernel.org/pub/software/scm/git/docs/git-submodule.html"
  *      >Git documentation about submodules</a>
  */
-public class SubmoduleAddCommand extends
-		TransportCommand<SubmoduleAddCommand, Repository> {
+public class SubmoduleAddCommand extends GitCommand<Repository> {
 
 	private String path;
 
 	private String uri;
 
 	private ProgressMonitor monitor;
+
+	private CredentialsProvider credentialsProvider;
 
 	/**
 	 * @param repo
@@ -124,6 +125,17 @@ public class SubmoduleAddCommand extends
 	}
 
 	/**
+	 * @param credentialsProvider
+	 *            the {@link CredentialsProvider} to use
+	 * @return this command
+	 */
+	public SubmoduleAddCommand setCredentialsProvider(
+			final CredentialsProvider credentialsProvider) {
+		this.credentialsProvider = credentialsProvider;
+		return this;
+	}
+
+	/**
 	 * Is the configured already a submodule in the index?
 	 *
 	 * @return true if submodule exists in index, false otherwise
@@ -149,26 +161,21 @@ public class SubmoduleAddCommand extends
 			throw new JGitInternalException(e.getMessage(), e);
 		}
 
-		final String resolvedUri;
-		try {
-			resolvedUri = SubmoduleWalk.getSubmoduleRemoteUrl(repo, uri);
-		} catch (IOException e) {
-			throw new JGitInternalException(e.getMessage(), e);
-		}
 		// Clone submodule repository
 		File moduleDirectory = SubmoduleWalk.getSubmoduleDirectory(repo, path);
 		CloneCommand clone = Git.cloneRepository();
-		configure(clone);
 		clone.setDirectory(moduleDirectory);
-		clone.setURI(resolvedUri);
+		clone.setURI(uri);
 		if (monitor != null)
 			clone.setProgressMonitor(monitor);
+		if (credentialsProvider != null)
+			clone.setCredentialsProvider(credentialsProvider);
 		Repository subRepo = clone.call().getRepository();
 
 		// Save submodule URL to parent repository's config
 		StoredConfig config = repo.getConfig();
 		config.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
-				ConfigConstants.CONFIG_KEY_URL, resolvedUri);
+				ConfigConstants.CONFIG_KEY_URL, uri);
 		try {
 			config.save();
 		} catch (IOException e) {
@@ -178,16 +185,13 @@ public class SubmoduleAddCommand extends
 		// Save path and URL to parent repository's .gitmodules file
 		FileBasedConfig modulesConfig = new FileBasedConfig(new File(
 				repo.getWorkTree(), Constants.DOT_GIT_MODULES), repo.getFS());
+		modulesConfig.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
+				ConfigConstants.CONFIG_KEY_PATH, path);
+		modulesConfig.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
+				ConfigConstants.CONFIG_KEY_URL, uri);
 		try {
-			modulesConfig.load();
-			modulesConfig.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION,
-					path, ConfigConstants.CONFIG_KEY_PATH, path);
-			modulesConfig.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION,
-					path, ConfigConstants.CONFIG_KEY_URL, uri);
 			modulesConfig.save();
 		} catch (IOException e) {
-			throw new JGitInternalException(e.getMessage(), e);
-		} catch (ConfigInvalidException e) {
 			throw new JGitInternalException(e.getMessage(), e);
 		}
 

@@ -62,6 +62,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.dircache.DirCacheIterator;
@@ -69,7 +70,6 @@ import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ConfigConstants;
@@ -275,16 +275,6 @@ public class DiffFormatter {
 	}
 
 	/**
-	 * Get the prefix applied in front of old file paths.
-	 *
-	 * @return the prefix
-	 * @since 2.0
-	 */
-	public String getOldPrefix() {
-		return this.oldPrefix;
-	}
-
-	/**
 	 * Set the prefix applied in front of new file paths.
 	 *
 	 * @param prefix
@@ -295,16 +285,6 @@ public class DiffFormatter {
 	 */
 	public void setNewPrefix(String prefix) {
 		newPrefix = prefix;
-	}
-
-	/**
-	 * Get the prefix applied in front of new file paths.
-	 * 
-	 * @return the prefix
-	 * @since 2.0
-	 */
-	public String getNewPrefix() {
-		return this.newPrefix;
 	}
 
 	/** @return true if rename detection is enabled. */

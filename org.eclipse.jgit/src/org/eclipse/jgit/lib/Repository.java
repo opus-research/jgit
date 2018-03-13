@@ -62,6 +62,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.CorruptObjectException;
@@ -73,7 +74,6 @@ import org.eclipse.jgit.events.IndexChangedEvent;
 import org.eclipse.jgit.events.IndexChangedListener;
 import org.eclipse.jgit.events.ListenerList;
 import org.eclipse.jgit.events.RepositoryEvent;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
@@ -86,7 +86,6 @@ import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
-import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
  * Represents a Git repository.
@@ -497,17 +496,14 @@ public abstract class Repository {
 					if (!Character.isDigit(rev[l]))
 						break;
 				}
+				String distnum = new String(rev, i + 1, l - i - 1);
 				int dist;
-				if (l - i > 1) {
-					String distnum = new String(rev, i + 1, l - i - 1);
-					try {
-						dist = Integer.parseInt(distnum);
-					} catch (NumberFormatException e) {
-						throw new RevisionSyntaxException(
-								JGitText.get().invalidAncestryLength, revstr);
-					}
-				} else
-					dist = 1;
+				try {
+					dist = Integer.parseInt(distnum);
+				} catch (NumberFormatException e) {
+					throw new RevisionSyntaxException(
+							JGitText.get().invalidAncestryLength, revstr);
+				}
 				while (dist > 0) {
 					RevCommit commit = (RevCommit) ref;
 					if (commit.getParentCount() == 0) {
@@ -560,7 +556,7 @@ public abstract class Repository {
 					tree = rw.parseTree(ref);
 				}
 
-				if (i == rev.length - 1)
+				if (i == rev.length - i)
 					return tree.copy();
 
 				TreeWalk tw = TreeWalk.forPath(rw.getObjectReader(),
@@ -1278,7 +1274,7 @@ public abstract class Repository {
 			throws FileNotFoundException, IOException {
 		File headsFile = new File(getDirectory(), filename);
 		if (heads != null) {
-			BufferedOutputStream bos = new SafeBufferedOutputStream(
+			BufferedOutputStream bos = new BufferedOutputStream(
 					new FileOutputStream(headsFile));
 			try {
 				for (ObjectId id : heads) {
