@@ -64,13 +64,13 @@ import org.eclipse.jgit.api.RebaseCommand.InteractiveHandler;
 import org.eclipse.jgit.api.RebaseCommand.Operation;
 import org.eclipse.jgit.api.RebaseResult.Status;
 import org.eclipse.jgit.api.errors.InvalidRebaseStepException;
+import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.api.errors.UnmergedPathsException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
-import org.eclipse.jgit.errors.IllegalTodoFileModification;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.junit.RepositoryTestCase;
@@ -569,69 +569,6 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		RevWalk rw = new RevWalk(db);
 		assertEquals(lastTopicCommit, rw
 				.parseCommit(db.resolve(Constants.HEAD)));
-		assertEquals(RepositoryState.SAFE, db.getRepositoryState());
-
-		// rebase- dir in .git must be deleted
-		assertFalse(new File(db.getDirectory(), "rebase-merge").exists());
-	}
-
-	@Test
-	public void testStopOnConflictAndAbortWithDetachedHEAD() throws Exception {
-		// create file1 on master
-		RevCommit firstInMaster = writeFileAndCommit(FILE1, "Add file1", "1",
-				"2", "3");
-		// change first line in master
-		writeFileAndCommit(FILE1, "change file1 in master", "1master", "2", "3");
-		checkFile(FILE1, "1master", "2", "3");
-		// create a topic branch based on second commit
-		createBranch(firstInMaster, "refs/heads/topic");
-		checkoutBranch("refs/heads/topic");
-		// we have the old content again
-		checkFile(FILE1, "1", "2", "3");
-
-		// add a line (non-conflicting)
-		writeFileAndCommit(FILE1, "add a line to file1 in topic", "1", "2",
-				"3", "topic4");
-
-		// change first line (conflicting)
-		RevCommit conflicting = writeFileAndCommit(FILE1,
-				"change file1 in topic", "1topic", "2", "3", "topic4");
-
-		RevCommit lastTopicCommit = writeFileAndCommit(FILE1,
-				"change file1 in topic again", "1topic", "2", "3", "topic4");
-
-		git.checkout().setName(lastTopicCommit.getName()).call();
-
-		RebaseResult res = git.rebase().setUpstream("refs/heads/master").call();
-		assertEquals(Status.STOPPED, res.getStatus());
-		assertEquals(conflicting, res.getCurrentCommit());
-		checkFile(FILE1,
-				"<<<<<<< Upstream, based on master\n1master\n=======\n1topic",
-				">>>>>>> e0d1dea change file1 in topic\n2\n3\ntopic4");
-
-		assertEquals(RepositoryState.REBASING_INTERACTIVE,
-				db.getRepositoryState());
-		assertTrue(new File(db.getDirectory(), "rebase-merge").exists());
-		// the first one should be included, so we should have left two picks in
-		// the file
-		assertEquals(1, countPicks());
-
-		// rebase should not succeed in this state
-		try {
-			git.rebase().setUpstream("refs/heads/master").call();
-			fail("Expected exception was not thrown");
-		} catch (WrongRepositoryStateException e) {
-			// expected
-		}
-
-		// abort should reset to topic branch
-		res = git.rebase().setOperation(Operation.ABORT).call();
-		assertEquals(res.getStatus(), Status.ABORTED);
-		assertEquals(lastTopicCommit.getName(), db.getFullBranch());
-		checkFile(FILE1, "1topic", "2", "3", "topic4");
-		RevWalk rw = new RevWalk(db);
-		assertEquals(lastTopicCommit,
-				rw.parseCommit(db.resolve(Constants.HEAD)));
 		assertEquals(RepositoryState.SAFE, db.getRepositoryState());
 
 		// rebase- dir in .git must be deleted
@@ -1953,12 +1890,8 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		RebaseResult res2 = git.rebase().setUpstream("HEAD~2")
 				.runInteractively(new InteractiveHandler() {
 					public void prepareSteps(List<RebaseTodoLine> steps) {
-						try {
-							// delete RevCommit c4
-							steps.get(0).setAction(Action.COMMENT);
-						} catch (IllegalTodoFileModification e) {
-							fail("unexpected exception: " + e);
-						}
+						steps.get(0).setAction(Action.COMMENT); // delete
+																// RevCommit c4
 					}
 
 					public String modifyCommitMessage(String commit) {
@@ -2087,7 +2020,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		try {
 			new RebaseTodoLine("This is a invalid comment");
 			fail("Constructing a comment line with invalid comment string should fail, but doesn't");
-		} catch (IllegalArgumentException e) {
+		} catch (JGitInternalException e) {
 			// expected
 		}
 		RebaseTodoLine validCommentLine = new RebaseTodoLine(
@@ -2102,7 +2035,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		try {
 			actionLineToBeChanged.setComment("invalid comment");
 			fail("Setting a invalid comment string should fail but doesn't");
-		} catch (IllegalArgumentException e) {
+		} catch (JGitInternalException e) {
 			assertEquals(null, actionLineToBeChanged.getComment());
 		}
 
@@ -2111,7 +2044,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		try {
 			actionLineToBeChanged.setComment("invalid comment");
 			fail("Setting a invalid comment string should fail but doesn't");
-		} catch (IllegalArgumentException e) {
+		} catch (JGitInternalException e) {
 			// expected
 			// setting comment failed, but was successfully set before,
 			// therefore it may not be altered since then
@@ -2128,7 +2061,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 			actionLineToBeChanged.setComment("line1 \n\r line2");
 			actionLineToBeChanged.setComment("\n\r");
 			fail("Setting a multiline comment string should fail but doesn't");
-		} catch (IllegalArgumentException e) {
+		} catch (JGitInternalException e) {
 			// expected
 		}
 		// Try setting valid comments
@@ -2180,15 +2113,9 @@ public class RebaseCommandTest extends RepositoryTestCase {
 
 		RebaseResult res = git.rebase().setUpstream("HEAD~2")
 				.runInteractively(new InteractiveHandler() {
-
 					public void prepareSteps(List<RebaseTodoLine> steps) {
-						try {
-							steps.get(0).setAction(Action.REWORD);
-						} catch (IllegalTodoFileModification e) {
-							fail("unexpected exception: " + e);
-						}
+						steps.get(0).setAction(Action.REWORD);
 					}
-
 					public String modifyCommitMessage(String commit) {
 						return "rewritten commit message";
 					}
@@ -2228,11 +2155,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		RebaseResult res = git.rebase().setUpstream("HEAD~2")
 				.runInteractively(new InteractiveHandler() {
 					public void prepareSteps(List<RebaseTodoLine> steps) {
-						try {
-							steps.get(0).setAction(Action.EDIT);
-						} catch (IllegalTodoFileModification e) {
-							fail("unexpected exception: " + e);
-						}
+						steps.get(0).setAction(Action.EDIT);
 					}
 
 					public String modifyCommitMessage(String commit) {
@@ -2292,11 +2215,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 				.runInteractively(new InteractiveHandler() {
 
 					public void prepareSteps(List<RebaseTodoLine> steps) {
-						try {
-							steps.get(1).setAction(Action.SQUASH);
-						} catch (IllegalTodoFileModification e) {
-							fail("unexpected exception: " + e);
-						}
+						steps.get(1).setAction(Action.SQUASH);
 					}
 
 					public String modifyCommitMessage(String commit) {
@@ -2371,12 +2290,8 @@ public class RebaseCommandTest extends RepositoryTestCase {
 				.runInteractively(new InteractiveHandler() {
 
 					public void prepareSteps(List<RebaseTodoLine> steps) {
-						try {
-							steps.get(1).setAction(Action.SQUASH);
-							steps.get(2).setAction(Action.SQUASH);
-						} catch (IllegalTodoFileModification e) {
-							fail("unexpected exception: " + e);
-						}
+						steps.get(1).setAction(Action.SQUASH);
+						steps.get(2).setAction(Action.SQUASH);
 					}
 
 					public String modifyCommitMessage(String commit) {
@@ -2452,12 +2367,8 @@ public class RebaseCommandTest extends RepositoryTestCase {
 				.runInteractively(new InteractiveHandler() {
 
 					public void prepareSteps(List<RebaseTodoLine> steps) {
-						try {
-							steps.get(1).setAction(Action.FIXUP);
-							steps.get(2).setAction(Action.SQUASH);
-						} catch (IllegalTodoFileModification e) {
-							fail("unexpected exception: " + e);
-						}
+						steps.get(1).setAction(Action.FIXUP);
+						steps.get(2).setAction(Action.SQUASH);
 					}
 
 					public String modifyCommitMessage(String commit) {
@@ -2526,11 +2437,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 				.runInteractively(new InteractiveHandler() {
 
 					public void prepareSteps(List<RebaseTodoLine> steps) {
-						try {
-							steps.get(1).setAction(Action.FIXUP);
-						} catch (IllegalTodoFileModification e) {
-							fail("unexpected exception: " + e);
-						}
+						steps.get(1).setAction(Action.FIXUP);
 					}
 
 					public String modifyCommitMessage(String commit) {
@@ -2574,11 +2481,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 				.runInteractively(new InteractiveHandler() {
 
 					public void prepareSteps(List<RebaseTodoLine> steps) {
-						try {
-							steps.get(1).setAction(Action.FIXUP);
-						} catch (IllegalTodoFileModification e) {
-							fail("unexpected exception: " + e);
-						}
+						steps.get(1).setAction(Action.FIXUP);
 					}
 
 					public String modifyCommitMessage(String commit) {
@@ -2613,11 +2516,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 				.runInteractively(new InteractiveHandler() {
 
 					public void prepareSteps(List<RebaseTodoLine> steps) {
-						try {
-							steps.get(0).setAction(Action.FIXUP);
-						} catch (IllegalTodoFileModification e) {
-							fail("unexpected exception: " + e);
-						}
+						steps.get(0).setAction(Action.FIXUP);
 					}
 
 					public String modifyCommitMessage(String commit) {
@@ -2645,11 +2544,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 				.runInteractively(new InteractiveHandler() {
 
 					public void prepareSteps(List<RebaseTodoLine> steps) {
-						try {
-							steps.get(0).setAction(Action.SQUASH);
-						} catch (IllegalTodoFileModification e) {
-							fail("unexpected exception: " + e);
-						}
+						steps.get(0).setAction(Action.SQUASH);
 					}
 
 					public String modifyCommitMessage(String commit) {
@@ -2676,11 +2571,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 				.runInteractively(new InteractiveHandler() {
 
 					public void prepareSteps(List<RebaseTodoLine> steps) {
-						try {
-							steps.get(0).setAction(Action.EDIT);
-						} catch (IllegalTodoFileModification e) {
-							fail("unexpected exception: " + e);
-						}
+						steps.get(0).setAction(Action.EDIT);
 					}
 
 					public String modifyCommitMessage(String commit) {
@@ -2719,11 +2610,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 
 					public void prepareSteps(List<RebaseTodoLine> steps) {
 						steps.remove(0);
-						try {
-							steps.get(0).setAction(Action.EDIT);
-						} catch (IllegalTodoFileModification e) {
-							fail("unexpected exception: " + e);
-						}
+						steps.get(0).setAction(Action.EDIT);
 					}
 
 					public String modifyCommitMessage(String commit) {
@@ -2761,11 +2648,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 
 					public void prepareSteps(List<RebaseTodoLine> steps) {
 						steps.remove(0);
-						try {
-							steps.get(0).setAction(Action.REWORD);
-						} catch (IllegalTodoFileModification e) {
-							fail("unexpected exception: " + e);
-						}
+						steps.get(0).setAction(Action.REWORD);
 					}
 
 					public String modifyCommitMessage(String commit) {
@@ -2778,11 +2661,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 
 			public void prepareSteps(List<RebaseTodoLine> steps) {
 				steps.remove(0);
-				try {
-					steps.get(0).setAction(Action.REWORD);
-				} catch (IllegalTodoFileModification e) {
-					fail("unexpected exception: " + e);
-				}
+				steps.get(0).setAction(Action.REWORD);
 			}
 
 			public String modifyCommitMessage(String commit) {
@@ -2823,13 +2702,9 @@ public class RebaseCommandTest extends RepositoryTestCase {
 				.runInteractively(new InteractiveHandler() {
 
 					public void prepareSteps(List<RebaseTodoLine> steps) {
-						try {
-							steps.get(0).setAction(Action.PICK);
-							steps.remove(1);
-							steps.get(1).setAction(Action.SQUASH);
-						} catch (IllegalTodoFileModification e) {
-							fail("unexpected exception: " + e);
-						}
+						steps.get(0).setAction(Action.PICK);
+						steps.remove(1);
+						steps.get(1).setAction(Action.SQUASH);
 					}
 
 					public String modifyCommitMessage(String commit) {
@@ -2841,13 +2716,9 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		result = git.rebase().runInteractively(new InteractiveHandler() {
 
 			public void prepareSteps(List<RebaseTodoLine> steps) {
-				try {
-					steps.get(0).setAction(Action.PICK);
-					steps.remove(1);
-					steps.get(1).setAction(Action.SQUASH);
-				} catch (IllegalTodoFileModification e) {
-					fail("unexpected exception: " + e);
-				}
+				steps.get(0).setAction(Action.PICK);
+				steps.remove(1);
+				steps.get(1).setAction(Action.SQUASH);
 			}
 
 			public String modifyCommitMessage(String commit) {
@@ -2889,13 +2760,9 @@ public class RebaseCommandTest extends RepositoryTestCase {
 				.runInteractively(new InteractiveHandler() {
 
 					public void prepareSteps(List<RebaseTodoLine> steps) {
-						try {
-							steps.get(0).setAction(Action.PICK);
-							steps.remove(1);
-							steps.get(1).setAction(Action.FIXUP);
-						} catch (IllegalTodoFileModification e) {
-							fail("unexpected exception: " + e);
-						}
+						steps.get(0).setAction(Action.PICK);
+						steps.remove(1);
+						steps.get(1).setAction(Action.FIXUP);
 					}
 
 					public String modifyCommitMessage(String commit) {
@@ -2907,13 +2774,9 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		result = git.rebase().runInteractively(new InteractiveHandler() {
 
 			public void prepareSteps(List<RebaseTodoLine> steps) {
-				try {
-					steps.get(0).setAction(Action.PICK);
-					steps.remove(1);
-					steps.get(1).setAction(Action.FIXUP);
-				} catch (IllegalTodoFileModification e) {
-					fail("unexpected exception: " + e);
-				}
+				steps.get(0).setAction(Action.PICK);
+				steps.remove(1);
+				steps.get(1).setAction(Action.FIXUP);
 			}
 
 			public String modifyCommitMessage(String commit) {
@@ -2960,12 +2823,8 @@ public class RebaseCommandTest extends RepositoryTestCase {
 				.runInteractively(new InteractiveHandler() {
 
 					public void prepareSteps(List<RebaseTodoLine> steps) {
-						try {
-							steps.get(0).setAction(Action.EDIT);
-							steps.get(1).setAction(Action.PICK);
-						} catch (IllegalTodoFileModification e) {
-							fail("unexpected exception: " + e);
-						}
+						steps.get(0).setAction(Action.EDIT);
+						steps.get(1).setAction(Action.PICK);
 					}
 
 					public String modifyCommitMessage(String commit) {
