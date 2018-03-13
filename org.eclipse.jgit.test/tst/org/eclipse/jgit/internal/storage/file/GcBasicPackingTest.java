@@ -51,31 +51,21 @@ import java.util.Iterator;
 
 import org.eclipse.jgit.junit.TestRepository.BranchBuilder;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.junit.experimental.theories.DataPoints;
-import org.junit.experimental.theories.Theories;
-import org.junit.experimental.theories.Theory;
-import org.junit.runner.RunWith;
+import org.junit.Test;
 
-@RunWith(Theories.class)
 public class GcBasicPackingTest extends GcTestCase {
-	@DataPoints
-	public static boolean[] aggressiveValues = { true, false };
-
-	@Theory
-	public void repackEmptyRepo_noPackCreated(boolean aggressive)
-			throws IOException {
-		gc.setAggressive(aggressive);
+	@Test
+	public void repackEmptyRepo_noPackCreated() throws IOException {
 		gc.repack();
 		assertEquals(0, repo.getObjectDatabase().getPacks().size());
 	}
 
-	@Theory
-	public void testPackRepoWithNoRefs(boolean aggressive) throws Exception {
+	@Test
+	public void testPackRepoWithNoRefs() throws Exception {
 		tr.commit().add("A", "A").add("B", "B").create();
 		stats = gc.getStatistics();
 		assertEquals(4, stats.numberOfLooseObjects);
 		assertEquals(0, stats.numberOfPackedObjects);
-		gc.setAggressive(aggressive);
 		gc.gc();
 		stats = gc.getStatistics();
 		assertEquals(4, stats.numberOfLooseObjects);
@@ -83,8 +73,8 @@ public class GcBasicPackingTest extends GcTestCase {
 		assertEquals(0, stats.numberOfPackFiles);
 	}
 
-	@Theory
-	public void testPack2Commits(boolean aggressive) throws Exception {
+	@Test
+	public void testPack2Commits() throws Exception {
 		BranchBuilder bb = tr.branch("refs/heads/master");
 		bb.commit().add("A", "A").add("B", "B").create();
 		bb.commit().add("A", "A2").add("B", "B2").create();
@@ -92,7 +82,6 @@ public class GcBasicPackingTest extends GcTestCase {
 		stats = gc.getStatistics();
 		assertEquals(8, stats.numberOfLooseObjects);
 		assertEquals(0, stats.numberOfPackedObjects);
-		gc.setAggressive(aggressive);
 		gc.gc();
 		stats = gc.getStatistics();
 		assertEquals(0, stats.numberOfLooseObjects);
@@ -100,15 +89,13 @@ public class GcBasicPackingTest extends GcTestCase {
 		assertEquals(1, stats.numberOfPackFiles);
 	}
 
-	@Theory
-	public void testPackAllObjectsInOnePack(boolean aggressive)
-			throws Exception {
+	@Test
+	public void testPackAllObjectsInOnePack() throws Exception {
 		tr.branch("refs/heads/master").commit().add("A", "A").add("B", "B")
 				.create();
 		stats = gc.getStatistics();
 		assertEquals(4, stats.numberOfLooseObjects);
 		assertEquals(0, stats.numberOfPackedObjects);
-		gc.setAggressive(aggressive);
 		gc.gc();
 		stats = gc.getStatistics();
 		assertEquals(0, stats.numberOfLooseObjects);
@@ -123,8 +110,8 @@ public class GcBasicPackingTest extends GcTestCase {
 		assertEquals(1, stats.numberOfPackFiles);
 	}
 
-	@Theory
-	public void testPackCommitsAndLooseOne(boolean aggressive) throws Exception {
+	@Test
+	public void testPackCommitsAndLooseOne() throws Exception {
 		BranchBuilder bb = tr.branch("refs/heads/master");
 		RevCommit first = bb.commit().add("A", "A").add("B", "B").create();
 		bb.commit().add("A", "A2").add("B", "B2").create();
@@ -133,7 +120,6 @@ public class GcBasicPackingTest extends GcTestCase {
 		stats = gc.getStatistics();
 		assertEquals(8, stats.numberOfLooseObjects);
 		assertEquals(0, stats.numberOfPackedObjects);
-		gc.setAggressive(aggressive);
 		gc.gc();
 		stats = gc.getStatistics();
 		assertEquals(0, stats.numberOfLooseObjects);
@@ -141,8 +127,8 @@ public class GcBasicPackingTest extends GcTestCase {
 		assertEquals(2, stats.numberOfPackFiles);
 	}
 
-	@Theory
-	public void testNotPackTwice(boolean aggressive) throws Exception {
+	@Test
+	public void testNotPackTwice() throws Exception {
 		BranchBuilder bb = tr.branch("refs/heads/master");
 		RevCommit first = bb.commit().message("M").add("M", "M").create();
 		bb.commit().message("B").add("B", "Q").create();
@@ -160,7 +146,6 @@ public class GcBasicPackingTest extends GcTestCase {
 
 		gc.setExpireAgeMillis(0);
 		fsTick();
-		gc.setAggressive(aggressive);
 		gc.gc();
 		stats = gc.getStatistics();
 		assertEquals(0, stats.numberOfLooseObjects);
