@@ -55,7 +55,7 @@ import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.junit.RepositoryTestCase;
-import org.eclipse.jgit.submodule.SubmoduleWalk.IgnoreSubmoduleMode;
+import org.eclipse.jgit.lib.IndexDiff.IgnoreSubmoduleMode;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.junit.Before;
 import org.junit.experimental.theories.DataPoints;
@@ -72,7 +72,7 @@ public class IndexDiffSubmoduleTest extends RepositoryTestCase {
 	protected File submodule_trash;
 
 	@DataPoints
-	public static IgnoreSubmoduleMode allModes[] = IgnoreSubmoduleMode.values();
+	public static IgnoreSubmoduleMode mode[] = IgnoreSubmoduleMode.values();
 
 	@Override
 	@Before
