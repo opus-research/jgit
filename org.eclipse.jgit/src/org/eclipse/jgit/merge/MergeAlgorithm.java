@@ -50,7 +50,6 @@ import java.util.List;
 import org.eclipse.jgit.diff.DiffAlgorithm;
 import org.eclipse.jgit.diff.Edit;
 import org.eclipse.jgit.diff.EditList;
-import org.eclipse.jgit.diff.HistogramDiff;
 import org.eclipse.jgit.diff.MyersDiff;
 import org.eclipse.jgit.diff.Sequence;
 import org.eclipse.jgit.diff.SequenceComparator;
@@ -61,14 +60,14 @@ import org.eclipse.jgit.merge.MergeChunk.ConflictState;
  * as RawText. By default {@link MyersDiff} is used as diff algorithm.
  */
 public final class MergeAlgorithm {
-	private DiffAlgorithm diffAlg;
+	private final DiffAlgorithm diffAlg;
 
 	/**
 	 * Creates a new MergeAlgorithm which uses {@link MyersDiff} as diff
 	 * algorithm
 	 */
 	public MergeAlgorithm() {
-		this(new HistogramDiff());
+		this(MyersDiff.INSTANCE);
 	}
 
 	/**
@@ -284,7 +283,7 @@ public final class MergeAlgorithm {
 	 * @return the next edit from the iterator or END_EDIT if there no more
 	 *         edits
 	 */
-	private Edit nextEdit(Iterator<Edit> it) {
+	private static Edit nextEdit(Iterator<Edit> it) {
 		return (it.hasNext() ? it.next() : END_EDIT);
 	}
 }
