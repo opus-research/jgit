@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2011, GEBIT Solutions
+ * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2011, Robin Rosenberg
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,23 +41,24 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.revwalk;
 
-import org.eclipse.jgit.diff.DiffEntry;
+package org.eclipse.jgit.dircache;
+
+import java.text.MessageFormat;
+
+import org.eclipse.jgit.JGitText;
 
 /**
- * An instance of this class can be used in conjunction with a
- * {@link FollowFilter}. Whenever a rename has been detected during a revision
- * walk, it will be reported here.
- * @see FollowFilter#setRenameCallback(RenameCallback)
+ * Thrown when JGit detects and refuses to use an invalid path
  */
-public abstract class RenameCallback {
+public class InvalidPathException extends IllegalArgumentException {
+
+	private static final long serialVersionUID = 1L;
+
 	/**
-	 * Called whenever a diff was found that is actually a rename or copy of a
-	 * file.
-	 *
-	 * @param entry
-	 *            the entry representing the rename/copy
+	 * @param path
 	 */
-	public abstract void renamed(DiffEntry entry);
+	public InvalidPathException(String path) {
+		super(MessageFormat.format(JGitText.get().invalidPath, path));
+	}
 }
