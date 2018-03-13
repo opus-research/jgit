@@ -54,6 +54,7 @@ import java.io.InputStream;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.FS;
 
@@ -64,8 +65,28 @@ import org.eclipse.jgit.util.FS;
  * specified working directory as part of a {@link TreeWalk}.
  */
 public class FileTreeIterator extends WorkingTreeIterator {
-	private final File directory;
-	private final FS fs;
+	/**
+	 * the starting directory. This directory should correspond to
+	 *            the root of the repository.
+	 */
+	protected final File directory;
+
+	/**
+	 *  the file system abstraction which will be necessary to
+	 *            perform certain file system operations.
+	 */
+	protected final FS fs;
+
+	/**
+	 * Create a new iterator to traverse the work tree and its children.
+	 *
+	 * @param repo
+	 *            the repository whose working tree will be scanned.
+	 */
+	public FileTreeIterator(Repository repo) {
+		this(repo.getWorkTree(), repo.getFS());
+		initRootIterator(repo);
+	}
 
 	/**
 	 * Create a new iterator to traverse the given directory and its children.
@@ -103,7 +124,7 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	}
 
 	@Override
-	public AbstractTreeIterator createSubtreeIterator(final Repository repo)
+	public AbstractTreeIterator createSubtreeIterator(final ObjectReader reader)
 			throws IncorrectObjectTypeException, IOException {
 		return new FileTreeIterator(this, ((FileEntry) current()).file, fs);
 	}
@@ -181,5 +202,13 @@ public class FileTreeIterator extends WorkingTreeIterator {
 		public File getFile() {
 			return file;
 		}
+	}
+
+	/**
+	 * @return
+	 * 			  The root directory of this iterator
+	 */
+	public File getDirectory() {
+		return directory;
 	}
 }

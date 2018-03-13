@@ -71,6 +71,7 @@ import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.NotSupportedException;
+import org.eclipse.jgit.events.IndexChangedEvent;
 import org.eclipse.jgit.util.RawParseUtils;
 
 /**
@@ -155,7 +156,7 @@ public class GitIndex {
 	public void rereadIfNecessary() throws IOException {
 		if (cacheFile.exists() && cacheFile.lastModified() != lastCacheTime) {
 			read();
-			db.fireIndexChanged();
+			db.fireEvent(new IndexChangedEvent());
 		}
 	}
 
@@ -297,17 +298,39 @@ public class GitIndex {
 			fc.write(buf);
 			fc.close();
 			fileOutputStream.close();
-			if (cacheFile.exists())
-				if (!cacheFile.delete())
-					throw new IOException(
-						JGitText.get().couldNotRenameDeleteOldIndex);
+			if (cacheFile.exists()) {
+				if (db.getFS().retryFailedLockFileCommit()) {
+					// file deletion fails on windows if another
+					// thread is reading the file concurrently
+					// So let's try 10 times...
+					boolean deleted = false;
+					for (int i = 0; i < 10; i++) {
+						if (cacheFile.delete()) {
+							deleted = true;
+							break;
+						}
+						try {
+							Thread.sleep(100);
+						} catch (InterruptedException e) {
+							// ignore
+						}
+					}
+					if (!deleted)
+						throw new IOException(
+								JGitText.get().couldNotRenameDeleteOldIndex);
+				} else {
+					if (!cacheFile.delete())
+						throw new IOException(
+								JGitText.get().couldNotRenameDeleteOldIndex);
+				}
+			}
 			if (!tmpIndex.renameTo(cacheFile))
 				throw new IOException(
 						JGitText.get().couldNotRenameTemporaryIndexFileToIndex);
 			changed = false;
 			statDirty = false;
 			lastCacheTime = cacheFile.lastModified();
-			db.fireIndexChanged();
+			db.fireEvent(new IndexChangedEvent());
 		} finally {
 			if (!lock.delete())
 				throw new IOException(
@@ -352,7 +375,7 @@ public class GitIndex {
 		// to change this for testing.
 		if (filemode != null)
 			return filemode.booleanValue();
-		RepositoryConfig config = db.getConfig();
+		Config config = db.getConfig();
 		filemode = Boolean.valueOf(config.getBoolean("core", null, "filemode", true));
 		return filemode.booleanValue();
 	}
@@ -437,7 +460,7 @@ public class GitIndex {
 			uid = -1;
 			gid = -1;
 			try {
-				size = (int) db.openBlob(f.getId()).getSize();
+				size = (int) db.open(f.getId(), Constants.OBJ_BLOB).getSize();
 			} catch (IOException e) {
 				e.printStackTrace();
 				size = -1;
@@ -877,17 +900,16 @@ public class GitIndex {
 	 * @throws IOException
 	 */
 	public void checkoutEntry(File wd, Entry e) throws IOException {
-		ObjectLoader ol = db.openBlob(e.sha1);
-		byte[] bytes = ol.getBytes();
+		ObjectLoader ol = db.open(e.sha1, Constants.OBJ_BLOB);
 		File file = new File(wd, e.getName());
 		file.delete();
 		file.getParentFile().mkdirs();
-		FileChannel channel = new FileOutputStream(file).getChannel();
-		ByteBuffer buffer = ByteBuffer.wrap(bytes);
-		int j = channel.write(buffer);
-		if (j != bytes.length)
-			throw new IOException(MessageFormat.format(JGitText.get().couldNotWriteFile, file));
-		channel.close();
+		FileOutputStream dst = new FileOutputStream(file);
+		try {
+			ol.copyTo(dst);
+		} finally {
+			dst.close();
+		}
 		if (config_filemode() && File_hasExecute()) {
 			if (FileMode.EXECUTABLE_FILE.equals(e.mode)) {
 				if (!File_canExecute(file))
