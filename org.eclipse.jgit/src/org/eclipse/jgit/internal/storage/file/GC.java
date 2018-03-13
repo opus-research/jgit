@@ -88,6 +88,7 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefDatabase;
+import org.eclipse.jgit.lib.ReflogEntry;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -614,26 +615,25 @@ public class GC {
 
 			while (treeWalk.next()) {
 				ObjectId objectId = treeWalk.getObjectId(0);
-			    switch (treeWalk.getRawMode(0) & FileMode.TYPE_MASK) {
-			      case FileMode.TYPE_MISSING:
-			      case FileMode.TYPE_GITLINK:
-			        continue;
-			      case FileMode.TYPE_TREE:
-			      case FileMode.TYPE_FILE:
-			      case FileMode.TYPE_SYMLINK:
-			        ret.add(objectId);
-			        continue;
-			      default:
+				switch (treeWalk.getRawMode(0) & FileMode.TYPE_MASK) {
+				case FileMode.TYPE_MISSING:
+				case FileMode.TYPE_GITLINK:
+					continue;
+				case FileMode.TYPE_TREE:
+				case FileMode.TYPE_FILE:
+				case FileMode.TYPE_SYMLINK:
+					ret.add(objectId);
+					continue;
+				default:
 					throw new IOException(MessageFormat.format(
-							JGitText.get().corruptObjectInvalidMode3, String
-									.format("%o", Integer.valueOf(treeWalk //$NON-NLS-1$
-											.getRawMode(0)),
-											(objectId == null) ? "null" //$NON-NLS-1$
-													: objectId.name(), treeWalk
-											.getPathString(), repo
-											.getIndexFile())));
-			    }
-			  }
+							JGitText.get().corruptObjectInvalidMode3,
+							String.format("%o", //$NON-NLS-1$
+									Integer.valueOf(treeWalk.getRawMode(0))),
+							(objectId == null) ? "null" : objectId.name(), //$NON-NLS-1$
+							treeWalk.getPathString(), //
+							repo.getIndexFile()));
+				}
+			}
 			return ret;
 		} finally {
 			if (revWalk != null)
@@ -702,7 +702,6 @@ public class GC {
 			}
 
 			// write the packindex
-			@SuppressWarnings("resource")
 			FileChannel idxChannel = new FileOutputStream(tmpIdx).getChannel();
 			OutputStream idxStream = Channels.newOutputStream(idxChannel);
 			try {

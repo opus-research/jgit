@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2012 Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2010, 2013 Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,7 +41,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.pgm;
+package org.eclipse.jgit.pgm.internal;
 
 import java.text.MessageFormat;
 
@@ -76,7 +76,6 @@ public class CLIText extends TranslationBundle {
 	// @formatter:off
 	/***/ public String alreadyOnBranch;
 	/***/ public String alreadyUpToDate;
-	/***/ public String archiveEntryModeIgnored;
 	/***/ public String authorInfo;
 	/***/ public String averageMSPerRead;
 	/***/ public String branchAlreadyExists;
@@ -103,7 +102,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String cannotResolve;
 	/***/ public String cannotSetupConsole;
 	/***/ public String cannotUseObjectsWithGlog;
-	/***/ public String cannotWrite;
 	/***/ public String cantFindGitDirectory;
 	/***/ public String cantWrite;
 	/***/ public String changesNotStagedForCommit;
@@ -191,7 +189,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String notAGitRepository;
 	/***/ public String notAJgitCommand;
 	/***/ public String notARevision;
-	/***/ public String notATagVersionIsRequired;
 	/***/ public String notATree;
 	/***/ public String notAValidRefName;
 	/***/ public String notAnIndexFile;
@@ -216,9 +213,17 @@ public class CLIText extends TranslationBundle {
 	/***/ public String skippingObject;
 	/***/ public String statusFileListFormat;
 	/***/ public String statusFileListFormatWithPrefix;
+	/***/ public String statusFileListFormatUnmerged;
 	/***/ public String statusModified;
 	/***/ public String statusNewFile;
 	/***/ public String statusRemoved;
+	/***/ public String statusBothDeleted;
+	/***/ public String statusAddedByUs;
+	/***/ public String statusDeletedByThem;
+	/***/ public String statusAddedByThem;
+	/***/ public String statusDeletedByUs;
+	/***/ public String statusBothAdded;
+	/***/ public String statusBothModified;
 	/***/ public String switchedToNewBranch;
 	/***/ public String switchedToBranch;
 	/***/ public String tagAlreadyExists;
@@ -233,5 +238,4 @@ public class CLIText extends TranslationBundle {
 	/***/ public String unsupportedOperation;
 	/***/ public String untrackedFiles;
 	/***/ public String updating;
-	/***/ public String warningNoCommitGivenOnCommandLine;
 }

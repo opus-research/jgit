@@ -54,13 +54,13 @@ import java.util.List;
 
 import org.eclipse.jgit.api.errors.UnmergedPathsException;
 import org.eclipse.jgit.diff.DiffEntry;
-import org.eclipse.jgit.internal.storage.file.ReflogEntry;
-import org.eclipse.jgit.internal.storage.file.ReflogReader;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.ReflogEntry;
+import org.eclipse.jgit.lib.ReflogReader;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -88,6 +88,7 @@ public class StashCreateCommandTest extends RepositoryTestCase {
 		git.add().addFilepattern("file.txt").call();
 		head = git.commit().setMessage("add file").call();
 		assertNotNull(head);
+		writeTrashFile("untracked.txt", "content");
 	}
 
 	/**
@@ -441,7 +442,7 @@ public class StashCreateCommandTest extends RepositoryTestCase {
 		assertEquals("content", read(committedFile));
 		validateStashedCommit(stashed);
 
-		ReflogReader reader = new ReflogReader(git.getRepository(),
+		ReflogReader reader = git.getRepository().getReflogReader(
 				Constants.R_STASH);
 		ReflogEntry entry = reader.getLastEntry();
 		assertNotNull(entry);

@@ -49,6 +49,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileLock;
 import java.text.MessageFormat;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.eclipse.jgit.internal.JGitText;
 
@@ -124,14 +126,27 @@ public class FileUtils {
 	 *             exception is not thrown when IGNORE_ERRORS is set.
 	 */
 	public static void delete(final File f, int options) throws IOException {
-		if ((options & SKIP_MISSING) != 0 && !f.exists())
+		FS fs = FS.DETECTED;
+		if ((options & SKIP_MISSING) != 0 && !fs.exists(f))
 			return;
 
-		if ((options & RECURSIVE) != 0 && f.isDirectory()) {
+		if ((options & RECURSIVE) != 0 && fs.isDirectory(f)) {
 			final File[] items = f.listFiles();
 			if (items != null) {
+				List<File> files = new ArrayList<File>();
+				List<File> dirs = new ArrayList<File>();
 				for (File c : items)
-					delete(c, options);
+					if (c.isFile())
+						files.add(c);
+					else
+						dirs.add(c);
+				// Try to delete files first, otherwise options
+				// EMPTY_DIRECTORIES_ONLY|RECURSIVE will delete empty
+				// directories before aborting, depending on order.
+				for (File file : files)
+					delete(file, options);
+				for (File d : dirs)
+					delete(d, options);
 			}
 		}
 
@@ -150,7 +165,7 @@ public class FileUtils {
 		}
 
 		if (delete && !f.delete()) {
-			if ((options & RETRY) != 0 && f.exists()) {
+			if ((options & RETRY) != 0 && fs.exists(f)) {
 				for (int i = 1; i < 10; i++) {
 					try {
 						Thread.sleep(100);
@@ -322,5 +337,29 @@ public class FileUtils {
 		if (!f.createNewFile())
 			throw new IOException(MessageFormat.format(
 					JGitText.get().createNewFileFailed, f));
+	}
+
+	/**
+	 * Create a symbolic link
+	 *
+	 * @param path
+	 * @param target
+	 * @throws IOException
+	 * @since 3.0
+	 */
+	public static void createSymLink(File path, String target)
+			throws IOException {
+		FS.DETECTED.createSymLink(path, target);
+	}
+
+	/**
+	 * @param path
+	 * @return the target of the symbolic link, or null if it is not a symbolic
+	 *         link
+	 * @throws IOException
+	 * @since 3.0
+	 */
+	public static String readSymLink(File path) throws IOException {
+		return FS.DETECTED.readSymLink(path);
 	}
 }

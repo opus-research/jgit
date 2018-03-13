@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2010, 2013 Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.util;
 
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.endsWith;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -119,6 +117,7 @@ public class FileUtilTest {
 	}
 
 	@Test
+
 	public void testDeleteRecursiveEmpty() throws IOException {
 		File f1 = new File(trash, "test/test/a");
 		File f2 = new File(trash, "test/a");
@@ -187,6 +186,35 @@ public class FileUtilTest {
 				| FileUtils.IGNORE_ERRORS);
 		FileUtils.delete(d2, FileUtils.EMPTY_DIRECTORIES_ONLY
 				| FileUtils.RECURSIVE | FileUtils.IGNORE_ERRORS);
+	}
+
+	@Test
+	public void testDeleteRecursiveEmptyNeedsToCheckFilesFirst()
+			throws IOException {
+		File d1 = new File(trash, "test");
+		File d2 = new File(trash, "test/a");
+		File d3 = new File(trash, "test/b");
+		File f1 = new File(trash, "test/c");
+		File d4 = new File(trash, "test/d");
+		FileUtils.mkdirs(d1);
+		FileUtils.mkdirs(d2);
+		FileUtils.mkdirs(d3);
+		FileUtils.mkdirs(d4);
+		FileUtils.createNewFile(f1);
+
+		// Cannot delete hierarchy since file exists
+		try {
+			FileUtils.delete(d1, FileUtils.EMPTY_DIRECTORIES_ONLY
+					| FileUtils.RECURSIVE);
+			fail("delete should fail");
+		} catch (IOException e) {
+			// Everything still there
+			assertTrue(f1.exists());
+			assertTrue(d1.exists());
+			assertTrue(d2.exists());
+			assertTrue(d3.exists());
+			assertTrue(d4.exists());
+		}
 	}
 
 	@Test
@@ -302,7 +330,7 @@ public class FileUtilTest {
 			FileUtils.delete(t, FileUtils.EMPTY_DIRECTORIES_ONLY | FileUtils.RECURSIVE);
 			fail("expected failure to delete f");
 		} catch (IOException e) {
-			assertThat(e.getMessage(), endsWith(f.getAbsolutePath()));
+			assertTrue(e.getMessage().endsWith(f.getAbsolutePath()));
 		}
 		assertTrue(t.exists());
 	}
@@ -389,5 +417,20 @@ public class FileUtilTest {
 		assertFalse(f1.exists());
 		assertTrue(f2.exists());
 		assertEquals("f1", JGitTestUtil.read(f2));
+	}
+
+	@Test
+	public void testCreateSymlink() throws IOException {
+		FS fs = FS.DETECTED;
+		try {
+			fs.createSymLink(new File(trash, "x"), "y");
+		} catch (IOException e) {
+			if (fs.supportsSymlinks())
+				fail("FS claims to support symlinks but attempt to create symlink failed");
+			return;
+		}
+		assertTrue(fs.supportsSymlinks());
+		String target = fs.readSymLink(new File(trash, "x"));
+		assertEquals("y", target);
 	}
 }

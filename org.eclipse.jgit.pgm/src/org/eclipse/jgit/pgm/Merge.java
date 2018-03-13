@@ -58,6 +58,7 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
+import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.kohsuke.args4j.Argument;
@@ -75,7 +76,7 @@ class Merge extends TextBuiltin {
 	@Option(name = "--no-commit", usage = "usage_noCommit")
 	private boolean noCommit = false;
 
-	private MergeStrategy mergeStrategy = MergeStrategy.RESOLVE;
+	private MergeStrategy mergeStrategy = MergeStrategy.RECURSIVE;
 
 	@Argument(required = true)
 	private String ref;

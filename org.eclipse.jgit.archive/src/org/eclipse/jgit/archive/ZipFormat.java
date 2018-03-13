@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2012 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,39 +40,53 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.archive;
 
-package org.eclipse.jgit.internal.storage.file;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
+import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream;
+import org.eclipse.jgit.api.ArchiveCommand;
+import org.eclipse.jgit.lib.FileMode;
+import org.eclipse.jgit.lib.ObjectLoader;
 
 /**
- * Parsed information about a checkout.
+ * PKWARE's ZIP format.
  */
-public class CheckoutEntry {
-	static final String CHECKOUT_MOVING_FROM = "checkout: moving from "; //$NON-NLS-1$
+public class ZipFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
+	private static final List<String> SUFFIXES =
+			Collections.unmodifiableList(Arrays.asList(".zip"));
 
-	private String from;
-
-	private String to;
-
-	CheckoutEntry(ReflogEntry reflogEntry) {
-		String comment = reflogEntry.getComment();
-		int p1 = CHECKOUT_MOVING_FROM.length();
-		int p2 = comment.indexOf(" to ", p1); //$NON-NLS-1$
-		int p3 = comment.length();
-		from = comment.substring(p1,p2);
-		to = comment.substring(p2 + " to ".length(), p3); //$NON-NLS-1$
+	public ArchiveOutputStream createArchiveOutputStream(OutputStream s) {
+		return new ZipArchiveOutputStream(s);
 	}
 
-	/**
-	 * @return the name of the branch before checkout
-	 */
-	public String getFromBranch() {
-		return from;
+	public void putEntry(ArchiveOutputStream out,
+			String path, FileMode mode, ObjectLoader loader)
+			throws IOException {
+		final ZipArchiveEntry entry = new ZipArchiveEntry(path);
+
+		if (mode == FileMode.REGULAR_FILE) {
+			// ok
+		} else if (mode == FileMode.EXECUTABLE_FILE
+				|| mode == FileMode.SYMLINK) {
+			entry.setUnixMode(mode.getBits());
+		} else {
+			// TODO(jrn): Let the caller know the tree contained
+			// an entry with unsupported mode (e.g., a submodule).
+		}
+		entry.setSize(loader.getSize());
+		out.putArchiveEntry(entry);
+		loader.copyTo(out);
+		out.closeArchiveEntry();
 	}
 
-	/**
-	 * @return the name of the branch after checkout
-	 */
-	public String getToBranch() {
-		return to;
+	public Iterable<String> suffixes() {
+		return SUFFIXES;
 	}
 }
