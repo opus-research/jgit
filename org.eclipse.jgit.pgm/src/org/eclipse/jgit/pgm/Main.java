@@ -57,10 +57,6 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jgit.awtui.AwtAuthenticator;
 import org.eclipse.jgit.awtui.AwtCredentialsProvider;
@@ -102,8 +98,6 @@ public class Main {
 
 	PrintWriter writer;
 
-	private ExecutorService gcExecutor;
-
 	/**
 	 *
 	 */
@@ -111,17 +105,6 @@ public class Main {
 		HttpTransport.setConnectionFactory(new HttpClientConnectionFactory());
 		CleanFilter.register();
 		SmudgeFilter.register();
-		gcExecutor = Executors.newSingleThreadExecutor(new ThreadFactory() {
-			private final ThreadFactory baseFactory = Executors
-					.defaultThreadFactory();
-
-			@Override
-			public Thread newThread(Runnable taskBody) {
-				Thread thr = baseFactory.newThread(taskBody);
-				thr.setName("JGit-autoGc"); //$NON-NLS-1$
-				return thr;
-			}
-		});
 	}
 
 	/**
@@ -209,8 +192,6 @@ public class Main {
 			// broken pipe
 			exit(1, null);
 		}
-		gcExecutor.shutdown();
-		gcExecutor.awaitTermination(10, TimeUnit.MINUTES);
 	}
 
 	PrintWriter createErrorWriter() {
