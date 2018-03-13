@@ -83,7 +83,7 @@ public class IgnoreNode {
 
 	/** Create an empty ignore node with no rules. */
 	public IgnoreNode() {
-		rules = new ArrayList<>();
+		rules = new ArrayList<FastIgnoreRule>();
 	}
 
 	/**

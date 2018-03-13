@@ -82,7 +82,6 @@ public class HMACSHA1NonceGenerator implements NonceGenerator {
 		}
 	}
 
-	@Override
 	public synchronized String createNonce(Repository repo, long timestamp)
 			throws IllegalStateException {
 		String path;

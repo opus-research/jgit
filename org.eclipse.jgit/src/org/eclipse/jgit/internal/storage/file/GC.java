@@ -79,7 +79,6 @@ import java.util.stream.Stream;
 
 import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.dircache.DirCacheIterator;
-import org.eclipse.jgit.errors.CancelledException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -94,8 +93,6 @@ import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdSet;
-import org.eclipse.jgit.lib.ObjectLoader;
-import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
@@ -222,41 +219,11 @@ public class GC {
 	}
 
 	/**
-	 * Loosen objects in a pack file which are not also in the newly-created
-	 * pack files.
-	 *
-	 * @param inserter
-	 * @param reader
-	 * @param pack
-	 * @param existing
-	 * @throws IOException
-	 */
-	private void loosen(ObjectDirectoryInserter inserter, ObjectReader reader, PackFile pack, HashSet<ObjectId> existing)
-			throws IOException {
-		for (PackIndex.MutableEntry entry : pack) {
-			ObjectId oid = entry.toObjectId();
-			if (existing.contains(oid)) {
-				continue;
-			}
-			existing.add(oid);
-			ObjectLoader loader = reader.open(oid);
-			inserter.insert(loader.getType(),
-					loader.getSize(),
-					loader.openStream(),
-					true /* create this object even though it's a duplicate */);
-		}
-	}
-
-	/**
 	 * Delete old pack files. What is 'old' is defined by specifying a set of
 	 * old pack files and a set of new pack files. Each pack file contained in
-	 * old pack files but not contained in new pack files will be deleted. If
-	 * preserveOldPacks is set, keep a copy of the pack file in the preserve
-	 * directory. If an expirationDate is set then pack files which are younger
-	 * than the expirationDate will not be deleted nor preserved.
-	 * <p>
-	 * If we're not immediately expiring loose objects, loosen any objects
-	 * in the old pack files which aren't in the new pack files.
+	 * old pack files but not contained in new pack files will be deleted. If an
+	 * expirationDate is set then pack files which are younger than the
+	 * expirationDate will not be deleted.
 	 *
 	 * @param oldPacks
 	 * @param newPacks
@@ -265,22 +232,8 @@ public class GC {
 	 */
 	private void deleteOldPacks(Collection<PackFile> oldPacks,
 			Collection<PackFile> newPacks) throws ParseException, IOException {
-		HashSet<ObjectId> ids = new HashSet<>();
-		for (PackFile pack : newPacks) {
-			for (PackIndex.MutableEntry entry : pack) {
-				ids.add(entry.toObjectId());
-			}
-		}
-		ObjectReader reader = repo.newObjectReader();
-		ObjectDirectory dir = repo.getObjectDatabase();
-		ObjectDirectoryInserter inserter = dir.newInserter();
-		boolean shouldLoosen = !"now".equals(getPruneExpireStr()) && //$NON-NLS-1$
-			getExpireDate() < Long.MAX_VALUE;
-
-		prunePreserved();
 		long packExpireDate = getPackExpireDate();
 		oldPackLoop: for (PackFile oldPack : oldPacks) {
-			checkCancelled();
 			String oldName = oldPack.getPackName();
 			// check whether an old pack file is also among the list of new
 			// pack files. Then we must not delete it.
@@ -292,54 +245,12 @@ public class GC {
 					&& repo.getFS().lastModified(
 							oldPack.getPackFile()) < packExpireDate) {
 				oldPack.close();
-				if (shouldLoosen) {
-					loosen(inserter, reader, oldPack, ids);
-				}
 				prunePack(oldName);
 			}
 		}
-
-		// close the complete object database. That's my only chance to force
+		// close the complete object database. Thats my only chance to force
 		// rescanning and to detect that certain pack files are now deleted.
 		repo.getObjectDatabase().close();
-	}
-
-	/**
-	 * Deletes old pack file, unless 'preserve-oldpacks' is set, in which case it
-	 * moves the pack file to the preserved directory
-	 *
-	 * @param packFile
-	 * @param packName
-	 * @param ext
-	 * @param deleteOptions
-	 * @throws IOException
-	 */
-	private void removeOldPack(File packFile, String packName, PackExt ext,
-			int deleteOptions) throws IOException {
-		if (pconfig != null && pconfig.isPreserveOldPacks()) {
-			File oldPackDir = repo.getObjectDatabase().getPreservedDirectory();
-			FileUtils.mkdir(oldPackDir, true);
-
-			String oldPackName = "pack-" + packName + ".old-" + ext.getExtension();  //$NON-NLS-1$ //$NON-NLS-2$
-			File oldPackFile = new File(oldPackDir, oldPackName);
-			FileUtils.rename(packFile, oldPackFile);
-		} else {
-			FileUtils.delete(packFile, deleteOptions);
-		}
-	}
-
-	/**
-	 * Delete the preserved directory including all pack files within
-	 */
-	private void prunePreserved() {
-		if (pconfig != null && pconfig.isPrunePreserved()) {
-			try {
-				FileUtils.delete(repo.getObjectDatabase().getPreservedDirectory(),
-						FileUtils.RECURSIVE | FileUtils.RETRY | FileUtils.SKIP_MISSING);
-			} catch (IOException e) {
-				// Deletion of the preserved pack files failed. Silently return.
-			}
-		}
 	}
 
 	/**
@@ -361,7 +272,7 @@ public class GC {
 			for (PackExt ext : extensions)
 				if (PackExt.PACK.equals(ext)) {
 					File f = nameFor(packName, "." + ext.getExtension()); //$NON-NLS-1$
-					removeOldPack(f, packName, ext, deleteOptions);
+					FileUtils.delete(f, deleteOptions);
 					break;
 				}
 			// The .pack file has been deleted. Delete as many as the other
@@ -370,7 +281,7 @@ public class GC {
 			for (PackExt ext : extensions) {
 				if (!PackExt.PACK.equals(ext)) {
 					File f = nameFor(packName, "." + ext.getExtension()); //$NON-NLS-1$
-					removeOldPack(f, packName, ext, deleteOptions);
+					FileUtils.delete(f, deleteOptions);
 				}
 			}
 		} catch (IOException e) {
@@ -395,7 +306,6 @@ public class GC {
 			pm.beginTask(JGitText.get().pruneLoosePackedObjects, fanout.length);
 			try {
 				for (String d : fanout) {
-					checkCancelled();
 					pm.update(1);
 					if (d.length() != 2)
 						continue;
@@ -403,7 +313,6 @@ public class GC {
 					if (entries == null)
 						continue;
 					for (String e : entries) {
-						checkCancelled();
 						if (e.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
 							continue;
 						ObjectId id;
@@ -415,13 +324,11 @@ public class GC {
 							continue;
 						}
 						boolean found = false;
-						for (PackFile p : packs) {
-							checkCancelled();
+						for (PackFile p : packs)
 							if (p.hasObject(id)) {
 								found = true;
 								break;
 							}
-						}
 						if (found)
 							FileUtils.delete(objdb.fileFor(id), FileUtils.RETRY
 									| FileUtils.SKIP_MISSING
@@ -453,7 +360,7 @@ public class GC {
 
 		// Collect all loose objects which are old enough, not referenced from
 		// the index and not in objectsToKeep
-		Map<ObjectId, File> deletionCandidates = new HashMap<>();
+		Map<ObjectId, File> deletionCandidates = new HashMap<ObjectId, File>();
 		Set<ObjectId> indexObjects = null;
 		File objects = repo.getObjectsDirectory();
 		String[] fanout = objects.list();
@@ -464,7 +371,6 @@ public class GC {
 				fanout.length);
 		try {
 			for (String d : fanout) {
-				checkCancelled();
 				pm.update(1);
 				if (d.length() != 2)
 					continue;
@@ -472,7 +378,6 @@ public class GC {
 				if (entries == null)
 					continue;
 				for (File f : entries) {
-					checkCancelled();
 					String fName = f.getName();
 					if (fName.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
 						continue;
@@ -501,8 +406,6 @@ public class GC {
 		if (deletionCandidates.isEmpty()) {
 			return;
 		}
-
-		checkCancelled();
 
 		// From the set of current refs remove all those which have been handled
 		// during last repack(). Only those refs will survive which have been
@@ -533,14 +436,11 @@ public class GC {
 			// leave this method.
 			ObjectWalk w = new ObjectWalk(repo);
 			try {
-				for (Ref cr : newRefs) {
-					checkCancelled();
+				for (Ref cr : newRefs)
 					w.markStart(w.parseAny(cr.getObjectId()));
-				}
 				if (lastPackedRefs != null)
-					for (Ref lpr : lastPackedRefs) {
+					for (Ref lpr : lastPackedRefs)
 						w.markUninteresting(w.parseAny(lpr.getObjectId()));
-					}
 				removeReferenced(deletionCandidates, w);
 			} finally {
 				w.dispose();
@@ -558,15 +458,11 @@ public class GC {
 		ObjectWalk w = new ObjectWalk(repo);
 		try {
 			for (Ref ar : getAllRefs())
-				for (ObjectId id : listRefLogObjects(ar, lastRepackTime)) {
-					checkCancelled();
+				for (ObjectId id : listRefLogObjects(ar, lastRepackTime))
 					w.markStart(w.parseAny(id));
-				}
 			if (lastPackedRefs != null)
-				for (Ref lpr : lastPackedRefs) {
-					checkCancelled();
+				for (Ref lpr : lastPackedRefs)
 					w.markUninteresting(w.parseAny(lpr.getObjectId()));
-				}
 			removeReferenced(deletionCandidates, w);
 		} finally {
 			w.dispose();
@@ -574,8 +470,6 @@ public class GC {
 
 		if (deletionCandidates.isEmpty())
 			return;
-
-		checkCancelled();
 
 		// delete all candidates which have survived: these are unreferenced
 		// loose objects. Make a last check, though, to avoid deleting objects
@@ -601,7 +495,9 @@ public class GC {
 		long expireDate = Long.MAX_VALUE;
 
 		if (expire == null && expireAgeMillis == -1) {
-			String pruneExpireStr = getPruneExpireStr();
+			String pruneExpireStr = repo.getConfig().getString(
+					ConfigConstants.CONFIG_GC_SECTION, null,
+					ConfigConstants.CONFIG_KEY_PRUNEEXPIRE);
 			if (pruneExpireStr == null)
 				pruneExpireStr = PRUNE_EXPIRE_DEFAULT;
 			expire = GitDateParser.parse(pruneExpireStr, null, SystemReader
@@ -613,12 +509,6 @@ public class GC {
 		if (expireAgeMillis != -1)
 			expireDate = System.currentTimeMillis() - expireAgeMillis;
 		return expireDate;
-	}
-
-	private String getPruneExpireStr() {
-		return repo.getConfig().getString(
-                        ConfigConstants.CONFIG_GC_SECTION, null,
-                        ConfigConstants.CONFIG_KEY_PRUNEEXPIRE);
 	}
 
 	private long getPackExpireDate() throws ParseException {
@@ -656,7 +546,6 @@ public class GC {
 			IncorrectObjectTypeException, IOException {
 		RevObject ro = w.next();
 		while (ro != null) {
-			checkCancelled();
 			if (id2File.remove(ro.getId()) != null)
 				if (id2File.isEmpty())
 					return;
@@ -664,7 +553,6 @@ public class GC {
 		}
 		ro = w.nextObject();
 		while (ro != null) {
-			checkCancelled();
 			if (id2File.remove(ro.getId()) != null)
 				if (id2File.isEmpty())
 					return;
@@ -694,11 +582,10 @@ public class GC {
 	 */
 	public void packRefs() throws IOException {
 		Collection<Ref> refs = repo.getRefDatabase().getRefs(Constants.R_REFS).values();
-		List<String> refsToBePacked = new ArrayList<>(refs.size());
+		List<String> refsToBePacked = new ArrayList<String>(refs.size());
 		pm.beginTask(JGitText.get().packRefs, refs.size());
 		try {
 			for (Ref ref : refs) {
-				checkCancelled();
 				if (!ref.isSymbolic() && ref.getStorage().isLoose())
 					refsToBePacked.add(ref.getName());
 				pm.update(1);
@@ -729,19 +616,18 @@ public class GC {
 		long time = System.currentTimeMillis();
 		Collection<Ref> refsBefore = getAllRefs();
 
-		Set<ObjectId> allHeads = new HashSet<>();
-		Set<ObjectId> nonHeads = new HashSet<>();
-		Set<ObjectId> txnHeads = new HashSet<>();
-		Set<ObjectId> tagTargets = new HashSet<>();
+		Set<ObjectId> allHeads = new HashSet<ObjectId>();
+		Set<ObjectId> nonHeads = new HashSet<ObjectId>();
+		Set<ObjectId> txnHeads = new HashSet<ObjectId>();
+		Set<ObjectId> tagTargets = new HashSet<ObjectId>();
 		Set<ObjectId> indexObjects = listNonHEADIndexObjects();
 		RefDatabase refdb = repo.getRefDatabase();
 
 		for (Ref ref : refsBefore) {
-			checkCancelled();
 			nonHeads.addAll(listRefLogObjects(ref, 0));
 			if (ref.isSymbolic() || ref.getObjectId() == null)
 				continue;
-			if (isHead(ref) || isTag(ref))
+			if (ref.getName().startsWith(Constants.R_HEADS))
 				allHeads.add(ref.getObjectId());
 			else if (RefTreeNames.isRefTree(refdb, ref.getName()))
 				txnHeads.add(ref.getObjectId());
@@ -751,17 +637,15 @@ public class GC {
 				tagTargets.add(ref.getPeeledObjectId());
 		}
 
-		List<ObjectIdSet> excluded = new LinkedList<>();
-		for (final PackFile f : repo.getObjectDatabase().getPacks()) {
-			checkCancelled();
+		List<ObjectIdSet> excluded = new LinkedList<ObjectIdSet>();
+		for (final PackFile f : repo.getObjectDatabase().getPacks())
 			if (f.shouldBeKept())
 				excluded.add(f.getIndex());
-		}
 
 		tagTargets.addAll(allHeads);
 		nonHeads.addAll(indexObjects);
 
-		List<PackFile> ret = new ArrayList<>(2);
+		List<PackFile> ret = new ArrayList<PackFile>(2);
 		PackFile heads = null;
 		if (!allHeads.isEmpty()) {
 			heads = writePack(allHeads, Collections.<ObjectId> emptySet(),
@@ -795,14 +679,6 @@ public class GC {
 		lastPackedRefs = refsBefore;
 		lastRepackTime = time;
 		return ret;
-	}
-
-	private static boolean isHead(Ref ref) {
-		return ref.getName().startsWith(Constants.R_HEADS);
-	}
-
-	private static boolean isTag(Ref ref) {
-		return ref.getName().startsWith(Constants.R_TAGS);
 	}
 
 	/**
@@ -863,7 +739,7 @@ public class GC {
 				.getReverseEntries();
 		if (rlEntries == null || rlEntries.isEmpty())
 			return Collections.<ObjectId> emptySet();
-		Set<ObjectId> ret = new HashSet<>();
+		Set<ObjectId> ret = new HashSet<ObjectId>();
 		for (ReflogEntry e : rlEntries) {
 			if (e.getWho().getWhen().getTime() < minTime)
 				break;
@@ -897,7 +773,6 @@ public class GC {
 			all.addAll(refs);
 			// add additional refs which start with refs/
 			for (Ref r : addl) {
-				checkCancelled();
 				if (r.getName().startsWith(Constants.R_REFS)) {
 					all.add(r);
 				}
@@ -932,10 +807,9 @@ public class GC {
 
 			treeWalk.setFilter(TreeFilter.ANY_DIFF);
 			treeWalk.setRecursive(true);
-			Set<ObjectId> ret = new HashSet<>();
+			Set<ObjectId> ret = new HashSet<ObjectId>();
 
 			while (treeWalk.next()) {
-				checkCancelled();
 				ObjectId objectId = treeWalk.getObjectId(0);
 				switch (treeWalk.getRawMode(0) & FileMode.TYPE_MASK) {
 				case FileMode.TYPE_MISSING:
@@ -963,11 +837,9 @@ public class GC {
 	private PackFile writePack(@NonNull Set<? extends ObjectId> want,
 			@NonNull Set<? extends ObjectId> have, Set<ObjectId> tagTargets,
 			List<ObjectIdSet> excludeObjects) throws IOException {
-		checkCancelled();
 		File tmpPack = null;
-		Map<PackExt, File> tmpExts = new TreeMap<>(
+		Map<PackExt, File> tmpExts = new TreeMap<PackExt, File>(
 				new Comparator<PackExt>() {
-					@Override
 					public int compare(PackExt o1, PackExt o2) {
 						// INDEX entries must be returned last, so the pack
 						// scanner does pick up the new pack until all the
@@ -996,7 +868,6 @@ public class GC {
 			pw.preparePack(pm, want, have);
 			if (pw.getObjectCount() == 0)
 				return null;
-			checkCancelled();
 
 			// create temporary files
 			String id = pw.computeName().getName();
@@ -1113,12 +984,6 @@ public class GC {
 		return new File(packdir, "pack-" + name + ext); //$NON-NLS-1$
 	}
 
-	private void checkCancelled() throws CancelledException {
-		if (pm.isCancelled()) {
-			throw new CancelledException(JGitText.get().operationCanceled);
-		}
-	}
-
 	/**
 	 * A class holding statistical data for a FileRepository regarding how many
 	 * objects are stored as loose or packed objects
@@ -1166,7 +1031,6 @@ public class GC {
 		 */
 		public long numberOfBitmaps;
 
-		@Override
 		public String toString() {
 			final StringBuilder b = new StringBuilder();
 			b.append("numberOfPackedObjects=").append(numberOfPackedObjects); //$NON-NLS-1$
@@ -1271,6 +1135,7 @@ public class GC {
 	 * influence how packs are written and to implement something similar to
 	 * "git gc --aggressive"
 	 *
+	 * @since 3.6
 	 * @param pconfig
 	 *            the {@link PackConfig} used when writing packs
 	 */
@@ -1343,6 +1208,7 @@ public class GC {
 	 *
 	 * @param auto
 	 *            defines whether gc should do automatic housekeeping
+	 * @since 4.5
 	 */
 	public void setAuto(boolean auto) {
 		this.automatic = auto;
@@ -1400,12 +1266,10 @@ public class GC {
 		try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir,
 				new DirectoryStream.Filter<Path>() {
 
-					@Override
 					public boolean accept(Path file) throws IOException {
-						Path fileName = file.getFileName();
-						return Files.isRegularFile(file) && fileName != null
-								&& PATTERN_LOOSE_OBJECT
-										.matcher(fileName.toString()).matches();
+						return Files.isRegularFile(file) && PATTERN_LOOSE_OBJECT
+								.matcher(file.getFileName().toString())
+								.matches();
 					}
 				})) {
 			for (Iterator<Path> iter = stream.iterator(); iter.hasNext();

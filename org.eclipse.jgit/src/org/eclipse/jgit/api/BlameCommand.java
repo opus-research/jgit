@@ -188,7 +188,7 @@ public class BlameCommand extends GitCommand<BlameResult> {
 	public BlameCommand reverse(AnyObjectId start, Collection<ObjectId> end)
 			throws IOException {
 		startCommit = start.toObjectId();
-		reverseEndCommits = new ArrayList<>(end);
+		reverseEndCommits = new ArrayList<ObjectId>(end);
 		return this;
 	}
 
@@ -198,7 +198,6 @@ public class BlameCommand extends GitCommand<BlameResult> {
 	 *
 	 * @return list of lines
 	 */
-	@Override
 	public BlameResult call() throws GitAPIException {
 		checkCallable();
 		try (BlameGenerator gen = new BlameGenerator(repo, path)) {

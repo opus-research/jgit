@@ -65,7 +65,7 @@ import org.eclipse.jgit.errors.TranslationStringMissingException;
  */
 class GlobalBundleCache {
 	private static final Map<Locale, Map<Class, TranslationBundle>> cachedBundles
-		= new HashMap<>();
+		= new HashMap<Locale, Map<Class, TranslationBundle>>();
 
 	/**
 	 * Looks up for a translation bundle in the global cache. If found returns
@@ -87,7 +87,7 @@ class GlobalBundleCache {
 		try {
 			Map<Class, TranslationBundle> bundles = cachedBundles.get(locale);
 			if (bundles == null) {
-				bundles = new HashMap<>();
+				bundles = new HashMap<Class, TranslationBundle>();
 				cachedBundles.put(locale, bundles);
 			}
 			TranslationBundle bundle = bundles.get(type);
