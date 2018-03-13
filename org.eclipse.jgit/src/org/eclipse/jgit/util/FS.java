@@ -45,7 +45,6 @@ package org.eclipse.jgit.util;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -53,6 +52,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.nio.charset.Charset;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
@@ -875,95 +875,52 @@ public abstract class FS {
 	 * Runs the given process until termination, clearing its stdout and stderr
 	 * streams on-the-fly.
 	 *
-	 * @param processBuilder
-	 *            The process builder configured for this process.
+	 * @param hookProcessBuilder
+	 *            The process builder configured for this hook.
 	 * @param outRedirect
-	 *            A OutputStream on which to redirect the processes stdout. Can
-	 *            be <code>null</code>, in which case the processes standard
-	 *            output will be lost.
+	 *            A print stream on which to redirect the hook's stdout. Can be
+	 *            <code>null</code>, in which case the hook's standard output
+	 *            will be lost.
 	 * @param errRedirect
-	 *            A OutputStream on which to redirect the processes stderr. Can
-	 *            be <code>null</code>, in which case the processes standard
-	 *            error will be lost.
+	 *            A print stream on which to redirect the hook's stderr. Can be
+	 *            <code>null</code>, in which case the hook's standard error
+	 *            will be lost.
 	 * @param stdinArgs
 	 *            A string to pass on to the standard input of the hook. Can be
 	 *            <code>null</code>.
-	 * @return the exit value of this process.
+	 * @return the exit value of this hook.
 	 * @throws IOException
-	 *             if an I/O error occurs while executing this process.
+	 *             if an I/O error occurs while executing this hook.
 	 * @throws InterruptedException
 	 *             if the current thread is interrupted while waiting for the
 	 *             process to end.
-	 * @since 4.1
+	 * @since 3.7
 	 */
-	public int runProcess(ProcessBuilder processBuilder,
+	protected int runProcess(ProcessBuilder hookProcessBuilder,
 			OutputStream outRedirect, OutputStream errRedirect, String stdinArgs)
 			throws IOException, InterruptedException {
-		InputStream in = (stdinArgs == null) ? null : new ByteArrayInputStream(
-				stdinArgs.getBytes(Constants.CHARACTER_ENCODING));
-		return runProcess(processBuilder, outRedirect, errRedirect, in,
-				false);
-	}
-
-	/**
-	 * Runs the given process until termination, clearing its stdout and stderr
-	 * streams on-the-fly.
-	 *
-	 * @param processBuilder
-	 *            The process builder configured for this process.
-	 * @param outRedirect
-	 *            An OutputStream on which to redirect the processes stdout. Can
-	 *            be <code>null</code>, in which case the processes standard
-	 *            output will be lost. If binary is set to <code>false</code>
-	 *            then it is expected that the process emits text data which
-	 *            should be processed line by line.
-	 * @param errRedirect
-	 *            An OutputStream on which to redirect the processes stderr. Can
-	 *            be <code>null</code>, in which case the processes standard
-	 *            error will be lost.
-	 * @param inRedirect
-	 *            An InputStream from which to redirect the processes stdin. Can
-	 *            be <code>null</code>, in which case the process doesn't get
-	 *            any data over stdin. If binary is set to
-	 *            <code>false</code> then it is expected that the process
-	 *            expects text data which should be processed line by line.
-	 * @param binary
-	 *            Determines whether the process is expecting/emitting binary
-	 *            data over stdin/stdout. Non binary data will be copied
-	 *            line-by-line to and from the processes stdin/stdout. Binary
-	 *            data will be copied in chunks of 4K. Copying binary data with
-	 *            binary set to <code>false</code> can lead to data corruption.
-	 * @return the return code of this process.
-	 * @throws IOException
-	 *             if an I/O error occurs while executing this process.
-	 * @throws InterruptedException
-	 *             if the current thread is interrupted while waiting for the
-	 *             process to end.
-	 * @since 4.1
-	 */
-	public int runProcess(ProcessBuilder processBuilder,
-			OutputStream outRedirect, OutputStream errRedirect,
-			InputStream inRedirect, boolean binary) throws IOException,
-			InterruptedException {
 		final ExecutorService executor = Executors.newFixedThreadPool(2);
 		Process process = null;
 		// We'll record the first I/O exception that occurs, but keep on trying
 		// to dispose of our open streams and file handles
 		IOException ioException = null;
 		try {
-			process = processBuilder.start();
+			process = hookProcessBuilder.start();
 			final Callable<Void> errorGobbler = new StreamGobbler(
-					process.getErrorStream(), errRedirect, binary);
+					process.getErrorStream(), errRedirect);
 			final Callable<Void> outputGobbler = new StreamGobbler(
-					process.getInputStream(), outRedirect, binary);
+					process.getInputStream(), outRedirect);
 			executor.submit(errorGobbler);
 			executor.submit(outputGobbler);
-			OutputStream outputStream = process.getOutputStream();
-			if (inRedirect != null) {
-				new StreamGobbler(inRedirect, outputStream, binary)
-						.call();
+			if (stdinArgs != null) {
+				final PrintWriter stdinWriter = new PrintWriter(
+						process.getOutputStream());
+				stdinWriter.print(stdinArgs);
+				stdinWriter.flush();
+				// We are done with this hook's input. Explicitly close its
+				// stdin now to kick off any blocking read the hook might have.
+				stdinWriter.close();
 			}
-			outputStream.close();
 			return process.waitFor();
 		} catch (IOException e) {
 			ioException = e;
@@ -1241,64 +1198,36 @@ public abstract class FS {
 	 * </p>
 	 */
 	private static class StreamGobbler implements Callable<Void> {
-		private BufferedReader reader;
-		private InputStream in;
+		private final BufferedReader reader;
 
-		private BufferedWriter writer;
-		private OutputStream out;
+		private final BufferedWriter writer;
 
-		private boolean binary = false;
-
-		public StreamGobbler(InputStream stream, OutputStream output, boolean binary) {
-			this.binary = binary;
-			if (!binary) {
-				this.reader = new BufferedReader(new InputStreamReader(stream));
-				if (output != null)
-					this.writer = new BufferedWriter(new OutputStreamWriter(
-							output));
-			} else {
-				this.in = stream;
-				this.out = output;
-			}
+		public StreamGobbler(InputStream stream, OutputStream output) {
+			this.reader = new BufferedReader(new InputStreamReader(stream));
+			if (output == null)
+				this.writer = null;
+			else
+				this.writer = new BufferedWriter(new OutputStreamWriter(output));
 		}
 
 		public Void call() throws IOException {
 			boolean writeFailure = false;
-			if (binary) {
-				byte buffer[] = new byte[4096];
-				int readBytes;
-				while ((readBytes = in.read(buffer)) != -1) {
-					// Do not try to write again after a failure, but keep
-					// reading as long as possible to prevent the input stream
-					// from choking.
-					if (!writeFailure && out != null) {
-						try {
-							out.write(buffer, 0, readBytes);
-							out.flush();
-						} catch (IOException e) {
-							writeFailure = true;
-						}
+
+			String line = null;
+			while ((line = reader.readLine()) != null) {
+				// Do not try to write again after a failure, but keep reading
+				// as long as possible to prevent the input stream from choking.
+				if (!writeFailure && writer != null) {
+					try {
+						writer.write(line);
+						writer.newLine();
+						writer.flush();
+					} catch (IOException e) {
+						writeFailure = true;
 					}
 				}
-				return null;
-			} else {
-				String line = null;
-				while ((line = reader.readLine()) != null) {
-					// Do not try to write again after a failure, but keep
-					// reading as long as possible to prevent the input stream
-					// from choking.
-					if (!writeFailure && writer != null) {
-						try {
-							writer.write(line);
-							writer.newLine();
-							writer.flush();
-						} catch (IOException e) {
-							writeFailure = true;
-						}
-					}
-				}
-				return null;
 			}
+			return null;
 		}
 	}
 }
