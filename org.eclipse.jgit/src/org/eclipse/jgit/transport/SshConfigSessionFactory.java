@@ -83,8 +83,7 @@ public abstract class SshConfigSessionFactory extends SshSessionFactory {
 
 	@Override
 	public synchronized Session getSession(String user, String pass,
-			String host, int port, CredentialsProvider credentialsProvider,
-			FS fs) throws JSchException {
+			String host, int port, FS fs) throws JSchException {
 		if (config == null)
 			config = OpenSshConfig.get(fs);
 
@@ -106,11 +105,6 @@ public abstract class SshConfigSessionFactory extends SshSessionFactory {
 		final String pauth = hc.getPreferredAuthentications();
 		if (pauth != null)
 			session.setConfig("PreferredAuthentications", pauth);
-		if (credentialsProvider != null
-				&& (!hc.isBatchMode() || !credentialsProvider.isInteractive())) {
-			session.setUserInfo(new CredentialsProviderUserInfo(session,
-					credentialsProvider));
-		}
 		configure(hc, session);
 		return session;
 	}
