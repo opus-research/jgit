@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2017 Ericsson
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,59 +41,79 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.internal.storage.file;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-public class FileUtils7Test {
+public class GcOrphanFilesTest extends GcTestCase {
+	private final static String PACK = "pack";
 
-	private final File trash = new File(new File("target"), "trash");
+	private final static String BITMAP_File_1 = PACK + "-1.bitmap";
+
+	private final static String IDX_File_2 = PACK + "-2.idx";
+
+	private final static String IDX_File_malformed = PACK + "-1234idx";
+
+	private final static String PACK_File_2 = PACK + "-2.pack";
+
+	private final static String PACK_File_3 = PACK + "-3.pack";
+
+	private File packDir;
 
 	@Before
 	public void setUp() throws Exception {
-		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY | FileUtils.SKIP_MISSING);
-		assertTrue(trash.mkdirs());
-	}
-
-	@After
-	public void tearDown() throws Exception {
-		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY);
+		super.setUp();
+		packDir = new File(repo.getObjectsDirectory(), PACK);
 	}
 
 	@Test
-	public void testDeleteSymlinkToDirectoryDoesNotDeleteTarget()
-			throws IOException {
-		org.junit.Assume.assumeTrue(FS.DETECTED.supportsSymlinks());
-		FS fs = FS.DETECTED;
-		File dir = new File(trash, "dir");
-		File file = new File(dir, "file");
-		File link = new File(trash, "link");
-		FileUtils.mkdirs(dir);
-		FileUtils.createNewFile(file);
-		fs.createSymLink(link, "dir");
-		FileUtils.delete(link, FileUtils.RECURSIVE);
-		assertFalse(link.exists());
-		assertTrue(dir.exists());
-		assertTrue(file.exists());
+	public void bitmapAndIdxDeletedButPackNot() throws Exception {
+		createFileInPackFolder(BITMAP_File_1);
+		createFileInPackFolder(IDX_File_2);
+		createFileInPackFolder(PACK_File_3);
+		gc.gc();
+		assertFalse(new File(packDir, BITMAP_File_1).exists());
+		assertFalse(new File(packDir, IDX_File_2).exists());
+		assertTrue(new File(packDir, PACK_File_3).exists());
 	}
 
 	@Test
-	public void testAtomicMove() throws IOException {
-		File src = new File(trash, "src");
-		Files.createFile(src.toPath());
-		File dst = new File(trash, "dst");
-		FileUtils.rename(src, dst, StandardCopyOption.ATOMIC_MOVE);
-		assertFalse(Files.exists(src.toPath()));
-		assertTrue(Files.exists(dst.toPath()));
+	public void bitmapDeletedButIdxAndPackNot() throws Exception {
+		createFileInPackFolder(BITMAP_File_1);
+		createFileInPackFolder(IDX_File_2);
+		createFileInPackFolder(PACK_File_2);
+		createFileInPackFolder(PACK_File_3);
+		gc.gc();
+		assertFalse(new File(packDir, BITMAP_File_1).exists());
+		assertTrue(new File(packDir, IDX_File_2).exists());
+		assertTrue(new File(packDir, PACK_File_2).exists());
+		assertTrue(new File(packDir, PACK_File_3).exists());
+	}
+
+	@Test
+	public void malformedIdxNotDeleted() throws Exception {
+		createFileInPackFolder(IDX_File_malformed);
+		gc.gc();
+		assertTrue(new File(packDir, IDX_File_malformed).exists());
+	}
+
+	private void createFileInPackFolder(String fileName) throws IOException {
+		if (!packDir.exists() || !packDir.isDirectory()) {
+			assertTrue(packDir.mkdirs());
+		}
+		assertTrue(new File(packDir, fileName).createNewFile());
+	}
+
+	@Test
+	public void noSuchPackFolder() throws Exception {
+		assertTrue(packDir.delete());
+		gc.gc();
 	}
 }

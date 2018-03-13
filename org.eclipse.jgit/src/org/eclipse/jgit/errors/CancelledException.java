@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2017 Ericsson
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,25 +40,23 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.transport;
 
-import org.eclipse.jgit.errors.TransportException;
+package org.eclipse.jgit.errors;
+
+import java.io.IOException;
 
 /**
- * Thrown on attempt to redirect a http transport request and git configuration
- * didn't allow redirect
+ * Thrown when an operation was canceled
  *
  * @since 4.7
  */
-public class RedirectForbiddenException extends TransportException {
-
+public class CancelledException extends IOException {
 	private static final long serialVersionUID = 1L;
 
 	/**
 	 * @param message
-	 *            error message
 	 */
-	public RedirectForbiddenException(String message) {
+	public CancelledException(String message) {
 		super(message);
 	}
 }
