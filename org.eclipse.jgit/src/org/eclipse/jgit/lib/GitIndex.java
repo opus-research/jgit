@@ -740,14 +740,6 @@ public class GitIndex {
 		public int getModeBits() {
 			return mode;
 		}
-
-		/**
-		 * Return the index modification time of this entry.
-		 * @return index modification time
-		 */
-		public long getMtime() {
-			return mtime;
-		}
 	}
 
 	static class Header {
