@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015,Matthias Sohn <matthias.sohn@sap.com> and
+ * Copyright (C) 2015, Christian Halstrick <christian.halstrick@sap.com> and
  * other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available under the
@@ -38,17 +38,28 @@
 package org.eclipse.jgit.api.errors;
 
 /**
- * Thrown when a ref is not found in advertised refs
+ * Exception thrown when the server rejected a too large pack
  *
  * @since 4.0
  */
-public class RefNotAdvertisedException extends GitAPIException {
+public class TooLargePackException extends TransportException {
 	private static final long serialVersionUID = 1L;
 
 	/**
-	 * @param message
+	 * @param msg
+	 *            message describing the transport failure.
 	 */
-	public RefNotAdvertisedException(String message) {
-		super(message);
+	public TooLargePackException(String msg) {
+		super(msg);
+	}
+
+	/**
+	 * @param msg
+	 *            message describing the transport exception.
+	 * @param cause
+	 *            why the transport failed.
+	 */
+	public TooLargePackException(String msg, Throwable cause) {
+		super(msg, cause);
 	}
 }
