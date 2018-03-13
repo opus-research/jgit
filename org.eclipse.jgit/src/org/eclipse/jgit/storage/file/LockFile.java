@@ -44,6 +44,7 @@
 
 package org.eclipse.jgit.storage.file;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -51,9 +52,8 @@ import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
-import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
 import java.text.MessageFormat;
 
 import org.eclipse.jgit.JGitText;
@@ -85,13 +85,13 @@ public class LockFile {
 
 	private final File lck;
 
+	private FileLock fLck;
+
 	private boolean haveLck;
 
 	private FileOutputStream os;
 
 	private boolean needStatInformation;
-
-	private boolean fsync;
 
 	private long commitLastModified;
 
@@ -127,6 +127,23 @@ public class LockFile {
 			haveLck = true;
 			try {
 				os = new FileOutputStream(lck);
+				try {
+					fLck = os.getChannel().tryLock();
+					if (fLck == null)
+						throw new OverlappingFileLockException();
+				} catch (OverlappingFileLockException ofle) {
+					// We cannot use unlock() here as this file is not
+					// held by us, but we thought we created it. We must
+					// not delete it, as it belongs to some other process.
+					//
+					haveLck = false;
+					try {
+						os.close();
+					} catch (IOException ioe) {
+						// Fail by returning haveLck = false.
+					}
+					os = null;
+				}
 			} catch (IOException ioe) {
 				unlock();
 				throw ioe;
@@ -175,21 +192,10 @@ public class LockFile {
 		try {
 			final FileInputStream fis = new FileInputStream(ref);
 			try {
-				if (fsync) {
-					FileChannel in = fis.getChannel();
-					long pos = 0;
-					long cnt = in.size();
-					while (0 < cnt) {
-						long r = os.getChannel().transferFrom(in, pos, cnt);
-						pos += r;
-						cnt -= r;
-					}
-				} else {
-					final byte[] buf = new byte[2048];
-					int r;
-					while ((r = fis.read(buf)) >= 0)
-						os.write(buf, 0, r);
-				}
+				final byte[] buf = new byte[2048];
+				int r;
+				while ((r = fis.read(buf)) >= 0)
+					os.write(buf, 0, r);
 			} finally {
 				fis.close();
 			}
@@ -223,10 +229,26 @@ public class LockFile {
 	 *             before throwing the underlying exception to the caller.
 	 */
 	public void write(final ObjectId id) throws IOException {
-		byte[] buf = new byte[Constants.OBJECT_ID_STRING_LENGTH + 1];
-		id.copyTo(buf, 0);
-		buf[Constants.OBJECT_ID_STRING_LENGTH] = '\n';
-		write(buf);
+		requireLock();
+		try {
+			final BufferedOutputStream b;
+			b = new BufferedOutputStream(os, Constants.OBJECT_ID_STRING_LENGTH + 1);
+			id.copyTo(b);
+			b.write('\n');
+			b.flush();
+			fLck.release();
+			b.close();
+			os = null;
+		} catch (IOException ioe) {
+			unlock();
+			throw ioe;
+		} catch (RuntimeException ioe) {
+			unlock();
+			throw ioe;
+		} catch (Error ioe) {
+			unlock();
+			throw ioe;
+		}
 	}
 
 	/**
@@ -246,15 +268,9 @@ public class LockFile {
 	public void write(final byte[] content) throws IOException {
 		requireLock();
 		try {
-			if (fsync) {
-				FileChannel fc = os.getChannel();
-				ByteBuffer buf = ByteBuffer.wrap(content);
-				while (0 < buf.remaining())
-					fc.write(buf);
-				fc.force(true);
-			} else {
-				os.write(content);
-			}
+			os.write(content);
+			os.flush();
+			fLck.release();
 			os.close();
 			os = null;
 		} catch (IOException ioe) {
@@ -280,36 +296,34 @@ public class LockFile {
 	 */
 	public OutputStream getOutputStream() {
 		requireLock();
-
-		final OutputStream out;
-		if (fsync)
-			out = Channels.newOutputStream(os.getChannel());
-		else
-			out = os;
-
 		return new OutputStream() {
 			@Override
 			public void write(final byte[] b, final int o, final int n)
 					throws IOException {
-				out.write(b, o, n);
+				os.write(b, o, n);
 			}
 
 			@Override
 			public void write(final byte[] b) throws IOException {
-				out.write(b);
+				os.write(b);
 			}
 
 			@Override
 			public void write(final int b) throws IOException {
-				out.write(b);
+				os.write(b);
+			}
+
+			@Override
+			public void flush() throws IOException {
+				os.flush();
 			}
 
 			@Override
 			public void close() throws IOException {
 				try {
-					if (fsync)
-						os.getChannel().force(true);
-					out.close();
+					os.flush();
+					fLck.release();
+					os.close();
 					os = null;
 				} catch (IOException ioe) {
 					unlock();
@@ -340,16 +354,6 @@ public class LockFile {
 	 */
 	public void setNeedStatInformation(final boolean on) {
 		needStatInformation = on;
-	}
-
-	/**
-	 * Request that {@link #commit()} force dirty data to the drive.
-	 *
-	 * @param on
-	 *            true if dirty data should be forced to the drive.
-	 */
-	public void setFSync(final boolean on) {
-		fsync = on;
 	}
 
 	/**
@@ -443,6 +447,14 @@ public class LockFile {
 	 */
 	public void unlock() {
 		if (os != null) {
+			if (fLck != null) {
+				try {
+					fLck.release();
+				} catch (IOException ioe) {
+					// Huh?
+				}
+				fLck = null;
+			}
 			try {
 				os.close();
 			} catch (IOException ioe) {

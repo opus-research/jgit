@@ -144,8 +144,8 @@ public class DirCacheCheckout {
 	}
 
 	/**
-	 * Constructs a DirCacheCeckout for merging and checking out two trees (HEAD
-	 * and mergeCommitTree) and the index.
+	 * Constructs a DirCacheCeckout for fast-forwarding from one tree to
+	 * another, merging it with the index
 	 *
 	 * @param repo
 	 *            the repository in which we do the checkout
@@ -170,9 +170,9 @@ public class DirCacheCheckout {
 	}
 
 	/**
-	 * Constructs a DirCacheCeckout for merging and checking out two trees (HEAD
-	 * and mergeCommitTree) and the index. As iterator over the working tree
-	 * this constructor creates a standard {@link FileTreeIterator}
+	 * Constructs a DirCacheCeckout for checking out one tree, merging with the
+	 * index. As iterator over the working tree this constructor creates a
+	 * standard {@link FileTreeIterator}
 	 *
 	 * @param repo
 	 *            the repository in which we do the checkout
@@ -184,49 +184,9 @@ public class DirCacheCheckout {
 	 *            the id of the tree of the
 	 * @throws IOException
 	 */
-	public DirCacheCheckout(Repository repo, ObjectId headCommitTree,
-			DirCache dc, ObjectId mergeCommitTree) throws IOException {
-		this(repo, headCommitTree, dc, mergeCommitTree, new FileTreeIterator(
-				repo.getWorkTree(), repo.getFS(),
-				WorkingTreeOptions.createDefaultInstance()));
-	}
-
-	/**
-	 * Constructs a DirCacheCeckout for checking out one tree, merging with the
-	 * index.
-	 *
-	 * @param repo
-	 *            the repository in which we do the checkout
-	 * @param dc
-	 *            the (already locked) Dircache for this repo
-	 * @param mergeCommitTree
-	 *            the id of the tree we want to fast-forward to
-	 * @param workingTree
-	 *            an iterator over the repositories Working Tree
-	 * @throws IOException
-	 */
-	public DirCacheCheckout(Repository repo, DirCache dc,
-			ObjectId mergeCommitTree, WorkingTreeIterator workingTree)
-			throws IOException {
-		this(repo, null, dc, mergeCommitTree, workingTree);
-	}
-
-	/**
-	 * Constructs a DirCacheCeckout for checking out one tree, merging with the
-	 * index. As iterator over the working tree this constructor creates a
-	 * standard {@link FileTreeIterator}
-	 *
-	 * @param repo
-	 *            the repository in which we do the checkout
-	 * @param dc
-	 *            the (already locked) Dircache for this repo
-	 * @param mergeCommitTree
-	 *            the id of the tree of the
-	 * @throws IOException
-	 */
-	public DirCacheCheckout(Repository repo, DirCache dc,
+	public DirCacheCheckout(Repository repo, ObjectId headCommitTree, DirCache dc,
 			ObjectId mergeCommitTree) throws IOException {
-		this(repo, null, dc, mergeCommitTree, new FileTreeIterator(
+		this(repo, headCommitTree, dc, mergeCommitTree, new FileTreeIterator(
 				repo.getWorkTree(), repo.getFS(),
 				WorkingTreeOptions.createDefaultInstance()));
 	}
@@ -314,9 +274,8 @@ public class DirCacheCheckout {
 			WorkingTreeIterator f) {
 		if (m != null) {
 			if (i == null || f == null || !m.idEqual(i)
-					|| (i.getDirCacheEntry() != null && (f.isModified(
-							i.getDirCacheEntry(), true, config_filemode(),
-							repo.getFS()) || i.getDirCacheEntry().getStage() != 0))) {
+					|| f.isModified(i.getDirCacheEntry(), true,
+							config_filemode(), repo.getFS())) {
 				update(m.getEntryPathString(), m.getEntryObjectId(),
 						m.getEntryFileMode());
 			} else
@@ -334,7 +293,7 @@ public class DirCacheCheckout {
 						conflicts.remove(i.getEntryPathString());
 					}
 				}
-			} else if (i.getDirCacheEntry().getStage() == 0)
+			} else
 				keep(i.getDirCacheEntry());
 		}
 	}
@@ -372,14 +331,10 @@ public class DirCacheCheckout {
 
 		File file=null;
 		String last = "";
-		// when deleting files process them in the opposite order as they have
-		// been reported. This ensures the files are deleted before we delete
-		// their parent folders
-		for (int i = removed.size() - 1; i >= 0; i--) {
-			String r = removed.get(i);
+		for (String r : removed) {
 			file = new File(repo.getWorkTree(), r);
-			if (!file.delete() && file.exists())
-					toBeDeleted.add(r);
+			if (!file.delete())
+				toBeDeleted.add(r);
 			else {
 				if (!isSamePrefix(r, last))
 					removeEmptyParents(file);
@@ -451,7 +406,7 @@ public class DirCacheCheckout {
 			// File/Directory conflict case #20
 			if (walk.isDirectoryFileConflict())
 				// TODO: check whether it is always correct to report a conflict here
-				conflict(name, null, null, null);
+				conflict(name, null, h, m);
 
 			// file only exists in working tree -> ignore it
 			return;

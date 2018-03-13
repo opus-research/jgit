@@ -84,9 +84,7 @@ import org.eclipse.jgit.treewalk.TreeWalk;
  */
 public abstract class TreeFilter {
 	/** Selects all tree entries. */
-	public static final TreeFilter ALL = new AllFilter();
-
-	private static final class AllFilter extends TreeFilter {
+	public static final TreeFilter ALL = new TreeFilter() {
 		@Override
 		public boolean include(final TreeWalk walker) {
 			return true;
@@ -106,7 +104,7 @@ public abstract class TreeFilter {
 		public String toString() {
 			return "ALL";
 		}
-	}
+	};
 
 	/**
 	 * Selects only tree entries which differ between at least 2 trees.
@@ -121,9 +119,7 @@ public abstract class TreeFilter {
 	 * against the single tree it was actually given. Applications may wish to
 	 * treat such a difference as "all names added".
 	 */
-	public static final TreeFilter ANY_DIFF = new AnyDiffFilter();
-
-	private static final class AnyDiffFilter extends TreeFilter {
+	public static final TreeFilter ANY_DIFF = new TreeFilter() {
 		private static final int baseTree = 0;
 
 		@Override
@@ -153,7 +149,7 @@ public abstract class TreeFilter {
 		public String toString() {
 			return "ANY_DIFF";
 		}
-	}
+	};
 
 	/**
 	 * Create a new filter that does the opposite of this filter.
