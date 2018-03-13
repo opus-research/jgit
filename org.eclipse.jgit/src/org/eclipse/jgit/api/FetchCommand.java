@@ -106,14 +106,15 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 		refSpecs = new ArrayList<>(3);
 	}
 
-	private FetchRecurseSubmodulesMode getRecurseMode(String path) {
+	private FetchRecurseSubmodulesMode getRecurseMode(Repository repository,
+			String path) {
 		// Use the caller-specified mode, if set
 		if (submoduleRecurseMode != null) {
 			return submoduleRecurseMode;
 		}
 
-		// Fall back to submodule.name.fetchRecurseSubmodules, if set
-		FetchRecurseSubmodulesMode mode = repo.getConfig().getEnum(
+		// Fall back to submodule config, if set
+		FetchRecurseSubmodulesMode mode = repository.getConfig().getEnum(
 				FetchRecurseSubmodulesMode.values(),
 				ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
 				ConfigConstants.CONFIG_KEY_FETCH_RECURSE_SUBMODULES, null);
@@ -121,16 +122,13 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 			return mode;
 		}
 
-		// Fall back to fetch.recurseSubmodules, if set
-		mode = repo.getConfig().getEnum(FetchRecurseSubmodulesMode.values(),
-				ConfigConstants.CONFIG_FETCH_SECTION, null,
-				ConfigConstants.CONFIG_KEY_RECURSE_SUBMODULES, null);
-		if (mode != null) {
-			return mode;
-		}
-
 		// Default to on-demand mode
 		return FetchRecurseSubmodulesMode.ON_DEMAND;
+	}
+
+	private boolean isRecurseSubmodules() {
+		return submoduleRecurseMode != null
+				&& submoduleRecurseMode != FetchRecurseSubmodulesMode.NO;
 	}
 
 	private void fetchSubmodules(FetchResult results)
@@ -152,7 +150,7 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 				}
 
 				FetchRecurseSubmodulesMode recurseMode = getRecurseMode(
-						walk.getPath());
+						submoduleRepo, walk.getPath());
 
 				// When the fetch mode is "yes" we always fetch. When the mode
 				// is "on demand", we only fetch if the submodule's revision was
@@ -206,7 +204,8 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 			configure(transport);
 
 			FetchResult result = transport.fetch(monitor, refSpecs);
-			if (!repo.isBare()) {
+			if (!repo.isBare() && (!result.getTrackingRefUpdates().isEmpty()
+					|| isRecurseSubmodules())) {
 				fetchSubmodules(result);
 			}
 
