@@ -47,7 +47,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Collection;
 
 import org.eclipse.jgit.lib.Constants;
@@ -89,6 +88,8 @@ public class LsRemoteCommandTest extends RepositoryTestCase {
 					+ git.getRepository().getWorkTree().getPath());
 			command.setCloneAllBranches(true);
 			Git git2 = command.call();
+			addRepoToClose(git2.getRepository());
+
 
 			LsRemoteCommand lsRemoteCommand = git2.lsRemote();
 			Collection<Ref> refs = lsRemoteCommand.call();
@@ -109,6 +110,7 @@ public class LsRemoteCommandTest extends RepositoryTestCase {
 					+ git.getRepository().getWorkTree().getPath());
 			command.setCloneAllBranches(true);
 			Git git2 = command.call();
+			addRepoToClose(git2.getRepository());
 
 			LsRemoteCommand lsRemoteCommand = git2.lsRemote();
 			lsRemoteCommand.setTags(true);
@@ -130,6 +132,7 @@ public class LsRemoteCommandTest extends RepositoryTestCase {
 					+ git.getRepository().getWorkTree().getPath());
 			command.setCloneAllBranches(true);
 			Git git2 = command.call();
+			addRepoToClose(git2.getRepository());
 
 			LsRemoteCommand lsRemoteCommand = git2.lsRemote();
 			lsRemoteCommand.setHeads(true);
@@ -139,22 +142,6 @@ public class LsRemoteCommandTest extends RepositoryTestCase {
 		} catch (Exception e) {
 			fail(e.getMessage());
 		}
-	}
-
-	public static File createTempDirectory(String name) throws IOException {
-		final File temp;
-		temp = File.createTempFile(name, Long.toString(System.nanoTime()));
-
-		if (!(temp.delete())) {
-			throw new IOException("Could not delete temp file: "
-					+ temp.getAbsolutePath());
-		}
-
-		if (!(temp.mkdir())) {
-			throw new IOException("Could not create temp directory: "
-					+ temp.getAbsolutePath());
-		}
-		return temp;
 	}
 
 }

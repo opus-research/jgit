@@ -45,11 +45,13 @@ package org.eclipse.jgit.api;
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.Callable;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.dircache.DirCache;
@@ -98,6 +100,8 @@ public class CloneCommand implements Callable<Git> {
 
 	private boolean cloneAllBranches;
 
+	private boolean noCheckout;
+
 	private Collection<String> branchesToClone;
 
 	/**
@@ -112,7 +116,8 @@ public class CloneCommand implements Callable<Git> {
 			URIish u = new URIish(uri);
 			Repository repository = init(u);
 			FetchResult result = fetch(repository, u);
-			checkout(repository, result);
+			if (!noCheckout)
+				checkout(repository, result);
 			return new Git(repository);
 		} catch (IOException ioe) {
 			throw new JGitInternalException(ioe.getMessage(), ioe);
@@ -128,6 +133,9 @@ public class CloneCommand implements Callable<Git> {
 		command.setBare(bare);
 		if (directory == null)
 			directory = new File(u.getHumanishName(), Constants.DOT_GIT);
+		if (directory.exists() && directory.listFiles().length != 0)
+			throw new JGitInternalException(MessageFormat.format(
+					JGitText.get().cloneNonEmptyDirectory, directory.getName()));
 		command.setDirectory(directory);
 		return command.call().getRepository();
 	}
@@ -140,7 +148,8 @@ public class CloneCommand implements Callable<Git> {
 		RemoteConfig config = new RemoteConfig(repo.getConfig(), remote);
 		config.addURI(u);
 
-		final String dst = Constants.R_REMOTES + config.getName();
+		final String dst = bare ? Constants.R_HEADS : Constants.R_REMOTES
+				+ config.getName();
 		RefSpec refSpec = new RefSpec();
 		refSpec = refSpec.setForceUpdate(true);
 		refSpec = refSpec.setSourceDestination(Constants.R_HEADS + "*", dst + "/*"); //$NON-NLS-1$ //$NON-NLS-2$
@@ -292,8 +301,13 @@ public class CloneCommand implements Callable<Git> {
 	}
 
 	/**
+	 * The remote name used to keep track of the upstream repository for the
+	 * clone operation. If no remote name is set, the default value of
+	 * <code>Constants.DEFAULT_REMOTE_NAME</code> will be used.
+	 *
+	 * @see Constants#DEFAULT_REMOTE_NAME
 	 * @param remote
-	 *            the branch to keep track of in the origin repository
+	 *            name that keeps track of the upstream repository
 	 * @return this instance
 	 */
 	public CloneCommand setRemote(String remote) {
@@ -365,6 +379,18 @@ public class CloneCommand implements Callable<Git> {
 	 */
 	public CloneCommand setBranchesToClone(Collection<String> branchesToClone) {
 		this.branchesToClone = branchesToClone;
+		return this;
+	}
+
+	/**
+	 * @param noCheckout
+	 *            if set to <code>true</code> no branch will be checked out
+	 *            after the clone. This enhances performance of the clone
+	 *            command when there is no need for a checked out branch.
+	 * @return {@code this}
+	 */
+	public CloneCommand setNoCheckout(boolean noCheckout) {
+		this.noCheckout = noCheckout;
 		return this;
 	}
 
