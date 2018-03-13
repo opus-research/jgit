@@ -779,21 +779,11 @@ public abstract class FS {
 
 	/**
 	 * Normalize the unicode path to composed form.
-	 *
+	 * 
 	 * @param file
-	 * @return NFC-format File
+	 * @return file
 	 */
 	public File normalize(File file) {
 		return file;
-	}
-
-	/**
-	 * Normalize the unicode path to composed form.
-	 *
-	 * @param name
-	 * @return NFC-format string
-	 */
-	public String normalize(String name) {
-		return name;
 	}
 }
