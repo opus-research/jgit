@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2011, Tomasz Zarna <Tomasz.Zarna@pl.ibm.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,32 +40,57 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.revwalk.filter;
 
-package org.eclipse.jgit.transport;
+import java.io.IOException;
 
-import org.eclipse.jgit.storage.pack.PackWriter;
+import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.errors.StopWalkException;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevWalk;
 
 /**
- * Logs activity that occurred within {@link UploadPack}.
- * <p>
- * Implementors of the interface are responsible for associating the current
- * thread to a particular connection, if they need to also include connection
- * information. One method is to use a {@link java.lang.ThreadLocal} to remember
- * the connection information before invoking UploadPack.
+ * Limits the number of commits output.
  */
-public interface UploadPackLogger {
-	/** A simple no-op logger. */
-	public static final UploadPackLogger NULL = new UploadPackLogger() {
-		public void onPackStatistics(PackWriter.Statistics stats) {
-			// Do nothing.
-		}
-	};
+public class MaxCountRevFilter extends RevFilter {
+
+	private int maxCount;
+
+	private int count;
 
 	/**
-	 * Notice to the logger after a pack has been sent.
+	 * Create a new max count filter.
 	 *
-	 * @param stats
-	 *            the statistics after sending a pack to the client.
+	 * @param maxCount
+	 *            the limit
+	 * @return a new filter
 	 */
-	public void onPackStatistics(PackWriter.Statistics stats);
+	public static RevFilter create(int maxCount) {
+		if (maxCount < 0)
+			throw new IllegalArgumentException(
+					JGitText.get().maxCountMustBeNonNegative);
+		return new MaxCountRevFilter(maxCount);
+	}
+
+	private MaxCountRevFilter(int maxCount) {
+		this.count = 0;
+		this.maxCount = maxCount;
+	}
+
+	@Override
+	public boolean include(RevWalk walker, RevCommit cmit)
+			throws StopWalkException, MissingObjectException,
+			IncorrectObjectTypeException, IOException {
+		count++;
+		if (count > maxCount)
+			throw StopWalkException.INSTANCE;
+		return true;
+	}
+
+	@Override
+	public RevFilter clone() {
+		return new MaxCountRevFilter(maxCount);
+	}
 }

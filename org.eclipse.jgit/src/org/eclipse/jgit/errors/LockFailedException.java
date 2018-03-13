@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2011, GitHub Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,32 +40,51 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.errors;
 
-package org.eclipse.jgit.transport;
+import java.io.File;
+import java.io.IOException;
+import java.text.MessageFormat;
 
-import org.eclipse.jgit.storage.pack.PackWriter;
+import org.eclipse.jgit.JGitText;
 
 /**
- * Logs activity that occurred within {@link UploadPack}.
- * <p>
- * Implementors of the interface are responsible for associating the current
- * thread to a particular connection, if they need to also include connection
- * information. One method is to use a {@link java.lang.ThreadLocal} to remember
- * the connection information before invoking UploadPack.
+ * An exception occurring when a file cannot be locked
  */
-public interface UploadPackLogger {
-	/** A simple no-op logger. */
-	public static final UploadPackLogger NULL = new UploadPackLogger() {
-		public void onPackStatistics(PackWriter.Statistics stats) {
-			// Do nothing.
-		}
-	};
+public class LockFailedException extends IOException {
+	private static final long serialVersionUID = 1L;
+
+	private File file;
 
 	/**
-	 * Notice to the logger after a pack has been sent.
+	 * Construct a CannotLockException for the given file and message
 	 *
-	 * @param stats
-	 *            the statistics after sending a pack to the client.
+	 * @param file
+	 *            file that could not be locked
+	 * @param message
+	 *            exception message
 	 */
-	public void onPackStatistics(PackWriter.Statistics stats);
+	public LockFailedException(File file, String message) {
+		super(message);
+		this.file = file;
+	}
+
+	/**
+	 * Construct a CannotLockException for the given file
+	 *
+	 * @param file
+	 *            file that could not be locked
+	 */
+	public LockFailedException(File file) {
+		this(file, MessageFormat.format(JGitText.get().cannotLock, file));
+	}
+
+	/**
+	 * Get the file that could not be locked
+	 *
+	 * @return file
+	 */
+	public File getFile() {
+		return file;
+	}
 }
