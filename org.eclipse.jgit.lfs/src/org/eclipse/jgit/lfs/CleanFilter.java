@@ -54,39 +54,39 @@ import org.eclipse.jgit.lfs.errors.CorruptMediaFile;
 import org.eclipse.jgit.lfs.lib.Constants;
 import org.eclipse.jgit.lfs.lib.LongObjectId;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.util.BuiltinCommand;
-import org.eclipse.jgit.util.BuiltinCommandFactory;
 import org.eclipse.jgit.util.FileUtils;
+import org.eclipse.jgit.util.FilterCommand;
+import org.eclipse.jgit.util.FilterCommandFactory;
 
 /**
- * A LFS Clean filter.
+ * Built-in LFS clean filter
  *
  * When new content is about to be added to the git repository and this filter
  * is configured for that content, then this filter will replace the original
- * content with content of a so called pointer file. The pointer file content
- * will then be added to the git repository. Additionally this filter writes the
- * original content in a so called 'media file' at '.git/lfs/objects/
- * <first-two-characters-of-contentid>/ <rest-of-contentid>'
+ * content with content of a so called LFS pointer file. The pointer file
+ * content will then be added to the git repository. Additionally this filter
+ * writes the original content in a so called 'media file' at '.git/lfs/objects/
+ * <first-two-characters-of-contentid>/<rest-of-contentid>'
  *
  * @since 4.5
  */
-public class CleanFilter extends BuiltinCommand {
+public class CleanFilter extends FilterCommand {
 	/**
-	 * The factory is responsible for creating instances for {@link CleanFilter}
-	 * . This factory can be registered to the repository with the help of
-	 * {@link Repository#registerCommand(String, BuiltinCommandFactory)}
+	 * The factory is responsible for creating instances of {@link CleanFilter}
+	 * . This factory can be registered using
+	 * {@link Repository#registerCommand(String, FilterCommandFactory)}
 	 */
-	public final static BuiltinCommandFactory FACTORY = new BuiltinCommandFactory() {
+	public final static FilterCommandFactory FACTORY = new FilterCommandFactory() {
 		@Override
-		public BuiltinCommand create(Repository db, InputStream in,
+		public FilterCommand create(Repository db, InputStream in,
 				OutputStream out) throws IOException {
 			return new CleanFilter(db, in, out);
 		}
 	};
 
 	/**
-	 * Registers this filter to JGit by calling
-	 * {@link Repository#registerCommand(String, BuiltinCommandFactory)}
+	 * Registers this filter by calling
+	 * {@link Repository#registerCommand(String, FilterCommandFactory)}
 	 */
 	public final static void register() {
 		Repository.registerCommand(
@@ -96,7 +96,10 @@ public class CleanFilter extends BuiltinCommand {
 	};
 
 	// Used to compute the hash for the original content
-	private DigestOutputStream mOut;
+	private DigestOutputStream dOut;
+
+	// The outputstream into which the filtered content should be copied
+	private OutputStream out;
 
 	private LfsUtil lfsUtil;
 
@@ -125,8 +128,9 @@ public class CleanFilter extends BuiltinCommand {
 		super(in, out);
 		lfsUtil = new LfsUtil(db.getDirectory().toPath().resolve("lfs")); //$NON-NLS-1$
 		Files.createDirectories(lfsUtil.getLfsTmpDir());
-		tmpFile = lfsUtil.getTmpFile();
-		mOut = new DigestOutputStream(
+		tmpFile = lfsUtil.createTmpFile();
+		this.out = out;
+		this.dOut = new DigestOutputStream(
 				Files.newOutputStream(tmpFile, StandardOpenOption.CREATE),
 				Constants.newMessageDigest());
 	}
@@ -134,13 +138,13 @@ public class CleanFilter extends BuiltinCommand {
 	public int run() throws IOException {
 		int b = in.read();
 		if (b != -1) {
-			mOut.write(b);
+			dOut.write(b);
 			size++;
 			return 1;
 		} else {
-			mOut.close();
+			dOut.close();
 			LongObjectId loid = LongObjectId
-					.fromRaw(mOut.getMessageDigest().digest());
+					.fromRaw(dOut.getMessageDigest().digest());
 			Path mediaFile = lfsUtil.getMediaFile(loid);
 			if (Files.isRegularFile(mediaFile)) {
 				long fsSize = Files.size(mediaFile);

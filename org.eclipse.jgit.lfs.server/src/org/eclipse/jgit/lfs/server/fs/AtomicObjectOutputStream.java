@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2015, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,55 +40,82 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.lfs.server.fs;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Path;
+import java.security.DigestOutputStream;
+import java.text.MessageFormat;
+
+import org.eclipse.jgit.internal.storage.file.LockFile;
+import org.eclipse.jgit.lfs.errors.CorruptLongObjectException;
+import org.eclipse.jgit.lfs.lib.AnyLongObjectId;
+import org.eclipse.jgit.lfs.lib.Constants;
+import org.eclipse.jgit.lfs.lib.LongObjectId;
+import org.eclipse.jgit.lfs.server.internal.LfsServerText;
 
 /**
- * An abstraction for JGits builtin implementations for hooks and filters.
- * Instead of spawning an external processes to start a filter/hook and to pump
- * data from/to stdin/stdout these builtin coammnds may be used. The are
- * constructed by {@link BuiltinCommandFactory} and take an InputStream,
- * OutputStream and a repository as constructor parameters. They offer a method
- * {@link #run()} which triggers the execution of the command().
- *
- * @since 4.5
+ * Output stream writing content to a {@link LockFile} which is committed on
+ * close(). The stream checks if the hash of the stream content matches the
+ * id.
  */
-public abstract class BuiltinCommand {
-	/**
-	 * The {@link InputStream} this command should read from
-	 */
-	protected InputStream in;
+class AtomicObjectOutputStream extends OutputStream {
 
-	/**
-	 * The {@link OutputStream} this command should write to
-	 */
-	protected OutputStream out;
+	private LockFile locked;
 
-	/**
-	 * @param in
-	 * @param out
-	 */
-	public BuiltinCommand(InputStream in, OutputStream out) {
-		this.in = in;
-		this.out = out;
+	private DigestOutputStream out;
+
+	private boolean aborted;
+
+	private AnyLongObjectId id;
+
+	AtomicObjectOutputStream(Path path, AnyLongObjectId id)
+			throws IOException {
+		locked = new LockFile(path.toFile());
+		locked.lock();
+		this.id = id;
+		out = new DigestOutputStream(locked.getOutputStream(),
+				Constants.newMessageDigest());
 	}
 
-	/**
-	 * Executes the command. The command is supposed to read data from
-	 * {@link #in} and to write the result to {@link #out}. It returns the
-	 * number of bytes it read from {@link #in}. It should be called in a loop
-	 * until it returns -1 signaling that the {@link InputStream} is completely
-	 * processed.
-	 *
-	 * @return the number of bytes read from the {@link InputStream} or -1. -1
-	 *         means that the {@link InputStream} is completely processed.
-	 * @throws IOException
-	 *             when {@link IOException} occured while reading from
-	 *             {@link #in} or writing to {@link #out}
-	 *
-	 */
-	public abstract int run() throws IOException;
+	@Override
+	public void write(int b) throws IOException {
+		out.write(b);
+	}
+
+	@Override
+	public void write(byte[] b) throws IOException {
+		out.write(b);
+	}
+
+	@Override
+	public void write(byte[] b, int off, int len) throws IOException {
+		out.write(b, off, len);
+	}
+
+	@Override
+	public void close() throws IOException {
+		out.close();
+		if (!aborted) {
+			verifyHash();
+			locked.commit();
+		}
+	}
+
+	private void verifyHash() {
+		AnyLongObjectId contentHash = LongObjectId
+				.fromRaw(out.getMessageDigest().digest());
+		if (!contentHash.equals(id)) {
+			abort();
+			throw new CorruptLongObjectException(id, contentHash,
+					MessageFormat.format(LfsServerText.get().corruptLongObject,
+							contentHash, id));
+		}
+	}
+
+	void abort() {
+		locked.unlock();
+		aborted = true;
+	}
 }

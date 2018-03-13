@@ -49,13 +49,13 @@ import java.io.OutputStream;
 import org.eclipse.jgit.lib.Repository;
 
 /**
- * The factory responsible for creating instances of {@link BuiltinCommand}.
+ * The factory responsible for creating instances of {@link FilterCommand}.
  *
  * @since 4.5
  */
-public interface BuiltinCommandFactory {
+public interface FilterCommandFactory {
 	/**
-	 * Creates a new {@link BuiltinCommand}.
+	 * Create a new {@link FilterCommand}.
 	 *
 	 * @param db
 	 *            the repository this command should work on
@@ -63,11 +63,11 @@ public interface BuiltinCommandFactory {
 	 *            the {@link InputStream} this command should read from
 	 * @param out
 	 *            the {@link OutputStream} this command should write to
-	 * @return the create {@link BuiltinCommand}
+	 * @return the create {@link FilterCommand}
 	 * @throws IOException
 	 *             thrown when the command constructor throws a IOException
 	 */
-	public BuiltinCommand create(Repository db, InputStream in,
+	public FilterCommand create(Repository db, InputStream in,
 			OutputStream out) throws IOException;
 
 }

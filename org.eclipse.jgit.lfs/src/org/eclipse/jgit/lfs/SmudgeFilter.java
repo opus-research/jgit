@@ -50,19 +50,31 @@ import java.nio.file.Path;
 
 import org.eclipse.jgit.lfs.lib.LongObjectId;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.util.BuiltinCommand;
-import org.eclipse.jgit.util.BuiltinCommandFactory;
+import org.eclipse.jgit.util.FilterCommand;
+import org.eclipse.jgit.util.FilterCommandFactory;
 
 /**
+ * Built-in LFS smudge filter
+ *
+ * When content is read from git's object-database and written to the filesystem
+ * and this filter is configured for that content, then this filter will replace
+ * the content of LFS pointer files with the original content. This happens e.g.
+ * when a checkout needs to update a working tree file which is under LFS
+ * control. This implementation expects that the origin content is already
+ * available in the .git/lfs/objects folder. This implementation will not
+ * contact any lfs servers in order to get the missing content.
+ *
  * @since 4.5
  */
-public class SmudgeFilter extends BuiltinCommand {
+public class SmudgeFilter extends FilterCommand {
 	/**
-	 *
+	 * The factory is responsible for creating instances of {@link SmudgeFilter}
+	 * . This factory can be registered using
+	 * {@link Repository#registerCommand(String, FilterCommandFactory)}
 	 */
-	public final static BuiltinCommandFactory FACTORY = new BuiltinCommandFactory() {
+	public final static FilterCommandFactory FACTORY = new FilterCommandFactory() {
 		@Override
-		public BuiltinCommand create(Repository db, InputStream in,
+		public FilterCommand create(Repository db, InputStream in,
 				OutputStream out) throws IOException {
 			return new SmudgeFilter(db, in, out);
 		}
@@ -70,7 +82,7 @@ public class SmudgeFilter extends BuiltinCommand {
 
 	/**
 	 * Registers this filter to JGit by calling
-	 * {@link Repository#registerCommand(String, BuiltinCommandFactory)}
+	 * {@link Repository#registerCommand(String, FilterCommandFactory)}
 	 */
 	public final static void register() {
 		Repository.registerCommand(
@@ -81,7 +93,7 @@ public class SmudgeFilter extends BuiltinCommand {
 
 	LongObjectId id;
 
-	private InputStream mIn;
+	private InputStream in;
 
 	private LfsUtil lfsUtil;
 
@@ -99,7 +111,7 @@ public class SmudgeFilter extends BuiltinCommand {
 		if (res != null) {
 			Path mediaFile = lfsUtil.getMediaFile(res.getOid());
 			if (Files.exists(mediaFile)) {
-				mIn = Files.newInputStream(mediaFile);
+				this.in = Files.newInputStream(mediaFile);
 			}
 		}
 	}
@@ -107,10 +119,10 @@ public class SmudgeFilter extends BuiltinCommand {
 	@Override
 	public int run() throws IOException {
 		int b;
-		if (mIn != null) {
-			while ((b = mIn.read()) != -1)
+		if (in != null) {
+			while ((b = in.read()) != -1)
 				out.write(b);
-			mIn.close();
+			in.close();
 		}
 		out.close();
 		return -1;
