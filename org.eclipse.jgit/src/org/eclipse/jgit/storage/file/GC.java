@@ -196,8 +196,10 @@ public class GC {
 
 			if (!oldPack.shouldBeKept()) {
 				oldPack.close();
-				FileUtils.delete(nameFor(oldName, ".pack"), deleteOptions); //$NON-NLS-1$
-				FileUtils.delete(nameFor(oldName, ".idx"), deleteOptions); //$NON-NLS-1$
+				for (PackExt ext : PackExt.values()) {
+					File f = nameFor(oldName, "." + ext.getExtension()); //$NON-NLS-1$
+					FileUtils.delete(f, deleteOptions);
+				}
 			}
 		}
 		// close the complete object database. Thats my only chance to force
