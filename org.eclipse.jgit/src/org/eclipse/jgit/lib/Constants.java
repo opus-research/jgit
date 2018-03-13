@@ -231,9 +231,6 @@ public final class Constants {
 	/** Default main branch name */
 	public static final String MASTER = "master";
 
-	/** Default stash branch name */
-	public static final String STASH = "stash";
-
 	/** Prefix for branch refs */
 	public static final String R_HEADS = "refs/heads/";
 
@@ -251,9 +248,6 @@ public final class Constants {
 
 	/** Prefix for any ref */
 	public static final String R_REFS = "refs/";
-
-	/** Standard stash ref */
-	public static final String R_STASH = R_REFS + STASH;
 
 	/** Logs folder name */
 	public static final String LOGS = "logs";
@@ -327,9 +321,6 @@ public final class Constants {
 
 	/** Default name for the Git repository directory */
 	public static final String DOT_GIT = ".git";
-
-	/** Default name for the Git repository configuration */
-	public static final String CONFIG = "config";
 
 	/** A bare repository typically ends with this string */
 	public static final String DOT_GIT_EXT = ".git";
