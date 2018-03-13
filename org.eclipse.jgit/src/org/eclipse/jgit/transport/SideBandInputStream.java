@@ -53,7 +53,7 @@ import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ProgressMonitor;
-import org.eclipse.jgit.util.IO;
+import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.RawParseUtils;
 
 /**
@@ -68,7 +68,7 @@ import org.eclipse.jgit.util.RawParseUtils;
  * <p>
  * Channel 3 results in an exception being thrown, as the remote side has issued
  * an unrecoverable error.
- * 
+ *
  * @see PacketLineIn#sideband(ProgressMonitor)
  */
 class SideBandInputStream extends InputStream {
@@ -229,7 +229,7 @@ class SideBandInputStream extends InputStream {
 
 	private String readString(final int len) throws IOException {
 		final byte[] raw = new byte[len];
-		IO.readFully(in, raw, 0, len);
+		NB.readFully(in, raw, 0, len);
 		return RawParseUtils.decode(Constants.CHARSET, raw, 0, len);
 	}
 }
