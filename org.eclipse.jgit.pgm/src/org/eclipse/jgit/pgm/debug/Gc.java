@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Robin Rosenberg
+ * Copyright (C) 2012, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,79 +40,19 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util;
 
-import java.io.File;
-import java.nio.charset.Charset;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+package org.eclipse.jgit.pgm.debug;
 
-abstract class FS_POSIX extends FS {
+import org.eclipse.jgit.lib.TextProgressMonitor;
+import org.eclipse.jgit.pgm.TextBuiltin;
+import org.eclipse.jgit.storage.file.FileRepository;
+import org.eclipse.jgit.storage.file.GC;
+
+class Gc extends TextBuiltin {
 	@Override
-	protected File discoverGitPrefix() {
-		String path = SystemReader.getInstance().getenv("PATH");
-		File gitExe = searchPath(path, "git");
-		if (gitExe != null)
-			return gitExe.getParentFile().getParentFile();
-
-		if (isMacOS()) {
-			// On MacOSX, PATH is shorter when Eclipse is launched from the
-			// Finder than from a terminal. Therefore try to launch bash as a
-			// login shell and search using that.
-			//
-			String w = readPipe(userHome(), //
-					new String[] { "bash", "--login", "-c", "which git" }, //
-					Charset.defaultCharset().name());
-			if (w == null || w.length() == 0)
-				return null;
-			File parentFile = new File(w).getParentFile();
-			if (parentFile == null)
-				return null;
-			return parentFile.getParentFile();
-		}
-
-		return null;
-	}
-
-	FS_POSIX() {
-		super();
-	}
-
-	FS_POSIX(FS src) {
-		super(src);
-	}
-
-	@Override
-	public boolean isCaseSensitive() {
-		if (isMacOS())
-			return false;
-		else
-			return true;
-	}
-
-	@Override
-	public ProcessBuilder runInShell(String cmd, String[] args) {
-		List<String> argv = new ArrayList<String>(4 + args.length);
-		argv.add("sh");
-		argv.add("-c");
-		argv.add(cmd + " \"$@\"");
-		argv.add(cmd);
-		argv.addAll(Arrays.asList(args));
-		ProcessBuilder proc = new ProcessBuilder();
-		proc.command(argv);
-		return proc;
-	}
-
-	private static boolean isMacOS() {
-		final String osDotName = AccessController
-				.doPrivileged(new PrivilegedAction<String>() {
-					public String run() {
-						return System.getProperty("os.name");
-					}
-				});
-		return "Mac OS X".equals(osDotName) || "Darwin".equals(osDotName);
+	protected void run() throws Exception {
+		GC gc = new GC((FileRepository) db);
+		gc.setProgressMonitor(new TextProgressMonitor());
+		gc.gc();
 	}
 }
