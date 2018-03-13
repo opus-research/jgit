@@ -50,6 +50,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -60,9 +61,6 @@ import java.util.Collection;
 import java.util.List;
 
 import org.eclipse.jgit.errors.AmbiguousObjectException;
-import org.eclipse.jgit.internal.storage.file.FileRepository;
-import org.eclipse.jgit.internal.storage.file.PackIndexWriter;
-import org.eclipse.jgit.internal.storage.file.PackIndexWriterV2;
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
@@ -72,7 +70,6 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.transport.PackedObjectInfo;
 import org.eclipse.jgit.util.FileUtils;
-import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -84,18 +81,21 @@ public class AbbreviationTest extends LocalDiskRepositoryTestCase {
 
 	private TestRepository<Repository> test;
 
+	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
 		db = createBareRepository();
 		reader = db.newObjectReader();
-		test = new TestRepository<Repository>(db);
+		test = new TestRepository<>(db);
 	}
 
+	@Override
 	@After
 	public void tearDown() throws Exception {
-		if (reader != null)
-			reader.release();
+		if (reader != null) {
+			reader.close();
+		}
 	}
 
 	@Test
@@ -171,7 +171,7 @@ public class AbbreviationTest extends LocalDiskRepositoryTestCase {
 
 		ObjectId id = id("9d5b926ed164e8ee88d3b8b1e525d699adda01ba");
 		byte[] idBuf = toByteArray(id);
-		List<PackedObjectInfo> objects = new ArrayList<PackedObjectInfo>();
+		List<PackedObjectInfo> objects = new ArrayList<>();
 		for (int i = 0; i < 256; i++) {
 			idBuf[9] = (byte) i;
 			objects.add(new PackedObjectInfo(ObjectId.fromRaw(idBuf)));
@@ -182,13 +182,10 @@ public class AbbreviationTest extends LocalDiskRepositoryTestCase {
 		File idxFile = new File(packDir, packName + ".idx");
 		File packFile = new File(packDir, packName + ".pack");
 		FileUtils.mkdir(packDir, true);
-		OutputStream dst = new SafeBufferedOutputStream(new FileOutputStream(
-				idxFile));
-		try {
+		try (OutputStream dst = new BufferedOutputStream(
+				new FileOutputStream(idxFile))) {
 			PackIndexWriter writer = new PackIndexWriterV2(dst);
 			writer.write(objects, new byte[OBJECT_ID_LENGTH]);
-		} finally {
-			dst.close();
 		}
 		new FileOutputStream(packFile).close();
 

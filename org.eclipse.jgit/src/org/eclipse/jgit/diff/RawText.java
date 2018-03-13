@@ -107,6 +107,7 @@ public class RawText extends Sequence {
 	}
 
 	/** @return total number of items in the sequence. */
+	@Override
 	public int size() {
 		// The line map is always 2 entries larger than the number of lines in
 		// the file. Index 0 is padded out/unused. The last index is the total
@@ -289,7 +290,7 @@ public class RawText extends Sequence {
 		int e = getEnd(0);
 		if (content[e - 1] != '\n')
 			return null;
-		if (content.length > 1 && content[e - 2] == '\r')
+		if (content.length > 1 && e > 1 && content[e - 2] == '\r')
 			return "\r\n"; //$NON-NLS-1$
 		else
 			return "\n"; //$NON-NLS-1$

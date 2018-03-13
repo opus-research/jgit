@@ -48,10 +48,13 @@ import java.util.List;
 import org.eclipse.jgit.internal.storage.pack.PackWriter;
 
 /**
- * {@link UploadPackLogger} that delegates to a list of other loggers.
+ * UploadPackLogger that delegates to a list of other loggers.
  * <p>
  * loggers are run in the order passed to the constructor.
+ *
+ * @deprecated Use {@link PostUploadHookChain} instead.
  */
+@Deprecated
 public class UploadPackLoggerChain implements UploadPackLogger {
 	private final UploadPackLogger[] loggers;
 	private final int count;
@@ -81,6 +84,7 @@ public class UploadPackLoggerChain implements UploadPackLogger {
 	/**
 	 * @since 3.0
 	 */
+	@Override
 	public void onPackStatistics(PackWriter.Statistics stats) {
 		for (int i = 0; i < count; i++)
 			loggers[i].onPackStatistics(stats);

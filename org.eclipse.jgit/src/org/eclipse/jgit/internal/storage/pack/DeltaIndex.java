@@ -51,8 +51,8 @@ import java.io.OutputStream;
  * <p>
  * The index can be passed a result buffer, and output an instruction sequence
  * that transforms the source buffer used by the index into the result buffer.
- * The instruction sequence can be executed by {@link BinaryDelta} or
- * {@link DeltaStream} to recreate the result buffer.
+ * The instruction sequence can be executed by {@link BinaryDelta} to recreate
+ * the result buffer.
  * <p>
  * An index stores the entire contents of the source buffer, but also a table of
  * block identities mapped to locations where the block appears in the source
@@ -421,6 +421,7 @@ public class DeltaIndex {
 		return start - resPtr;
 	}
 
+	@Override
 	@SuppressWarnings("nls")
 	public String toString() {
 		String[] units = { "bytes", "KiB", "MiB", "GiB" };

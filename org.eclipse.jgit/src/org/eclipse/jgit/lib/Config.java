@@ -51,11 +51,16 @@
 
 package org.eclipse.jgit.lib;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.jgit.errors.ConfigInvalidException;
@@ -64,17 +69,25 @@ import org.eclipse.jgit.events.ConfigChangedListener;
 import org.eclipse.jgit.events.ListenerHandle;
 import org.eclipse.jgit.events.ListenerList;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.util.StringUtils;
-
+import org.eclipse.jgit.transport.RefSpec;
+import org.eclipse.jgit.util.IO;
+import org.eclipse.jgit.util.RawParseUtils;
 
 /**
  * Git style {@code .config}, {@code .gitconfig}, {@code .gitmodules} file.
  */
 public class Config {
+
 	private static final String[] EMPTY_STRING_ARRAY = {};
-	private static final long KiB = 1024;
-	private static final long MiB = 1024 * KiB;
-	private static final long GiB = 1024 * MiB;
+
+	static final long KiB = 1024;
+	static final long MiB = 1024 * KiB;
+	static final long GiB = 1024 * MiB;
+	private static final int MAX_DEPTH = 10;
+
+	private static final TypedConfigGetter DEFAULT_GETTER = new DefaultTypedConfigGetter();
+
+	private static TypedConfigGetter typedGetter = DEFAULT_GETTER;
 
 	/** the change listeners */
 	private final ListenerList listeners = new ListenerList();
@@ -96,7 +109,7 @@ public class Config {
 	 * must ensure it is a special copy of the empty string.  It also must
 	 * be treated like the empty string.
 	 */
-	private static final String MAGIC_EMPTY_VALUE = new String();
+	static final String MAGIC_EMPTY_VALUE = new String();
 
 	/** Create a configuration with no default fallback. */
 	public Config() {
@@ -112,7 +125,19 @@ public class Config {
 	 */
 	public Config(Config defaultConfig) {
 		baseConfig = defaultConfig;
-		state = new AtomicReference<ConfigSnapshot>(newState());
+		state = new AtomicReference<>(newState());
+	}
+
+	/**
+	 * Globally sets a {@link TypedConfigGetter} that is subsequently used to
+	 * read typed values from all git configs.
+	 *
+	 * @param getter
+	 *            to use; if {@code null} use the default getter.
+	 * @since 4.9
+	 */
+	public static void setTypedConfigGetter(TypedConfigGetter getter) {
+		typedGetter = getter == null ? DEFAULT_GETTER : getter;
 	}
 
 	/**
@@ -196,7 +221,7 @@ public class Config {
 	 */
 	public int getInt(final String section, final String name,
 			final int defaultValue) {
-		return getInt(section, null, name, defaultValue);
+		return typedGetter.getInt(this, section, null, name, defaultValue);
 	}
 
 	/**
@@ -214,11 +239,8 @@ public class Config {
 	 */
 	public int getInt(final String section, String subsection,
 			final String name, final int defaultValue) {
-		final long val = getLong(section, subsection, name, defaultValue);
-		if (Integer.MIN_VALUE <= val && val <= Integer.MAX_VALUE)
-			return (int) val;
-		throw new IllegalArgumentException(MessageFormat.format(JGitText.get().integerValueOutOfRange
-				, section, name));
+		return typedGetter.getInt(this, section, subsection, name,
+				defaultValue);
 	}
 
 	/**
@@ -233,7 +255,7 @@ public class Config {
 	 * @return an integer value from the configuration, or defaultValue.
 	 */
 	public long getLong(String section, String name, long defaultValue) {
-		return getLong(section, null, name, defaultValue);
+		return typedGetter.getLong(this, section, null, name, defaultValue);
 	}
 
 	/**
@@ -251,37 +273,8 @@ public class Config {
 	 */
 	public long getLong(final String section, String subsection,
 			final String name, final long defaultValue) {
-		final String str = getString(section, subsection, name);
-		if (str == null)
-			return defaultValue;
-
-		String n = str.trim();
-		if (n.length() == 0)
-			return defaultValue;
-
-		long mul = 1;
-		switch (StringUtils.toLowerCase(n.charAt(n.length() - 1))) {
-		case 'g':
-			mul = GiB;
-			break;
-		case 'm':
-			mul = MiB;
-			break;
-		case 'k':
-			mul = KiB;
-			break;
-		}
-		if (mul > 1)
-			n = n.substring(0, n.length() - 1).trim();
-		if (n.length() == 0)
-			return defaultValue;
-
-		try {
-			return mul * Long.parseLong(n);
-		} catch (NumberFormatException nfe) {
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidIntegerValue
-					, section, name, str));
-		}
+		return typedGetter.getLong(this, section, subsection, name,
+				defaultValue);
 	}
 
 	/**
@@ -298,7 +291,7 @@ public class Config {
 	 */
 	public boolean getBoolean(final String section, final String name,
 			final boolean defaultValue) {
-		return getBoolean(section, null, name, defaultValue);
+		return typedGetter.getBoolean(this, section, null, name, defaultValue);
 	}
 
 	/**
@@ -317,17 +310,8 @@ public class Config {
 	 */
 	public boolean getBoolean(final String section, String subsection,
 			final String name, final boolean defaultValue) {
-		String n = getRawString(section, subsection, name);
-		if (n == null)
-			return defaultValue;
-		if (MAGIC_EMPTY_VALUE == n)
-			return true;
-		try {
-			return StringUtils.toBoolean(n);
-		} catch (IllegalArgumentException err) {
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidBooleanValue
-					, section, name, n));
-		}
+		return typedGetter.getBoolean(this, section, subsection, name,
+				defaultValue);
 	}
 
 	/**
@@ -348,7 +332,8 @@ public class Config {
 	public <T extends Enum<?>> T getEnum(final String section,
 			final String subsection, final String name, final T defaultValue) {
 		final T[] all = allValuesOf(defaultValue);
-		return getEnum(all, section, subsection, name, defaultValue);
+		return typedGetter.getEnum(this, all, section, subsection, name,
+				defaultValue);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -383,59 +368,12 @@ public class Config {
 	 */
 	public <T extends Enum<?>> T getEnum(final T[] all, final String section,
 			final String subsection, final String name, final T defaultValue) {
-		String value = getString(section, subsection, name);
-		if (value == null)
-			return defaultValue;
-
-		if (all[0] instanceof ConfigEnum) {
-			for (T t : all) {
-				if (((ConfigEnum) t).matchConfigValue(value))
-					return t;
-			}
-		}
-
-		String n = value.replace(' ', '_');
-
-		// Because of c98abc9c0586c73ef7df4172644b7dd21c979e9d being used in
-		// the real world before its breakage was fully understood, we must
-		// also accept '-' as though it were ' '.
-		n = n.replace('-', '_');
-
-		T trueState = null;
-		T falseState = null;
-		for (T e : all) {
-			if (StringUtils.equalsIgnoreCase(e.name(), n))
-				return e;
-			else if (StringUtils.equalsIgnoreCase(e.name(), "TRUE")) //$NON-NLS-1$
-				trueState = e;
-			else if (StringUtils.equalsIgnoreCase(e.name(), "FALSE")) //$NON-NLS-1$
-				falseState = e;
-		}
-
-		// This is an odd little fallback. C Git sometimes allows boolean
-		// values in a tri-state with other things. If we have both a true
-		// and a false value in our enumeration, assume its one of those.
-		//
-		if (trueState != null && falseState != null) {
-			try {
-				return StringUtils.toBoolean(n) ? trueState : falseState;
-			} catch (IllegalArgumentException err) {
-				// Fall through and use our custom error below.
-			}
-		}
-
-		if (subsection != null)
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().enumValueNotSupported3, section, subsection,
-					name, value));
-		else
-			throw new IllegalArgumentException(
-					MessageFormat.format(JGitText.get().enumValueNotSupported2,
-							section, name, value));
+		return typedGetter.getEnum(this, all, section, subsection, name,
+				defaultValue);
 	}
 
 	/**
-	 * Get string value
+	 * Get string value or null if not found.
 	 *
 	 * @param section
 	 *            the section
@@ -443,7 +381,7 @@ public class Config {
 	 *            the subsection for the value
 	 * @param name
 	 *            the key name
-	 * @return a String value from git config.
+	 * @return a String value from the config, <code>null</code> if not found
 	 */
 	public String getString(final String section, String subsection,
 			final String name) {
@@ -482,6 +420,48 @@ public class Config {
 		System.arraycopy(base, 0, res, 0, n);
 		System.arraycopy(self, 0, res, n, self.length);
 		return res;
+	}
+
+	/**
+	 * Parse a numerical time unit, such as "1 minute", from the configuration.
+	 *
+	 * @param section
+	 *            section the key is in.
+	 * @param subsection
+	 *            subsection the key is in, or null if not in a subsection.
+	 * @param name
+	 *            the key name.
+	 * @param defaultValue
+	 *            default value to return if no value was present.
+	 * @param wantUnit
+	 *            the units of {@code defaultValue} and the return value, as
+	 *            well as the units to assume if the value does not contain an
+	 *            indication of the units.
+	 * @return the value, or {@code defaultValue} if not set, expressed in
+	 *         {@code units}.
+	 * @since 4.5
+	 */
+	public long getTimeUnit(String section, String subsection, String name,
+			long defaultValue, TimeUnit wantUnit) {
+		return typedGetter.getTimeUnit(this, section, subsection, name,
+				defaultValue, wantUnit);
+	}
+
+	/**
+	 * Parse a list of {@link RefSpec}s from the configuration.
+	 *
+	 * @param section
+	 *            section the key is in.
+	 * @param subsection
+	 *            subsection the key is in, or null if not in a subsection.
+	 * @param name
+	 *            the key name.
+	 * @return a possibly empty list of {@link RefSpec}s
+	 * @since 4.9
+	 */
+	public List<RefSpec> getRefSpecs(String section, String subsection,
+			String name) {
+		return typedGetter.getRefSpecs(this, section, subsection, name);
 	}
 
 	/**
@@ -525,6 +505,35 @@ public class Config {
 	 */
 	public Set<String> getNames(String section, String subsection) {
 		return getState().getNames(section, subsection);
+	}
+
+	/**
+	 * @param section
+	 *            the section
+	 * @param recursive
+	 *            if {@code true} recursively adds the names defined in all base
+	 *            configurations
+	 * @return the list of names defined for this section
+	 * @since 3.2
+	 */
+	public Set<String> getNames(String section, boolean recursive) {
+		return getState().getNames(section, null, recursive);
+	}
+
+	/**
+	 * @param section
+	 *            the section
+	 * @param subsection
+	 *            the subsection
+	 * @param recursive
+	 *            if {@code true} recursively adds the names defined in all base
+	 *            configurations
+	 * @return the list of names defined for this subsection
+	 * @since 3.2
+	 */
+	public Set<String> getNames(String section, String subsection,
+			boolean recursive) {
+		return getState().getNames(section, subsection, recursive);
 	}
 
 	/**
@@ -601,15 +610,16 @@ public class Config {
 		listeners.dispatch(new ConfigChangedEvent());
 	}
 
-	private String getRawString(final String section, final String subsection,
+	String getRawString(final String section, final String subsection,
 			final String name) {
 		String[] lst = getRawStringList(section, subsection, name);
-		if (lst != null)
-			return lst[0];
-		else if (baseConfig != null)
+		if (lst != null) {
+			return lst[lst.length - 1];
+		} else if (baseConfig != null) {
 			return baseConfig.getRawString(section, subsection, name);
-		else
+		} else {
 			return null;
+		}
 	}
 
 	private String[] getRawStringList(String section, String subsection,
@@ -679,11 +689,11 @@ public class Config {
 		final String s;
 
 		if (value >= GiB && (value % GiB) == 0)
-			s = String.valueOf(value / GiB) + " g"; //$NON-NLS-1$
+			s = String.valueOf(value / GiB) + "g"; //$NON-NLS-1$
 		else if (value >= MiB && (value % MiB) == 0)
-			s = String.valueOf(value / MiB) + " m"; //$NON-NLS-1$
+			s = String.valueOf(value / MiB) + "m"; //$NON-NLS-1$
 		else if (value >= KiB && (value % KiB) == 0)
-			s = String.valueOf(value / KiB) + " k"; //$NON-NLS-1$
+			s = String.valueOf(value / KiB) + "k"; //$NON-NLS-1$
 		else
 			s = String.valueOf(value);
 
@@ -739,7 +749,7 @@ public class Config {
 		if (value instanceof ConfigEnum)
 			n = ((ConfigEnum) value).toConfigValue();
 		else
-			n = value.name().toLowerCase().replace('_', ' ');
+			n = value.name().toLowerCase(Locale.ROOT).replace('_', ' ');
 		setString(section, subsection, name, n);
 	}
 
@@ -803,7 +813,7 @@ public class Config {
 			final String section,
 			final String subsection) {
 		final int max = srcState.entryList.size();
-		final ArrayList<ConfigLine> r = new ArrayList<ConfigLine>(max);
+		final ArrayList<ConfigLine> r = new ArrayList<>(max);
 
 		boolean lastWasMatch = false;
 		for (ConfigLine e : srcState.entryList) {
@@ -826,7 +836,8 @@ public class Config {
 	 *
 	 * <pre>
 	 * [section &quot;subsection&quot;]
-	 *         name = value
+	 *         name = value1
+	 *         name = value2
 	 * </pre>
 	 *
 	 * @param section
@@ -917,7 +928,7 @@ public class Config {
 		// for a new section header. Assume that and allocate the space.
 		//
 		final int max = src.entryList.size() + values.size() + 1;
-		final ArrayList<ConfigLine> r = new ArrayList<ConfigLine>(max);
+		final ArrayList<ConfigLine> r = new ArrayList<>(max);
 		r.addAll(src.entryList);
 		return r;
 	}
@@ -996,7 +1007,16 @@ public class Config {
 	 *             made to {@code this}.
 	 */
 	public void fromText(final String text) throws ConfigInvalidException {
-		final List<ConfigLine> newEntries = new ArrayList<ConfigLine>();
+		state.set(newState(fromTextRecurse(text, 1)));
+	}
+
+	private List<ConfigLine> fromTextRecurse(final String text, int depth)
+			throws ConfigInvalidException {
+		if (depth > MAX_DEPTH) {
+			throw new ConfigInvalidException(
+					JGitText.get().tooManyIncludeRecursions);
+		}
+		final List<ConfigLine> newEntries = new ArrayList<>();
 		final StringReader in = new StringReader(text);
 		ConfigLine last = null;
 		ConfigLine e = new ConfigLine();
@@ -1054,11 +1074,44 @@ public class Config {
 				} else
 					e.value = readValue(in, false, -1);
 
+				if (e.section.equals("include")) { //$NON-NLS-1$
+					addIncludedConfig(newEntries, e, depth);
+				}
 			} else
 				throw new ConfigInvalidException(JGitText.get().invalidLineInConfigFile);
 		}
 
-		state.set(newState(newEntries));
+		return newEntries;
+	}
+
+	private void addIncludedConfig(final List<ConfigLine> newEntries,
+			ConfigLine line, int depth) throws ConfigInvalidException {
+		if (!line.name.equals("path") || //$NON-NLS-1$
+				line.value == null || line.value.equals(MAGIC_EMPTY_VALUE)) {
+			throw new ConfigInvalidException(
+					JGitText.get().invalidLineInConfigFile);
+		}
+		File path = new File(line.value);
+		try {
+			byte[] bytes = IO.readFully(path);
+			String decoded;
+			if (isUtf8(bytes)) {
+				decoded = RawParseUtils.decode(RawParseUtils.UTF8_CHARSET,
+						bytes, 3, bytes.length);
+			} else {
+				decoded = RawParseUtils.decode(bytes);
+			}
+			newEntries.addAll(fromTextRecurse(decoded, depth + 1));
+		} catch (FileNotFoundException fnfe) {
+			if (path.exists()) {
+				throw new ConfigInvalidException(MessageFormat
+						.format(JGitText.get().cannotReadFile, path), fnfe);
+			}
+		} catch (IOException ioe) {
+			throw new ConfigInvalidException(
+					MessageFormat.format(JGitText.get().cannotReadFile, path),
+					ioe);
+		}
 	}
 
 	private ConfigSnapshot newState() {
@@ -1076,6 +1129,19 @@ public class Config {
 	 */
 	protected void clear() {
 		state.set(newState());
+	}
+
+	/**
+	 * Check if bytes should be treated as UTF-8 or not.
+	 *
+	 * @param bytes
+	 *            the bytes to check encoding for.
+	 * @return true if bytes should be treated as UTF-8, false otherwise.
+	 * @since 4.4
+	 */
+	protected boolean isUtf8(final byte[] bytes) {
+		return bytes.length >= 3 && bytes[0] == (byte) 0xEF
+				&& bytes[1] == (byte) 0xBB && bytes[2] == (byte) 0xBF;
 	}
 
 	private static String readSectionName(final StringReader in)
@@ -1171,8 +1237,6 @@ public class Config {
 		for (;;) {
 			int c = in.read();
 			if (c < 0) {
-				if (value.length() == 0)
-					throw new ConfigInvalidException(JGitText.get().unexpectedEndOfConfigFile);
 				break;
 			}
 

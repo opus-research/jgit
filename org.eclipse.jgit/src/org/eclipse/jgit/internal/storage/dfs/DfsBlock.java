@@ -46,27 +46,15 @@
 package org.eclipse.jgit.internal.storage.dfs;
 
 import java.io.IOException;
-import java.security.MessageDigest;
 import java.util.zip.CRC32;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
 import org.eclipse.jgit.internal.storage.pack.PackOutputStream;
 
-/** A cached slice of a {@link DfsPackFile}. */
+/** A cached slice of a {@link BlockBasedFile}. */
 final class DfsBlock {
-	/**
-	 * Size in bytes to pass to {@link Inflater} at a time.
-	 * <p>
-	 * Blocks can be large (for example 1 MiB), while compressed objects inside
-	 * of them are very small (for example less than 100 bytes for a delta). JNI
-	 * forces the data supplied to the Inflater to be copied during setInput(),
-	 * so use a smaller stride to reduce the risk that too much unnecessary was
-	 * moved into the native layer.
-	 */
-	private static final int INFLATE_STRIDE = 512;
-
-	final DfsPackKey pack;
+	final DfsStreamKey stream;
 
 	final long start;
 
@@ -74,8 +62,8 @@ final class DfsBlock {
 
 	private final byte[] block;
 
-	DfsBlock(DfsPackKey p, long pos, byte[] buf) {
-		pack = p;
+	DfsBlock(DfsStreamKey p, long pos, byte[] buf) {
+		stream = p;
 		start = pos;
 		end = pos + buf.length;
 		block = buf;
@@ -85,13 +73,8 @@ final class DfsBlock {
 		return block.length;
 	}
 
-	int remaining(long pos) {
-		int ptr = (int) (pos - start);
-		return block.length - ptr;
-	}
-
-	boolean contains(DfsPackKey want, long pos) {
-		return pack == want && start <= pos && pos < end;
+	boolean contains(DfsStreamKey want, long pos) {
+		return stream.equals(want) && start <= pos && pos < end;
 	}
 
 	int copy(long pos, byte[] dstbuf, int dstoff, int cnt) {
@@ -105,29 +88,18 @@ final class DfsBlock {
 		return n;
 	}
 
-	int inflate(Inflater inf, long pos, byte[] dstbuf, int dstoff)
-			throws DataFormatException {
+	int setInput(long pos, Inflater inf) throws DataFormatException {
 		int ptr = (int) (pos - start);
-		int in = Math.min(INFLATE_STRIDE, block.length - ptr);
-		if (dstoff < dstbuf.length)
-			in = Math.min(in, dstbuf.length - dstoff);
-		inf.setInput(block, ptr, in);
-
-		for (;;) {
-			int out = inf.inflate(dstbuf, dstoff, dstbuf.length - dstoff);
-			if (out == 0) {
-				if (inf.needsInput()) {
-					ptr += in;
-					in = Math.min(INFLATE_STRIDE, block.length - ptr);
-					if (in == 0)
-						return dstoff;
-					inf.setInput(block, ptr, in);
-					continue;
-				}
-				return dstoff;
-			}
-			dstoff += out;
+		int cnt = block.length - ptr;
+		if (cnt <= 0) {
+			throw new DataFormatException(cnt + " bytes to inflate:" //$NON-NLS-1$
+					+ " at pos=" + pos //$NON-NLS-1$
+					+ "; block.start=" + start //$NON-NLS-1$
+					+ "; ptr=" + ptr //$NON-NLS-1$
+					+ "; block.length=" + block.length); //$NON-NLS-1$
 		}
+		inf.setInput(block, ptr, cnt);
+		return cnt;
 	}
 
 	void crc32(CRC32 out, long pos, int cnt) {
@@ -135,12 +107,9 @@ final class DfsBlock {
 		out.update(block, ptr, cnt);
 	}
 
-	void write(PackOutputStream out, long pos, int cnt, MessageDigest digest)
+	void write(PackOutputStream out, long pos, int cnt)
 			throws IOException {
-		int ptr = (int) (pos - start);
-		out.write(block, ptr, cnt);
-		if (digest != null)
-			digest.update(block, ptr, cnt);
+		out.write(block, (int) (pos - start), cnt);
 	}
 
 	void check(Inflater inf, byte[] tmp, long pos, int cnt)

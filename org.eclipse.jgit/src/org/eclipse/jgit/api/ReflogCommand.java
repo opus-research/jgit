@@ -48,6 +48,7 @@ import java.util.Collection;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
+import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ReflogEntry;
@@ -91,12 +92,16 @@ public class ReflogCommand extends GitCommand<Collection<ReflogEntry>> {
 	 * @throws GitAPIException
 	 * @throws InvalidRefNameException
 	 */
+	@Override
 	public Collection<ReflogEntry> call() throws GitAPIException,
 			InvalidRefNameException {
 		checkCallable();
 
 		try {
 			ReflogReader reader = repo.getReflogReader(ref);
+			if (reader == null)
+				throw new RefNotFoundException(MessageFormat.format(
+						JGitText.get().refNotResolved, ref));
 			return reader.getReverseEntries();
 		} catch (IOException e) {
 			throw new InvalidRefNameException(MessageFormat.format(

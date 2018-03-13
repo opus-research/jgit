@@ -69,6 +69,7 @@ public class DefaultUploadPackFactoryTest extends LocalDiskRepositoryTestCase {
 
 	private UploadPackFactory<HttpServletRequest> factory;
 
+	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
@@ -77,6 +78,7 @@ public class DefaultUploadPackFactoryTest extends LocalDiskRepositoryTestCase {
 		factory = new DefaultUploadPackFactory();
 	}
 
+	@SuppressWarnings("unchecked")
 	@Test
 	public void testDisabledSingleton() throws ServiceNotAuthorizedException {
 		factory = (UploadPackFactory<HttpServletRequest>) UploadPackFactory.DISABLED;
@@ -160,7 +162,7 @@ public class DefaultUploadPackFactoryTest extends LocalDiskRepositoryTestCase {
 		private final String host;
 
 		R(final String user, final String host) {
-			super(new Request() /* can't pass null, sigh */);
+			super(new Request(null, null) /* can't pass null, sigh */);
 			this.user = user;
 			this.host = host;
 		}

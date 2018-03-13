@@ -47,20 +47,27 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.security.MessageDigest;
 import java.text.MessageFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.zip.Deflater;
 
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.pack.DeltaEncoder;
+import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
@@ -75,6 +82,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.storage.file.WindowCacheConfig;
 import org.eclipse.jgit.transport.PackParser;
+import org.eclipse.jgit.transport.PackedObjectInfo;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.TemporaryBuffer;
@@ -87,7 +95,7 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 
 	private TestRng rng;
 
-	private Repository repo;
+	private FileRepository repo;
 
 	private TestRepository<Repository> tr;
 
@@ -99,24 +107,26 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 		return rng;
 	}
 
+	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
 
 		WindowCacheConfig cfg = new WindowCacheConfig();
 		cfg.setStreamFileThreshold(streamThreshold);
-		WindowCache.reconfigure(cfg);
+		cfg.install();
 
 		repo = createBareRepository();
-		tr = new TestRepository<Repository>(repo);
+		tr = new TestRepository<>(repo);
 		wc = (WindowCursor) repo.newObjectReader();
 	}
 
+	@Override
 	@After
 	public void tearDown() throws Exception {
 		if (wc != null)
-			wc.release();
-		WindowCache.reconfigure(new WindowCacheConfig());
+			wc.close();
+		new WindowCacheConfig().install();
 		super.tearDown();
 	}
 
@@ -183,126 +193,144 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 
 	@Test
 	public void testDelta_SmallObjectChain() throws Exception {
-		ObjectInserter.Formatter fmt = new ObjectInserter.Formatter();
-		byte[] data0 = new byte[512];
-		Arrays.fill(data0, (byte) 0xf3);
-		ObjectId id0 = fmt.idFor(Constants.OBJ_BLOB, data0);
+		try (ObjectInserter.Formatter fmt = new ObjectInserter.Formatter()) {
+			byte[] data0 = new byte[512];
+			Arrays.fill(data0, (byte) 0xf3);
+			ObjectId id0 = fmt.idFor(Constants.OBJ_BLOB, data0);
 
-		TemporaryBuffer.Heap pack = new TemporaryBuffer.Heap(64 * 1024);
-		packHeader(pack, 4);
-		objectHeader(pack, Constants.OBJ_BLOB, data0.length);
-		deflate(pack, data0);
+			TemporaryBuffer.Heap pack = new TemporaryBuffer.Heap(64 * 1024);
+			packHeader(pack, 4);
+			objectHeader(pack, Constants.OBJ_BLOB, data0.length);
+			deflate(pack, data0);
 
-		byte[] data1 = clone(0x01, data0);
-		byte[] delta1 = delta(data0, data1);
-		ObjectId id1 = fmt.idFor(Constants.OBJ_BLOB, data1);
-		objectHeader(pack, Constants.OBJ_REF_DELTA, delta1.length);
-		id0.copyRawTo(pack);
-		deflate(pack, delta1);
+			byte[] data1 = clone(0x01, data0);
+			byte[] delta1 = delta(data0, data1);
+			ObjectId id1 = fmt.idFor(Constants.OBJ_BLOB, data1);
+			objectHeader(pack, Constants.OBJ_REF_DELTA, delta1.length);
+			id0.copyRawTo(pack);
+			deflate(pack, delta1);
 
-		byte[] data2 = clone(0x02, data1);
-		byte[] delta2 = delta(data1, data2);
-		ObjectId id2 = fmt.idFor(Constants.OBJ_BLOB, data2);
-		objectHeader(pack, Constants.OBJ_REF_DELTA, delta2.length);
-		id1.copyRawTo(pack);
-		deflate(pack, delta2);
+			byte[] data2 = clone(0x02, data1);
+			byte[] delta2 = delta(data1, data2);
+			ObjectId id2 = fmt.idFor(Constants.OBJ_BLOB, data2);
+			objectHeader(pack, Constants.OBJ_REF_DELTA, delta2.length);
+			id1.copyRawTo(pack);
+			deflate(pack, delta2);
 
-		byte[] data3 = clone(0x03, data2);
-		byte[] delta3 = delta(data2, data3);
-		ObjectId id3 = fmt.idFor(Constants.OBJ_BLOB, data3);
-		objectHeader(pack, Constants.OBJ_REF_DELTA, delta3.length);
-		id2.copyRawTo(pack);
-		deflate(pack, delta3);
+			byte[] data3 = clone(0x03, data2);
+			byte[] delta3 = delta(data2, data3);
+			ObjectId id3 = fmt.idFor(Constants.OBJ_BLOB, data3);
+			objectHeader(pack, Constants.OBJ_REF_DELTA, delta3.length);
+			id2.copyRawTo(pack);
+			deflate(pack, delta3);
 
-		digest(pack);
-		PackParser ip = index(pack.toByteArray());
-		ip.setAllowThin(true);
-		ip.parse(NullProgressMonitor.INSTANCE);
+			digest(pack);
+			PackParser ip = index(pack.toByteArray());
+			ip.setAllowThin(true);
+			ip.parse(NullProgressMonitor.INSTANCE);
 
-		assertTrue("has blob", wc.has(id3));
+			assertTrue("has blob", wc.has(id3));
 
-		ObjectLoader ol = wc.open(id3);
-		assertNotNull("created loader", ol);
-		assertEquals(Constants.OBJ_BLOB, ol.getType());
-		assertEquals(data3.length, ol.getSize());
-		assertFalse("is large", ol.isLarge());
-		assertNotNull(ol.getCachedBytes());
-		assertArrayEquals(data3, ol.getCachedBytes());
+			ObjectLoader ol = wc.open(id3);
+			assertNotNull("created loader", ol);
+			assertEquals(Constants.OBJ_BLOB, ol.getType());
+			assertEquals(data3.length, ol.getSize());
+			assertFalse("is large", ol.isLarge());
+			assertNotNull(ol.getCachedBytes());
+			assertArrayEquals(data3, ol.getCachedBytes());
 
-		ObjectStream in = ol.openStream();
-		assertNotNull("have stream", in);
-		assertEquals(Constants.OBJ_BLOB, in.getType());
-		assertEquals(data3.length, in.getSize());
-		byte[] act = new byte[data3.length];
-		IO.readFully(in, act, 0, data3.length);
-		assertTrue("same content", Arrays.equals(act, data3));
-		assertEquals("stream at EOF", -1, in.read());
-		in.close();
+			ObjectStream in = ol.openStream();
+			assertNotNull("have stream", in);
+			assertEquals(Constants.OBJ_BLOB, in.getType());
+			assertEquals(data3.length, in.getSize());
+			byte[] act = new byte[data3.length];
+			IO.readFully(in, act, 0, data3.length);
+			assertTrue("same content", Arrays.equals(act, data3));
+			assertEquals("stream at EOF", -1, in.read());
+			in.close();
+		}
 	}
 
 	@Test
-	public void testDelta_LargeObjectChain() throws Exception {
-		ObjectInserter.Formatter fmt = new ObjectInserter.Formatter();
-		byte[] data0 = new byte[streamThreshold + 5];
-		Arrays.fill(data0, (byte) 0xf3);
-		ObjectId id0 = fmt.idFor(Constants.OBJ_BLOB, data0);
+	public void testDelta_FailsOver2GiB() throws Exception {
+		try (ObjectInserter.Formatter fmt = new ObjectInserter.Formatter()) {
+			byte[] base = new byte[] { 'a' };
+			ObjectId idA = fmt.idFor(Constants.OBJ_BLOB, base);
+			ObjectId idB = fmt.idFor(Constants.OBJ_BLOB, new byte[] { 'b' });
 
-		TemporaryBuffer.Heap pack = new TemporaryBuffer.Heap(64 * 1024);
-		packHeader(pack, 4);
-		objectHeader(pack, Constants.OBJ_BLOB, data0.length);
-		deflate(pack, data0);
+			PackedObjectInfo a = new PackedObjectInfo(idA);
+			PackedObjectInfo b = new PackedObjectInfo(idB);
 
-		byte[] data1 = clone(0x01, data0);
-		byte[] delta1 = delta(data0, data1);
-		ObjectId id1 = fmt.idFor(Constants.OBJ_BLOB, data1);
-		objectHeader(pack, Constants.OBJ_REF_DELTA, delta1.length);
-		id0.copyRawTo(pack);
-		deflate(pack, delta1);
+			TemporaryBuffer.Heap pack = new TemporaryBuffer.Heap(64 * 1024);
+			packHeader(pack, 2);
+			a.setOffset(pack.length());
+			objectHeader(pack, Constants.OBJ_BLOB, base.length);
+			deflate(pack, base);
 
-		byte[] data2 = clone(0x02, data1);
-		byte[] delta2 = delta(data1, data2);
-		ObjectId id2 = fmt.idFor(Constants.OBJ_BLOB, data2);
-		objectHeader(pack, Constants.OBJ_REF_DELTA, delta2.length);
-		id1.copyRawTo(pack);
-		deflate(pack, delta2);
+			ByteArrayOutputStream tmp = new ByteArrayOutputStream();
+			DeltaEncoder de = new DeltaEncoder(tmp, base.length, 3L << 30);
+			de.copy(0, 1);
+			byte[] delta = tmp.toByteArray();
+			b.setOffset(pack.length());
+			objectHeader(pack, Constants.OBJ_REF_DELTA, delta.length);
+			idA.copyRawTo(pack);
+			deflate(pack, delta);
+			byte[] footer = digest(pack);
 
-		byte[] data3 = clone(0x03, data2);
-		byte[] delta3 = delta(data2, data3);
-		ObjectId id3 = fmt.idFor(Constants.OBJ_BLOB, data3);
-		objectHeader(pack, Constants.OBJ_REF_DELTA, delta3.length);
-		id2.copyRawTo(pack);
-		deflate(pack, delta3);
+			File dir = new File(repo.getObjectDatabase().getDirectory(),
+					"pack");
+			File packName = new File(dir, idA.name() + ".pack");
+			File idxName = new File(dir, idA.name() + ".idx");
 
-		digest(pack);
-		PackParser ip = index(pack.toByteArray());
-		ip.setAllowThin(true);
-		ip.parse(NullProgressMonitor.INSTANCE);
+			FileOutputStream f = new FileOutputStream(packName);
+			try {
+				f.write(pack.toByteArray());
+			} finally {
+				f.close();
+			}
 
-		assertTrue("has blob", wc.has(id3));
+			f = new FileOutputStream(idxName);
+			try {
+				List<PackedObjectInfo> list = new ArrayList<>();
+				list.add(a);
+				list.add(b);
+				Collections.sort(list);
+				new PackIndexWriterV1(f).write(list, footer);
+			} finally {
+				f.close();
+			}
 
-		ObjectLoader ol = wc.open(id3);
-		assertNotNull("created loader", ol);
-		assertEquals(Constants.OBJ_BLOB, ol.getType());
-		assertEquals(data3.length, ol.getSize());
-		assertTrue("is large", ol.isLarge());
-		try {
-			ol.getCachedBytes();
-			fail("Should have thrown LargeObjectException");
-		} catch (LargeObjectException tooBig) {
-			assertEquals(MessageFormat.format(
-					JGitText.get().largeObjectException, id3.name()), tooBig
-					.getMessage());
+			PackFile packFile = new PackFile(packName, PackExt.INDEX.getBit());
+			try {
+				packFile.get(wc, b);
+				fail("expected LargeObjectException.ExceedsByteArrayLimit");
+			} catch (LargeObjectException.ExceedsByteArrayLimit bad) {
+				assertNull(bad.getObjectId());
+			} finally {
+				packFile.close();
+			}
 		}
+	}
 
+	@Test
+	public void testConfigurableStreamFileThreshold() throws Exception {
+		byte[] data = getRng().nextBytes(300);
+		RevBlob id = tr.blob(data);
+		tr.branch("master").commit().add("A", id).create();
+		tr.packAndPrune();
+		assertTrue("has blob", wc.has(id));
+
+		ObjectLoader ol = wc.open(id);
 		ObjectStream in = ol.openStream();
-		assertNotNull("have stream", in);
-		assertEquals(Constants.OBJ_BLOB, in.getType());
-		assertEquals(data3.length, in.getSize());
-		byte[] act = new byte[data3.length];
-		IO.readFully(in, act, 0, data3.length);
-		assertTrue("same content", Arrays.equals(act, data3));
-		assertEquals("stream at EOF", -1, in.read());
+		assertTrue(in instanceof ObjectStream.SmallStream);
+		assertEquals(300, in.available());
 		in.close();
+
+		wc.setStreamFileThreshold(299);
+		ol = wc.open(id);
+		in = ol.openStream();
+		assertTrue(in instanceof ObjectStream.Filter);
+		assertEquals(1, in.available());
 	}
 
 	private static byte[] clone(int first, byte[] base) {
@@ -358,18 +386,22 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 		deflater.end();
 	}
 
-	private static void digest(TemporaryBuffer.Heap buf) throws IOException {
+	private static byte[] digest(TemporaryBuffer.Heap buf)
+			throws IOException {
 		MessageDigest md = Constants.newMessageDigest();
 		md.update(buf.toByteArray());
-		buf.write(md.digest());
+		byte[] footer = md.digest();
+		buf.write(footer);
+		return footer;
 	}
 
 	private ObjectInserter inserter;
 
 	@After
 	public void release() {
-		if (inserter != null)
-			inserter.release();
+		if (inserter != null) {
+			inserter.close();
+		}
 	}
 
 	private PackParser index(byte[] raw) throws IOException {

@@ -43,6 +43,9 @@
 
 package org.eclipse.jgit.diff;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * An extended form of Bram Cohen's patience diff algorithm.
  * <p>
@@ -91,7 +94,7 @@ package org.eclipse.jgit.diff;
  */
 public class HistogramDiff extends LowLevelDiffAlgorithm {
 	/** Algorithm to use when there are too many element occurrences. */
-	private DiffAlgorithm fallback = MyersDiff.INSTANCE;
+	DiffAlgorithm fallback = MyersDiff.INSTANCE;
 
 	/**
 	 * Maximum number of positions to consider for a given element hash.
@@ -100,7 +103,7 @@ public class HistogramDiff extends LowLevelDiffAlgorithm {
 	 * size is capped to ensure search is linear time at O(len_A + len_B) rather
 	 * than quadratic at O(len_A * len_B).
 	 */
-	private int maxChainLength = 64;
+	int maxChainLength = 64;
 
 	/**
 	 * Set the algorithm used when there are too many element occurrences.
@@ -127,18 +130,18 @@ public class HistogramDiff extends LowLevelDiffAlgorithm {
 		maxChainLength = maxLen;
 	}
 
+	@Override
 	public <S extends Sequence> void diffNonCommon(EditList edits,
 			HashedSequenceComparator<S> cmp, HashedSequence<S> a,
 			HashedSequence<S> b, Edit region) {
-		new State<S>(edits, cmp, a, b).diffReplace(region);
+		new State<>(edits, cmp, a, b).diffRegion(region);
 	}
 
 	private class State<S extends Sequence> {
 		private final HashedSequenceComparator<S> cmp;
-
 		private final HashedSequence<S> a;
-
 		private final HashedSequence<S> b;
+		private final List<Edit> queue = new ArrayList<>();
 
 		/** Result edits we have determined that must be made to convert a to b. */
 		final EditList edits;
@@ -151,8 +154,14 @@ public class HistogramDiff extends LowLevelDiffAlgorithm {
 			this.edits = edits;
 		}
 
-		void diffReplace(Edit r) {
-			Edit lcs = new HistogramDiffIndex<S>(maxChainLength, cmp, a, b, r)
+		void diffRegion(Edit r) {
+			diffReplace(r);
+			while (!queue.isEmpty())
+				diff(queue.remove(queue.size() - 1));
+		}
+
+		private void diffReplace(Edit r) {
+			Edit lcs = new HistogramDiffIndex<>(maxChainLength, cmp, a, b, r)
 					.findLongestCommonSequence();
 			if (lcs != null) {
 				// If we were given an edit, we can prove a result here.
@@ -163,8 +172,8 @@ public class HistogramDiff extends LowLevelDiffAlgorithm {
 					//
 					edits.add(r);
 				} else {
-					diff(r.before(lcs));
-					diff(r.after(lcs));
+					queue.add(r.after(lcs));
+					queue.add(r.before(lcs));
 				}
 
 			} else if (fallback instanceof LowLevelDiffAlgorithm) {
@@ -192,7 +201,10 @@ public class HistogramDiff extends LowLevelDiffAlgorithm {
 				break;
 
 			case REPLACE:
-				diffReplace(r);
+				if (r.getLengthA() == 1 && r.getLengthB() == 1)
+					edits.add(r);
+				else
+					diffReplace(r);
 				break;
 
 			case EMPTY:
@@ -202,7 +214,7 @@ public class HistogramDiff extends LowLevelDiffAlgorithm {
 		}
 
 		private SubsequenceComparator<HashedSequence<S>> subcmp() {
-			return new SubsequenceComparator<HashedSequence<S>>(cmp);
+			return new SubsequenceComparator<>(cmp);
 		}
 	}
 }

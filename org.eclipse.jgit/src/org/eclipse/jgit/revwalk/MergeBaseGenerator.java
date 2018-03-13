@@ -45,6 +45,7 @@ package org.eclipse.jgit.revwalk;
 
 import java.io.IOException;
 import java.text.MessageFormat;
+import java.util.LinkedList;
 
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -68,29 +69,27 @@ import org.eclipse.jgit.internal.JGitText;
  */
 class MergeBaseGenerator extends Generator {
 	private static final int PARSED = RevWalk.PARSED;
-
 	private static final int IN_PENDING = RevWalk.SEEN;
-
 	private static final int POPPED = RevWalk.TEMP_MARK;
-
 	private static final int MERGE_BASE = RevWalk.REWRITE;
 
 	private final RevWalk walker;
-
 	private final DateRevQueue pending;
 
 	private int branchMask;
-
 	private int recarryTest;
-
 	private int recarryMask;
+	private int mergeBaseAncestor = -1;
+	private LinkedList<RevCommit> ret = new LinkedList<>();
+
+	private CarryStack stack;
 
 	MergeBaseGenerator(final RevWalk w) {
 		walker = w;
 		pending = new DateRevQueue();
 	}
 
-	void init(final AbstractRevQueue p) {
+	void init(final AbstractRevQueue p) throws IOException {
 		try {
 			for (;;) {
 				final RevCommit c = p.next();
@@ -98,17 +97,25 @@ class MergeBaseGenerator extends Generator {
 					break;
 				add(c);
 			}
-		} finally {
-			// Always free the flags immediately. This ensures the flags
-			// will be available for reuse when the walk resets.
-			//
-			walker.freeFlag(branchMask);
-
 			// Setup the condition used by carryOntoOne to detect a late
 			// merge base and produce it on the next round.
 			//
 			recarryTest = branchMask | POPPED;
 			recarryMask = branchMask | POPPED | MERGE_BASE;
+			mergeBaseAncestor = walker.allocFlag();
+
+			for (;;) {
+				RevCommit c = _next();
+				if (c == null) {
+					break;
+				}
+				ret.add(c);
+			}
+		} finally {
+			// Always free the flags immediately. This ensures the flags
+			// will be available for reuse when the walk resets.
+			//
+			walker.freeFlag(branchMask | mergeBaseAncestor);
 		}
 	}
 
@@ -131,13 +138,11 @@ class MergeBaseGenerator extends Generator {
 		return 0;
 	}
 
-	@Override
-	RevCommit next() throws MissingObjectException,
+	private RevCommit _next() throws MissingObjectException,
 			IncorrectObjectTypeException, IOException {
 		for (;;) {
 			final RevCommit c = pending.next();
 			if (c == null) {
-				walker.reader.walkAdviceEnd();
 				return null;
 			}
 
@@ -157,7 +162,7 @@ class MergeBaseGenerator extends Generator {
 				// also flagged as being popped, so that they do not
 				// generate to the caller.
 				//
-				carry |= MERGE_BASE;
+				carry |= MERGE_BASE | mergeBaseAncestor;
 			}
 			carryOntoHistory(c, carry);
 
@@ -180,29 +185,68 @@ class MergeBaseGenerator extends Generator {
 		}
 	}
 
-	private void carryOntoHistory(RevCommit c, final int carry) {
-		for (;;) {
-			final RevCommit[] pList = c.parents;
-			if (pList == null)
-				return;
-			final int n = pList.length;
-			if (n == 0)
-				return;
-
-			for (int i = 1; i < n; i++) {
-				final RevCommit p = pList[i];
-				if (!carryOntoOne(p, carry))
-					carryOntoHistory(p, carry);
+	@Override
+	RevCommit next() throws MissingObjectException,
+			IncorrectObjectTypeException, IOException {
+		while (!ret.isEmpty()) {
+			RevCommit commit = ret.remove();
+			if ((commit.flags & mergeBaseAncestor) == 0) {
+				return commit;
 			}
+		}
+		return null;
+	}
 
-			c = pList[0];
-			if (carryOntoOne(c, carry))
+	private void carryOntoHistory(RevCommit c, int carry) {
+		stack = null;
+		for (;;) {
+			carryOntoHistoryInnerLoop(c, carry);
+			if (stack == null) {
 				break;
+			}
+			c = stack.c;
+			carry = stack.carry;
+			stack = stack.prev;
 		}
 	}
 
-	private boolean carryOntoOne(final RevCommit p, final int carry) {
-		final boolean haveAll = (p.flags & carry) == carry;
+	private void carryOntoHistoryInnerLoop(RevCommit c, int carry) {
+		for (;;) {
+			RevCommit[] parents = c.parents;
+			if (parents == null || parents.length == 0) {
+				break;
+			}
+
+			int e = parents.length - 1;
+			for (int i = 0; i < e; i++) {
+				RevCommit p = parents[i];
+				if (carryOntoOne(p, carry) == CONTINUE) {
+					// Walking p will be required, buffer p on stack.
+					stack = new CarryStack(stack, p, carry);
+				}
+				// For other results from carryOntoOne:
+				// HAVE_ALL: p has all bits, do nothing to skip that path.
+				// CONTINUE_ON_STACK: callee pushed StackElement for p.
+			}
+
+			c = parents[e];
+			if (carryOntoOne(c, carry) != CONTINUE) {
+				break;
+			}
+		}
+	}
+
+	private static final int CONTINUE = 0;
+	private static final int HAVE_ALL = 1;
+	private static final int CONTINUE_ON_STACK = 2;
+
+	private int carryOntoOne(RevCommit p, int carry) {
+		// If we already had all carried flags, our parents do too.
+		// Return HAVE_ALL to stop caller from running down this leg
+		// of the revision graph any further.
+		//
+		// Otherwise return CONTINUE to ask the caller to walk history.
+		int rc = (p.flags & carry) == carry ? HAVE_ALL : CONTINUE;
 		p.flags |= carry;
 
 		if ((p.flags & recarryMask) == recarryTest) {
@@ -210,17 +254,23 @@ class MergeBaseGenerator extends Generator {
 			// voted to be one. Inject ourselves back at the front of the
 			// pending queue and tell all of our ancestors they are within
 			// the merge base now.
-			//
 			p.flags &= ~POPPED;
 			pending.add(p);
-			carryOntoHistory(p, branchMask | MERGE_BASE);
-			return true;
+			stack = new CarryStack(stack, p, branchMask | MERGE_BASE);
+			return CONTINUE_ON_STACK;
 		}
+		return rc;
+	}
 
-		// If we already had all carried flags, our parents do too.
-		// Return true to stop the caller from running down this leg
-		// of the revision graph any further.
-		//
-		return haveAll;
+	private static class CarryStack {
+		final CarryStack prev;
+		final RevCommit c;
+		final int carry;
+
+		CarryStack(CarryStack prev, RevCommit c, int carry) {
+			this.prev = prev;
+			this.c = c;
+			this.carry = carry;
+		}
 	}
 }

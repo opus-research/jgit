@@ -45,46 +45,70 @@ package org.eclipse.jgit.internal.storage.dfs;
 
 import static org.eclipse.jgit.internal.storage.pack.PackExt.INDEX;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.PACK;
+import static org.eclipse.jgit.lib.Constants.OBJ_OFS_DELTA;
+import static org.eclipse.jgit.lib.Constants.OBJ_REF_DELTA;
 
+import java.io.BufferedInputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.security.MessageDigest;
+import java.text.MessageFormat;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.zip.CRC32;
+import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
+import java.util.zip.Inflater;
+import java.util.zip.InflaterInputStream;
 
+import org.eclipse.jgit.errors.CorruptObjectException;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.LargeObjectException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.PackIndex;
 import org.eclipse.jgit.internal.storage.file.PackIndexWriter;
+import org.eclipse.jgit.internal.storage.pack.PackExt;
+import org.eclipse.jgit.lib.AbbreviatedObjectId;
+import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdOwnerMap;
 import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.ObjectLoader;
+import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.ObjectStream;
 import org.eclipse.jgit.transport.PackedObjectInfo;
 import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.TemporaryBuffer;
 import org.eclipse.jgit.util.io.CountingOutputStream;
+import org.eclipse.jgit.util.sha1.SHA1;
 
 /** Inserts objects into the DFS. */
 public class DfsInserter extends ObjectInserter {
 	/** Always produce version 2 indexes, to get CRC data. */
 	private static final int INDEX_VERSION = 2;
 
-	private final DfsObjDatabase db;
+	final DfsObjDatabase db;
+	int compression = Deflater.BEST_COMPRESSION;
 
-	private List<PackedObjectInfo> objectList;
-	private ObjectIdOwnerMap<PackedObjectInfo> objectMap;
+	List<PackedObjectInfo> objectList;
+	ObjectIdOwnerMap<PackedObjectInfo> objectMap;
 
-	private DfsBlockCache cache;
-	private DfsPackKey packKey;
-	private DfsPackDescription packDsc;
-	private PackStream packOut;
+	DfsBlockCache cache;
+	DfsStreamKey packKey;
+	DfsPackDescription packDsc;
+	PackStream packOut;
 	private boolean rollback;
+	private boolean checkExisting = true;
 
 	/**
 	 * Initialize a new inserter.
@@ -96,9 +120,27 @@ public class DfsInserter extends ObjectInserter {
 		this.db = db;
 	}
 
+	/**
+	 * @param check
+	 *            if false, will write out possibly-duplicate objects without
+	 *            first checking whether they exist in the repo; default is true.
+	 */
+	public void checkExisting(boolean check) {
+		checkExisting = check;
+	}
+
+	void setCompressionLevel(int compression) {
+		this.compression = compression;
+	}
+
 	@Override
 	public DfsPackParser newPackParser(InputStream in) throws IOException {
 		return new DfsPackParser(db, this, in);
+	}
+
+	@Override
+	public ObjectReader newReader() {
+		return new Reader();
 	}
 
 	@Override
@@ -107,7 +149,8 @@ public class DfsInserter extends ObjectInserter {
 		ObjectId id = idFor(type, data, off, len);
 		if (objectMap != null && objectMap.contains(id))
 			return id;
-		if (db.has(id))
+		// Ignore unreachable (garbage) objects here.
+		if (checkExisting && db.has(id, true))
 			return id;
 
 		long offset = beginObject(type, len);
@@ -119,14 +162,14 @@ public class DfsInserter extends ObjectInserter {
 	@Override
 	public ObjectId insert(int type, long len, InputStream in)
 			throws IOException {
-		byte[] buf = buffer();
+		byte[] buf = insertBuffer(len);
 		if (len <= buf.length) {
 			IO.readFully(in, buf, 0, (int) len);
 			return insert(type, buf, 0, (int) len);
 		}
 
 		long offset = beginObject(type, len);
-		MessageDigest md = digest();
+		SHA1 md = digest();
 		md.update(Constants.encodedTypeString(type));
 		md.update((byte) ' ');
 		md.update(Constants.encodeASCII(len));
@@ -141,7 +184,21 @@ public class DfsInserter extends ObjectInserter {
 			len -= n;
 		}
 		packOut.compress.finish();
-		return endObject(ObjectId.fromRaw(md.digest()), offset);
+		return endObject(md.toObjectId(), offset);
+	}
+
+	private byte[] insertBuffer(long len) {
+		byte[] buf = buffer();
+		if (len <= buf.length)
+			return buf;
+		if (len < db.getReaderOptions().getStreamFileThreshold()) {
+			try {
+				return new byte[(int) len];
+			} catch (OutOfMemoryError noMem) {
+				return buf;
+			}
+		}
+		return buf;
 	}
 
 	@Override
@@ -164,7 +221,7 @@ public class DfsInserter extends ObjectInserter {
 		db.commitPack(Collections.singletonList(packDsc), null);
 		rollback = false;
 
-		DfsPackFile p = cache.getOrCreate(packDsc, packKey);
+		DfsPackFile p = new DfsPackFile(cache, packDsc);
 		if (index != null)
 			p.setPackIndex(index);
 		db.addPack(p);
@@ -172,7 +229,7 @@ public class DfsInserter extends ObjectInserter {
 	}
 
 	@Override
-	public void release() {
+	public void close() {
 		if (packOut != null) {
 			try {
 				packOut.close();
@@ -218,14 +275,16 @@ public class DfsInserter extends ObjectInserter {
 	}
 
 	private void beginPack() throws IOException {
-		objectList = new BlockList<PackedObjectInfo>();
-		objectMap = new ObjectIdOwnerMap<PackedObjectInfo>();
+		objectList = new BlockList<>();
+		objectMap = new ObjectIdOwnerMap<>();
 		cache = DfsBlockCache.getInstance();
 
 		rollback = true;
 		packDsc = db.newPack(DfsObjDatabase.PackSource.INSERT);
-		packOut = new PackStream(db.writeFile(packDsc, PACK));
-		packKey = new DfsPackKey();
+		DfsOutputStream dfsOut = db.writeFile(packDsc, PACK);
+		packDsc.setBlockSize(PACK, dfsOut.blockSize());
+		packOut = new PackStream(dfsOut);
+		packKey = packDsc.getStreamKey(PACK);
 
 		// Write the header as though it were a single object pack.
 		byte[] buf = packOut.hdrBuf;
@@ -255,17 +314,19 @@ public class DfsInserter extends ObjectInserter {
 			packIndex = PackIndex.read(buf.openInputStream());
 		}
 
-		DfsOutputStream os = db.writeFile(pack, INDEX);
-		try {
+		try (DfsOutputStream os = db.writeFile(pack, INDEX)) {
 			CountingOutputStream cnt = new CountingOutputStream(os);
 			if (buf != null)
 				buf.writeTo(cnt, null);
 			else
 				index(cnt, packHash, list);
 			pack.addFileExt(INDEX);
+			pack.setBlockSize(INDEX, os.blockSize());
 			pack.setFileSize(INDEX, cnt.getCount());
 		} finally {
-			os.close();
+			if (buf != null) {
+				buf.close();
+			}
 		}
 		return packIndex;
 	}
@@ -278,7 +339,7 @@ public class DfsInserter extends ObjectInserter {
 	private class PackStream extends OutputStream {
 		private final DfsOutputStream out;
 		private final MessageDigest md;
-		private final byte[] hdrBuf;
+		final byte[] hdrBuf;
 		private final Deflater deflater;
 		private final int blockSize;
 
@@ -295,7 +356,7 @@ public class DfsInserter extends ObjectInserter {
 			hdrBuf = new byte[32];
 			md = Constants.newMessageDigest();
 			crc32 = new CRC32();
-			deflater = new Deflater(Deflater.BEST_COMPRESSION);
+			deflater = new Deflater(compression);
 			compress = new DeflaterOutputStream(this, deflater, 8192);
 
 			int size = out.blockSize();
@@ -389,10 +450,273 @@ public class DfsInserter extends ObjectInserter {
 			return packHash;
 		}
 
+		int read(long pos, byte[] dst, int ptr, int cnt) throws IOException {
+			int r = 0;
+			while (pos < currPos && r < cnt) {
+				DfsBlock b = getOrLoadBlock(pos);
+				int n = b.copy(pos, dst, ptr + r, cnt - r);
+				pos += n;
+				r += n;
+			}
+			if (currPos <= pos && r < cnt) {
+				int s = (int) (pos - currPos);
+				int n = Math.min(currPtr - s, cnt - r);
+				System.arraycopy(currBuf, s, dst, ptr + r, n);
+				r += n;
+			}
+			return r;
+		}
+
+		byte[] inflate(DfsReader ctx, long pos, int len) throws IOException,
+				DataFormatException {
+			byte[] dstbuf;
+			try {
+				dstbuf = new byte[len];
+			} catch (OutOfMemoryError noMemory) {
+				return null; // Caller will switch to large object streaming.
+			}
+
+			Inflater inf = ctx.inflater();
+			pos += setInput(pos, inf);
+			for (int dstoff = 0;;) {
+				int n = inf.inflate(dstbuf, dstoff, dstbuf.length - dstoff);
+				dstoff += n;
+				if (inf.finished())
+					return dstbuf;
+				if (inf.needsInput())
+					pos += setInput(pos, inf);
+				else if (n == 0)
+					throw new DataFormatException();
+			}
+		}
+
+		private int setInput(long pos, Inflater inf)
+				throws IOException, DataFormatException {
+			if (pos < currPos)
+				return getOrLoadBlock(pos).setInput(pos, inf);
+			if (pos < currPos + currPtr) {
+				int s = (int) (pos - currPos);
+				int n = currPtr - s;
+				inf.setInput(currBuf, s, n);
+				return n;
+			}
+			throw new EOFException(DfsText.get().unexpectedEofInPack);
+		}
+
+		private DfsBlock getOrLoadBlock(long pos) throws IOException {
+			long s = toBlockStart(pos);
+			DfsBlock b = cache.get(packKey, s);
+			if (b != null)
+				return b;
+
+			byte[] d = new byte[blockSize];
+			for (int p = 0; p < blockSize;) {
+				int n = out.read(s + p, ByteBuffer.wrap(d, p, blockSize - p));
+				if (n <= 0)
+					throw new EOFException(DfsText.get().unexpectedEofInPack);
+				p += n;
+			}
+			b = new DfsBlock(packKey, s, d);
+			cache.put(b);
+			return b;
+		}
+
+		private long toBlockStart(long pos) {
+			return (pos / blockSize) * blockSize;
+		}
+
 		@Override
 		public void close() throws IOException {
 			deflater.end();
 			out.close();
+		}
+	}
+
+	private class Reader extends ObjectReader {
+		private final DfsReader ctx = db.newReader();
+
+		@Override
+		public ObjectReader newReader() {
+			return db.newReader();
+		}
+
+		@Override
+		public Collection<ObjectId> resolve(AbbreviatedObjectId id)
+				throws IOException {
+			Collection<ObjectId> stored = ctx.resolve(id);
+			if (objectList == null)
+				return stored;
+
+			Set<ObjectId> r = new HashSet<>(stored.size() + 2);
+			r.addAll(stored);
+			for (PackedObjectInfo obj : objectList) {
+				if (id.prefixCompare(obj) == 0)
+					r.add(obj.copy());
+			}
+			return r;
+		}
+
+		@Override
+		public ObjectLoader open(AnyObjectId objectId, int typeHint)
+				throws IOException {
+			if (objectMap == null)
+				return ctx.open(objectId, typeHint);
+
+			PackedObjectInfo obj = objectMap.get(objectId);
+			if (obj == null)
+				return ctx.open(objectId, typeHint);
+
+			byte[] buf = buffer();
+			int cnt = packOut.read(obj.getOffset(), buf, 0, 20);
+			if (cnt <= 0)
+					throw new EOFException(DfsText.get().unexpectedEofInPack);
+
+			int c = buf[0] & 0xff;
+			int type = (c >> 4) & 7;
+			if (type == OBJ_OFS_DELTA || type == OBJ_REF_DELTA)
+				throw new IOException(MessageFormat.format(
+						DfsText.get().cannotReadBackDelta, Integer.toString(type)));
+			if (typeHint != OBJ_ANY && type != typeHint) {
+				throw new IncorrectObjectTypeException(objectId.copy(), typeHint);
+			}
+
+			long sz = c & 0x0f;
+			int ptr = 1;
+			int shift = 4;
+			while ((c & 0x80) != 0) {
+				if (ptr >= cnt)
+					throw new EOFException(DfsText.get().unexpectedEofInPack);
+				c = buf[ptr++] & 0xff;
+				sz += ((long) (c & 0x7f)) << shift;
+				shift += 7;
+			}
+
+			long zpos = obj.getOffset() + ptr;
+			if (sz < ctx.getStreamFileThreshold()) {
+				byte[] data = inflate(obj, zpos, (int) sz);
+				if (data != null)
+					return new ObjectLoader.SmallObject(type, data);
+			}
+			return new StreamLoader(obj.copy(), type, sz, packKey, zpos);
+		}
+
+		private byte[] inflate(PackedObjectInfo obj, long zpos, int sz)
+				throws IOException, CorruptObjectException {
+			try {
+				return packOut.inflate(ctx, zpos, sz);
+			} catch (DataFormatException dfe) {
+				CorruptObjectException coe = new CorruptObjectException(
+						MessageFormat.format(
+								JGitText.get().objectAtHasBadZlibStream,
+								Long.valueOf(obj.getOffset()),
+								packDsc.getFileName(PackExt.PACK)));
+				coe.initCause(dfe);
+				throw coe;
+			}
+		}
+
+		@Override
+		public Set<ObjectId> getShallowCommits() throws IOException {
+			return ctx.getShallowCommits();
+		}
+
+		@Override
+		public ObjectInserter getCreatedFromInserter() {
+			return DfsInserter.this;
+		}
+
+		@Override
+		public void close() {
+			ctx.close();
+		}
+	}
+
+	private class StreamLoader extends ObjectLoader {
+		private final ObjectId id;
+		private final int type;
+		private final long size;
+
+		private final DfsStreamKey srcPack;
+		private final long pos;
+
+		StreamLoader(ObjectId id, int type, long sz,
+				DfsStreamKey key, long pos) {
+			this.id = id;
+			this.type = type;
+			this.size = sz;
+			this.srcPack = key;
+			this.pos = pos;
+		}
+
+		@Override
+		public ObjectStream openStream() throws IOException {
+			final DfsReader ctx = db.newReader();
+			if (srcPack != packKey) {
+				try {
+					// Post DfsInserter.flush() use the normal code path.
+					// The newly created pack is registered in the cache.
+					return ctx.open(id, type).openStream();
+				} finally {
+					ctx.close();
+				}
+			}
+
+			int bufsz = 8192;
+			final Inflater inf = ctx.inflater();
+			return new ObjectStream.Filter(type,
+					size, new BufferedInputStream(new InflaterInputStream(
+							new ReadBackStream(pos), inf, bufsz), bufsz)) {
+				@Override
+				public void close() throws IOException {
+					ctx.close();
+					super.close();
+				}
+			};
+		}
+
+		@Override
+		public int getType() {
+			return type;
+		}
+
+		@Override
+		public long getSize() {
+			return size;
+		}
+
+		@Override
+		public boolean isLarge() {
+			return true;
+		}
+
+		@Override
+		public byte[] getCachedBytes() throws LargeObjectException {
+			throw new LargeObjectException.ExceedsLimit(
+					db.getReaderOptions().getStreamFileThreshold(), size);
+		}
+	}
+
+	private final class ReadBackStream extends InputStream {
+		private long pos;
+
+		ReadBackStream(long offset) {
+			pos = offset;
+		}
+
+		@Override
+		public int read() throws IOException {
+			byte[] b = new byte[1];
+			int n = read(b);
+			return n == 1 ? b[0] & 0xff : -1;
+		}
+
+		@Override
+		public int read(byte[] buf, int ptr, int len) throws IOException {
+			int n = packOut.read(pos, buf, ptr, len);
+			if (n > 0) {
+				pos += n;
+			}
+			return n;
 		}
 	}
 }

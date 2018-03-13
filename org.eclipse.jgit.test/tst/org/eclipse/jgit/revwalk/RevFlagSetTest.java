@@ -103,7 +103,6 @@ public class RevFlagSetTest extends RevWalkTestCase {
 		assertTrue(set1.add(flag1));
 		assertTrue(set1.add(flag2));
 
-		assertTrue(set1.containsAll(set1));
 		assertTrue(set1.containsAll(Arrays
 				.asList(new RevFlag[] { flag1, flag2 })));
 
@@ -147,6 +146,5 @@ public class RevFlagSetTest extends RevWalkTestCase {
 		set.add(flag1);
 		assertTrue(set.contains(flag1));
 		assertFalse(set.contains(flag2));
-		assertFalse(set.contains("bob"));
 	}
 }

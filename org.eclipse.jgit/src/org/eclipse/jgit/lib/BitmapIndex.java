@@ -108,6 +108,7 @@ public interface BitmapIndex {
 		 *
 		 * @return an Iterator.
 		 */
+		@Override
 		Iterator<BitmapObject> iterator();
 	}
 
@@ -125,7 +126,9 @@ public interface BitmapIndex {
 		 * @param type
 		 *            the Git object type. See {@link Constants}.
 		 * @return true if the value was not contained or able to be loaded.
+		 * @deprecated use {@link #or} or {@link #addObject} instead.
 		 */
+		@Deprecated
 		boolean add(AnyObjectId objectId, int type);
 
 		/**
@@ -136,6 +139,18 @@ public interface BitmapIndex {
 		 * @return whether the bitmap currently contains the object ID
 		 */
 		boolean contains(AnyObjectId objectId);
+
+		/**
+		 * Adds the id to the bitmap.
+		 *
+		 * @param objectId
+		 *            the object ID
+		 * @param type
+		 *            the Git object type. See {@link Constants}.
+		 * @return the current builder.
+		 * @since 4.2
+		 */
+		BitmapBuilder addObject(AnyObjectId objectId, int type);
 
 		/**
 		 * Remove the id from the bitmap.
@@ -152,6 +167,7 @@ public interface BitmapIndex {
 		 *            the other bitmap
 		 * @return the current builder.
 		 */
+		@Override
 		BitmapBuilder or(Bitmap other);
 
 		/**
@@ -162,6 +178,7 @@ public interface BitmapIndex {
 		 *            the other bitmap
 		 * @return the current builder.
 		 */
+		@Override
 		BitmapBuilder andNot(Bitmap other);
 
 		/**
@@ -171,6 +188,7 @@ public interface BitmapIndex {
 		 *            the other bitmap
 		 * @return the current builder.
 		 */
+		@Override
 		BitmapBuilder xor(Bitmap other);
 
 		/** @return the fully built immutable bitmap */
@@ -190,5 +208,14 @@ public interface BitmapIndex {
 
 		/** @return the number of elements in the bitmap. */
 		int cardinality();
+
+		/**
+		 * Get the BitmapIndex for this BitmapBuilder.
+		 *
+		 * @return the BitmapIndex for this BitmapBuilder
+		 *
+		 * @since 4.2
+		 */
+		BitmapIndex getBitmapIndex();
 	}
 }

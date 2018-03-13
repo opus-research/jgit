@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2013 François Rey <eclipse.org_@_francois_._rey_._name>
+ * Copyright (C) 2011, 2015 François Rey <eclipse.org_@_francois_._rey_._name>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -50,18 +50,25 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.StatusCommand;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.IndexDiff.StageState;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.pgm.internal.CLIText;
+import org.eclipse.jgit.pgm.opt.UntrackedFilesHandler;
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.Option;
+import org.kohsuke.args4j.spi.RestOfArgumentsHandler;
 
+/**
+ * Status command
+ */
 @Command(usage = "usage_Status", common = true)
 class Status extends TextBuiltin {
-
-	protected final String lineFormat = CLIText.get().lineFormat;
 
 	protected final String statusFileListFormat = CLIText.get().statusFileListFormat;
 
@@ -69,19 +76,143 @@ class Status extends TextBuiltin {
 
 	protected final String statusFileListFormatUnmerged = CLIText.get().statusFileListFormatUnmerged;
 
+	@Option(name = "--porcelain", usage = "usage_machineReadableOutput")
+	protected boolean porcelain;
+
+	@Option(name = "--untracked-files", aliases = { "-u", "-uno", "-uall" }, usage = "usage_untrackedFilesMode", handler = UntrackedFilesHandler.class)
+	protected String untrackedFilesMode = "all"; // default value //$NON-NLS-1$
+
+	@Argument(required = false, index = 0, metaVar = "metaVar_paths")
+	@Option(name = "--", metaVar = "metaVar_paths", multiValued = true, handler = RestOfArgumentsHandler.class)
+	protected List<String> filterPaths;
+
 	@Override
 	protected void run() throws Exception {
+		try (Git git = new Git(db)) {
+			StatusCommand statusCommand = git.status();
+			if (filterPaths != null && filterPaths.size() > 0)
+				for (String path : filterPaths)
+					statusCommand.addPath(path);
+			org.eclipse.jgit.api.Status status = statusCommand.call();
+			printStatus(status);
+		}
+	}
+
+	private void printStatus(org.eclipse.jgit.api.Status status)
+			throws IOException {
+		if (porcelain)
+			printPorcelainStatus(status);
+		else
+			printLongStatus(status);
+	}
+
+	private void printPorcelainStatus(org.eclipse.jgit.api.Status status)
+			throws IOException {
+
+		Collection<String> added = status.getAdded();
+		Collection<String> changed = status.getChanged();
+		Collection<String> removed = status.getRemoved();
+		Collection<String> modified = status.getModified();
+		Collection<String> missing = status.getMissing();
+		Map<String, StageState> conflicting = status.getConflictingStageState();
+
+		// build a sorted list of all paths except untracked and ignored
+		TreeSet<String> sorted = new TreeSet<>();
+		sorted.addAll(added);
+		sorted.addAll(changed);
+		sorted.addAll(removed);
+		sorted.addAll(modified);
+		sorted.addAll(missing);
+		sorted.addAll(conflicting.keySet());
+
+		// list each path
+		for (String path : sorted) {
+			char x = ' ';
+			char y = ' ';
+
+			if (added.contains(path))
+				x = 'A';
+			else if (changed.contains(path))
+				x = 'M';
+			else if (removed.contains(path))
+				x = 'D';
+
+			if (modified.contains(path))
+				y = 'M';
+			else if (missing.contains(path))
+				y = 'D';
+
+			if (conflicting.containsKey(path)) {
+				StageState stageState = conflicting.get(path);
+
+				switch (stageState) {
+				case BOTH_DELETED:
+					x = 'D';
+					y = 'D';
+					break;
+				case ADDED_BY_US:
+					x = 'A';
+					y = 'U';
+					break;
+				case DELETED_BY_THEM:
+					x = 'U';
+					y = 'D';
+					break;
+				case ADDED_BY_THEM:
+					x = 'U';
+					y = 'A';
+					break;
+				case DELETED_BY_US:
+					x = 'D';
+					y = 'U';
+					break;
+				case BOTH_ADDED:
+					x = 'A';
+					y = 'A';
+					break;
+				case BOTH_MODIFIED:
+					x = 'U';
+					y = 'U';
+					break;
+				default:
+					throw new IllegalArgumentException("Unknown StageState: " //$NON-NLS-1$
+							+ stageState);
+				}
+			}
+
+			printPorcelainLine(x, y, path);
+		}
+
+		// untracked are always at the end of the list
+		if ("all".equals(untrackedFilesMode)) { //$NON-NLS-1$
+			TreeSet<String> untracked = new TreeSet<>(
+					status.getUntracked());
+			for (String path : untracked)
+				printPorcelainLine('?', '?', path);
+		}
+	}
+
+	private void printPorcelainLine(char x, char y, String path)
+			throws IOException {
+		StringBuilder lineBuilder = new StringBuilder();
+		lineBuilder.append(x).append(y).append(' ').append(path);
+		outw.println(lineBuilder.toString());
+	}
+
+	private void printLongStatus(org.eclipse.jgit.api.Status status)
+			throws IOException {
 		// Print current branch name
-		final Ref head = db.getRef(Constants.HEAD);
-		boolean firstHeader = true;
+		final Ref head = db.exactRef(Constants.HEAD);
 		if (head != null && head.isSymbolic()) {
 			String branch = Repository.shortenRefName(head.getLeaf().getName());
-			outw.println(CLIText.formatLine(
-					MessageFormat.format(CLIText.get().onBranch, branch)));
+			outw.println(CLIText.formatLine(MessageFormat.format(
+					CLIText.get().onBranch, branch)));
 		} else
 			outw.println(CLIText.formatLine(CLIText.get().notOnAnyBranch));
+
 		// List changes
-		org.eclipse.jgit.api.Status status = new Git(db).status().call();
+		boolean firstHeader = true;
+
 		Collection<String> added = status.getAdded();
 		Collection<String> changed = status.getChanged();
 		Collection<String> removed = status.getRemoved();
@@ -90,7 +221,7 @@ class Status extends TextBuiltin {
 		Collection<String> untracked = status.getUntracked();
 		Map<String, StageState> unmergedStates = status
 				.getConflictingStageState();
-		Collection<String> toBeCommitted = new ArrayList<String>(added);
+		Collection<String> toBeCommitted = new ArrayList<>(added);
 		toBeCommitted.addAll(changed);
 		toBeCommitted.addAll(removed);
 		int nbToBeCommitted = toBeCommitted.size();
@@ -101,7 +232,7 @@ class Status extends TextBuiltin {
 					toBeCommitted, added, changed, removed);
 			firstHeader = false;
 		}
-		Collection<String> notStagedForCommit = new ArrayList<String>(modified);
+		Collection<String> notStagedForCommit = new ArrayList<>(modified);
 		notStagedForCommit.addAll(missing);
 		int nbNotStagedForCommit = notStagedForCommit.size();
 		if (nbNotStagedForCommit > 0) {
@@ -122,7 +253,7 @@ class Status extends TextBuiltin {
 			firstHeader = false;
 		}
 		int nbUntracked = untracked.size();
-		if (nbUntracked > 0) {
+		if (nbUntracked > 0 && ("all".equals(untrackedFilesMode))) { //$NON-NLS-1$
 			if (!firstHeader)
 				printSectionHeader(""); //$NON-NLS-1$
 			printSectionHeader(CLIText.get().untrackedFiles);
@@ -132,16 +263,18 @@ class Status extends TextBuiltin {
 
 	protected void printSectionHeader(String pattern, Object... arguments)
 			throws IOException {
-		outw.println(CLIText.formatLine(MessageFormat
-				.format(pattern, arguments)));
-		if (!pattern.equals("")) //$NON-NLS-1$
-			outw.println(CLIText.formatLine("")); //$NON-NLS-1$
-		outw.flush();
+		if (!porcelain) {
+			outw.println(CLIText.formatLine(MessageFormat.format(pattern,
+					arguments)));
+			if (!pattern.equals("")) //$NON-NLS-1$
+				outw.println(CLIText.formatLine("")); //$NON-NLS-1$
+			outw.flush();
+		}
 	}
 
 	protected int printList(Collection<String> list) throws IOException {
 		if (!list.isEmpty()) {
-			List<String> sortedList = new ArrayList<String>(list);
+			List<String> sortedList = new ArrayList<>(list);
 			java.util.Collections.sort(sortedList);
 			for (String filename : sortedList) {
 				outw.println(CLIText.formatLine(String.format(
@@ -158,7 +291,7 @@ class Status extends TextBuiltin {
 			Collection<String> set2,
 			@SuppressWarnings("unused") Collection<String> set3)
 			throws IOException {
-		List<String> sortedList = new ArrayList<String>(list);
+		List<String> sortedList = new ArrayList<>(list);
 		java.util.Collections.sort(sortedList);
 		for (String filename : sortedList) {
 			String prefix;
@@ -178,7 +311,7 @@ class Status extends TextBuiltin {
 
 	private void printUnmerged(Map<String, StageState> unmergedStates)
 			throws IOException {
-		List<String> paths = new ArrayList<String>(unmergedStates.keySet());
+		List<String> paths = new ArrayList<>(unmergedStates.keySet());
 		Collections.sort(paths);
 		for (String path : paths) {
 			StageState state = unmergedStates.get(path);

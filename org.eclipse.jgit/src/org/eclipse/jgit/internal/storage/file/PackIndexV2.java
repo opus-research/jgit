@@ -45,6 +45,7 @@ package org.eclipse.jgit.internal.storage.file;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -74,16 +75,16 @@ class PackIndexV2 extends PackIndex {
 	private final long[] fanoutTable;
 
 	/** 256 arrays of contiguous object names. */
-	private int[][] names;
+	int[][] names;
 
 	/** 256 arrays of the 32 bit offset data, matching {@link #names}. */
-	private byte[][] offset32;
+	byte[][] offset32;
 
 	/** 256 arrays of the CRC-32 of objects, matching {@link #names}. */
 	private byte[][] crc32;
 
 	/** 64 bit offset table. */
-	private byte[] offset64;
+	byte[] offset64;
 
 	PackIndexV2(final InputStream fd) throws IOException {
 		final byte[] fanoutRaw = new byte[4 * FANOUT];
@@ -113,10 +114,13 @@ class PackIndexV2 extends PackIndex {
 				offset32[k] = NO_BYTES;
 				crc32[k] = NO_BYTES;
 				continue;
-			}
+			} else if (bucketCnt < 0)
+				throw new IOException(MessageFormat.format(
+						JGitText.get().indexFileCorruptedNegativeBucketCount,
+						Long.valueOf(bucketCnt)));
 
 			final long nameLen = bucketCnt * Constants.OBJECT_ID_LENGTH;
-			if (nameLen > Integer.MAX_VALUE)
+			if (nameLen > Integer.MAX_VALUE - 8) // see http://stackoverflow.com/a/8381338
 				throw new IOException(JGitText.get().indexFileIsTooLargeForJgit);
 
 			final int intNameLen = (int) nameLen;
@@ -228,7 +232,7 @@ class PackIndexV2 extends PackIndex {
 		final int levelOne = objId.getFirstByte();
 		final int levelTwo = binarySearchLevelTwo(objId, levelOne);
 		if (levelTwo == -1)
-			throw new MissingObjectException(objId.copy(), "unknown");
+			throw new MissingObjectException(objId.copy(), "unknown"); //$NON-NLS-1$
 		return NB.decodeUInt32(crc32[levelOne], levelTwo << 2);
 	}
 
@@ -300,13 +304,14 @@ class PackIndexV2 extends PackIndex {
 	}
 
 	private class EntriesIteratorV2 extends EntriesIterator {
-		private int levelOne;
+		int levelOne;
 
-		private int levelTwo;
+		int levelTwo;
 
 		@Override
 		protected MutableEntry initEntry() {
 			return new MutableEntry() {
+				@Override
 				protected void ensureId() {
 					idBuffer.fromRaw(names[levelOne], levelTwo
 							- Constants.OBJECT_ID_LENGTH / 4);
@@ -314,6 +319,7 @@ class PackIndexV2 extends PackIndex {
 			};
 		}
 
+		@Override
 		public MutableEntry next() {
 			for (; levelOne < names.length; levelOne++) {
 				if (levelTwo < names[levelOne].length) {

@@ -69,7 +69,7 @@ public class MergeResult {
 		FAST_FORWARD {
 			@Override
 			public String toString() {
-				return "Fast-forward";
+				return "Fast-forward"; //$NON-NLS-1$
 			}
 
 			@Override
@@ -83,7 +83,7 @@ public class MergeResult {
 		FAST_FORWARD_SQUASHED {
 			@Override
 			public String toString() {
-				return "Fast-forward-squashed";
+				return "Fast-forward-squashed"; //$NON-NLS-1$
 			}
 
 			@Override
@@ -95,7 +95,7 @@ public class MergeResult {
 		ALREADY_UP_TO_DATE {
 			@Override
 			public String toString() {
-				return "Already-up-to-date";
+				return "Already-up-to-date"; //$NON-NLS-1$
 			}
 
 			@Override
@@ -107,7 +107,7 @@ public class MergeResult {
 		FAILED {
 			@Override
 			public String toString() {
-				return "Failed";
+				return "Failed"; //$NON-NLS-1$
 			}
 
 			@Override
@@ -119,7 +119,7 @@ public class MergeResult {
 		MERGED {
 			@Override
 			public String toString() {
-				return "Merged";
+				return "Merged"; //$NON-NLS-1$
 			}
 
 			@Override
@@ -133,7 +133,7 @@ public class MergeResult {
 		MERGED_SQUASHED {
 			@Override
 			public String toString() {
-				return "Merged-squashed";
+				return "Merged-squashed"; //$NON-NLS-1$
 			}
 
 			@Override
@@ -147,7 +147,7 @@ public class MergeResult {
 		MERGED_SQUASHED_NOT_COMMITTED {
 			@Override
 			public String toString() {
-				return "Merged-squashed-not-committed";
+				return "Merged-squashed-not-committed"; //$NON-NLS-1$
 			}
 
 			@Override
@@ -159,7 +159,7 @@ public class MergeResult {
 		CONFLICTING {
 			@Override
 			public String toString() {
-				return "Conflicting";
+				return "Conflicting"; //$NON-NLS-1$
 			}
 
 			@Override
@@ -173,7 +173,7 @@ public class MergeResult {
 		ABORTED {
 			@Override
 			public String toString() {
-				return "Aborted";
+				return "Aborted"; //$NON-NLS-1$
 			}
 
 			@Override
@@ -185,8 +185,9 @@ public class MergeResult {
 		 * @since 3.0
 		 **/
 		MERGED_NOT_COMMITTED {
+			@Override
 			public String toString() {
-				return "MergedNotCommited";
+				return "Merged-not-committed"; //$NON-NLS-1$
 			}
 
 			@Override
@@ -198,7 +199,7 @@ public class MergeResult {
 		NOT_SUPPORTED {
 			@Override
 			public String toString() {
-				return "Not-yet-supported";
+				return "Not-yet-supported"; //$NON-NLS-1$
 			}
 
 			@Override
@@ -212,8 +213,9 @@ public class MergeResult {
 		 * files (i.e. local modifications prevent checkout of files).
 		 */
 		CHECKOUT_CONFLICT {
+			@Override
 			public String toString() {
-				return "Checkout Conflict";
+				return "Checkout Conflict"; //$NON-NLS-1$
 			}
 
 			@Override
@@ -414,7 +416,7 @@ public class MergeResult {
 	 */
 	public void addConflict(String path, int[][] conflictingRanges) {
 		if (conflicts == null)
-			conflicts = new HashMap<String, int[][]>();
+			conflicts = new HashMap<>();
 		conflicts.put(path, conflictingRanges);
 	}
 
@@ -426,7 +428,7 @@ public class MergeResult {
 		if (!lowLevelResult.containsConflicts())
 			return;
 		if (conflicts == null)
-			conflicts = new HashMap<String, int[][]>();
+			conflicts = new HashMap<>();
 		int nrOfConflicts = 0;
 		// just counting
 		for (MergeChunk mergeChunk : lowLevelResult) {
@@ -464,32 +466,36 @@ public class MergeResult {
 	 * file to a two-dimensional int-array of line-numbers telling where in the
 	 * file conflict markers for which merged commit can be found.
 	 * <p>
-	 * If the returned value contains a mapping "path"->[x][y]=z then this means
+	 * If the returned value contains a mapping "path"-&gt;[x][y]=z then this
+	 * means
 	 * <ul>
 	 * <li>the file with path "path" contains conflicts</li>
-	 * <li>if y < "number of merged commits": for conflict number x in this file
-	 * the chunk which was copied from commit number y starts on line number z.
-	 * All numberings and line numbers start with 0.</li>
+	 * <li>if y &lt; "number of merged commits": for conflict number x in this
+	 * file the chunk which was copied from commit number y starts on line
+	 * number z. All numberings and line numbers start with 0.</li>
 	 * <li>if y == "number of merged commits": the first non-conflicting line
 	 * after conflict number x starts at line number z</li>
 	 * </ul>
 	 * <p>
 	 * Example code how to parse this data:
-	 * <pre> MergeResult m=...;
-	 * Map<String, int[][]> allConflicts = m.getConflicts();
+	 *
+	 * <pre>
+	 * MergeResult m=...;
+	 * Map&lt;String, int[][]&gt; allConflicts = m.getConflicts();
 	 * for (String path : allConflicts.keySet()) {
 	 * 	int[][] c = allConflicts.get(path);
 	 * 	System.out.println("Conflicts in file " + path);
-	 * 	for (int i = 0; i < c.length; ++i) {
+	 * 	for (int i = 0; i &lt; c.length; ++i) {
 	 * 		System.out.println("  Conflict #" + i);
-	 * 		for (int j = 0; j < (c[i].length) - 1; ++j) {
-	 * 			if (c[i][j] >= 0)
+	 * 		for (int j = 0; j &lt; (c[i].length) - 1; ++j) {
+	 * 			if (c[i][j] &gt;= 0)
 	 * 				System.out.println("    Chunk for "
 	 * 						+ m.getMergedCommits()[j] + " starts on line #"
 	 * 						+ c[i][j]);
 	 * 		}
 	 * 	}
-	 * }</pre>
+	 * }
+	 * </pre>
 	 *
 	 * @return the conflicts or <code>null</code> if no conflict occurred
 	 */

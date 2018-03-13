@@ -46,6 +46,8 @@
 
 package org.eclipse.jgit.transport;
 
+import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_AGENT;
+
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -115,10 +117,10 @@ abstract class BasePackConnection extends BaseConnection {
 	protected boolean statelessRPC;
 
 	/** Capability tokens advertised by the remote side. */
-	private final Set<String> remoteCapablities = new HashSet<String>();
+	private final Set<String> remoteCapablities = new HashSet<>();
 
 	/** Extra objects the remote has, but which aren't offered as refs. */
-	protected final Set<ObjectId> additionalHaves = new HashSet<ObjectId>();
+	protected final Set<ObjectId> additionalHaves = new HashSet<>();
 
 	BasePackConnection(final PackTransport packTransport) {
 		transport = (Transport) packTransport;
@@ -141,7 +143,9 @@ abstract class BasePackConnection extends BaseConnection {
 		final int timeout = transport.getTimeout();
 		if (timeout > 0) {
 			final Thread caller = Thread.currentThread();
-			myTimer = new InterruptTimer(caller.getName() + "-Timer"); //$NON-NLS-1$
+			if (myTimer == null) {
+				myTimer = new InterruptTimer(caller.getName() + "-Timer"); //$NON-NLS-1$
+			}
 			timeoutIn = new TimeoutInputStream(myIn, myTimer);
 			timeoutOut = new TimeoutOutputStream(myOut, myTimer);
 			timeoutIn.setTimeout(timeout * 1000);
@@ -187,7 +191,7 @@ abstract class BasePackConnection extends BaseConnection {
 	}
 
 	private void readAdvertisedRefsImpl() throws IOException {
-		final LinkedHashMap<String, Ref> avail = new LinkedHashMap<String, Ref>();
+		final LinkedHashMap<String, Ref> avail = new LinkedHashMap<>();
 		for (;;) {
 			String line;
 
@@ -273,6 +277,18 @@ abstract class BasePackConnection extends BaseConnection {
 		b.append(' ');
 		b.append(option);
 		return true;
+	}
+
+	protected void addUserAgentCapability(StringBuilder b) {
+		String a = UserAgent.get();
+		if (a != null && UserAgent.hasAgent(remoteCapablities)) {
+			b.append(' ').append(OPTION_AGENT).append('=').append(a);
+		}
+	}
+
+	@Override
+	public String getPeerUserAgent() {
+		return UserAgent.getAgent(remoteCapablities, super.getPeerUserAgent());
 	}
 
 	private PackProtocolException duplicateAdvertisement(final String name) {

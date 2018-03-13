@@ -42,7 +42,6 @@
  */
 package org.eclipse.jgit.internal.storage.file;
 
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
@@ -51,7 +50,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.eclipse.jgit.internal.storage.file.FileSnapshot;
 import org.eclipse.jgit.util.FileUtils;
 import org.junit.After;
 import org.junit.Before;
@@ -59,9 +57,16 @@ import org.junit.Test;
 
 public class FileSnapshotTest {
 
-	private List<File> files = new ArrayList<File>();
+	private List<File> files = new ArrayList<>();
 
-	private final File trash = new File(new File("target"), "trash");
+	private File trash;
+
+	@Before
+	public void setUp() throws Exception {
+		trash = File.createTempFile("tmp_", "");
+		trash.delete();
+		assertTrue("mkdir " + trash, trash.mkdir());
+	}
 
 	@Before
 	@After
@@ -89,22 +94,6 @@ public class FileSnapshotTest {
 		append(f1, (byte) 'x');
 		waitNextSec(f1);
 		assertTrue(save.isModified(f1));
-	}
-
-	/**
-	 * Create a file, wait long enough and verify that it has not been modified.
-	 * 3.5 seconds mean any difference between file system timestamp and system
-	 * clock should be significant.
-	 *
-	 * @throws Exception
-	 */
-	@Test
-	public void testOldFile() throws Exception {
-		File f1 = createFile("oldfile");
-		waitNextSec(f1);
-		FileSnapshot save = FileSnapshot.save(f1);
-		Thread.sleep(3500);
-		assertFalse(save.isModified(f1));
 	}
 
 	/**

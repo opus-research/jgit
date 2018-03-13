@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2012 Google Inc.
+ * Copyright (C) 2010, 2017 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -46,27 +46,36 @@ package org.eclipse.jgit.junit.http;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
+import org.eclipse.jetty.http.HttpVersion;
+import org.eclipse.jetty.security.AbstractLoginService;
 import org.eclipse.jetty.security.Authenticator;
 import org.eclipse.jetty.security.ConstraintMapping;
 import org.eclipse.jetty.security.ConstraintSecurityHandler;
-import org.eclipse.jetty.security.MappedLoginService;
 import org.eclipse.jetty.security.authentication.BasicAuthenticator;
 import org.eclipse.jetty.server.Connector;
+import org.eclipse.jetty.server.HttpConfiguration;
+import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.server.UserIdentity;
+import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
-import org.eclipse.jetty.server.nio.SelectChannelConnector;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.util.security.Constraint;
 import org.eclipse.jetty.util.security.Password;
+import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jgit.transport.URIish;
 
 /**
@@ -86,6 +95,12 @@ public class AppServer {
 	/** Password for {@link #username} in secured access areas. */
 	public static final String password = "letmein";
 
+	/** SSL keystore password; must have at least 6 characters. */
+	private static final String keyPassword = "mykeys";
+
+	/** Role for authentication. */
+	private static final String authRole = "can-access";
+
 	static {
 		// Install a logger that throws warning messages.
 		//
@@ -95,20 +110,77 @@ public class AppServer {
 
 	private final Server server;
 
-	private final Connector connector;
+	private final HttpConfiguration config;
+
+	private final ServerConnector connector;
+
+	private final HttpConfiguration secureConfig;
+
+	private final ServerConnector secureConnector;
 
 	private final ContextHandlerCollection contexts;
 
 	private final TestRequestLog log;
 
+	private List<File> filesToDelete = new ArrayList<>();
+
 	public AppServer() {
-		connector = new SelectChannelConnector();
-		connector.setPort(0);
+		this(0, -1);
+	}
+
+	/**
+	 * @param port
+	 *            the http port number; may be zero to allocate a port
+	 *            dynamically
+	 * @since 4.2
+	 */
+	public AppServer(int port) {
+		this(port, -1);
+	}
+
+	/**
+	 * @param port
+	 *            for http, may be zero to allocate a port dynamically
+	 * @param sslPort
+	 *            for https,may be zero to allocate a port dynamically. If
+	 *            negative, the server will be set up without https support.
+	 * @since 4.9
+	 */
+	public AppServer(int port, int sslPort) {
+		server = new Server();
+
+		config = new HttpConfiguration();
+		config.setSecureScheme("https");
+		config.setSecurePort(0);
+		config.setOutputBufferSize(32768);
+
+		connector = new ServerConnector(server,
+				new HttpConnectionFactory(config));
+		connector.setPort(port);
+		String ip;
+		String hostName;
 		try {
 			final InetAddress me = InetAddress.getByName("localhost");
-			connector.setHost(me.getHostAddress());
+			ip = me.getHostAddress();
+			connector.setHost(ip);
+			hostName = InetAddress.getLocalHost().getCanonicalHostName();
 		} catch (UnknownHostException e) {
 			throw new RuntimeException("Cannot find localhost", e);
+		}
+
+		if (sslPort >= 0) {
+			SslContextFactory sslContextFactory = createTestSslContextFactory(
+					hostName);
+			secureConfig = new HttpConfiguration(config);
+			secureConnector = new ServerConnector(server,
+					new SslConnectionFactory(sslContextFactory,
+							HttpVersion.HTTP_1_1.asString()),
+					new HttpConnectionFactory(secureConfig));
+			secureConnector.setPort(sslPort);
+			secureConnector.setHost(ip);
+		} else {
+			secureConfig = null;
+			secureConnector = null;
 		}
 
 		contexts = new ContextHandlerCollection();
@@ -116,9 +188,61 @@ public class AppServer {
 		log = new TestRequestLog();
 		log.setHandler(contexts);
 
-		server = new Server();
-		server.setConnectors(new Connector[] { connector });
+		if (secureConnector == null) {
+			server.setConnectors(new Connector[] { connector });
+		} else {
+			server.setConnectors(
+					new Connector[] { connector, secureConnector });
+		}
 		server.setHandler(log);
+	}
+
+	private SslContextFactory createTestSslContextFactory(String hostName) {
+		SslContextFactory factory = new SslContextFactory(true);
+
+		String dName = "CN=,OU=,O=,ST=,L=,C=";
+
+		try {
+			File tmpDir = Files.createTempDirectory("jks").toFile();
+			tmpDir.deleteOnExit();
+			makePrivate(tmpDir);
+			File keyStore = new File(tmpDir, "keystore.jks");
+			Runtime.getRuntime().exec(
+					new String[] {
+							"keytool", //
+							"-keystore", keyStore.getAbsolutePath(), //
+							"-storepass", keyPassword,
+							"-alias", hostName, //
+							"-genkeypair", //
+							"-keyalg", "RSA", //
+							"-keypass", keyPassword, //
+							"-dname", dName, //
+							"-validity", "2" //
+					}).waitFor();
+			keyStore.deleteOnExit();
+			makePrivate(keyStore);
+			filesToDelete.add(keyStore);
+			filesToDelete.add(tmpDir);
+			factory.setKeyStorePath(keyStore.getAbsolutePath());
+			factory.setKeyStorePassword(keyPassword);
+			factory.setKeyManagerPassword(keyPassword);
+			factory.setTrustStorePath(keyStore.getAbsolutePath());
+			factory.setTrustStorePassword(keyPassword);
+		} catch (InterruptedException | IOException e) {
+			throw new RuntimeException("Cannot create ssl key/certificate", e);
+		}
+		return factory;
+	}
+
+	private void makePrivate(File file) {
+		file.setReadable(false);
+		file.setWritable(false);
+		file.setExecutable(false);
+		file.setReadable(true, true);
+		file.setWritable(true, true);
+		if (file.isDirectory()) {
+			file.setExecutable(true, true);
+		}
 	}
 
 	/**
@@ -144,40 +268,74 @@ public class AppServer {
 		return ctx;
 	}
 
-	public ServletContextHandler authBasic(ServletContextHandler ctx) {
+	public ServletContextHandler authBasic(ServletContextHandler ctx,
+			String... methods) {
 		assertNotYetSetUp();
-		auth(ctx, new BasicAuthenticator());
+		auth(ctx, new BasicAuthenticator(), methods);
 		return ctx;
 	}
 
-	private void auth(ServletContextHandler ctx, Authenticator authType) {
-		final String role = "can-access";
+	static class TestMappedLoginService extends AbstractLoginService {
+		private String role;
 
-		MappedLoginService users = new MappedLoginService() {
-			@Override
-			protected UserIdentity loadUser(String who) {
+		protected final ConcurrentMap<String, UserPrincipal> users = new ConcurrentHashMap<>();
+
+		TestMappedLoginService(String role) {
+			this.role = role;
+		}
+
+		@Override
+		protected void doStart() throws Exception {
+			UserPrincipal p = new UserPrincipal(username,
+					new Password(password));
+			users.put(username, p);
+			super.doStart();
+		}
+
+		@Override
+		protected String[] loadRoleInfo(UserPrincipal user) {
+			if (users.get(user.getName()) == null)
 				return null;
-			}
+			else
+				return new String[] { role };
+		}
 
-			@Override
-			protected void loadUsers() throws IOException {
-				putUser(username, new Password(password), new String[] { role });
-			}
-		};
+		@Override
+		protected UserPrincipal loadUserInfo(String user) {
+			return users.get(user);
+		}
+	}
 
+	private ConstraintMapping createConstraintMapping() {
 		ConstraintMapping cm = new ConstraintMapping();
 		cm.setConstraint(new Constraint());
 		cm.getConstraint().setAuthenticate(true);
 		cm.getConstraint().setDataConstraint(Constraint.DC_NONE);
-		cm.getConstraint().setRoles(new String[] { role });
+		cm.getConstraint().setRoles(new String[] { authRole });
 		cm.setPathSpec("/*");
+		return cm;
+	}
+
+	private void auth(ServletContextHandler ctx, Authenticator authType,
+			String... methods) {
+		AbstractLoginService users = new TestMappedLoginService(authRole);
+		List<ConstraintMapping> mappings = new ArrayList<>();
+		if (methods == null || methods.length == 0) {
+			mappings.add(createConstraintMapping());
+		} else {
+			for (String method : methods) {
+				ConstraintMapping cm = createConstraintMapping();
+				cm.setMethod(method.toUpperCase(Locale.ROOT));
+				mappings.add(cm);
+			}
+		}
 
 		ConstraintSecurityHandler sec = new ConstraintSecurityHandler();
-		sec.setStrict(false);
 		sec.setRealmName(realm);
 		sec.setAuthenticator(authType);
 		sec.setLoginService(users);
-		sec.setConstraintMappings(new ConstraintMapping[] { cm });
+		sec.setConstraintMappings(
+				mappings.toArray(new ConstraintMapping[mappings.size()]));
 		sec.setHandler(ctx);
 
 		contexts.removeHandler(ctx);
@@ -194,6 +352,10 @@ public class AppServer {
 		RecordingLogger.clear();
 		log.clear();
 		server.start();
+		config.setSecurePort(getSecurePort());
+		if (secureConfig != null) {
+			secureConfig.setSecurePort(getSecurePort());
+		}
 	}
 
 	/**
@@ -206,6 +368,10 @@ public class AppServer {
 		RecordingLogger.clear();
 		log.clear();
 		server.stop();
+		for (File f : filesToDelete) {
+			f.delete();
+		}
+		filesToDelete.clear();
 	}
 
 	/**
@@ -232,12 +398,18 @@ public class AppServer {
 	/** @return the local port number the server is listening on. */
 	public int getPort() {
 		assertAlreadySetUp();
-		return ((SelectChannelConnector) connector).getLocalPort();
+		return connector.getLocalPort();
+	}
+
+	/** @return the HTTPS port or -1 if not configured. */
+	public int getSecurePort() {
+		assertAlreadySetUp();
+		return secureConnector != null ? secureConnector.getLocalPort() : -1;
 	}
 
 	/** @return all requests since the server was started. */
 	public List<AccessEvent> getRequests() {
-		return new ArrayList<AccessEvent>(log.getEvents());
+		return new ArrayList<>(log.getEvents());
 	}
 
 	/**
@@ -257,7 +429,7 @@ public class AppServer {
 	 * @return all requests which match the given path.
 	 */
 	public List<AccessEvent> getRequests(String path) {
-		ArrayList<AccessEvent> r = new ArrayList<AccessEvent>();
+		ArrayList<AccessEvent> r = new ArrayList<>();
 		for (AccessEvent event : log.getEvents()) {
 			if (event.getPath().equals(path)) {
 				r.add(event);

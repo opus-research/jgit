@@ -47,20 +47,36 @@ package org.eclipse.jgit.util;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.ConnectException;
-import java.net.HttpURLConnection;
 import java.net.Proxy;
 import java.net.ProxySelector;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.X509Certificate;
 import java.text.MessageFormat;
 
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.transport.http.HttpConnection;
 
 /** Extra utilities to support usage of HTTP. */
 public class HttpSupport {
 	/** The {@code GET} HTTP method. */
 	public static final String METHOD_GET = "GET"; //$NON-NLS-1$
+
+	/** The {@code HEAD} HTTP method.
+	 * @since 4.3 */
+	public static final String METHOD_HEAD = "HEAD"; //$NON-NLS-1$
+
+	/** The {@code POST} HTTP method.
+	 * @since 4.3 */
+	public static final String METHOD_PUT = "PUT"; //$NON-NLS-1$
 
 	/** The {@code POST} HTTP method. */
 	public static final String METHOD_POST = "POST"; //$NON-NLS-1$
@@ -73,6 +89,12 @@ public class HttpSupport {
 
 	/** The {@code User-Agent} header. */
 	public static final String HDR_USER_AGENT = "User-Agent"; //$NON-NLS-1$
+
+	/**
+	 * The {@code Server} header.
+	 * @since 4.0
+	 */
+	public static final String HDR_SERVER = "Server"; //$NON-NLS-1$
 
 	/** The {@code Date} header. */
 	public static final String HDR_DATE = "Date"; //$NON-NLS-1$
@@ -119,8 +141,20 @@ public class HttpSupport {
 	/** The {@code Accept-Encoding} header. */
 	public static final String HDR_ACCEPT_ENCODING = "Accept-Encoding"; //$NON-NLS-1$
 
+	/**
+	 * The {@code Location} header.
+	 * @since 4.7
+	 */
+	public static final String HDR_LOCATION = "Location"; //$NON-NLS-1$
+
 	/** The {@code gzip} encoding value for {@link #HDR_ACCEPT_ENCODING}. */
 	public static final String ENCODING_GZIP = "gzip"; //$NON-NLS-1$
+
+	/**
+	 * The {@code x-gzip} encoding value for {@link #HDR_ACCEPT_ENCODING}.
+	 * @since 4.6
+	 */
+	public static final String ENCODING_X_GZIP = "x-gzip"; //$NON-NLS-1$
 
 	/** The standard {@code text/plain} MIME type. */
 	public static final String TEXT_PLAIN = "text/plain"; //$NON-NLS-1$
@@ -158,21 +192,69 @@ public class HttpSupport {
 	 * @param c
 	 *            connection the code should be obtained from.
 	 * @return r HTTP status code, usually 200 to indicate success. See
-	 *         {@link HttpURLConnection} for other defined constants.
+	 *         {@link HttpConnection} for other defined constants.
 	 * @throws IOException
 	 *             communications error prevented obtaining the response code.
+	 * @since 3.3
 	 */
-	public static int response(final HttpURLConnection c) throws IOException {
+	public static int response(final HttpConnection c) throws IOException {
 		try {
 			return c.getResponseCode();
 		} catch (ConnectException ce) {
-			final String host = c.getURL().getHost();
+			final URL url = c.getURL();
+			final String host = (url == null) ? "<null>" : url.getHost(); //$NON-NLS-1$
 			// The standard J2SE error message is not very useful.
 			//
-			if ("Connection timed out: connect".equals(ce.getMessage()))
+			if ("Connection timed out: connect".equals(ce.getMessage())) //$NON-NLS-1$
 				throw new ConnectException(MessageFormat.format(JGitText.get().connectionTimeOut, host));
 			throw new ConnectException(ce.getMessage() + " " + host); //$NON-NLS-1$
 		}
+	}
+
+	/**
+	 * Get the HTTP response code from the request.
+	 * <p>
+	 * Roughly the same as <code>c.getResponseCode()</code> but the
+	 * ConnectException is translated to be more understandable.
+	 *
+	 * @param c
+	 *            connection the code should be obtained from.
+	 * @return r HTTP status code, usually 200 to indicate success. See
+	 *         {@link HttpConnection} for other defined constants.
+	 * @throws IOException
+	 *             communications error prevented obtaining the response code.
+	 */
+	public static int response(final java.net.HttpURLConnection c)
+			throws IOException {
+		try {
+			return c.getResponseCode();
+		} catch (ConnectException ce) {
+			final URL url = c.getURL();
+			final String host = (url == null) ? "<null>" : url.getHost(); //$NON-NLS-1$
+			// The standard J2SE error message is not very useful.
+			//
+			if ("Connection timed out: connect".equals(ce.getMessage())) //$NON-NLS-1$
+				throw new ConnectException(MessageFormat.format(
+						JGitText.get().connectionTimeOut, host));
+			throw new ConnectException(ce.getMessage() + " " + host); //$NON-NLS-1$
+		}
+	}
+
+	/**
+	 * Extract a HTTP header from the response.
+	 *
+	 * @param c
+	 *            connection the header should be obtained from.
+	 * @param headerName
+	 *            the header name
+	 * @return the header value
+	 * @throws IOException
+	 *             communications error prevented obtaining the header.
+	 * @since 4.7
+	 */
+	public static String responseHeader(final HttpConnection c,
+			final String headerName) throws IOException {
+		return c.getHeaderField(headerName);
 	}
 
 	/**
@@ -196,6 +278,54 @@ public class HttpSupport {
 			err = new ConnectException(MessageFormat.format(JGitText.get().cannotDetermineProxyFor, u));
 			err.initCause(e);
 			throw err;
+		}
+	}
+
+	/**
+	 * Disable SSL and hostname verification for given HTTP connection
+	 *
+	 * @param conn
+	 * @throws IOException
+	 * @since 4.3
+	 */
+	public static void disableSslVerify(HttpConnection conn)
+			throws IOException {
+		final TrustManager[] trustAllCerts = new TrustManager[] {
+				new DummyX509TrustManager() };
+		try {
+			conn.configure(null, trustAllCerts, null);
+			conn.setHostnameVerifier(new DummyHostnameVerifier());
+		} catch (KeyManagementException e) {
+			throw new IOException(e.getMessage());
+		} catch (NoSuchAlgorithmException e) {
+			throw new IOException(e.getMessage());
+		}
+	}
+
+	private static class DummyX509TrustManager implements X509TrustManager {
+		@Override
+		public X509Certificate[] getAcceptedIssuers() {
+			return null;
+		}
+
+		@Override
+		public void checkClientTrusted(X509Certificate[] certs,
+				String authType) {
+			// no check
+		}
+
+		@Override
+		public void checkServerTrusted(X509Certificate[] certs,
+				String authType) {
+			// no check
+		}
+	}
+
+	private static class DummyHostnameVerifier implements HostnameVerifier {
+		@Override
+		public boolean verify(String hostname, SSLSession session) {
+			// always accept
+			return true;
 		}
 	}
 

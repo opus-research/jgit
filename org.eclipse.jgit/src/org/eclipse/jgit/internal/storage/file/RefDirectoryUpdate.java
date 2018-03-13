@@ -50,12 +50,14 @@ import java.io.IOException;
 
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
+import org.eclipse.jgit.lib.ReflogEntry;
 import org.eclipse.jgit.lib.Repository;
 
 /** Updates any reference stored by {@link RefDirectory}. */
 class RefDirectoryUpdate extends RefUpdate {
 	private final RefDirectory database;
 
+	private boolean shouldDeref;
 	private LockFile lock;
 
 	RefDirectoryUpdate(final RefDirectory r, final Ref ref) {
@@ -75,11 +77,12 @@ class RefDirectoryUpdate extends RefUpdate {
 
 	@Override
 	protected boolean tryLock(boolean deref) throws IOException {
+		shouldDeref = deref;
 		Ref dst = getRef();
 		if (deref)
 			dst = dst.getLeaf();
 		String name = dst.getName();
-		lock = new LockFile(database.fileFor(name), getRepository().getFS());
+		lock = new LockFile(database.fileFor(name));
 		if (lock.lock()) {
 			dst = database.getRef(name);
 			setOldObjectId(dst != null ? dst.getObjectId() : null);
@@ -117,7 +120,7 @@ class RefDirectoryUpdate extends RefUpdate {
 						msg = strResult;
 				}
 			}
-			database.log(this, msg, true);
+			database.log(this, msg, shouldDeref);
 		}
 		if (!lock.commit())
 			return Result.LOCK_FAILURE;
@@ -125,14 +128,14 @@ class RefDirectoryUpdate extends RefUpdate {
 		return status;
 	}
 
-	private String toResultString(final Result status) {
+	private String toResultString(Result status) {
 		switch (status) {
 		case FORCED:
-			return "forced-update";
+			return ReflogEntry.PREFIX_FORCED_UPDATE;
 		case FAST_FORWARD:
-			return "fast forward";
+			return ReflogEntry.PREFIX_FAST_FORWARD;
 		case NEW:
-			return "created";
+			return ReflogEntry.PREFIX_CREATED;
 		default:
 			return null;
 		}
@@ -140,7 +143,7 @@ class RefDirectoryUpdate extends RefUpdate {
 
 	@Override
 	protected Result doDelete(final Result status) throws IOException {
-		if (getRef().getLeaf().getStorage() != Ref.Storage.NEW)
+		if (getRef().getStorage() != Ref.Storage.NEW)
 			database.delete(this);
 		return status;
 	}

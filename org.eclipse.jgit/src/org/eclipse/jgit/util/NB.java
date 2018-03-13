@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2008, 2015 Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -56,13 +56,44 @@ public final class NB {
 	 *            the first value to compare.
 	 * @param b
 	 *            the second value to compare.
-	 * @return < 0 if a < b; 0 if a == b; > 0 if a > b.
+	 * @return &lt; 0 if a &lt; b; 0 if a == b; &gt; 0 if a &gt; b.
 	 */
 	public static int compareUInt32(final int a, final int b) {
 		final int cmp = (a >>> 1) - (b >>> 1);
 		if (cmp != 0)
 			return cmp;
 		return (a & 1) - (b & 1);
+	}
+
+	/**
+	 * Compare a 64 bit unsigned integer stored in a 64 bit signed integer.
+	 * <p>
+	 * This function performs an unsigned compare operation, even though Java
+	 * does not natively support unsigned integer values. Negative numbers are
+	 * treated as larger than positive ones.
+	 *
+	 * @param a
+	 *            the first value to compare.
+	 * @param b
+	 *            the second value to compare.
+	 * @return &lt; 0 if a &lt; b; 0 if a == b; &gt; 0 if a &gt; b.
+	 * @since 4.3
+	 */
+	public static int compareUInt64(final long a, final long b) {
+		long cmp = (a >>> 1) - (b >>> 1);
+		if (cmp > 0) {
+			return 1;
+		} else if (cmp < 0) {
+			return -1;
+		}
+		cmp = ((a & 1) - (b & 1));
+		if (cmp > 0) {
+			return 1;
+		} else if (cmp < 0) {
+			return -1;
+		} else {
+			return 0;
+		}
 	}
 
 	/**
@@ -79,6 +110,24 @@ public final class NB {
 	public static int decodeUInt16(final byte[] intbuf, final int offset) {
 		int r = (intbuf[offset] & 0xff) << 8;
 		return r | (intbuf[offset + 1] & 0xff);
+	}
+
+	/**
+	 * Convert sequence of 3 bytes (network byte order) into unsigned value.
+	 *
+	 * @param intbuf
+	 *            buffer to acquire the 3 bytes of data from.
+	 * @param offset
+	 *            position within the buffer to begin reading from. This
+	 *            position and the next 2 bytes after it (for a total of 3
+	 *            bytes) will be read.
+	 * @return signed integer value that matches the 24 bits read.
+	 * @since 4.9
+	 */
+	public static int decodeUInt24(byte[] intbuf, int offset) {
+		int r = (intbuf[offset] & 0xff) << 8;
+		r |= intbuf[offset + 1] & 0xff;
+		return (r << 8) | (intbuf[offset + 2] & 0xff);
 	}
 
 	/**
@@ -185,6 +234,29 @@ public final class NB {
 	 *            the value to write.
 	 */
 	public static void encodeInt16(final byte[] intbuf, final int offset, int v) {
+		intbuf[offset + 1] = (byte) v;
+		v >>>= 8;
+
+		intbuf[offset] = (byte) v;
+	}
+
+	/**
+	 * Write a 24 bit integer as a sequence of 3 bytes (network byte order).
+	 *
+	 * @param intbuf
+	 *            buffer to write the 3 bytes of data into.
+	 * @param offset
+	 *            position within the buffer to begin writing to. This position
+	 *            and the next 2 bytes after it (for a total of 3 bytes) will be
+	 *            replaced.
+	 * @param v
+	 *            the value to write.
+	 * @since 4.9
+	 */
+	public static void encodeInt24(byte[] intbuf, int offset, int v) {
+		intbuf[offset + 2] = (byte) v;
+		v >>>= 8;
+
 		intbuf[offset + 1] = (byte) v;
 		v >>>= 8;
 

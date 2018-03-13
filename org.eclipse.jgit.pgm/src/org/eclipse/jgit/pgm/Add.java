@@ -58,14 +58,16 @@ class Add extends TextBuiltin {
 	private boolean update = false;
 
 	@Argument(required = true, metaVar = "metaVar_filepattern", usage = "usage_filesToAddContentFrom")
-	private List<String> filepatterns = new ArrayList<String>();
+	private List<String> filepatterns = new ArrayList<>();
 
 	@Override
 	protected void run() throws Exception {
-		AddCommand addCmd = new Git(db).add();
-		addCmd.setUpdate(update);
-		for (String p : filepatterns)
-			addCmd.addFilepattern(p);
-		addCmd.call();
+		try (Git git = new Git(db)) {
+			AddCommand addCmd = git.add();
+			addCmd.setUpdate(update);
+			for (String p : filepatterns)
+				addCmd.addFilepattern(p);
+			addCmd.call();
+		}
 	}
 }

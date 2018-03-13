@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>
- * Copyright (C) 2010-2012, Stefan Lay <stefan.lay@sap.com>
+ * Copyright (C) 2010-2014, Stefan Lay <stefan.lay@sap.com>
+ * Copyright (C) 2016, Laurent Delaigue <laurent.delaigue@obeo.fr>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -49,8 +50,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.MergeResult.MergeStatus;
 import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
@@ -61,17 +64,21 @@ import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.api.errors.NoMessageException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
+import org.eclipse.jgit.events.WorkingTreeModifiedEvent;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Config.ConfigEnum;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
+import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.merge.MergeConfig;
 import org.eclipse.jgit.merge.MergeMessageFormatter;
 import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.merge.Merger;
@@ -97,16 +104,20 @@ public class MergeCommand extends GitCommand<MergeResult> {
 
 	private MergeStrategy mergeStrategy = MergeStrategy.RECURSIVE;
 
-	private List<Ref> commits = new LinkedList<Ref>();
+	private List<Ref> commits = new LinkedList<>();
 
-	private boolean squash;
+	private Boolean squash;
 
-	private FastForwardMode fastForwardMode = FastForwardMode.FF;
+	private FastForwardMode fastForwardMode;
+
+	private String message;
+
+	private ProgressMonitor monitor = NullProgressMonitor.INSTANCE;
 
 	/**
 	 * The modes available for fast forward merges corresponding to the
 	 * <code>--ff</code>, <code>--no-ff</code> and <code>--ff-only</code>
-	 * options under <code>branch.<name>.mergeoptions</code>.
+	 * options under <code>branch.&lt;name&gt;.mergeoptions</code>.
 	 */
 	public enum FastForwardMode implements ConfigEnum {
 		/**
@@ -125,10 +136,12 @@ public class MergeCommand extends GitCommand<MergeResult> {
 		 */
 		FF_ONLY;
 
+		@Override
 		public String toConfigValue() {
-			return "--" + name().toLowerCase().replace('_', '-'); //$NON-NLS-1$
+			return "--" + name().toLowerCase(Locale.ROOT).replace('_', '-'); //$NON-NLS-1$
 		}
 
+		@Override
 		public boolean matchConfigValue(String in) {
 			if (StringUtils.isEmptyOrNull(in))
 				return false;
@@ -161,7 +174,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 			 *
 			 * @param ffMode
 			 *            the <code>FastForwardMode</code> value to be mapped
-			 * @return the mapped code>FastForwardMode.Merge</code> value
+			 * @return the mapped <code>FastForwardMode.Merge</code> value
 			 */
 			public static Merge valueOf(FastForwardMode ffMode) {
 				switch (ffMode) {
@@ -181,7 +194,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 		 *
 		 * @param ffMode
 		 *            the <code>FastForwardMode.Merge</code> value to be mapped
-		 * @return the mapped code>FastForwardMode</code> value
+		 * @return the mapped <code>FastForwardMode</code> value
 		 */
 		public static FastForwardMode valueOf(FastForwardMode.Merge ffMode) {
 			switch (ffMode) {
@@ -195,7 +208,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 		}
 	}
 
-	private boolean commit = true;
+	private Boolean commit;
 
 	/**
 	 * @param repo
@@ -212,16 +225,19 @@ public class MergeCommand extends GitCommand<MergeResult> {
 	 *
 	 * @return the result of the merge
 	 */
+	@Override
+	@SuppressWarnings("boxing")
 	public MergeResult call() throws GitAPIException, NoHeadException,
 			ConcurrentRefUpdateException, CheckoutConflictException,
 			InvalidMergeHeadsException, WrongRepositoryStateException, NoMessageException {
 		checkCallable();
+		fallBackToConfiguration();
 		checkParameters();
 
 		RevWalk revWalk = null;
 		DirCacheCheckout dco = null;
 		try {
-			Ref head = repo.getRef(Constants.HEAD);
+			Ref head = repo.exactRef(Constants.HEAD);
 			if (head == null)
 				throw new NoHeadException(
 						JGitText.get().commitOnRepoWithoutHEADCurrentlyNotSupported);
@@ -310,7 +326,10 @@ public class MergeCommand extends GitCommand<MergeResult> {
 				}
 				String mergeMessage = ""; //$NON-NLS-1$
 				if (!squash) {
-					mergeMessage = new MergeMessageFormatter().format(
+					if (message != null)
+						mergeMessage = message;
+					else
+						mergeMessage = new MergeMessageFormatter().format(
 							commits, head);
 					repo.writeMergeCommitMsg(mergeMessage);
 					repo.writeMergeHeads(Arrays.asList(ref.getObjectId()));
@@ -322,6 +341,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 					repo.writeSquashCommitMsg(squashMessage);
 				}
 				Merger merger = mergeStrategy.newMerger(repo);
+				merger.setProgressMonitor(monitor);
 				boolean noProblems;
 				Map<String, org.eclipse.jgit.merge.MergeResult<?>> lowLevelResults = null;
 				Map<String, MergeFailureReason> failingPaths = null;
@@ -336,6 +356,10 @@ public class MergeCommand extends GitCommand<MergeResult> {
 							.getMergeResults();
 					failingPaths = resolveMerger.getFailingPaths();
 					unmergedPaths = resolveMerger.getUnmergedPaths();
+					if (!resolveMerger.getModifiedFiles().isEmpty()) {
+						repo.fireEvent(new WorkingTreeModifiedEvent(
+								resolveMerger.getModifiedFiles(), null));
+					}
 				} else
 					noProblems = merger.merge(headCommit, srcCommit);
 				refLogMessage.append(": Merge made by "); //$NON-NLS-1$
@@ -361,10 +385,13 @@ public class MergeCommand extends GitCommand<MergeResult> {
 						mergeStatus = MergeStatus.MERGED_NOT_COMMITTED;
 					}
 					if (commit && !squash) {
-						newHeadId = new Git(getRepository()).commit()
-								.setReflogComment(refLogMessage.toString())
-								.call().getId();
+						try (Git git = new Git(getRepository())) {
+							newHeadId = git.commit()
+									.setReflogComment(refLogMessage.toString())
+									.call().getId();
+						}
 						mergeStatus = MergeStatus.MERGED;
+						getRepository().autoGC(monitor);
 					}
 					if (commit && squash) {
 						msg = JGitText.get().squashCommitNotUpdatingHEAD;
@@ -379,8 +406,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 					if (failingPaths != null) {
 						repo.writeMergeCommitMsg(null);
 						repo.writeMergeHeads(null);
-						return new MergeResult(null,
-								merger.getBaseCommit(0, 1),
+						return new MergeResult(null, merger.getBaseCommitId(),
 								new ObjectId[] {
 										headCommit.getId(), srcCommit.getId() },
 								MergeStatus.FAILED, mergeStrategy,
@@ -390,8 +416,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 								.formatWithConflicts(mergeMessage,
 										unmergedPaths);
 						repo.writeMergeCommitMsg(mergeMessageWithConflicts);
-						return new MergeResult(null,
-								merger.getBaseCommit(0, 1),
+						return new MergeResult(null, merger.getBaseCommitId(),
 								new ObjectId[] { headCommit.getId(),
 										srcCommit.getId() },
 								MergeStatus.CONFLICTING, mergeStrategy,
@@ -410,12 +435,12 @@ public class MergeCommand extends GitCommand<MergeResult> {
 							e), e);
 		} finally {
 			if (revWalk != null)
-				revWalk.release();
+				revWalk.close();
 		}
 	}
 
 	private void checkParameters() throws InvalidMergeHeadsException {
-		if (squash && fastForwardMode == FastForwardMode.NO_FF) {
+		if (squash.booleanValue() && fastForwardMode == FastForwardMode.NO_FF) {
 			throw new JGitInternalException(
 					JGitText.get().cannotCombineSquashWithNoff);
 		}
@@ -427,6 +452,20 @@ public class MergeCommand extends GitCommand<MergeResult> {
 									JGitText.get().mergeStrategyDoesNotSupportHeads,
 									mergeStrategy.getName(),
 									Integer.valueOf(commits.size())));
+	}
+
+	/**
+	 * Use values from the configuation if they have not been explicitly defined
+	 * via the setters
+	 */
+	private void fallBackToConfiguration() {
+		MergeConfig config = MergeConfig.getConfigForCurrentBranch(repo);
+		if (squash == null)
+			squash = Boolean.valueOf(config.isSquash());
+		if (commit == null)
+			commit = Boolean.valueOf(config.isCommit());
+		if (fastForwardMode == null)
+			fastForwardMode = config.getFastForwardMode();
 	}
 
 	private void updateHead(StringBuilder refLogMessage, ObjectId newHeadId,
@@ -465,35 +504,35 @@ public class MergeCommand extends GitCommand<MergeResult> {
 	}
 
 	/**
-	 * @param commit
+	 * @param aCommit
 	 *            a reference to a commit which is merged with the current head
 	 * @return {@code this}
 	 */
-	public MergeCommand include(Ref commit) {
+	public MergeCommand include(Ref aCommit) {
 		checkCallable();
-		commits.add(commit);
+		commits.add(aCommit);
 		return this;
 	}
 
 	/**
-	 * @param commit
+	 * @param aCommit
 	 *            the Id of a commit which is merged with the current head
 	 * @return {@code this}
 	 */
-	public MergeCommand include(AnyObjectId commit) {
-		return include(commit.getName(), commit);
+	public MergeCommand include(AnyObjectId aCommit) {
+		return include(aCommit.getName(), aCommit);
 	}
 
 	/**
 	 * @param name
 	 *            a name given to the commit
-	 * @param commit
+	 * @param aCommit
 	 *            the Id of a commit which is merged with the current head
 	 * @return {@code this}
 	 */
-	public MergeCommand include(String name, AnyObjectId commit) {
+	public MergeCommand include(String name, AnyObjectId aCommit) {
 		return include(new ObjectIdRef.Unpeeled(Storage.LOOSE, name,
-				commit.copy()));
+				aCommit.copy()));
 	}
 
 	/**
@@ -513,7 +552,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 	 */
 	public MergeCommand setSquash(boolean squash) {
 		checkCallable();
-		this.squash = squash;
+		this.squash = Boolean.valueOf(squash);
 		return this;
 	}
 
@@ -521,12 +560,15 @@ public class MergeCommand extends GitCommand<MergeResult> {
 	 * Sets the fast forward mode.
 	 *
 	 * @param fastForwardMode
-	 *            corresponds to the --ff/--no-ff/--ff-only options. --ff is the
-	 *            default option.
+	 *            corresponds to the --ff/--no-ff/--ff-only options. If
+	 *            {@code null} use the value of the {@code merge.ff} option
+	 *            configured in git config. If this option is not configured
+	 *            --ff is the built-in default.
 	 * @return {@code this}
 	 * @since 2.2
 	 */
-	public MergeCommand setFastForward(FastForwardMode fastForwardMode) {
+	public MergeCommand setFastForward(
+			@Nullable FastForwardMode fastForwardMode) {
 		checkCallable();
 		this.fastForwardMode = fastForwardMode;
 		return this;
@@ -547,7 +589,40 @@ public class MergeCommand extends GitCommand<MergeResult> {
 	 * @since 3.0
 	 */
 	public MergeCommand setCommit(boolean commit) {
-		this.commit = commit;
+		this.commit = Boolean.valueOf(commit);
+		return this;
+	}
+
+	/**
+	 * Set the commit message to be used for the merge commit (in case one is
+	 * created)
+	 *
+	 * @param message
+	 *            the message to be used for the merge commit
+	 * @return {@code this}
+	 * @since 3.5
+	 */
+	public MergeCommand setMessage(String message) {
+		this.message = message;
+		return this;
+	}
+
+	/**
+	 * The progress monitor associated with the diff operation. By default, this
+	 * is set to <code>NullProgressMonitor</code>
+	 *
+	 * @see NullProgressMonitor
+	 *
+	 * @param monitor
+	 *            A progress monitor
+	 * @return this instance
+	 * @since 4.2
+	 */
+	public MergeCommand setProgressMonitor(ProgressMonitor monitor) {
+		if (monitor == null) {
+			monitor = NullProgressMonitor.INSTANCE;
+		}
+		this.monitor = monitor;
 		return this;
 	}
 }

@@ -54,13 +54,29 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.jgit.internal.storage.pack.PackExt;
+import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectReader;
 
 /** Manages objects stored in {@link DfsPackFile} on a storage system. */
 public abstract class DfsObjDatabase extends ObjectDatabase {
-	private static final PackList NO_PACKS = new PackList(new DfsPackFile[0]);
+	private static final PackList NO_PACKS = new PackList(new DfsPackFile[0]) {
+		@Override
+		boolean dirty() {
+			return true;
+		}
+
+		@Override
+		void clearDirty() {
+			// Always dirty.
+		}
+
+		@Override
+		public void markDirty() {
+			// Always dirty.
+		}
+	};
 
 	/** Sources for a pack file. */
 	public static enum PackSource {
@@ -79,17 +95,6 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		RECEIVE(0),
 
 		/**
-		 * Pack was created by Git garbage collection by this implementation.
-		 * <p>
-		 * This source is only used by the {@link DfsGarbageCollector} when it
-		 * builds a pack file by traversing the object graph and copying all
-		 * reachable objects into a new pack stream.
-		 *
-		 * @see DfsGarbageCollector
-		 */
-		GC(1),
-
-		/**
 		 * The pack was created by compacting multiple packs together.
 		 * <p>
 		 * Packs created by compacting multiple packs together aren't nearly as
@@ -101,13 +106,34 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		COMPACT(1),
 
 		/**
+		 * Pack was created by Git garbage collection by this implementation.
+		 * <p>
+		 * This source is only used by the {@link DfsGarbageCollector} when it
+		 * builds a pack file by traversing the object graph and copying all
+		 * reachable objects into a new pack stream.
+		 *
+		 * @see DfsGarbageCollector
+		 */
+		GC(2),
+
+		/** Created from non-heads by {@link DfsGarbageCollector}. */
+		GC_REST(3),
+
+		/**
+		 * RefTreeGraph pack was created by Git garbage collection.
+		 *
+		 * @see DfsGarbageCollector
+		 */
+		GC_TXN(4),
+
+		/**
 		 * Pack was created by Git garbage collection.
 		 * <p>
 		 * This pack contains only unreachable garbage that was found during the
 		 * last GC pass. It is retained in a new pack until it is safe to prune
 		 * these objects from the repository.
 		 */
-		UNREACHABLE_GARBAGE(2);
+		UNREACHABLE_GARBAGE(5);
 
 		final int category;
 
@@ -134,7 +160,7 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 	protected DfsObjDatabase(DfsRepository repository,
 			DfsReaderOptions options) {
 		this.repository = repository;
-		this.packList = new AtomicReference<PackList>(NO_PACKS);
+		this.packList = new AtomicReference<>(NO_PACKS);
 		this.readerOptions = options;
 	}
 
@@ -144,7 +170,7 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 	}
 
 	@Override
-	public ObjectReader newReader() {
+	public DfsReader newReader() {
 		return new DfsReader(this);
 	}
 
@@ -162,7 +188,20 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 	 *             the pack list cannot be initialized.
 	 */
 	public DfsPackFile[] getPacks() throws IOException {
-		return scanPacks(NO_PACKS).packs;
+		return getPackList().packs;
+	}
+
+	/**
+	 * Scan and list all available pack files in the repository.
+	 *
+	 * @return list of available packs, with some additional metadata. The
+	 *         returned array is shared with the implementation and must not be
+	 *         modified by the caller.
+	 * @throws IOException
+	 *             the pack list cannot be initialized.
+	 */
+	public PackList getPackList() throws IOException {
+		return scanPacks(NO_PACKS);
 	}
 
 	/** @return repository owning this object database. */
@@ -177,7 +216,40 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 	 *         implementation and must not be modified by the caller.
 	 */
 	public DfsPackFile[] getCurrentPacks() {
-		return packList.get().packs;
+		return getCurrentPackList().packs;
+	}
+
+	/**
+	 * List currently known pack files in the repository, without scanning.
+	 *
+	 * @return list of available packs, with some additional metadata. The
+	 *         returned array is shared with the implementation and must not be
+	 *         modified by the caller.
+	 */
+	public PackList getCurrentPackList() {
+		return packList.get();
+	}
+
+	/**
+	 * Does the requested object exist in this database?
+	 * <p>
+	 * This differs from ObjectDatabase's implementation in that we can selectively
+	 * ignore unreachable (garbage) objects.
+	 *
+	 * @param objectId
+	 *            identity of the object to test for existence of.
+	 * @param avoidUnreachableObjects
+	 *            if true, ignore objects that are unreachable.
+	 * @return true if the specified object is stored in this database.
+	 * @throws IOException
+	 *             the object store cannot be accessed.
+	 */
+	public boolean has(AnyObjectId objectId, boolean avoidUnreachableObjects)
+			throws IOException {
+		try (ObjectReader or = newReader()) {
+			or.setAvoidUnreachableObjects(avoidUnreachableObjects);
+			return or.has(objectId);
+		}
 	}
 
 	/**
@@ -192,6 +264,32 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 	 */
 	protected abstract DfsPackDescription newPack(PackSource source)
 			throws IOException;
+
+	/**
+	 * Generate a new unique name for a pack file.
+	 *
+	 * <p>
+	 * Default implementation of this method would be equivalent to
+	 * {@code newPack(source).setEstimatedPackSize(estimatedPackSize)}. But the
+	 * clients can override this method to use the given
+	 * {@code estomatedPackSize} value more efficiently in the process of
+	 * creating a new {@link DfsPackDescription} object.
+	 *
+	 * @param source
+	 *            where the pack stream is created.
+	 * @param estimatedPackSize
+	 *            the estimated size of the pack.
+	 * @return a unique name for the pack file. Must not collide with any other
+	 *         pack file name in the same DFS.
+	 * @throws IOException
+	 *             a new unique pack description cannot be generated.
+	 */
+	protected DfsPackDescription newPack(PackSource source,
+			long estimatedPackSize) throws IOException {
+		DfsPackDescription pack = newPack(source);
+		pack.setEstimatedPackSize(estimatedPackSize);
+		return pack;
+	}
 
 	/**
 	 * Commit a pack and index pair that was written to the DFS.
@@ -330,11 +428,11 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 			DfsPackFile[] packs = new DfsPackFile[1 + o.packs.length];
 			packs[0] = newPack;
 			System.arraycopy(o.packs, 0, packs, 1, o.packs.length);
-			n = new PackList(packs);
+			n = new PackListImpl(packs);
 		} while (!packList.compareAndSet(o, n));
 	}
 
-	private PackList scanPacks(final PackList original) throws IOException {
+	PackList scanPacks(final PackList original) throws IOException {
 		PackList o, n;
 		synchronized (packList) {
 			do {
@@ -360,14 +458,14 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		List<DfsPackDescription> scanned = listPacks();
 		Collections.sort(scanned);
 
-		List<DfsPackFile> list = new ArrayList<DfsPackFile>(scanned.size());
+		List<DfsPackFile> list = new ArrayList<>(scanned.size());
 		boolean foundNew = false;
 		for (DfsPackDescription dsc : scanned) {
 			DfsPackFile oldPack = forReuse.remove(dsc);
 			if (oldPack != null) {
 				list.add(oldPack);
-			} else {
-				list.add(cache.getOrCreate(dsc, null));
+			} else if (dsc.hasFileExt(PackExt.PACK)) {
+				list.add(new DfsPackFile(cache, dsc));
 				foundNew = true;
 			}
 		}
@@ -375,15 +473,16 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		for (DfsPackFile p : forReuse.values())
 			p.close();
 		if (list.isEmpty())
-			return new PackList(NO_PACKS.packs);
-		if (!foundNew)
+			return new PackListImpl(NO_PACKS.packs);
+		if (!foundNew) {
+			old.clearDirty();
 			return old;
-		return new PackList(list.toArray(new DfsPackFile[list.size()]));
+		}
+		return new PackListImpl(list.toArray(new DfsPackFile[list.size()]));
 	}
 
 	private static Map<DfsPackDescription, DfsPackFile> reuseMap(PackList old) {
-		Map<DfsPackDescription, DfsPackFile> forReuse
-			= new HashMap<DfsPackDescription, DfsPackFile>();
+		Map<DfsPackDescription, DfsPackFile> forReuse = new HashMap<>();
 		for (DfsPackFile p : old.packs) {
 			if (p.invalid()) {
 				// The pack instance is corrupted, and cannot be safely used
@@ -423,12 +522,62 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		// p.close();
 	}
 
-	private static final class PackList {
+	/** Snapshot of packs scanned in a single pass. */
+	public static abstract class PackList {
 		/** All known packs, sorted. */
-		final DfsPackFile[] packs;
+		public final DfsPackFile[] packs;
 
-		PackList(final DfsPackFile[] packs) {
+		private long lastModified = -1;
+
+		PackList(DfsPackFile[] packs) {
 			this.packs = packs;
+		}
+
+		/** @return last modified time of all packs, in milliseconds. */
+		public long getLastModified() {
+			if (lastModified < 0) {
+				long max = 0;
+				for (DfsPackFile pack : packs) {
+					max = Math.max(max, pack.getPackDescription().getLastModified());
+				}
+				lastModified = max;
+			}
+			return lastModified;
+		}
+
+		abstract boolean dirty();
+		abstract void clearDirty();
+
+		/**
+		 * Mark pack list as dirty.
+		 * <p>
+		 * Used when the caller knows that new data might have been written to the
+		 * repository that could invalidate open readers depending on this pack list,
+		 * for example if refs are newly scanned.
+		 */
+		public abstract void markDirty();
+	}
+
+	private static final class PackListImpl extends PackList {
+		private volatile boolean dirty;
+
+		PackListImpl(DfsPackFile[] packs) {
+			super(packs);
+		}
+
+		@Override
+		boolean dirty() {
+			return dirty;
+		}
+
+		@Override
+		void clearDirty() {
+			dirty = false;
+		}
+
+		@Override
+		public void markDirty() {
+			dirty = true;
 		}
 	}
 }

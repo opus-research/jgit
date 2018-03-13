@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2016, Mark Ingram <markdingram@gmail.com>
  * Copyright (C) 2009, Constantine Plotnikov <constantine.plotnikov@gmail.com>
  * Copyright (C) 2008-2009, Google Inc.
  * Copyright (C) 2009, Google, Inc.
@@ -79,7 +80,7 @@ import com.jcraft.jsch.UserInfo;
  * to supply appropriate {@link UserInfo} to the session.
  */
 public abstract class JschConfigSessionFactory extends SshSessionFactory {
-	private final Map<String, JSch> byIdentityFile = new HashMap<String, JSch>();
+	private final Map<String, JSch> byIdentityFile = new HashMap<>();
 
 	private JSch defaultJSch;
 
@@ -110,23 +111,40 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 					pass, host, port, hc);
 
 			int retries = 0;
-			while (!session.isConnected() && retries < 3) {
+			while (!session.isConnected()) {
 				try {
 					retries++;
 					session.connect(tms);
 				} catch (JSchException e) {
 					session.disconnect();
 					session = null;
-					// if authentication failed maybe credentials changed at the
-					// remote end therefore reset credentials and retry
-					if (credentialsProvider != null && e.getCause() == null
-							&& e.getMessage().equals("Auth fail") //$NON-NLS-1$
-							&& retries < 3) {
-						credentialsProvider.reset(uri);
-						session = createSession(credentialsProvider, fs, user,
-								pass, host, port, hc);
-					} else {
+					// Make sure our known_hosts is not outdated
+					knownHosts(getJSch(hc, fs), fs);
+
+					if (isAuthenticationCanceled(e)) {
 						throw e;
+					} else if (isAuthenticationFailed(e)
+							&& credentialsProvider != null) {
+						// if authentication failed maybe credentials changed at
+						// the remote end therefore reset credentials and retry
+						if (retries < 3) {
+							credentialsProvider.reset(uri);
+							session = createSession(credentialsProvider, fs,
+									user, pass, host, port, hc);
+						} else
+							throw e;
+					} else if (retries >= hc.getConnectionAttempts()) {
+						throw e;
+					} else {
+						try {
+							Thread.sleep(1000);
+							session = createSession(credentialsProvider, fs,
+									user, pass, host, port, hc);
+						} catch (InterruptedException e1) {
+							throw new TransportException(
+									JGitText.get().transportSSHRetryInterrupt,
+									e1);
+						}
 					}
 				}
 			}
@@ -135,19 +153,33 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 
 		} catch (JSchException je) {
 			final Throwable c = je.getCause();
-			if (c instanceof UnknownHostException)
-				throw new TransportException(uri, JGitText.get().unknownHost);
-			if (c instanceof ConnectException)
-				throw new TransportException(uri, c.getMessage());
+			if (c instanceof UnknownHostException) {
+				throw new TransportException(uri, JGitText.get().unknownHost,
+						je);
+			}
+			if (c instanceof ConnectException) {
+				throw new TransportException(uri, c.getMessage(), je);
+			}
 			throw new TransportException(uri, je.getMessage(), je);
 		}
 
+	}
+
+	private static boolean isAuthenticationFailed(JSchException e) {
+		return e.getCause() == null && e.getMessage().equals("Auth fail"); //$NON-NLS-1$
+	}
+
+	private static boolean isAuthenticationCanceled(JSchException e) {
+		return e.getCause() == null && e.getMessage().equals("Auth cancel"); //$NON-NLS-1$
 	}
 
 	private Session createSession(CredentialsProvider credentialsProvider,
 			FS fs, String user, final String pass, String host, int port,
 			final OpenSshConfig.Host hc) throws JSchException {
 		final Session session = createSession(hc, user, host, port, fs);
+		// We retry already in getSession() method. JSch must not retry
+		// on its own.
+		session.setConfig("MaxAuthTries", "1"); //$NON-NLS-1$ //$NON-NLS-2$
 		if (pass != null)
 			session.setPassword(pass);
 		final String strictHostKeyCheckingPolicy = hc
@@ -192,6 +224,19 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 	}
 
 	/**
+	 * Provide additional configuration for the JSch instance. This method could
+	 * be overridden to supply a preferred
+	 * {@link com.jcraft.jsch.IdentityRepository}.
+	 *
+	 * @param jsch
+	 *            jsch instance
+	 * @since 4.5
+	 */
+	protected void configureJSch(JSch jsch) {
+		// No additional configuration required.
+	}
+
+	/**
 	 * Provide additional configuration for the session based on the host
 	 * information. This method could be used to supply {@link UserInfo}.
 	 *
@@ -217,6 +262,9 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 	protected JSch getJSch(final OpenSshConfig.Host hc, FS fs) throws JSchException {
 		if (defaultJSch == null) {
 			defaultJSch = createDefaultJSch(fs);
+			if (defaultJSch.getConfigRepository() == null) {
+				defaultJSch.setConfigRepository(config);
+			}
 			for (Object name : defaultJSch.getIdentityNames())
 				byIdentityFile.put((String) name, defaultJSch);
 		}
@@ -229,6 +277,10 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 		JSch jsch = byIdentityFile.get(identityKey);
 		if (jsch == null) {
 			jsch = new JSch();
+			configureJSch(jsch);
+			if (jsch.getConfigRepository() == null) {
+				jsch.setConfigRepository(defaultJSch.getConfigRepository());
+			}
 			jsch.setHostKeyRepository(defaultJSch.getHostKeyRepository());
 			jsch.addIdentity(identityKey);
 			byIdentityFile.put(identityKey, jsch);
@@ -246,6 +298,7 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 	 */
 	protected JSch createDefaultJSch(FS fs) throws JSchException {
 		final JSch jsch = new JSch();
+		configureJSch(jsch);
 		knownHosts(jsch, fs);
 		identities(jsch, fs);
 		return jsch;

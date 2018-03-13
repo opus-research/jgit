@@ -46,13 +46,16 @@
 package org.eclipse.jgit.junit;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.lang.reflect.Method;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.Path;
 
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.FileUtils;
@@ -124,10 +127,41 @@ public abstract class JGitTestUtil {
 			// loaded previously
 			return new File("tst", fileName);
 		}
+		if ("jar".equals(url.getProtocol())) {
+			try {
+				File tmp = File.createTempFile("tmp_", "_" + fileName);
+				copyTestResource(fileName, tmp);
+				return tmp;
+			} catch (IOException err) {
+				throw new RuntimeException("Cannot create temporary file", err);
+			}
+		}
 		try {
 			return new File(url.toURI());
-		} catch(URISyntaxException e) {
+		} catch (IllegalArgumentException e) {
+			throw new IllegalArgumentException(e.getMessage() + " " + url);
+		} catch (URISyntaxException e) {
 			return new File(url.getPath());
+		}
+	}
+
+	public static void copyTestResource(String name, File dest)
+			throws IOException {
+		URL url = cl().getResource(CLASSPATH_TO_RESOURCES + name);
+		if (url == null)
+			throw new FileNotFoundException(name);
+		InputStream in = url.openStream();
+		try {
+			FileOutputStream out = new FileOutputStream(dest);
+			try {
+				byte[] buf = new byte[4096];
+				for (int n; (n = in.read(buf)) > 0;)
+					out.write(buf, 0, n);
+			} finally {
+				out.close();
+			}
+		} finally {
+			in.close();
 		}
 	}
 
@@ -196,10 +230,55 @@ public abstract class JGitTestUtil {
 		return read(file);
 	}
 
+	public static boolean check(final Repository db, final String name) {
+		File file = new File(db.getWorkTree(), name);
+		return file.exists();
+	}
+
 	public static void deleteTrashFile(final Repository db,
 			final String name) throws IOException {
 		File path = new File(db.getWorkTree(), name);
 		FileUtils.delete(path);
 	}
 
+	/**
+	 * @param db
+	 *            the repository
+	 * @param link
+	 *            the path of the symbolic link to create
+	 * @param target
+	 *            the target of the symbolic link
+	 * @return the path to the symbolic link
+	 * @throws Exception
+	 * @since 4.2
+	 */
+	public static Path writeLink(Repository db, String link,
+			String target) throws Exception {
+		return FileUtils.createSymLink(new File(db.getWorkTree(), link),
+				target);
+	}
+
+	/**
+	 * Concatenate byte arrays.
+	 *
+	 * @param b
+	 *            byte arrays to combine together.
+	 * @return a single byte array that contains all bytes copied from input
+	 *         byte arrays.
+	 * @since 4.9
+	 */
+	public static byte[] concat(byte[]... b) {
+		int n = 0;
+		for (byte[] a : b) {
+			n += a.length;
+		}
+
+		byte[] data = new byte[n];
+		n = 0;
+		for (byte[] a : b) {
+			System.arraycopy(a, 0, data, n, a.length);
+			n += a.length;
+		}
+		return data;
+	}
 }

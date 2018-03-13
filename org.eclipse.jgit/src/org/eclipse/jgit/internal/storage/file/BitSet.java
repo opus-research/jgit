@@ -45,7 +45,7 @@ package org.eclipse.jgit.internal.storage.file;
 
 import java.util.Arrays;
 
-import javaewah.EWAHCompressedBitmap;
+import com.googlecode.javaewah.EWAHCompressedBitmap;
 
 /**
  * A random access BitSet to supports efficient conversions to
@@ -96,7 +96,7 @@ final class BitSet {
 			}
 
 			if (lastNonEmptyWord != 0)
-				compressed.add(lastNonEmptyWord);
+				compressed.addWord(lastNonEmptyWord);
 
 			if (runningEmptyWords > 0) {
 				compressed.addStreamOfEmptyWords(false, runningEmptyWords);
@@ -107,7 +107,7 @@ final class BitSet {
 		}
 		int bitsThatMatter = 64 - Long.numberOfLeadingZeros(lastNonEmptyWord);
 		if (bitsThatMatter > 0)
-			compressed.add(lastNonEmptyWord, bitsThatMatter);
+			compressed.addWord(lastNonEmptyWord, bitsThatMatter);
 		return compressed;
 	}
 

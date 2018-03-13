@@ -46,6 +46,7 @@ package org.eclipse.jgit.diff;
 
 import java.text.MessageFormat;
 
+import org.eclipse.jgit.errors.DiffInterruptedException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.util.IntList;
 import org.eclipse.jgit.util.LongList;
@@ -109,14 +110,16 @@ import org.eclipse.jgit.util.LongList;
  * @param <S>
  *            type of sequence.
  */
+@SuppressWarnings("hiding")
 public class MyersDiff<S extends Sequence> {
 	/** Singleton instance of MyersDiff. */
 	public static final DiffAlgorithm INSTANCE = new LowLevelDiffAlgorithm() {
+		@SuppressWarnings("unused")
 		@Override
 		public <S extends Sequence> void diffNonCommon(EditList edits,
 				HashedSequenceComparator<S> cmp, HashedSequence<S> a,
 				HashedSequence<S> b, Edit region) {
-			new MyersDiff<S>(edits, cmp, a, b, region);
+			new MyersDiff<>(edits, cmp, a, b, region);
 		}
 	};
 
@@ -167,11 +170,21 @@ public class MyersDiff<S extends Sequence> {
 	}
 
 	/**
-	 * Calculates the differences between a given part of A against another given part of B
-	 * @param beginA start of the part of A which should be compared (0<=beginA<sizeof(A))
-	 * @param endA end of the part of A which should be compared (beginA<=endA<sizeof(A))
-	 * @param beginB start of the part of B which should be compared (0<=beginB<sizeof(B))
-	 * @param endB end of the part of B which should be compared (beginB<=endB<sizeof(B))
+	 * Calculates the differences between a given part of A against another
+	 * given part of B
+	 *
+	 * @param beginA
+	 *            start of the part of A which should be compared
+	 *            (0&lt;=beginA&lt;sizeof(A))
+	 * @param endA
+	 *            end of the part of A which should be compared
+	 *            (beginA&lt;=endA&lt;sizeof(A))
+	 * @param beginB
+	 *            start of the part of B which should be compared
+	 *            (0&lt;=beginB&lt;sizeof(B))
+	 * @param endB
+	 *            end of the part of B which should be compared
+	 *            (beginB&lt;=endB&lt;sizeof(B))
 	 */
 	protected void calculateEdits(int beginA, int endA,
 			int beginB, int endB) {
@@ -395,6 +408,9 @@ if (k < beginK || k > endK)
 				// TODO: move end points out of the loop to avoid conditionals inside the loop
 				// go backwards so that we can avoid temp vars
 				for (int k = endK; k >= beginK; k -= 2) {
+					if (Thread.interrupted()) {
+						throw new DiffInterruptedException();
+					}
 					int left = -1, right = -1;
 					long leftSnake = -1L, rightSnake = -1L;
 					// TODO: refactor into its own function
@@ -444,6 +460,7 @@ if (k < beginK || k > endK)
 		}
 
 		class ForwardEditPaths extends EditPaths {
+			@Override
 			final int snake(int k, int x) {
 				for (; x < endA && k + x < endB; x++)
 					if (!cmp.equals(a, x, b, k + x))
@@ -451,18 +468,22 @@ if (k < beginK || k > endK)
 				return x;
 			}
 
+			@Override
 			final int getLeft(final int x) {
 				return x;
 			}
 
+			@Override
 			final int getRight(final int x) {
 				return x + 1;
 			}
 
+			@Override
 			final boolean isBetter(final int left, final int right) {
 				return left > right;
 			}
 
+			@Override
 			final void adjustMinMaxK(final int k, final int x) {
 				if (x >= endA || k + x >= endB) {
 					if (k > backward.middleK)
@@ -472,6 +493,7 @@ if (k < beginK || k > endK)
 				}
 			}
 
+			@Override
 			final boolean meets(int d, int k, int x, long snake) {
 				if (k < backward.beginK || k > backward.endK)
 					return false;
@@ -486,6 +508,7 @@ if (k < beginK || k > endK)
 		}
 
 		class BackwardEditPaths extends EditPaths {
+			@Override
 			final int snake(int k, int x) {
 				for (; x > beginA && k + x > beginB; x--)
 					if (!cmp.equals(a, x - 1, b, k + x - 1))
@@ -493,18 +516,22 @@ if (k < beginK || k > endK)
 				return x;
 			}
 
+			@Override
 			final int getLeft(final int x) {
 				return x - 1;
 			}
 
+			@Override
 			final int getRight(final int x) {
 				return x;
 			}
 
+			@Override
 			final boolean isBetter(final int left, final int right) {
 				return left < right;
 			}
 
+			@Override
 			final void adjustMinMaxK(final int k, final int x) {
 				if (x <= beginA || k + x <= beginB) {
 					if (k > forward.middleK)
@@ -514,6 +541,7 @@ if (k < beginK || k > endK)
 				}
 			}
 
+			@Override
 			final boolean meets(int d, int k, int x, long snake) {
 				if (k < forward.beginK || k > forward.endK)
 					return false;

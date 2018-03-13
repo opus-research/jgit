@@ -56,6 +56,7 @@ import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.RefRename;
+import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.SymbolicRef;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
@@ -77,7 +78,7 @@ public abstract class DfsRefDatabase extends RefDatabase {
 	 */
 	protected DfsRefDatabase(DfsRepository repository) {
 		this.repository = repository;
-		this.cache = new AtomicReference<RefCache>();
+		this.cache = new AtomicReference<>();
 	}
 
 	/** @return the repository the database holds the references of. */
@@ -87,6 +88,13 @@ public abstract class DfsRefDatabase extends RefDatabase {
 
 	boolean exists() throws IOException {
 		return 0 < read().size();
+	}
+
+	@Override
+	public Ref exactRef(String name) throws IOException {
+		RefCache curr = read();
+		Ref ref = curr.ids.get(name);
+		return ref != null ? resolve(ref, 0, curr.ids) : null;
 	}
 
 	@Override
@@ -102,14 +110,6 @@ public abstract class DfsRefDatabase extends RefDatabase {
 		return null;
 	}
 
-	private Ref getOneRef(String refName) throws IOException {
-		RefCache curr = read();
-		Ref ref = curr.ids.get(refName);
-		if (ref != null)
-			return resolve(ref, 0, curr.ids);
-		return ref;
-	}
-
 	@Override
 	public List<Ref> getAdditionalRefs() {
 		return Collections.emptyList();
@@ -120,7 +120,7 @@ public abstract class DfsRefDatabase extends RefDatabase {
 		RefCache curr = read();
 		RefList<Ref> packed = RefList.emptyList();
 		RefList<Ref> loose = curr.ids;
-		RefList.Builder<Ref> sym = new RefList.Builder<Ref>(curr.sym.size());
+		RefList.Builder<Ref> sym = new RefList.Builder<>(curr.sym.size());
 
 		for (int idx = 0; idx < curr.sym.size(); idx++) {
 			Ref ref = curr.sym.get(idx);
@@ -182,8 +182,7 @@ public abstract class DfsRefDatabase extends RefDatabase {
 
 	private Ref doPeel(final Ref leaf) throws MissingObjectException,
 			IOException {
-		RevWalk rw = new RevWalk(repository);
-		try {
+		try (RevWalk rw = new RevWalk(repository)) {
 			RevObject obj = rw.parseAny(leaf.getObjectId());
 			if (obj instanceof RevTag) {
 				return new ObjectIdRef.PeeledTag(
@@ -197,8 +196,6 @@ public abstract class DfsRefDatabase extends RefDatabase {
 						leaf.getName(),
 						leaf.getObjectId());
 			}
-		} finally {
-			rw.release();
 		}
 	}
 
@@ -211,18 +208,14 @@ public abstract class DfsRefDatabase extends RefDatabase {
 	}
 
 	@Override
-	public DfsRefUpdate newUpdate(String refName, boolean detach)
+	public RefUpdate newUpdate(String refName, boolean detach)
 			throws IOException {
 		boolean detachingSymbolicRef = false;
-		Ref ref = getOneRef(refName);
+		Ref ref = exactRef(refName);
 		if (ref == null)
 			ref = new ObjectIdRef.Unpeeled(NEW, refName, null);
 		else
 			detachingSymbolicRef = detach && ref.isSymbolic();
-
-		if (detachingSymbolicRef) {
-			ref = new ObjectIdRef.Unpeeled(NEW, refName, ref.getObjectId());
-		}
 
 		DfsRefUpdate update = new DfsRefUpdate(this, ref);
 		if (detachingSymbolicRef)
@@ -233,8 +226,8 @@ public abstract class DfsRefDatabase extends RefDatabase {
 	@Override
 	public RefRename newRename(String fromName, String toName)
 			throws IOException {
-		DfsRefUpdate src = newUpdate(fromName, true);
-		DfsRefUpdate dst = newUpdate(toName, true);
+		RefUpdate src = newUpdate(fromName, true);
+		RefUpdate dst = newUpdate(toName, true);
 		return new DfsRefRename(src, dst);
 	}
 
@@ -262,6 +255,11 @@ public abstract class DfsRefDatabase extends RefDatabase {
 	@Override
 	public void create() {
 		// Nothing to do.
+	}
+
+	@Override
+	public void refresh() {
+		clearCache();
 	}
 
 	@Override
@@ -313,6 +311,15 @@ public abstract class DfsRefDatabase extends RefDatabase {
 
 	/**
 	 * Compare a reference, and put if it matches.
+	 * <p>
+	 * Two reference match if and only if they satisfy the following:
+	 *
+	 * <ul>
+	 * <li>If one reference is a symbolic ref, the other one should be a symbolic
+	 * ref.
+	 * <li>If both are symbolic refs, the target names should be same.
+	 * <li>If both are object ID refs, the object IDs should be same.
+	 * </ul>
 	 *
 	 * @param oldRef
 	 *            old value to compare to. If the reference is expected to not

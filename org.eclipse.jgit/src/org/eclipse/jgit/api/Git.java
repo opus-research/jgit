@@ -82,9 +82,11 @@ import org.eclipse.jgit.util.FS;
  * methods in this class may for example offer too much functionality or they
  * offer the functionality with the wrong arguments.
  */
-public class Git {
+public class Git implements AutoCloseable {
 	/** The git repository this class is interacting with */
 	private final Repository repo;
+
+	private final boolean closeRepo;
 
 	/**
 	 * @param dir
@@ -103,25 +105,52 @@ public class Git {
 	 *            working tree directory that contains {@code .git}.
 	 * @param fs
 	 *            filesystem abstraction to use when accessing the repository.
-	 * @return a {@link Git} object for the existing git repository
+	 * @return a {@link Git} object for the existing git repository. Closing this
+	 *         instance will close the repo.
 	 * @throws IOException
 	 */
 	public static Git open(File dir, FS fs) throws IOException {
 		RepositoryCache.FileKey key;
 
 		key = RepositoryCache.FileKey.lenient(dir, fs);
-		return wrap(new RepositoryBuilder().setFS(fs).setGitDir(key.getFile())
-				.setMustExist(true).build());
+		Repository db = new RepositoryBuilder().setFS(fs).setGitDir(key.getFile())
+				.setMustExist(true).build();
+		return new Git(db, true);
 	}
 
 	/**
 	 * @param repo
-	 *            the git repository this class is interacting with.
-	 *            {@code null} is not allowed
-	 * @return a {@link Git} object for the existing git repository
+	 *            the git repository this class is interacting with;
+	 *            {@code null} is not allowed.
+	 * @return a {@link Git} object for the existing git repository. The caller is
+	 *         responsible for closing the repository; {@link #close()} on this
+	 *         instance does not close the repo.
 	 */
 	public static Git wrap(Repository repo) {
 		return new Git(repo);
+	}
+
+	/**
+	 * Frees resources associated with this instance.
+	 * <p>
+	 * If the repository was opened by a static factory method in this class, then
+	 * this method calls {@link Repository#close()} on the underlying repository
+	 * instance. (Whether this actually releases underlying resources, such as
+	 * file handles, may vary; see {@link Repository} for more details.)
+	 * <p>
+	 * If the repository was created by a caller and passed into {@link
+	 * #Git(Repository)} or a static factory method in this class, then this
+	 * method does not call close on the underlying repository.
+	 * <p>
+	 * In all cases, after calling this method you should not use this {@link Git}
+	 * instance anymore.
+	 *
+	 * @since 3.2
+	 */
+	@Override
+	public void close() {
+		if (closeRepo)
+			repo.close();
 	}
 
 	/**
@@ -135,6 +164,17 @@ public class Git {
 	 */
 	public static CloneCommand cloneRepository() {
 		return new CloneCommand();
+	}
+
+	/**
+	 * Returns a command to list remote branches/tags without a local
+	 * repository.
+	 *
+	 * @return a {@link LsRemoteCommand}
+	 * @since 3.1
+	 */
+	public static LsRemoteCommand lsRemoteRepository() {
+		return new LsRemoteCommand(null);
 	}
 
 	/**
@@ -152,17 +192,27 @@ public class Git {
 
 	/**
 	 * Constructs a new {@link Git} object which can interact with the specified
-	 * git repository. All command classes returned by methods of this class
-	 * will always interact with this git repository.
+	 * git repository.
+	 * <p>
+	 * All command classes returned by methods of this class will always interact
+	 * with this git repository.
+	 * <p>
+	 * The caller is responsible for closing the repository; {@link #close()} on
+	 * this instance does not close the repo.
 	 *
 	 * @param repo
-	 *            the git repository this class is interacting with.
-	 *            {@code null} is not allowed
+	 *            the git repository this class is interacting with;
+	 *            {@code null} is not allowed.
 	 */
 	public Git(Repository repo) {
+		this(repo, false);
+	}
+
+	Git(Repository repo, boolean closeRepo) {
 		if (repo == null)
 			throw new NullPointerException();
 		this.repo = repo;
+		this.closeRepo = closeRepo;
 	}
 
 	/**
@@ -653,10 +703,66 @@ public class Git {
 	}
 
 	/**
-	 * @return the git repository this class is interacting with
+	 * Returns a command object to come up with a short name that describes a
+	 * commit in terms of the nearest git tag.
+	 *
+	 * @return a {@link DescribeCommand}.
+	 * @since 3.2
+	 */
+	public DescribeCommand describe() {
+		return new DescribeCommand(repo);
+	}
+
+	/**
+	 * Return a command used to list the available remotes.
+	 *
+	 * @return a {@link RemoteListCommand}
+	 * @since 4.2
+	 */
+	public RemoteListCommand remoteList() {
+		return new RemoteListCommand(repo);
+	}
+
+	/**
+	 * Return a command used to add a new remote.
+	 *
+	 * @return a {@link RemoteAddCommand}
+	 * @since 4.2
+	 */
+	public RemoteAddCommand remoteAdd() {
+		return new RemoteAddCommand(repo);
+	}
+
+	/**
+	 * Return a command used to remove an existing remote.
+	 *
+	 * @return a {@link RemoteRemoveCommand}
+	 * @since 4.2
+	 */
+	public RemoteRemoveCommand remoteRemove() {
+		return new RemoteRemoveCommand(repo);
+	}
+
+	/**
+	 * Return a command used to change the URL of an existing remote.
+	 *
+	 * @return a {@link RemoteSetUrlCommand}
+	 * @since 4.2
+	 */
+	public RemoteSetUrlCommand remoteSetUrl() {
+		return new RemoteSetUrlCommand(repo);
+	}
+
+	/**
+	 * @return the git repository this class is interacting with; see
+	 *         {@link #close()} for notes on closing this repository.
 	 */
 	public Repository getRepository() {
 		return repo;
 	}
 
+	@Override
+	public String toString() {
+		return "Git[" + repo + "]"; //$NON-NLS-1$//$NON-NLS-2$
+	}
 }

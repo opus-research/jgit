@@ -56,31 +56,49 @@ import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CharsetEncoder;
-import java.security.MessageDigest;
 import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 
+import org.eclipse.jgit.api.errors.FilterFailedException;
+import org.eclipse.jgit.attributes.AttributesNode;
+import org.eclipse.jgit.attributes.AttributesRule;
+import org.eclipse.jgit.attributes.FilterCommand;
+import org.eclipse.jgit.attributes.FilterCommandRegistry;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
+import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
+import org.eclipse.jgit.ignore.FastIgnoreRule;
 import org.eclipse.jgit.ignore.IgnoreNode;
-import org.eclipse.jgit.ignore.IgnoreRule;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig;
+import org.eclipse.jgit.lib.CoreConfig.CheckStat;
+import org.eclipse.jgit.lib.CoreConfig.EolStreamType;
+import org.eclipse.jgit.lib.CoreConfig.SymLinks;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectLoader;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.CoreConfig.CheckStat;
 import org.eclipse.jgit.submodule.SubmoduleWalk;
+import org.eclipse.jgit.treewalk.TreeWalk.OperationType;
 import org.eclipse.jgit.util.FS;
+import org.eclipse.jgit.util.FS.ExecutionResult;
+import org.eclipse.jgit.util.Holder;
 import org.eclipse.jgit.util.IO;
-import org.eclipse.jgit.util.io.EolCanonicalizingInputStream;
+import org.eclipse.jgit.util.Paths;
+import org.eclipse.jgit.util.RawParseUtils;
+import org.eclipse.jgit.util.TemporaryBuffer;
+import org.eclipse.jgit.util.TemporaryBuffer.LocalFile;
+import org.eclipse.jgit.util.io.AutoLFInputStream;
+import org.eclipse.jgit.util.io.EolStreamTypeUtil;
+import org.eclipse.jgit.util.sha1.SHA1;
 
 /**
  * Walks a working directory tree as part of a {@link TreeWalk}.
@@ -94,6 +112,8 @@ import org.eclipse.jgit.util.io.EolCanonicalizingInputStream;
  * @see FileTreeIterator
  */
 public abstract class WorkingTreeIterator extends AbstractTreeIterator {
+	private static final int MAX_EXCEPTION_TEXT_SIZE = 10 * 1024;
+
 	/** An empty entry array, suitable for {@link #init(Entry[])}. */
 	protected static final Entry[] EOF = {};
 
@@ -126,6 +146,18 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 	/** If there is a .gitignore file present, the parsed rules from it. */
 	private IgnoreNode ignoreNode;
+
+	/**
+	 * cached clean filter command. Use a Ref in order to distinguish between
+	 * the ref not cached yet and the value null
+	 */
+	private Holder<String> cleanFilterCommandHolder;
+
+	/**
+	 * cached eol stream type. Use a Ref in order to distinguish between the ref
+	 * not cached yet and the value null
+	 */
+	private Holder<EolStreamType> eolStreamTypeHolder;
 
 	/** Repository that is the root level being iterated over */
 	protected Repository repository;
@@ -179,6 +211,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	protected WorkingTreeIterator(final WorkingTreeIterator p) {
 		super(p);
 		state = p.state;
+		repository = p.repository;
 	}
 
 	/**
@@ -234,12 +267,13 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			// If there is a matching DirCacheIterator, we can reuse
 			// its idBuffer, but only if we appear to be clean against
 			// the cached index information for the path.
-			//
 			DirCacheIterator i = state.walk.getTree(state.dirCacheTree,
-					DirCacheIterator.class);
+							DirCacheIterator.class);
 			if (i != null) {
 				DirCacheEntry ent = i.getDirCacheEntry();
-				if (ent != null && compareMetadata(ent) == MetadataDiff.EQUAL) {
+				if (ent != null && compareMetadata(ent) == MetadataDiff.EQUAL
+						&& ((ent.getFileMode().getBits()
+								& FileMode.TYPE_MASK) != FileMode.TYPE_GITLINK)) {
 					contentIdOffset = i.idOffset();
 					contentIdFromPtr = ptr;
 					return contentId = i.idBuffer();
@@ -250,19 +284,20 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			}
 		}
 		switch (mode & FileMode.TYPE_MASK) {
+		case FileMode.TYPE_SYMLINK:
 		case FileMode.TYPE_FILE:
 			contentIdFromPtr = ptr;
 			return contentId = idBufferBlob(entries[ptr]);
-		case FileMode.TYPE_SYMLINK:
-			// Java does not support symbolic links, so we should not
-			// have reached this particular part of the walk code.
-			//
-			return zeroid;
 		case FileMode.TYPE_GITLINK:
 			contentIdFromPtr = ptr;
 			return contentId = idSubmodule(entries[ptr]);
 		}
 		return zeroid;
+	}
+
+	@Override
+	public boolean isWorkTree() {
+		return true;
 	}
 
 	/**
@@ -329,10 +364,11 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			if (is == null)
 				return zeroid;
 			try {
-				state.initializeDigestAndReadBuffer();
+				state.initializeReadBuffer();
 
 				final long len = e.getLength();
-				InputStream filteredIs = possiblyFilteredInputStream(e, is, len);
+				InputStream filteredIs = possiblyFilteredInputStream(e, is, len,
+						OperationType.CHECKIN_OP);
 				return computeHash(filteredIs, canonLen);
 			} finally {
 				safeClose(is);
@@ -345,36 +381,39 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 	private InputStream possiblyFilteredInputStream(final Entry e,
 			final InputStream is, final long len) throws IOException {
-		if (!mightNeedCleaning()) {
+		return possiblyFilteredInputStream(e, is, len, null);
+
+	}
+
+	private InputStream possiblyFilteredInputStream(final Entry e,
+			final InputStream is, final long len, OperationType opType)
+			throws IOException {
+		if (getCleanFilterCommand() == null
+				&& getEolStreamType(opType) == EolStreamType.DIRECT) {
 			canonLen = len;
 			return is;
 		}
 
 		if (len <= MAXIMUM_FILE_SIZE_TO_READ_FULLY) {
 			ByteBuffer rawbuf = IO.readWholeStream(is, (int) len);
-			byte[] raw = rawbuf.array();
-			int n = rawbuf.limit();
-			if (!isBinary(raw, n)) {
-				rawbuf = filterClean(raw, n);
-				raw = rawbuf.array();
-				n = rawbuf.limit();
+			rawbuf = filterClean(rawbuf.array(), rawbuf.limit(), opType);
+			canonLen = rawbuf.limit();
+			return new ByteArrayInputStream(rawbuf.array(), 0, (int) canonLen);
+		}
+
+		if (getCleanFilterCommand() == null && isBinary(e)) {
+				canonLen = len;
+				return is;
 			}
-			canonLen = n;
-			return new ByteArrayInputStream(raw, 0, n);
-		}
 
-		if (isBinary(e)) {
-			canonLen = len;
-			return is;
-		}
-
-		final InputStream lenIs = filterClean(e.openInputStream());
+		final InputStream lenIs = filterClean(e.openInputStream(),
+				opType);
 		try {
 			canonLen = computeLength(lenIs);
 		} finally {
 			safeClose(lenIs);
 		}
-		return filterClean(is);
+		return filterClean(is, opType);
 	}
 
 	private static void safeClose(final InputStream in) {
@@ -387,23 +426,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private boolean mightNeedCleaning() {
-		switch (getOptions().getAutoCRLF()) {
-		case FALSE:
-		default:
-			return false;
-
-		case TRUE:
-		case INPUT:
-			return true;
-		}
-	}
-
-	private boolean isBinary(byte[] content, int sz) {
-		return RawText.isBinary(content, sz);
-	}
-
-	private boolean isBinary(Entry entry) throws IOException {
+	private static boolean isBinary(Entry entry) throws IOException {
 		InputStream in = entry.openInputStream();
 		try {
 			return RawText.isBinary(in);
@@ -412,18 +435,64 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private ByteBuffer filterClean(byte[] src, int n)
+	private ByteBuffer filterClean(byte[] src, int n, OperationType opType)
 			throws IOException {
 		InputStream in = new ByteArrayInputStream(src);
 		try {
-			return IO.readWholeStream(filterClean(in), n);
+			return IO.readWholeStream(filterClean(in, opType), n);
 		} finally {
 			safeClose(in);
 		}
 	}
 
-	private InputStream filterClean(InputStream in) {
-		return new EolCanonicalizingInputStream(in, true);
+	private InputStream filterClean(InputStream in) throws IOException {
+		return filterClean(in, null);
+	}
+
+	private InputStream filterClean(InputStream in, OperationType opType)
+			throws IOException {
+		in = handleAutoCRLF(in, opType);
+		String filterCommand = getCleanFilterCommand();
+		if (filterCommand != null) {
+			if (FilterCommandRegistry.isRegistered(filterCommand)) {
+				LocalFile buffer = new TemporaryBuffer.LocalFile(null);
+				FilterCommand command = FilterCommandRegistry
+						.createFilterCommand(filterCommand, repository, in,
+								buffer);
+				while (command.run() != -1) {
+					// loop as long as command.run() tells there is work to do
+				}
+				return buffer.openInputStream();
+			}
+			FS fs = repository.getFS();
+			ProcessBuilder filterProcessBuilder = fs.runInShell(filterCommand,
+					new String[0]);
+			filterProcessBuilder.directory(repository.getWorkTree());
+			filterProcessBuilder.environment().put(Constants.GIT_DIR_KEY,
+					repository.getDirectory().getAbsolutePath());
+			ExecutionResult result;
+			try {
+				result = fs.execute(filterProcessBuilder, in);
+			} catch (IOException | InterruptedException e) {
+				throw new IOException(new FilterFailedException(e,
+						filterCommand, getEntryPathString()));
+			}
+			int rc = result.getRc();
+			if (rc != 0) {
+				throw new IOException(new FilterFailedException(rc,
+						filterCommand, getEntryPathString(),
+						result.getStdout().toByteArray(MAX_EXCEPTION_TEXT_SIZE),
+						RawParseUtils.decode(result.getStderr()
+								.toByteArray(MAX_EXCEPTION_TEXT_SIZE))));
+			}
+			return result.getStdout().openInputStream();
+		}
+		return in;
+	}
+
+	private InputStream handleAutoCRLF(InputStream in, OperationType opType)
+			throws IOException {
+		return EolStreamTypeUtil.wrapInputStream(in, getEolStreamType(opType));
 	}
 
 	/**
@@ -463,7 +532,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	public void next(final int delta) throws CorruptObjectException {
 		ptr += delta;
 		if (!eof()) {
-			canonLen = -1;
 			parseEntry();
 		}
 	}
@@ -482,6 +550,9 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		ensurePathCapacity(pathOffset + nameLen, pathOffset);
 		System.arraycopy(e.encodedName, 0, path, pathOffset, nameLen);
 		pathLen = pathOffset + nameLen;
+		canonLen = -1;
+		cleanFilterCommandHolder = null;
+		eolStreamTypeHolder = null;
 	}
 
 	/**
@@ -544,10 +615,11 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 */
 	public InputStream openEntryStream() throws IOException {
 		InputStream rawis = current().openInputStream();
-		if (mightNeedCleaning())
-			return filterClean(rawis);
-		else
+		if (getCleanFilterCommand() == null
+				&& getEolStreamType() == EolStreamType.DIRECT)
 			return rawis;
+		else
+			return filterClean(rawis);
 	}
 
 	/**
@@ -571,6 +643,26 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *             a relevant ignore rule file exists but cannot be read.
 	 */
 	protected boolean isEntryIgnored(final int pLen) throws IOException {
+		return isEntryIgnored(pLen, mode, false);
+	}
+
+	/**
+	 * Determine if the entry path is ignored by an ignore rule. Consider
+	 * possible rule negation from child iterator.
+	 *
+	 * @param pLen
+	 *            the length of the path in the path buffer.
+	 * @param fileMode
+	 *            the original iterator file mode
+	 * @param negatePrevious
+	 *            true if the previous matching iterator rule was negation
+	 * @return true if the entry is ignored by an ignore rule.
+	 * @throws IOException
+	 *             a relevant ignore rule file exists but cannot be read.
+	 */
+	private boolean isEntryIgnored(final int pLen, int fileMode,
+			boolean negatePrevious)
+			throws IOException {
 		IgnoreNode rules = getIgnoreNode();
 		if (rules != null) {
 			// The ignore code wants path to start with a '/' if possible.
@@ -581,17 +673,23 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			if (0 < pOff)
 				pOff--;
 			String p = TreeWalk.pathOf(path, pOff, pLen);
-			switch (rules.isIgnored(p, FileMode.TREE.equals(mode))) {
+			switch (rules.isIgnored(p, FileMode.TREE.equals(fileMode),
+					negatePrevious)) {
 			case IGNORED:
 				return true;
 			case NOT_IGNORED:
 				return false;
 			case CHECK_PARENT:
+				negatePrevious = false;
+				break;
+			case CHECK_PARENT_NEGATE_FIRST_MATCH:
+				negatePrevious = true;
 				break;
 			}
 		}
 		if (parent instanceof WorkingTreeIterator)
-			return ((WorkingTreeIterator) parent).isEntryIgnored(pLen);
+			return ((WorkingTreeIterator) parent).isEntryIgnored(pLen, fileMode,
+					negatePrevious);
 		return false;
 	}
 
@@ -601,31 +699,29 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		return ignoreNode;
 	}
 
+	/**
+	 * Retrieves the {@link AttributesNode} for the current entry.
+	 *
+	 * @return {@link AttributesNode} for the current entry.
+	 * @throws IOException
+	 *             if an error is raised while parsing the .gitattributes file
+	 * @since 3.7
+	 */
+	public AttributesNode getEntryAttributesNode() throws IOException {
+		if (attributesNode instanceof PerDirectoryAttributesNode)
+			attributesNode = ((PerDirectoryAttributesNode) attributesNode)
+					.load();
+		return attributesNode;
+	}
+
 	private static final Comparator<Entry> ENTRY_CMP = new Comparator<Entry>() {
-		public int compare(final Entry o1, final Entry o2) {
-			final byte[] a = o1.encodedName;
-			final byte[] b = o2.encodedName;
-			final int aLen = o1.encodedNameLen;
-			final int bLen = o2.encodedNameLen;
-			int cPos;
-
-			for (cPos = 0; cPos < aLen && cPos < bLen; cPos++) {
-				final int cmp = (a[cPos] & 0xff) - (b[cPos] & 0xff);
-				if (cmp != 0)
-					return cmp;
-			}
-
-			if (cPos < aLen)
-				return (a[cPos] & 0xff) - lastPathChar(o2);
-			if (cPos < bLen)
-				return lastPathChar(o1) - (b[cPos] & 0xff);
-			return lastPathChar(o1) - lastPathChar(o2);
+		@Override
+		public int compare(Entry a, Entry b) {
+			return Paths.compare(
+					a.encodedName, 0, a.encodedNameLen, a.getMode().getBits(),
+					b.encodedName, 0, b.encodedNameLen, b.getMode().getBits());
 		}
 	};
-
-	static int lastPathChar(final Entry e) {
-		return e.getMode() == FileMode.TREE ? '/' : '\0';
-	}
 
 	/**
 	 * Constructor helper.
@@ -654,6 +750,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				continue;
 			if (Constants.DOT_GIT_IGNORE.equals(name))
 				ignoreNode = new PerDirectoryIgnoreNode(e);
+			if (Constants.DOT_GIT_ATTRIBUTES.equals(name))
+				attributesNode = new PerDirectoryAttributesNode(e);
 			if (i != o)
 				entries[o] = e;
 			e.encodeName(nameEncoder);
@@ -666,6 +764,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		ptr = 0;
 		if (!eof())
 			parseEntry();
+		else if (pathLen == 0) // see bug 445363
+			pathLen = pathOffset;
 	}
 
 	/**
@@ -721,8 +821,9 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			return false;
 
 		// Do not rely on filemode differences in case of symbolic links
-		if (FileMode.SYMLINK.equals(rawMode))
-			return false;
+		if (getOptions().getSymLinks() == SymLinks.FALSE)
+			if (FileMode.SYMLINK.equals(rawMode))
+				return false;
 
 		// Ignore the executable file bits if WorkingTreeOptions tell me to
 		// do so. Ignoring is done by setting the bits representing a
@@ -748,10 +849,15 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		if (entry.isUpdateNeeded())
 			return MetadataDiff.DIFFER_BY_METADATA;
 
-		if (!entry.isSmudged() && entry.getLength() != (int) getEntryLength())
+		if (isModeDifferent(entry.getRawMode()))
 			return MetadataDiff.DIFFER_BY_METADATA;
 
-		if (isModeDifferent(entry.getRawMode()))
+		// Don't check for length or lastmodified on folders
+		int type = mode & FileMode.TYPE_MASK;
+		if (type == FileMode.TYPE_TREE || type == FileMode.TYPE_GITLINK)
+			return MetadataDiff.EQUAL;
+
+		if (!entry.isSmudged() && entry.getLength() != (int) getEntryLength())
 			return MetadataDiff.DIFFER_BY_METADATA;
 
 		// Git under windows only stores seconds so we round the timestamp
@@ -795,26 +901,38 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 * @param forceContentCheck
 	 *            True if the actual file content should be checked if
 	 *            modification time differs.
+	 * @param reader
+	 *            access to repository objects if necessary. Should not be null.
 	 * @return true if content is most likely different.
+	 * @throws IOException
+	 * @since 3.3
 	 */
-	public boolean isModified(DirCacheEntry entry, boolean forceContentCheck) {
+	public boolean isModified(DirCacheEntry entry, boolean forceContentCheck,
+			ObjectReader reader) throws IOException {
+		if (entry == null)
+			return !FileMode.MISSING.equals(getEntryFileMode());
 		MetadataDiff diff = compareMetadata(entry);
 		switch (diff) {
 		case DIFFER_BY_TIMESTAMP:
 			if (forceContentCheck)
 				// But we are told to look at content even though timestamps
 				// tell us about modification
-				return contentCheck(entry);
+				return contentCheck(entry, reader);
 			else
 				// We are told to assume a modification if timestamps differs
 				return true;
 		case SMUDGED:
 			// The file is clean by timestamps but the entry was smudged.
 			// Lets do a content check
-			return contentCheck(entry);
+			return contentCheck(entry, reader);
 		case EQUAL:
+			if (mode == FileMode.SYMLINK.getBits()) {
+				return contentCheck(entry, reader);
+			}
 			return false;
 		case DIFFER_BY_METADATA:
+			if (mode == FileMode.SYMLINK.getBits())
+				return contentCheck(entry, reader);
 			return true;
 		default:
 			throw new IllegalStateException(MessageFormat.format(
@@ -834,17 +952,31 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 */
 	public FileMode getIndexFileMode(final DirCacheIterator indexIter) {
 		final FileMode wtMode = getEntryFileMode();
-		if (indexIter == null)
+		if (indexIter == null) {
 			return wtMode;
-		if (getOptions().isFileMode())
-			return wtMode;
+		}
 		final FileMode iMode = indexIter.getEntryFileMode();
-		if (FileMode.REGULAR_FILE == wtMode
-				&& FileMode.EXECUTABLE_FILE == iMode)
+		if (getOptions().isFileMode() && iMode != FileMode.GITLINK && iMode != FileMode.TREE) {
+			return wtMode;
+		}
+		if (!getOptions().isFileMode()) {
+			if (FileMode.REGULAR_FILE == wtMode
+					&& FileMode.EXECUTABLE_FILE == iMode) {
+				return iMode;
+			}
+			if (FileMode.EXECUTABLE_FILE == wtMode
+					&& FileMode.REGULAR_FILE == iMode) {
+				return iMode;
+			}
+		}
+		if (FileMode.GITLINK == iMode
+				&& FileMode.TREE == wtMode) {
 			return iMode;
-		if (FileMode.EXECUTABLE_FILE == wtMode
-				&& FileMode.REGULAR_FILE == iMode)
+		}
+		if (FileMode.TREE == iMode
+				&& FileMode.GITLINK == wtMode) {
 			return iMode;
+		}
 		return wtMode;
 	}
 
@@ -854,10 +986,14 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *
 	 * @param entry
 	 *            the entry to be checked
-	 * @return <code>true</code> if the content matches, <code>false</code>
-	 *         otherwise
+	 * @param reader
+	 *            acccess to repository data if necessary
+	 * @return <code>true</code> if the content doesn't match,
+	 *         <code>false</code> if it matches
+	 * @throws IOException
 	 */
-	private boolean contentCheck(DirCacheEntry entry) {
+	private boolean contentCheck(DirCacheEntry entry, ObjectReader reader)
+			throws IOException {
 		if (getEntryObjectId().equals(entry.getObjectId())) {
 			// Content has not changed
 
@@ -873,12 +1009,82 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 			return false;
 		} else {
-			// Content differs: that's a real change!
-			return true;
+			if (mode == FileMode.SYMLINK.getBits()) {
+				return !new File(readSymlinkTarget(current())).equals(
+						new File(readContentAsNormalizedString(entry, reader)));
+			}
+			// Content differs: that's a real change, perhaps
+			if (reader == null) // deprecated use, do no further checks
+				return true;
+
+			switch (getEolStreamType()) {
+			case DIRECT:
+				return true;
+			default:
+				try {
+					ObjectLoader loader = reader.open(entry.getObjectId());
+					if (loader == null)
+						return true;
+
+					// We need to compute the length, but only if it is not
+					// a binary stream.
+					long dcInLen;
+					try (InputStream dcIn = new AutoLFInputStream(
+							loader.openStream(), true,
+							true /* abort if binary */)) {
+						dcInLen = computeLength(dcIn);
+					} catch (AutoLFInputStream.IsBinaryException e) {
+						return true;
+					}
+
+					try (InputStream dcIn = new AutoLFInputStream(
+							loader.openStream(), true)) {
+						byte[] autoCrLfHash = computeHash(dcIn, dcInLen);
+						boolean changed = getEntryObjectId()
+								.compareTo(autoCrLfHash, 0) != 0;
+						return changed;
+					}
+				} catch (IOException e) {
+					return true;
+				}
+			}
 		}
 	}
 
-	private long computeLength(InputStream in) throws IOException {
+	private static String readContentAsNormalizedString(DirCacheEntry entry,
+			ObjectReader reader) throws MissingObjectException, IOException {
+		ObjectLoader open = reader.open(entry.getObjectId());
+		byte[] cachedBytes = open.getCachedBytes();
+		return FS.detect().normalize(RawParseUtils.decode(cachedBytes));
+	}
+
+	/**
+	 * Reads the target of a symlink as a string. This default implementation
+	 * fully reads the entry's input stream and converts it to a normalized
+	 * string. Subclasses may override to provide more specialized
+	 * implementations.
+	 *
+	 * @param entry
+	 *            to read
+	 * @return the entry's content as a normalized string
+	 * @throws IOException
+	 *             if the entry cannot be read or does not denote a symlink
+	 * @since 4.6
+	 */
+	protected String readSymlinkTarget(Entry entry) throws IOException {
+		if (!entry.getMode().equals(FileMode.SYMLINK)) {
+			throw new java.nio.file.NotLinkException(entry.getName());
+		}
+		long length = entry.getLength();
+		byte[] content = new byte[(int) length];
+		try (InputStream is = entry.openInputStream()) {
+			int bytesRead = IO.readFully(is, content, 0);
+			return FS.detect()
+					.normalize(RawParseUtils.decode(content, 0, bytesRead));
+		}
+	}
+
+	private static long computeLength(InputStream in) throws IOException {
 		// Since we only care about the length, use skip. The stream
 		// may be able to more efficiently wade through its data.
 		//
@@ -893,10 +1099,9 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	}
 
 	private byte[] computeHash(InputStream in, long length) throws IOException {
-		final MessageDigest contentDigest = state.contentDigest;
+		SHA1 contentDigest = SHA1.newInstance();
 		final byte[] contentReadBuffer = state.contentReadBuffer;
 
-		contentDigest.reset();
 		contentDigest.update(hblob);
 		contentDigest.update((byte) ' ');
 
@@ -949,6 +1154,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				b.get(encodedName = new byte[encodedNameLen]);
 		}
 
+		@Override
 		public String toString() {
 			return getMode().toString() + " " + getName(); //$NON-NLS-1$
 		}
@@ -1026,7 +1232,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		final Entry entry;
 
 		PerDirectoryIgnoreNode(Entry entry) {
-			super(Collections.<IgnoreRule> emptyList());
+			super(Collections.<FastIgnoreRule> emptyList());
 			this.entry = entry;
 		}
 
@@ -1081,9 +1287,9 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			return r.getRules().isEmpty() ? null : r;
 		}
 
-		private void loadRulesFromFile(IgnoreNode r, File exclude)
+		private static void loadRulesFromFile(IgnoreNode r, File exclude)
 				throws FileNotFoundException, IOException {
-			if (exclude.exists()) {
+			if (FS.DETECTED.exists(exclude)) {
 				FileInputStream in = new FileInputStream(exclude);
 				try {
 					r.parse(in);
@@ -1094,15 +1300,34 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
+	/** Magic type indicating we know rules exist, but they aren't loaded. */
+	private static class PerDirectoryAttributesNode extends AttributesNode {
+		final Entry entry;
+
+		PerDirectoryAttributesNode(Entry entry) {
+			super(Collections.<AttributesRule> emptyList());
+			this.entry = entry;
+		}
+
+		AttributesNode load() throws IOException {
+			AttributesNode r = new AttributesNode();
+			InputStream in = entry.openInputStream();
+			try {
+				r.parse(in);
+			} finally {
+				in.close();
+			}
+			return r.getRules().isEmpty() ? null : r;
+		}
+	}
+
+
 	private static final class IteratorState {
 		/** Options used to process the working tree. */
 		final WorkingTreeOptions options;
 
 		/** File name character encoder. */
 		final CharsetEncoder nameEncoder;
-
-		/** Digest computer for {@link #contentId} computations. */
-		MessageDigest contentDigest;
 
 		/** Buffer used to perform {@link #contentId} computations. */
 		byte[] contentReadBuffer;
@@ -1118,11 +1343,75 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			this.nameEncoder = Constants.CHARSET.newEncoder();
 		}
 
-		void initializeDigestAndReadBuffer() {
-			if (contentDigest == null) {
-				contentDigest = Constants.newMessageDigest();
+		void initializeReadBuffer() {
+			if (contentReadBuffer == null) {
 				contentReadBuffer = new byte[BUFFER_SIZE];
 			}
 		}
+	}
+
+	/**
+	 * @return the clean filter command for the current entry or
+	 *         <code>null</code> if no such command is defined
+	 * @throws IOException
+	 * @since 4.2
+	 */
+	public String getCleanFilterCommand() throws IOException {
+		if (cleanFilterCommandHolder == null) {
+			String cmd = null;
+			if (state.walk != null) {
+				cmd = state.walk
+						.getFilterCommand(Constants.ATTR_FILTER_TYPE_CLEAN);
+			}
+			cleanFilterCommandHolder = new Holder<>(cmd);
+		}
+		return cleanFilterCommandHolder.get();
+	}
+
+	/**
+	 * @return the eol stream type for the current entry or <code>null</code> if
+	 *         it cannot be determined. When state or state.walk is null or the
+	 *         {@link TreeWalk} is not based on a {@link Repository} then null
+	 *         is returned.
+	 * @throws IOException
+	 * @since 4.3
+	 */
+	public EolStreamType getEolStreamType() throws IOException {
+		return getEolStreamType(null);
+	}
+
+	/**
+	 * @param opType
+	 *            The operationtype (checkin/checkout) which should be used
+	 * @return the eol stream type for the current entry or <code>null</code> if
+	 *         it cannot be determined. When state or state.walk is null or the
+	 *         {@link TreeWalk} is not based on a {@link Repository} then null
+	 *         is returned.
+	 * @throws IOException
+	 */
+	private EolStreamType getEolStreamType(OperationType opType)
+			throws IOException {
+		if (eolStreamTypeHolder == null) {
+			EolStreamType type=null;
+			if (state.walk != null) {
+				if (opType != null) {
+					type = state.walk.getEolStreamType(opType);
+				} else {
+					type=state.walk.getEolStreamType();
+				}
+			} else {
+				switch (getOptions().getAutoCRLF()) {
+				case FALSE:
+					type = EolStreamType.DIRECT;
+					break;
+				case TRUE:
+				case INPUT:
+					type = EolStreamType.AUTO_LF;
+					break;
+				}
+			}
+			eolStreamTypeHolder = new Holder<>(type);
+		}
+		return eolStreamTypeHolder.get();
 	}
 }

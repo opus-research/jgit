@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2008, Google Inc.
  * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2012, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2006-2017, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -272,7 +272,21 @@ public final class Constants {
 	 */
 	public static final String INFO_EXCLUDE = "info/exclude";
 
-	/** The environment variable that contains the system user name */
+	/**
+	 * Attributes-override-file
+	 *
+	 * @since 4.2
+	 */
+	public static final String INFO_ATTRIBUTES = "info/attributes";
+
+	/**
+	 * The system property that contains the system user name
+	 *
+	 * @since 3.6
+	 */
+	public static final String OS_USER_DIR = "user.dir";
+
+	/** The system property that contains the system user name */
 	public static final String OS_USER_NAME_KEY = "user.name";
 
 	/** The environment variable that contains the author's name */
@@ -286,6 +300,13 @@ public final class Constants {
 
 	/** The environment variable that contains the commiter's email */
 	public static final String GIT_COMMITTER_EMAIL_KEY = "GIT_COMMITTER_EMAIL";
+
+	/**
+	 * The environment variable that blocks use of the system config file
+	 *
+	 * @since 3.3
+	 */
+	public static final String GIT_CONFIG_NOSYSTEM_KEY = "GIT_CONFIG_NOSYSTEM";
 
 	/**
 	 * The environment variable that limits how close to the root of the file
@@ -342,6 +363,41 @@ public final class Constants {
 	/** A bare repository typically ends with this string */
 	public static final String DOT_GIT_EXT = ".git";
 
+	/**
+	 * Name of the attributes file
+	 *
+	 * @since 3.7
+	 */
+	public static final String DOT_GIT_ATTRIBUTES = ".gitattributes";
+
+	/**
+	 * Key for filters in .gitattributes
+	 *
+	 * @since 4.2
+	 */
+	public static final String ATTR_FILTER = "filter";
+
+	/**
+	 * clean command name, used to call filter driver
+	 *
+	 * @since 4.2
+	 */
+	public static final String ATTR_FILTER_TYPE_CLEAN = "clean";
+
+	/**
+	 * smudge command name, used to call filter driver
+	 *
+	 * @since 4.2
+	 */
+	public static final String ATTR_FILTER_TYPE_SMUDGE = "smudge";
+
+	/**
+	 * Builtin filter commands start with this prefix
+	 *
+	 * @since 4.6
+	 */
+	public static final String BUILTIN_FILTER_PREFIX = "jgit://builtin/";
+
 	/** Name of the ignore file */
 	public static final String DOT_GIT_IGNORE = ".gitignore";
 
@@ -350,6 +406,41 @@ public final class Constants {
 
 	/** Name of the .git/shallow file */
 	public static final String SHALLOW = "shallow";
+
+	/**
+	 * Prefix of the first line in a ".git" file
+	 *
+	 * @since 3.6
+	 */
+	public static final String GITDIR = "gitdir: ";
+
+	/**
+	 * Name of the folder (inside gitDir) where submodules are stored
+	 *
+	 * @since 3.6
+	 */
+	public static final String MODULES = "modules";
+
+	/**
+	 * Name of the folder (inside gitDir) where the hooks are stored.
+	 *
+	 * @since 3.7
+	 */
+	public static final String HOOKS = "hooks";
+
+	/**
+	 * Merge attribute.
+	 *
+	 * @since 4.9
+	 */
+	public static final String ATTR_MERGE = "merge"; //$NON-NLS-1$
+
+	/**
+	 * Binary value for custom merger.
+	 *
+	 * @since 4.9
+	 */
+	public static final String ATTR_BUILTIN_BINARY_MERGER = "binary"; //$NON-NLS-1$
 
 	/**
 	 * Create a new digest function for objects.
@@ -575,6 +666,14 @@ public final class Constants {
 	 * value of HEAD
 	 */
 	public static final String ORIG_HEAD = "ORIG_HEAD";
+
+	/**
+	 * Name of the file in which git commands and hooks store and read the
+	 * message prepared for the upcoming commit.
+	 *
+	 * @since 4.0
+	 */
+	public static final String COMMIT_EDITMSG = "COMMIT_EDITMSG";
 
 	/** objectid for the empty blob */
 	public static final ObjectId EMPTY_BLOB_ID = ObjectId

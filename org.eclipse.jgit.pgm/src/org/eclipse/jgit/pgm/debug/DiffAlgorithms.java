@@ -70,6 +70,7 @@ import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryBuilder;
 import org.eclipse.jgit.lib.RepositoryCache;
+import org.eclipse.jgit.pgm.Command;
 import org.eclipse.jgit.pgm.TextBuiltin;
 import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -79,15 +80,18 @@ import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.FS;
 import org.kohsuke.args4j.Option;
 
+@Command(usage = "usage_DiffAlgorithms")
 class DiffAlgorithms extends TextBuiltin {
 
 	final Algorithm myers = new Algorithm() {
+		@Override
 		DiffAlgorithm create() {
 			return MyersDiff.INSTANCE;
 		}
 	};
 
 	final Algorithm histogram = new Algorithm() {
+		@Override
 		DiffAlgorithm create() {
 			HistogramDiff d = new HistogramDiff();
 			d.setFallbackAlgorithm(null);
@@ -96,6 +100,7 @@ class DiffAlgorithms extends TextBuiltin {
 	};
 
 	final Algorithm histogram_myers = new Algorithm() {
+		@Override
 		DiffAlgorithm create() {
 			HistogramDiff d = new HistogramDiff();
 			d.setFallbackAlgorithm(MyersDiff.INSTANCE);
@@ -109,14 +114,14 @@ class DiffAlgorithms extends TextBuiltin {
 	//
 	//
 
-	@Option(name = "--algorithm", metaVar = "NAME", usage = "Enable algorithm(s)")
-	List<String> algorithms = new ArrayList<String>();
+	@Option(name = "--algorithm", multiValued = true, metaVar = "NAME", usage = "Enable algorithm(s)")
+	List<String> algorithms = new ArrayList<>();
 
 	@Option(name = "--text-limit", metaVar = "LIMIT", usage = "Maximum size in KiB to scan per file revision")
 	int textLimit = 15 * 1024; // 15 MiB as later we do * 1024.
 
-	@Option(name = "--repository", aliases = { "-r" }, metaVar = "GIT_DIR", usage = "Repository to scan")
-	List<File> gitDirs = new ArrayList<File>();
+	@Option(name = "--repository", aliases = { "-r" }, multiValued = true, metaVar = "GIT_DIR", usage = "Repository to scan")
+	List<File> gitDirs = new ArrayList<>();
 
 	@Option(name = "--count", metaVar = "LIMIT", usage = "Number of file revisions to be compared")
 	int count = 0; // unlimited
@@ -134,7 +139,7 @@ class DiffAlgorithms extends TextBuiltin {
 	protected void run() throws Exception {
 		mxBean = ManagementFactory.getThreadMXBean();
 		if (!mxBean.isCurrentThreadCpuTimeSupported())
-			throw die("Current thread CPU time not supported on this JRE");
+			throw die("Current thread CPU time not supported on this JRE"); //$NON-NLS-1$
 
 		if (gitDirs.isEmpty()) {
 			RepositoryBuilder rb = new RepositoryBuilder() //
@@ -153,16 +158,16 @@ class DiffAlgorithms extends TextBuiltin {
 			else
 				rb.findGitDir(dir);
 
-			Repository db = rb.build();
+			Repository repo = rb.build();
 			try {
-				run(db);
+				run(repo);
 			} finally {
-				db.close();
+				repo.close();
 			}
 		}
 	}
 
-	private void run(Repository db) throws Exception {
+	private void run(Repository repo) throws Exception {
 		List<Test> all = init();
 
 		long files = 0;
@@ -171,15 +176,14 @@ class DiffAlgorithms extends TextBuiltin {
 		int maxN = 0;
 
 		AbbreviatedObjectId startId;
-		ObjectReader or = db.newObjectReader();
-		try {
+		try (ObjectReader or = repo.newObjectReader();
+			RevWalk rw = new RevWalk(or)) {
 			final MutableObjectId id = new MutableObjectId();
-			RevWalk rw = new RevWalk(or);
 			TreeWalk tw = new TreeWalk(or);
 			tw.setFilter(TreeFilter.ANY_DIFF);
 			tw.setRecursive(true);
 
-			ObjectId start = db.resolve(Constants.HEAD);
+			ObjectId start = repo.resolve(Constants.HEAD);
 			startId = or.abbreviate(start);
 			rw.markStart(rw.parseCommit(start));
 			for (;;) {
@@ -230,36 +234,37 @@ class DiffAlgorithms extends TextBuiltin {
 				if (count > 0 && files > count)
 					break;
 			}
-		} finally {
-			or.release();
 		}
 
 		Collections.sort(all, new Comparator<Test>() {
+			@Override
 			public int compare(Test a, Test b) {
-				int cmp = Long.signum(a.runningTimeNanos - b.runningTimeNanos);
-				if (cmp == 0)
-					cmp = a.algorithm.name.compareTo(b.algorithm.name);
-				return cmp;
+				int result = Long.signum(a.runningTimeNanos - b.runningTimeNanos);
+				if (result == 0) {
+					result = a.algorithm.name.compareTo(b.algorithm.name);
+				}
+				return result;
 			}
 		});
 
-		if (db.getDirectory() != null) {
-			String name = db.getDirectory().getName();
-			File parent = db.getDirectory().getParentFile();
+		File directory = repo.getDirectory();
+		if (directory != null) {
+			String name = directory.getName();
+			File parent = directory.getParentFile();
 			if (name.equals(Constants.DOT_GIT) && parent != null)
 				name = parent.getName();
-			outw.println(name + ": start at " + startId.name());
+			outw.println(name + ": start at " + startId.name()); //$NON-NLS-1$
 		}
 
-		outw.format("  %12d files,     %8d commits\n", valueOf(files),
+		outw.format("  %12d files,     %8d commits\n", valueOf(files), //$NON-NLS-1$
 				valueOf(commits));
-		outw.format("  N=%10d min lines, %8d max lines\n", valueOf(minN),
+		outw.format("  N=%10d min lines, %8d max lines\n", valueOf(minN), //$NON-NLS-1$
 				valueOf(maxN));
 
-		outw.format("%-25s %12s ( %12s  %12s )\n", //
-				"Algorithm", "Time(ns)", "Time(ns) on", "Time(ns) on");
-		outw.format("%-25s %12s ( %12s  %12s )\n", //
-				"", "", "N=" + minN, "N=" + maxN);
+		outw.format("%-25s %12s ( %12s  %12s )\n", //$NON-NLS-1$
+				"Algorithm", "Time(ns)", "Time(ns) on", "Time(ns) on"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
+		outw.format("%-25s %12s ( %12s  %12s )\n", //$NON-NLS-1$
+				"", "", "N=" + minN, "N=" + maxN); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
 		outw.println("-----------------------------------------------------" //$NON-NLS-1$
 				+ "----------------"); //$NON-NLS-1$
 
@@ -319,7 +324,7 @@ class DiffAlgorithms extends TextBuiltin {
 	}
 
 	private List<Test> init() {
-		List<Test> all = new ArrayList<Test>();
+		List<Test> all = new ArrayList<>();
 
 		try {
 			for (Field f : DiffAlgorithms.class.getDeclaredFields()) {
@@ -335,9 +340,9 @@ class DiffAlgorithms extends TextBuiltin {
 				}
 			}
 		} catch (IllegalArgumentException e) {
-			throw die("Cannot determine names", e);
+			throw die("Cannot determine names", e); //$NON-NLS-1$
 		} catch (IllegalAccessException e) {
-			throw die("Cannot determine names", e);
+			throw die("Cannot determine names", e); //$NON-NLS-1$
 		}
 
 		return all;

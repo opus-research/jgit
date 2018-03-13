@@ -68,7 +68,7 @@ import org.eclipse.jgit.lib.RefComparator;
  *            the type of reference being stored in the collection.
  */
 public class RefList<T extends Ref> implements Iterable<Ref> {
-	private static final RefList<Ref> EMPTY = new RefList<Ref>(new Ref[0], 0);
+	private static final RefList<Ref> EMPTY = new RefList<>(new Ref[0], 0);
 
 	/**
 	 * @return an empty unmodifiable reference list.
@@ -80,9 +80,9 @@ public class RefList<T extends Ref> implements Iterable<Ref> {
 		return (RefList<T>) EMPTY;
 	}
 
-	private final Ref[] list;
+	final Ref[] list;
 
-	private final int cnt;
+	final int cnt;
 
 	RefList(Ref[] list, int cnt) {
 		this.list = list;
@@ -100,20 +100,24 @@ public class RefList<T extends Ref> implements Iterable<Ref> {
 		this.cnt = src.cnt;
 	}
 
+	@Override
 	public Iterator<Ref> iterator() {
 		return new Iterator<Ref>() {
 			private int idx;
 
+			@Override
 			public boolean hasNext() {
 				return idx < cnt;
 			}
 
+			@Override
 			public Ref next() {
 				if (idx < cnt)
 					return list[idx++];
 				throw new NoSuchElementException();
 			}
 
+			@Override
 			public void remove() {
 				throw new UnsupportedOperationException();
 			}
@@ -209,7 +213,7 @@ public class RefList<T extends Ref> implements Iterable<Ref> {
 	 * @return a new builder with the first {@code n} elements already added.
 	 */
 	public final Builder<T> copy(int n) {
-		Builder<T> r = new Builder<T>(Math.max(16, n));
+		Builder<T> r = new Builder<>(Math.max(16, n));
 		r.addAll(list, 0, n);
 		return r;
 	}
@@ -230,7 +234,7 @@ public class RefList<T extends Ref> implements Iterable<Ref> {
 		Ref[] newList = new Ref[cnt];
 		System.arraycopy(list, 0, newList, 0, cnt);
 		newList[idx] = ref;
-		return new RefList<T>(newList, cnt);
+		return new RefList<>(newList, cnt);
 	}
 
 	/**
@@ -257,7 +261,7 @@ public class RefList<T extends Ref> implements Iterable<Ref> {
 		newList[idx] = ref;
 		if (idx < cnt)
 			System.arraycopy(list, idx, newList, idx + 1, cnt - idx);
-		return new RefList<T>(newList, cnt + 1);
+		return new RefList<>(newList, cnt + 1);
 	}
 
 	/**
@@ -278,7 +282,7 @@ public class RefList<T extends Ref> implements Iterable<Ref> {
 			System.arraycopy(list, 0, newList, 0, idx);
 		if (idx + 1 < cnt)
 			System.arraycopy(list, idx + 1, newList, idx, cnt - (idx + 1));
-		return new RefList<T>(newList, cnt - 1);
+		return new RefList<>(newList, cnt - 1);
 	}
 
 	/**
@@ -334,10 +338,11 @@ public class RefList<T extends Ref> implements Iterable<Ref> {
 		 * Create an empty list with at least the specified capacity.
 		 *
 		 * @param capacity
-		 *            the new capacity.
+		 *            the new capacity; if zero or negative, behavior is the same as
+		 *            {@link #Builder()}.
 		 */
 		public Builder(int capacity) {
-			list = new Ref[capacity];
+			list = new Ref[Math.max(capacity, 16)];
 		}
 
 		/** @return number of items in this builder's internal collection. */
@@ -427,7 +432,7 @@ public class RefList<T extends Ref> implements Iterable<Ref> {
 
 		/** @return an unmodifiable list using this collection's backing array. */
 		public RefList<T> toRefList() {
-			return new RefList<T>(list, size);
+			return new RefList<>(list, size);
 		}
 
 		@Override

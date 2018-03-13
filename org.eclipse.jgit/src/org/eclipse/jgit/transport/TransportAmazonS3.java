@@ -101,23 +101,28 @@ public class TransportAmazonS3 extends HttpTransport implements WalkTransport {
 	static final String S3_SCHEME = "amazon-s3"; //$NON-NLS-1$
 
 	static final TransportProtocol PROTO_S3 = new TransportProtocol() {
+		@Override
 		public String getName() {
 			return "Amazon S3"; //$NON-NLS-1$
 		}
 
+		@Override
 		public Set<String> getSchemes() {
 			return Collections.singleton(S3_SCHEME);
 		}
 
+		@Override
 		public Set<URIishField> getRequiredFields() {
 			return Collections.unmodifiableSet(EnumSet.of(URIishField.USER,
 					URIishField.HOST, URIishField.PATH));
 		}
 
+		@Override
 		public Set<URIishField> getOptionalFields() {
 			return Collections.unmodifiableSet(EnumSet.of(URIishField.PASS));
 		}
 
+		@Override
 		public Transport open(URIish uri, Repository local, String remoteName)
 				throws NotSupportedException {
 			return new TransportAmazonS3(local, uri);
@@ -125,10 +130,10 @@ public class TransportAmazonS3 extends HttpTransport implements WalkTransport {
 	};
 
 	/** User information necessary to connect to S3. */
-	private final AmazonS3 s3;
+	final AmazonS3 s3;
 
 	/** Bucket the remote repository is stored in. */
-	private final String bucket;
+	final String bucket;
 
 	/**
 	 * Key prefix which all objects related to the repository start with.
@@ -147,7 +152,12 @@ public class TransportAmazonS3 extends HttpTransport implements WalkTransport {
 			throws NotSupportedException {
 		super(local, uri);
 
-		s3 = new AmazonS3(loadProperties());
+		Properties props = loadProperties();
+		File directory = local.getDirectory();
+		if (!props.containsKey("tmpdir") && directory != null) //$NON-NLS-1$
+			props.put("tmpdir", directory.getPath()); //$NON-NLS-1$
+
+		s3 = new AmazonS3(props);
 		bucket = uri.getHost();
 
 		String p = uri.getPath();
@@ -170,8 +180,14 @@ public class TransportAmazonS3 extends HttpTransport implements WalkTransport {
 			return loadPropertiesFile(propsFile);
 
 		Properties props = new Properties();
-		props.setProperty("accesskey", uri.getUser()); //$NON-NLS-1$
-		props.setProperty("secretkey", uri.getPass()); //$NON-NLS-1$
+		String user = uri.getUser();
+		String pass = uri.getPass();
+		if (user != null && pass != null) {
+		        props.setProperty("accesskey", user); //$NON-NLS-1$
+		        props.setProperty("secretkey", pass); //$NON-NLS-1$
+		} else
+			throw new NotSupportedException(MessageFormat.format(
+					JGitText.get().cannotReadFile, propsFile));
 		return props;
 	}
 
@@ -254,10 +270,10 @@ public class TransportAmazonS3 extends HttpTransport implements WalkTransport {
 
 		@Override
 		Collection<String> getPackNames() throws IOException {
-			final HashSet<String> have = new HashSet<String>();
+			final HashSet<String> have = new HashSet<>();
 			have.addAll(s3.list(bucket, resolveKey("pack"))); //$NON-NLS-1$
 
-			final Collection<String> packs = new ArrayList<String>();
+			final Collection<String> packs = new ArrayList<>();
 			for (final String n : have) {
 				if (!n.startsWith("pack-") || !n.endsWith(".pack")) //$NON-NLS-1$ //$NON-NLS-2$
 					continue;
@@ -296,7 +312,7 @@ public class TransportAmazonS3 extends HttpTransport implements WalkTransport {
 		}
 
 		Map<String, Ref> readAdvertisedRefs() throws TransportException {
-			final TreeMap<String, Ref> avail = new TreeMap<String, Ref>();
+			final TreeMap<String, Ref> avail = new TreeMap<>();
 			readPackedRefs(avail);
 			readLooseRefs(avail);
 			readRef(avail, Constants.HEAD);

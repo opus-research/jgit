@@ -46,6 +46,7 @@
 
 package org.eclipse.jgit.transport;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.MessageFormat;
@@ -55,6 +56,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
@@ -63,11 +65,11 @@ import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.QuotedString;
 import org.eclipse.jgit.util.SystemReader;
 import org.eclipse.jgit.util.io.MessageWriter;
 import org.eclipse.jgit.util.io.StreamCopyThread;
-import org.eclipse.jgit.util.FS;
 
 /**
  * Transport through an SSH tunnel.
@@ -85,27 +87,32 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		private final String[] schemeNames = { "ssh", "ssh+git", "git+ssh" }; //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
 
 		private final Set<String> schemeSet = Collections
-				.unmodifiableSet(new LinkedHashSet<String>(Arrays
+				.unmodifiableSet(new LinkedHashSet<>(Arrays
 						.asList(schemeNames)));
 
+		@Override
 		public String getName() {
 			return JGitText.get().transportProtoSSH;
 		}
 
+		@Override
 		public Set<String> getSchemes() {
 			return schemeSet;
 		}
 
+		@Override
 		public Set<URIishField> getRequiredFields() {
 			return Collections.unmodifiableSet(EnumSet.of(URIishField.HOST,
 					URIishField.PATH));
 		}
 
+		@Override
 		public Set<URIishField> getOptionalFields() {
 			return Collections.unmodifiableSet(EnumSet.of(URIishField.USER,
 					URIishField.PASS, URIishField.PORT));
 		}
 
+		@Override
 		public int getDefaultPort() {
 			return 22;
 		}
@@ -122,14 +129,29 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 			return super.canHandle(uri, local, remoteName);
 		}
 
+		@Override
 		public Transport open(URIish uri, Repository local, String remoteName)
 				throws NotSupportedException {
 			return new TransportGitSsh(local, uri);
+		}
+
+		@Override
+		public Transport open(URIish uri) throws NotSupportedException, TransportException {
+			return new TransportGitSsh(uri);
 		}
 	};
 
 	TransportGitSsh(final Repository local, final URIish uri) {
 		super(local, uri);
+		initSshSessionFactory();
+	}
+
+	TransportGitSsh(final URIish uri) {
+		super(uri);
+		initSshSessionFactory();
+	}
+
+	private void initSshSessionFactory() {
 		if (useExtSession()) {
 			setSshSessionFactory(new SshSessionFactory() {
 				@Override
@@ -199,14 +221,16 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 	}
 
 	private class ExtSession implements RemoteSession {
+		@Override
 		public Process exec(String command, int timeout)
 				throws TransportException {
 			String ssh = SystemReader.getInstance().getenv("GIT_SSH"); //$NON-NLS-1$
-			boolean putty = ssh.toLowerCase().contains("plink"); //$NON-NLS-1$
+			boolean putty = ssh.toLowerCase(Locale.ROOT).contains("plink"); //$NON-NLS-1$
 
-			List<String> args = new ArrayList<String>();
+			List<String> args = new ArrayList<>();
 			args.add(ssh);
-			if (putty && !ssh.toLowerCase().contains("tortoiseplink")) //$NON-NLS-1$
+			if (putty
+					&& !ssh.toLowerCase(Locale.ROOT).contains("tortoiseplink")) //$NON-NLS-1$
 				args.add("-batch"); //$NON-NLS-1$
 			if (0 < getURI().getPort()) {
 				args.add(putty ? "-P" : "-p"); //$NON-NLS-1$ //$NON-NLS-2$
@@ -221,9 +245,10 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 			ProcessBuilder pb = new ProcessBuilder();
 			pb.command(args);
 
-			if (local.getDirectory() != null)
+			File directory = local.getDirectory();
+			if (directory != null)
 				pb.environment().put(Constants.GIT_DIR_KEY,
-						local.getDirectory().getPath());
+						directory.getPath());
 
 			try {
 				return pb.start();
@@ -232,6 +257,7 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 			}
 		}
 
+		@Override
 		public void disconnect() {
 			// Nothing to do
 		}

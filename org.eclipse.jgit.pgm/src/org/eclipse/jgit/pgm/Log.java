@@ -53,6 +53,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -93,7 +94,7 @@ class Log extends RevWalkTextBuiltin {
 	@Option(name = "--no-standard-notes", usage = "usage_noShowStandardNotes")
 	private boolean noStandardNotes;
 
-	private List<String> additionalNoteRefs = new ArrayList<String>();
+	private List<String> additionalNoteRefs = new ArrayList<>();
 
 	@Option(name = "--show-notes", usage = "usage_showNotes", metaVar = "metaVar_ref")
 	void addAdditionalNoteRef(String notesRef) {
@@ -102,8 +103,8 @@ class Log extends RevWalkTextBuiltin {
 
 	@Option(name = "--date", usage = "usage_date")
 	void dateFormat(String date) {
-		if (date.toLowerCase().equals(date))
-			date = date.toUpperCase();
+		if (date.toLowerCase(Locale.ROOT).equals(date))
+			date = date.toUpperCase(Locale.ROOT);
 		dateFormatter = new GitDateFormatter(Format.valueOf(date));
 	}
 
@@ -203,7 +204,7 @@ class Log extends RevWalkTextBuiltin {
 
 			if (!noStandardNotes || !additionalNoteRefs.isEmpty()) {
 				createWalk();
-				noteMaps = new LinkedHashMap<String, NoteMap>();
+				noteMaps = new LinkedHashMap<>();
 				if (!noStandardNotes) {
 					addNoteMap(Constants.R_NOTES_COMMITS);
 				}
@@ -223,12 +224,12 @@ class Log extends RevWalkTextBuiltin {
 
 			super.run();
 		} finally {
-			diffFmt.release();
+			diffFmt.close();
 		}
 	}
 
 	private void addNoteMap(String notesRef) throws IOException {
-		Ref notes = db.getRef(notesRef);
+		Ref notes = db.exactRef(notesRef);
 		if (notes == null)
 			return;
 		RevCommit notesCommit = argWalk.parseCommit(notes.getObjectId());
@@ -267,12 +268,13 @@ class Log extends RevWalkTextBuiltin {
 			outw.print(s);
 			outw.println();
 		}
+		c.disposeBody();
 
 		outw.println();
 		if (showNotes(c))
 			outw.println();
 
-		if (c.getParentCount() == 1 && (showNameAndStatusOnly || showPatch))
+		if (c.getParentCount() <= 1 && (showNameAndStatusOnly || showPatch))
 			showDiff(c);
 		outw.flush();
 	}
@@ -323,7 +325,7 @@ class Log extends RevWalkTextBuiltin {
 			return false;
 		if (emptyLine)
 			outw.println();
-		outw.print("Notes");
+		outw.print("Notes"); //$NON-NLS-1$
 		if (label != null) {
 			outw.print(" ("); //$NON-NLS-1$
 			outw.print(label);
@@ -345,7 +347,8 @@ class Log extends RevWalkTextBuiltin {
 	}
 
 	private void showDiff(RevCommit c) throws IOException {
-		final RevTree a = c.getParent(0).getTree();
+		final RevTree a = c.getParentCount() > 0 ? c.getParent(0).getTree()
+				: null;
 		final RevTree b = c.getTree();
 
 		if (showNameAndStatusOnly)

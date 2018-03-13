@@ -47,14 +47,14 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
 import org.eclipse.jgit.diff.DiffConfig;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.pgm.opt.PathTreeFilterHandler;
 import org.eclipse.jgit.revwalk.FollowFilter;
@@ -71,6 +71,8 @@ import org.eclipse.jgit.revwalk.filter.MessageRevFilter;
 import org.eclipse.jgit.revwalk.filter.RevFilter;
 import org.eclipse.jgit.treewalk.filter.AndTreeFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.Option;
 
 abstract class RevWalkTextBuiltin extends TextBuiltin {
 	RevWalk walk;
@@ -122,12 +124,12 @@ abstract class RevWalkTextBuiltin extends TextBuiltin {
 	private String followPath;
 
 	@Argument(index = 0, metaVar = "metaVar_commitish")
-	private final List<RevCommit> commits = new ArrayList<RevCommit>();
+	private final List<RevCommit> commits = new ArrayList<>();
 
-	@Option(name = "--", metaVar = "metaVar_path", handler = PathTreeFilterHandler.class)
+	@Option(name = "--", metaVar = "metaVar_path", multiValued = true, handler = PathTreeFilterHandler.class)
 	protected TreeFilter pathFilter = TreeFilter.ALL;
 
-	private final List<RevFilter> revLimiter = new ArrayList<RevFilter>();
+	private final List<RevFilter> revLimiter = new ArrayList<>();
 
 	@Option(name = "--author")
 	void addAuthorRevFilter(final String who) {
@@ -143,6 +145,9 @@ abstract class RevWalkTextBuiltin extends TextBuiltin {
 	void addCMessageRevFilter(final String msg) {
 		revLimiter.add(MessageRevFilter.create(msg));
 	}
+
+	@Option(name = "--max-count", aliases = "-n", metaVar = "metaVar_n")
+	private int maxCount = -1;
 
 	@Override
 	protected void run() throws Exception {
@@ -164,8 +169,10 @@ abstract class RevWalkTextBuiltin extends TextBuiltin {
 		else if (revLimiter.size() > 1)
 			walk.setRevFilter(AndRevFilter.create(revLimiter));
 
-		if (all)
-			for (Ref a : db.getAllRefs().values()) {
+		if (all) {
+			Map<String, Ref> refs =
+				db.getRefDatabase().getRefs(RefDatabase.ALL);
+			for (Ref a : refs.values()) {
 				ObjectId oid = a.getPeeledObjectId();
 				if (oid == null)
 					oid = a.getObjectId();
@@ -175,6 +182,7 @@ abstract class RevWalkTextBuiltin extends TextBuiltin {
 					// Ignore all refs which are not commits
 				}
 			}
+		}
 
 		if (commits.isEmpty()) {
 			final ObjectId head = db.resolve(Constants.HEAD);
@@ -194,27 +202,31 @@ abstract class RevWalkTextBuiltin extends TextBuiltin {
 		final int n = walkLoop();
 		if (count) {
 			final long end = System.currentTimeMillis();
-			System.err.print(n);
-			System.err.print(' ');
-			System.err
-					.println(MessageFormat.format(
+			errw.print(n);
+			errw.print(' ');
+			errw.println(MessageFormat.format(
 							CLIText.get().timeInMilliSeconds,
 							Long.valueOf(end - start)));
 		}
 	}
 
 	protected RevWalk createWalk() {
+		RevWalk result;
 		if (objects)
-			return new ObjectWalk(db);
-		if (argWalk != null)
-			return argWalk;
-		return argWalk = new RevWalk(db);
+			result = new ObjectWalk(db);
+		else if (argWalk != null)
+			result = argWalk;
+		else
+		  result = argWalk = new RevWalk(db);
+		result.setRewriteParents(false);
+		return result;
 	}
 
 	protected int walkLoop() throws Exception {
 		int n = 0;
 		for (final RevCommit c : walk) {
-			n++;
+			if (++n > maxCount && maxCount >= 0)
+				break;
 			show(c);
 		}
 		if (walk instanceof ObjectWalk) {

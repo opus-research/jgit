@@ -49,12 +49,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.text.MessageFormat;
 
-import javaewah.EWAHCompressedBitmap;
-
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectId;
+
+import com.googlecode.javaewah.EWAHCompressedBitmap;
 
 /**
  * Logical representation of the bitmap data stored in the pack index.
@@ -193,4 +193,11 @@ public abstract class PackBitmapIndex {
 	 *         pack that this index was generated from.
 	 */
 	public abstract int getObjectCount();
+
+	/**
+	 * Returns the number of bitmaps in this bitmap index.
+	 *
+	 * @return the number of bitmaps in this bitmap index.
+	 */
+	public abstract int getBitmapCount();
 }

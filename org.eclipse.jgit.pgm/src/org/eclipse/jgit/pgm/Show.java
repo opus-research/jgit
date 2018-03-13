@@ -63,6 +63,7 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.pgm.opt.PathTreeFilterHandler;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -81,13 +82,12 @@ class Show extends TextBuiltin {
 
 	private final DateFormat fmt;
 
-	private final DiffFormatter diffFmt = new DiffFormatter( //
-			new BufferedOutputStream(System.out));
+	private DiffFormatter diffFmt;
 
 	@Argument(index = 0, metaVar = "metaVar_object")
 	private String objectName;
 
-	@Option(name = "--", metaVar = "metaVar_path", handler = PathTreeFilterHandler.class)
+	@Option(name = "--", metaVar = "metaVar_path", multiValued = true, handler = PathTreeFilterHandler.class)
 	protected TreeFilter pathFilter = TreeFilter.ALL;
 
 	// BEGIN -- Options shared with Diff
@@ -165,6 +165,12 @@ class Show extends TextBuiltin {
 		fmt = new SimpleDateFormat("EEE MMM dd HH:mm:ss yyyy ZZZZZ", Locale.US); //$NON-NLS-1$
 	}
 
+	@Override
+	protected void init(final Repository repository, final String gitDir) {
+		super.init(repository, gitDir);
+		diffFmt = new DiffFormatter(new BufferedOutputStream(outs));
+	}
+
 	@SuppressWarnings("boxing")
 	@Override
 	protected void run() throws Exception {
@@ -184,8 +190,7 @@ class Show extends TextBuiltin {
 			else
 				objectId = db.resolve(objectName);
 
-			RevWalk rw = new RevWalk(db);
-			try {
+			try (RevWalk rw = new RevWalk(db)) {
 				RevObject obj = rw.parseAny(objectId);
 				while (obj instanceof RevTag) {
 					show((RevTag) obj);
@@ -216,11 +221,9 @@ class Show extends TextBuiltin {
 							CLIText.get().cannotReadBecause, obj.name(),
 							obj.getType()));
 				}
-			} finally {
-				rw.release();
 			}
 		} finally {
-			diffFmt.release();
+			diffFmt.close();
 		}
 	}
 
@@ -254,16 +257,17 @@ class Show extends TextBuiltin {
 
 	private void show(RevTree obj) throws MissingObjectException,
 			IncorrectObjectTypeException, CorruptObjectException, IOException {
-		final TreeWalk walk = new TreeWalk(db);
-		walk.reset();
-		walk.addTree(obj);
+		try (final TreeWalk walk = new TreeWalk(db)) {
+			walk.reset();
+			walk.addTree(obj);
 
-		while (walk.next()) {
-			outw.print(walk.getPathString());
-			final FileMode mode = walk.getFileMode(0);
-			if (mode == FileMode.TREE)
-				outw.print("/"); //$NON-NLS-1$
-			outw.println();
+			while (walk.next()) {
+				outw.print(walk.getPathString());
+				final FileMode mode = walk.getFileMode(0);
+				if (mode == FileMode.TREE)
+					outw.print("/"); //$NON-NLS-1$
+				outw.println();
+			}
 		}
 	}
 

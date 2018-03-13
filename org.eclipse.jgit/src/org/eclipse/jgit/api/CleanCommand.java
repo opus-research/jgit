@@ -43,6 +43,8 @@
  */
 package org.eclipse.jgit.api;
 
+import static org.eclipse.jgit.lib.Constants.DOT_GIT;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
@@ -52,7 +54,9 @@ import java.util.TreeSet;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
+import org.eclipse.jgit.events.WorkingTreeModifiedEvent;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 
 /**
@@ -72,6 +76,8 @@ public class CleanCommand extends GitCommand<Set<String>> {
 
 	private boolean ignore = true;
 
+	private boolean force = false;
+
 	/**
 	 * @param repo
 	 */
@@ -89,24 +95,25 @@ public class CleanCommand extends GitCommand<Set<String>> {
 	 * @throws GitAPIException
 	 * @throws NoWorkTreeException
 	 */
+	@Override
 	public Set<String> call() throws NoWorkTreeException, GitAPIException {
-		Set<String> files = new TreeSet<String>();
+		Set<String> files = new TreeSet<>();
 		try {
 			StatusCommand command = new StatusCommand(repo);
 			Status status = command.call();
 
-			Set<String> untrackedAndIgnoredFiles = new TreeSet<String>(
+			Set<String> untrackedAndIgnoredFiles = new TreeSet<>(
 					status.getUntracked());
-			Set<String> untrackedAndIgnoredDirs = new TreeSet<String>(
+			Set<String> untrackedAndIgnoredDirs = new TreeSet<>(
 					status.getUntrackedFolders());
 
+			FS fs = getRepository().getFS();
 			for (String p : status.getIgnoredNotInIndex()) {
 				File f = new File(repo.getWorkTree(), p);
-				if (f.isFile()) {
+				if (fs.isFile(f) || fs.isSymLink(f))
 					untrackedAndIgnoredFiles.add(p);
-				} else if (f.isDirectory()) {
+				else if (fs.isDirectory(f))
 					untrackedAndIgnoredDirs.add(p);
-				}
 			}
 
 			Set<String> filtered = filterFolders(untrackedAndIgnoredFiles,
@@ -120,29 +127,77 @@ public class CleanCommand extends GitCommand<Set<String>> {
 
 			for (String file : notIgnoredFiles)
 				if (paths.isEmpty() || paths.contains(file)) {
-					if (!dryRun)
-						FileUtils.delete(new File(repo.getWorkTree(), file));
-					files.add(file);
+					files = cleanPath(file, files);
 				}
 
-			if (directories)
-				for (String dir : notIgnoredDirs)
-					if (paths.isEmpty() || paths.contains(dir)) {
-						if (!dryRun)
-							FileUtils.delete(new File(repo.getWorkTree(), dir),
-									FileUtils.RECURSIVE);
-						files.add(dir + "/"); //$NON-NLS-1$
-					}
+			for (String dir : notIgnoredDirs)
+				if (paths.isEmpty() || paths.contains(dir)) {
+					files = cleanPath(dir, files);
+				}
 		} catch (IOException e) {
 			throw new JGitInternalException(e.getMessage(), e);
+		} finally {
+			if (!files.isEmpty()) {
+				repo.fireEvent(new WorkingTreeModifiedEvent(null, files));
+			}
 		}
 		return files;
+	}
+
+	/**
+	 * When dryRun is false, deletes the specified path from disk. If dryRun
+	 * is true, no paths are actually deleted. In both cases, the paths that
+	 * would have been deleted are added to inFiles and returned.
+	 *
+	 * Paths that are directories are recursively deleted when
+	 * {@link #directories} is true.
+	 * Paths that are git repositories are recursively deleted when
+	 * {@link #directories} and {@link #force} are both true.
+	 *
+	 * @param path
+	 * 			The path to be cleaned
+	 * @param inFiles
+	 * 			A set of strings representing the files that have been cleaned
+	 * 			already, the path to be cleaned will be added to this set
+	 * 			before being returned.
+	 *
+	 * @return a set of strings with the cleaned path added to it
+	 * @throws IOException
+	 */
+	private Set<String> cleanPath(String path, Set<String> inFiles)
+			throws IOException {
+		File curFile = new File(repo.getWorkTree(), path);
+		if (curFile.isDirectory()) {
+			if (directories) {
+				// Is this directory a git repository?
+				if (new File(curFile, DOT_GIT).exists()) {
+					if (force) {
+						if (!dryRun) {
+							FileUtils.delete(curFile, FileUtils.RECURSIVE);
+						}
+						inFiles.add(path + "/"); //$NON-NLS-1$
+					}
+				} else {
+					if (!dryRun) {
+						FileUtils.delete(curFile, FileUtils.RECURSIVE);
+					}
+					inFiles.add(path + "/"); //$NON-NLS-1$
+				}
+			}
+		} else {
+			if (!dryRun) {
+				FileUtils.delete(curFile, FileUtils.NONE);
+			}
+			inFiles.add(path);
+		}
+
+		return inFiles;
 	}
 
 	private Set<String> filterIgnorePaths(Set<String> inputPaths,
 			Set<String> ignoredNotInIndex, boolean exact) {
 		if (ignore) {
-			Set<String> filtered = new TreeSet<String>(inputPaths);
+			Set<String> filtered = new TreeSet<>(inputPaths);
 			for (String path : inputPaths)
 				for (String ignored : ignoredNotInIndex)
 					if ((exact && path.equals(ignored))
@@ -158,7 +213,7 @@ public class CleanCommand extends GitCommand<Set<String>> {
 
 	private Set<String> filterFolders(Set<String> untracked,
 			Set<String> untrackedFolders) {
-		Set<String> filtered = new TreeSet<String>(untracked);
+		Set<String> filtered = new TreeSet<>(untracked);
 		for (String file : untracked)
 			for (String folder : untrackedFolders)
 				if (file.startsWith(folder)) {
@@ -174,7 +229,7 @@ public class CleanCommand extends GitCommand<Set<String>> {
 	 * If paths are set, only these paths are affected by the cleaning.
 	 *
 	 * @param paths
-	 *            the paths to set
+	 *            the paths to set (with <code>/</code> as separator)
 	 * @return {@code this}
 	 */
 	public CleanCommand setPaths(Set<String> paths) {
@@ -191,6 +246,20 @@ public class CleanCommand extends GitCommand<Set<String>> {
 	 */
 	public CleanCommand setDryRun(boolean dryRun) {
 		this.dryRun = dryRun;
+		return this;
+	}
+
+	/**
+	 * If force is set, directories that are git repositories will also be
+	 * deleted.
+	 *
+	 * @param force
+	 *            whether or not to delete git repositories
+	 * @return {@code this}
+	 * @since 4.5
+	 */
+	public CleanCommand setForce(boolean force) {
+		this.force = force;
 		return this;
 	}
 

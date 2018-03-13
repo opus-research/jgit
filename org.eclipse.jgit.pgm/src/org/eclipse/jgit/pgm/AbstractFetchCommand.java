@@ -50,7 +50,6 @@ package org.eclipse.jgit.pgm;
 import static java.lang.Character.valueOf;
 
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.text.MessageFormat;
 
 import org.eclipse.jgit.lib.Constants;
@@ -60,6 +59,7 @@ import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.transport.FetchResult;
 import org.eclipse.jgit.transport.TrackingRefUpdate;
+import org.eclipse.jgit.util.io.ThrowingPrintWriter;
 import org.kohsuke.args4j.Option;
 
 abstract class AbstractFetchCommand extends TextBuiltin {
@@ -67,8 +67,7 @@ abstract class AbstractFetchCommand extends TextBuiltin {
 	private boolean verbose;
 
 	protected void showFetchResult(final FetchResult r) throws IOException {
-		ObjectReader reader = db.newObjectReader();
-		try {
+		try (ObjectReader reader = db.newObjectReader()) {
 			boolean shownURI = false;
 			for (final TrackingRefUpdate u : r.getTrackingRefUpdates()) {
 				if (!verbose && u.getResult() == RefUpdate.Result.NO_CHANGE)
@@ -89,14 +88,14 @@ abstract class AbstractFetchCommand extends TextBuiltin {
 						src, dst);
 				outw.println();
 			}
-		} finally {
-			reader.release();
 		}
-		showRemoteMessages(r.getMessages());
+		showRemoteMessages(errw, r.getMessages());
+		for (FetchResult submoduleResult : r.submoduleResults().values()) {
+			showFetchResult(submoduleResult);
+		}
 	}
 
-	static void showRemoteMessages(String pkt) {
-		PrintWriter writer = new PrintWriter(System.err);
+	static void showRemoteMessages(ThrowingPrintWriter writer, String pkt) throws IOException {
 		while (0 < pkt.length()) {
 			final int lf = pkt.indexOf('\n');
 			final int cr = pkt.indexOf('\r');
@@ -133,20 +132,20 @@ abstract class AbstractFetchCommand extends TextBuiltin {
 			final TrackingRefUpdate u) {
 		final RefUpdate.Result r = u.getResult();
 		if (r == RefUpdate.Result.LOCK_FAILURE)
-			return "[lock fail]";
+			return "[lock fail]"; //$NON-NLS-1$
 		if (r == RefUpdate.Result.IO_FAILURE)
-			return "[i/o error]";
+			return "[i/o error]"; //$NON-NLS-1$
 		if (r == RefUpdate.Result.REJECTED)
-			return "[rejected]";
+			return "[rejected]"; //$NON-NLS-1$
 		if (ObjectId.zeroId().equals(u.getNewObjectId()))
-			return "[deleted]";
+			return "[deleted]"; //$NON-NLS-1$
 
 		if (r == RefUpdate.Result.NEW) {
 			if (u.getRemoteName().startsWith(Constants.R_HEADS))
-				return "[new branch]";
+				return "[new branch]"; //$NON-NLS-1$
 			else if (u.getLocalName().startsWith(Constants.R_TAGS))
-				return "[new tag]";
-			return "[new]";
+				return "[new tag]"; //$NON-NLS-1$
+			return "[new]"; //$NON-NLS-1$
 		}
 
 		if (r == RefUpdate.Result.FORCED) {
@@ -162,7 +161,7 @@ abstract class AbstractFetchCommand extends TextBuiltin {
 		}
 
 		if (r == RefUpdate.Result.NO_CHANGE)
-			return "[up to date]";
+			return "[up to date]"; //$NON-NLS-1$
 		return "[" + r.name() + "]"; //$NON-NLS-1$//$NON-NLS-2$
 	}
 

@@ -43,6 +43,8 @@
 
 package org.eclipse.jgit.merge;
 
+import org.eclipse.jgit.lib.Config;
+import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.Repository;
 
 /**
@@ -63,7 +65,12 @@ public class StrategyRecursive extends StrategyResolve {
 	}
 
 	@Override
+	public ThreeWayMerger newMerger(ObjectInserter inserter, Config config) {
+		return new RecursiveMerger(inserter, config);
+	}
+
+	@Override
 	public String getName() {
-		return "recursive";
+		return "recursive"; //$NON-NLS-1$
 	}
 }

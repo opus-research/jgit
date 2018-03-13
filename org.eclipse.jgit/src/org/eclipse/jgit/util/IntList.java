@@ -44,7 +44,7 @@
 
 package org.eclipse.jgit.util;
 
-/** A more efficient List<Integer> using a primitive integer array. */
+/** A more efficient List&lt;Integer&gt; using a primitive integer array. */
 public class IntList {
 	private int[] entries;
 
@@ -68,6 +68,21 @@ public class IntList {
 	/** @return number of entries in this list */
 	public int size() {
 		return count;
+	}
+
+	/**
+	 * Check if an entry appears in this collection.
+	 *
+	 * @param value
+	 *            the value to search for.
+	 * @return true of {@code value} appears in this list.
+	 * @since 4.9
+	 */
+	public boolean contains(int value) {
+		for (int i = 0; i < count; i++)
+			if (entries[i] == value)
+				return true;
+		return false;
 	}
 
 	/**
@@ -138,6 +153,7 @@ public class IntList {
 		entries = n;
 	}
 
+	@Override
 	public String toString() {
 		final StringBuilder r = new StringBuilder();
 		r.append('[');
