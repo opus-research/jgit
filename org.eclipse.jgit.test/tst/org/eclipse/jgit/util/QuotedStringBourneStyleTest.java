@@ -44,9 +44,7 @@
 package org.eclipse.jgit.util;
 
 import static org.eclipse.jgit.util.QuotedString.BOURNE;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.*;
 
 import org.eclipse.jgit.lib.Constants;
 import org.junit.Test;

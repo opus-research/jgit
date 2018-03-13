@@ -43,8 +43,7 @@
 
 package org.eclipse.jgit.storage.file;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.junit.Test;

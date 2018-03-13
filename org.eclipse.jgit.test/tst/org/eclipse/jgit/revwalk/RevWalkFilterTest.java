@@ -43,8 +43,7 @@
 
 package org.eclipse.jgit.revwalk;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
+import static org.junit.Assert.*;
 
 import java.io.IOException;
 import java.util.Date;

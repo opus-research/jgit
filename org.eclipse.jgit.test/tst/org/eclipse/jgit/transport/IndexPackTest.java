@@ -46,7 +46,7 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;

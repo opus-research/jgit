@@ -44,10 +44,7 @@
 
 package org.eclipse.jgit.storage.file;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.junit.JGitTestUtil;

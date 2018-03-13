@@ -43,15 +43,11 @@
 
 package org.eclipse.jgit.http.test;
 
+import static org.junit.Assert.*;
+
 import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_ENCODING;
 import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_LENGTH;
 import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_TYPE;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.io.PrintWriter;

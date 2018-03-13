@@ -43,7 +43,7 @@
 
 package org.eclipse.jgit.junit.http;
 
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 import java.io.IOException;
 import java.net.URI;
