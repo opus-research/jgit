@@ -42,7 +42,7 @@
  */
 package org.eclipse.jgit.attributes;
 
-import java.util.Set;
+import java.util.Map;
 
 /**
  * Interface for classes which provide git attributes
@@ -51,7 +51,7 @@ import java.util.Set;
  */
 public interface AttributesProvider {
 	/**
-	 * @return the currently active attributes
+	 * @return the currently active attributes by attribute key
 	 */
-	public Set<Attribute> getAttributes();
+	public Map<String, Attribute> getAttributes();
 }

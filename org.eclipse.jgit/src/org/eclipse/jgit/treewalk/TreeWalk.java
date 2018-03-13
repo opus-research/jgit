@@ -46,7 +46,6 @@ package org.eclipse.jgit.treewalk;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -256,7 +255,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	AbstractTreeIterator currentHead;
 
 	/** Cached attribute for the current entry */
-	private Set<Attribute> attrs = null;
+	private Map<String, Attribute> attrs = null;
 
 	/**
 	 * Create a new tree walker for a given repository.
@@ -1117,7 +1116,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 * @return a {@link Set} of {@link Attribute}s that match the current entry.
 	 * @since 4.2
 	 */
-	public Set<Attribute> getAttributes() {
+	public Map<String, Attribute> getAttributes() {
 		if (attrs != null)
 			return attrs;
 
@@ -1147,7 +1146,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 				&& dirCacheIterator == null) {
 			// Can not retrieve the attributes without at least one of the above
 			// iterators.
-			return Collections.<Attribute> emptySet();
+			return Collections.<String, Attribute> emptyMap();
 		}
 
 		String path = currentHead.getEntryPathString();
@@ -1176,16 +1175,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 		} catch (IOException e) {
 			throw new JGitInternalException("Error while parsing attributes", e); //$NON-NLS-1$
 		}
-		final Set<Attribute> result;
-		if (attributes.isEmpty()) {
-			result = Collections.<Attribute> emptySet();
-		} else {
-			result = new HashSet<Attribute>(attributes.values());
-		}
-
-		attrs = result;
-
-		return result;
+		return attributes;
 	}
 
 	/**
