@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Google Inc.
+ * Copyright (C) 2014, Sven Selberg <sven.selberg@sonymobile.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,52 +40,41 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.archive;
+package org.eclipse.jgit.revwalk;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import static org.junit.Assert.assertTrue;
 
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream;
-import org.eclipse.jgit.api.ArchiveCommand;
-import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectLoader;
+import org.junit.Test;
 
-/**
- * bzip2-compressed tarball (tar.bz2) format.
- */
-public final class Tbz2Format implements ArchiveCommand.Format<ArchiveOutputStream> {
-	private static final List<String> SUFFIXES = Collections
-			.unmodifiableList(Arrays.asList(".tar.bz2", ".tbz", ".tbz2")); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+public class RevWalkMergedIntoTest extends RevWalkTestCase {
 
-	private final ArchiveCommand.Format<ArchiveOutputStream> tarFormat = new TarFormat();
-
-	public ArchiveOutputStream createArchiveOutputStream(OutputStream s)
-			throws IOException {
-		BZip2CompressorOutputStream out = new BZip2CompressorOutputStream(s);
-		return tarFormat.createArchiveOutputStream(out);
-	}
-
-	public void putEntry(ArchiveOutputStream out,
-			String path, FileMode mode, ObjectLoader loader)
-			throws IOException {
-		tarFormat.putEntry(out, path, mode, loader);
-	}
-
-	public Iterable<String> suffixes() {
-		return SUFFIXES;
-	}
-
-	@Override
-	public boolean equals(Object other) {
-		return (other instanceof Tbz2Format);
-	}
-
-	@Override
-	public int hashCode() {
-		return getClass().hashCode();
+	@Test
+	public void testOldCommitWalk() throws Exception {
+		/*
+		 * Sometimes a merge is performed on a machine with faulty time.
+		 * This makes the traversal of the graph, when trying to find out if B
+		 * is merged into T, complex since the algorithm uses the time stamps
+		 * of commits to find the best route.
+		 * When for example O(ld) has a very old time stamp compared to one of the
+		 * commits (N(ew)) on the upper route between T and F(alse base), the route
+		 * to False is deemed the better option even though the alternate route leeds
+		 * to B(ase) which was the commit we were after.
+		 *
+		 *             o---o---o---o---N
+		 *            /                 \
+		 *           /   o---o---o---O---T
+		 *          /   /
+		 *      ---F---B
+		 *
+		 * This test is asserting that isMergedInto(B, T) returns true even
+		 * under those circumstances.
+		 */
+		final int threeDaysInSecs = 3 * 24 * 60 * 60;
+		final RevCommit f = commit();
+		final RevCommit b = commit(f);
+		final RevCommit o = commit(-threeDaysInSecs, commit(commit(commit(b))));
+		final RevCommit n = commit(commit(commit(commit(commit(f)))));
+		final RevCommit t = commit(n, o);
+		assertTrue(rw.isMergedInto(b, t));
 	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014, Google Inc.
+ * Copyright (C) 2011, 2013 Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,26 +40,52 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm;
+package org.eclipse.jgit.gitrepo;
 
-import org.eclipse.jgit.gitrepo.RepoCommand;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
+import static org.junit.Assert.assertTrue;
 
-@Command(common = true, usage = "usage_parseRepoManifest")
-class Repo extends TextBuiltin {
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 
-	@Option(name = "--base-uri", aliases = { "-u" }, usage = "usage_baseUri")
-	private String uri;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.junit.JGitTestUtil;
+import org.eclipse.jgit.junit.RepositoryTestCase;
+import org.eclipse.jgit.lib.Repository;
+import org.junit.Test;
 
-	@Argument(required = true, usage = "usage_pathToXml")
-	private String path;
+public class RepoCommandTest extends RepositoryTestCase {
 
-	@Override
-	protected void run() throws Exception {
-		new RepoCommand(db)
-			.setURI(uri)
-			.setPath(path)
+	private Git remoteGit;
+
+	public void setUp() throws Exception {
+		super.setUp();
+
+		Repository remoteDb = createWorkRepository();
+		remoteGit = new Git(remoteDb);
+		JGitTestUtil.writeTrashFile(remoteDb, "hello.txt", "world");
+		remoteGit.add().addFilepattern("hello.txt").call();
+		remoteGit.commit().setMessage("Initial commit").call();
+	}
+
+	@Test
+	public void testAddRepoManifest() throws Exception {
+		StringBuilder xmlContent = new StringBuilder();
+		xmlContent.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
+			.append("<manifest>")
+			.append("<remote name=\"remote1\" fetch=\".\" />")
+			.append("<default revision=\"master\" remote=\"remote1\" />")
+			.append("<project path=\"foo\" name=\".\" />")
+			.append("</manifest>");
+		writeTrashFile("manifest.xml", xmlContent.toString());
+		RepoCommand command = new RepoCommand(db);
+		command.setPath(db.getWorkTree() + "/manifest.xml")
+			.setURI(remoteGit.getRepository().getDirectory().toURI().toString())
 			.call();
+		File hello = new File(db.getWorkTree() + "/foo/hello.txt");
+		assertTrue(hello.exists());
+		BufferedReader reader = new BufferedReader(new FileReader(hello));
+		String content = reader.readLine();
+		assertTrue(content.startsWith("world"));
 	}
 }
