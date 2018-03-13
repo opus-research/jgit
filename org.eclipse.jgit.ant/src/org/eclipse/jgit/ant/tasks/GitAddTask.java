@@ -60,7 +60,7 @@ import org.eclipse.jgit.util.FS;
 
 /**
  * Adds a file to the git index.
- *
+ * 
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-add.html"
  *      >git-add(1)</a>
  */
@@ -79,7 +79,7 @@ public class GitAddTask extends Task {
 
 	/**
 	 * Add a set of files to add.
-	 *
+	 * 
 	 * @param set
 	 *            a set of files to add.
 	 */
@@ -89,7 +89,7 @@ public class GitAddTask extends Task {
 
 	/**
 	 * Add a set of files to add.
-	 *
+	 * 
 	 * @param set
 	 *            a set of files to add.
 	 */
