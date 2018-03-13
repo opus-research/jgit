@@ -192,10 +192,6 @@ public class ResetCommand extends GitCommand<Ref> {
 				throw new JGitInternalException(MessageFormat.format(
 						JGitText.get().cannotLock, ru.getName()));
 
-			ObjectId origHead = ru.getOldObjectId();
-			if (origHead != null)
-				repo.writeOrigHead(origHead);
-
 			switch (mode) {
 				case HARD:
 					checkoutIndex(commit);

@@ -576,7 +576,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		// create the folder for the meta information
 		FileUtils.mkdir(rebaseDir);
 
-		repo.writeOrigHead(headId);
+		createFile(repo.getDirectory(), Constants.ORIG_HEAD, headId.name());
 		createFile(rebaseDir, REBASE_HEAD, headId.name());
 		createFile(rebaseDir, HEAD_NAME, headName);
 		createFile(rebaseDir, ONTO, upstreamCommit.name());
@@ -733,8 +733,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 	private RebaseResult abort(RebaseResult result) throws IOException {
 		try {
-			ObjectId origHead = repo.readOrigHead();
-			String commitId = origHead != null ? origHead.name() : null;
+			String commitId = readFile(repo.getDirectory(), Constants.ORIG_HEAD);
 			monitor.beginTask(MessageFormat.format(
 					JGitText.get().abortingRebase, commitId),
 					ProgressMonitor.UNKNOWN);
