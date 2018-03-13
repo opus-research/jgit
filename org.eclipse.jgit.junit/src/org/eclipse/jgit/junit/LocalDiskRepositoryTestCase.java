@@ -63,7 +63,6 @@ import junit.framework.TestCase;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileBasedConfig;
-import org.eclipse.jgit.lib.FileRepository;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryCache;
@@ -260,7 +259,7 @@ public abstract class LocalDiskRepositoryTestCase extends TestCase {
 	 * @throws IOException
 	 *             the repository could not be created in the temporary area
 	 */
-	protected FileRepository createBareRepository() throws IOException {
+	protected Repository createBareRepository() throws IOException {
 		return createRepository(true /* bare */);
 	}
 
@@ -271,7 +270,7 @@ public abstract class LocalDiskRepositoryTestCase extends TestCase {
 	 * @throws IOException
 	 *             the repository could not be created in the temporary area
 	 */
-	protected FileRepository createWorkRepository() throws IOException {
+	protected Repository createWorkRepository() throws IOException {
 		return createRepository(false /* not bare */);
 	}
 
@@ -285,11 +284,11 @@ public abstract class LocalDiskRepositoryTestCase extends TestCase {
 	 * @throws IOException
 	 *             the repository could not be created in the temporary area
 	 */
-	private FileRepository createRepository(boolean bare) throws IOException {
+	private Repository createRepository(boolean bare) throws IOException {
 		String uniqueId = System.currentTimeMillis() + "_" + (testCount++);
 		String gitdirName = "test" + uniqueId + (bare ? "" : "/") + Constants.DOT_GIT;
 		File gitdir = new File(trash, gitdirName).getCanonicalFile();
-		FileRepository db = new FileRepository(gitdir);
+		Repository db = new Repository(gitdir);
 
 		assertFalse(gitdir.exists());
 		db.create();

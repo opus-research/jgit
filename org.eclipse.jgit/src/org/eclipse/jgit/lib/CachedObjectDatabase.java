@@ -129,9 +129,4 @@ public class CachedObjectDatabase extends ObjectDatabase {
 		// The situation might become even more tricky if we will consider alternates.
 		return wrapped.newCachedDatabase();
 	}
-
-	@Override
-	public ObjectInserter newInserter() {
-		return wrapped.newInserter();
-	}
 }

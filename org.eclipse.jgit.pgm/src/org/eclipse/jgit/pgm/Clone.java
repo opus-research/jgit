@@ -57,11 +57,11 @@ import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Commit;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.FileRepository;
 import org.eclipse.jgit.lib.GitIndex;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefComparator;
 import org.eclipse.jgit.lib.RefUpdate;
+import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.lib.Tree;
 import org.eclipse.jgit.lib.WorkDirCheckout;
@@ -81,8 +81,6 @@ class Clone extends AbstractFetchCommand {
 
 	@Argument(index = 1, metaVar = "metaVar_directory")
 	private String localName;
-
-	private FileRepository dst;
 
 	@Override
 	protected final boolean requiresRepository() {
@@ -105,11 +103,10 @@ class Clone extends AbstractFetchCommand {
 		if (gitdir == null)
 			gitdir = new File(localName, Constants.DOT_GIT);
 
-		dst = new FileRepository(gitdir);
-		dst.create();
-		dst.getConfig().setBoolean("core", null, "bare", false);
-		dst.getConfig().save();
-		db = dst;
+		db = new Repository(gitdir);
+		db.create();
+		db.getConfig().setBoolean("core", null, "bare", false);
+		db.getConfig().save();
 
 		out.format(CLIText.get().initializedEmptyGitRepositoryIn, gitdir.getAbsolutePath());
 		out.println();
@@ -123,13 +120,13 @@ class Clone extends AbstractFetchCommand {
 
 	private void saveRemote(final URIish uri) throws URISyntaxException,
 			IOException {
-		final RemoteConfig rc = new RemoteConfig(dst.getConfig(), remoteName);
+		final RemoteConfig rc = new RemoteConfig(db.getConfig(), remoteName);
 		rc.addURI(uri);
 		rc.addFetchRefSpec(new RefSpec().setForceUpdate(true)
 				.setSourceDestination(Constants.R_HEADS + "*",
 						Constants.R_REMOTES + remoteName + "/*"));
-		rc.update(dst.getConfig());
-		dst.getConfig().save();
+		rc.update(db.getConfig());
+		db.getConfig().save();
 	}
 
 	private FetchResult runFetch() throws NotSupportedException,
