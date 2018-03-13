@@ -204,7 +204,8 @@ public class CommitBuilder {
 			setParentId(additionalParent);
 		} else {
 			ObjectId[] newParents = new ObjectId[parentIds.length + 1];
-			System.arraycopy(parentIds, 0, newParents, 0, parentIds.length);
+			for (int i = 0; i < parentIds.length; i++)
+				newParents[i] = parentIds[i];
 			newParents[parentIds.length] = additionalParent.copy();
 			parentIds = newParents;
 		}
