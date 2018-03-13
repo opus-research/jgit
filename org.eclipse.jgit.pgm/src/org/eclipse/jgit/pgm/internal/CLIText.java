@@ -68,7 +68,6 @@ public class CLIText extends TranslationBundle {
 	 * @param line
 	 *            the line to format
 	 * @return the formatted line
-	 * @since 2.2
 	 */
 	public static String formatLine(String line) {
 		return MessageFormat.format(get().lineFormat, line);
@@ -81,7 +80,6 @@ public class CLIText extends TranslationBundle {
 	 * @param message
 	 *            the message to format
 	 * @return the formatted line
-	 * @since 4.2
 	 */
 	public static String fatalError(String message) {
 		return MessageFormat.format(get().fatalError, message);
@@ -123,6 +121,7 @@ public class CLIText extends TranslationBundle {
 	/***/ public String cantWrite;
 	/***/ public String changesNotStagedForCommit;
 	/***/ public String changesToBeCommitted;
+	/***/ public String checkingOut;
 	/***/ public String checkoutConflict;
 	/***/ public String checkoutConflictPathLine;
 	/***/ public String cleanRequireForce;
@@ -265,6 +264,7 @@ public class CLIText extends TranslationBundle {
 	/***/ public String statusDeletedByUs;
 	/***/ public String statusBothAdded;
 	/***/ public String statusBothModified;
+	/***/ public String submoduleRegistered;
 	/***/ public String switchedToNewBranch;
 	/***/ public String switchedToBranch;
 	/***/ public String tagAlreadyExists;

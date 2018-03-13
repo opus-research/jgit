@@ -45,8 +45,6 @@
 
 package org.eclipse.jgit.util;
 
-import static org.eclipse.jgit.lib.Constants.COMMONDIR_FILE;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileLock;
@@ -67,6 +65,7 @@ import java.text.Normalizer;
 import java.text.Normalizer.Form;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 import org.eclipse.jgit.internal.JGitText;
@@ -152,8 +151,8 @@ public class FileUtils {
 		if ((options & RECURSIVE) != 0 && fs.isDirectory(f)) {
 			final File[] items = f.listFiles();
 			if (items != null) {
-				List<File> files = new ArrayList<File>();
-				List<File> dirs = new ArrayList<File>();
+				List<File> files = new ArrayList<>();
+				List<File> dirs = new ArrayList<>();
 				for (File c : items)
 					if (c.isFile())
 						files.add(c);
@@ -469,10 +468,71 @@ public class FileUtils {
 		throw new IOException(JGitText.get().cannotCreateTempDir);
 	}
 
+
 	/**
-	 * This will try and make a given path relative to another.
+	 * @deprecated Use the more-clearly-named
+	 *             {@link FileUtils#relativizeNativePath(String, String)}
+	 *             instead, or directly call
+	 *             {@link FileUtils#relativizePath(String, String, String, boolean)}
+	 *
+	 *             Expresses <code>other</code> as a relative file path from
+	 *             <code>base</code>. File-separator and case sensitivity are
+	 *             based on the current file system.
+	 *
+	 *             See also
+	 *             {@link FileUtils#relativizePath(String, String, String, boolean)}.
+	 *
+	 * @param base
+	 *            Base path
+	 * @param other
+	 *            Destination path
+	 * @return Relative path from <code>base</code> to <code>other</code>
+	 * @since 3.7
+	 */
+	@Deprecated
+	public static String relativize(String base, String other) {
+		return relativizeNativePath(base, other);
+	}
+
+	/**
+	 * Expresses <code>other</code> as a relative file path from <code>base</code>.
+	 * File-separator and case sensitivity are based on the current file system.
+	 *
+	 * See also {@link FileUtils#relativizePath(String, String, String, boolean)}.
+	 *
+	 * @param base
+	 *            Base path
+	 * @param other
+	 *             Destination path
+	 * @return Relative path from <code>base</code> to <code>other</code>
+	 * @since 4.8
+	 */
+	public static String relativizeNativePath(String base, String other) {
+		return FS.DETECTED.relativize(base, other);
+	}
+
+	/**
+	 * Expresses <code>other</code> as a relative file path from <code>base</code>.
+	 * File-separator and case sensitivity are based on Git's internal representation of files (which matches Unix).
+	 *
+	 * See also {@link FileUtils#relativizePath(String, String, String, boolean)}.
+	 *
+	 * @param base
+	 *            Base path
+	 * @param other
+	 *             Destination path
+	 * @return Relative path from <code>base</code> to <code>other</code>
+	 * @since 4.8
+	 */
+	public static String relativizeGitPath(String base, String other) {
+		return relativizePath(base, other, "/", false); //$NON-NLS-1$
+	}
+
+
+	/**
+	 * Expresses <code>other</code> as a relative file path from <code>base</code>
 	 * <p>
-	 * For example, if this is called with the two following paths :
+	 * For example, if called with the two following paths :
 	 *
 	 * <pre>
 	 * <code>base = "c:\\Users\\jdoe\\eclipse\\git\\project"</code>
@@ -481,9 +541,7 @@ public class FileUtils {
 	 *
 	 * This will return "..\\another_project\\pom.xml".
 	 * </p>
-	 * <p>
-	 * This method uses {@link File#separator} to split the paths into segments.
-	 * </p>
+	 *
 	 * <p>
 	 * <b>Note</b> that this will return the empty String if <code>base</code>
 	 * and <code>other</code> are equal.
@@ -495,29 +553,32 @@ public class FileUtils {
 	 *            folder and not a file.
 	 * @param other
 	 *            The path that will be made relative to <code>base</code>.
+	 * @param dirSeparator
+	 *            A string that separates components of the path. In practice, this is "/" or "\\".
+	 * @param caseSensitive
+	 *            Whether to consider differently-cased directory names as distinct
 	 * @return A relative path that, when resolved against <code>base</code>,
 	 *         will yield the original <code>other</code>.
-	 * @since 3.7
+	 * @since 4.8
 	 */
-	public static String relativize(String base, String other) {
+	public static String relativizePath(String base, String other, String dirSeparator, boolean caseSensitive) {
 		if (base.equals(other))
 			return ""; //$NON-NLS-1$
 
-		final boolean ignoreCase = !FS.DETECTED.isCaseSensitive();
-		final String[] baseSegments = base.split(Pattern.quote(File.separator));
+		final String[] baseSegments = base.split(Pattern.quote(dirSeparator));
 		final String[] otherSegments = other.split(Pattern
-				.quote(File.separator));
+				.quote(dirSeparator));
 
 		int commonPrefix = 0;
 		while (commonPrefix < baseSegments.length
 				&& commonPrefix < otherSegments.length) {
-			if (ignoreCase
+			if (caseSensitive
+					&& baseSegments[commonPrefix]
+					.equals(otherSegments[commonPrefix]))
+				commonPrefix++;
+			else if (!caseSensitive
 					&& baseSegments[commonPrefix]
 							.equalsIgnoreCase(otherSegments[commonPrefix]))
-				commonPrefix++;
-			else if (!ignoreCase
-					&& baseSegments[commonPrefix]
-							.equals(otherSegments[commonPrefix]))
 				commonPrefix++;
 			else
 				break;
@@ -525,11 +586,11 @@ public class FileUtils {
 
 		final StringBuilder builder = new StringBuilder();
 		for (int i = commonPrefix; i < baseSegments.length; i++)
-			builder.append("..").append(File.separator); //$NON-NLS-1$
+			builder.append("..").append(dirSeparator); //$NON-NLS-1$
 		for (int i = commonPrefix; i < otherSegments.length; i++) {
 			builder.append(otherSegments[i]);
 			if (i < otherSegments.length - 1)
-				builder.append(File.separator);
+				builder.append(dirSeparator);
 		}
 		return builder.toString();
 	}
@@ -544,7 +605,28 @@ public class FileUtils {
 	public static boolean isStaleFileHandle(IOException ioe) {
 		String msg = ioe.getMessage();
 		return msg != null
-				&& msg.toLowerCase().matches("stale .*file .*handle"); //$NON-NLS-1$
+				&& msg.toLowerCase(Locale.ROOT)
+						.matches("stale .*file .*handle"); //$NON-NLS-1$
+	}
+
+	/**
+	 * Determine if a throwable or a cause in its causal chain is a Stale NFS
+	 * File Handle
+	 *
+	 * @param throwable
+	 * @return a boolean true if the throwable or a cause in its causal chain is
+	 *         a Stale NFS File Handle
+	 * @since 4.7
+	 */
+	public static boolean isStaleFileHandleInCausalChain(Throwable throwable) {
+		while (throwable != null) {
+			if (throwable instanceof IOException
+					&& isStaleFileHandle((IOException) throwable)) {
+				return true;
+			}
+			throwable = throwable.getCause();
+		}
+		return false;
 	}
 
 	/**
@@ -766,78 +848,4 @@ public class FileUtils {
 		}
 	}
 
-	/**
-	 * Get GIT_COMMON_DIR
-	 *
-	 * @param dir
-	 *            the GIT_DIR folder
-	 * @return GIT_COMMON_DIR or null
-	 * @throws IOException
-	 *
-	 * @since 4.3
-	 */
-	public static File getCommonDir(File dir) throws IOException {
-		// first the GIT_COMMON_DIR is same as GIT_DIR
-		File commonDir = null;
-		// now check if commondir file exists (e.g. worktree repository)
-		File commonDirFile = new File(dir, COMMONDIR_FILE);
-		if (commonDirFile.isFile()) {
-			String commonDirPath = new String(IO.readFully(commonDirFile))
-					.trim();
-			commonDir = new File(commonDirPath);
-			if (!commonDir.isAbsolute()) {
-				commonDir = new File(dir, commonDirPath).getCanonicalFile();
-			}
-		}
-		return commonDir;
-	}
-
-	private static boolean isSymRef(byte[] ref) {
-		if (ref.length < 9)
-			return false;
-		return /**/ref[0] == 'g' //
-				&& ref[1] == 'i' //
-				&& ref[2] == 't' //
-				&& ref[3] == 'd' //
-				&& ref[4] == 'i' //
-				&& ref[5] == 'r' //
-				&& ref[6] == ':' //
-				&& ref[7] == ' ';
-	}
-
-	/**
-	 * @param workTree
-	 *            the worktree to search
-	 * @param dotGit
-	 *            the .git file
-	 * @param fs
-	 *            FS handle
-	 * @return the GIT_DIR path if available
-	 * @throws IOException
-	 *
-	 * @since 4.3
-	 */
-	public static File getSymRef(File workTree, File dotGit, FS fs)
-			throws IOException {
-		byte[] content = IO.readFully(dotGit);
-		if (!isSymRef(content))
-			throw new IOException(MessageFormat.format(
-					JGitText.get().invalidGitdirRef, dotGit.getAbsolutePath()));
-
-		int pathStart = 8;
-		int lineEnd = RawParseUtils.nextLF(content, pathStart);
-		while (content[lineEnd - 1] == '\n' || (content[lineEnd - 1] == '\r'
-				&& SystemReader.getInstance().isWindows()))
-			lineEnd--;
-		if (lineEnd == pathStart)
-			throw new IOException(MessageFormat.format(
-					JGitText.get().invalidGitdirRef, dotGit.getAbsolutePath()));
-
-		String gitdirPath = RawParseUtils.decode(content, pathStart, lineEnd);
-		File gitdirFile = fs.resolve(workTree, gitdirPath);
-		if (gitdirFile.isAbsolute())
-			return gitdirFile;
-		else
-			return new File(workTree, gitdirPath).getCanonicalFile();
-	}
 }

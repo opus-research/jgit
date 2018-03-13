@@ -4,6 +4,7 @@
  * Copyright (C) 2006-2010, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2006-2012, Shawn O. Pearce <spearce@spearce.org>
  * Copyright (C) 2012, Daniel Megert <daniel_megert@ch.ibm.com>
+ * Copyright (C) 2017, Wim Jongman <wim.jongman@remainsoftware.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -52,6 +53,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.URISyntaxException;
 import java.text.MessageFormat;
 import java.util.Collection;
@@ -64,6 +66,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Pattern;
 
 import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.annotations.Nullable;
@@ -80,6 +83,7 @@ import org.eclipse.jgit.events.IndexChangedListener;
 import org.eclipse.jgit.events.ListenerList;
 import org.eclipse.jgit.events.RepositoryEvent;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.internal.storage.file.GC;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
@@ -93,7 +97,6 @@ import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.SystemReader;
-import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -106,9 +109,19 @@ import org.slf4j.LoggerFactory;
  * This class is thread-safe.
  */
 public abstract class Repository implements AutoCloseable {
-	private static Logger LOG = LoggerFactory.getLogger(Repository.class);
-
+	private static final Logger LOG = LoggerFactory.getLogger(Repository.class);
 	private static final ListenerList globalListeners = new ListenerList();
+
+	/**
+	 * Branch names containing slashes should not have a name component that is
+	 * one of the reserved device names on Windows.
+	 *
+	 * @see #normalizeBranchName(String)
+	 */
+	private static final Pattern FORBIDDEN_BRANCH_NAME_COMPONENTS = Pattern
+			.compile(
+					"(^|/)(aux|com[1-9]|con|lpt[1-9]|nul|prn)(\\.[^/]*)?", //$NON-NLS-1$
+					Pattern.CASE_INSENSITIVE);
 
 	/** @return the global listener list observing all events in this JVM. */
 	public static ListenerList getGlobalListenerList() {
@@ -120,11 +133,8 @@ public abstract class Repository implements AutoCloseable {
 
 	final AtomicLong closedAt = new AtomicLong();
 
-	/** $GIT_DIR: metadata directory holding the repository's critical files. */
+	/** Metadata directory holding the repository's critical files. */
 	private final File gitDir;
-
-	/** $GIT_COMMON_DIR: metadata directory holding the common repository's critical files.  */
-	private final File gitCommonDir;
 
 	/** File abstraction used to resolve paths. */
 	private final FS fs;
@@ -145,7 +155,6 @@ public abstract class Repository implements AutoCloseable {
 	 */
 	protected Repository(final BaseRepositoryBuilder options) {
 		gitDir = options.getGitDir();
-		gitCommonDir = options.getGitCommonDir();
 		fs = options.getFS();
 		workTree = options.getWorkTree();
 		indexFile = options.getIndexFile();
@@ -212,23 +221,6 @@ public abstract class Repository implements AutoCloseable {
 	}
 
 	/**
-	 * @return $GIT_COMMON_DIR: local common metadata directory; $GIT_DIR if not
-	 *         set.
-	 * @since 4.3
-	 */
-	public File getCommonDirectory() {
-		return gitCommonDir != null ? gitCommonDir : gitDir;
-	}
-
-	/**
-	 * @return true if $GIT_COMMON_DIR is set; false if not set.
-	 * @since 4.3
-	 */
-	public boolean hasCommonDirectory() {
-		return gitCommonDir != null;
-	}
-
-	/**
 	 * @return the object database which stores this repository's data.
 	 */
 	@NonNull
@@ -265,7 +257,6 @@ public abstract class Repository implements AutoCloseable {
 	 */
 	@NonNull
 	public abstract AttributesNodeProvider createAttributesNodeProvider();
-
 
 	/**
 	 * @return the used file system abstraction, or or {@code null} if
@@ -674,7 +665,10 @@ public abstract class Repository implements AutoCloseable {
 							// detached
 							name = Constants.HEAD;
 						if (!Repository.isValidRefName("x/" + name)) //$NON-NLS-1$
-							throw new RevisionSyntaxException(revstr);
+							throw new RevisionSyntaxException(MessageFormat
+									.format(JGitText.get().invalidRefName,
+											name),
+									revstr);
 						Ref ref = getRef(name);
 						name = null;
 						if (ref == null)
@@ -724,7 +718,10 @@ public abstract class Repository implements AutoCloseable {
 						if (name.equals("")) //$NON-NLS-1$
 							name = Constants.HEAD;
 						if (!Repository.isValidRefName("x/" + name)) //$NON-NLS-1$
-							throw new RevisionSyntaxException(revstr);
+							throw new RevisionSyntaxException(MessageFormat
+									.format(JGitText.get().invalidRefName,
+											name),
+									revstr);
 						Ref ref = getRef(name);
 						name = null;
 						if (ref == null)
@@ -773,7 +770,9 @@ public abstract class Repository implements AutoCloseable {
 			return null;
 		name = revstr.substring(done);
 		if (!Repository.isValidRefName("x/" + name)) //$NON-NLS-1$
-			throw new RevisionSyntaxException(revstr);
+			throw new RevisionSyntaxException(
+					MessageFormat.format(JGitText.get().invalidRefName, name),
+					revstr);
 		if (getRef(name) != null)
 			return name;
 		return resolveSimple(name);
@@ -890,6 +889,7 @@ public abstract class Repository implements AutoCloseable {
 	}
 
 	/** Decrement the use count, and maybe close resources. */
+	@Override
 	public void close() {
 		int newCount = useCnt.decrementAndGet();
 		if (newCount == 0) {
@@ -901,11 +901,12 @@ public abstract class Repository implements AutoCloseable {
 		} else if (newCount == -1) {
 			// should not happen, only log when useCnt became negative to
 			// minimize number of log entries
+			String message = MessageFormat.format(JGitText.get().corruptUseCnt,
+					toString());
 			if (LOG.isDebugEnabled()) {
-				IllegalStateException e = new IllegalStateException();
-				LOG.debug(JGitText.get().corruptUseCnt, e);
+				LOG.debug(message, new IllegalStateException());
 			} else {
-				LOG.warn(JGitText.get().corruptUseCnt);
+				LOG.warn(message);
 			}
 			if (RepositoryCache.isCached(this)) {
 				closedAt.set(System.currentTimeMillis());
@@ -923,17 +924,17 @@ public abstract class Repository implements AutoCloseable {
 		getRefDatabase().close();
 	}
 
+	@Override
 	@NonNull
-	@SuppressWarnings("nls")
 	public String toString() {
 		String desc;
-		File gitDirLocal = getDirectory();
-		if (gitDirLocal != null)
-			desc = gitDirLocal.getPath();
+		File directory = getDirectory();
+		if (directory != null)
+			desc = directory.getPath();
 		else
 			desc = getClass().getSimpleName() + "-" //$NON-NLS-1$
 					+ System.identityHashCode(this);
-		return "Repository[" + desc + "]"; //$NON-NLS-1$
+		return "Repository[" + desc + "]"; //$NON-NLS-1$ //$NON-NLS-2$
 	}
 
 	/**
@@ -1063,7 +1064,7 @@ public abstract class Repository implements AutoCloseable {
 		try {
 			return getRefDatabase().getRefs(RefDatabase.ALL);
 		} catch (IOException e) {
-			return new HashMap<String, Ref>();
+			return new HashMap<>();
 		}
 	}
 
@@ -1077,7 +1078,7 @@ public abstract class Repository implements AutoCloseable {
 		try {
 			return getRefDatabase().getRefs(Constants.R_TAGS);
 		} catch (IOException e) {
-			return new HashMap<String, Ref>();
+			return new HashMap<>();
 		}
 	}
 
@@ -1112,7 +1113,7 @@ public abstract class Repository implements AutoCloseable {
 	@NonNull
 	public Map<AnyObjectId, Set<Ref>> getAllRefsByPeeledObjectId() {
 		Map<String, Ref> allRefs = getAllRefs();
-		Map<AnyObjectId, Set<Ref>> ret = new HashMap<AnyObjectId, Set<Ref>>(allRefs.size());
+		Map<AnyObjectId, Set<Ref>> ret = new HashMap<>(allRefs.size());
 		for (Ref ref : allRefs.values()) {
 			ref = peel(ref);
 			AnyObjectId target = ref.getPeeledObjectId();
@@ -1124,7 +1125,7 @@ public abstract class Repository implements AutoCloseable {
 				// that was not the case (rare)
 				if (oset.size() == 1) {
 					// Was a read-only singleton, we must copy to a new Set
-					oset = new HashSet<Ref>(oset);
+					oset = new HashSet<>(oset);
 				}
 				ret.put(target, oset);
 				oset.add(ref);
@@ -1145,6 +1146,33 @@ public abstract class Repository implements AutoCloseable {
 		if (isBare())
 			throw new NoWorkTreeException();
 		return indexFile;
+	}
+
+	/**
+	 * Locate a reference to a commit and immediately parse its content.
+	 * <p>
+	 * This method only returns successfully if the commit object exists,
+	 * is verified to be a commit, and was parsed without error.
+	 *
+	 * @param id
+	 *            name of the commit object.
+	 * @return reference to the commit object. Never null.
+	 * @throws MissingObjectException
+	 *             the supplied commit does not exist.
+	 * @throws IncorrectObjectTypeException
+	 *             the supplied id is not a commit or an annotated tag.
+	 * @throws IOException
+	 *             a pack file or loose object could not be read.
+	 * @since 4.8
+	 */
+	public RevCommit parseCommit(AnyObjectId id) throws IncorrectObjectTypeException,
+			IOException, MissingObjectException {
+		if (id instanceof RevCommit && ((RevCommit) id).getRawBuffer() != null) {
+			return (RevCommit) id;
+		}
+		try (RevWalk walk = new RevWalk(this)) {
+			return walk.parseCommit(id);
+		}
 	}
 
 	/**
@@ -1196,7 +1224,7 @@ public abstract class Repository implements AutoCloseable {
 		// we want DirCache to inform us so that we can inform registered
 		// listeners about index changes
 		IndexChangedListener l = new IndexChangedListener() {
-
+			@Override
 			public void onIndexChanged(IndexChangedEvent event) {
 				notifyIndexChanged();
 			}
@@ -1204,45 +1232,35 @@ public abstract class Repository implements AutoCloseable {
 		return DirCache.lock(this, l);
 	}
 
-	static byte[] gitInternalSlash(byte[] bytes) {
-		if (File.separatorChar == '/')
-			return bytes;
-		for (int i=0; i<bytes.length; ++i)
-			if (bytes[i] == File.separatorChar)
-				bytes[i] = '/';
-		return bytes;
-	}
-
 	/**
 	 * @return an important state
 	 */
 	@NonNull
 	public RepositoryState getRepositoryState() {
-		final File gitDirLocal = getDirectory();
-		if (isBare() || gitDirLocal == null)
+		if (isBare() || getDirectory() == null)
 			return RepositoryState.BARE;
 
 		// Pre Git-1.6 logic
 		if (new File(getWorkTree(), ".dotest").exists()) //$NON-NLS-1$
 			return RepositoryState.REBASING;
-		if (new File(gitDirLocal, ".dotest-merge").exists()) //$NON-NLS-1$
+		if (new File(getDirectory(), ".dotest-merge").exists()) //$NON-NLS-1$
 			return RepositoryState.REBASING_INTERACTIVE;
 
 		// From 1.6 onwards
-		if (new File(gitDirLocal, "rebase-apply/rebasing").exists()) //$NON-NLS-1$
+		if (new File(getDirectory(),"rebase-apply/rebasing").exists()) //$NON-NLS-1$
 			return RepositoryState.REBASING_REBASING;
-		if (new File(gitDirLocal, "rebase-apply/applying").exists()) //$NON-NLS-1$
+		if (new File(getDirectory(),"rebase-apply/applying").exists()) //$NON-NLS-1$
 			return RepositoryState.APPLY;
-		if (new File(gitDirLocal, "rebase-apply").exists()) //$NON-NLS-1$
+		if (new File(getDirectory(),"rebase-apply").exists()) //$NON-NLS-1$
 			return RepositoryState.REBASING;
 
-		if (new File(gitDirLocal, "rebase-merge/interactive").exists()) //$NON-NLS-1$
+		if (new File(getDirectory(),"rebase-merge/interactive").exists()) //$NON-NLS-1$
 			return RepositoryState.REBASING_INTERACTIVE;
-		if (new File(gitDirLocal, "rebase-merge").exists()) //$NON-NLS-1$
+		if (new File(getDirectory(),"rebase-merge").exists()) //$NON-NLS-1$
 			return RepositoryState.REBASING_MERGE;
 
 		// Both versions
-		if (new File(gitDirLocal, Constants.MERGE_HEAD).exists()) {
+		if (new File(getDirectory(), Constants.MERGE_HEAD).exists()) {
 			// we are merging - now check whether we have unmerged paths
 			try {
 				if (!readDirCache().hasUnmergedPaths()) {
@@ -1257,10 +1275,10 @@ public abstract class Repository implements AutoCloseable {
 			return RepositoryState.MERGING;
 		}
 
-		if (new File(gitDirLocal, "BISECT_LOG").exists()) //$NON-NLS-1$
+		if (new File(getDirectory(), "BISECT_LOG").exists()) //$NON-NLS-1$
 			return RepositoryState.BISECTING;
 
-		if (new File(gitDirLocal, Constants.CHERRY_PICK_HEAD).exists()) {
+		if (new File(getDirectory(), Constants.CHERRY_PICK_HEAD).exists()) {
 			try {
 				if (!readDirCache().hasUnmergedPaths()) {
 					// no unmerged paths
@@ -1273,7 +1291,7 @@ public abstract class Repository implements AutoCloseable {
 			return RepositoryState.CHERRY_PICKING;
 		}
 
-		if (new File(gitDirLocal, Constants.REVERT_HEAD).exists()) {
+		if (new File(getDirectory(), Constants.REVERT_HEAD).exists()) {
 			try {
 				if (!readDirCache().hasUnmergedPaths()) {
 					// no unmerged paths
@@ -1353,12 +1371,105 @@ public abstract class Repository implements AutoCloseable {
 	}
 
 	/**
+	 * Normalizes the passed branch name into a possible valid branch name. The
+	 * validity of the returned name should be checked by a subsequent call to
+	 * {@link #isValidRefName(String)}.
+	 * <p/>
+	 * Future implementations of this method could be more restrictive or more
+	 * lenient about the validity of specific characters in the returned name.
+	 * <p/>
+	 * The current implementation returns the trimmed input string if this is
+	 * already a valid branch name. Otherwise it returns a trimmed string with
+	 * special characters not allowed by {@link #isValidRefName(String)}
+	 * replaced by hyphens ('-') and blanks replaced by underscores ('_').
+	 * Leading and trailing slashes, dots, hyphens, and underscores are removed.
+	 *
+	 * @param name
+	 *            to normalize
+	 *
+	 * @return The normalized name or an empty String if it is {@code null} or
+	 *         empty.
+	 * @since 4.7
+	 * @see #isValidRefName(String)
+	 */
+	public static String normalizeBranchName(String name) {
+		if (name == null || name.isEmpty()) {
+			return ""; //$NON-NLS-1$
+		}
+		String result = name.trim();
+		String fullName = result.startsWith(Constants.R_HEADS) ? result
+				: Constants.R_HEADS + result;
+		if (isValidRefName(fullName)) {
+			return result;
+		}
+
+		// All Unicode blanks to underscore
+		result = result.replaceAll("(?:\\h|\\v)+", "_"); //$NON-NLS-1$ //$NON-NLS-2$
+		StringBuilder b = new StringBuilder();
+		char p = '/';
+		for (int i = 0, len = result.length(); i < len; i++) {
+			char c = result.charAt(i);
+			if (c < ' ' || c == 127) {
+				continue;
+			}
+			// Substitute a dash for problematic characters
+			switch (c) {
+			case '\\':
+			case '^':
+			case '~':
+			case ':':
+			case '?':
+			case '*':
+			case '[':
+			case '@':
+			case '<':
+			case '>':
+			case '|':
+			case '"':
+				c = '-';
+				break;
+			default:
+				break;
+			}
+			// Collapse multiple slashes, dashes, dots, underscores, and omit
+			// dashes, dots, and underscores following a slash.
+			switch (c) {
+			case '/':
+				if (p == '/') {
+					continue;
+				}
+				p = '/';
+				break;
+			case '.':
+			case '_':
+			case '-':
+				if (p == '/' || p == '-') {
+					continue;
+				}
+				p = '-';
+				break;
+			default:
+				p = c;
+				break;
+			}
+			b.append(c);
+		}
+		// Strip trailing special characters, and avoid the .lock extension
+		result = b.toString().replaceFirst("[/_.-]+$", "") //$NON-NLS-1$ //$NON-NLS-2$
+				.replaceAll("\\.lock($|/)", "_lock$1"); //$NON-NLS-1$ //$NON-NLS-2$
+		return FORBIDDEN_BRANCH_NAME_COMPONENTS.matcher(result)
+				.replaceAll("$1+$2$3"); //$NON-NLS-1$
+	}
+
+	/**
 	 * Strip work dir and return normalized repository path.
 	 *
-	 * @param workDir Work dir
-	 * @param file File whose path shall be stripped of its workdir
-	 * @return normalized repository relative path or the empty
-	 *         string if the file is not relative to the work directory.
+	 * @param workDir
+	 *            Work dir
+	 * @param file
+	 *            File whose path shall be stripped of its workdir
+	 * @return normalized repository relative path or the empty string if the
+	 *         file is not relative to the work directory.
 	 */
 	@NonNull
 	public static String stripWorkDir(File workDir, File file) {
@@ -1467,6 +1578,33 @@ public abstract class Repository implements AutoCloseable {
 	}
 
 	/**
+	 * Read the {@code GIT_DIR/description} file for gitweb.
+	 *
+	 * @return description text; null if no description has been configured.
+	 * @throws IOException
+	 *             description cannot be accessed.
+	 * @since 4.6
+	 */
+	@Nullable
+	public String getGitwebDescription() throws IOException {
+		return null;
+	}
+
+	/**
+	 * Set the {@code GIT_DIR/description} file for gitweb.
+	 *
+	 * @param description
+	 *            new description; null to clear the description.
+	 * @throws IOException
+	 *             description cannot be persisted.
+	 * @since 4.6
+	 */
+	public void setGitwebDescription(@Nullable String description)
+			throws IOException {
+		throw new IOException(JGitText.get().unsupportedRepositoryDescription);
+	}
+
+	/**
 	 * @param refName
 	 * @return a {@link ReflogReader} for the supplied refname, or {@code null}
 	 *         if the named ref does not exist.
@@ -1569,7 +1707,7 @@ public abstract class Repository implements AutoCloseable {
 		if (raw == null)
 			return null;
 
-		LinkedList<ObjectId> heads = new LinkedList<ObjectId>();
+		LinkedList<ObjectId> heads = new LinkedList<>();
 		for (int p = 0; p < raw.length;) {
 			heads.add(ObjectId.fromString(raw, p));
 			p = RawParseUtils
@@ -1803,15 +1941,12 @@ public abstract class Repository implements AutoCloseable {
 			throws FileNotFoundException, IOException {
 		File headsFile = new File(getDirectory(), filename);
 		if (heads != null) {
-			BufferedOutputStream bos = new SafeBufferedOutputStream(
-					new FileOutputStream(headsFile));
-			try {
+			try (OutputStream bos = new BufferedOutputStream(
+					new FileOutputStream(headsFile))) {
 				for (ObjectId id : heads) {
 					id.copyTo(bos);
 					bos.write('\n');
 				}
-			} finally {
-				bos.close();
 			}
 		} else {
 			FileUtils.delete(headsFile, FileUtils.SKIP_MISSING);
@@ -1866,5 +2001,23 @@ public abstract class Repository implements AutoCloseable {
 	public Set<String> getRemoteNames() {
 		return getConfig()
 				.getSubsections(ConfigConstants.CONFIG_REMOTE_SECTION);
+	}
+
+	/**
+	 * Check whether any housekeeping is required; if yes, run garbage
+	 * collection; if not, exit without performing any work. Some JGit commands
+	 * run autoGC after performing operations that could create many loose
+	 * objects.
+	 * <p/>
+	 * Currently this option is supported for repositories of type
+	 * {@code FileRepository} only. See {@link GC#setAuto(boolean)} for
+	 * configuration details.
+	 *
+	 * @param monitor
+	 *            to report progress
+	 * @since 4.6
+	 */
+	public void autoGC(ProgressMonitor monitor) {
+		// default does nothing
 	}
 }

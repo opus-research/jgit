@@ -87,6 +87,27 @@ public final class Constants {
 			* 2;
 
 	/**
+	 * LFS upload operation.
+	 *
+	 * @since 4.7
+	 */
+	public static final String UPLOAD = "upload";
+
+	/**
+	 * LFS download operation.
+	 *
+	 * @since 4.7
+	 */
+	public static final String DOWNLOAD = "download";
+
+	/**
+	 * LFS verify operation.
+	 *
+	 * @since 4.7
+	 */
+	public static final String VERIFY = "verify";
+
+	/**
 	 * Create a new digest function for objects.
 	 *
 	 * @return a new digest object.
@@ -115,11 +136,11 @@ public final class Constants {
 	 * Content type used by LFS REST API as defined in
 	 * {@link "https://github.com/github/git-lfs/blob/master/docs/api/v1/http-v1-batch.md"}
 	 */
-	public static String CONTENT_TYPE_GIT_LFS_JSON = "application/vnd.git-lfs+json";
+	public static final String CONTENT_TYPE_GIT_LFS_JSON = "application/vnd.git-lfs+json";
 
 	/**
 	 * "arbitrary binary data" as defined in RFC 2046
 	 * {@link "https://www.ietf.org/rfc/rfc2046.txt"}
 	 */
-	public static String HDR_APPLICATION_OCTET_STREAM = "application/octet-stream";
+	public static final String HDR_APPLICATION_OCTET_STREAM = "application/octet-stream";
 }

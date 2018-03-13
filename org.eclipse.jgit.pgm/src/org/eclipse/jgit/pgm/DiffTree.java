@@ -47,14 +47,14 @@ package org.eclipse.jgit.pgm;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.pgm.opt.PathTreeFilterHandler;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.AndTreeFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.Option;
 
 @Command(usage = "usage_ShowDiffTree")
 class DiffTree extends TextBuiltin {
@@ -67,7 +67,7 @@ class DiffTree extends TextBuiltin {
 	}
 
 	@Argument(index = 1, metaVar = "metaVar_treeish", required = true)
-	private final List<AbstractTreeIterator> trees = new ArrayList<AbstractTreeIterator>();
+	private final List<AbstractTreeIterator> trees = new ArrayList<>();
 
 	@Option(name = "--", metaVar = "metaVar_path", multiValued = true, handler = PathTreeFilterHandler.class)
 	private TreeFilter pathFilter = TreeFilter.ALL;

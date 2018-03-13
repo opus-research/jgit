@@ -43,6 +43,8 @@
 
 package org.eclipse.jgit.http.server.glue;
 
+import static java.lang.Integer.valueOf;
+
 import java.io.IOException;
 import java.text.MessageFormat;
 
@@ -52,8 +54,6 @@ import javax.servlet.FilterConfig;
 import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
-
-import static java.lang.Integer.valueOf;
 
 import org.eclipse.jgit.http.server.HttpServerText;
 
@@ -79,14 +79,17 @@ public class RegexGroupFilter implements Filter {
 		this.groupIdx = groupIdx - 1;
 	}
 
+	@Override
 	public void init(FilterConfig config) throws ServletException {
 		// Do nothing.
 	}
 
+	@Override
 	public void destroy() {
 		// Do nothing.
 	}
 
+	@Override
 	public void doFilter(final ServletRequest request,
 			final ServletResponse rsp, final FilterChain chain)
 			throws IOException, ServletException {
