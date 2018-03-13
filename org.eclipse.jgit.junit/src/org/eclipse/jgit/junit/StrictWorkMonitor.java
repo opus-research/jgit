@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, Google Inc.
+ * Copyright (C) 2017 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,32 +41,38 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.reftable;
+package org.eclipse.jgit.junit;
 
-import java.io.IOException;
+import static org.junit.Assert.assertEquals;
 
-import org.eclipse.jgit.lib.ReflogEntry;
+import org.eclipse.jgit.lib.ProgressMonitor;
 
-/** Iterator over logs inside a {@link Reftable}. */
-public abstract class LogCursor implements AutoCloseable {
-	/**
-	 * Check if another log record is available.
-	 *
-	 * @return {@code true} if there is another result.
-	 * @throws IOException
-	 *             logs cannot be read.
-	 */
-	public abstract boolean next() throws IOException;
-
-	/** @return name of the current reference. */
-	public abstract String getRefName();
-
-	/** @return time of reflog entry, microseconds since the epoch. */
-	public abstract long getReflogTimeUsec();
-
-	/** @return current log entry. */
-	public abstract ReflogEntry getReflogEntry();
+public final class StrictWorkMonitor implements ProgressMonitor {
+	private int lastWork, totalWork;
 
 	@Override
-	public abstract void close();
+	public void start(int totalTasks) {
+		// empty
+	}
+
+	@Override
+	public void beginTask(String title, int total) {
+		this.totalWork = total;
+		lastWork = 0;
+	}
+
+	@Override
+	public void update(int completed) {
+		lastWork += completed;
+	}
+
+	@Override
+	public void endTask() {
+		assertEquals("Units of work recorded", totalWork, lastWork);
+	}
+
+	@Override
+	public boolean isCancelled() {
+		return false;
+	}
 }
