@@ -50,7 +50,6 @@ import static org.eclipse.jgit.storage.pack.StoredObjectRepresentation.PACK_WHOL
 import java.io.IOException;
 import java.io.OutputStream;
 import java.security.MessageDigest;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -156,8 +155,6 @@ public class PackWriter {
 
 	private final PackConfig config;
 
-	private final Statistics stats;
-
 	private List<ObjectToPack> sortedByName;
 
 	private byte packcsum[];
@@ -232,7 +229,6 @@ public class PackWriter {
 
 		deltaBaseAsOffset = config.isDeltaBaseAsOffset();
 		reuseDeltas = config.isReuseDeltas();
-		stats = new Statistics();
 	}
 
 	/**
@@ -502,7 +498,6 @@ public class PackWriter {
 				packStream, this);
 
 		int objCnt = getObjectsNumber();
-		stats.totalObjects = objCnt;
 		writeMonitor.beginTask(JGitText.get().writingObjects, objCnt);
 		out.writeFileHeader(PACK_VERSION_GENERATED, objCnt);
 		out.flush();
@@ -511,15 +506,6 @@ public class PackWriter {
 
 		reader.release();
 		writeMonitor.endTask();
-	}
-
-	/**
-	 * @return description of what this PackWriter did in order to create the
-	 *         final pack stream. The object is only available to callers after
-	 *         {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)}
-	 */
-	public Statistics getStatistics() {
-		return stats;
 	}
 
 	/** Release all resources used by this writer. */
@@ -860,9 +846,6 @@ public class PackWriter {
 				reuseSupport.copyObjectAsIs(out, otp);
 				out.endObject();
 				otp.setCRC(out.getCRC32());
-				stats.reusedObjects++;
-				if (otp.isDeltaRepresentation())
-					stats.reusedDeltas++;
 				return;
 			} catch (StoredObjectRepresentationNotAvailableException gone) {
 				if (otp.getOffset() == out.length()) {
@@ -957,7 +940,6 @@ public class PackWriter {
 		DeflaterOutputStream dst = new DeflaterOutputStream(out, deflater);
 		delta.writeTo(dst, null);
 		dst.finish();
-		stats.totalDeltas++;
 	}
 
 	private TemporaryBuffer.Heap delta(final ObjectToPack otp)
@@ -1184,23 +1166,5 @@ public class PackWriter {
 		}
 
 		otp.select(next);
-	}
-
-	/** Summary of how PackWriter created the pack. */
-	public static class Statistics {
-		long totalObjects;
-
-		long totalDeltas;
-
-		long reusedObjects;
-
-		long reusedDeltas;
-
-		/** @return formatted message string for display to clients. */
-		public String getMessage() {
-			return MessageFormat.format(JGitText.get().packWriterStatistics, //
-					totalObjects, totalDeltas, //
-					reusedObjects, reusedDeltas);
-		}
 	}
 }

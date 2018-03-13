@@ -182,6 +182,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String couldNotGetAdvertisedRef;
 	/***/ public String couldNotLockHEAD;
 	/***/ public String couldNotReadIndexInOneGo;
+	/***/ public String couldNotReadObjectWhileParsingCommit;
 	/***/ public String couldNotRenameDeleteOldIndex;
 	/***/ public String couldNotRenameTemporaryFile;
 	/***/ public String couldNotRenameTemporaryIndexFileToIndex;
@@ -388,7 +389,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String packfileCorruptionDetected;
 	/***/ public String packfileIsTruncated;
 	/***/ public String packingCancelledDuringObjectsWriting;
-	/***/ public String packWriterStatistics;
 	/***/ public String pathIsNotInWorkingDir;
 	/***/ public String peeledLineBeforeRef;
 	/***/ public String peerDidNotSupplyACompleteObjectGraph;
