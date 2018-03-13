@@ -171,30 +171,25 @@ public class FileTreeIterator extends WorkingTreeIterator {
 			if (attributes.isSymbolicLink())
 				mode = FileMode.SYMLINK;
 			else if (attributes.isDirectory()) {
-				if (directoryIsValidGitRepo(f))
-					mode = FileMode.GITLINK;
-				else
-					mode = FileMode.TREE;
+				FileMode dirMode;
+				Repository subRepo = null;
+				try {
+					File gitDir = new File(f, Constants.DOT_GIT);
+					subRepo = new RepositoryBuilder().setGitDir(gitDir)
+							.setMustExist(true).build();
+					subRepo.resolve(Constants.HEAD);
+					dirMode = FileMode.GITLINK;
+				} catch (IOException e) {
+					dirMode = FileMode.TREE;
+				} finally {
+					if (subRepo != null)
+						subRepo.close();
+				}
+				mode = dirMode;
 			} else if (attributes.isExecutable())
 				mode = FileMode.EXECUTABLE_FILE;
 			else
 				mode = FileMode.REGULAR_FILE;
-		}
-
-		private static boolean directoryIsValidGitRepo(File f) {
-			Repository subRepo = null;
-			try {
-				File dotGit = new File(f, Constants.DOT_GIT);
-				subRepo = new RepositoryBuilder().setGitDir(dotGit)
-						.setMustExist(true).build();
-				subRepo.resolve(Constants.HEAD);
-				return true;
-			} catch (IOException e) {
-				return false;
-			} finally {
-				if (subRepo != null)
-					subRepo.close();
-			}
 		}
 
 		@Override
