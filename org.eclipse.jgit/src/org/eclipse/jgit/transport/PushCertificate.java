@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2015, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,54 +41,95 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.console;
+package org.eclipse.jgit.transport;
 
-import java.io.Console;
-import java.net.Authenticator;
-import java.net.PasswordAuthentication;
-import java.text.MessageFormat;
+/**
+ * The required information to verify the push.
+ */
+public class PushCertificate {
 
-import org.eclipse.jgit.util.CachedAuthenticator;
+	/** The tuple "name <email>" as presented in the push certificate */
+	String pusher;
 
-/** Basic network prompt for username/password when using the console. */
-public class ConsoleAuthenticator extends CachedAuthenticator {
-	/** Install this authenticator implementation into the JVM. */
-	public static void install() {
-		final ConsoleAuthenticator c = new ConsoleAuthenticator();
-		if (c.cons == null)
-			throw new NoClassDefFoundError(ConsoleText.get().noSystemConsoleAvailable);
-		Authenticator.setDefault(c);
+	/** The remote URL the signed push goes to */
+	String pushee;
+
+	/** What we think about the returned signed nonce */
+	NonceStatus nonceStatus;
+
+	/**
+	 *
+	 *
+	 */
+	public enum NonceStatus {
+		/**
+		 *
+		 */
+		UNSOLICITED,
+		/**
+		 *
+		 */
+		BAD,
+		/**
+		 *
+		 */
+		MISSING,
+		/**
+		 *
+		 */
+		OK,
+		/**
+		 *
+		 */
+		SLOP
 	}
 
-	private final Console cons = System.console();
+	/**
+	 *
+	 */
+	String commandList;
 
-	@Override
-	protected PasswordAuthentication promptPasswordAuthentication() {
-		final String realm = formatRealm();
-		String username = cons.readLine(MessageFormat.format(ConsoleText.get().usernameFor + " ", realm)); //$NON-NLS-1$
-		if (username == null || username.isEmpty()) {
-			return null;
-		}
-		char[] password = cons.readPassword(ConsoleText.get().password + " "); //$NON-NLS-1$
-		if (password == null) {
-			password = new char[0];
-		}
-		return new PasswordAuthentication(username, password);
+	/**
+	 *
+	 */
+	String signature;
+
+	/**
+	 *
+	 * @return the signature, consisting of the lines received between the lines
+	 *         '----BEGIN GPG SIGNATURE-----\n' and the '----END GPG
+	 *         SIGNATURE-----\n'
+	 */
+	public String getSignature() {
+		return signature;
 	}
 
-	private String formatRealm() {
-		final StringBuilder realm = new StringBuilder();
-		if (getRequestorType() == RequestorType.PROXY) {
-			realm.append(getRequestorType());
-			realm.append(" "); //$NON-NLS-1$
-			realm.append(getRequestingHost());
-			if (getRequestingPort() > 0) {
-				realm.append(":"); //$NON-NLS-1$
-				realm.append(getRequestingPort());
-			}
-		} else {
-			realm.append(getRequestingURL());
-		}
-		return realm.toString();
+	/**
+	 * @return the list of commands as one string to be feed into the signature
+	 *         verifier.
+	 */
+	public String getCommandList() {
+		return commandList;
+	}
+
+	/**
+	 * @return the pushedCertPusher
+	 */
+	public String getPusher() {
+		return pusher;
+	}
+
+	/**
+	 * @return the pushedCertPushee
+	 */
+	public String getPushee() {
+		return pushee;
+	}
+
+	/**
+	 * @return the pushCertNonceStatus
+	 */
+	public NonceStatus getNonceStatus() {
+		return nonceStatus;
 	}
 }
