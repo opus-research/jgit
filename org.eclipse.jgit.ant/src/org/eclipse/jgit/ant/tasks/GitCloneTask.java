@@ -46,38 +46,72 @@ import java.io.File;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.Task;
+import org.eclipse.jgit.api.CloneCommand;
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.InitCommand;
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.transport.URIish;
 
-public class GitInitTask extends Task {
+/**
+ * Clone a repository into a new directory.
+ * 
+ * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-clone.html"
+ *      >git-clone(1)</a>
+ */
+public class GitCloneTask extends Task {
+
+	private String uri;
 	private File destination;
 	private boolean bare;
+	private String branch = Constants.HEAD;
 
 	/**
-	 * @param dest
-	 *            the directory to init to
+	 * @param uri
+	 *            the uri to clone from
 	 */
-	public void setDest(File dest) {
-		this.destination = dest;
+	public void setUri(String uri) {
+		this.uri = uri;
+	}
+
+	/**
+	 * The optional directory associated with the clone operation. If the
+	 * directory isn't set, a name associated with the source uri will be used.
+	 * 
+	 * @see URIish#getHumanishName()
+	 * 
+	 * @param destination
+	 *            the directory to clone to
+	 */
+	public void setDest(File destination) {
+		this.destination = destination;
 	}
 
 	/**
 	 * @param bare
-	 *            whether the repository is bare or not
+	 *            whether the cloned repository is bare or not
 	 */
 	public void setBare(boolean bare) {
 		this.bare = bare;
 	}
 
+	/**
+	 * @param branch
+	 *            the initial branch to check out when cloning the repository
+	 */
+	public void setBranch(String branch) {
+		this.branch = branch;
+	}
+
 	@Override
 	public void execute() throws BuildException {
-		if (bare) {
-			log("Initializing bare repository at " + destination);
-		} else {
-			log("Initializing repository at " + destination);
+		log("Cloning repository " + uri);
+		
+		CloneCommand clone = Git.cloneRepository();
+		clone.setURI(uri).setDirectory(destination).setBranch(branch).setBare(bare);
+		try {
+			clone.call();
+		} catch (JGitInternalException e) {
+			throw new BuildException("Could not clone repository: " + e.getMessage(), e);
 		}
-		InitCommand init = Git.init();
-		init.setBare(bare).setDirectory(destination);
-		init.call();
 	}
 }

@@ -43,41 +43,84 @@
 package org.eclipse.jgit.ant.tasks;
 
 import java.io.File;
+import java.io.IOException;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.Task;
+import org.eclipse.jgit.api.CheckoutCommand;
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.InitCommand;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 
-public class GitInitTask extends Task {
-	private File destination;
-	private boolean bare;
+/**
+ * Checkout a branch or paths to the working tree.
+ * 
+ * @see <a
+ *      href="http://www.kernel.org/pub/software/scm/git/docs/git-checkout.html"
+ *      >git-checkout(1)</a>
+ */
+public class GitCheckoutTask extends Task {
+
+	private File src;
+	private String branch;
+	private boolean createBranch;
+	private boolean force;
 
 	/**
-	 * @param dest
-	 *            the directory to init to
+	 * @param src
+	 *            the src to set
 	 */
-	public void setDest(File dest) {
-		this.destination = dest;
+	public void setSrc(File src) {
+		this.src = src;
 	}
 
 	/**
-	 * @param bare
-	 *            whether the repository is bare or not
+	 * @param branch
+	 *            the initial branch to check out
 	 */
-	public void setBare(boolean bare) {
-		this.bare = bare;
+	public void setBranch(String branch) {
+		this.branch = branch;
+	}
+
+	/**
+	 * @param createBranch
+	 *            whether the branch should be created if it does not already
+	 *            exist
+	 */
+	public void setCreateBranch(boolean createBranch) {
+		this.createBranch = createBranch;
+	}
+
+	/**
+	 * @param force
+	 *            if <code>true</code> and the branch with the given name
+	 *            already exists, the start-point of an existing branch will be
+	 *            set to a new start-point; if false, the existing branch will
+	 *            not be changed
+	 * @return this instance
+	 */
+	public void setForce(boolean force) {
+		this.force = force;
 	}
 
 	@Override
 	public void execute() throws BuildException {
-		if (bare) {
-			log("Initializing bare repository at " + destination);
-		} else {
-			log("Initializing repository at " + destination);
+		CheckoutCommand checkout;
+		try {
+			Repository repo = new FileRepositoryBuilder().readEnvironment()
+					.findGitDir(src).build();
+			checkout = new Git(repo).checkout();
+		} catch (IOException e) {
+			throw new BuildException("Could not access repository " + src, e);
 		}
-		InitCommand init = Git.init();
-		init.setBare(bare).setDirectory(destination);
-		init.call();
+
+		try {
+			checkout.setCreateBranch(createBranch).setForce(force)
+					.setName(branch);
+			checkout.call();
+		} catch (Exception e) {
+			throw new BuildException("Could not checkout repository " + src, e);
+		}
 	}
+
 }
