@@ -462,9 +462,10 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		in = handleAutoCRLF(in, opType);
 		String filterCommand = getCleanFilterCommand();
 		if (filterCommand != null) {
-			if (repository.isRegistered(filterCommand)) {
+			if (Repository.isRegistered(filterCommand)) {
 				LocalFile buffer = new TemporaryBuffer.LocalFile(null);
-				BuiltinCommand command = repository.getCommand(filterCommand, repository,
+				BuiltinCommand command = Repository.getCommand(filterCommand,
+						repository,
 						in, buffer);
 				while (command.run() != -1)
 					;
