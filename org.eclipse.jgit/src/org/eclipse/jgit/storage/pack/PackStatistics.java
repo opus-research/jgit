@@ -101,12 +101,6 @@ public class PackStatistics {
 		 *            the accumulator of the statistics
 		 */
 		public ObjectType(ObjectType.Accumulator accumulator) {
-			/*
-			 * For efficiency this wraps and serves up the Accumulator object
-			 * rather than making a deep clone. Normal usage of PackWriter is to
-			 * create a single pack/index/bitmap and only call getStatistics()
-			 * after all work is complete.
-			 */
 			objectType = accumulator;
 		}
 
@@ -257,12 +251,8 @@ public class PackStatistics {
 	 *            the accumulator of the statistics
 	 */
 	public PackStatistics(Accumulator accumulator) {
-		/*
-		 * For efficiency this wraps and serves up the Accumulator object rather
-		 * than making a deep clone. Normal usage of PackWriter is to create a
-		 * single pack/index/bitmap and only call getStatistics() after all work
-		 * is complete.
-		 */
+		// Note: PackStatistics directly serves up the collections in the
+		// accumulator.
 		statistics = accumulator;
 	}
 

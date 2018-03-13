@@ -52,6 +52,7 @@ import java.text.MessageFormat;
 import java.util.List;
 
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.lib.PersonIdent;
 
 /**
  * The required information to verify the push.
@@ -80,7 +81,7 @@ public class PushCertificate {
 	}
 
 	private final String version;
-	private final PushCertificateIdent pusher;
+	private final PersonIdent pusher;
 	private final String pushee;
 	private final String nonce;
 	private final NonceStatus nonceStatus;
@@ -88,7 +89,7 @@ public class PushCertificate {
 	private final String rawCommands;
 	private final String signature;
 
-	PushCertificate(String version, PushCertificateIdent pusher, String pushee,
+	PushCertificate(String version, PersonIdent pusher, String pushee,
 			String nonce, NonceStatus nonceStatus, List<ReceiveCommand> commands,
 			String rawCommands, String signature) {
 		if (version == null || version.isEmpty()) {
@@ -122,11 +123,6 @@ public class PushCertificate {
 			throw new IllegalArgumentException(
 					JGitText.get().pushCertificateInvalidSignature);
 		}
-		if (!signature.startsWith(PushCertificateParser.BEGIN_SIGNATURE)
-				|| !signature.endsWith(PushCertificateParser.END_SIGNATURE)) {
-			throw new IllegalArgumentException(
-					JGitText.get().pushCertificateInvalidSignature);
-		}
 		this.version = version;
 		this.pusher = pusher;
 		this.pushee = pushee;
@@ -146,18 +142,18 @@ public class PushCertificate {
 	}
 
 	/**
-	 * @return the raw line that signed the cert, as a string.
+	 * @return the identity of the pusher who signed the cert, as a string.
 	 * @since 4.0
 	 */
 	public String getPusher() {
-		return pusher.getRaw();
+		return pusher.toExternalString();
 	}
 
 	/**
 	 * @return identity of the pusher who signed the cert.
 	 * @since 4.1
 	 */
-	public PushCertificateIdent getPusherIdent() {
+	public PersonIdent getPusherIdent() {
 		return pusher;
 	}
 
@@ -171,7 +167,7 @@ public class PushCertificate {
 
 	/**
 	 * @return the raw nonce value that was presented by the pusher.
-	 * @since 4.1
+	 * @since 4.0
 	 */
 	public String getNonce() {
 		return nonce;
@@ -197,21 +193,18 @@ public class PushCertificate {
 	/**
 	 * @return the raw signature, consisting of the lines received between the
 	 *     lines {@code "----BEGIN GPG SIGNATURE-----\n"} and
-	 *     {@code "----END GPG SIGNATURE-----\n}", inclusive.
+	 *     {@code "----END GPG SIGNATURE-----\n}", exclusive
 	 * @since 4.0
 	 */
 	public String getSignature() {
 		return signature;
 	}
 
-	/**
-	 * @return text payload of the certificate for the signature verifier.
-	 * @since 4.1
-	 */
+	/** @return text payload of the certificate for the signature verifier. */
 	public String toText() {
 		return new StringBuilder()
 				.append(VERSION).append(' ').append(version).append('\n')
-				.append(PUSHER).append(' ').append(getPusher())
+				.append(PUSHER).append(' ').append(pusher.toExternalString())
 				.append('\n')
 				.append(PUSHEE).append(' ').append(pushee).append('\n')
 				.append(NONCE).append(' ').append(nonce).append('\n')
