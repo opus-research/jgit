@@ -1450,16 +1450,6 @@ public class ObjectCheckerTest {
 	}
 
 	@Test
-	public void testRejectNulInPathSegment() {
-		try {
-			checker.checkPathSegment(Constants.encodeASCII("a\u0000b"), 0, 3);
-			fail("incorrectly accepted NUL in middle of name");
-		} catch (CorruptObjectException e) {
-			assertEquals("name contains byte 0x00", e.getMessage());
-		}
-	}
-
-	@Test
 	public void testRejectSpaceAtEndOnWindows() {
 		checker.setSafeForWindows(true);
 		try {
