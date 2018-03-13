@@ -45,7 +45,6 @@ package org.eclipse.jgit.internal.storage.reftree;
 
 import static org.eclipse.jgit.lib.Ref.Storage.LOOSE;
 import static org.eclipse.jgit.lib.Ref.Storage.PACKED;
-import static org.eclipse.jgit.util.Paths.stripTrailingSeparator;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -85,6 +84,8 @@ public class RefTreeDatabase extends RefDatabase {
 	private final Repository repo;
 	private final RefDatabase bootstrap;
 	private final String txnCommitted;
+
+	@Nullable
 	private final String txnNamespace;
 	private volatile Scanner.Result refs;
 
@@ -104,17 +105,9 @@ public class RefTreeDatabase extends RefDatabase {
 			committed = "refs/txn/committed"; //$NON-NLS-1$
 		}
 
-		String namespace = cfg.getString("reftree", null, "namespace"); //$NON-NLS-1$ //$NON-NLS-2$
-		if (namespace == null || namespace.isEmpty()) {
-			int s = committed.lastIndexOf('/');
-			if (s > 0) {
-				namespace = committed.substring(0, s);
-			}
-		}
-
 		this.repo = repo;
 		this.bootstrap = bootstrap;
-		this.txnNamespace = initNamespace(namespace);
+		this.txnNamespace = initNamespace(committed);
 		this.txnCommitted = committed;
 	}
 
@@ -126,27 +119,23 @@ public class RefTreeDatabase extends RefDatabase {
 	 * @param bootstrap
 	 *            bootstrap reference database storing the references that
 	 *            anchor the {@link RefTree}.
-	 * @param txnNamespace
-	 *            if non-empty the namespace containing the references that
-	 *            store the RefTree. To minimize confusion this namespace is
-	 *            forbidden to be stored through the {@link RefTreeDatabase} and
-	 *            must use {@link #getBootstrap()}.
 	 * @param txnCommitted
 	 *            name of the bootstrap reference holding the committed RefTree.
 	 */
 	public RefTreeDatabase(Repository repo, RefDatabase bootstrap,
-			String txnNamespace, String txnCommitted) {
+			String txnCommitted) {
 		this.repo = repo;
 		this.bootstrap = bootstrap;
-		this.txnNamespace = initNamespace(txnNamespace);
+		this.txnNamespace = initNamespace(txnCommitted);
 		this.txnCommitted = txnCommitted;
 	}
 
-	private static String initNamespace(String txnNamespace) {
-		if (txnNamespace == null || txnNamespace.isEmpty()) {
+	private static String initNamespace(String committed) {
+		int s = committed.lastIndexOf('/');
+		if (s < 0) {
 			return null;
 		}
-		return stripTrailingSeparator(txnNamespace) + '/';
+		return committed.substring(0, s + 1); // Keep trailing '/'.
 	}
 
 	Repository getRepository() {
@@ -250,9 +239,7 @@ public class RefTreeDatabase extends RefDatabase {
 				refs = c;
 			}
 		}
-
-		RefList<Ref> empty = RefList.emptyList();
-		return new RefMap(prefix, empty, c.all, c.sym);
+		return new RefMap(prefix, RefList.<Ref> emptyList(), c.all, c.sym);
 	}
 
 	private static ObjectId idOf(@Nullable Ref src) {
