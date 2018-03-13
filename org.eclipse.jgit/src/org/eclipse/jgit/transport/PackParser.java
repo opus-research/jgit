@@ -76,7 +76,6 @@ import org.eclipse.jgit.lib.ObjectStream;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.storage.file.PackLock;
 import org.eclipse.jgit.storage.pack.BinaryDelta;
-import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
 
@@ -166,7 +165,7 @@ public abstract class PackParser {
 	private LongMap<UnresolvedDelta> baseByPos;
 
 	/** Blobs whose contents need to be double-checked after indexing. */
-	private BlockList<PackedObjectInfo> deferredCheckBlobs;
+	private List<PackedObjectInfo> deferredCheckBlobs;
 
 	private MessageDigest packDigest;
 
@@ -440,7 +439,7 @@ public abstract class PackParser {
 			entries = new PackedObjectInfo[(int) objectCount];
 			baseById = new ObjectIdSubclassMap<DeltaChain>();
 			baseByPos = new LongMap<UnresolvedDelta>();
-			deferredCheckBlobs = new BlockList<PackedObjectInfo>();
+			deferredCheckBlobs = new ArrayList<PackedObjectInfo>();
 
 			receiving.beginTask(JGitText.get().receivingObjects,
 					(int) objectCount);

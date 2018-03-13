@@ -99,7 +99,6 @@ import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.storage.file.PackIndexWriter;
-import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.TemporaryBuffer;
 
 /**
@@ -142,16 +141,16 @@ public class PackWriter {
 	private final List<ObjectToPack> objectsLists[] = new List[Constants.OBJ_TAG + 1];
 	{
 		objectsLists[0] = Collections.<ObjectToPack> emptyList();
-		objectsLists[Constants.OBJ_COMMIT] = new BlockList<ObjectToPack>();
-		objectsLists[Constants.OBJ_TREE] = new BlockList<ObjectToPack>();
-		objectsLists[Constants.OBJ_BLOB] = new BlockList<ObjectToPack>();
-		objectsLists[Constants.OBJ_TAG] = new BlockList<ObjectToPack>();
+		objectsLists[Constants.OBJ_COMMIT] = new ArrayList<ObjectToPack>();
+		objectsLists[Constants.OBJ_TREE] = new ArrayList<ObjectToPack>();
+		objectsLists[Constants.OBJ_BLOB] = new ArrayList<ObjectToPack>();
+		objectsLists[Constants.OBJ_TAG] = new ArrayList<ObjectToPack>();
 	}
 
 	private final ObjectIdSubclassMap<ObjectToPack> objectsMap = new ObjectIdSubclassMap<ObjectToPack>();
 
 	// edge objects for thin packs
-	private List<ObjectToPack> edgeObjects = new BlockList<ObjectToPack>();
+	private List<ObjectToPack> edgeObjects = new ArrayList<ObjectToPack>();
 
 	private List<CachedPack> cachedPacks = new ArrayList<CachedPack>(2);
 
@@ -587,9 +586,11 @@ public class PackWriter {
 			int cnt = 0;
 			for (List<ObjectToPack> list : objectsLists)
 				cnt += list.size();
-			sortedByName = new BlockList<ObjectToPack>(cnt);
-			for (List<ObjectToPack> list : objectsLists)
-				sortedByName.addAll(list);
+			sortedByName = new ArrayList<ObjectToPack>(cnt);
+			for (List<ObjectToPack> list : objectsLists) {
+				for (ObjectToPack otp : list)
+					sortedByName.add(otp);
+			}
 			Collections.sort(sortedByName);
 		}
 		return sortedByName;
@@ -1297,7 +1298,7 @@ public class PackWriter {
 		int typesToPrune = 0;
 		final int maxBases = config.getDeltaSearchWindowSize();
 		Set<RevTree> baseTrees = new HashSet<RevTree>();
-		BlockList<RevCommit> commits = new BlockList<RevCommit>();
+		List<RevCommit> commits = new ArrayList<RevCommit>();
 		RevCommit c;
 		while ((c = walker.next()) != null) {
 			if (c.has(inCachedPack)) {
@@ -1305,7 +1306,7 @@ public class PackWriter {
 				if (includesAllTips(pack, include, walker)) {
 					useCachedPack(walker, keepOnRestart, //
 							wantObjs, haveObjs, pack);
-					commits = new BlockList<RevCommit>();
+					commits = new ArrayList<RevCommit>();
 
 					countingMonitor.endTask();
 					countingMonitor.beginTask(JGitText.get().countingObjects,
@@ -1322,6 +1323,11 @@ public class PackWriter {
 
 			commits.add(c);
 			countingMonitor.update(1);
+		}
+
+		if (objectsLists[Constants.OBJ_COMMIT] instanceof ArrayList) {
+			ArrayList<ObjectToPack> list = (ArrayList<ObjectToPack>) objectsLists[Constants.OBJ_COMMIT];
+			list.ensureCapacity(list.size() + commits.size());
 		}
 
 		int commitCnt = 0;
@@ -1430,7 +1436,7 @@ public class PackWriter {
 		}
 
 		while (dst < list.size())
-			list.remove(list.size() - 1);
+			list.remove(dst);
 	}
 
 	private void useCachedPack(ObjectWalk walker, RevFlagSet keepOnRestart,
