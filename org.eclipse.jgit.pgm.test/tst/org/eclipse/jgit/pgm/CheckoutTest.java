@@ -198,7 +198,8 @@ public class CheckoutTest extends CLIRepositoryTestCase {
 
 		assertStringArrayEquals("Switched to a new branch 'new_branch'",
 				execute("git checkout --orphan new_branch"));
-		assertEquals("refs/heads/new_branch", db.getRef("HEAD").getTarget().getName());
+		assertEquals("refs/heads/new_branch",
+				db.exactRef("HEAD").getTarget().getName());
 		RevCommit commit = git.commit().setMessage("orphan commit").call();
 		assertEquals(0, commit.getParentCount());
 	}
@@ -554,15 +555,6 @@ public class CheckoutTest extends CLIRepositoryTestCase {
 		// assertEquals(2, exception.getConflictingPaths().size());
 		// assertEquals("a", exception.getConflictingPaths().get(0));
 		// assertEquals("a/c", exception.getConflictingPaths().get(1));
-	}
-
-	static private void assertStringArrayEquals(String expected, String[] actual) {
-		// if there is more than one line, ignore last one if empty
-		assertEquals(
-				1,
-				actual.length > 1 && actual[actual.length - 1].equals("") ? actual.length - 1
-						: actual.length);
-		assertEquals(expected, actual[0]);
 	}
 
 	@Test

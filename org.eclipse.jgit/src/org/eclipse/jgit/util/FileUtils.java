@@ -398,21 +398,28 @@ public class FileUtils {
 	 * Create a symbolic link
 	 *
 	 * @param path
+	 *            the path of the symbolic link to create
 	 * @param target
+	 *            the target of the symbolic link
+	 * @return the path to the symbolic link
 	 * @throws IOException
-	 * @since 3.0
+	 * @since 4.2
 	 */
-	public static void createSymLink(File path, String target)
+	public static Path createSymLink(File path, String target)
 			throws IOException {
 		Path nioPath = path.toPath();
 		if (Files.exists(nioPath, LinkOption.NOFOLLOW_LINKS)) {
-			Files.delete(nioPath);
+			if (Files.isRegularFile(nioPath)) {
+				delete(path);
+			} else {
+				delete(path, EMPTY_DIRECTORIES_ONLY | RECURSIVE);
+			}
 		}
 		if (SystemReader.getInstance().isWindows()) {
 			target = target.replace('/', '\\');
 		}
 		Path nioTarget = new File(target).toPath();
-		Files.createSymbolicLink(nioPath, nioTarget);
+		return Files.createSymbolicLink(nioPath, nioTarget);
 	}
 
 	/**
@@ -730,4 +737,29 @@ public class FileUtils {
 		}
 		return name;
 	}
+
+	/**
+	 * Best-effort variation of {@link File#getCanonicalFile()} returning the
+	 * input file if the file cannot be canonicalized instead of throwing
+	 * {@link IOException}.
+	 *
+	 * @param file
+	 *            to be canonicalized; may be {@code null}
+	 * @return canonicalized file, or the unchanged input file if
+	 *         canonicalization failed or if {@code file == null}
+	 * @throws SecurityException
+	 *             if {@link File#getCanonicalFile()} throws one
+	 * @since 4.2
+	 */
+	public static File canonicalize(File file) {
+		if (file == null) {
+			return null;
+		}
+		try {
+			return file.getCanonicalFile();
+		} catch (IOException e) {
+			return file;
+		}
+	}
+
 }

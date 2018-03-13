@@ -67,6 +67,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 
@@ -90,6 +91,7 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.ReflogEntry;
+import org.eclipse.jgit.lib.ReflogReader;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -482,9 +484,10 @@ public class GC {
 				return false;
 			return r1.getTarget().getName().equals(r2.getTarget().getName());
 		} else {
-			if (r2.isSymbolic())
+			if (r2.isSymbolic()) {
 				return false;
-			return r1.getObjectId().equals(r2.getObjectId());
+			}
+			return Objects.equals(r1.getObjectId(), r2.getObjectId());
 		}
 	}
 
@@ -592,7 +595,11 @@ public class GC {
 	 * @throws IOException
 	 */
 	private Set<ObjectId> listRefLogObjects(Ref ref, long minTime) throws IOException {
-		List<ReflogEntry> rlEntries = repo.getReflogReader(ref.getName())
+		ReflogReader reflogReader = repo.getReflogReader(ref.getName());
+		if (reflogReader == null) {
+			return Collections.emptySet();
+		}
+		List<ReflogEntry> rlEntries = reflogReader
 				.getReverseEntries();
 		if (rlEntries == null || rlEntries.isEmpty())
 			return Collections.<ObjectId> emptySet();
@@ -635,10 +642,7 @@ public class GC {
 	 */
 	private Set<ObjectId> listNonHEADIndexObjects()
 			throws CorruptObjectException, IOException {
-		try {
-			if (repo.getIndexFile() == null)
-				return Collections.emptySet();
-		} catch (NoWorkTreeException e) {
+		if (repo.isBare()) {
 			return Collections.emptySet();
 		}
 		try (TreeWalk treeWalk = new TreeWalk(repo)) {
@@ -877,6 +881,11 @@ public class GC {
 		 */
 		public long numberOfPackedRefs;
 
+		/**
+		 * The number of bitmaps in the bitmap indices.
+		 */
+		public long numberOfBitmaps;
+
 		public String toString() {
 			final StringBuilder b = new StringBuilder();
 			b.append("numberOfPackedObjects=").append(numberOfPackedObjects); //$NON-NLS-1$
@@ -886,15 +895,15 @@ public class GC {
 			b.append(", numberOfPackedRefs=").append(numberOfPackedRefs); //$NON-NLS-1$
 			b.append(", sizeOfLooseObjects=").append(sizeOfLooseObjects); //$NON-NLS-1$
 			b.append(", sizeOfPackedObjects=").append(sizeOfPackedObjects); //$NON-NLS-1$
+			b.append(", numberOfBitmaps=").append(numberOfBitmaps); //$NON-NLS-1$
 			return b.toString();
 		}
 	}
 
 	/**
-	 * Returns the number of objects stored in pack files. If an object is
-	 * contained in multiple pack files it is counted as often as it occurs.
+	 * Returns information about objects and pack files for a FileRepository.
 	 *
-	 * @return the number of objects stored in pack files
+	 * @return information about objects and pack files for a FileRepository
 	 * @throws IOException
 	 */
 	public RepoStatistics getStatistics() throws IOException {
@@ -904,6 +913,8 @@ public class GC {
 			ret.numberOfPackedObjects += f.getIndex().getObjectCount();
 			ret.numberOfPackFiles++;
 			ret.sizeOfPackedObjects += f.getPackFile().length();
+			if (f.getBitmapIndex() != null)
+				ret.numberOfBitmaps += f.getBitmapIndex().getBitmapCount();
 		}
 		File objDir = repo.getObjectsDirectory();
 		String[] fanout = objDir.list();

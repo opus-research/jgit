@@ -55,6 +55,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.nio.file.Path;
 import java.util.Map;
 
 import org.eclipse.jgit.api.Git;
@@ -105,6 +106,22 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 	protected File writeTrashFile(final String name, final String data)
 			throws IOException {
 		return JGitTestUtil.writeTrashFile(db, name, data);
+	}
+
+	/**
+	 * Create a symbolic link
+	 *
+	 * @param link
+	 *            the path of the symbolic link to create
+	 * @param target
+	 *            the target of the symbolic link
+	 * @return the path to the symbolic link
+	 * @throws Exception
+	 * @since 4.2
+	 */
+	protected Path writeLink(final String link, final String target)
+			throws Exception {
+		return JGitTestUtil.writeLink(db, link, target);
 	}
 
 	protected File writeTrashFile(final String subdir, final String name,
@@ -263,6 +280,19 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 			lookupTable.put(l, name);
 		}
 		return name;
+	}
+
+	/**
+	 * Replaces '\' by '/'
+	 *
+	 * @param str
+	 *            the string in which backslashes should be replaced
+	 * @return the resulting string with slashes
+         * @since 4.2
+	 */
+	public static String slashify(String str) {
+		str = str.replace('\\', '/');
+		return str;
 	}
 
 	/**
