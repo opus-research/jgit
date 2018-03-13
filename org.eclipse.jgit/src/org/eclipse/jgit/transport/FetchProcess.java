@@ -136,6 +136,7 @@ class FetchProcess {
 		conn = transport.openFetch();
 		try {
 			result.setAdvertisedRefs(transport.getURI(), conn.getRefsMap());
+			result.peerUserAgent = conn.getPeerUserAgent();
 			final Set<Ref> matched = new HashSet<Ref>();
 			for (final RefSpec spec : toFetch) {
 				if (spec.getSource() == null)
@@ -336,7 +337,6 @@ class FetchProcess {
 	private boolean askForIsComplete() throws TransportException {
 		try {
 			try (final ObjectWalk ow = new ObjectWalk(transport.local)) {
-				ow.setRetainBody(false);
 				for (final ObjectId want : askFor.keySet())
 					ow.markStart(ow.parseAny(want));
 				for (final Ref ref : localRefs().values())
