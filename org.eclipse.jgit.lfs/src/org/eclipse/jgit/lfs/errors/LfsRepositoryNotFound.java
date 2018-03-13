@@ -57,7 +57,6 @@ public class LfsRepositoryNotFound extends LfsException {
 
 	/**
 	 * @param name
-	 *            the repository name.
 	 *
 	 */
 	public LfsRepositoryNotFound(String name) {

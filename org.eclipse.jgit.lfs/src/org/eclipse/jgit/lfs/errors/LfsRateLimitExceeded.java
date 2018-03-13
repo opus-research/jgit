@@ -54,7 +54,6 @@ public class LfsRateLimitExceeded extends LfsException {
 
 	/**
 	 * @param message
-	 *            error message, which may be shown to an end-user.
 	 */
 	public LfsRateLimitExceeded(String message) {
 		super(message);
