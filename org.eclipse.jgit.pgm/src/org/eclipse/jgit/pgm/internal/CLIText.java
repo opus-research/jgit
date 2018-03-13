@@ -77,6 +77,8 @@ public class CLIText extends TranslationBundle {
 	// @formatter:off
 	/***/ public String alreadyOnBranch;
 	/***/ public String alreadyUpToDate;
+	/***/ public String answerNo;
+	/***/ public String answerYes;
 	/***/ public String authorInfo;
 	/***/ public String averageMSPerRead;
 	/***/ public String branchAlreadyExists;
@@ -109,6 +111,8 @@ public class CLIText extends TranslationBundle {
 	/***/ public String changesToBeCommitted;
 	/***/ public String checkoutConflict;
 	/***/ public String checkoutConflictPathLine;
+	/***/ public String clonedEmptyRepository;
+	/***/ public String cloningInto;
 	/***/ public String commitLabel;
 	/***/ public String conflictingUsageOf_git_dir_andArguments;
 	/***/ public String couldNotCreateBranch;
@@ -183,13 +187,13 @@ public class CLIText extends TranslationBundle {
 	/***/ public String metaVar_version;
 	/***/ public String mostCommonlyUsedCommandsAre;
 	/***/ public String needApprovalToDestroyCurrentRepository;
-	/***/ public String needSingleRevision;
 	/***/ public String noGitRepositoryConfigured;
 	/***/ public String noNamesFound;
 	/***/ public String noSuchFile;
 	/***/ public String noSuchRemoteRef;
 	/***/ public String noTREESectionInIndex;
 	/***/ public String nonFastForward;
+	/***/ public String noSystemConsoleAvailable;
 	/***/ public String notABranch;
 	/***/ public String notACommit;
 	/***/ public String notAGitRepository;
@@ -207,6 +211,7 @@ public class CLIText extends TranslationBundle {
 	/***/ public String onBranch;
 	/***/ public String onlyOneMetaVarExpectedIn;
 	/***/ public String onlyOneOfIncludeOnlyAllInteractiveCanBeUsed;
+	/***/ public String password;
 	/***/ public String pathspecDidNotMatch;
 	/***/ public String pushTo;
 	/***/ public String pathsRequired;
@@ -244,4 +249,5 @@ public class CLIText extends TranslationBundle {
 	/***/ public String unsupportedOperation;
 	/***/ public String untrackedFiles;
 	/***/ public String updating;
+	/***/ public String usernameFor;
 }

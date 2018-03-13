@@ -193,6 +193,13 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	 */
 	public static final String OPTION_ALLOW_TIP_SHA1_IN_WANT = GitProtocolConstants.OPTION_ALLOW_TIP_SHA1_IN_WANT;
 
+	/**
+	 * The client supports fetching objects that are reachable from a tip of a
+	 * ref that is allowed to fetch.
+	 * @since 4.1
+	 */
+	public static final String OPTION_ALLOW_REACHABLE_SHA1_IN_WANT = GitProtocolConstants.OPTION_ALLOW_REACHABLE_SHA1_IN_WANT;
+
 	private final RevWalk walk;
 
 	/** All commits that are immediately reachable by a local ref. */
@@ -377,7 +384,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	@Override
 	public void close() {
 		if (walk != null)
-			walk.release();
+			walk.close();
 		super.close();
 	}
 
@@ -521,6 +528,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 					OPTION_MULTI_ACK_DETAILED));
 		}
 
+		addUserAgentCapability(line);
 		return line.toString();
 	}
 
@@ -753,16 +761,13 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 			input = new SideBandInputStream(input, monitor, getMessageWriter(),
 					outputStream);
 
-		ObjectInserter ins = local.newObjectInserter();
-		try {
+		try (ObjectInserter ins = local.newObjectInserter()) {
 			PackParser parser = ins.newPackParser(input);
 			parser.setAllowThin(thinPack);
-			parser.setObjectChecking(transport.isCheckFetchedObjects());
+			parser.setObjectChecker(transport.getObjectChecker());
 			parser.setLockMessage(lockMessage);
 			packLock = parser.parse(monitor);
 			ins.flush();
-		} finally {
-			ins.release();
 		}
 	}
 

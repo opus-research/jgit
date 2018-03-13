@@ -48,8 +48,10 @@ import java.util.Map;
 
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Config.SectionParser;
+import org.eclipse.jgit.lib.ObjectChecker;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.util.SystemReader;
 
 /**
  * The standard "transfer", "fetch", "receive", and "uploadpack" configuration
@@ -63,29 +65,54 @@ public class TransferConfig {
 		}
 	};
 
-	private final boolean fetchFsck;
+	private final boolean checkReceivedObjects;
+	private final boolean allowLeadingZeroFileMode;
+	private final boolean allowInvalidPersonIdent;
+	private final boolean safeForWindows;
+	private final boolean safeForMacOS;
 	private final boolean allowTipSha1InWant;
-	private final String[] hideRefs;
+	private final boolean allowReachableSha1InWant;
+	final String[] hideRefs;
 
 	TransferConfig(final Repository db) {
 		this(db.getConfig());
 	}
 
-	private TransferConfig(final Config rc) {
-		fetchFsck = rc.getBoolean(
+	TransferConfig(final Config rc) {
+		checkReceivedObjects = rc.getBoolean(
 				"fetch", "fsckobjects", //$NON-NLS-1$ //$NON-NLS-2$
 				rc.getBoolean("transfer", "fsckobjects", false)); //$NON-NLS-1$ //$NON-NLS-2$
+		allowLeadingZeroFileMode = checkReceivedObjects
+				&& rc.getBoolean("fsck", "allowLeadingZeroFileMode", false); //$NON-NLS-1$ //$NON-NLS-2$
+		allowInvalidPersonIdent = checkReceivedObjects
+				&& rc.getBoolean("fsck", "allowInvalidPersonIdent", false); //$NON-NLS-1$ //$NON-NLS-2$
+		safeForWindows = checkReceivedObjects
+				&& rc.getBoolean("fsck", "safeForWindows", //$NON-NLS-1$ //$NON-NLS-2$
+						SystemReader.getInstance().isWindows());
+		safeForMacOS = checkReceivedObjects
+				&& rc.getBoolean("fsck", "safeForMacOS", //$NON-NLS-1$ //$NON-NLS-2$
+						SystemReader.getInstance().isMacOS());
 
 		allowTipSha1InWant = rc.getBoolean(
 				"uploadpack", "allowtipsha1inwant", false); //$NON-NLS-1$ //$NON-NLS-2$
+		allowReachableSha1InWant = rc.getBoolean(
+				"uploadpack", "allowreachablesha1inwant", false); //$NON-NLS-1$ //$NON-NLS-2$
 		hideRefs = rc.getStringList("uploadpack", null, "hiderefs"); //$NON-NLS-1$ //$NON-NLS-2$
 	}
 
 	/**
-	 * @return strictly verify received objects?
+	 * @return checker to verify fetched objects, or null if checking is not
+	 *         enabled in the repository configuration.
+	 * @since 3.6
 	 */
-	public boolean isFsckObjects() {
-		return fetchFsck;
+	public ObjectChecker newObjectChecker() {
+		if (!checkReceivedObjects)
+			return null;
+		return new ObjectChecker()
+			.setAllowLeadingZeroFileMode(allowLeadingZeroFileMode)
+			.setAllowInvalidPersonIdent(allowInvalidPersonIdent)
+			.setSafeForWindows(safeForWindows)
+			.setSafeForMacOS(safeForMacOS);
 	}
 
 	/**
@@ -94,6 +121,14 @@ public class TransferConfig {
 	 */
 	public boolean isAllowTipSha1InWant() {
 		return allowTipSha1InWant;
+	}
+
+	/**
+	 * @return allow clients to request non-tip SHA-1s?
+	 * @since 4.1
+	 */
+	public boolean isAllowReachableSha1InWant() {
+		return allowReachableSha1InWant;
 	}
 
 	/**

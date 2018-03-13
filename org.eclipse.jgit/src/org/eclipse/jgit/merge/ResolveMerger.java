@@ -47,12 +47,14 @@ package org.eclipse.jgit.merge;
 import static org.eclipse.jgit.lib.Constants.CHARACTER_ENCODING;
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -77,7 +79,6 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.IndexWriteException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
@@ -89,8 +90,8 @@ import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.NameConflictTreeWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
+import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.TemporaryBuffer;
 
 /**
@@ -309,13 +310,6 @@ public class ResolveMerger extends ThreeWayMerger {
 	}
 
 	private void checkout() throws NoWorkTreeException, IOException {
-		for (Map.Entry<String, DirCacheEntry> entry : toBeCheckedOut
-				.entrySet()) {
-			File f = new File(db.getWorkTree(), entry.getKey());
-			createDir(f.getParentFile());
-			DirCacheCheckout.checkoutEntry(db, f, entry.getValue(), reader);
-			modifiedFiles.add(entry.getKey());
-		}
 		// Iterate in reverse so that "folder/file" is deleted before
 		// "folder". Otherwise this could result in a failing path because
 		// of a non-empty directory, for which delete() would fail.
@@ -328,18 +322,10 @@ public class ResolveMerger extends ThreeWayMerger {
 							MergeFailureReason.COULD_NOT_DELETE);
 			modifiedFiles.add(fileName);
 		}
-	}
-
-	private void createDir(File f) throws IOException {
-		if (!db.getFS().isDirectory(f) && !f.mkdirs()) {
-			File p = f;
-			while (p != null && !db.getFS().exists(p))
-				p = p.getParentFile();
-			if (p == null || db.getFS().isDirectory(p))
-				throw new IOException(JGitText.get().cannotCreateDirectory);
-			FileUtils.delete(p);
-			if (!f.mkdirs())
-				throw new IOException(JGitText.get().cannotCreateDirectory);
+		for (Map.Entry<String, DirCacheEntry> entry : toBeCheckedOut
+				.entrySet()) {
+			DirCacheCheckout.checkoutEntry(db, entry.getValue(), reader);
+			modifiedFiles.add(entry.getKey());
 		}
 	}
 
@@ -367,15 +353,8 @@ public class ResolveMerger extends ThreeWayMerger {
 		while(mpathsIt.hasNext()) {
 			String mpath=mpathsIt.next();
 			DirCacheEntry entry = dc.getEntry(mpath);
-			if (entry == null)
-				continue;
-			FileOutputStream fos = new FileOutputStream(new File(
-					db.getWorkTree(), mpath));
-			try {
-				reader.open(entry.getObjectId()).copyTo(fos);
-			} finally {
-				fos.close();
-			}
+			if (entry != null)
+				DirCacheCheckout.checkoutEntry(db, entry, reader);
 			mpathsIt.remove();
 		}
 	}
@@ -546,10 +525,11 @@ public class ResolveMerger extends ThreeWayMerger {
 			}
 		}
 
-		if (nonTree(modeO) && modeB == modeT && tw.idEqual(T_BASE, T_THEIRS)) {
+		if (modeB == modeT && tw.idEqual(T_BASE, T_THEIRS)) {
 			// THEIRS was not changed compared to BASE. All changes must be in
 			// OURS. OURS is chosen. We can keep the existing entry.
-			keep(ourDce);
+			if (ourDce != null)
+				keep(ourDce);
 			// no checkout needed!
 			return true;
 		}
@@ -570,11 +550,12 @@ public class ResolveMerger extends ThreeWayMerger {
 				if (e != null)
 					toBeCheckedOut.put(tw.getPathString(), e);
 				return true;
-			} else if (modeT == 0 && modeB != 0) {
-				// we want THEIRS ... but THEIRS contains the deletion of the
-				// file. Also, do not complain if the file is already deleted
-				// locally. This complements the test in isWorktreeDirty() for
-				// the same case.
+			} else {
+				// we want THEIRS ... but THEIRS contains a folder or the
+				// deletion of the path. Delete what's in the workingtree (the
+				// workingtree is clean) but do not complain if the file is
+				// already deleted locally. This complements the test in
+				// isWorktreeDirty() for the same case.
 				if (tw.getTreeCount() > T_FILE && tw.getRawMode(T_FILE) == 0)
 					return true;
 				toBeDeleted.add(tw.getPathString());
@@ -815,25 +796,25 @@ public class ResolveMerger extends ThreeWayMerger {
 		File parentFolder = of.getParentFile();
 		if (!fs.exists(parentFolder))
 			parentFolder.mkdirs();
-		FileOutputStream fos = new FileOutputStream(of);
-		try {
-			new MergeFormatter().formatMerge(fos, result,
+		try (OutputStream os = new BufferedOutputStream(
+				new FileOutputStream(of))) {
+			new MergeFormatter().formatMerge(os, result,
 					Arrays.asList(commitNames), CHARACTER_ENCODING);
-		} finally {
-			fos.close();
 		}
 		return of;
 	}
 
 	private ObjectId insertMergeResult(MergeResult<RawText> result)
 			throws IOException {
-		TemporaryBuffer.LocalFile buf = new TemporaryBuffer.LocalFile(10 << 20);
+		TemporaryBuffer.LocalFile buf = new TemporaryBuffer.LocalFile(
+				db.getDirectory(), 10 << 20);
 		try {
 			new MergeFormatter().formatMerge(buf, result,
 					Arrays.asList(commitNames), CHARACTER_ENCODING);
 			buf.close();
-			return getObjectInserter().insert(OBJ_BLOB, buf.length(),
-					buf.openInputStream());
+			try (InputStream in = buf.openInputStream()) {
+				return getObjectInserter().insert(OBJ_BLOB, buf.length(), in);
+			}
 		} finally {
 			buf.destroy();
 		}
@@ -1034,8 +1015,11 @@ public class ResolveMerger extends ThreeWayMerger {
 		tw.addTree(headTree);
 		tw.addTree(mergeTree);
 		tw.addTree(buildIt);
-		if (workingTreeIterator != null)
+		if (workingTreeIterator != null) {
 			tw.addTree(workingTreeIterator);
+		} else {
+			tw.setFilter(TreeFilter.ANY_DIFF);
+		}
 
 		if (!mergeTreeWalk(tw, ignoreConflicts)) {
 			return false;

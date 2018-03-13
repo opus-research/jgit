@@ -109,27 +109,25 @@ class Push extends TextBuiltin {
 
 	@Override
 	protected void run() throws Exception {
-		Git git = new Git(db);
-		PushCommand push = git.push();
-		push.setDryRun(dryRun);
-		push.setForce(force);
-		push.setProgressMonitor(new TextProgressMonitor());
-		push.setReceivePack(receivePack);
-		push.setRefSpecs(refSpecs);
-		if (all)
-			push.setPushAll();
-		if (tags)
-			push.setPushTags();
-		push.setRemote(remote);
-		push.setThin(thin);
-		push.setTimeout(timeout);
-		Iterable<PushResult> results = push.call();
-		for (PushResult result : results) {
-			ObjectReader reader = db.newObjectReader();
-			try {
-				printPushResult(reader, result.getURI(), result);
-			} finally {
-				reader.release();
+		try (Git git = new Git(db)) {
+			PushCommand push = git.push();
+			push.setDryRun(dryRun);
+			push.setForce(force);
+			push.setProgressMonitor(new TextProgressMonitor(errw));
+			push.setReceivePack(receivePack);
+			push.setRefSpecs(refSpecs);
+			if (all)
+				push.setPushAll();
+			if (tags)
+				push.setPushTags();
+			push.setRemote(remote);
+			push.setThin(thin);
+			push.setTimeout(timeout);
+			Iterable<PushResult> results = push.call();
+			for (PushResult result : results) {
+				try (ObjectReader reader = db.newObjectReader()) {
+					printPushResult(reader, result.getURI(), result);
+				}
 			}
 		}
 	}

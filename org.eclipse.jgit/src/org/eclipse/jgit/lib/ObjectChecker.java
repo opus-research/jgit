@@ -104,6 +104,8 @@ public class ObjectChecker {
 	private final MutableInteger ptrout = new MutableInteger();
 
 	private boolean allowZeroMode;
+
+	private boolean allowInvalidPersonIdent;
 	private boolean windows;
 	private boolean macosx;
 
@@ -121,6 +123,22 @@ public class ObjectChecker {
 	 */
 	public ObjectChecker setAllowLeadingZeroFileMode(boolean allow) {
 		allowZeroMode = allow;
+		return this;
+	}
+
+	/**
+	 * Enable accepting invalid author, committer and tagger identities.
+	 * <p>
+	 * Some broken Git versions/libraries allowed users to create commits and
+	 * tags with invalid formatting between the name, email and timestamp.
+	 *
+	 * @param allow
+	 *            if true accept invalid person identity strings.
+	 * @return {@code this}.
+	 * @since 4.0
+	 */
+	public ObjectChecker setAllowInvalidPersonIdent(boolean allow) {
+		allowInvalidPersonIdent = allow;
 		return this;
 	}
 
@@ -198,6 +216,9 @@ public class ObjectChecker {
 	}
 
 	private int personIdent(final byte[] raw, int ptr) {
+		if (allowInvalidPersonIdent)
+			return nextLF(raw, ptr) - 1;
+
 		final int emailB = nextLF(raw, ptr, '<');
 		if (emailB == ptr || raw[emailB - 1] != '<')
 			return -1;
@@ -233,25 +254,32 @@ public class ObjectChecker {
 		int ptr = 0;
 
 		if ((ptr = match(raw, ptr, tree)) < 0)
-			throw new CorruptObjectException("no tree header");
+			throw new CorruptObjectException(
+					JGitText.get().corruptObjectNotreeHeader);
 		if ((ptr = id(raw, ptr)) < 0 || raw[ptr++] != '\n')
-			throw new CorruptObjectException("invalid tree");
+			throw new CorruptObjectException(
+					JGitText.get().corruptObjectInvalidTree);
 
 		while (match(raw, ptr, parent) >= 0) {
 			ptr += parent.length;
 			if ((ptr = id(raw, ptr)) < 0 || raw[ptr++] != '\n')
-				throw new CorruptObjectException("invalid parent");
+				throw new CorruptObjectException(
+						JGitText.get().corruptObjectInvalidParent);
 		}
 
 		if ((ptr = match(raw, ptr, author)) < 0)
-			throw new CorruptObjectException("no author");
+			throw new CorruptObjectException(
+					JGitText.get().corruptObjectNoAuthor);
 		if ((ptr = personIdent(raw, ptr)) < 0 || raw[ptr++] != '\n')
-			throw new CorruptObjectException("invalid author");
+			throw new CorruptObjectException(
+					JGitText.get().corruptObjectInvalidAuthor);
 
 		if ((ptr = match(raw, ptr, committer)) < 0)
-			throw new CorruptObjectException("no committer");
+			throw new CorruptObjectException(
+					JGitText.get().corruptObjectNoCommitter);
 		if ((ptr = personIdent(raw, ptr)) < 0 || raw[ptr++] != '\n')
-			throw new CorruptObjectException("invalid committer");
+			throw new CorruptObjectException(
+					JGitText.get().corruptObjectInvalidCommitter);
 	}
 
 	/**
@@ -266,21 +294,26 @@ public class ObjectChecker {
 		int ptr = 0;
 
 		if ((ptr = match(raw, ptr, object)) < 0)
-			throw new CorruptObjectException("no object header");
+			throw new CorruptObjectException(
+					JGitText.get().corruptObjectNoObjectHeader);
 		if ((ptr = id(raw, ptr)) < 0 || raw[ptr++] != '\n')
-			throw new CorruptObjectException("invalid object");
+			throw new CorruptObjectException(
+					JGitText.get().corruptObjectInvalidObject);
 
 		if ((ptr = match(raw, ptr, type)) < 0)
-			throw new CorruptObjectException("no type header");
+			throw new CorruptObjectException(
+					JGitText.get().corruptObjectNoTypeHeader);
 		ptr = nextLF(raw, ptr);
 
 		if ((ptr = match(raw, ptr, tag)) < 0)
-			throw new CorruptObjectException("no tag header");
+			throw new CorruptObjectException(
+					JGitText.get().corruptObjectNoTagHeader);
 		ptr = nextLF(raw, ptr);
 
 		if ((ptr = match(raw, ptr, tagger)) > 0) {
 			if ((ptr = personIdent(raw, ptr)) < 0 || raw[ptr++] != '\n')
-				throw new CorruptObjectException("invalid tagger");
+				throw new CorruptObjectException(
+						JGitText.get().corruptObjectInvalidTagger);
 		}
 	}
 
@@ -361,37 +394,46 @@ public class ObjectChecker {
 			int thisMode = 0;
 			for (;;) {
 				if (ptr == sz)
-					throw new CorruptObjectException("truncated in mode");
+					throw new CorruptObjectException(
+							JGitText.get().corruptObjectTruncatedInMode);
 				final byte c = raw[ptr++];
 				if (' ' == c)
 					break;
 				if (c < '0' || c > '7')
-					throw new CorruptObjectException("invalid mode character");
+					throw new CorruptObjectException(
+							JGitText.get().corruptObjectInvalidModeChar);
 				if (thisMode == 0 && c == '0' && !allowZeroMode)
-					throw new CorruptObjectException("mode starts with '0'");
+					throw new CorruptObjectException(
+							JGitText.get().corruptObjectInvalidModeStartsZero);
 				thisMode <<= 3;
 				thisMode += c - '0';
 			}
 
 			if (FileMode.fromBits(thisMode).getObjectType() == Constants.OBJ_BAD)
-				throw new CorruptObjectException("invalid mode " + thisMode);
+				throw new CorruptObjectException(MessageFormat.format(
+						JGitText.get().corruptObjectInvalidMode2,
+						Integer.valueOf(thisMode)));
 
 			final int thisNameB = ptr;
 			ptr = scanPathSegment(raw, ptr, sz);
 			if (ptr == sz || raw[ptr] != 0)
-				throw new CorruptObjectException("truncated in name");
+				throw new CorruptObjectException(
+						JGitText.get().corruptObjectTruncatedInName);
 			checkPathSegment2(raw, thisNameB, ptr);
 			if (normalized != null) {
 				if (!normalized.add(normalize(raw, thisNameB, ptr)))
-					throw new CorruptObjectException("duplicate entry names");
+					throw new CorruptObjectException(
+							JGitText.get().corruptObjectDuplicateEntryNames);
 			} else if (duplicateName(raw, thisNameB, ptr))
-				throw new CorruptObjectException("duplicate entry names");
+				throw new CorruptObjectException(
+						JGitText.get().corruptObjectDuplicateEntryNames);
 
 			if (lastNameB != 0) {
 				final int cmp = pathCompare(raw, lastNameB, lastNameE,
 						lastMode, thisNameB, ptr, thisMode);
 				if (cmp > 0)
-					throw new CorruptObjectException("incorrectly sorted");
+					throw new CorruptObjectException(
+							JGitText.get().corruptObjectIncorrectSorting);
 			}
 
 			lastNameB = thisNameB;
@@ -400,7 +442,8 @@ public class ObjectChecker {
 
 			ptr += 1 + Constants.OBJECT_ID_LENGTH;
 			if (ptr > sz)
-				throw new CorruptObjectException("truncated in object id");
+				throw new CorruptObjectException(
+						JGitText.get().corruptObjectTruncatedInObjectId);
 		}
 	}
 
@@ -411,16 +454,58 @@ public class ObjectChecker {
 			if (c == 0)
 				return ptr;
 			if (c == '/')
-				throw new CorruptObjectException("name contains '/'");
+				throw new CorruptObjectException(
+						JGitText.get().corruptObjectNameContainsSlash);
 			if (windows && isInvalidOnWindows(c)) {
 				if (c > 31)
 					throw new CorruptObjectException(String.format(
-							"name contains '%c'", c));
+							JGitText.get().corruptObjectNameContainsChar,
+							Byte.valueOf(c)));
 				throw new CorruptObjectException(String.format(
-						"name contains byte 0x%x", c & 0xff));
+						JGitText.get().corruptObjectNameContainsByte,
+						Integer.valueOf(c & 0xff)));
 			}
 		}
 		return ptr;
+	}
+
+	/**
+	 * Check tree path entry for validity.
+	 * <p>
+	 * Unlike {@link #checkPathSegment(byte[], int, int)}, this version
+	 * scans a multi-directory path string such as {@code "src/main.c"}.
+	 *
+	 * @param path path string to scan.
+	 * @throws CorruptObjectException path is invalid.
+	 * @since 3.6
+	 */
+	public void checkPath(String path) throws CorruptObjectException {
+		byte[] buf = Constants.encode(path);
+		checkPath(buf, 0, buf.length);
+	}
+
+	/**
+	 * Check tree path entry for validity.
+	 * <p>
+	 * Unlike {@link #checkPathSegment(byte[], int, int)}, this version
+	 * scans a multi-directory path string such as {@code "src/main.c"}.
+	 *
+	 * @param raw buffer to scan.
+	 * @param ptr offset to first byte of the name.
+	 * @param end offset to one past last byte of name.
+	 * @throws CorruptObjectException path is invalid.
+	 * @since 3.6
+	 */
+	public void checkPath(byte[] raw, int ptr, int end)
+			throws CorruptObjectException {
+		int start = ptr;
+		for (; ptr < end; ptr++) {
+			if (raw[ptr] == '/') {
+				checkPathSegment(raw, start, ptr);
+				start = ptr + 1;
+			}
+		}
+		checkPathSegment(raw, start, end);
 	}
 
 	/**
@@ -436,38 +521,141 @@ public class ObjectChecker {
 			throws CorruptObjectException {
 		int e = scanPathSegment(raw, ptr, end);
 		if (e < end && raw[e] == 0)
-			throw new CorruptObjectException("name contains byte 0x00");
+			throw new CorruptObjectException(
+					JGitText.get().corruptObjectNameContainsNullByte);
 		checkPathSegment2(raw, ptr, end);
 	}
 
 	private void checkPathSegment2(byte[] raw, int ptr, int end)
 			throws CorruptObjectException {
 		if (ptr == end)
-			throw new CorruptObjectException("zero length name");
+			throw new CorruptObjectException(
+					JGitText.get().corruptObjectNameZeroLength);
 		if (raw[ptr] == '.') {
 			switch (end - ptr) {
 			case 1:
-				throw new CorruptObjectException("invalid name '.'");
+				throw new CorruptObjectException(
+						JGitText.get().corruptObjectNameDot);
 			case 2:
 				if (raw[ptr + 1] == '.')
-					throw new CorruptObjectException("invalid name '..'");
+					throw new CorruptObjectException(
+							JGitText.get().corruptObjectNameDotDot);
 				break;
 			case 4:
-				if (isDotGit(raw, ptr + 1))
+				if (isGit(raw, ptr + 1))
 					throw new CorruptObjectException(String.format(
-							"invalid name '%s'",
+							JGitText.get().corruptObjectInvalidName,
+							RawParseUtils.decode(raw, ptr, end)));
+				break;
+			default:
+				if (end - ptr > 4 && isNormalizedGit(raw, ptr + 1, end))
+					throw new CorruptObjectException(String.format(
+							JGitText.get().corruptObjectInvalidName,
 							RawParseUtils.decode(raw, ptr, end)));
 			}
+		} else if (isGitTilde1(raw, ptr, end)) {
+			throw new CorruptObjectException(String.format(
+					JGitText.get().corruptObjectInvalidName,
+					RawParseUtils.decode(raw, ptr, end)));
 		}
+
+		if (macosx && isMacHFSGit(raw, ptr, end))
+			throw new CorruptObjectException(String.format(
+					JGitText.get().corruptObjectInvalidNameIgnorableUnicode,
+					RawParseUtils.decode(raw, ptr, end)));
 
 		if (windows) {
 			// Windows ignores space and dot at end of file name.
 			if (raw[end - 1] == ' ' || raw[end - 1] == '.')
-				throw new CorruptObjectException("invalid name ends with '"
-						+ ((char) raw[end - 1]) + "'");
+				throw new CorruptObjectException(String.format(
+						JGitText.get().corruptObjectInvalidNameEnd,
+						Character.valueOf(((char) raw[end - 1]))));
 			if (end - ptr >= 3)
 				checkNotWindowsDevice(raw, ptr, end);
 		}
+	}
+
+	// Mac's HFS+ folds permutations of ".git" and Unicode ignorable characters
+	// to ".git" therefore we should prevent such names
+	private static boolean isMacHFSGit(byte[] raw, int ptr, int end)
+			throws CorruptObjectException {
+		boolean ignorable = false;
+		byte[] git = new byte[] { '.', 'g', 'i', 't' };
+		int g = 0;
+		while (ptr < end) {
+			switch (raw[ptr]) {
+			case (byte) 0xe2: // http://www.utf8-chartable.de/unicode-utf8-table.pl?start=8192
+				checkTruncatedIgnorableUTF8(raw, ptr, end);
+				switch (raw[ptr + 1]) {
+				case (byte) 0x80:
+					switch (raw[ptr + 2]) {
+					case (byte) 0x8c:	// U+200C 0xe2808c ZERO WIDTH NON-JOINER
+					case (byte) 0x8d:	// U+200D 0xe2808d ZERO WIDTH JOINER
+					case (byte) 0x8e:	// U+200E 0xe2808e LEFT-TO-RIGHT MARK
+					case (byte) 0x8f:	// U+200F 0xe2808f RIGHT-TO-LEFT MARK
+					case (byte) 0xaa:	// U+202A 0xe280aa LEFT-TO-RIGHT EMBEDDING
+					case (byte) 0xab:	// U+202B 0xe280ab RIGHT-TO-LEFT EMBEDDING
+					case (byte) 0xac:	// U+202C 0xe280ac POP DIRECTIONAL FORMATTING
+					case (byte) 0xad:	// U+202D 0xe280ad LEFT-TO-RIGHT OVERRIDE
+					case (byte) 0xae:	// U+202E 0xe280ae RIGHT-TO-LEFT OVERRIDE
+						ignorable = true;
+						ptr += 3;
+						continue;
+					default:
+						return false;
+					}
+				case (byte) 0x81:
+					switch (raw[ptr + 2]) {
+					case (byte) 0xaa:	// U+206A 0xe281aa INHIBIT SYMMETRIC SWAPPING
+					case (byte) 0xab:	// U+206B 0xe281ab ACTIVATE SYMMETRIC SWAPPING
+					case (byte) 0xac:	// U+206C 0xe281ac INHIBIT ARABIC FORM SHAPING
+					case (byte) 0xad:	// U+206D 0xe281ad ACTIVATE ARABIC FORM SHAPING
+					case (byte) 0xae:	// U+206E 0xe281ae NATIONAL DIGIT SHAPES
+					case (byte) 0xaf:	// U+206F 0xe281af NOMINAL DIGIT SHAPES
+						ignorable = true;
+						ptr += 3;
+						continue;
+					default:
+						return false;
+					}
+				default:
+					return false;
+				}
+			case (byte) 0xef: // http://www.utf8-chartable.de/unicode-utf8-table.pl?start=65024
+				checkTruncatedIgnorableUTF8(raw, ptr, end);
+				// U+FEFF 0xefbbbf ZERO WIDTH NO-BREAK SPACE
+				if ((raw[ptr + 1] == (byte) 0xbb)
+						&& (raw[ptr + 2] == (byte) 0xbf)) {
+					ignorable = true;
+					ptr += 3;
+					continue;
+				}
+				return false;
+			default:
+				if (g == 4)
+					return false;
+				if (raw[ptr++] != git[g++])
+					return false;
+			}
+		}
+		if (g == 4 && ignorable)
+			return true;
+		return false;
+	}
+
+	private static void checkTruncatedIgnorableUTF8(byte[] raw, int ptr, int end)
+			throws CorruptObjectException {
+		if ((ptr + 2) >= end)
+			throw new CorruptObjectException(MessageFormat.format(
+					JGitText.get().corruptObjectInvalidNameInvalidUtf8,
+					toHexString(raw, ptr, end)));
+	}
+
+	private static String toHexString(byte[] raw, int ptr, int end) {
+		StringBuilder b = new StringBuilder("0x"); //$NON-NLS-1$
+		for (int i = ptr; i < end; i++)
+			b.append(String.format("%02x", Byte.valueOf(raw[i]))); //$NON-NLS-1$
+		return b.toString();
 	}
 
 	private static void checkNotWindowsDevice(byte[] raw, int ptr, int end)
@@ -478,7 +666,8 @@ public class ObjectChecker {
 					&& toLower(raw[ptr + 1]) == 'u'
 					&& toLower(raw[ptr + 2]) == 'x'
 					&& (end - ptr == 3 || raw[ptr + 3] == '.'))
-				throw new CorruptObjectException("invalid name 'AUX'");
+				throw new CorruptObjectException(
+						JGitText.get().corruptObjectInvalidNameAux);
 			break;
 
 		case 'c': // CON, COM[1-9]
@@ -486,14 +675,16 @@ public class ObjectChecker {
 					&& toLower(raw[ptr + 2]) == 'n'
 					&& toLower(raw[ptr + 1]) == 'o'
 					&& (end - ptr == 3 || raw[ptr + 3] == '.'))
-				throw new CorruptObjectException("invalid name 'CON'");
+				throw new CorruptObjectException(
+						JGitText.get().corruptObjectInvalidNameCon);
 			if (end - ptr >= 4
 					&& toLower(raw[ptr + 2]) == 'm'
 					&& toLower(raw[ptr + 1]) == 'o'
 					&& isPositiveDigit(raw[ptr + 3])
 					&& (end - ptr == 4 || raw[ptr + 4] == '.'))
-				throw new CorruptObjectException("invalid name 'COM"
-						+ ((char) raw[ptr + 3]) + "'");
+				throw new CorruptObjectException(String.format(
+						JGitText.get().corruptObjectInvalidNameCom,
+						Character.valueOf(((char) raw[ptr + 3]))));
 			break;
 
 		case 'l': // LPT[1-9]
@@ -502,8 +693,9 @@ public class ObjectChecker {
 					&& toLower(raw[ptr + 2]) == 't'
 					&& isPositiveDigit(raw[ptr + 3])
 					&& (end - ptr == 4 || raw[ptr + 4] == '.'))
-				throw new CorruptObjectException("invalid name 'LPT"
-						+ ((char) raw[ptr + 3]) + "'");
+				throw new CorruptObjectException(String.format(
+						JGitText.get().corruptObjectInvalidNameLpt,
+						Character.valueOf(((char) raw[ptr + 3]))));
 			break;
 
 		case 'n': // NUL
@@ -511,7 +703,8 @@ public class ObjectChecker {
 					&& toLower(raw[ptr + 1]) == 'u'
 					&& toLower(raw[ptr + 2]) == 'l'
 					&& (end - ptr == 3 || raw[ptr + 3] == '.'))
-				throw new CorruptObjectException("invalid name 'NUL'");
+				throw new CorruptObjectException(
+						JGitText.get().corruptObjectInvalidNameNul);
 			break;
 
 		case 'p': // PRN
@@ -519,7 +712,8 @@ public class ObjectChecker {
 					&& toLower(raw[ptr + 1]) == 'r'
 					&& toLower(raw[ptr + 2]) == 'n'
 					&& (end - ptr == 3 || raw[ptr + 3] == '.'))
-				throw new CorruptObjectException("invalid name 'PRN'");
+				throw new CorruptObjectException(
+						JGitText.get().corruptObjectInvalidNamePrn);
 			break;
 		}
 	}
@@ -540,12 +734,36 @@ public class ObjectChecker {
 		return 1 <= c && c <= 31;
 	}
 
-	private boolean isDotGit(byte[] buf, int p) {
-		if (windows || macosx)
-			return toLower(buf[p]) == 'g'
-					&& toLower(buf[p + 1]) == 'i'
-					&& toLower(buf[p + 2]) == 't';
-		return buf[p] == 'g' && buf[p + 1] == 'i' && buf[p + 2] == 't';
+	private static boolean isGit(byte[] buf, int p) {
+		return toLower(buf[p]) == 'g'
+				&& toLower(buf[p + 1]) == 'i'
+				&& toLower(buf[p + 2]) == 't';
+	}
+
+	private static boolean isGitTilde1(byte[] buf, int p, int end) {
+		if (end - p != 5)
+			return false;
+		return toLower(buf[p]) == 'g' && toLower(buf[p + 1]) == 'i'
+				&& toLower(buf[p + 2]) == 't' && buf[p + 3] == '~'
+				&& buf[p + 4] == '1';
+	}
+
+	private static boolean isNormalizedGit(byte[] raw, int ptr, int end) {
+		if (isGit(raw, ptr)) {
+			int dots = 0;
+			boolean space = false;
+			int p = end - 1;
+			for (; (ptr + 2) < p; p--) {
+				if (raw[p] == '.')
+					dots++;
+				else if (raw[p] == ' ')
+					space = true;
+				else
+					break;
+			}
+			return p == ptr + 2 && (dots == 1 || space);
+		}
+		return false;
 	}
 
 	private static char toLower(byte b) {

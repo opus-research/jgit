@@ -113,6 +113,13 @@ public class ConfigConstants {
 	/** The "excludesfile" key */
 	public static final String CONFIG_KEY_EXCLUDESFILE = "excludesfile";
 
+	/**
+	 * The "attributesfile" key
+	 *
+	 * @since 3.7
+	 */
+	public static final String CONFIG_KEY_ATTRIBUTESFILE = "attributesfile";
+
 	/** The "filemode" key */
 	public static final String CONFIG_KEY_FILEMODE = "filemode";
 
@@ -292,4 +299,16 @@ public class ConfigConstants {
 	 * @since 3.3
 	 */
 	public static final String CONFIG_KEY_PRUNE = "prune";
+
+	/**
+	 * The "streamBuffer" key
+	 * @since 4.0
+	 */
+	public static final String CONFIG_KEY_STREAM_BUFFER = "streamBuffer";
+
+	/**
+	 * The "streamRatio" key
+	 * @since 4.0
+	 */
+	public static final String CONFIG_KEY_STREAM_RATIO = "streamRatio";
 }

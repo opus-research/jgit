@@ -76,6 +76,7 @@ import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.treewalk.TreeWalk.OperationType;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
@@ -607,7 +608,8 @@ public class DirCache {
 		final LockFile tmp = myLock;
 		requireLocked(tmp);
 		try {
-			writeTo(new SafeBufferedOutputStream(tmp.getOutputStream()));
+			writeTo(liveFile.getParentFile(),
+					new SafeBufferedOutputStream(tmp.getOutputStream()));
 		} catch (IOException err) {
 			tmp.unlock();
 			throw err;
@@ -620,7 +622,7 @@ public class DirCache {
 		}
 	}
 
-	void writeTo(final OutputStream os) throws IOException {
+	void writeTo(File dir, final OutputStream os) throws IOException {
 		final MessageDigest foot = Constants.newMessageDigest();
 		final DigestOutputStream dos = new DigestOutputStream(os, foot);
 
@@ -670,14 +672,18 @@ public class DirCache {
 		}
 
 		if (writeTree) {
-			final TemporaryBuffer bb = new TemporaryBuffer.LocalFile();
-			tree.write(tmp, bb);
-			bb.close();
+			TemporaryBuffer bb = new TemporaryBuffer.LocalFile(dir, 5 << 20);
+			try {
+				tree.write(tmp, bb);
+				bb.close();
 
-			NB.encodeInt32(tmp, 0, EXT_TREE);
-			NB.encodeInt32(tmp, 4, (int) bb.length());
-			dos.write(tmp, 0, 8);
-			bb.writeTo(dos, null);
+				NB.encodeInt32(tmp, 0, EXT_TREE);
+				NB.encodeInt32(tmp, 4, (int) bb.length());
+				dos.write(tmp, 0, 8);
+				bb.writeTo(dos, null);
+			} finally {
+				bb.destroy();
+			}
 		}
 		writeIndexChecksum = foot.digest();
 		os.write(writeIndexChecksum);
@@ -956,9 +962,9 @@ public class DirCache {
 	 * @throws IOException
 	 */
 	private void updateSmudgedEntries() throws IOException {
-		TreeWalk walk = new TreeWalk(repository);
 		List<String> paths = new ArrayList<String>(128);
-		try {
+		try (TreeWalk walk = new TreeWalk(repository)) {
+			walk.setOperationType(OperationType.CHECKIN_OP);
 			for (int i = 0; i < entryCnt; i++)
 				if (sortedEntries[i].isSmudged())
 					paths.add(sortedEntries[i].getPathString());
@@ -984,8 +990,6 @@ public class DirCache {
 					entry.setLastModified(fIter.getEntryLastModified());
 				}
 			}
-		} finally {
-			walk.release();
 		}
 	}
 }

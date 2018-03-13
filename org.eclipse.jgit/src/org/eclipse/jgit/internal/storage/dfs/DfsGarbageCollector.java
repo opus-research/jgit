@@ -58,6 +58,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource;
 import org.eclipse.jgit.internal.storage.file.PackIndex;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
@@ -71,6 +72,7 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.pack.PackConfig;
+import org.eclipse.jgit.storage.pack.PackStatistics;
 import org.eclipse.jgit.util.io.CountingOutputStream;
 
 /** Repack and garbage collect a repository. */
@@ -83,7 +85,7 @@ public class DfsGarbageCollector {
 
 	private final List<DfsPackDescription> newPackDesc;
 
-	private final List<PackWriter.Statistics> newPackStats;
+	private final List<PackStatistics> newPackStats;
 
 	private final List<PackWriter.ObjectIdSet> newPackObj;
 
@@ -114,7 +116,7 @@ public class DfsGarbageCollector {
 		refdb = repo.getRefDatabase();
 		objdb = repo.getObjectDatabase();
 		newPackDesc = new ArrayList<DfsPackDescription>(4);
-		newPackStats = new ArrayList<PackWriter.Statistics>(4);
+		newPackStats = new ArrayList<PackStatistics>(4);
 		newPackObj = new ArrayList<PackWriter.ObjectIdSet>(4);
 
 		packConfig = new PackConfig(repo);
@@ -188,7 +190,8 @@ public class DfsGarbageCollector {
 		if (pm == null)
 			pm = NullProgressMonitor.INSTANCE;
 		if (packConfig.getIndexVersion() != 2)
-			throw new IllegalStateException("Only index version 2");
+			throw new IllegalStateException(
+					JGitText.get().supportOnlyPackIndexVersion2);
 
 		ctx = (DfsReader) objdb.newReader();
 		try {
@@ -228,7 +231,7 @@ public class DfsGarbageCollector {
 					objdb.rollbackPack(newPackDesc);
 			}
 		} finally {
-			ctx.release();
+			ctx.close();
 		}
 	}
 
@@ -256,7 +259,7 @@ public class DfsGarbageCollector {
 	}
 
 	/** @return statistics corresponding to the {@link #getNewPacks()}. */
-	public List<PackWriter.Statistics> getNewPackStatistics() {
+	public List<PackStatistics> getNewPackStatistics() {
 		return newPackStats;
 	}
 
@@ -272,14 +275,11 @@ public class DfsGarbageCollector {
 		if (allHeads.isEmpty())
 			return;
 
-		PackWriter pw = newPackWriter();
-		try {
+		try (PackWriter pw = newPackWriter()) {
 			pw.setTagTargets(tagTargets);
 			pw.preparePack(pm, allHeads, Collections.<ObjectId> emptySet());
 			if (0 < pw.getObjectCount())
 				writePack(GC, pw, pm);
-		} finally {
-			pw.release();
 		}
 	}
 
@@ -287,15 +287,12 @@ public class DfsGarbageCollector {
 		if (nonHeads.isEmpty())
 			return;
 
-		PackWriter pw = newPackWriter();
-		try {
+		try (PackWriter pw = newPackWriter()) {
 			for (PackWriter.ObjectIdSet packedObjs : newPackObj)
 				pw.excludeObjects(packedObjs);
 			pw.preparePack(pm, nonHeads, allHeads);
 			if (0 < pw.getObjectCount())
 				writePack(GC, pw, pm);
-		} finally {
-			pw.release();
 		}
 	}
 
@@ -307,12 +304,11 @@ public class DfsGarbageCollector {
 		cfg.setDeltaCompress(false);
 		cfg.setBuildBitmaps(false);
 
-		PackWriter pw = new PackWriter(cfg, ctx);
-		pw.setDeltaBaseAsOffset(true);
-		pw.setReuseDeltaCommits(true);
-		try {
-			RevWalk pool = new RevWalk(ctx);
-			pm.beginTask("Finding garbage", objectsBefore());
+		try (PackWriter pw = new PackWriter(cfg, ctx);
+				RevWalk pool = new RevWalk(ctx)) {
+			pw.setDeltaBaseAsOffset(true);
+			pw.setReuseDeltaCommits(true);
+			pm.beginTask(JGitText.get().findingGarbage, objectsBefore());
 			for (DfsPackFile oldPack : packsBefore) {
 				PackIndex oldIdx = oldPack.getPackIndex(ctx);
 				for (PackIndex.MutableEntry ent : oldIdx) {
@@ -328,8 +324,6 @@ public class DfsGarbageCollector {
 			pm.endTask();
 			if (0 < pw.getObjectCount())
 				writePack(UNREACHABLE_GARBAGE, pw, pm);
-		} finally {
-			pw.release();
 		}
 	}
 
@@ -403,7 +397,7 @@ public class DfsGarbageCollector {
 			}
 		});
 
-		PackWriter.Statistics stats = pw.getStatistics();
+		PackStatistics stats = pw.getStatistics();
 		pack.setPackStats(stats);
 		newPackStats.add(stats);
 

@@ -44,12 +44,18 @@
 package org.eclipse.jgit.util;
 
 import java.io.File;
+import java.io.PrintStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.Repository;
 
 /**
  * FS implementation for Cygwin on Windows
@@ -134,5 +140,43 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 		ProcessBuilder proc = new ProcessBuilder();
 		proc.command(argv);
 		return proc;
+	}
+
+	/**
+	 * @since 3.7
+	 */
+	@Override
+	public String relativize(String base, String other) {
+		final String relativized = super.relativize(base, other);
+		return relativized.replace(File.separatorChar, '/');
+	}
+
+	/**
+	 * @since 4.0
+	 */
+	@Override
+	public ProcessResult runHookIfPresent(Repository repository, String hookName,
+			String[] args, PrintStream outRedirect, PrintStream errRedirect,
+			String stdinArgs) throws JGitInternalException {
+		return internalRunHookIfPresent(repository, hookName, args, outRedirect,
+				errRedirect, stdinArgs);
+	}
+
+	@Override
+	public boolean supportsSymlinks() {
+		return true;
+	}
+
+	/**
+	 * @since 3.7
+	 */
+	@Override
+	public File findHook(Repository repository, String hookName) {
+		final File gitdir = repository.getDirectory();
+		final Path hookPath = gitdir.toPath().resolve(Constants.HOOKS)
+				.resolve(hookName);
+		if (Files.isExecutable(hookPath))
+			return hookPath.toFile();
+		return null;
 	}
 }

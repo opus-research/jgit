@@ -43,7 +43,6 @@
  */
 package org.eclipse.jgit.api;
 
-import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
@@ -81,7 +80,6 @@ import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
-import org.eclipse.jgit.util.FileUtils;
 
 /**
  * Checkout a branch to the working tree.
@@ -210,16 +208,17 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			}
 
 			if (createBranch) {
-				Git git = new Git(repo);
-				CreateBranchCommand command = git.branchCreate();
-				command.setName(name);
-				if (startCommit != null)
-					command.setStartPoint(startCommit);
-				else
-					command.setStartPoint(startPoint);
-				if (upstreamMode != null)
-					command.setUpstreamMode(upstreamMode);
-				command.call();
+				try (Git git = new Git(repo)) {
+					CreateBranchCommand command = git.branchCreate();
+					command.setName(name);
+					if (startCommit != null)
+						command.setStartPoint(startCommit);
+					else
+						command.setStartPoint(startPoint);
+					if (upstreamMode != null)
+						command.setUpstreamMode(upstreamMode);
+					command.call();
+				}
 			}
 
 			Ref headRef = repo.getRef(Constants.HEAD);
@@ -245,11 +244,14 @@ public class CheckoutCommand extends GitCommand<Ref> {
 							JGitText.get().refNotResolved, name));
 			}
 
-			RevWalk revWalk = new RevWalk(repo);
-			AnyObjectId headId = headRef.getObjectId();
-			RevCommit headCommit = headId == null ? null : revWalk
-					.parseCommit(headId);
-			RevCommit newCommit = revWalk.parseCommit(branch);
+			RevCommit headCommit = null;
+			RevCommit newCommit = null;
+			try (RevWalk revWalk = new RevWalk(repo)) {
+				AnyObjectId headId = headRef.getObjectId();
+				headCommit = headId == null ? null
+						: revWalk.parseCommit(headId);
+				newCommit = revWalk.parseCommit(branch);
+			}
 			RevTree headTree = headCommit == null ? null : headCommit.getTree();
 			DirCacheCheckout dco;
 			DirCache dc = repo.lockDirCache();
@@ -378,26 +380,20 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	 */
 	protected CheckoutCommand checkoutPaths() throws IOException,
 			RefNotFoundException {
-		RevWalk revWalk = new RevWalk(repo);
 		DirCache dc = repo.lockDirCache();
-		try {
-			TreeWalk treeWalk = new TreeWalk(revWalk.getObjectReader());
+		try (RevWalk revWalk = new RevWalk(repo);
+				TreeWalk treeWalk = new TreeWalk(revWalk.getObjectReader())) {
 			treeWalk.setRecursive(true);
 			if (!checkoutAllPaths)
 				treeWalk.setFilter(PathFilterGroup.createFromStrings(paths));
-			try {
-				if (isCheckoutIndex())
-					checkoutPathsFromIndex(treeWalk, dc);
-				else {
-					RevCommit commit = revWalk.parseCommit(getStartPointObjectId());
-					checkoutPathsFromCommit(treeWalk, dc, commit);
-				}
-			} finally {
-				treeWalk.release();
+			if (isCheckoutIndex())
+				checkoutPathsFromIndex(treeWalk, dc);
+			else {
+				RevCommit commit = revWalk.parseCommit(getStartPointObjectId());
+				checkoutPathsFromCommit(treeWalk, dc, commit);
 			}
 		} finally {
 			dc.unlock();
-			revWalk.release();
 		}
 		return this;
 	}
@@ -407,14 +403,17 @@ public class CheckoutCommand extends GitCommand<Ref> {
 		DirCacheIterator dci = new DirCacheIterator(dc);
 		treeWalk.addTree(dci);
 
+		String previousPath = null;
+
 		final ObjectReader r = treeWalk.getObjectReader();
 		DirCacheEditor editor = dc.editor();
 		while (treeWalk.next()) {
-			DirCacheEntry entry = dci.getDirCacheEntry();
+			String path = treeWalk.getPathString();
 			// Only add one edit per path
-			if (entry != null && entry.getStage() > DirCacheEntry.STAGE_1)
+			if (path.equals(previousPath))
 				continue;
-			editor.add(new PathEdit(treeWalk.getPathString()) {
+
+			editor.add(new PathEdit(path) {
 				public void apply(DirCacheEntry ent) {
 					int stage = ent.getStage();
 					if (stage > DirCacheEntry.STAGE_0) {
@@ -431,6 +430,8 @@ public class CheckoutCommand extends GitCommand<Ref> {
 					}
 				}
 			});
+
+			previousPath = path;
 		}
 		editor.commit();
 	}
@@ -455,11 +456,8 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	}
 
 	private void checkoutPath(DirCacheEntry entry, ObjectReader reader) {
-		File file = new File(repo.getWorkTree(), entry.getPathString());
-		File parentDir = file.getParentFile();
 		try {
-			FileUtils.mkdirs(parentDir, true);
-			DirCacheCheckout.checkoutEntry(repo, file, entry, reader);
+			DirCacheCheckout.checkoutEntry(repo, entry, reader, true);
 		} catch (IOException e) {
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().checkoutConflictWithFile,
@@ -675,7 +673,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	private void checkOptions() {
 		if (checkoutStage != null && !isCheckoutIndex())
 			throw new IllegalStateException(
-					"Checking out ours/theirs is only possible when checking out index, "
-							+ "not when switching branches.");
+					JGitText.get().cannotCheckoutOursSwitchBranch);
 	}
 }

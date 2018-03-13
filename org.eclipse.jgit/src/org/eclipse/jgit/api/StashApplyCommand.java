@@ -42,7 +42,6 @@
  */
 package org.eclipse.jgit.api;
 
-import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
 
@@ -167,9 +166,8 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 					JGitText.get().stashApplyOnUnsafeRepository,
 					repo.getRepositoryState()));
 
-		ObjectReader reader = repo.newObjectReader();
-		try {
-			RevWalk revWalk = new RevWalk(reader);
+		try (ObjectReader reader = repo.newObjectReader();
+				RevWalk revWalk = new RevWalk(reader)) {
 
 			ObjectId headCommit = repo.resolve(Constants.HEAD);
 			if (headCommit == null)
@@ -193,8 +191,8 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 				untrackedCommit = revWalk.parseCommit(stashCommit.getParent(2));
 
 			ResolveMerger merger = (ResolveMerger) strategy.newMerger(repo);
-			merger.setCommitNames(new String[] { "stashed HEAD", "HEAD",
-					"stash" });
+			merger.setCommitNames(new String[] { "stashed HEAD", "HEAD", //$NON-NLS-1$ //$NON-NLS-2$
+					"stash" }); //$NON-NLS-1$
 			merger.setBase(stashHeadCommit);
 			merger.setWorkingTreeIterator(new FileTreeIterator(repo));
 			if (merger.merge(headCommit, stashCommit)) {
@@ -206,8 +204,8 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 				if (applyIndex) {
 					ResolveMerger ixMerger = (ResolveMerger) strategy
 							.newMerger(repo, true);
-					ixMerger.setCommitNames(new String[] { "stashed HEAD",
-							"HEAD", "stashed index" });
+					ixMerger.setCommitNames(new String[] { "stashed HEAD", //$NON-NLS-1$
+							"HEAD", "stashed index" }); //$NON-NLS-1$//$NON-NLS-2$
 					ixMerger.setBase(stashHeadCommit);
 					boolean ok = ixMerger.merge(headCommit, stashIndexCommit);
 					if (ok) {
@@ -251,8 +249,6 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 			throw e;
 		} catch (IOException e) {
 			throw new JGitInternalException(JGitText.get().stashApplyFailed, e);
-		} finally {
-			reader.release();
 		}
 	}
 
@@ -287,11 +283,9 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 
 	private void resetIndex(RevTree tree) throws IOException {
 		DirCache dc = repo.lockDirCache();
-		TreeWalk walk = null;
-		try {
+		try (TreeWalk walk = new TreeWalk(repo)) {
 			DirCacheBuilder builder = dc.builder();
 
-			walk = new TreeWalk(repo);
 			walk.addTree(tree);
 			walk.addTree(new DirCacheIterator(dc));
 			walk.setRecursive(true);
@@ -322,16 +316,13 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 			builder.commit();
 		} finally {
 			dc.unlock();
-			if (walk != null)
-				walk.release();
 		}
 	}
 
 	private void resetUntracked(RevTree tree) throws CheckoutConflictException,
 			IOException {
-		TreeWalk walk = null;
-		try {
-			walk = new TreeWalk(repo); // maybe NameConflictTreeWalk?
+		// TODO maybe NameConflictTreeWalk ?
+		try (TreeWalk walk = new TreeWalk(repo)) {
 			walk.addTree(tree);
 			walk.addTree(new FileTreeIterator(repo));
 			walk.setRecursive(true);
@@ -361,16 +352,12 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 
 				checkoutPath(entry, reader);
 			}
-		} finally {
-			if (walk != null)
-				walk.release();
 		}
 	}
 
 	private void checkoutPath(DirCacheEntry entry, ObjectReader reader) {
 		try {
-			File file = new File(repo.getWorkTree(), entry.getPathString());
-			DirCacheCheckout.checkoutEntry(repo, file, entry, reader);
+			DirCacheCheckout.checkoutEntry(repo, entry, reader, true);
 		} catch (IOException e) {
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().checkoutConflictWithFile,
