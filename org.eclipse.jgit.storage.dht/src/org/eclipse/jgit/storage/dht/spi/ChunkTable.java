@@ -44,12 +44,11 @@
 package org.eclipse.jgit.storage.dht.spi;
 
 import java.util.Collection;
-import java.util.Map;
 import java.util.Set;
 
-import org.eclipse.jgit.generated.storage.dht.proto.GitStore.ChunkMeta;
 import org.eclipse.jgit.storage.dht.AsyncCallback;
 import org.eclipse.jgit.storage.dht.ChunkKey;
+import org.eclipse.jgit.storage.dht.ChunkMeta;
 import org.eclipse.jgit.storage.dht.DhtException;
 import org.eclipse.jgit.storage.dht.PackChunk;
 import org.eclipse.jgit.storage.dht.StreamingCallback;
@@ -114,7 +113,7 @@ public interface ChunkTable {
 	 *            results early.
 	 */
 	public void getMeta(Context options, Set<ChunkKey> keys,
-			AsyncCallback<Map<ChunkKey, ChunkMeta>> callback);
+			AsyncCallback<Collection<ChunkMeta>> callback);
 
 	/**
 	 * Put some (or all) of a single chunk.

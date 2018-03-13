@@ -45,7 +45,6 @@ package org.eclipse.jgit.storage.dht;
 
 import static org.eclipse.jgit.lib.Ref.Storage.LOOSE;
 import static org.eclipse.jgit.lib.Ref.Storage.NEW;
-import static org.eclipse.jgit.storage.dht.RefDataUtil.NONE;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -56,9 +55,11 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.generated.storage.dht.proto.GitStore.RefData;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectIdRef.PeeledNonTag;
+import org.eclipse.jgit.lib.ObjectIdRef.PeeledTag;
+import org.eclipse.jgit.lib.ObjectIdRef.Unpeeled;
 import org.eclipse.jgit.lib.ObjectIdSubclassMap;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefDatabase;
@@ -67,7 +68,6 @@ import org.eclipse.jgit.lib.SymbolicRef;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.dht.RefDataUtil.IdWithChunk;
 import org.eclipse.jgit.storage.dht.spi.Context;
 import org.eclipse.jgit.storage.dht.spi.Database;
 import org.eclipse.jgit.util.RefList;
@@ -94,7 +94,7 @@ public class DhtRefDatabase extends RefDatabase {
 	ChunkKey findChunk(AnyObjectId id) {
 		RefCache c = cache.get();
 		if (c != null) {
-			IdWithChunk i = c.hints.get(id);
+			RefData.IdWithChunk i = c.hints.get(id);
 			if (i != null)
 				return i.getChunkKey();
 		}
@@ -105,21 +105,13 @@ public class DhtRefDatabase extends RefDatabase {
 	public Ref getRef(String needle) throws IOException {
 		RefCache curr = readRefs();
 		for (String prefix : SEARCH_PATH) {
-			DhtRef ref = curr.ids.get(prefix + needle);
+			Ref ref = curr.ids.get(prefix + needle);
 			if (ref != null) {
 				ref = resolve(ref, 0, curr.ids);
 				return ref;
 			}
 		}
 		return null;
-	}
-
-	private DhtRef getOneRef(String refName) throws IOException {
-		RefCache curr = readRefs();
-		DhtRef ref = curr.ids.get(refName);
-		if (ref != null)
-			return resolve(ref, 0, curr.ids);
-		return ref;
 	}
 
 	@Override
@@ -130,12 +122,12 @@ public class DhtRefDatabase extends RefDatabase {
 	@Override
 	public Map<String, Ref> getRefs(String prefix) throws IOException {
 		RefCache curr = readRefs();
-		RefList<DhtRef> packed = RefList.emptyList();
-		RefList<DhtRef> loose = curr.ids;
-		RefList.Builder<DhtRef> sym = new RefList.Builder<DhtRef>(curr.sym.size());
+		RefList<Ref> packed = RefList.emptyList();
+		RefList<Ref> loose = curr.ids;
+		RefList.Builder<Ref> sym = new RefList.Builder<Ref>(curr.sym.size());
 
 		for (int idx = 0; idx < curr.sym.size(); idx++) {
-			DhtRef ref = curr.sym.get(idx);
+			Ref ref = curr.sym.get(idx);
 			String name = ref.getName();
 			ref = resolve(ref, 0, loose);
 			if (ref != null && ref.getObjectId() != null) {
@@ -153,12 +145,12 @@ public class DhtRefDatabase extends RefDatabase {
 		return new RefMap(prefix, packed, loose, sym.toRefList());
 	}
 
-	private DhtRef resolve(DhtRef ref, int depth, RefList<DhtRef> loose)
+	private Ref resolve(Ref ref, int depth, RefList<Ref> loose)
 			throws IOException {
 		if (!ref.isSymbolic())
 			return ref;
 
-		DhtRef dst = (DhtRef) ref.getTarget();
+		Ref dst = ref.getTarget();
 
 		if (MAX_SYMBOLIC_REF_DEPTH <= depth)
 			return null; // claim it doesn't exist
@@ -171,10 +163,7 @@ public class DhtRefDatabase extends RefDatabase {
 		if (dst == null)
 			return null;
 
-		return new DhtSymbolicRef(
-				ref.getName(),
-				dst,
-				((DhtSymbolicRef) ref).getRefData());
+		return new SymbolicRef(ref.getName(), dst);
 	}
 
 	@Override
@@ -183,12 +172,12 @@ public class DhtRefDatabase extends RefDatabase {
 		if (oldLeaf.isPeeled() || oldLeaf.getObjectId() == null)
 			return ref;
 
-		DhtRef newLeaf = doPeel(oldLeaf);
+		Ref newLeaf = doPeel(oldLeaf);
 
 		RefCache cur = readRefs();
 		int idx = cur.ids.find(oldLeaf.getName());
 		if (0 <= idx && cur.ids.get(idx) == oldLeaf) {
-			RefList<DhtRef> newList = cur.ids.set(idx, newLeaf);
+			RefList<Ref> newList = cur.ids.set(idx, newLeaf);
 			if (cache.compareAndSet(cur, new RefCache(newList, cur)))
 				cachePeeledState(oldLeaf, newLeaf);
 		}
@@ -201,8 +190,8 @@ public class DhtRefDatabase extends RefDatabase {
 		try {
 			RepositoryKey repo = repository.getRepositoryKey();
 			RefKey key = RefKey.create(repo, newLeaf.getName());
-			RefData oldData = ((DhtRef) oldLeaf).getRefData();
-			RefData newData = ((DhtRef) newLeaf).getRefData();
+			RefData oldData = RefData.fromRef(oldLeaf);
+			RefData newData = RefData.fromRef(newLeaf);
 			db.ref().compareAndPut(key, oldData, newData);
 		} catch (TimeoutException e) {
 			// Ignore a timeout here, we were only trying to update
@@ -214,36 +203,28 @@ public class DhtRefDatabase extends RefDatabase {
 		}
 	}
 
-	private DhtRef doPeel(final Ref leaf) throws MissingObjectException,
+	private Ref doPeel(final Ref leaf) throws MissingObjectException,
 			IOException {
 		RevWalk rw = new RevWalk(getRepository());
 		try {
+			String name = leaf.getName();
+			ObjectId oId = leaf.getObjectId();
+			RevObject obj = rw.parseAny(oId);
 			DhtReader ctx = (DhtReader) rw.getObjectReader();
-			RevObject obj = rw.parseAny(leaf.getObjectId());
-			RefData.Builder d = RefData.newBuilder(((DhtRef) leaf).getRefData());
 
-			ChunkKey oKey = ctx.findChunk(leaf.getObjectId());
-			if (oKey != null)
-				d.getTargetBuilder().setChunkKey(oKey.asString());
-			else
-				d.getTargetBuilder().clearChunkKey();
+			ChunkKey key = ctx.findChunk(oId);
+			if (key != null)
+				oId = new RefData.IdWithChunk(oId, key);
 
 			if (obj instanceof RevTag) {
 				ObjectId pId = rw.peel(obj);
-				d.getPeeledBuilder().setObjectName(pId.name());
-
-				ChunkKey pKey = ctx.findChunk(pId);
-				if (pKey != null)
-					d.getPeeledBuilder().setChunkKey(pKey.asString());
-				else
-					d.getPeeledBuilder().clearChunkKey();
+				key = ctx.findChunk(pId);
+				pId = key != null ? new RefData.IdWithChunk(pId, key) : pId
+						.copy();
+				return new PeeledTag(leaf.getStorage(), name, oId, pId);
 			} else {
-				d.clearPeeled();
+				return new PeeledNonTag(leaf.getStorage(), name, oId);
 			}
-
-			d.setIsPeeled(true);
-			d.setSequence(d.getSequence() + 1);
-			return new DhtObjectIdRef(leaf.getName(), d.build());
 		} finally {
 			rw.release();
 		}
@@ -260,26 +241,11 @@ public class DhtRefDatabase extends RefDatabase {
 	@Override
 	public DhtRefUpdate newUpdate(String refName, boolean detach)
 			throws IOException {
-		boolean detachingSymbolicRef = false;
-		DhtRef ref = getOneRef(refName);
+		Ref ref = getRefs(ALL).get(refName);
 		if (ref == null)
-			ref = new DhtObjectIdRef(refName, NONE);
-		else
-			detachingSymbolicRef = detach && ref.isSymbolic();
-
-		if (detachingSymbolicRef) {
-			RefData src = ((DhtRef) ref.getLeaf()).getRefData();
-			RefData.Builder b = RefData.newBuilder(ref.getRefData());
-			b.clearSymref();
-			b.setTarget(src.getTarget());
-			ref = new DhtObjectIdRef(refName, b.build());
-		}
-
+			ref = new Unpeeled(NEW, refName, null);
 		RepositoryKey repo = repository.getRepositoryKey();
-		DhtRefUpdate update = new DhtRefUpdate(this, repo, db, ref);
-		if (detachingSymbolicRef)
-			update.setDetachingSymbolicRef();
-		return update;
+		return new DhtRefUpdate(this, repo, db, ref);
 	}
 
 	@Override
@@ -292,7 +258,7 @@ public class DhtRefDatabase extends RefDatabase {
 
 	@Override
 	public boolean isNameConflicting(String refName) throws IOException {
-		RefList<DhtRef> all = readRefs().ids;
+		RefList<Ref> all = readRefs().ids;
 
 		// Cannot be nested within an existing reference.
 		int lastSlash = refName.lastIndexOf('/');
@@ -326,15 +292,15 @@ public class DhtRefDatabase extends RefDatabase {
 	}
 
 	void stored(String refName, RefData newData) {
-		DhtRef ref = fromData(refName, newData);
+		Ref ref = fromData(refName, newData);
 		RefCache oldCache, newCache;
 		do {
 			oldCache = cache.get();
 			if (oldCache == null)
 				return;
 
-			RefList<DhtRef> ids = oldCache.ids.put(ref);
-			RefList<DhtRef> sym = oldCache.sym;
+			RefList<Ref> ids = oldCache.ids.put(ref);
+			RefList<Ref> sym = oldCache.sym;
 
 			if (ref.isSymbolic()) {
 				sym.put(ref);
@@ -357,12 +323,12 @@ public class DhtRefDatabase extends RefDatabase {
 
 			int p;
 
-			RefList<DhtRef> ids = oldCache.ids;
+			RefList<Ref> ids = oldCache.ids;
 			p = ids.find(refName);
 			if (0 <= p)
 				ids = ids.remove(p);
 
-			RefList<DhtRef> sym = oldCache.sym;
+			RefList<Ref> sym = oldCache.sym;
 			p = sym.find(refName);
 			if (0 <= p)
 				sym = sym.remove(p);
@@ -385,23 +351,23 @@ public class DhtRefDatabase extends RefDatabase {
 	}
 
 	private RefCache read() throws DhtException, TimeoutException {
-		RefList.Builder<DhtRef> id = new RefList.Builder<DhtRef>();
-		RefList.Builder<DhtRef> sym = new RefList.Builder<DhtRef>();
-		ObjectIdSubclassMap<IdWithChunk> hints = new ObjectIdSubclassMap<IdWithChunk>();
+		RefList.Builder<Ref> id = new RefList.Builder<Ref>();
+		RefList.Builder<Ref> sym = new RefList.Builder<Ref>();
+		ObjectIdSubclassMap<RefData.IdWithChunk> hints = new ObjectIdSubclassMap<RefData.IdWithChunk>();
 
 		for (Map.Entry<RefKey, RefData> e : scan()) {
-			DhtRef ref = fromData(e.getKey().getName(), e.getValue());
+			Ref ref = fromData(e.getKey().getName(), e.getValue());
 
 			if (ref.isSymbolic())
 				sym.add(ref);
 			id.add(ref);
 
-			if (ref.getObjectId() instanceof IdWithChunk
+			if (ref.getObjectId() instanceof RefData.IdWithChunk
 					&& !hints.contains(ref.getObjectId()))
-				hints.add((IdWithChunk) ref.getObjectId());
-			if (ref.getPeeledObjectId() instanceof IdWithChunk
+				hints.add((RefData.IdWithChunk) ref.getObjectId());
+			if (ref.getPeeledObjectId() instanceof RefData.IdWithChunk
 					&& !hints.contains(ref.getPeeledObjectId()))
-				hints.add((IdWithChunk) ref.getPeeledObjectId());
+				hints.add((RefData.IdWithChunk) ref.getPeeledObjectId());
 		}
 
 		id.sort();
@@ -410,18 +376,43 @@ public class DhtRefDatabase extends RefDatabase {
 		return new RefCache(id.toRefList(), sym.toRefList(), hints);
 	}
 
-	static DhtRef fromData(String name, RefData data) {
-		if (data.hasSymref())
-			return new DhtSymbolicRef(name, data);
-		else
-			return new DhtObjectIdRef(name, data);
-	}
+	private static Ref fromData(String name, RefData data) {
+		ObjectId oId = null;
+		boolean peeled = false;
+		ObjectId pId = null;
 
-	private static ObjectId idFrom(RefData.Id src) {
-		ObjectId id = ObjectId.fromString(src.getObjectName());
-		if (!src.hasChunkKey())
-			return id;
-		return new IdWithChunk(id, ChunkKey.fromString(src.getChunkKey()));
+		TinyProtobuf.Decoder d = data.decode();
+		DECODE: for (;;) {
+			switch (d.next()) {
+			case 0:
+				break DECODE;
+
+			case RefData.TAG_SYMREF: {
+				String symref = d.string();
+				Ref leaf = new Unpeeled(NEW, symref, null);
+				return new SymbolicRef(name, leaf);
+			}
+
+			case RefData.TAG_TARGET:
+				oId = RefData.IdWithChunk.decode(d.message());
+				continue;
+			case RefData.TAG_IS_PEELED:
+				peeled = d.bool();
+				continue;
+			case RefData.TAG_PEELED:
+				pId = RefData.IdWithChunk.decode(d.message());
+				continue;
+			default:
+				d.skip();
+				continue;
+			}
+		}
+
+		if (peeled && pId != null)
+			return new PeeledTag(LOOSE, name, oId, pId);
+		if (peeled)
+			return new PeeledNonTag(LOOSE, name, oId);
+		return new Unpeeled(LOOSE, name, oId);
 	}
 
 	private Set<Map.Entry<RefKey, RefData>> scan() throws DhtException,
@@ -432,93 +423,21 @@ public class DhtRefDatabase extends RefDatabase {
 	}
 
 	private static class RefCache {
-		final RefList<DhtRef> ids;
+		final RefList<Ref> ids;
 
-		final RefList<DhtRef> sym;
+		final RefList<Ref> sym;
 
-		final ObjectIdSubclassMap<IdWithChunk> hints;
+		final ObjectIdSubclassMap<RefData.IdWithChunk> hints;
 
-		RefCache(RefList<DhtRef> ids, RefList<DhtRef> sym,
-				ObjectIdSubclassMap<IdWithChunk> hints) {
+		RefCache(RefList<Ref> ids, RefList<Ref> sym,
+				ObjectIdSubclassMap<RefData.IdWithChunk> hints) {
 			this.ids = ids;
 			this.sym = sym;
 			this.hints = hints;
 		}
 
-		RefCache(RefList<DhtRef> ids, RefCache old) {
+		RefCache(RefList<Ref> ids, RefCache old) {
 			this(ids, old.sym, old.hints);
-		}
-	}
-
-	static interface DhtRef extends Ref {
-		RefData getRefData();
-	}
-
-	private static class DhtSymbolicRef extends SymbolicRef implements DhtRef {
-		private final RefData data;
-
-		DhtSymbolicRef(String refName,RefData data) {
-			super(refName, new DhtObjectIdRef(data.getSymref(), NONE));
-			this.data = data;
-		}
-
-		DhtSymbolicRef(String refName, Ref target, RefData data) {
-			super(refName, target);
-			this.data = data;
-		}
-
-		public RefData getRefData() {
-			return data;
-		}
-	}
-
-	private static class DhtObjectIdRef implements DhtRef {
-		private final String name;
-		private final RefData data;
-		private final ObjectId objectId;
-		private final ObjectId peeledId;
-
-		DhtObjectIdRef(String name, RefData data) {
-			this.name = name;
-			this.data = data;
-			this.objectId = data.hasTarget() ? idFrom(data.getTarget()) : null;
-			this.peeledId = data.hasPeeled() ? idFrom(data.getPeeled()) : null;
-		}
-
-		public String getName() {
-			return name;
-		}
-
-		public boolean isSymbolic() {
-			return false;
-		}
-
-		public Ref getLeaf() {
-			return this;
-		}
-
-		public Ref getTarget() {
-			return this;
-		}
-
-		public ObjectId getObjectId() {
-			return objectId;
-		}
-
-		public Ref.Storage getStorage() {
-			return data.hasTarget() ? LOOSE : NEW;
-		}
-
-		public boolean isPeeled() {
-			return data.getIsPeeled();
-		}
-
-		public ObjectId getPeeledObjectId() {
-			return peeledId;
-		}
-
-		public RefData getRefData() {
-			return data;
 		}
 	}
 }
