@@ -239,7 +239,7 @@ public class MacroExpanderTest extends RepositoryTestCase {
 		walk = beginWalk();
 		assertIteration(D, "sub");
 		assertIteration(F, "sub/.gitattributes");
-		assertIteration(F, "sub/a.txt", attrs("-foo -x -bar"));
+		assertIteration(F, "sub/a.txt", attrs("foo x bar"));
 		endWalk();
 	}
 

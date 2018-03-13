@@ -57,17 +57,15 @@ import org.eclipse.jgit.attributes.Attributes;
 import org.eclipse.jgit.attributes.AttributesNode;
 import org.eclipse.jgit.attributes.AttributesNodeProvider;
 import org.eclipse.jgit.attributes.AttributesProvider;
-import org.eclipse.jgit.attributes.MacroExpanderImpl;
+import org.eclipse.jgit.attributes.MacroExpander;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StopWalkException;
-import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.CoreConfig.StreamType;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
@@ -78,8 +76,6 @@ import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.QuotedString;
 import org.eclipse.jgit.util.RawParseUtils;
-import org.eclipse.jgit.util.io.StreamTypeProvider;
-import org.eclipse.jgit.util.io.StreamTypeUtil;
 
 /**
  * Walks one or more {@link AbstractTreeIterator}s in parallel.
@@ -101,8 +97,7 @@ import org.eclipse.jgit.util.io.StreamTypeUtil;
  * Multiple simultaneous TreeWalk instances per {@link Repository} are
  * permitted, even from concurrent threads.
  */
-public class TreeWalk
-		implements AutoCloseable, AttributesProvider, StreamTypeProvider {
+public class TreeWalk implements AutoCloseable, AttributesProvider {
 	private static final AbstractTreeIterator[] NO_TREES = {};
 
 	/**
@@ -270,14 +265,13 @@ public class TreeWalk
 
 	private AttributesNodeProvider attributesNodeProvider;
 
-	private StreamTypeProvider streamTypeProvider;
-
-	private final MacroExpanderImpl macroExpander = new MacroExpanderImpl();
-
 	AbstractTreeIterator currentHead;
 
 	/** Cached attribute for the current entry */
 	private Attributes attrs = null;
+
+	/** Cached macro expander */
+	private MacroExpander macroExpander;
 
 	private Config config;
 
@@ -293,8 +287,6 @@ public class TreeWalk
 		this(repo.newObjectReader(), true);
 		config = repo.getConfig();
 		attributesNodeProvider = repo.createAttributesNodeProvider();
-		streamTypeProvider = new StreamTypeProviderImpl(repo, operationType,
-				this);
 	}
 
 	/**
@@ -446,26 +438,10 @@ public class TreeWalk
 		attributesNodeProvider = provider;
 	}
 
-	/**
-	 * Sets the {@link StreamTypeProvider} for this {@link TreeWalk}.
-	 * <p>
-	 * This is a requirement for a correct computation of
-	 * {@link #getStreamType()}. If this {@link TreeWalk} has been built using
-	 * {@link #TreeWalk(Repository)} constructor, the {@link StreamTypeProvider}
-	 * has already been set. Otherwise you should provide one with
-	 * {@link #setStreamTypeProvider(StreamTypeProvider)}.
-	 * </p>
-	 *
-	 * @param provider
-	 * @since 4.2
-	 */
-	public void setStreamTypeProvider(StreamTypeProvider provider) {
-		streamTypeProvider = provider;
-	}
-
 	/** Reset this walker so new tree iterators can be added to it. */
 	public void reset() {
 		attrs = null;
+		macroExpander = null;
 		trees = NO_TREES;
 		advance = false;
 		depth = 0;
@@ -1171,9 +1147,12 @@ public class TreeWalk
 					"The tree walk should have one AttributesNodeProvider set in order to compute the git attributes."); //$NON-NLS-1$
 		}
 
-		WorkingTreeIterator workingTreeIterator = getTree(WorkingTreeIterator.class);
-		DirCacheIterator dirCacheIterator = getTree(DirCacheIterator.class);
-		CanonicalTreeParser other = getTree(CanonicalTreeParser.class);
+		WorkingTreeIterator workingTreeIterator = getCurrentTreeNode(
+				WorkingTreeIterator.class);
+		DirCacheIterator dirCacheIterator = getCurrentTreeNode(
+				DirCacheIterator.class);
+		CanonicalTreeParser other = getCurrentTreeNode(
+				CanonicalTreeParser.class);
 
 		if (workingTreeIterator == null && dirCacheIterator == null
 				&& other == null) {
@@ -1185,39 +1164,33 @@ public class TreeWalk
 		String path = currentHead.getEntryPathString();
 		final boolean isDir = FileMode.TREE.equals(currentHead.mode);
 		Attributes attributes = new Attributes();
-		try {
-			// Gets the global attributes node
-			AttributesNode globalNodeAttr = attributesNodeProvider
-					.getGlobalAttributesNode();
-			// Gets the info attributes node
-			AttributesNode infoNodeAttr = attributesNodeProvider
-					.getInfoAttributesNode();
-			// Gets the root attributes node
-			AttributesNode rootNodeAttr = getRootAttributesNode(operationType,
-					workingTreeIterator, dirCacheIterator, other);
 
-			// Update the macro expander using the global node, the info node
-			// and the current root node
-			macroExpander.updateWhenDifferent(globalNodeAttr, infoNodeAttr,
-					rootNodeAttr);
+		try {
+			if (macroExpander == null) {
+				// Lazy create the macro expander on the first access of
+				// attributes. This requires the info, global and root
+				// attributes nodes
+				AttributesNode globalNode = attributesNodeProvider
+						.getGlobalAttributesNode();
+				AttributesNode infoNode = attributesNodeProvider
+						.getInfoAttributesNode();
+				AttributesNode rootNode = getRootAttributesNode();
+				macroExpander = new MacroExpander(globalNode, infoNode,
+						rootNode);
+			}
 
 			// Gets the info attributes
-			if (infoNodeAttr != null) {
-				infoNodeAttr.getAttributes(macroExpander, path, isDir,
-						attributes);
-			}
+			macroExpander.mergeInfoAttributes(path, isDir, attributes);
 
 			// Gets the attributes located on the current entry path
 			getPerDirectoryEntryAttributes(path, isDir, operationType,
 					workingTreeIterator, dirCacheIterator, other, attributes);
 
 			// Gets the attributes located in the global attribute file
-			if (globalNodeAttr != null) {
-				globalNodeAttr.getAttributes(macroExpander, path, isDir,
-						attributes);
-			}
+			macroExpander.mergeGlobalAttributes(path, isDir, attributes);
 		} catch (IOException e) {
-			throw new JGitInternalException("Error while parsing attributes", e); //$NON-NLS-1$
+			throw new JGitInternalException("Error while parsing attributes", //$NON-NLS-1$
+					e);
 		}
 		// now after all attributes are collected - in the correct hierarchy
 		// order - remove all unspecified entries (the ! marker)
@@ -1226,14 +1199,6 @@ public class TreeWalk
 				attributes.remove(a.getKey());
 		}
 		return attributes;
-	}
-
-	@Override
-	public StreamType getStreamType() {
-		if (streamTypeProvider == null)
-			throw new IllegalStateException(
-					"cannot detect the stream type with a null StreamTypeProvider"); //$NON-NLS-1$
-		return streamTypeProvider.getStreamType();
 	}
 
 	/**
@@ -1269,8 +1234,8 @@ public class TreeWalk
 			AttributesNode currentAttributesNode = getCurrentAttributesNode(
 					opType, workingTreeIterator, dirCacheIterator, other);
 			if (currentAttributesNode != null) {
-				currentAttributesNode.getAttributes(macroExpander, path, isDir,
-						attributes);
+				macroExpander.mergeAttributes(currentAttributesNode, path,
+						isDir, attributes);
 			}
 			getPerDirectoryEntryAttributes(path, isDir, opType,
 					getParent(workingTreeIterator, WorkingTreeIterator.class),
@@ -1290,12 +1255,24 @@ public class TreeWalk
 		return null;
 	}
 
-	private <T extends AbstractTreeIterator> T getTree(Class<T> type) {
+	private <T extends AbstractTreeIterator> T getCurrentTreeNode(
+			Class<T> type) {
 		for (int i = 0; i < trees.length; i++) {
 			AbstractTreeIterator tree = trees[i];
 			if (type.isInstance(tree)) {
 				return type.cast(tree);
 			}
+		}
+		return null;
+	}
+
+	private <T extends AbstractTreeIterator> T getRootTreeNode(Class<T> type) {
+		AbstractTreeIterator node = getCurrentTreeNode(type);
+		while (node != null && node.parent != null) {
+			node = node.parent;
+		}
+		if (type.isInstance(node)) {
+			return type.cast(node);
 		}
 		return null;
 	}
@@ -1329,14 +1306,12 @@ public class TreeWalk
 				attributesNode = workingTreeIterator.getEntryAttributesNode();
 			}
 			if (attributesNode == null && dirCacheIterator != null) {
-				attributesNode = getAttributesNode(dirCacheIterator
-						.getEntryAttributesNode(getObjectReader()),
-						attributesNode);
+				attributesNode = dirCacheIterator
+						.getEntryAttributesNode(getObjectReader());
 			}
 			if (attributesNode == null && other != null) {
-				attributesNode = getAttributesNode(
-						other.getEntryAttributesNode(getObjectReader()),
-						attributesNode);
+				attributesNode = other
+						.getEntryAttributesNode(getObjectReader());
 			}
 			break;
 		case CHECKOUT_OP:
@@ -1344,15 +1319,12 @@ public class TreeWalk
 				attributesNode = other
 						.getEntryAttributesNode(getObjectReader());
 			}
-			if (dirCacheIterator != null) {
-				attributesNode = getAttributesNode(dirCacheIterator
-						.getEntryAttributesNode(getObjectReader()),
-						attributesNode);
+			if (attributesNode == null && dirCacheIterator != null) {
+				attributesNode = dirCacheIterator
+						.getEntryAttributesNode(getObjectReader());
 			}
 			if (attributesNode == null && workingTreeIterator != null) {
-				attributesNode = getAttributesNode(
-						workingTreeIterator.getEntryAttributesNode(),
-						attributesNode);
+				attributesNode = workingTreeIterator.getEntryAttributesNode();
 			}
 			break;
 		default:
@@ -1365,104 +1337,25 @@ public class TreeWalk
 		return attributesNode;
 	}
 
-	private static <T extends AbstractTreeIterator> T getRoot(T current,
-			Class<T> type) {
-		if (current != null) {
-			AbstractTreeIterator root = current.root;
-			if (type.isInstance(root)) {
-				return type.cast(root);
-			}
-		}
-		return null;
-	}
-
 	/**
 	 * Gets the {@link AttributesNode} for the root folder. This is needed for
 	 * the git macro expansion facilty that requires the global, the info and
 	 * the root attributes node.
-	 * <p>
-	 * This method implements the fallback mechanism between the index and the
-	 * working tree depending on the operation type
-	 * </p>
 	 *
-	 * @param opType
-	 * @param workingTreeIterator
-	 * @param dirCacheIterator
-	 * @param other
 	 * @return the root {@link AttributesNode} of the tree,
 	 *         {@link NullPointerException} otherwise.
 	 * @throws IOException
 	 *             It raises an {@link IOException} if a problem appears while
 	 *             parsing one on the attributes file.
 	 */
-	private AttributesNode getRootAttributesNode(OperationType opType,
-			@Nullable WorkingTreeIterator workingTreeIterator,
-			@Nullable DirCacheIterator dirCacheIterator,
-			@Nullable CanonicalTreeParser other) throws IOException {
-		AttributesNode attributesNode = null;
-		switch (opType) {
-		case CHECKIN_OP:
-			if (workingTreeIterator != null) {
-				WorkingTreeIterator root = getRoot(workingTreeIterator,
-						WorkingTreeIterator.class);
-				if (root != null) {
-					attributesNode = root.getEntryAttributesNode();
-				}
-			}
-			if (attributesNode == null && dirCacheIterator != null) {
-				DirCacheIterator root = getRoot(dirCacheIterator,
-						DirCacheIterator.class);
-				if (root != null) {
-					attributesNode = root
-							.getEntryAttributesNode(getObjectReader());
-				}
-			}
-			if (attributesNode == null && other != null) {
-				CanonicalTreeParser root = getRoot(other,
-						CanonicalTreeParser.class);
-				if (root != null) {
-					attributesNode = root
-							.getEntryAttributesNode(getObjectReader());
-				}
-			}
-			break;
-		case CHECKOUT_OP:
-			if (other != null) {
-				CanonicalTreeParser root = getRoot(other,
-						CanonicalTreeParser.class);
-				if (root != null) {
-					attributesNode = root
-							.getEntryAttributesNode(getObjectReader());
-				}
-			}
-			if (dirCacheIterator != null) {
-				DirCacheIterator root = getRoot(dirCacheIterator,
-						DirCacheIterator.class);
-				if (root != null) {
-					attributesNode = root
-							.getEntryAttributesNode(getObjectReader());
-				}
-			}
-			if (attributesNode == null && workingTreeIterator != null) {
-				WorkingTreeIterator root = getRoot(workingTreeIterator,
-						WorkingTreeIterator.class);
-				if (root != null) {
-					attributesNode = root.getEntryAttributesNode();
-				}
-			}
-			break;
-		default:
-			throw new IllegalStateException(
-					"The only operation type handled are:" //$NON-NLS-1$
-							+ OperationType.CHECKIN_OP + "," //$NON-NLS-1$
-							+ OperationType.CHECKOUT_OP);
-		}
-		return attributesNode;
-	}
-
-	private static AttributesNode getAttributesNode(AttributesNode value,
-			AttributesNode defaultValue) {
-		return (value == null) ? defaultValue : value;
+	private AttributesNode getRootAttributesNode() throws IOException {
+		WorkingTreeIterator workingTreeIterator = getRootTreeNode(
+				WorkingTreeIterator.class);
+		DirCacheIterator dirCacheIterator = getRootTreeNode(
+				DirCacheIterator.class);
+		CanonicalTreeParser other = getRootTreeNode(CanonicalTreeParser.class);
+		return getCurrentAttributesNode(operationType, workingTreeIterator,
+				dirCacheIterator, other);
 	}
 
 	/**
@@ -1525,29 +1418,5 @@ public class TreeWalk
 		if (filterCommand != null)
 			filterCommandsByNameDotType.put(key, filterCommand);
 		return filterCommand;
-	}
-
-	/**
-	 * Implementation a {@link StreamTypeProvider} for a {@link FileRepository}.
-	 */
-	private static class StreamTypeProviderImpl implements StreamTypeProvider {
-		private final WorkingTreeOptions options;
-
-		private final OperationType op;
-
-		private final AttributesProvider attributesProvider;
-
-		StreamTypeProviderImpl(Repository repo, OperationType op,
-				AttributesProvider attributesProvider) {
-			this.options = repo.getConfig().get(WorkingTreeOptions.KEY);
-			this.op = op;
-			this.attributesProvider = attributesProvider;
-		}
-
-		@Override
-		public StreamType getStreamType() {
-			return StreamTypeUtil.detectStreamType(op, options,
-					attributesProvider.getAttributes());
-		}
 	}
 }
