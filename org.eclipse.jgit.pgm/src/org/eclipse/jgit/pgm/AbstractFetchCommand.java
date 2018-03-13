@@ -67,7 +67,8 @@ abstract class AbstractFetchCommand extends TextBuiltin {
 	private boolean verbose;
 
 	protected void showFetchResult(final FetchResult r) throws IOException {
-		try (ObjectReader reader = db.newObjectReader()) {
+		ObjectReader reader = db.newObjectReader();
+		try {
 			boolean shownURI = false;
 			for (final TrackingRefUpdate u : r.getTrackingRefUpdates()) {
 				if (!verbose && u.getResult() == RefUpdate.Result.NO_CHANGE)
@@ -88,6 +89,8 @@ abstract class AbstractFetchCommand extends TextBuiltin {
 						src, dst);
 				outw.println();
 			}
+		} finally {
+			reader.release();
 		}
 		showRemoteMessages(errw, r.getMessages());
 	}
