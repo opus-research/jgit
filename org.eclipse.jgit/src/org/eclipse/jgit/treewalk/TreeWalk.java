@@ -671,7 +671,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	}
 
 	@SuppressWarnings("unused")
-	void stopWalk() throws CorruptObjectException {
+	void stopWalk() throws IOException {
 		for (AbstractTreeIterator t : trees) {
 			t.stopWalk();
 		}

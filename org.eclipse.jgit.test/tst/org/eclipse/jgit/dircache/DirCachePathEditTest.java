@@ -43,13 +43,11 @@
 package org.eclipse.jgit.dircache;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
-import org.eclipse.jgit.errors.DirCacheNameConflictException;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.junit.Test;
@@ -157,47 +155,61 @@ public class DirCachePathEditTest {
 	}
 
 	@Test
-	public void testFileOverlapsTree() throws Exception {
+	public void testFileReplacesTree() throws Exception {
 		DirCache dc = DirCache.newInCore();
 		DirCacheEditor editor = dc.editor();
 		editor.add(new AddEdit("a"));
-		editor.add(new AddEdit("a/b"));
-		try {
-			editor.finish();
-			fail("Expected DirCacheNameConflictException to be thrown");
-		} catch (DirCacheNameConflictException e) {
-			assertEquals("a a/b", e.getMessage());
-			assertEquals("a", e.getPath1());
-			assertEquals("a/b", e.getPath2());
-		}
+		editor.add(new AddEdit("b/c"));
+		editor.add(new AddEdit("b/d"));
+		editor.add(new AddEdit("e"));
+		editor.finish();
 
+		editor = dc.editor();
+		editor.add(new AddEdit("b"));
+		editor.finish();
+
+		assertEquals(3, dc.getEntryCount());
+		assertEquals("a", dc.getEntry(0).getPathString());
+		assertEquals("b", dc.getEntry(1).getPathString());
+		assertEquals("e", dc.getEntry(2).getPathString());
+
+		dc.clear();
 		editor = dc.editor();
 		editor.add(new AddEdit("A.c"));
 		editor.add(new AddEdit("A/c"));
 		editor.add(new AddEdit("A0c"));
-		editor.add(new AddEdit("A"));
-		try {
-			editor.finish();
-			fail("Expected DirCacheNameConflictException to be thrown");
-		} catch (DirCacheNameConflictException e) {
-			assertEquals("A A/c", e.getMessage());
-			assertEquals("A", e.getPath1());
-			assertEquals("A/c", e.getPath2());
-		}
+		editor.finish();
 
 		editor = dc.editor();
-		editor.add(new AddEdit("A.c"));
-		editor.add(new AddEdit("A/b/c/d"));
-		editor.add(new AddEdit("A/b/c"));
-		editor.add(new AddEdit("A0c"));
-		try {
-			editor.finish();
-			fail("Expected DirCacheNameConflictException to be thrown");
-		} catch (DirCacheNameConflictException e) {
-			assertEquals("A/b/c A/b/c/d", e.getMessage());
-			assertEquals("A/b/c", e.getPath1());
-			assertEquals("A/b/c/d", e.getPath2());
-		}
+		editor.add(new AddEdit("A"));
+		editor.finish();
+		assertEquals(3, dc.getEntryCount());
+		assertEquals("A", dc.getEntry(0).getPathString());
+		assertEquals("A.c", dc.getEntry(1).getPathString());
+		assertEquals("A0c", dc.getEntry(2).getPathString());
+	}
+
+	@Test
+	public void testTreeReplacesFile() throws Exception {
+		DirCache dc = DirCache.newInCore();
+		DirCacheEditor editor = dc.editor();
+		editor.add(new AddEdit("a"));
+		editor.add(new AddEdit("ab"));
+		editor.add(new AddEdit("b"));
+		editor.add(new AddEdit("e"));
+		editor.finish();
+
+		editor = dc.editor();
+		editor.add(new AddEdit("b/c/d/f"));
+		editor.add(new AddEdit("b/g/h/i"));
+		editor.finish();
+
+		assertEquals(5, dc.getEntryCount());
+		assertEquals("a", dc.getEntry(0).getPathString());
+		assertEquals("ab", dc.getEntry(1).getPathString());
+		assertEquals("b/c/d/f", dc.getEntry(2).getPathString());
+		assertEquals("b/g/h/i", dc.getEntry(3).getPathString());
+		assertEquals("e", dc.getEntry(4).getPathString());
 	}
 
 	private static DirCacheEntry createEntry(String path, int stage) {
