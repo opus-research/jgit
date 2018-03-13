@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,63 +40,48 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+package org.eclipse.jgit.notes;
 
-import java.io.File;
 import java.io.IOException;
 
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.eclipse.jgit.util.FileUtils;
-import org.junit.Before;
-import org.junit.Test;
+import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.ObjectReader;
 
-public class InitCommandTest extends RepositoryTestCase {
+/**
+ * Three-way note merge operation.
+ * <p>
+ * This operation takes three versions of a note: base, ours and theirs,
+ * performs the three-way merge and returns the merge result.
+ */
+public interface NoteMerger {
 
-	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
-	}
-
-	@Test
-	public void testInitRepository() {
-		try {
-			File directory = createTempDirectory("testInitRepository");
-			InitCommand command = new InitCommand();
-			command.setDirectory(directory);
-			Repository repository = command.call().getRepository();
-			assertNotNull(repository);
-		} catch (Exception e) {
-			fail(e.getMessage());
-		}
-	}
-
-	@Test
-	public void testInitBareRepository() {
-		try {
-			File directory = createTempDirectory("testInitBareRepository");
-			InitCommand command = new InitCommand();
-			command.setDirectory(directory);
-			command.setBare(true);
-			Repository repository = command.call().getRepository();
-			assertNotNull(repository);
-			assertTrue(repository.isBare());
-		} catch (Exception e) {
-			fail(e.getMessage());
-		}
-	}
-
-	public static File createTempDirectory(String name) throws IOException {
-		final File temp;
-		temp = File.createTempFile(name, Long.toString(System.nanoTime()));
-		FileUtils.delete(temp);
-		FileUtils.mkdir(temp);
-		return temp;
-	}
-
+	/**
+	 * Merges the conflicting note changes.
+	 * <p>
+	 * base, ours and their are all notes on the same object.
+	 *
+	 * @param base
+	 *            version of the Note
+	 * @param ours
+	 *            version of the Note
+	 * @param their
+	 *            version of the Note
+	 * @param reader
+	 *            the object reader that must be used to read Git objects
+	 * @param inserter
+	 *            the object inserter that must be used to insert Git objects
+	 * @return the merge result
+	 * @throws NotesMergeConflictException
+	 *             in case there was a merge conflict which this note merger
+	 *             couldn't resolve
+	 * @throws IOException
+	 *             in case the reader or the inserter would throw an IOException
+	 *             the implementor will most likely want to propagate it as it
+	 *             can't do much to recover from it
+	 */
+	Note merge(Note base, Note ours, Note their, ObjectReader reader,
+			ObjectInserter inserter) throws NotesMergeConflictException,
+			IOException;
 }
+

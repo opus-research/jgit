@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,63 +40,50 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+package org.eclipse.jgit.notes;
 
-import java.io.File;
 import java.io.IOException;
 
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.eclipse.jgit.util.FileUtils;
-import org.junit.Before;
-import org.junit.Test;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.ObjectLoader;
+import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.util.io.UnionInputStream;
 
-public class InitCommandTest extends RepositoryTestCase {
+/**
+ * Default implementation of the {@link NoteMerger}.
+ * <p>
+ * If ours and theirs are both non-null, which means they are either both edits
+ * or both adds, then this merger will simply join the content of ours and
+ * theirs (in that order) and return that as the merge result.
+ * <p>
+ * If one or ours/theirs is non-null and the other one is null then the non-null
+ * value is returned as the merge result. This means that an edit/delete
+ * conflict is resolved by keeping the edit version.
+ * <p>
+ * If both ours and theirs are null then the result of the merge is also null.
+ */
+public class DefaultNoteMerger implements NoteMerger {
 
-	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
+	public Note merge(Note base, Note ours, Note theirs, ObjectReader reader,
+			ObjectInserter inserter) throws IOException {
+		if (ours == null)
+			return theirs;
+
+		if (theirs == null)
+			return ours;
+
+		if (ours.getData().equals(theirs.getData()))
+			return ours;
+
+		ObjectLoader lo = reader.open(ours.getData());
+		ObjectLoader lt = reader.open(theirs.getData());
+		UnionInputStream union = new UnionInputStream(lo.openStream(),
+				lt.openStream());
+		ObjectId noteData = inserter.insert(Constants.OBJ_BLOB,
+				lo.getSize() + lt.getSize(), union);
+		return new Note(ours, noteData);
 	}
-
-	@Test
-	public void testInitRepository() {
-		try {
-			File directory = createTempDirectory("testInitRepository");
-			InitCommand command = new InitCommand();
-			command.setDirectory(directory);
-			Repository repository = command.call().getRepository();
-			assertNotNull(repository);
-		} catch (Exception e) {
-			fail(e.getMessage());
-		}
-	}
-
-	@Test
-	public void testInitBareRepository() {
-		try {
-			File directory = createTempDirectory("testInitBareRepository");
-			InitCommand command = new InitCommand();
-			command.setDirectory(directory);
-			command.setBare(true);
-			Repository repository = command.call().getRepository();
-			assertNotNull(repository);
-			assertTrue(repository.isBare());
-		} catch (Exception e) {
-			fail(e.getMessage());
-		}
-	}
-
-	public static File createTempDirectory(String name) throws IOException {
-		final File temp;
-		temp = File.createTempFile(name, Long.toString(System.nanoTime()));
-		FileUtils.delete(temp);
-		FileUtils.mkdir(temp);
-		return temp;
-	}
-
 }

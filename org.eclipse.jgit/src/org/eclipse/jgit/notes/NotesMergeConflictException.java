@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,63 +40,71 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+package org.eclipse.jgit.notes;
 
-import java.io.File;
 import java.io.IOException;
+import java.text.MessageFormat;
 
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.eclipse.jgit.util.FileUtils;
-import org.junit.Before;
-import org.junit.Test;
+import org.eclipse.jgit.JGitText;
 
-public class InitCommandTest extends RepositoryTestCase {
+/**
+ * This exception will be thrown from the {@link NoteMerger} when a conflict on
+ * Notes content is found during merge.
+ */
+public class NotesMergeConflictException extends IOException {
+	private static final long serialVersionUID = 1L;
 
-	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
+	/**
+	 * Construct a NotesMergeConflictException for the specified base, ours and
+	 * theirs note versions.
+	 *
+	 * @param base
+	 *            note version
+	 * @param ours
+	 *            note version
+	 * @param theirs
+	 *            note version
+	 */
+	public NotesMergeConflictException(Note base, Note ours, Note theirs) {
+		super(MessageFormat.format(JGitText.get().mergeConflictOnNotes,
+				noteOn(base, ours, theirs), noteData(base), noteData(ours),
+				noteData(theirs)));
 	}
 
-	@Test
-	public void testInitRepository() {
-		try {
-			File directory = createTempDirectory("testInitRepository");
-			InitCommand command = new InitCommand();
-			command.setDirectory(directory);
-			Repository repository = command.call().getRepository();
-			assertNotNull(repository);
-		} catch (Exception e) {
-			fail(e.getMessage());
-		}
+	/**
+	 * Constructs a NotesMergeConflictException for the specified base, ours and
+	 * theirs versions of the root note tree.
+	 *
+	 * @param base
+	 *            version of the root note tree
+	 * @param ours
+	 *            version of the root note tree
+	 * @param theirs
+	 *            version of the root note tree
+	 */
+	public NotesMergeConflictException(NonNoteEntry base, NonNoteEntry ours,
+			NonNoteEntry theirs) {
+		super(MessageFormat.format(
+				JGitText.get().mergeConflictOnNonNoteEntries, name(base),
+				name(ours), name(theirs)));
 	}
 
-	@Test
-	public void testInitBareRepository() {
-		try {
-			File directory = createTempDirectory("testInitBareRepository");
-			InitCommand command = new InitCommand();
-			command.setDirectory(directory);
-			command.setBare(true);
-			Repository repository = command.call().getRepository();
-			assertNotNull(repository);
-			assertTrue(repository.isBare());
-		} catch (Exception e) {
-			fail(e.getMessage());
-		}
+	private static String noteOn(Note base, Note ours, Note theirs) {
+		if (base != null)
+			return base.name();
+		if (ours != null)
+			return ours.name();
+		return theirs.name();
 	}
 
-	public static File createTempDirectory(String name) throws IOException {
-		final File temp;
-		temp = File.createTempFile(name, Long.toString(System.nanoTime()));
-		FileUtils.delete(temp);
-		FileUtils.mkdir(temp);
-		return temp;
+	private static String noteData(Note n) {
+		if (n != null)
+			return n.getData().name();
+		return "";
 	}
 
+	private static String name(NonNoteEntry e) {
+		return e != null ? e.name() : "";
+	}
 }
