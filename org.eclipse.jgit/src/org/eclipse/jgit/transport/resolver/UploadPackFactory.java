@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Robin Rosenberg
+ * Copyright (C) 2009-2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,63 +40,43 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util;
 
-import java.io.File;
-import java.nio.charset.Charset;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+package org.eclipse.jgit.transport.resolver;
 
-abstract class FS_POSIX extends FS {
-	@Override
-	public File gitPrefix() {
-		String path = SystemReader.getInstance().getenv("PATH");
-		File gitExe = searchPath(path, "git");
-		if (gitExe != null)
-			return gitExe.getParentFile().getParentFile();
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.UploadPack;
 
-		if (isMacOS()) {
-			// On MacOSX, PATH is shorter when Eclipse is launched from the
-			// Finder than from a terminal. Therefore try to launch bash as a
-			// login shell and search using that.
-			//
-			String w = readPipe(userHome(), //
-					new String[] { "bash", "--login", "-c", "which git" }, //
-					Charset.defaultCharset().name());
-			if (w == null || w.length() == 0)
-				return null;
-			File parentFile = new File(w).getParentFile();
-			if (parentFile == null)
-				return null;
-			return parentFile.getParentFile();
+/**
+ * Create and configure {@link UploadPack} service instance.
+ *
+ * @param <C>
+ *            the connection type
+ */
+public interface UploadPackFactory<C> {
+	/** A factory disabling the UploadPack service for all repositories. */
+	public static final UploadPackFactory<?> DISABLED = new UploadPackFactory<Object>() {
+		public UploadPack create(Object req, Repository db)
+				throws ServiceNotEnabledException {
+			throw new ServiceNotEnabledException();
 		}
+	};
 
-		return null;
-	}
-
-	@Override
-	public ProcessBuilder runInShell(String cmd, String[] args) {
-		List<String> argv = new ArrayList<String>(4 + args.length);
-		argv.add("sh");
-		argv.add("-c");
-		argv.add(cmd + " \"$@\"");
-		argv.add(cmd);
-		argv.addAll(Arrays.asList(args));
-		ProcessBuilder proc = new ProcessBuilder();
-		proc.command(argv);
-		return proc;
-	}
-
-	private static boolean isMacOS() {
-		final String osDotName = AccessController
-				.doPrivileged(new PrivilegedAction<String>() {
-					public String run() {
-						return System.getProperty("os.name");
-					}
-				});
-		return "Mac OS X".equals(osDotName);
-	}
+	/**
+	 * Create and configure a new UploadPack instance for a repository.
+	 *
+	 * @param req
+	 *            current request, in case information from the request may help
+	 *            configure the UploadPack instance.
+	 * @param db
+	 *            the repository the upload would read from.
+	 * @return the newly configured UploadPack instance, must not be null.
+	 * @throws ServiceNotEnabledException
+	 *             this factory refuses to create the instance because it is not
+	 *             allowed on the target repository, by any user.
+	 * @throws ServiceNotAuthorizedException
+	 *             this factory refuses to create the instance for this HTTP
+	 *             request and repository, such as due to a permission error.
+	 */
+	UploadPack create(C req, Repository db) throws ServiceNotEnabledException,
+			ServiceNotAuthorizedException;
 }

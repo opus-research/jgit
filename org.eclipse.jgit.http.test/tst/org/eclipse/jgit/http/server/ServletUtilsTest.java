@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,28 +40,25 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
 
-import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.lib.RepositoryTestCase;
+package org.eclipse.jgit.http.server;
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
 import org.junit.Test;
 
-public class ResetCommandTest extends RepositoryTestCase {
-
+public class ServletUtilsTest {
 	@Test
-	public void testHardReset() throws JGitInternalException {
-		// TODO
+	public void testAcceptGzip() {
+		assertFalse(ServletUtils.acceptsGzipEncoding((String) null));
+		assertFalse(ServletUtils.acceptsGzipEncoding(""));
+
+		assertTrue(ServletUtils.acceptsGzipEncoding("gzip"));
+		assertTrue(ServletUtils.acceptsGzipEncoding("deflate,gzip"));
+		assertTrue(ServletUtils.acceptsGzipEncoding("gzip,deflate"));
+
+		assertFalse(ServletUtils.acceptsGzipEncoding("gzip(proxy)"));
+		assertFalse(ServletUtils.acceptsGzipEncoding("proxy-gzip"));
 	}
-
-	@Test
-	public void testSoftReset() throws JGitInternalException {
-		// TODO
-	}
-
-	@Test
-	public void testMixedReset() throws JGitInternalException {
-		// TODO
-	}
-
-
 }

@@ -41,9 +41,9 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.http.server.resolver;
+package org.eclipse.jgit.transport.resolver;
 
-import org.eclipse.jgit.http.server.HttpServerText;
+import org.eclipse.jgit.JGitText;
 
 /** Indicates the request service is not enabled on a repository. */
 public class ServiceNotEnabledException extends Exception {
@@ -51,6 +51,6 @@ public class ServiceNotEnabledException extends Exception {
 
 	/** Indicates the request service is not available. */
 	public ServiceNotEnabledException() {
-		super(HttpServerText.get().serviceNotEnabled);
+		super(JGitText.get().serviceNotEnabledNoName);
 	}
 }
