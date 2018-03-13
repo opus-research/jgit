@@ -51,7 +51,6 @@ import java.io.IOException;
 import java.util.Iterator;
 
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
 
 /**
@@ -85,7 +84,7 @@ public abstract class PackIndex implements Iterable<PackIndex.MutableEntry> {
 		final FileInputStream fd = new FileInputStream(idxFile);
 		try {
 			final byte[] hdr = new byte[8];
-			IO.readFully(fd, hdr, 0, hdr.length);
+			NB.readFully(fd, hdr, 0, hdr.length);
 			if (isTOC(hdr)) {
 				final int v = NB.decodeInt32(hdr, 4);
 				switch (v) {

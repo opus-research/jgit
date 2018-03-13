@@ -247,7 +247,7 @@ public class TemporaryBuffer extends OutputStream {
 		} else {
 			final FileInputStream in = new FileInputStream(onDiskFile);
 			try {
-				IO.readFully(in, out, 0, (int) len);
+				NB.readFully(in, out, 0, (int) len);
 			} finally {
 				in.close();
 			}
