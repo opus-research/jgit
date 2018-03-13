@@ -67,7 +67,7 @@ import org.kohsuke.args4j.Option;
 
 @Command(usage = "usage_RebuildRefTree")
 class RebuildRefTree extends TextBuiltin {
-	@Option(name = "--enable", usage = "set extensions.refsStorage = reftree")
+	@Option(name = "--enable", usage = "usage_RebuildRefTreeEnable")
 	boolean enable;
 
 	private String txnNamespace;
@@ -154,7 +154,7 @@ class RebuildRefTree extends TextBuiltin {
 		}
 
 		for (Ref r : refdb.getRefs(RefDatabase.ALL).values()) {
-			if (r.getName().equals(txnCommitted)
+			if (r.getName().equals(txnCommitted) || r.getName().equals(HEAD)
 					|| r.getName().startsWith(txnNamespace)) {
 				continue;
 			}
