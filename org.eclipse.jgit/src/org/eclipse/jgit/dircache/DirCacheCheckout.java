@@ -280,9 +280,8 @@ public class DirCacheCheckout {
 
 		addTree(walk, headCommitTree);
 		addTree(walk, mergeCommitTree);
-		int dciPos = walk.addTree(new DirCacheBuildIterator(builder));
+		walk.addTree(new DirCacheBuildIterator(builder));
 		walk.addTree(workingTree);
-		workingTree.setDirCacheIterator(walk, dciPos);
 
 		while (walk.next()) {
 			processEntry(walk.getTree(0, CanonicalTreeParser.class),
@@ -321,9 +320,8 @@ public class DirCacheCheckout {
 
 		walk = new NameConflictTreeWalk(repo);
 		addTree(walk, mergeCommitTree);
-		int dciPos = walk.addTree(new DirCacheBuildIterator(builder));
+		walk.addTree(new DirCacheBuildIterator(builder));
 		walk.addTree(workingTree);
-		workingTree.setDirCacheIterator(walk, dciPos);
 
 		while (walk.next()) {
 			processEntry(walk.getTree(0, CanonicalTreeParser.class),
@@ -354,16 +352,8 @@ public class DirCacheCheckout {
 				// The index entry is missing
 				if (f != null && !FileMode.TREE.equals(f.getEntryFileMode())
 						&& !f.isEntryIgnored()) {
-					if (failOnConflict) {
-						// don't overwrite an untracked and not ignored file
-						conflicts.add(walk.getPathString());
-					} else {
-						// failOnConflict is false. Putting something to conflicts
-						// would mean we delete it. Instead we want the mergeCommit
-						// content to be checked out.
-						update(m.getEntryPathString(), m.getEntryObjectId(),
-								m.getEntryFileMode());
-					}
+					// don't overwrite an untracked and not ignored file
+					conflicts.add(walk.getPathString());
 				} else
 					update(m.getEntryPathString(), m.getEntryObjectId(),
 						m.getEntryFileMode());
@@ -398,9 +388,6 @@ public class DirCacheCheckout {
 			if (f != null) {
 				// There is a file/folder for that path in the working tree
 				if (walk.isDirectoryFileConflict()) {
-					// We put it in conflicts. Even if failOnConflict is false
-					// this would cause the path to be deleted. Thats exactly what
-					// we want in this situation
 					conflicts.add(walk.getPathString());
 				} else {
 					// No file/folder conflict exists. All entries are files or
@@ -1106,10 +1093,8 @@ public class DirCacheCheckout {
 	private boolean isModifiedSubtree_IndexWorkingtree(String path)
 			throws CorruptObjectException, IOException {
 		try (NameConflictTreeWalk tw = new NameConflictTreeWalk(repo)) {
-			int dciPos = tw.addTree(new DirCacheIterator(dc));
-			FileTreeIterator fti = new FileTreeIterator(repo);
-			tw.addTree(fti);
-			fti.setDirCacheIterator(tw, dciPos);
+			tw.addTree(new DirCacheIterator(dc));
+			tw.addTree(new FileTreeIterator(repo));
 			tw.setRecursive(true);
 			tw.setFilter(PathFilter.create(path));
 			DirCacheIterator dcIt;
