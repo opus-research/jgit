@@ -49,10 +49,11 @@ import java.io.InputStream;
 import org.eclipse.jgit.diff.RawText;
 
 /**
- * An input stream which canonicalizes EOLs bytes on the fly to '\n', unless the
- * first 8000 bytes indicate the stream is binary.
+ * An input stream which canonicalizes EOLs bytes on the fly to '\n'.
  *
- * Note: Make sure to apply this InputStream only to text files!
+ * Optionally, a binary check on the first 8000 bytes is performed
+ * and in case of binary files, canonicalization is turned off
+ * (for the complete file).
  */
 public class EolCanonicalizingInputStream extends InputStream {
 	private final byte[] single = new byte[1];
@@ -67,20 +68,20 @@ public class EolCanonicalizingInputStream extends InputStream {
 
 	private boolean isBinary;
 
-	private boolean modeDetected;
-
-	private long srcBytes = 0;
-
-	private long dstBytes = 0;
+	private boolean detectBinary;
 
 	/**
 	 * Creates a new InputStream, wrapping the specified stream
 	 *
 	 * @param in
 	 *            raw input stream
+	 * @param detectBinary
+	 *            whether binaries should be detected
+	 * @since 2.0
 	 */
-	public EolCanonicalizingInputStream(InputStream in) {
+	public EolCanonicalizingInputStream(InputStream in, boolean detectBinary) {
 		this.in = in;
+		this.detectBinary = detectBinary;
 	}
 
 	@Override
@@ -124,12 +125,7 @@ public class EolCanonicalizingInputStream extends InputStream {
 				bs[off++] = '\r';
 		}
 
-		if (startOff == off)
-			return -1;
-
-		int read = off - startOff;
-		dstBytes += read;
-		return read;
+		return startOff == off ? -1 : off - startOff;
 	}
 
 	@Override
@@ -137,31 +133,14 @@ public class EolCanonicalizingInputStream extends InputStream {
 		in.close();
 	}
 
-	/**
-	 * @return number of bytes sent to this stream
-	 *         <em>This counter is not reliable until the stream has been closed or flushed</emA>
-	 */
-	public long getSourceLength() {
-		return srcBytes;
-	}
-
-	/**
-	 * @return number of bytes sent to the underlying stream.
-	 *         <em>This counter is not reliable until the stream has been closed or flused</emA>
-	 */
-	public long getDestinationLength() {
-		return dstBytes;
-	}
-
 	private boolean fillBuffer() throws IOException {
 		cnt = in.read(buf, 0, buf.length);
 		if (cnt < 1)
 			return false;
-		if (!modeDetected) {
+		if (detectBinary) {
 			isBinary = RawText.isBinary(buf, cnt);
-			modeDetected = true;
+			detectBinary = false;
 		}
-		srcBytes += cnt;
 		ptr = 0;
 		return true;
 	}

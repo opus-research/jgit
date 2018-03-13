@@ -48,7 +48,6 @@
 package org.eclipse.jgit.transport;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -59,14 +58,15 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryCache;
 import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.util.io.MessageWriter;
+import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 import org.eclipse.jgit.util.io.StreamCopyThread;
 
 /**
@@ -118,10 +118,10 @@ class TransportLocal extends Transport implements PackTransport {
 		@Override
 		public Transport open(URIish uri, Repository local, String remoteName)
 				throws NoRemoteRepositoryException {
+			File localPath = local.isBare() ? local.getDirectory() : local.getWorkTree();
+			File path = local.getFS().resolve(localPath, uri.getPath());
 			// If the reference is to a local file, C Git behavior says
 			// assume this is a bundle, since repositories are directories.
-			//
-			File path = local.getFS().resolve(new File("."), uri.getPath());
 			if (path.isFile())
 				return new TransportBundleFile(local, uri, path);
 
@@ -301,7 +301,7 @@ class TransportLocal extends Transport implements PackTransport {
 			OutputStream upOut = uploadPack.getOutputStream();
 
 			upIn = new BufferedInputStream(upIn);
-			upOut = new BufferedOutputStream(upOut);
+			upOut = new SafeBufferedOutputStream(upOut);
 
 			init(upIn, upOut);
 			readAdvertisedRefs();
@@ -431,7 +431,7 @@ class TransportLocal extends Transport implements PackTransport {
 			OutputStream rpOut = receivePack.getOutputStream();
 
 			rpIn = new BufferedInputStream(rpIn);
-			rpOut = new BufferedOutputStream(rpOut);
+			rpOut = new SafeBufferedOutputStream(rpOut);
 
 			init(rpIn, rpOut);
 			readAdvertisedRefs();
