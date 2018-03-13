@@ -106,7 +106,7 @@ class Merge extends TextBuiltin {
 		final ObjectId src = db.resolve(ref + "^{commit}"); //$NON-NLS-1$
 		if (src == null)
 			throw die(MessageFormat.format(
-					CLIText.get().notSomethingWeCanMerge, ref));
+					CLIText.get().refDoesNotExistOrNoCommit, ref));
 
 		Ref oldHead = db.getRef(Constants.HEAD);
 		Git git = new Git(db);
