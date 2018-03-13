@@ -55,7 +55,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
-import com.googlecode.javaewah.EWAHCompressedBitmap;
+import javaewah.EWAHCompressedBitmap;
 
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
