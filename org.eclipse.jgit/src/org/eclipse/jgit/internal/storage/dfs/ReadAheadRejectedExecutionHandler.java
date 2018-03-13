@@ -41,50 +41,21 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.transport;
+package org.eclipse.jgit.internal.storage.dfs;
 
-import java.util.List;
+import java.util.concurrent.RejectedExecutionHandler;
+import java.util.concurrent.ThreadPoolExecutor;
 
-import org.eclipse.jgit.internal.storage.pack.PackWriter;
+/** This handler aborts a {@link ReadAheadTask} when the queue is full. */
+final class ReadAheadRejectedExecutionHandler implements
+		RejectedExecutionHandler {
+	static final ReadAheadRejectedExecutionHandler INSTANCE = new ReadAheadRejectedExecutionHandler();
 
-/**
- * {@link UploadPackLogger} that delegates to a list of other loggers.
- * <p>
- * loggers are run in the order passed to the constructor.
- */
-public class UploadPackLoggerChain implements UploadPackLogger {
-	private final UploadPackLogger[] loggers;
-	private final int count;
-
-	/**
-	 * Create a new logger chaining the given loggers together.
-	 *
-	 * @param loggers
-	 *            loggers to execute, in order.
-	 * @return a new logger chain of the given loggers.
-	 */
-	public static UploadPackLogger newChain(
-			List<? extends UploadPackLogger> loggers) {
-		UploadPackLogger[] newLoggers = new UploadPackLogger[loggers.size()];
-		int i = 0;
-		for (UploadPackLogger logger : loggers)
-			if (logger != UploadPackLogger.NULL)
-				newLoggers[i++] = logger;
-		if (i == 0)
-			return UploadPackLogger.NULL;
-		else if (i == 1)
-			return newLoggers[0];
-		else
-			return new UploadPackLoggerChain(newLoggers, i);
+	private ReadAheadRejectedExecutionHandler() {
+		// Singleton, do not create more instances.
 	}
 
-	public void onPackStatistics(PackWriter.Statistics stats) {
-		for (int i = 0; i < count; i++)
-			loggers[i].onPackStatistics(stats);
-	}
-
-	private UploadPackLoggerChain(UploadPackLogger[] loggers, int count) {
-		this.loggers = loggers;
-		this.count = count;
+	public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
+		((ReadAheadTask.TaskFuture) r).task.abort();
 	}
 }

@@ -1269,9 +1269,7 @@ public abstract class Repository {
 	 * @param refName
 	 * @return a {@link ReflogReader} for the supplied refname, or null if the
 	 *         named ref does not exist.
-	 * @throws IOException
-	 *             the ref could not be accessed.
-	 * @since 3.0
+	 * @throws IOException the ref could not be accessed.
 	 */
 	public abstract ReflogReader getReflogReader(String refName)
 			throws IOException;

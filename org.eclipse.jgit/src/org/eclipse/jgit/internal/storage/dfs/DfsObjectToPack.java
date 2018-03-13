@@ -49,10 +49,11 @@ import org.eclipse.jgit.lib.AnyObjectId;
 
 /** {@link ObjectToPack} for {@link DfsObjDatabase}. */
 class DfsObjectToPack extends ObjectToPack {
-	private static final int FLAG_FOUND = 1 << 0;
-
 	/** Pack to reuse compressed data from, otherwise null. */
 	DfsPackFile pack;
+
+	/** Position of the pack in the reader's pack list. */
+	int packIndex;
 
 	/** Offset of the object's header in {@link #pack}. */
 	long offset;
@@ -62,14 +63,6 @@ class DfsObjectToPack extends ObjectToPack {
 
 	DfsObjectToPack(AnyObjectId src, final int type) {
 		super(src, type);
-	}
-
-	final boolean isFound() {
-		return isExtendedFlag(FLAG_FOUND);
-	}
-
-	final void setFound() {
-		setExtendedFlag(FLAG_FOUND);
 	}
 
 	@Override
@@ -82,6 +75,7 @@ class DfsObjectToPack extends ObjectToPack {
 	public void select(StoredObjectRepresentation ref) {
 		DfsObjectRepresentation ptr = (DfsObjectRepresentation) ref;
 		this.pack = ptr.pack;
+		this.packIndex = ptr.packIndex;
 		this.offset = ptr.offset;
 		this.length = ptr.length;
 	}

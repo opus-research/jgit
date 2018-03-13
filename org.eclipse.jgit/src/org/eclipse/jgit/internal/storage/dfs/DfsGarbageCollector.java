@@ -273,7 +273,6 @@ public class DfsGarbageCollector {
 
 		PackWriter pw = newPackWriter();
 		try {
-			pw.setTagTargets(tagTargets);
 			pw.preparePack(pm, allHeads, Collections.<ObjectId> emptySet());
 			if (0 < pw.getObjectCount())
 				writePack(GC, pw, pm);
@@ -300,15 +299,7 @@ public class DfsGarbageCollector {
 
 	private void packGarbage(ProgressMonitor pm) throws IOException {
 		// TODO(sop) This is ugly. The garbage pack needs to be deleted.
-		PackConfig cfg = new PackConfig(packConfig);
-		cfg.setReuseDeltas(true);
-		cfg.setReuseObjects(true);
-		cfg.setDeltaCompress(false);
-		cfg.setBuildBitmaps(false);
-
-		PackWriter pw = new PackWriter(cfg, ctx);
-		pw.setDeltaBaseAsOffset(true);
-		pw.setReuseDeltaCommits(true);
+		PackWriter pw = newPackWriter();
 		try {
 			RevWalk pool = new RevWalk(ctx);
 			pm.beginTask("Finding garbage", objectsBefore());
@@ -354,6 +345,7 @@ public class DfsGarbageCollector {
 		PackWriter pw = new PackWriter(packConfig, ctx);
 		pw.setDeltaBaseAsOffset(true);
 		pw.setReuseDeltaCommits(false);
+		pw.setTagTargets(tagTargets);
 		return pw;
 	}
 
@@ -366,7 +358,6 @@ public class DfsGarbageCollector {
 		out = objdb.writeFile(pack, PACK);
 		try {
 			pw.writePack(pm, pm, out);
-			pack.addFileExt(PACK);
 		} finally {
 			out.close();
 		}
@@ -375,7 +366,6 @@ public class DfsGarbageCollector {
 		try {
 			CountingOutputStream cnt = new CountingOutputStream(out);
 			pw.writeIndex(cnt);
-			pack.addFileExt(INDEX);
 			pack.setFileSize(INDEX, cnt.getCount());
 			pack.setIndexVersion(pw.getIndexVersion());
 		} finally {
@@ -387,7 +377,6 @@ public class DfsGarbageCollector {
 			try {
 				CountingOutputStream cnt = new CountingOutputStream(out);
 				pw.writeBitmapIndex(cnt);
-				pack.addFileExt(BITMAP_INDEX);
 				pack.setFileSize(BITMAP_INDEX, cnt.getCount());
 			} finally {
 				out.close();
