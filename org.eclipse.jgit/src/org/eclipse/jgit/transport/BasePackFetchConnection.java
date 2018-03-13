@@ -464,12 +464,8 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		final PacketLineOut p = statelessRPC ? pckState : pckOut;
 		boolean first = true;
 		for (final Ref r : want) {
-			ObjectId objectId = r.getObjectId();
-			if (objectId == null) {
-				continue;
-			}
 			try {
-				if (walk.parseAny(objectId).has(REACHABLE)) {
+				if (walk.parseAny(r.getObjectId()).has(REACHABLE)) {
 					// We already have this object. Asking for it is
 					// not a very good idea.
 					//
@@ -482,7 +478,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 			final StringBuilder line = new StringBuilder(46);
 			line.append("want "); //$NON-NLS-1$
-			line.append(objectId.name());
+			line.append(r.getObjectId().name());
 			if (first) {
 				line.append(enableCapabilities());
 				first = false;
