@@ -73,8 +73,6 @@ public class AddCommand extends GitCommand<DirCache> {
 
 	private Collection<String> filepatterns;
 
-	private boolean update = false;
-
 	/**
 	 *
 	 * @param repo
@@ -121,8 +119,7 @@ public class AddCommand extends GitCommand<DirCache> {
 			final TreeWalk tw = new TreeWalk(repo);
 			tw.reset();
 			tw.addTree(new DirCacheBuildIterator(builder));
-			FileTreeIterator fileTreeIterator = new FileTreeIterator(
-					repo.getWorkDir(), repo.getFS());
+			FileTreeIterator fileTreeIterator = new FileTreeIterator(repo);
 			tw.addTree(fileTreeIterator);
 			tw.setRecursive(true);
 			tw.setFilter(PathFilterGroup.createFromStrings(filepatterns));
@@ -138,21 +135,19 @@ public class AddCommand extends GitCommand<DirCache> {
 				// this path, we however want to add only one
 				// new DirCacheEntry per path.
 				if (!(path.equals(lastAddedFile))) {
-					if (!(update && tw.getTree(0, DirCacheIterator.class) == null)) {
-						FileTreeIterator f = tw.getTree(1, FileTreeIterator.class);
-						if (f != null) { // the file exists
-							DirCacheEntry entry = new DirCacheEntry(path);
-							entry.setLength((int)f.getEntryLength());
-							entry.setLastModified(f.getEntryLastModified());
-							entry.setFileMode(f.getEntryFileMode());
-							entry.setObjectId(ow.writeBlob(file));
+					 FileTreeIterator f = tw.getTree(1, FileTreeIterator.class);
+					 if (f != null) { // the file exists
+						DirCacheEntry entry = new DirCacheEntry(path);
+						entry.setLength((int)f.getEntryLength());
+						entry.setLastModified(f.getEntryLastModified());
+						entry.setFileMode(f.getEntryFileMode());
+						entry.setObjectId(ow.writeBlob(file));
 
-							builder.add(entry);
-							lastAddedFile = path;
-						} else if (!update){
-							c = tw.getTree(0, DirCacheIterator.class);
-							builder.add(c.getDirCacheEntry());
-						}
+						builder.add(entry);
+						lastAddedFile = path;
+					} else {
+						c = tw.getTree(0, DirCacheIterator.class);
+						builder.add(c.getDirCacheEntry());
 					}
 				}
 			}
@@ -169,29 +164,4 @@ public class AddCommand extends GitCommand<DirCache> {
 		return dc;
 	}
 
-	/**
-	 * @param update
-	 *            If set to true, the command only matches {@code filepattern}
-	 *            against already tracked files in the index rather than the
-	 *            working tree. That means that it will never stage new files,
-	 *            but that it will stage modified new contents of tracked files
-	 *            and that it will remove files from the index if the
-	 *            corresponding files in the working tree have been removed.
-	 *            In contrast to the git command line a {@code filepattern} must
-	 *            exist also if update is set to true as there is no
-	 *            concept of a working directory here.
-	 *
-	 * @return {@code this}
-	 */
-	public AddCommand setUpdate(boolean update) {
-		this.update = update;
-		return this;
-	}
-
-	/**
-	 * @return is the parameter update is set
-	 */
-	public boolean isUpdate() {
-		return update;
-	}
 }
