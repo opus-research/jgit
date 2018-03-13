@@ -1,5 +1,4 @@
 /*
- * Copyright (C) 2009, Jonas Fonseca <fonseca@diku.dk>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -57,12 +56,13 @@ public class RevObjectList<E extends RevObject> extends AbstractList<E> {
 
 	static final int BLOCK_SIZE = 1 << BLOCK_SHIFT;
 
-	protected Block contents = new Block(0);
+	Block contents;
 
-	protected int size = 0;
+	int size;
 
 	/** Create an empty object list. */
 	public RevObjectList() {
+		clear();
 	}
 
 	public void add(final int index, final E element) {
@@ -113,7 +113,7 @@ public class RevObjectList<E extends RevObject> extends AbstractList<E> {
 		size = 0;
 	}
 
-	protected static class Block {
+	static class Block {
 		final Object[] contents = new Object[BLOCK_SIZE];
 
 		final int shift;
