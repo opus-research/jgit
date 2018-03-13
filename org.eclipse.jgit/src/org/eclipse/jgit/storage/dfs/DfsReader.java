@@ -444,31 +444,38 @@ final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 			return;
 		}
 
-		int objectCount = 0;
+		int packIndex = 0;
+		DfsPackFile packLast = packList[packIndex];
+
 		int updated = 0;
 		int posted = 0;
 		List<DfsObjectRepresentation> all = new BlockList<DfsObjectRepresentation>();
 		for (ObjectToPack otp : objects) {
-			boolean found = false;
-			for (int packIndex = 0; packIndex < packList.length; packIndex++) {
-				DfsPackFile pack = packList[packIndex];
-				long p = pack.findOffset(this, otp);
-				if (0 < p) {
-					DfsObjectRepresentation r = new DfsObjectRepresentation(otp);
-					r.pack = pack;
-					r.packIndex = packIndex;
-					r.offset = p;
-					all.add(r);
-					found = true;
+			long p = packLast.findOffset(this, otp);
+			if (p < 0) {
+				int skip = packIndex;
+				for (packIndex = 0; packIndex < packList.length; packIndex++) {
+					if (skip == packIndex)
+						continue;
+					packLast = packList[packIndex];
+					p = packLast.findOffset(this, otp);
+					if (0 < p)
+						break;
 				}
+				if (packIndex == packList.length)
+					throw new MissingObjectException(otp, otp.getType());
 			}
-			if (!found)
-				throw new MissingObjectException(otp, otp.getType());
+
+			DfsObjectRepresentation r = new DfsObjectRepresentation(otp);
+			r.pack = packLast;
+			r.packIndex = packIndex;
+			r.offset = p;
+			all.add(r);
+
 			if ((++updated & 1) == 1) {
 				monitor.update(1); // Update by 50%, the other 50% is below.
 				posted++;
 			}
-			objectCount++;
 		}
 		Collections.sort(all, REPRESENTATION_SORT);
 
@@ -477,7 +484,7 @@ final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 			for (DfsObjectRepresentation r : all) {
 				r.pack.representation(this, r);
 				packer.select(r.object, r);
-				if ((++updated & 1) == 1 && posted < objectCount) {
+				if ((++updated & 1) == 1) {
 					monitor.update(1);
 					posted++;
 				}
@@ -485,8 +492,8 @@ final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		} finally {
 			cancelReadAhead();
 		}
-		if (posted < objectCount)
-			monitor.update(objectCount - posted);
+		if (posted < all.size())
+			monitor.update(all.size() - posted);
 	}
 
 	public void copyObjectAsIs(PackOutputStream out, ObjectToPack otp,
@@ -547,14 +554,11 @@ final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		List<CachedPack> cached = new ArrayList<CachedPack>(packList.length);
 		for (DfsPackFile pack : packList) {
 			DfsPackDescription desc = pack.getPackDescription();
-			if (canBeCachedPack(desc))
-				cached.add(new DfsCachedPack(pack));
+			if (desc.getTips() == null || desc.getTips().isEmpty())
+				continue;
+			cached.add(new DfsCachedPack(pack));
 		}
 		return cached;
-	}
-
-	private static boolean canBeCachedPack(DfsPackDescription desc) {
-		return desc.getTips() != null && !desc.getTips().isEmpty();
 	}
 
 	public void copyPackAsIs(PackOutputStream out, CachedPack pack,
@@ -684,7 +688,7 @@ final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		for (;;) {
 			dstoff = block.inflate(inf, position, dstbuf, dstoff);
 
-			if (headerOnly && dstoff == dstbuf.length)
+			if (headerOnly & dstoff == dstbuf.length)
 				return dstoff;
 			if (inf.needsInput()) {
 				position += block.remaining(position);
