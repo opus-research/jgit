@@ -484,7 +484,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String sourceIsNotAWildcard;
 	/***/ public String sourceRefDoesntResolveToAnyObject;
 	/***/ public String sourceRefNotSpecifiedForRefspec;
-	/***/ public String squashCommitNotUpdatingHEAD;
 	/***/ public String staleRevFlagsOn;
 	/***/ public String startingReadStageWithoutWrittenRequestDataPendingIsNotSupported;
 	/***/ public String stashApplyFailed;
@@ -511,7 +510,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String transportExceptionInvalid;
 	/***/ public String transportExceptionMissingAssumed;
 	/***/ public String transportExceptionReadRef;
-	/***/ public String transportNeedsRepository;
 	/***/ public String transportProtoAmazonS3;
 	/***/ public String transportProtoBundleFile;
 	/***/ public String transportProtoFTP;
