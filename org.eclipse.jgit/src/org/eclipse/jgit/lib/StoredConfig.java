@@ -87,9 +87,4 @@ public abstract class StoredConfig extends Config {
 	 *             the configuration could not be written.
 	 */
 	public abstract void save() throws IOException;
-
-	@Override
-	public void clear() {
-		super.clear();
-	}
 }
