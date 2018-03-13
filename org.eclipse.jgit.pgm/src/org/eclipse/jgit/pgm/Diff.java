@@ -45,12 +45,11 @@
 
 package org.eclipse.jgit.pgm;
 
-import static java.lang.Integer.valueOf;
 import static org.eclipse.jgit.lib.Constants.HEAD;
 import static org.eclipse.jgit.lib.Constants.OBJECT_ID_STRING_LENGTH;
 
 import java.io.BufferedOutputStream;
-import java.io.PrintWriter;
+import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -70,13 +69,14 @@ import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
+import org.eclipse.jgit.util.io.ThrowingPrintWriter;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 
 @Command(common = true, usage = "usage_ShowDiffs")
 class Diff extends TextBuiltin {
 	private final DiffFormatter diffFmt = new DiffFormatter( //
-			new BufferedOutputStream(System.out));
+			new BufferedOutputStream(outs));
 
 	@Argument(index = 0, metaVar = "metaVar_treeish")
 	private AbstractTreeIterator oldTree;
@@ -203,8 +203,8 @@ class Diff extends TextBuiltin {
 			}
 
 			if (showNameAndStatusOnly) {
-				nameStatus(out, diffFmt.scan(oldTree, newTree));
-				out.flush();
+				nameStatus(outw, diffFmt.scan(oldTree, newTree));
+				outw.flush();
 
 			} else {
 				diffFmt.format(oldTree, newTree);
@@ -215,7 +215,8 @@ class Diff extends TextBuiltin {
 		}
 	}
 
-	static void nameStatus(PrintWriter out, List<DiffEntry> files) {
+	static void nameStatus(ThrowingPrintWriter out, List<DiffEntry> files)
+			throws IOException {
 		for (DiffEntry ent : files) {
 			switch (ent.getChangeType()) {
 			case ADD:
@@ -228,12 +229,12 @@ class Diff extends TextBuiltin {
 				out.println("M\t" + ent.getNewPath());
 				break;
 			case COPY:
-				out.format("C%1$03d\t%2$s\t%3$s", valueOf(ent.getScore()), //
+				out.format("C%1$03d\t%2$s\t%3$s", ent.getScore(), //
 						ent.getOldPath(), ent.getNewPath());
 				out.println();
 				break;
 			case RENAME:
-				out.format("R%1$03d\t%2$s\t%3$s", valueOf(ent.getScore()), //
+				out.format("R%1$03d\t%2$s\t%3$s", ent.getScore(), //
 						ent.getOldPath(), ent.getNewPath());
 				out.println();
 				break;

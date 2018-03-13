@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Robin Rosenberg
+ * Copyright (C) 2012, Christian Halstrick
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,19 +40,60 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.junit;
+package org.eclipse.jgit.util;
 
-import static java.lang.Boolean.valueOf;
+import static org.junit.Assert.fail;
 
-public class Assert {
+import java.text.ParseException;
+import java.util.Calendar;
+import java.util.GregorianCalendar;
 
-	public static void assertEquals(boolean expect, boolean actual) {
-		org.junit.Assert.assertEquals(valueOf(expect), valueOf(actual));
+import org.junit.experimental.theories.DataPoints;
+import org.junit.experimental.theories.Theories;
+import org.junit.experimental.theories.Theory;
+import org.junit.runner.RunWith;
+
+/**
+ * Tests which assert that unparseable Strings lead to ParseExceptions
+ */
+@RunWith(Theories.class)
+public class GitDateParserBadlyFormattedTest {
+	private String dateStr;
+
+	public GitDateParserBadlyFormattedTest(String dateStr) {
+		this.dateStr = dateStr;
 	}
 
-	public static void assertEquals(String message, boolean expect,
-			boolean actual) {
-		org.junit.Assert
-				.assertEquals(message, valueOf(expect), valueOf(actual));
+	@DataPoints
+	static public String[] getDataPoints() {
+		return new String[] { "", "1970", "3000.3000.3000", "3 yesterday ago",
+				"now yesterday ago", "yesterdays", "3.day. 2.week.ago",
+				"day ago", "Gra Feb 21 15:35:00 2007 +0100",
+				"Sun Feb 21 15:35:00 2007 +0100",
+				"Wed Feb 21 15:35:00 Grand +0100" };
+	}
+
+	@Theory
+	public void badlyFormattedWithExplicitRef() {
+		Calendar ref = new GregorianCalendar(SystemReader.getInstance()
+				.getTimeZone(), SystemReader.getInstance().getLocale());
+		try {
+			GitDateParser.parse(dateStr, ref);
+			fail("The expected ParseException while parsing '" + dateStr
+					+ "' did not occur.");
+		} catch (ParseException e) {
+			// expected
+		}
+	}
+
+	@Theory
+	public void badlyFormattedWithoutRef() {
+		try {
+			GitDateParser.parse(dateStr, null);
+			fail("The expected ParseException while parsing '" + dateStr
+					+ "' did not occur.");
+		} catch (ParseException e) {
+			// expected
+		}
 	}
 }

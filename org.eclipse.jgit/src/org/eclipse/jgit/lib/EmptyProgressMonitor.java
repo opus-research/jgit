@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2008, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2012, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,43 +40,35 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.lib;
 
-package org.eclipse.jgit.pgm;
+/**
+ * A convenient base class which provides empty method bodies for all
+ * ProgressMonitor methods.
+ * <p>
+ * Could be used in scenarios when only some of the progress notifications are
+ * important and others can be ignored.
+ */
+public abstract class EmptyProgressMonitor implements ProgressMonitor {
 
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.treewalk.AbstractTreeIterator;
-import org.eclipse.jgit.treewalk.TreeWalk;
-
-class LsTree extends TextBuiltin {
-	@Option(name = "--recursive", usage = "usage_recurseIntoSubtrees", aliases = { "-r" })
-	private boolean recursive;
-
-	@Argument(index = 0, required = true, metaVar = "metaVar_treeish")
-	private AbstractTreeIterator tree;
-
-	@Override
-	protected void run() throws Exception {
-		final TreeWalk walk = new TreeWalk(db);
-		walk.setRecursive(recursive);
-		walk.addTree(tree);
-
-		while (walk.next()) {
-			final FileMode mode = walk.getFileMode(0);
-			if (mode == FileMode.TREE)
-				outw.print('0');
-			outw.print(mode);
-			outw.print(' ');
-			outw.print(Constants.typeString(mode.getObjectType()));
-
-			outw.print(' ');
-			outw.print(walk.getObjectId(0).name());
-
-			outw.print('\t');
-			outw.print(walk.getPathString());
-			outw.println();
-		}
+	public void start(int totalTasks) {
+		// empty
 	}
+
+	public void beginTask(String title, int totalWork) {
+		// empty
+	}
+
+	public void update(int completed) {
+		// empty
+	}
+
+	public void endTask() {
+		// empty
+	}
+
+	public boolean isCancelled() {
+		return false;
+	}
+
 }
