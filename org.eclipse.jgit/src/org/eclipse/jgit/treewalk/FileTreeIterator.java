@@ -426,9 +426,4 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	protected byte[] idSubmodule(final Entry e) {
 		return idSubmodule(getDirectory(), e);
 	}
-
-	@Override
-	protected String readSymlinkTarget(Entry entry) throws IOException {
-		return fs.readSymLink(getEntryFile());
-	}
 }
