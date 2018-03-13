@@ -52,7 +52,6 @@ import static org.junit.Assert.fail;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
-import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
@@ -315,17 +314,6 @@ public class PacketLineInTest {
 			fail("incorrectly accepted no ACK/NAK");
 		} catch (IOException e) {
 			assertEquals("Expected ACK/NAK, found EOF", e.getMessage());
-		}
-	}
-
-	@Test
-	public void testReadACK_ERR() throws IOException {
-		init("001aERR want is not valid\n");
-		try {
-			in.readACK(new MutableObjectId());
-			fail("incorrectly accepted ERR");
-		} catch (PackProtocolException e) {
-			assertEquals("want is not valid", e.getMessage());
 		}
 	}
 
