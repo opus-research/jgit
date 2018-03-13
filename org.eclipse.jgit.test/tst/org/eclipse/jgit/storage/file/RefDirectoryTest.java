@@ -59,7 +59,10 @@ import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.jgit.events.ListenerHandle;
 import org.eclipse.jgit.events.RefsChangedEvent;
@@ -925,7 +928,7 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(v0_1.getId(), all.get("refs/tags/v0.1").getObjectId());
 
 		all = refdir.getRefs(RefDatabase.ALL);
-		refdir.pack(all.keySet().toArray(new String[all.size()]));
+		refdir.pack(new ArrayList<String>(all.keySet()));
 
 		all = refdir.getRefs(RefDatabase.ALL);
 		assertEquals(5, all.size());
@@ -1125,6 +1128,36 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertTrue(master_p2.isPeeled());
 		assertNull(master_p2.getPeeledObjectId());
 		assertSame(master_p2, refdir.peel(master_p2));
+	}
+
+	@Test
+	public void testRefsChangedStackOverflow() throws Exception {
+		final FileRepository newRepo = createBareRepository();
+		final RefDatabase refDb = newRepo.getRefDatabase();
+		File packedRefs = new File(newRepo.getDirectory(), "packed-refs");
+		assertTrue(packedRefs.createNewFile());
+		final AtomicReference<StackOverflowError> error = new AtomicReference<StackOverflowError>();
+		final AtomicReference<IOException> exception = new AtomicReference<IOException>();
+		final AtomicInteger changeCount = new AtomicInteger();
+		newRepo.getListenerList().addRefsChangedListener(
+				new RefsChangedListener() {
+
+					public void onRefsChanged(RefsChangedEvent event) {
+						try {
+							refDb.getRefs("ref");
+							changeCount.incrementAndGet();
+						} catch (StackOverflowError soe) {
+							error.set(soe);
+						} catch (IOException ioe) {
+							exception.set(ioe);
+						}
+					}
+				});
+		refDb.getRefs("ref");
+		refDb.getRefs("ref");
+		assertNull(error.get());
+		assertNull(exception.get());
+		assertEquals(1, changeCount.get());
 	}
 
 	private void writeLooseRef(String name, AnyObjectId id) throws IOException {

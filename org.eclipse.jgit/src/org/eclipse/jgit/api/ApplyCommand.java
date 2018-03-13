@@ -68,6 +68,7 @@ import org.eclipse.jgit.util.IO;
  *
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-apply.html"
  *      >Git documentation about apply</a>
+ * @since 2.0
  */
 public class ApplyCommand extends GitCommand<ApplyResult> {
 
@@ -101,8 +102,12 @@ public class ApplyCommand extends GitCommand<ApplyResult> {
 	 * method twice on an instance.
 	 *
 	 * @return an {@link ApplyResult} object representing the command result
+	 * @throws GitAPIException
+	 * @throws PatchFormatException
+	 * @throws PatchApplyException
 	 */
-	public ApplyResult call() throws GitAPIException {
+	public ApplyResult call() throws GitAPIException, PatchFormatException,
+			PatchApplyException {
 		checkCallable();
 		ApplyResult r = new ApplyResult();
 		try {
@@ -162,6 +167,8 @@ public class ApplyCommand extends GitCommand<ApplyResult> {
 		File f = new File(getRepository().getWorkTree(), path);
 		if (create)
 			try {
+				File parent = f.getParentFile();
+				FileUtils.mkdirs(parent, true);
 				FileUtils.createNewFile(f);
 			} catch (IOException e) {
 				throw new PatchApplyException(MessageFormat.format(
