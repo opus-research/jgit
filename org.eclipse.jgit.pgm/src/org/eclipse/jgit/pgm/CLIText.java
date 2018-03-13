@@ -67,7 +67,6 @@ public class CLIText extends TranslationBundle {
 	 * @param line
 	 *            the line to format
 	 * @return the formatted line
-	 * @since 2.2
 	 */
 	public static String formatLine(String line) {
 		return MessageFormat.format(get().lineFormat, line);
@@ -87,7 +86,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String configFileNotFound;
 	/***/ public String cannotBeRenamed;
 	/***/ public String cannotChekoutNoHeadsAdvertisedByRemote;
-	/***/ public String cannotCombineSquashWithNoff;
 	/***/ public String cannotCreateCommand;
 	/***/ public String cannotCreateOutputStream;
 	/***/ public String cannotDeatchHEAD;
@@ -122,9 +120,9 @@ public class CLIText extends TranslationBundle {
 	/***/ public String failedToLockIndex;
 	/***/ public String failedToLockTag;
 	/***/ public String fatalError;
+	/***/ public String fatalErrorTagExists;
 	/***/ public String fatalThisProgramWillDestroyTheRepository;
 	/***/ public String fileIsRequired;
-	/***/ public String ffNotPossibleAborting;
 	/***/ public String forcedUpdate;
 	/***/ public String fromURI;
 	/***/ public String initializedEmptyGitRepositoryIn;
@@ -135,7 +133,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String mergeConflict;
 	/***/ public String mergeFailed;
 	/***/ public String mergeMadeBy;
-	/***/ public String mergedSquashed;
 	/***/ public String metaVar_KEY;
 	/***/ public String metaVar_arg;
 	/***/ public String metaVar_author;
@@ -192,7 +189,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String notFound;
 	/***/ public String notOnAnyBranch;
 	/***/ public String noteObjectTooLargeToPrint;
-	/***/ public String nothingToSquash;
 	/***/ public String onBranchToBeBorn;
 	/***/ public String onBranch;
 	/***/ public String onlyOneMetaVarExpectedIn;
@@ -212,9 +208,12 @@ public class CLIText extends TranslationBundle {
 	/***/ public String statusModified;
 	/***/ public String statusNewFile;
 	/***/ public String statusRemoved;
-	/***/ public String switchedToNewBranch;
-	/***/ public String switchedToBranch;
-	/***/ public String tagAlreadyExists;
+
+	/***/
+	public String switchedToNewBranch;
+
+	/***/
+	public String switchedToBranch;
 	/***/ public String tagLabel;
 	/***/ public String taggerInfo;
 	/***/ public String timeInMilliSeconds;
@@ -224,6 +223,5 @@ public class CLIText extends TranslationBundle {
 	/***/ public String unmergedPaths;
 	/***/ public String unsupportedOperation;
 	/***/ public String untrackedFiles;
-	/***/ public String updating;
 	/***/ public String warningNoCommitGivenOnCommandLine;
 }

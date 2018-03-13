@@ -51,8 +51,6 @@ import org.eclipse.jgit.util.SystemReader;
 
 /**
  * An alternative PrintWriter that doesn't catch exceptions.
- *
- * @since 2.2
  */
 public class ThrowingPrintWriter extends Writer {
 
