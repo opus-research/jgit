@@ -46,7 +46,6 @@
 
 package org.eclipse.jgit.transport;
 
-import java.io.File;
 import java.io.Serializable;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -55,7 +54,6 @@ import java.util.regex.Pattern;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.util.StringUtils;
 
 /**
  * This URI like construct used for referencing Git archives over the net, as
@@ -194,10 +192,6 @@ public class URIish implements Serializable {
 	 * @throws URISyntaxException
 	 */
 	public URIish(String s) throws URISyntaxException {
-		if (StringUtils.isEmptyOrNull(s)) {
-			throw new URISyntaxException("The uri was empty or null",
-					JGitText.get().cannotParseGitURIish);
-		}
 		Matcher matcher = SINGLE_SLASH_FILE_URI.matcher(s);
 		if (matcher.matches()) {
 			scheme = matcher.group(1);
@@ -557,12 +551,7 @@ public class URIish implements Serializable {
 	public String getHumanishName() throws IllegalArgumentException {
 		if ("".equals(getPath()) || getPath() == null)
 			throw new IllegalArgumentException();
-		String s = getPath();
-		String[] elements;
-		if ("file".equals(scheme) || LOCAL_FILE.matcher(s).matches())
-			elements = s.split("[\\" + File.separatorChar + "/]");
-		else
-			elements = s.split("/");
+		String[] elements = getPath().split("/");
 		if (elements.length == 0)
 			throw new IllegalArgumentException();
 		String result = elements[elements.length - 1];

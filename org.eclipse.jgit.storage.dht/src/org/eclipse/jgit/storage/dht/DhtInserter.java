@@ -53,9 +53,6 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.zip.Deflater;
 
-import org.eclipse.jgit.generated.storage.dht.proto.GitStore;
-import org.eclipse.jgit.generated.storage.dht.proto.GitStore.ChunkMeta;
-import org.eclipse.jgit.generated.storage.dht.proto.GitStore.ObjectInfo.ObjectType;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
@@ -177,13 +174,8 @@ class DhtInserter extends ObjectInserter {
 				ChunkKey key = chunk.end(chunkDigest);
 				chunk.setChunkIndex(Collections.singletonList(oe));
 				chunk.safePut(db, dbBuffer());
-
-				GitStore.ObjectInfo.Builder b = GitStore.ObjectInfo.newBuilder();
-				b.setObjectType(ObjectType.valueOf(type));
-				b.setOffset(position);
-				b.setPackedSize(packedSize);
-				b.setInflatedSize(inflatedSize);
-				ObjectInfo info = new ObjectInfo(key, b.build());
+				ObjectInfo info = new ObjectInfo(key, -1, type, position,
+						packedSize, inflatedSize, null, false);
 				ObjectIndexKey objKey = ObjectIndexKey.create(repo, objId);
 				db.objectIndex().add(objKey, info, dbBuffer());
 				return objId;
@@ -196,15 +188,12 @@ class DhtInserter extends ObjectInserter {
 		chunk = null;
 
 		ChunkKey firstChunkKey = fragmentList.get(0);
-
-		ChunkMeta.Builder metaBuilder = ChunkMeta.newBuilder();
-		for (ChunkKey k : fragmentList)
-			metaBuilder.addFragment(k.asString());
-		ChunkMeta meta = metaBuilder.build();
-
 		for (ChunkKey key : fragmentList) {
 			PackChunk.Members builder = new PackChunk.Members();
 			builder.setChunkKey(key);
+
+			ChunkMeta meta = new ChunkMeta(key);
+			meta.fragments = fragmentList;
 			builder.setMeta(meta);
 
 			if (firstChunkKey.equals(key))
@@ -213,12 +202,8 @@ class DhtInserter extends ObjectInserter {
 			db.chunk().put(builder, dbBuffer());
 		}
 
-		GitStore.ObjectInfo.Builder b = GitStore.ObjectInfo.newBuilder();
-		b.setObjectType(ObjectType.valueOf(type));
-		b.setOffset(position);
-		b.setPackedSize(packedSize);
-		b.setInflatedSize(inflatedSize);
-		ObjectInfo info = new ObjectInfo(firstChunkKey, b.build());
+		ObjectInfo info = new ObjectInfo(firstChunkKey, -1, type, position,
+				packedSize, inflatedSize, null, true);
 		ObjectIndexKey objKey = ObjectIndexKey.create(repo, objId);
 		db.objectIndex().add(objKey, info, dbBuffer());
 
@@ -249,13 +234,12 @@ class DhtInserter extends ObjectInserter {
 		// TODO Allow more than one chunk pending at a time, this would
 		// permit batching puts of the ChunkInfo records.
 
-		if (!activeChunk.isEmpty()) {
-			activeChunk.end(digest());
-			activeChunk.safePut(db, dbBuffer());
-			activeChunk = newChunk();
-			if (activeChunk.whole(deflater(), type, data, off, len, objId))
-				return objId;
-		}
+		activeChunk.end(digest());
+		activeChunk.safePut(db, dbBuffer());
+		activeChunk = newChunk();
+
+		if (activeChunk.whole(deflater(), type, data, off, len, objId))
+			return objId;
 
 		return insertStream(type, len, asStream(data, off, len));
 	}
@@ -311,7 +295,7 @@ class DhtInserter extends ObjectInserter {
 		ChunkFormatter fmt;
 
 		fmt = new ChunkFormatter(repo, options);
-		fmt.setSource(GitStore.ChunkInfo.Source.INSERT);
+		fmt.setSource(ChunkInfo.Source.INSERT);
 		return fmt;
 	}
 
