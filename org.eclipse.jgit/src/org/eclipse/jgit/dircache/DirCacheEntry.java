@@ -141,8 +141,8 @@ public class DirCacheEntry {
 	private byte inCoreFlags;
 
 	DirCacheEntry(final byte[] sharedInfo, final MutableInteger infoAt,
-			final InputStream in, final MessageDigest md, final int smudge_s,
-			final int smudge_ns) throws IOException {
+			final InputStream in, final MessageDigest md, int smudge_s,
+			int smudge_ns) throws IOException {
 		info = sharedInfo;
 		infoOffset = infoAt.value;
 
@@ -567,6 +567,7 @@ public class DirCacheEntry {
 	 * @param sz
 	 *            new cached size of the file, as bytes.
 	 */
+	@SuppressWarnings("boxing")
 	public void setLength(final long sz) {
 		setLength((int) sz);
 	}
