@@ -108,7 +108,7 @@ public class LsRemoteCommand extends GitCommand<Collection<Ref>> {
 	}
 
 	/**
-	 * Inlcude refs/tags in references results
+	 * Include refs/tags in references results
 	 *
 	 * @param tags
 	 */
@@ -117,6 +117,8 @@ public class LsRemoteCommand extends GitCommand<Collection<Ref>> {
 	}
 
 	/**
+	 * The full path of git-upload-pack on the remote host
+	 * 
 	 * @param uploadPack
 	 */
 	public void setUploadPack(String uploadPack) {
