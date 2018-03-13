@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Robin Rosenberg
+ * Copyright (C) 2016, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,49 +40,47 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util.io;
 
-import java.io.BufferedOutputStream;
+package org.eclipse.jgit.internal.storage.file;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+
+import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
 
-/**
- * A BufferedOutputStream that throws an error if the final flush fails on
- * close.
- * <p>
- * Java's BufferedOutputStream swallows errors that occur when the output stream
- * tries to write the final bytes to the output during close. This may result in
- * corrupted files without notice.
- * </p>
- */
-public class SafeBufferedOutputStream extends BufferedOutputStream {
+import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
+import org.eclipse.jgit.lib.Repository;
+import org.junit.Test;
 
-	/**
-	 * @see BufferedOutputStream#BufferedOutputStream(OutputStream)
-	 * @param out
-	 *            underlying output stream
-	 */
-	public SafeBufferedOutputStream(OutputStream out) {
-		super(out);
-	}
+/** Test managing the gitweb description file. */
+public class DescriptionTest extends LocalDiskRepositoryTestCase {
+	private static final String UNCONFIGURED = "Unnamed repository; edit this file to name it for gitweb.";
 
-	/**
-	 * @see BufferedOutputStream#BufferedOutputStream(OutputStream, int)
-	 * @param out
-	 *            underlying output stream
-	 * @param size
-	 *            buffer size
-	 */
-	public SafeBufferedOutputStream(OutputStream out, int size) {
-		super(out, size);
-	}
+	@Test
+	public void description() throws IOException {
+		Repository git = createBareRepository();
+		File path = new File(git.getDirectory(), "description");
+		assertNull("description", git.getGitwebDescription());
 
-	@Override
-	public void close() throws IOException {
-		try {
-			flush();
-		} finally {
-			super.close();
-		}
+		String desc = "a test repo\nfor jgit";
+		git.setGitwebDescription(desc);
+		assertEquals(desc + '\n', read(path));
+		assertEquals(desc, git.getGitwebDescription());
+
+		git.setGitwebDescription(null);
+		assertEquals("", read(path));
+
+		desc = "foo";
+		git.setGitwebDescription(desc);
+		assertEquals(desc + '\n', read(path));
+		assertEquals(desc, git.getGitwebDescription());
+
+		git.setGitwebDescription("");
+		assertEquals("", read(path));
+
+		git.setGitwebDescription(UNCONFIGURED);
+		assertEquals(UNCONFIGURED + '\n', read(path));
+		assertNull("description", git.getGitwebDescription());
 	}
 }

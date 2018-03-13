@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Robin Rosenberg
+ * Copyright (C) 2016, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,49 +40,26 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util.io;
 
-import java.io.BufferedOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+package org.eclipse.jgit.transport;
+
+import java.security.NoSuchAlgorithmException;
+
+import javax.crypto.Cipher;
+import javax.crypto.NoSuchPaddingException;
 
 /**
- * A BufferedOutputStream that throws an error if the final flush fails on
- * close.
+ * <b>DO NOT USE</b> Factory to create any cipher.
  * <p>
- * Java's BufferedOutputStream swallows errors that occur when the output stream
- * tries to write the final bytes to the output during close. This may result in
- * corrupted files without notice.
- * </p>
+ * This is a hack for {@link WalkEncryption} to create any cipher configured by
+ * the end-user. Using this class allows JGit to violate ErrorProne's security
+ * recommendations (<a
+ * href="http://errorprone.info/bugpattern/InsecureCryptoUsage"
+ * >InsecureCryptoUsage</a>), which is not secure.
  */
-public class SafeBufferedOutputStream extends BufferedOutputStream {
-
-	/**
-	 * @see BufferedOutputStream#BufferedOutputStream(OutputStream)
-	 * @param out
-	 *            underlying output stream
-	 */
-	public SafeBufferedOutputStream(OutputStream out) {
-		super(out);
-	}
-
-	/**
-	 * @see BufferedOutputStream#BufferedOutputStream(OutputStream, int)
-	 * @param out
-	 *            underlying output stream
-	 * @param size
-	 *            buffer size
-	 */
-	public SafeBufferedOutputStream(OutputStream out, int size) {
-		super(out, size);
-	}
-
-	@Override
-	public void close() throws IOException {
-		try {
-			flush();
-		} finally {
-			super.close();
-		}
+class InsecureCipherFactory {
+	static Cipher create(String algo)
+			throws NoSuchAlgorithmException, NoSuchPaddingException {
+		return Cipher.getInstance(algo);
 	}
 }
