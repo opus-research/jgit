@@ -166,7 +166,9 @@ public class DirCachePathEditTest {
 			editor.finish();
 			fail("Expected DirCacheNameConflictException to be thrown");
 		} catch (DirCacheNameConflictException e) {
-			assertEquals("a", e.getMessage());
+			assertEquals("a a/b", e.getMessage());
+			assertEquals("a", e.getPath1());
+			assertEquals("a/b", e.getPath2());
 		}
 
 		editor = dc.editor();
@@ -178,7 +180,9 @@ public class DirCachePathEditTest {
 			editor.finish();
 			fail("Expected DirCacheNameConflictException to be thrown");
 		} catch (DirCacheNameConflictException e) {
-			assertEquals("A", e.getMessage());
+			assertEquals("A A/c", e.getMessage());
+			assertEquals("A", e.getPath1());
+			assertEquals("A/c", e.getPath2());
 		}
 
 		editor = dc.editor();
@@ -190,7 +194,9 @@ public class DirCachePathEditTest {
 			editor.finish();
 			fail("Expected DirCacheNameConflictException to be thrown");
 		} catch (DirCacheNameConflictException e) {
-			assertEquals("A/b/c", e.getMessage());
+			assertEquals("A/b/c A/b/c/d", e.getMessage());
+			assertEquals("A/b/c", e.getPath1());
+			assertEquals("A/b/c/d", e.getPath2());
 		}
 	}
 

@@ -200,7 +200,7 @@ abstract class BaseDirCacheEditor {
 				}
 
 				byte[] nPath = n.path;
-				if (!prefixEqual(ePath, nPath, prefixLen)) {
+				if (!startsWith(ePath, nPath, prefixLen)) {
 					// Different prefix; this entry is in another directory.
 					break;
 				}
@@ -240,12 +240,12 @@ abstract class BaseDirCacheEditor {
 		return n;
 	}
 
-	private static boolean prefixEqual(byte[] a, byte[] b, int aLen) {
-		if (b.length < aLen) {
+	private static boolean startsWith(byte[] a, byte[] b, int n) {
+		if (b.length < n) {
 			return false;
 		}
-		for (aLen--; aLen >= 0; aLen--) {
-			if (a[aLen] != b[aLen]) {
+		for (n--; n >= 0; n--) {
+			if (a[n] != b[n]) {
 				return false;
 			}
 		}
