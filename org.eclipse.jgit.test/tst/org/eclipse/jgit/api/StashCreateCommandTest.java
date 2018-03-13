@@ -202,10 +202,10 @@ public class StashCreateCommandTest extends RepositoryTestCase {
 		TreeWalk tw = TreeWalk.forPath(db, string, commit.getTree());
 		if (tw == null)
 			return null;
-		ObjectReader or = db.getObjectDatabase().newReader();
 		ObjectId bId = tw.getObjectId(0);
 		if (bId == null)
 			return null;
+		ObjectReader or = db.getObjectDatabase().newReader();
 		ObjectLoader ol = or.open(bId);
 		ByteArrayOutputStream bos = new ByteArrayOutputStream();
 		ol.copyTo(bos);

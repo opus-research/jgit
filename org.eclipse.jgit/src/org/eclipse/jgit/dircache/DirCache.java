@@ -403,6 +403,10 @@ public class DirCache {
 		if (entryCnt < 0)
 			throw new CorruptObjectException(JGitText.get().DIRCHasTooManyEntries);
 
+		snapshot = FileSnapshot.save(liveFile);
+		int smudge_s = (int) (snapshot.lastModified() / 1000);
+		int smudge_ns = ((int) (snapshot.lastModified() % 1000)) * 1000000;
+
 		// Load the individual file entries.
 		//
 		final int infoLength = DirCacheEntry.getMaximumInfoLength(extended);
@@ -411,8 +415,7 @@ public class DirCache {
 
 		final MutableInteger infoAt = new MutableInteger();
 		for (int i = 0; i < entryCnt; i++)
-			sortedEntries[i] = new DirCacheEntry(infos, infoAt, in, md);
-		snapshot = FileSnapshot.save(liveFile);
+			sortedEntries[i] = new DirCacheEntry(infos, infoAt, in, md, smudge_s, smudge_ns);
 
 		// After the file entries are index extensions, and then a footer.
 		//
