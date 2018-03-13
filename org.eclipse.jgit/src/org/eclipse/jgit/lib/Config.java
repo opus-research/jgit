@@ -387,13 +387,6 @@ public class Config {
 		if (value == null)
 			return defaultValue;
 
-		if (all[0] instanceof ConfigEnum) {
-			for (T t : all) {
-				if (((ConfigEnum) t).matchConfigValue(value))
-					return t;
-			}
-		}
-
 		String n = value.replace(' ', '_');
 
 		// Because of c98abc9c0586c73ef7df4172644b7dd21c979e9d being used in
@@ -735,11 +728,7 @@ public class Config {
 	 */
 	public <T extends Enum<?>> void setEnum(final String section,
 			final String subsection, final String name, final T value) {
-		String n;
-		if (value instanceof ConfigEnum)
-			n = ((ConfigEnum) value).toConfigValue();
-		else
-			n = value.name().toLowerCase().replace('_', ' ');
+		String n = value.name().toLowerCase().replace('_', ' ');
 		setString(section, subsection, name, n);
 	}
 
@@ -1002,11 +991,8 @@ public class Config {
 		ConfigLine e = new ConfigLine();
 		for (;;) {
 			int input = in.read();
-			if (-1 == input) {
-				if (e.section != null)
-					newEntries.add(e);
+			if (-1 == input)
 				break;
-			}
 
 			final char c = (char) input;
 			if ('\n' == c) {
@@ -1288,28 +1274,5 @@ public class Config {
 		void reset() {
 			pos--;
 		}
-	}
-
-	/**
-	 * Converts enumeration values into configuration options and vice-versa,
-	 * allowing to match a config option with an enum value.
-	 *
-	 */
-	public static interface ConfigEnum {
-		/**
-		 * Converts enumeration value into a string to be save in config.
-		 *
-		 * @return the enum value as config string
-		 */
-		String toConfigValue();
-
-		/**
-		 * Checks if the given string matches with enum value.
-		 *
-		 * @param in
-		 *            the string to match
-		 * @return true if the given string matches enum value, false otherwise
-		 */
-		boolean matchConfigValue(String in);
 	}
 }

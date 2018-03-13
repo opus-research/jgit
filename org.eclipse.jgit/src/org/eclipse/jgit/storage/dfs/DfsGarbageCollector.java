@@ -45,8 +45,6 @@ package org.eclipse.jgit.storage.dfs;
 
 import static org.eclipse.jgit.storage.dfs.DfsObjDatabase.PackSource.GC;
 import static org.eclipse.jgit.storage.dfs.DfsObjDatabase.PackSource.UNREACHABLE_GARBAGE;
-import static org.eclipse.jgit.storage.pack.PackExt.PACK;
-import static org.eclipse.jgit.storage.pack.PackExt.INDEX;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -61,13 +59,13 @@ import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdOwnerMap;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.dfs.DfsObjDatabase.PackSource;
 import org.eclipse.jgit.storage.file.PackIndex;
 import org.eclipse.jgit.storage.pack.PackConfig;
+import org.eclipse.jgit.storage.pack.PackConstants;
 import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.util.io.CountingOutputStream;
 
@@ -83,7 +81,7 @@ public class DfsGarbageCollector {
 
 	private final List<PackWriter.Statistics> newPackStats;
 
-	private final List<PackWriter.ObjectIdSet> newPackObj;
+	private final List<DfsPackFile> newPackList;
 
 	private DfsReader ctx;
 
@@ -117,7 +115,7 @@ public class DfsGarbageCollector {
 		objdb = repo.getObjectDatabase();
 		newPackDesc = new ArrayList<DfsPackDescription>(4);
 		newPackStats = new ArrayList<PackWriter.Statistics>(4);
-		newPackObj = new ArrayList<PackWriter.ObjectIdSet>(4);
+		newPackList = new ArrayList<DfsPackFile>(4);
 
 		packConfig = new PackConfig(repo);
 		packConfig.setIndexVersion(2);
@@ -245,8 +243,8 @@ public class DfsGarbageCollector {
 
 		PackWriter pw = newPackWriter();
 		try {
-			for (PackWriter.ObjectIdSet packedObjs : newPackObj)
-				pw.excludeObjects(packedObjs);
+			for (DfsPackFile pack : newPackList)
+				pw.excludeObjects(pack.getPackIndex(ctx));
 			pw.preparePack(pm, nonHeads, allHeads);
 			if (0 < pw.getObjectCount())
 				writePack(GC, pw, pm);
@@ -260,6 +258,10 @@ public class DfsGarbageCollector {
 			return;
 
 		// TODO(sop) This is ugly. The garbage pack needs to be deleted.
+		List<PackIndex> newIdx = new ArrayList<PackIndex>(newPackList.size());
+		for (DfsPackFile pack : newPackList)
+			newIdx.add(pack.getPackIndex(ctx));
+
 		PackWriter pw = newPackWriter();
 		try {
 			RevWalk pool = new RevWalk(ctx);
@@ -269,7 +271,7 @@ public class DfsGarbageCollector {
 				for (PackIndex.MutableEntry ent : oldIdx) {
 					pm.update(1);
 					ObjectId id = ent.toObjectId();
-					if (pool.lookupOrNull(id) != null || anyPackHas(id))
+					if (pool.lookupOrNull(id) != null || anyIndexHas(newIdx, id))
 						continue;
 
 					int type = oldPack.getObjectType(ctx, ent.getOffset());
@@ -284,9 +286,9 @@ public class DfsGarbageCollector {
 		}
 	}
 
-	private boolean anyPackHas(AnyObjectId id) {
-		for (PackWriter.ObjectIdSet packedObjs : newPackObj)
-			if (packedObjs.contains(id))
+	private static boolean anyIndexHas(List<PackIndex> list, AnyObjectId id) {
+		for (PackIndex idx : list)
+			if (idx.hasObject(id))
 				return true;
 		return false;
 	}
@@ -317,39 +319,30 @@ public class DfsGarbageCollector {
 		DfsPackDescription pack = repo.getObjectDatabase().newPack(source);
 		newPackDesc.add(pack);
 
-		out = objdb.writeFile(pack, PACK);
+		out = objdb.writeFile(pack, PackConstants.PACK_EXT);
 		try {
 			pw.writePack(pm, pm, out);
 		} finally {
 			out.close();
 		}
 
-		out = objdb.writeFile(pack, INDEX);
+		out = objdb.writeFile(pack, PackConstants.PACK_INDEX_EXT);
 		try {
 			CountingOutputStream cnt = new CountingOutputStream(out);
 			pw.writeIndex(cnt);
-			pack.setFileSize(INDEX, cnt.getCount());
+			pack.setIndexSize(cnt.getCount());
 		} finally {
 			out.close();
 		}
 
-		final ObjectIdOwnerMap<ObjectIdOwnerMap.Entry> packedObjs = pw
-				.getObjectSet();
-		newPackObj.add(new PackWriter.ObjectIdSet() {
-			public boolean contains(AnyObjectId objectId) {
-				return packedObjs.contains(objectId);
-			}
-		});
-
 		PackWriter.Statistics stats = pw.getStatistics();
 		pack.setPackStats(stats);
-		pack.setFileSize(PACK, stats.getTotalBytes());
+		pack.setPackSize(stats.getTotalBytes());
 		pack.setObjectCount(stats.getTotalObjects());
 		pack.setDeltaCount(stats.getTotalDeltas());
 		objectsPacked += stats.getTotalObjects();
 		newPackStats.add(stats);
-
-		DfsBlockCache.getInstance().getOrCreate(pack, null);
+		newPackList.add(DfsBlockCache.getInstance().getOrCreate(pack, null));
 		return pack;
 	}
 }

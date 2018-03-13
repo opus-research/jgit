@@ -15,7 +15,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
-import org.eclipse.jgit.storage.pack.PackExt;
 import org.eclipse.jgit.util.RefList;
 
 /**
@@ -104,7 +103,7 @@ public class InMemoryRepository extends DfsRepository {
 		}
 
 		@Override
-		protected ReadableChannel openFile(DfsPackDescription desc, PackExt ext)
+		protected ReadableChannel openFile(DfsPackDescription desc, String ext)
 				throws FileNotFoundException, IOException {
 			MemPack memPack = (MemPack) desc;
 			byte[] file = memPack.fileMap.get(ext);
@@ -115,7 +114,7 @@ public class InMemoryRepository extends DfsRepository {
 
 		@Override
 		protected DfsOutputStream writeFile(
-				DfsPackDescription desc, final PackExt ext) throws IOException {
+				DfsPackDescription desc, final String ext) throws IOException {
 			final MemPack memPack = (MemPack) desc;
 			return new Out() {
 				@Override
@@ -127,8 +126,8 @@ public class InMemoryRepository extends DfsRepository {
 	}
 
 	private static class MemPack extends DfsPackDescription {
-		private final Map<PackExt, byte[]>
-				fileMap = new HashMap<PackExt, byte[]>();
+		private final Map<String, byte[]>
+				fileMap = new HashMap<String, byte[]>();
 
 		MemPack(String name, DfsRepositoryDescription repoDesc) {
 			super(repoDesc, name);
