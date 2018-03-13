@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>,
+ * Copyright (C) 2010, Stefan Lay <stefan.lay@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,21 +41,29 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.errors;
 
-package org.eclipse.jgit.notes;
+import org.eclipse.jgit.transport.CredentialItem;
+import org.eclipse.jgit.transport.CredentialsProvider;
+import org.eclipse.jgit.transport.URIish;
 
-/** A note bucket that has been loaded into the process. */
-abstract class InMemoryNoteBucket extends NoteBucket {
+/**
+ * An exception thrown when a {@link CredentialItem} is requested from a
+ * {@link CredentialsProvider} which is not supported by this provider.
+ */
+public class UnsupportedCredentialItem extends RuntimeException {
+	private static final long serialVersionUID = 1L;
+
 	/**
-	 * Number of leading digits that leads to this bucket in the note path.
+	 * Constructs an UnsupportedCredentialItem with the specified detail message
+	 * prefixed with provided URI.
 	 *
-	 * This is counted in terms of hex digits, not raw bytes. Each bucket level
-	 * is typically 2 higher than its parent, placing about 256 items in each
-	 * level of the tree.
+	 * @param uri
+	 *            URI used for transport
+	 * @param s
+	 *            message
 	 */
-	final int prefixLen;
-
-	InMemoryNoteBucket(int prefixLen) {
-		this.prefixLen = prefixLen;
+	public UnsupportedCredentialItem(final URIish uri, final String s) {
+		super(uri.setPass(null) + ": " + s);
 	}
 }
