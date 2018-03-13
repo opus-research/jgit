@@ -210,8 +210,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		}
 
 		if (typeHint == OBJ_ANY)
-			throw new MissingObjectException(objectId.copy(),
-					JGitText.get().unknownObjectType2);
+			throw new MissingObjectException(objectId.copy(), "unknown");
 		throw new MissingObjectException(objectId.copy(), typeHint);
 	}
 
@@ -340,8 +339,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 
 			public ObjectLoader open() throws IOException {
 				if (cur.pack == null)
-					throw new MissingObjectException(cur.id,
-							JGitText.get().unknownObjectType2);
+					throw new MissingObjectException(cur.id, "unknown");
 				return cur.pack.load(DfsReader.this, cur.offset);
 			}
 
@@ -378,8 +376,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 				if (idItr.hasNext()) {
 					cur = idItr.next();
 					if (cur.pack == null)
-						throw new MissingObjectException(cur.id,
-								JGitText.get().unknownObjectType2);
+						throw new MissingObjectException(cur.id, "unknown");
 					sz = cur.pack.getObjectSize(DfsReader.this, cur.offset);
 					return true;
 				} else if (findAllError != null) {
@@ -432,8 +429,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		}
 
 		if (typeHint == OBJ_ANY)
-			throw new MissingObjectException(objectId.copy(),
-					JGitText.get().unknownObjectType2);
+			throw new MissingObjectException(objectId.copy(), "unknown");
 		throw new MissingObjectException(objectId.copy(), typeHint);
 	}
 
