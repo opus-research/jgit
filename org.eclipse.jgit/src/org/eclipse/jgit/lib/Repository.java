@@ -49,6 +49,7 @@ package org.eclipse.jgit.lib;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -129,11 +130,6 @@ public abstract class Repository {
 		return getObjectDatabase().newInserter();
 	}
 
-	/** @return a new inserter to create objects in {@link #getObjectDatabase()} */
-	public ObjectReader newObjectReader() {
-		return getObjectDatabase().newReader();
-	}
-
 	/** @return the reference database which stores the reference namespace. */
 	public abstract RefDatabase getRefDatabase();
 
@@ -165,12 +161,7 @@ public abstract class Repository {
 	 *         known shared repositories.
 	 */
 	public boolean hasObject(AnyObjectId objectId) {
-		try {
-			return getObjectDatabase().hasObject(objectId);
-		} catch (IOException e) {
-			// Legacy API, assume error means "no"
-			return false;
-		}
+		return getObjectDatabase().hasObject(objectId);
 	}
 
 	/**
@@ -183,11 +174,11 @@ public abstract class Repository {
 	 */
 	public ObjectLoader openObject(final AnyObjectId id)
 			throws IOException {
+		final WindowCursor wc = new WindowCursor();
 		try {
-			return getObjectDatabase().openObject(id);
-		} catch (MissingObjectException notFound) {
-			// Legacy API, return null
-			return null;
+			return openObject(wc, id);
+		} finally {
+			wc.release();
 		}
 	}
 
@@ -200,17 +191,42 @@ public abstract class Repository {
 	 * @return a {@link ObjectLoader} for accessing the data of the named
 	 *         object, or null if the object does not exist.
 	 * @throws IOException
-	 * @deprecated Use {code newObjectReader().open(id)}.
 	 */
-	@Deprecated
-	public ObjectLoader openObject(ObjectReader curs, AnyObjectId id)
+	public ObjectLoader openObject(WindowCursor curs, AnyObjectId id)
 			throws IOException {
-		try {
-			return curs.openObject(id);
-		} catch (MissingObjectException notFound) {
-			return null;
-		}
+		return getObjectDatabase().openObject(curs, id);
 	}
+
+	/**
+	 * Open object in all packs containing specified object.
+	 *
+	 * @param objectId
+	 *            id of object to search for
+	 * @param curs
+	 *            temporary working space associated with the calling thread.
+	 * @return collection of loaders for this object, from all packs containing
+	 *         this object
+	 * @throws IOException
+	 */
+	public abstract Collection<PackedObjectLoader> openObjectInAllPacks(
+			AnyObjectId objectId, WindowCursor curs)
+			throws IOException;
+
+	/**
+	 * Open object in all packs containing specified object.
+	 *
+	 * @param objectId
+	 *            id of object to search for
+	 * @param resultLoaders
+	 *            result collection of loaders for this object, filled with
+	 *            loaders from all packs containing specified object
+	 * @param curs
+	 *            temporary working space associated with the calling thread.
+	 * @throws IOException
+	 */
+	abstract void openObjectInAllPacks(final AnyObjectId objectId,
+			final Collection<PackedObjectLoader> resultLoaders,
+			final WindowCursor curs) throws IOException;
 
 	/**
 	 * @param id
@@ -853,7 +869,7 @@ public abstract class Repository {
 		final int len = refName.length();
 		if (len == 0)
 			return false;
-		if (refName.endsWith(LockFile.SUFFIX))
+		if (refName.endsWith(".lock"))
 			return false;
 
 		int components = 1;
@@ -976,8 +992,6 @@ public abstract class Repository {
 			return new ArrayList<RepositoryListener>(allListeners);
 		}
 	}
-
-	abstract void fireRefsChanged();
 
 	abstract void fireIndexChanged();
 
