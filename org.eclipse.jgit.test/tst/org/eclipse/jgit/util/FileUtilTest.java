@@ -48,9 +48,6 @@ import java.io.IOException;
 
 import junit.framework.TestCase;
 
-/**
- * Tests for FileUtils
- */
 public class FileUtilTest extends TestCase {
 
 	private final File trash = new File(new File("target"), "trash");
