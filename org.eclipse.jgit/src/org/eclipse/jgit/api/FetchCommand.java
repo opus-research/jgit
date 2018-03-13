@@ -325,12 +325,8 @@ public class FetchCommand extends GitCommand<FetchResult> {
 	/**
 	 * @param credentialsProvider
 	 *            the {@link CredentialsProvider} to use
-	 * @return {@code this}
 	 */
-	public FetchCommand setCredentialsProvider(
-			CredentialsProvider credentialsProvider) {
-		checkCallable();
+	public void setCredentialsProvider(CredentialsProvider credentialsProvider) {
 		this.credentialsProvider = credentialsProvider;
-		return this;
 	}
 }
