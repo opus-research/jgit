@@ -188,8 +188,6 @@ public class PackWriter {
 
 	private boolean ignoreMissingUninteresting = true;
 
-	private boolean pruneCurrentObjectList;
-
 	/**
 	 * Create writer for specified repository.
 	 * <p>
@@ -528,7 +526,16 @@ public class PackWriter {
 	 */
 	public boolean willInclude(final AnyObjectId id) throws IOException {
 		ObjectToPack obj = objectsMap.get(id);
-		return obj != null && !obj.isEdge();
+		if (obj != null && !obj.isEdge())
+			return true;
+
+		Set<ObjectId> toFind = Collections.singleton(id.toObjectId());
+		for (CachedPack pack : cachedPacks) {
+			if (pack.hasObject(toFind).contains(id))
+				return true;
+		}
+
+		return false;
 	}
 
 	/**
@@ -632,10 +639,7 @@ public class PackWriter {
 		if (writeMonitor == null)
 			writeMonitor = NullProgressMonitor.INSTANCE;
 
-		if (reuseSupport != null && (
-				   reuseDeltas
-				|| config.isReuseObjects()
-				|| !cachedPacks.isEmpty()))
+		if ((reuseDeltas || config.isReuseObjects()) && reuseSupport != null)
 			searchForReuse(compressMonitor);
 		if (config.isDeltaCompress())
 			searchForDeltas(compressMonitor);
@@ -711,12 +715,8 @@ public class PackWriter {
 			cnt += list.size();
 		long start = System.currentTimeMillis();
 		monitor.beginTask(JGitText.get().searchForReuse, cnt);
-		for (List<ObjectToPack> list : objectsLists) {
-			pruneCurrentObjectList = false;
+		for (List<ObjectToPack> list : objectsLists)
 			reuseSupport.selectObjectRepresentation(this, monitor, list);
-			if (pruneCurrentObjectList)
-				pruneEdgesFromObjectList(list);
-		}
 		monitor.endTask();
 		stats.timeSearchingForReuse = System.currentTimeMillis() - start;
 	}
@@ -1324,6 +1324,7 @@ public class PackWriter {
 		for (RevObject obj : haveObjs)
 			walker.markUninteresting(obj);
 
+		int typesToPrune = 0;
 		final int maxBases = config.getDeltaSearchWindowSize();
 		Set<RevTree> baseTrees = new HashSet<RevTree>();
 		BlockList<RevCommit> commits = new BlockList<RevCommit>();
@@ -1387,6 +1388,15 @@ public class PackWriter {
 		}
 		commits = null;
 
+		for (CachedPack p : cachedPacks) {
+			for (ObjectId d : p.hasObject(objectsLists[Constants.OBJ_COMMIT])) {
+				if (baseTrees.size() <= maxBases)
+					baseTrees.add(walker.lookupCommit(d).getTree());
+				objectsMap.get(d).setEdge();
+				typesToPrune |= 1 << Constants.OBJ_COMMIT;
+			}
+		}
+
 		BaseSearch bases = new BaseSearch(countingMonitor, baseTrees, //
 				objectsMap, edgeObjects, reader);
 		RevObject o;
@@ -1403,13 +1413,39 @@ public class PackWriter {
 			countingMonitor.update(1);
 		}
 
+		for (CachedPack p : cachedPacks) {
+			for (ObjectId d : p.hasObject(objectsLists[Constants.OBJ_TREE])) {
+				objectsMap.get(d).setEdge();
+				typesToPrune |= 1 << Constants.OBJ_TREE;
+			}
+			for (ObjectId d : p.hasObject(objectsLists[Constants.OBJ_BLOB])) {
+				objectsMap.get(d).setEdge();
+				typesToPrune |= 1 << Constants.OBJ_BLOB;
+			}
+			for (ObjectId d : p.hasObject(objectsLists[Constants.OBJ_TAG])) {
+				objectsMap.get(d).setEdge();
+				typesToPrune |= 1 << Constants.OBJ_TAG;
+			}
+		}
+
+		if (typesToPrune != 0) {
+			pruneObjectList(typesToPrune, Constants.OBJ_COMMIT);
+			pruneObjectList(typesToPrune, Constants.OBJ_TREE);
+			pruneObjectList(typesToPrune, Constants.OBJ_BLOB);
+			pruneObjectList(typesToPrune, Constants.OBJ_TAG);
+		}
+
 		for (CachedPack pack : cachedPacks)
 			countingMonitor.update((int) pack.getObjectCount());
 		countingMonitor.endTask();
 		stats.timeCounting = System.currentTimeMillis() - countingStart;
 	}
 
-	private static void pruneEdgesFromObjectList(List<ObjectToPack> list) {
+	private void pruneObjectList(int typesToPrune, int typeCode) {
+		if ((typesToPrune & (1 << typeCode)) == 0)
+			return;
+
+		final List<ObjectToPack> list = objectsLists[typeCode];
 		final int size = list.size();
 		int src = 0;
 		int dst = 0;
@@ -1508,23 +1544,6 @@ public class PackWriter {
 	 */
 	public void select(ObjectToPack otp, StoredObjectRepresentation next) {
 		int nFmt = next.getFormat();
-
-		if (!cachedPacks.isEmpty()) {
-			if (otp.isEdge())
-				return;
-			if ((nFmt == PACK_WHOLE) | (nFmt == PACK_DELTA)) {
-				for (CachedPack pack : cachedPacks) {
-					if (pack.hasObject(otp, next)) {
-						otp.setEdge();
-						otp.clearDeltaBase();
-						otp.clearReuseAsIs();
-						pruneCurrentObjectList = true;
-						return;
-					}
-				}
-			}
-		}
-
 		int nWeight;
 		if (otp.isReuseAsIs()) {
 			// We've already chosen to reuse a packed form, if next
