@@ -134,14 +134,14 @@ public abstract class FS {
 			try {
 				Class<?> activatorClass = Class
 						.forName("org.eclipse.jgit.util.Java7FSFactory"); //$NON-NLS-1$
-				System.out.println("Found Java7");
+				// found Java7
 				factory = (FSFactory) activatorClass.newInstance();
 			} catch (ClassNotFoundException e) {
-				System.out.println("Java7 module not found");
+				// Java7 module not found
 				factory = new FS.FSFactory();
 				// Silently ignore failure to find Java7 FS factory
 			} catch (UnsupportedClassVersionError e) {
-				System.out.println("Java7 module not accessible");
+				// Java7 module not accessible
 				factory = new FS.FSFactory();
 			} catch (Exception e) {
 				factory = new FS.FSFactory();
