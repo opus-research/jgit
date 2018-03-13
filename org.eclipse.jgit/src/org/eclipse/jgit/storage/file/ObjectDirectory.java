@@ -43,9 +43,6 @@
 
 package org.eclipse.jgit.storage.file;
 
-import static org.eclipse.jgit.storage.pack.PackExt.INDEX;
-import static org.eclipse.jgit.storage.pack.PackExt.PACK;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -77,7 +74,6 @@ import org.eclipse.jgit.lib.RepositoryCache;
 import org.eclipse.jgit.lib.RepositoryCache.FileKey;
 import org.eclipse.jgit.storage.pack.CachedPack;
 import org.eclipse.jgit.storage.pack.ObjectToPack;
-import org.eclipse.jgit.storage.pack.PackExt;
 import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
@@ -339,23 +335,10 @@ public class ObjectDirectory extends FileObjectDatabase {
 	public PackFile openPack(final File pack)
 			throws IOException {
 		final String p = pack.getName();
-		if (p.length() != 50 || !p.startsWith("pack-") || !p.endsWith(".pack")) //$NON-NLS-1$ //$NON-NLS-2$
+		if (p.length() != 50 || !p.startsWith("pack-") || !p.endsWith(".pack")) //$NON-NLS-1$
 			throw new IOException(MessageFormat.format(JGitText.get().notAValidPack, pack));
 
-		// The pack and index are assumed to exist. The existence of other
-		// extensions needs to be explicitly checked.
-		//
-		int extensions = PACK.getBit() | INDEX.getBit();
-		final String base = p.substring(0, p.length() - 4);
-		for (PackExt ext : PackExt.values()) {
-			if ((extensions & ext.getBit()) == 0) {
-				final String name = base + ext.getExtension();
-				if (new File(pack.getParentFile(), name).exists())
-					extensions |= ext.getBit();
-			}
-		}
-
-		PackFile res = new PackFile(pack, extensions);
+		PackFile res = new PackFile(pack);
 		insertPack(res);
 		return res;
 	}
@@ -737,14 +720,9 @@ public class ObjectDirectory extends FileObjectDatabase {
 			if (indexName.length() != 49 || !indexName.endsWith(".idx")) //$NON-NLS-1$
 				continue;
 
-			final String base = indexName.substring(0, indexName.length() - 3);
-			int extensions = 0;
-			for (PackExt ext : PackExt.values()) {
-				if (names.contains(base + ext.getExtension()))
-					extensions |= ext.getBit();
-			}
-
-			if ((extensions & PACK.getBit()) == 0) {
+			final String base = indexName.substring(0, indexName.length() - 4);
+			final String packName = base + ".pack"; //$NON-NLS-1$
+			if (!names.contains(packName)) {
 				// Sometimes C Git's HTTP fetch transport leaves a
 				// .idx file behind and does not download the .pack.
 				// We have to skip over such useless indexes.
@@ -752,7 +730,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 				continue;
 			}
 
-			final String packName = base + PACK.getExtension();
 			final PackFile oldPack = forReuse.remove(packName);
 			if (oldPack != null) {
 				list.add(oldPack);
@@ -760,7 +737,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 			}
 
 			final File packFile = new File(packDirectory, packName);
-			list.add(new PackFile(packFile, extensions));
+			list.add(new PackFile(packFile));
 			foundNew = true;
 		}
 
