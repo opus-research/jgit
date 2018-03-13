@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2013 Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2014, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,6 +42,7 @@
  */
 package org.eclipse.jgit.gitrepo;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -111,14 +112,15 @@ public class RepoCommandTest extends RepositoryTestCase {
 			.append("</manifest>");
 		writeTrashFile("manifest.xml", xmlContent.toString());
 		RepoCommand command = new RepoCommand(db);
-		command.setPath(db.getWorkTree() + "/manifest.xml")
+		command.setPath(db.getWorkTree().getAbsolutePath() + "/manifest.xml")
 			.setURI(rootUri)
 			.call();
-		File hello = new File(db.getWorkTree() + "/foo/hello.txt");
-		assertTrue(hello.exists());
+		File hello = new File(db.getWorkTree(), "foo/hello.txt");
+		assertTrue("submodule was checked out", hello.exists());
 		BufferedReader reader = new BufferedReader(new FileReader(hello));
 		String content = reader.readLine();
-		assertTrue(content.startsWith("world"));
+		reader.close();
+		assertEquals("submodule content is as expected.", "world", content);
 	}
 
 	@Test
@@ -146,34 +148,34 @@ public class RepoCommandTest extends RepositoryTestCase {
 		Repository localDb = createWorkRepository();
 		JGitTestUtil.writeTrashFile(localDb, "manifest.xml", xmlContent.toString());
 		RepoCommand command = new RepoCommand(localDb);
-		command.setPath(localDb.getWorkTree() + "/manifest.xml")
+		command.setPath(localDb.getWorkTree().getAbsolutePath() + "/manifest.xml")
 			.setURI(rootUri)
 			.call();
-		File file = new File(localDb.getWorkTree() + "/foo/hello.txt");
-		assertTrue(file.exists());
-		file = new File(localDb.getWorkTree() + "/bar/world.txt");
-		assertFalse(file.exists());
-		file = new File(localDb.getWorkTree() + "/a/a.txt");
-		assertTrue(file.exists());
-		file = new File(localDb.getWorkTree() + "/b/b.txt");
-		assertTrue(file.exists());
+		File file = new File(localDb.getWorkTree(), "foo/hello.txt");
+		assertTrue("default has foo", file.exists());
+		file = new File(localDb.getWorkTree(), "bar/world.txt");
+		assertFalse("default doesn't have bar", file.exists());
+		file = new File(localDb.getWorkTree(), "a/a.txt");
+		assertTrue("default has a", file.exists());
+		file = new File(localDb.getWorkTree(), "b/b.txt");
+		assertTrue("default has b", file.exists());
 
 		// all,-a should have bar & b
 		localDb = createWorkRepository();
 		JGitTestUtil.writeTrashFile(localDb, "manifest.xml", xmlContent.toString());
 		command = new RepoCommand(localDb);
-		command.setPath(localDb.getWorkTree() + "/manifest.xml")
+		command.setPath(localDb.getWorkTree().getAbsolutePath() + "/manifest.xml")
 			.setURI(rootUri)
 			.setGroups("all,-a")
 			.call();
-		file = new File(localDb.getWorkTree() + "/foo/hello.txt");
-		assertFalse(file.exists());
-		file = new File(localDb.getWorkTree() + "/bar/world.txt");
-		assertTrue(file.exists());
-		file = new File(localDb.getWorkTree() + "/a/a.txt");
-		assertFalse(file.exists());
-		file = new File(localDb.getWorkTree() + "/b/b.txt");
-		assertTrue(file.exists());
+		file = new File(localDb.getWorkTree(), "foo/hello.txt");
+		assertFalse("\"all,-a\" doesn't have foo", file.exists());
+		file = new File(localDb.getWorkTree(), "bar/world.txt");
+		assertTrue("\"all,-a\" has bar", file.exists());
+		file = new File(localDb.getWorkTree(), "a/a.txt");
+		assertFalse("\"all,-a\" doesn't have a", file.exists());
+		file = new File(localDb.getWorkTree(), "b/b.txt");
+		assertTrue("\"all,-a\" has have b", file.exists());
 	}
 
 	@Test
@@ -192,21 +194,23 @@ public class RepoCommandTest extends RepositoryTestCase {
 			.append("</manifest>");
 		JGitTestUtil.writeTrashFile(localDb, "manifest.xml", xmlContent.toString());
 		RepoCommand command = new RepoCommand(localDb);
-		command.setPath(localDb.getWorkTree() + "/manifest.xml")
+		command.setPath(localDb.getWorkTree().getAbsolutePath() + "/manifest.xml")
 			.setURI(rootUri)
 			.call();
 		// The original file should exist
-		File hello = new File(localDb.getWorkTree() + "/foo/hello.txt");
-		assertTrue(hello.exists());
+		File hello = new File(localDb.getWorkTree(), "foo/hello.txt");
+		assertTrue("The original file exists", hello.exists());
 		BufferedReader reader = new BufferedReader(new FileReader(hello));
 		String content = reader.readLine();
-		assertTrue(content.startsWith("world"));
+		reader.close();
+		assertEquals("The original file has expected content", "world", content);
 		// The dest file should also exist
-		hello = new File(localDb.getWorkTree() + "/Hello");
-		assertTrue(hello.exists());
+		hello = new File(localDb.getWorkTree(), "Hello");
+		assertTrue("The destination file exists", hello.exists());
 		reader = new BufferedReader(new FileReader(hello));
 		content = reader.readLine();
-		assertTrue(content.startsWith("world"));
+		reader.close();
+		assertEquals("The destination file has expected content", "world", content);
 	}
 
 	private void resolveRelativeUris() {
