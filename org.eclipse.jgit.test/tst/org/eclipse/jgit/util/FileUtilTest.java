@@ -71,7 +71,7 @@ public class FileUtilTest {
 	@Test
 	public void testDeleteFile() throws IOException {
 		File f = new File(trash, "test");
-		assertTrue(f.createNewFile());
+		FileUtils.createNewFile(f);
 		FileUtils.delete(f);
 		assertFalse(f.exists());
 
@@ -92,7 +92,7 @@ public class FileUtilTest {
 	@Test
 	public void testDeleteRecursive() throws IOException {
 		File f1 = new File(trash, "test/test/a");
-		FileUtils.mkdirs(f1.getParentFile());
+		assertTrue(f1.getParentFile().mkdirs());
 		FileUtils.createNewFile(f1);
 		File f2 = new File(trash, "test/test/b");
 		FileUtils.createNewFile(f2);
@@ -132,7 +132,7 @@ public class FileUtilTest {
 
 		assertTrue(d.delete());
 		File f = new File(trash, "test");
-		assertTrue(f.createNewFile());
+		FileUtils.createNewFile(f);
 		try {
 			FileUtils.mkdir(d);
 			fail("creation of directory having same path as existing file must"
@@ -164,7 +164,7 @@ public class FileUtilTest {
 
 		FileUtils.delete(root, FileUtils.RECURSIVE);
 		File f = new File(trash, "test");
-		assertTrue(f.createNewFile());
+		FileUtils.createNewFile(f);
 		try {
 			FileUtils.mkdirs(d);
 			fail("creation of directory having path conflicting with existing"
