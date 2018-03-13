@@ -50,7 +50,6 @@ import java.util.Set;
 
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.lib.ObjectId;
@@ -113,6 +112,11 @@ class CachedObjectDirectory extends FileObjectDatabase {
 	}
 
 	@Override
+	public ObjectDirectoryInserter newInserter() {
+		return wrapped.newInserter();
+	}
+
+	@Override
 	public ObjectDatabase newCachedDatabase() {
 		return this;
 	}
@@ -125,11 +129,6 @@ class CachedObjectDirectory extends FileObjectDatabase {
 	@Override
 	File getDirectory() {
 		return wrapped.getDirectory();
-	}
-
-	@Override
-	Config getConfig() {
-		return wrapped.getConfig();
 	}
 
 	@Override

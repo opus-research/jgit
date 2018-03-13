@@ -273,25 +273,17 @@ public class DirCacheCheckout {
 	void processEntry(CanonicalTreeParser m, DirCacheBuildIterator i,
 			WorkingTreeIterator f) {
 		if (m != null) {
-			if (i == null || f == null || !m.idEqual(i)
-					|| f.isModified(i.getDirCacheEntry(), true,
-							config_filemode(), repo.getFS())) {
-				update(m.getEntryPathString(), m.getEntryObjectId(),
-						m.getEntryFileMode());
-			} else
-				keep(i.getDirCacheEntry());
+			update(m.getEntryPathString(), m.getEntryObjectId(),
+					m.getEntryFileMode());
 		} else {
 			if (f != null) {
 				if (walk.isDirectoryFileConflict()) {
 					conflicts.add(walk.getPathString());
 				} else {
-					if (i != null) {
-						// ... and the working dir contained a file or folder ->
-						// add it to the removed set and remove it from
-						// conflicts set
-						remove(i.getEntryPathString());
-						conflicts.remove(i.getEntryPathString());
-					}
+					// ... and the working dir contained a file or folder ->
+					// add it to the removed set and remove it from conflicts set
+					remove(i.getEntryPathString());
+					conflicts.remove(i.getEntryPathString());
 				}
 			} else
 				keep(i.getDirCacheEntry());
