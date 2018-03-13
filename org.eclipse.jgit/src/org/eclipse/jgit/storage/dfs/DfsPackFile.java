@@ -283,11 +283,9 @@ public final class DfsPackFile {
 					return revidx;
 			}
 
-			PackIndex idx = idx(ctx);
-			PackReverseIndex revidx = new PackReverseIndex(idx);
-			int sz = (int) Math.min(
-					idx.getObjectCount() * 8, Integer.MAX_VALUE);
-			reverseIndex = cache.put(key, POS_REVERSE_INDEX, sz, revidx);
+			PackReverseIndex revidx = new PackReverseIndex(idx(ctx));
+			reverseIndex = cache.put(key, POS_REVERSE_INDEX,
+					packDesc.getReverseIndexSize(), revidx);
 			return revidx;
 		}
 	}
