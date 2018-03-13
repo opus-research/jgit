@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2013, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2016, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,39 +40,47 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lib;
 
-/**
- * Parsed reflog entry
- *
- * @since 3.0
- */
-public interface ReflogEntry {
+package org.eclipse.jgit.internal.storage.file;
 
-	/**
-	 * @return the commit id before the change
-	 */
-	public abstract ObjectId getOldId();
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
-	/**
-	 * @return the commit id after the change
-	 */
-	public abstract ObjectId getNewId();
+import java.io.File;
+import java.io.IOException;
 
-	/**
-	 * @return user performing the change
-	 */
-	public abstract PersonIdent getWho();
+import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
+import org.eclipse.jgit.lib.Repository;
+import org.junit.Test;
 
-	/**
-	 * @return textual description of the change
-	 */
-	public abstract String getComment();
+/** Test managing the gitweb description file. */
+public class DescriptionTest extends LocalDiskRepositoryTestCase {
+	private static final String UNCONFIGURED = "Unnamed repository; edit this file to name it for gitweb.";
 
-	/**
-	 * @return a {@link CheckoutEntry} with parsed information about a branch
-	 *         switch, or null if the entry is not a checkout
-	 */
-	public abstract CheckoutEntry parseCheckout();
+	@Test
+	public void description() throws IOException {
+		Repository git = createBareRepository();
+		File path = new File(git.getDirectory(), "description");
+		assertNull("description", git.getGitwebDescription());
 
+		String desc = "a test repo\nfor jgit";
+		git.setGitwebDescription(desc);
+		assertEquals(desc + '\n', read(path));
+		assertEquals(desc, git.getGitwebDescription());
+
+		git.setGitwebDescription(null);
+		assertEquals("", read(path));
+
+		desc = "foo";
+		git.setGitwebDescription(desc);
+		assertEquals(desc + '\n', read(path));
+		assertEquals(desc, git.getGitwebDescription());
+
+		git.setGitwebDescription("");
+		assertEquals("", read(path));
+
+		git.setGitwebDescription(UNCONFIGURED);
+		assertEquals(UNCONFIGURED + '\n', read(path));
+		assertNull("description", git.getGitwebDescription());
+	}
 }
