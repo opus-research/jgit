@@ -66,7 +66,7 @@ import org.eclipse.jgit.treewalk.AbstractTreeIterator;
  * algorithm. For example deleting a path:
  *
  * <pre>
- * final DirCache dirc = db.lockDirCache();
+ * final DirCache dirc = DirCache.lock(db);
  * final DirCacheBuilder edit = dirc.builder();
  *
  * final TreeWalk walk = new TreeWalk(db);
