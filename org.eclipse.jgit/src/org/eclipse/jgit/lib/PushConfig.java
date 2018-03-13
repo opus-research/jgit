@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2013 Robin Stocker <robin@nibor.org> and others.
+ * Copyright (C) 2017, David Pursehouse <david.pursehouse@gmail.com>
+ * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -39,42 +40,57 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
+package org.eclipse.jgit.lib;
 
-import java.io.File;
+import java.util.Locale;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.lib.CLIRepositoryTestCase;
-import org.junit.Before;
-import org.junit.Test;
+import org.eclipse.jgit.util.StringUtils;
 
-public class RmTest extends CLIRepositoryTestCase {
-	private Git git;
+/**
+ * Push section of a Git configuration file.
+ *
+ * @since 4.9
+ */
+public class PushConfig {
+	/**
+	 * Config values for push.recurseSubmodules.
+	 */
+	public enum PushRecurseSubmodulesMode implements Config.ConfigEnum {
+		/**
+		 * Verify that all submodule commits that changed in the revisions to be
+		 * pushed are available on at least one remote of the submodule.
+		 */
+		CHECK("check"), //$NON-NLS-1$
 
-	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
-		git = new Git(db);
-	}
+		/**
+		 * All submodules that changed in the revisions to be pushed will be
+		 * pushed.
+		 */
+		ON_DEMAND("on-demand"), //$NON-NLS-1$
 
-	@Test
-	public void multiplePathsShouldBeRemoved() throws Exception {
-		File a = writeTrashFile("a", "Hello");
-		File b = writeTrashFile("b", "world!");
-		git.add().addFilepattern("a").addFilepattern("b").call();
+		/** Default behavior of ignoring submodules when pushing is retained. */
+		NO("false"); //$NON-NLS-1$
 
-		String[] result = execute("git rm a b");
-		assertArrayEquals(new String[] { "" }, result);
-		DirCache cache = db.readDirCache();
-		assertNull(cache.getEntry("a"));
-		assertNull(cache.getEntry("b"));
-		assertFalse(a.exists());
-		assertFalse(b.exists());
+		private final String configValue;
+
+		private PushRecurseSubmodulesMode(String configValue) {
+			this.configValue = configValue;
+		}
+
+		@Override
+		public String toConfigValue() {
+			return name().toLowerCase(Locale.ROOT).replace('_', '-');
+		}
+
+		@Override
+		public boolean matchConfigValue(String s) {
+			if (StringUtils.isEmptyOrNull(s)) {
+				return false;
+			}
+			s = s.replace('-', '_');
+			return name().equalsIgnoreCase(s)
+					|| configValue.equalsIgnoreCase(s);
+		}
 	}
 }

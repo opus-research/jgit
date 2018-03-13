@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, Google Inc.
+ * Copyright (C) 2017, David Pursehouse <david.pursehouse@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,50 +43,44 @@
 
 package org.eclipse.jgit.lib;
 
-import org.eclipse.jgit.errors.CorruptObjectException;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
-/**
- * Verifies that a blob object is a valid object.
- * <p>
- * Unlike trees, commits and tags, there's no validity of blobs. Implementers
- * can optionally implement this blob checker to reject certain blobs.
- *
- * @since 4.9
- */
-public interface BlobObjectChecker {
-	/** No-op implementation of {@link BlobObjectChecker}. */
-	public static final BlobObjectChecker NULL_CHECKER =
-			new BlobObjectChecker() {
-				@Override
-				public void update(byte[] in, int p, int len) {
-					// Empty implementation.
-				}
+import org.eclipse.jgit.lib.PushConfig.PushRecurseSubmodulesMode;
+import org.junit.Test;
 
-				@Override
-				public void endBlob(AnyObjectId id) {
-					// Empty implementation.
-				}
-			};
+public class PushConfigTest {
+	@Test
+	public void pushRecurseSubmoduleMatch() throws Exception {
+		assertTrue(PushRecurseSubmodulesMode.CHECK.matchConfigValue("check"));
+		assertTrue(PushRecurseSubmodulesMode.CHECK.matchConfigValue("CHECK"));
 
-	/**
-	 * Check a new fragment of the blob.
-	 *
-	 * @param in
-	 *            input array of bytes.
-	 * @param offset
-	 *            offset to start at from {@code in}.
-	 * @param len
-	 *            length of the fragment to check.
-	 */
-	void update(byte[] in, int offset, int len);
+		assertTrue(PushRecurseSubmodulesMode.ON_DEMAND
+				.matchConfigValue("on-demand"));
+		assertTrue(PushRecurseSubmodulesMode.ON_DEMAND
+				.matchConfigValue("ON-DEMAND"));
+		assertTrue(PushRecurseSubmodulesMode.ON_DEMAND
+				.matchConfigValue("on_demand"));
+		assertTrue(PushRecurseSubmodulesMode.ON_DEMAND
+				.matchConfigValue("ON_DEMAND"));
 
-	/**
-	 * Finalize the blob checking.
-	 *
-	 * @param id
-	 *            identity of the object being checked.
-	 * @throws CorruptObjectException
-	 *             if any error was detected.
-	 */
-	void endBlob(AnyObjectId id) throws CorruptObjectException;
+		assertTrue(PushRecurseSubmodulesMode.NO.matchConfigValue("no"));
+		assertTrue(PushRecurseSubmodulesMode.NO.matchConfigValue("NO"));
+		assertTrue(PushRecurseSubmodulesMode.NO.matchConfigValue("false"));
+		assertTrue(PushRecurseSubmodulesMode.NO.matchConfigValue("FALSE"));
+	}
+
+	@Test
+	public void pushRecurseSubmoduleNoMatch() throws Exception {
+		assertFalse(PushRecurseSubmodulesMode.NO.matchConfigValue("N"));
+		assertFalse(PushRecurseSubmodulesMode.ON_DEMAND
+				.matchConfigValue("ONDEMAND"));
+	}
+
+	@Test
+	public void pushRecurseSubmoduleToConfigValue() {
+		assertEquals("on-demand",
+				PushRecurseSubmodulesMode.ON_DEMAND.toConfigValue());
+	}
 }
