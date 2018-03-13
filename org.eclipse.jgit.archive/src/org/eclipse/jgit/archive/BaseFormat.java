@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2015, David Ostrovsky <david@ostrovsky.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,53 +41,45 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.archive;
 
-import java.io.File;
+import java.beans.Statement;
+import java.io.IOException;
+import java.text.MessageFormat;
+import java.util.Map;
 
+import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.eclipse.jgit.archive.internal.ArchiveText;
+import org.eclipse.jgit.util.StringUtils;
 
 /**
- * FS implementaton for Java5
+ * Base format class
  *
- * @since 3.0
+ * @since 4.0
  */
-public class FS_POSIX_Java5 extends FS_POSIX {
-	/**
-	 * Constructor
-	 */
-	public FS_POSIX_Java5() {
-		super();
-	}
+public class BaseFormat {
 
 	/**
-	 * Constructor
+	 * Apply options to archive output stream
 	 *
-	 * @param src
-	 *            instance whose attributes to copy
+	 * @param s
+	 *            stream to apply options to
+	 * @param o
+	 *            options map
+	 * @return stream with option applied
+	 * @throws IOException
 	 */
-	public FS_POSIX_Java5(FS src) {
-		super(src);
-	}
-
-	@Override
-	public FS newInstance() {
-		return new FS_POSIX_Java5(this);
-	}
-
-	public boolean supportsExecute() {
-		return false;
-	}
-
-	public boolean canExecute(final File f) {
-		return false;
-	}
-
-	public boolean setExecute(final File f, final boolean canExec) {
-		return false;
-	}
-
-	@Override
-	public boolean retryFailedLockFileCommit() {
-		return false;
+	protected ArchiveOutputStream applyFormatOptions(ArchiveOutputStream s,
+			Map<String, Object> o) throws IOException {
+		for (Map.Entry<String, Object> p : o.entrySet()) {
+			try {
+				new Statement(s, "set" + StringUtils.capitalize(p.getKey()), //$NON-NLS-1$
+						new Object[] { p.getValue() }).execute();
+			} catch (Exception e) {
+				throw new IOException(MessageFormat.format(
+						ArchiveText.get().cannotSetOption, p.getKey()), e);
+			}
+		}
+		return s;
 	}
 }
