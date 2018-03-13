@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2016, David Pursehouse <david.pursehouse@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,28 +40,22 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs.internal;
 
-import org.eclipse.jgit.nls.NLS;
-import org.eclipse.jgit.nls.TranslationBundle;
+package org.eclipse.jgit.lfs.errors;
 
 /**
- * Translation bundle for JGit LFS server
+ * Thrown when the bandwidth limit for the user or repository has been exceeded.
+ *
+ * @since 4.5
+ *
  */
-public class LfsText extends TranslationBundle {
+public class LfsBandwidthLimitExceeded extends LfsException {
+	private static final long serialVersionUID = 1L;
 
 	/**
-	 * @return an instance of this translation bundle
+	 * @param message
 	 */
-	public static LfsText get() {
-		return NLS.getBundleFor(LfsText.class);
+	public LfsBandwidthLimitExceeded(String message) {
+		super(message);
 	}
-
-	// @formatter:off
-	/***/ public String incorrectLONG_OBJECT_ID_LENGTH;
-	/***/ public String invalidLongId;
-	/***/ public String invalidLongIdLength;
-	/***/ public String requiredHashFunctionNotAvailable;
-	/***/ public String repositoryNotFound;
-	/***/ public String repositoryReadOnly;
 }

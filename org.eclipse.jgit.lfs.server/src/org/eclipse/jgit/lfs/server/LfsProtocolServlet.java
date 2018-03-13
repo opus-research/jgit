@@ -63,7 +63,9 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.eclipse.jgit.lfs.errors.LfsBandwidthLimitExceeded;
 import org.eclipse.jgit.lfs.errors.LfsException;
+import org.eclipse.jgit.lfs.errors.LfsRateLimitExceeded;
 import org.eclipse.jgit.lfs.errors.LfsRepositoryNotFound;
 import org.eclipse.jgit.lfs.errors.LfsRepositoryReadOnly;
 import org.eclipse.jgit.lfs.errors.LfsValidationError;
@@ -85,6 +87,10 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 
 	private static final String CONTENTTYPE_VND_GIT_LFS_JSON =
 			"application/vnd.git-lfs+json; charset=utf-8"; //$NON-NLS-1$
+
+	private static final int SC_RATE_LIMIT_EXCEEDED = 429;
+
+	private static final int SC_BANDWIDTH_LIMIT_EXCEEDED = 509;
 
 	private Gson gson = createGson();
 
@@ -149,7 +155,8 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 		try {
 			repo = getLargeFileRepository(request, path);
 			if (repo == null) {
-				res.setStatus(SC_SERVICE_UNAVAILABLE);
+				sendError(res, w, SC_SERVICE_UNAVAILABLE,
+						"LFS is not available"); //$NON-NLS-1$
 			} else {
 				res.setStatus(SC_OK);
 				TransferHandler handler = TransferHandler
@@ -162,6 +169,10 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 			sendError(res, w, SC_NOT_FOUND, e.getMessage());
 		} catch (LfsRepositoryReadOnly e) {
 			sendError(res, w, SC_FORBIDDEN, e.getMessage());
+		} catch (LfsRateLimitExceeded e) {
+			sendError(res, w, SC_RATE_LIMIT_EXCEEDED, e.getMessage());
+		} catch (LfsBandwidthLimitExceeded e) {
+			sendError(res, w, SC_BANDWIDTH_LIMIT_EXCEEDED, e.getMessage());
 		} catch (LfsException e) {
 			sendError(res, w, SC_SERVICE_UNAVAILABLE, e.getMessage());
 		} finally {
