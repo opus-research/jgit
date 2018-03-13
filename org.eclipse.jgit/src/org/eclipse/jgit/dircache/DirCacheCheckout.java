@@ -473,26 +473,6 @@ public class DirCacheCheckout {
 	}
 
 	/**
-	 * Compares whether two pairs of ObjectId and FileMode are equal.
-	 * 
-	 * @param id1
-	 * @param mode1
-	 * @param id2
-	 * @param mode2
-	 * @return <code>true</code> if FileModes and ObjectIds are equal.
-	 *         <code>false</code> otherwise
-	 */
-	private boolean equalIdAndMode(ObjectId id1, FileMode mode1, ObjectId id2,
-			FileMode mode2) {
-		if (mode1.equals(mode2)) {
-			if (id1 == null)
-				return id2 == null;
-			return (id1.equals(id2));
-		}
-		return false;
-	}
-
-	/**
 	 * Here the main work is done. This method is called for each existing path
 	 * in head, index and merge. This method decides what to do with the
 	 * corresponding index entry: keep it, update it, remove it or mark a
@@ -528,9 +508,6 @@ public class DirCacheCheckout {
 		ObjectId iId = (i == null ? null : i.getEntryObjectId());
 		ObjectId mId = (m == null ? null : m.getEntryObjectId());
 		ObjectId hId = (h == null ? null : h.getEntryObjectId());
-		FileMode iMode = (i == null ? null : i.getEntryFileMode());
-		FileMode mMode = (m == null ? null : m.getEntryFileMode());
-		FileMode hMode = (h == null ? null : h.getEntryFileMode());
 
 		/**
 		 * <pre>
@@ -633,7 +610,7 @@ public class DirCacheCheckout {
 				conflict(name, (i != null) ? i.getDirCacheEntry() : null, h, m);
 				break;
 			case 0xFDF: // 7 8 9
-				if (equalIdAndMode(hId, hMode, mId, mMode)) {
+				if (hId.equals(mId)) {
 					if (isModified(name))
 						conflict(name, i.getDirCacheEntry(), h, m); // 8
 					else
@@ -648,7 +625,7 @@ public class DirCacheCheckout {
 				keep(i.getDirCacheEntry());
 				break;
 			case 0xFFD: // 12 13 14
-				if (equalIdAndMode(hId, hMode, iId, iMode)) {
+				if (hId.equals(iId)) {
 					dce = i.getDirCacheEntry();
 					if (f == null || f.isModified(dce, true))
 						conflict(name, dce, h, m);
@@ -726,7 +703,7 @@ public class DirCacheCheckout {
 				 * </pre>
 				 */
 
-				if (m == null || equalIdAndMode(mId, mMode, iId, iMode)) {
+				if (m == null || mId.equals(iId)) {
 					if (m==null && walk.isDirectoryFileConflict()) {
 						if (dce != null
 								&& (f == null || f.isModified(dce, true)))
@@ -755,7 +732,7 @@ public class DirCacheCheckout {
 					// be removed from the index, but not deleted from disk.
 					remove(name);
 				} else {
-					if (equalIdAndMode(hId, hMode, iId, iMode)) {
+					if (hId.equals(iId)) {
 						if (f == null || f.isModified(dce, true))
 							conflict(name, dce, h, m);
 						else
@@ -764,12 +741,9 @@ public class DirCacheCheckout {
 						conflict(name, dce, h, m);
 				}
 			} else {
-				if (!equalIdAndMode(hId, hMode, mId, mMode)
-						&& !equalIdAndMode(hId, hMode, iId, iMode)
-						&& !equalIdAndMode(mId, mMode, iId, iMode))
+				if (!hId.equals(mId) && !hId.equals(iId) && !mId.equals(iId))
 					conflict(name, dce, h, m);
-				else if (equalIdAndMode(hId, hMode, iId, iMode)
-						&& !equalIdAndMode(mId, mMode, iId, iMode)) {
+				else if (hId.equals(iId) && !mId.equals(iId)) {
 					// For submodules just update the index with the new SHA-1
 					if (dce != null
 							&& FileMode.GITLINK.equals(dce.getFileMode())) {
