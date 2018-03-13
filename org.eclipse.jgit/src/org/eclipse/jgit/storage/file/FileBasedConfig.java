@@ -101,12 +101,6 @@ public class FileBasedConfig extends StoredConfig {
 		this.fs = fs;
 	}
 
-	@Override
-	protected boolean notifyUponTransientChanges() {
-		// we will notify listeners upon save()
-		return false;
-	}
-
 	/** @return location of the configuration file on disk */
 	public final File getFile() {
 		return configFile;
@@ -165,8 +159,6 @@ public class FileBasedConfig extends StoredConfig {
 			lf.unlock();
 		}
 		lastModified = lf.getCommitLastModified();
-		// notify the listeners
-		fireConfigChangedEvent();
 	}
 
 	@Override
