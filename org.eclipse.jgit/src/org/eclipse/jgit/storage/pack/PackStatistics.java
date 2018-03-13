@@ -166,9 +166,6 @@ public class PackStatistics {
 		/** The set of objects to be excluded from the pack. */
 		public Set<ObjectId> uninterestingObjects;
 
-		/** The set of shallow commits on the client. */
-		public Set<ObjectId> clientShallowCommits;
-
 		/** The collection of reused packs in the upload. */
 		public List<CachedPack> reusedPacks;
 
@@ -271,14 +268,6 @@ public class PackStatistics {
 	 */
 	public Set<ObjectId> getUninterestingObjects() {
 		return statistics.uninterestingObjects;
-	}
-
-	/**
-	 * @return unmodifiable collection of objects that were shallow commits on
-	 *         the client.
-	 */
-	public Set<ObjectId> getClientShallowCommits() {
-		return statistics.clientShallowCommits;
 	}
 
 	/**

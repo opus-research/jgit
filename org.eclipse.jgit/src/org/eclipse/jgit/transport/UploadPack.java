@@ -1444,7 +1444,6 @@ public class UploadPack {
 			pw.setIndexDisabled(true);
 			pw.setUseCachedPacks(true);
 			pw.setUseBitmaps(depth == 0 && clientShallowCommits.isEmpty());
-			pw.setClientShallowCommits(clientShallowCommits);
 			pw.setReuseDeltaCommits(true);
 			pw.setDeltaBaseAsOffset(options.contains(OPTION_OFS_DELTA));
 			pw.setThin(options.contains(OPTION_THIN_PACK));
