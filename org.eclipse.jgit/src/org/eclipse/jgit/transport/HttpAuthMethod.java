@@ -51,10 +51,12 @@ import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
@@ -149,9 +151,12 @@ abstract class HttpAuthMethod {
 	 *
 	 * @param conn
 	 *            the connection that failed.
+	 * @param ignoreTypes
+	 *            authentication types to be ignored.
 	 * @return new authentication method to try.
 	 */
-	static HttpAuthMethod scanResponse(final HttpConnection conn) {
+	static HttpAuthMethod scanResponse(final HttpConnection conn,
+			Collection<Type> ignoreTypes) {
 		final Map<String, List<String>> headers = conn.getHeaderFields();
 		HttpAuthMethod authentication = Type.NONE.method(EMPTY_STRING);
 
@@ -164,7 +169,14 @@ abstract class HttpAuthMethod {
 									SCHEMA_NAME_SEPARATOR, 2);
 
 							try {
-								Type methodType = Type.valueOf(valuePart[0].toUpperCase());
+								Type methodType = Type.valueOf(
+										valuePart[0].toUpperCase(Locale.ROOT));
+
+								if ((ignoreTypes != null)
+										&& (ignoreTypes.contains(methodType))) {
+									continue;
+								}
+
 								if (authentication.getType().compareTo(methodType) >= 0) {
 									continue;
 								}
@@ -336,7 +348,7 @@ abstract class HttpAuthMethod {
 		@SuppressWarnings("boxing")
 		@Override
 		void configureRequest(final HttpConnection conn) throws IOException {
-			final Map<String, String> r = new LinkedHashMap<String, String>();
+			final Map<String, String> r = new LinkedHashMap<>();
 
 			final String realm = params.get("realm"); //$NON-NLS-1$
 			final String nonce = params.get("nonce"); //$NON-NLS-1$
@@ -455,7 +467,7 @@ abstract class HttpAuthMethod {
 		}
 
 		private static Map<String, String> parse(String auth) {
-			Map<String, String> p = new HashMap<String, String>();
+			Map<String, String> p = new HashMap<>();
 			int next = 0;
 			while (next < auth.length()) {
 				if (next < auth.length() && auth.charAt(next) == ',') {
@@ -530,7 +542,7 @@ abstract class HttpAuthMethod {
 			GSSManager gssManager = GSS_MANAGER_FACTORY.newInstance(conn
 					.getURL());
 			String host = conn.getURL().getHost();
-			String peerName = "HTTP@" + host.toLowerCase(); //$NON-NLS-1$
+			String peerName = "HTTP@" + host.toLowerCase(Locale.ROOT); //$NON-NLS-1$
 			try {
 				GSSName gssName = gssManager.createName(peerName,
 						GSSName.NT_HOSTBASED_SERVICE);

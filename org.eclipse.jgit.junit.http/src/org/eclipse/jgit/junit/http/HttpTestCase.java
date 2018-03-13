@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2009-2017, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -74,19 +74,35 @@ public abstract class HttpTestCase extends LocalDiskRepositoryTestCase {
 	/** In-memory application server; subclass must start. */
 	protected AppServer server;
 
+	@Override
 	public void setUp() throws Exception {
 		super.setUp();
-		server = new AppServer();
+		server = createServer();
 	}
 
+	@Override
 	public void tearDown() throws Exception {
 		server.tearDown();
 		super.tearDown();
 	}
 
+	/**
+	 * Creates the {@linkAppServer}.This default implementation creates a server
+	 * without SSLsupport listening for HTTP connections on a dynamically chosen
+	 * port, which can be gotten once the server has been started via its
+	 * {@link AppServer#getPort()} method. Subclasses may override if they need
+	 * a more specialized server.
+	 *
+	 * @return the {@link AppServer}.
+	 * @since 4.9
+	 */
+	protected AppServer createServer() {
+		return new AppServer();
+	}
+
 	protected TestRepository<Repository> createTestRepository()
 			throws IOException {
-		return new TestRepository<Repository>(createBareRepository());
+		return new TestRepository<>(createBareRepository());
 	}
 
 	protected URIish toURIish(String path) throws URISyntaxException {
@@ -117,11 +133,13 @@ public abstract class HttpTestCase extends LocalDiskRepositoryTestCase {
 
 	protected static void fsck(Repository db, RevObject... tips)
 			throws Exception {
-		new TestRepository(db).fsck(tips);
+		TestRepository<? extends Repository> tr =
+				new TestRepository<>(db);
+		tr.fsck(tips);
 	}
 
 	protected static Set<RefSpec> mirror(String... refs) {
-		HashSet<RefSpec> r = new HashSet<RefSpec>();
+		HashSet<RefSpec> r = new HashSet<>();
 		for (String name : refs) {
 			RefSpec rs = new RefSpec(name);
 			rs = rs.setDestination(name);
@@ -160,5 +178,38 @@ public abstract class HttpTestCase extends LocalDiskRepositoryTestCase {
 		if (!dir.endsWith("/"))
 			dir += "/";
 		return dir + path;
+	}
+
+	protected static String rewriteUrl(String url, String newProtocol,
+			int newPort) {
+		String newUrl = url;
+		if (newProtocol != null && !newProtocol.isEmpty()) {
+			int schemeEnd = newUrl.indexOf("://");
+			if (schemeEnd >= 0) {
+				newUrl = newProtocol + newUrl.substring(schemeEnd);
+			}
+		}
+		if (newPort > 0) {
+			newUrl = newUrl.replaceFirst(":\\d+/", ":" + newPort + "/");
+		} else {
+			// Remove the port, if any
+			newUrl = newUrl.replaceFirst(":\\d+/", "/");
+		}
+		return newUrl;
+	}
+
+	protected static URIish extendPath(URIish uri, String pathComponents)
+			throws URISyntaxException {
+		String raw = uri.toString();
+		String newComponents = pathComponents;
+		if (!newComponents.startsWith("/")) {
+			newComponents = '/' + newComponents;
+		}
+		if (!newComponents.endsWith("/")) {
+			newComponents += '/';
+		}
+		int i = raw.lastIndexOf('/');
+		raw = raw.substring(0, i) + newComponents + raw.substring(i + 1);
+		return new URIish(raw);
 	}
 }

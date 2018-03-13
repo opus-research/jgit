@@ -50,6 +50,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.storage.pack.ObjectReuseAsIs;
@@ -63,6 +64,13 @@ import org.eclipse.jgit.internal.storage.pack.ObjectReuseAsIs;
 public abstract class ObjectReader implements AutoCloseable {
 	/** Type hint indicating the caller doesn't know the type. */
 	public static final int OBJ_ANY = -1;
+
+	/**
+	 * The threshold at which a file will be streamed rather than loaded
+	 * entirely into memory.
+	 * @since 4.6
+	 */
+	protected int streamFileThreshold;
 
 	/**
 	 * Construct a new reader from the same data.
@@ -126,7 +134,7 @@ public abstract class ObjectReader implements AutoCloseable {
 		Collection<ObjectId> matches = resolve(abbrev);
 		while (1 < matches.size() && len < Constants.OBJECT_ID_STRING_LENGTH) {
 			abbrev = objectId.abbreviate(++len);
-			List<ObjectId> n = new ArrayList<ObjectId>(8);
+			List<ObjectId> n = new ArrayList<>(8);
 			for (ObjectId candidate : matches) {
 				if (abbrev.prefixCompare(candidate) == 0)
 					n.add(candidate);
@@ -278,6 +286,7 @@ public abstract class ObjectReader implements AutoCloseable {
 		return new AsyncObjectLoaderQueue<T>() {
 			private T cur;
 
+			@Override
 			public boolean next() throws MissingObjectException, IOException {
 				if (idItr.hasNext()) {
 					cur = idItr.next();
@@ -287,22 +296,27 @@ public abstract class ObjectReader implements AutoCloseable {
 				}
 			}
 
+			@Override
 			public T getCurrent() {
 				return cur;
 			}
 
+			@Override
 			public ObjectId getObjectId() {
 				return cur;
 			}
 
+			@Override
 			public ObjectLoader open() throws IOException {
 				return ObjectReader.this.open(cur, OBJ_ANY);
 			}
 
+			@Override
 			public boolean cancel(boolean mayInterruptIfRunning) {
 				return true;
 			}
 
+			@Override
 			public void release() {
 				// Since we are sequential by default, we don't
 				// have any state to clean up if we terminate early.
@@ -362,6 +376,7 @@ public abstract class ObjectReader implements AutoCloseable {
 
 			private long sz;
 
+			@Override
 			public boolean next() throws MissingObjectException, IOException {
 				if (idItr.hasNext()) {
 					cur = idItr.next();
@@ -372,22 +387,27 @@ public abstract class ObjectReader implements AutoCloseable {
 				}
 			}
 
+			@Override
 			public T getCurrent() {
 				return cur;
 			}
 
+			@Override
 			public ObjectId getObjectId() {
 				return cur;
 			}
 
+			@Override
 			public long getSize() {
 				return sz;
 			}
 
+			@Override
 			public boolean cancel(boolean mayInterruptIfRunning) {
 				return true;
 			}
 
+			@Override
 			public void release() {
 				// Since we are sequential by default, we don't
 				// have any state to clean up if we terminate early.
@@ -422,6 +442,17 @@ public abstract class ObjectReader implements AutoCloseable {
 	}
 
 	/**
+	 * @return the {@link ObjectInserter} from which this reader was created
+	 *         using {@code inserter.newReader()}, or null if this reader was not
+	 *         created from an inserter.
+	 * @since 4.4
+	 */
+	@Nullable
+	public ObjectInserter getCreatedFromInserter() {
+		return null;
+	}
+
+	/**
 	 * Release any resources used by this reader.
 	 * <p>
 	 * A reader that has been released can be used again, but may need to be
@@ -431,4 +462,131 @@ public abstract class ObjectReader implements AutoCloseable {
 	 */
 	@Override
 	public abstract void close();
+
+	/**
+	 * Sets the threshold at which a file will be streamed rather than loaded
+	 * entirely into memory
+	 *
+	 * @param threshold
+	 *            the new threshold
+	 * @since 4.6
+	 */
+	public void setStreamFileThreshold(int threshold) {
+		streamFileThreshold = threshold;
+	}
+
+	/**
+	 * Returns the threshold at which a file will be streamed rather than loaded
+	 * entirely into memory
+	 *
+	 * @return the threshold in bytes
+	 * @since 4.6
+	 */
+	public int getStreamFileThreshold() {
+		return streamFileThreshold;
+	}
+
+	/**
+	 * Wraps a delegate ObjectReader.
+	 *
+	 * @since 4.4
+	 */
+	public static abstract class Filter extends ObjectReader {
+		/**
+		 * @return delegate ObjectReader to handle all processing.
+		 * @since 4.4
+		 */
+		protected abstract ObjectReader delegate();
+
+		@Override
+		public ObjectReader newReader() {
+			return delegate().newReader();
+		}
+
+		@Override
+		public AbbreviatedObjectId abbreviate(AnyObjectId objectId)
+				throws IOException {
+			return delegate().abbreviate(objectId);
+		}
+
+		@Override
+		public AbbreviatedObjectId abbreviate(AnyObjectId objectId, int len)
+				throws IOException {
+			return delegate().abbreviate(objectId, len);
+		}
+
+		@Override
+		public Collection<ObjectId> resolve(AbbreviatedObjectId id)
+				throws IOException {
+			return delegate().resolve(id);
+		}
+
+		@Override
+		public boolean has(AnyObjectId objectId) throws IOException {
+			return delegate().has(objectId);
+		}
+
+		@Override
+		public boolean has(AnyObjectId objectId, int typeHint) throws IOException {
+			return delegate().has(objectId, typeHint);
+		}
+
+		@Override
+		public ObjectLoader open(AnyObjectId objectId)
+				throws MissingObjectException, IOException {
+			return delegate().open(objectId);
+		}
+
+		@Override
+		public ObjectLoader open(AnyObjectId objectId, int typeHint)
+				throws MissingObjectException, IncorrectObjectTypeException,
+				IOException {
+			return delegate().open(objectId, typeHint);
+		}
+
+		@Override
+		public Set<ObjectId> getShallowCommits() throws IOException {
+			return delegate().getShallowCommits();
+		}
+
+		@Override
+		public <T extends ObjectId> AsyncObjectLoaderQueue<T> open(
+				Iterable<T> objectIds, boolean reportMissing) {
+			return delegate().open(objectIds, reportMissing);
+		}
+
+		@Override
+		public long getObjectSize(AnyObjectId objectId, int typeHint)
+				throws MissingObjectException, IncorrectObjectTypeException,
+				IOException {
+			return delegate().getObjectSize(objectId, typeHint);
+		}
+
+		@Override
+		public <T extends ObjectId> AsyncObjectSizeQueue<T> getObjectSize(
+				Iterable<T> objectIds, boolean reportMissing) {
+			return delegate().getObjectSize(objectIds, reportMissing);
+		}
+
+		@Override
+		public void setAvoidUnreachableObjects(boolean avoid) {
+			delegate().setAvoidUnreachableObjects(avoid);
+		}
+
+		@Override
+		public BitmapIndex getBitmapIndex() throws IOException {
+			return delegate().getBitmapIndex();
+		}
+
+		@Override
+		@Nullable
+		public ObjectInserter getCreatedFromInserter() {
+			return delegate().getCreatedFromInserter();
+		}
+
+		@Override
+		public void close() {
+			delegate().close();
+		}
+	}
 }

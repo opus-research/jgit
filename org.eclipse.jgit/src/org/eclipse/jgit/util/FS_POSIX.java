@@ -57,8 +57,11 @@ import java.util.List;
 import java.util.Set;
 
 import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.errors.CommandFailedException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Base FS for POSIX based systems
@@ -66,6 +69,8 @@ import org.eclipse.jgit.lib.Repository;
  * @since 3.0
  */
 public class FS_POSIX extends FS {
+	private final static Logger LOG = LoggerFactory.getLogger(FS_POSIX.class);
+
 	private static final int DEFAULT_UMASK = 0022;
 	private volatile int umask = -1;
 
@@ -122,7 +127,7 @@ public class FS_POSIX extends FS {
 							.defaultCharset().name()))) {
 				if (p.waitFor() == 0) {
 					String s = lineRead.readLine();
-					if (s.matches("0?\\d{3}")) { //$NON-NLS-1$
+					if (s != null && s.matches("0?\\d{3}")) { //$NON-NLS-1$
 						return Integer.parseInt(s, 8);
 					}
 				}
@@ -144,11 +149,18 @@ public class FS_POSIX extends FS {
 					// On MacOSX, PATH is shorter when Eclipse is launched from the
 					// Finder than from a terminal. Therefore try to launch bash as a
 					// login shell and search using that.
-					String w = readPipe(userHome(),
+					String w;
+					try {
+						w = readPipe(userHome(),
 							new String[]{"bash", "--login", "-c", "which git"}, // //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
 							Charset.defaultCharset().name());
-					if (!StringUtils.isEmptyOrNull(w))
+					} catch (CommandFailedException e) {
+						LOG.warn(e.getMessage());
+						return null;
+					}
+					if (!StringUtils.isEmptyOrNull(w)) {
 						gitExe = new File(w);
+					}
 				}
 			}
 		}
@@ -176,7 +188,7 @@ public class FS_POSIX extends FS {
 		if (!isFile(f))
 			return false;
 		if (!canExecute)
-			return f.setExecutable(false);
+			return f.setExecutable(false, false);
 
 		try {
 			Path path = f.toPath();
@@ -213,7 +225,7 @@ public class FS_POSIX extends FS {
 
 	@Override
 	public ProcessBuilder runInShell(String cmd, String[] args) {
-		List<String> argv = new ArrayList<String>(4 + args.length);
+		List<String> argv = new ArrayList<>(4 + args.length);
 		argv.add("sh"); //$NON-NLS-1$
 		argv.add("-c"); //$NON-NLS-1$
 		argv.add(cmd + " \"$@\""); //$NON-NLS-1$

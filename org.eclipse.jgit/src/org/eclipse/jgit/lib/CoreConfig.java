@@ -57,11 +57,7 @@ import org.eclipse.jgit.lib.Config.SectionParser;
  */
 public class CoreConfig {
 	/** Key for {@link Config#get(SectionParser)}. */
-	public static final Config.SectionParser<CoreConfig> KEY = new SectionParser<CoreConfig>() {
-		public CoreConfig parse(final Config cfg) {
-			return new CoreConfig(cfg);
-		}
-	};
+	public static final Config.SectionParser<CoreConfig> KEY = CoreConfig::new;
 
 	/** Permissible values for {@code core.autocrlf}. */
 	public static enum AutoCRLF {
@@ -73,6 +69,46 @@ public class CoreConfig {
 
 		/** CRLF-&gt;LF performed, but no LF-&gt;CRLF. */
 		INPUT;
+	}
+
+	/**
+	 * Permissible values for {@code core.eol}.
+	 * <p>
+	 * https://git-scm.com/docs/gitattributes
+	 *
+	 * @since 4.3
+	 */
+	public static enum EOL {
+		/** checkin with LF, checkout with CRLF. */
+		CRLF,
+
+		/** checkin with LF, checkout without conversion. */
+		LF,
+
+		/** use the platform's native line ending. */
+		NATIVE;
+	}
+
+	/**
+	 * EOL stream conversion protocol
+	 *
+	 * @since 4.3
+	 */
+	public static enum EolStreamType {
+		/** convert to CRLF without binary detection */
+		TEXT_CRLF,
+
+		/** convert to LF without binary detection */
+		TEXT_LF,
+
+		/** convert to CRLF with binary detection */
+		AUTO_CRLF,
+
+		/** convert to LF with binary detection */
+		AUTO_LF,
+
+		/** do not convert */
+		DIRECT;
 	}
 
 	/**

@@ -44,12 +44,16 @@
 package org.eclipse.jgit.pgm;
 
 import java.io.File;
+import java.io.IOException;
 import java.text.MessageFormat;
+import java.util.Collection;
 
 import org.eclipse.jgit.api.CloneCommand;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
+import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.transport.URIish;
 import org.eclipse.jgit.util.SystemReader;
@@ -57,7 +61,7 @@ import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 
 @Command(common = true, usage = "usage_cloneRepositoryIntoNewDir")
-class Clone extends AbstractFetchCommand {
+class Clone extends AbstractFetchCommand implements CloneCommand.Callback {
 	@Option(name = "--origin", aliases = { "-o" }, metaVar = "metaVar_remoteName", usage = "usage_useNameInsteadOfOriginToTrackUpstream")
 	private String remoteName = Constants.DEFAULT_REMOTE_NAME;
 
@@ -69,6 +73,12 @@ class Clone extends AbstractFetchCommand {
 
 	@Option(name = "--bare", usage = "usage_bareClone")
 	private boolean isBare;
+
+	@Option(name = "--quiet", usage = "usage_quiet")
+	private Boolean quiet;
+
+	@Option(name = "--recurse-submodules", usage = "usage_recurseSubmodules")
+	private boolean cloneSubmodules;
 
 	@Argument(index = 0, required = true, metaVar = "metaVar_uriish")
 	private String sourceUri;
@@ -91,6 +101,9 @@ class Clone extends AbstractFetchCommand {
 		if (localName == null) {
 			try {
 				localName = uri.getHumanishName();
+				if (isBare) {
+					localName = localName + Constants.DOT_GIT_EXT;
+				}
 				localNameF = new File(SystemReader.getInstance().getProperty(
 						Constants.OS_USER_DIR), localName);
 			} catch (IllegalArgumentException e) {
@@ -105,14 +118,22 @@ class Clone extends AbstractFetchCommand {
 
 		CloneCommand command = Git.cloneRepository();
 		command.setURI(sourceUri).setRemote(remoteName).setBare(isBare)
-				.setNoCheckout(noCheckout).setBranch(branch);
+				.setNoCheckout(noCheckout).setBranch(branch)
+				.setCloneSubmodules(cloneSubmodules);
 
 		command.setGitDir(gitdir == null ? null : new File(gitdir));
 		command.setDirectory(localNameF);
-		outw.println(MessageFormat.format(CLIText.get().cloningInto, localName));
+		boolean msgs = quiet == null || !quiet.booleanValue();
+		if (msgs) {
+			command.setProgressMonitor(new TextProgressMonitor(errw))
+					.setCallback(this);
+			outw.println(MessageFormat.format(
+					CLIText.get().cloningInto, localName));
+			outw.flush();
+		}
 		try {
 			db = command.call().getRepository();
-			if (db.resolve(Constants.HEAD) == null)
+			if (msgs && db.resolve(Constants.HEAD) == null)
 				outw.println(CLIText.get().clonedEmptyRepository);
 		} catch (InvalidRemoteException e) {
 			throw die(MessageFormat.format(CLIText.get().doesNotExist,
@@ -121,8 +142,44 @@ class Clone extends AbstractFetchCommand {
 			if (db != null)
 				db.close();
 		}
+		if (msgs) {
+			outw.println();
+			outw.flush();
+		}
+	}
 
-		outw.println();
-		outw.flush();
+	@Override
+	public void initializedSubmodules(Collection<String> submodules) {
+		try {
+			for (String submodule : submodules) {
+				outw.println(MessageFormat
+						.format(CLIText.get().submoduleRegistered, submodule));
+			}
+			outw.flush();
+		} catch (IOException e) {
+			// ignore
+		}
+	}
+
+	@Override
+	public void cloningSubmodule(String path) {
+		try {
+			outw.println(MessageFormat.format(
+					CLIText.get().cloningInto, path));
+			outw.flush();
+		} catch (IOException e) {
+			// ignore
+		}
+	}
+
+	@Override
+	public void checkingOut(AnyObjectId commit, String path) {
+		try {
+			outw.println(MessageFormat.format(CLIText.get().checkingOut,
+					path, commit.getName()));
+			outw.flush();
+		} catch (IOException e) {
+			// ignore
+		}
 	}
 }

@@ -53,6 +53,7 @@ import java.util.Set;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
@@ -69,6 +70,7 @@ import org.eclipse.jgit.lib.BitmapIndex.BitmapBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.InflaterCache;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
@@ -84,10 +86,22 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 
 	private DeltaBaseCache baseCache;
 
+	@Nullable
+	private final ObjectInserter createdFromInserter;
+
 	final FileObjectDatabase db;
 
 	WindowCursor(FileObjectDatabase db) {
 		this.db = db;
+		this.createdFromInserter = null;
+		this.streamFileThreshold = WindowCache.getStreamFileThreshold();
+	}
+
+	WindowCursor(FileObjectDatabase db,
+			@Nullable ObjectDirectoryInserter createdFromInserter) {
+		this.db = db;
+		this.createdFromInserter = createdFromInserter;
+		this.streamFileThreshold = WindowCache.getStreamFileThreshold();
 	}
 
 	DeltaBaseCache getDeltaBaseCache() {
@@ -111,6 +125,7 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 		return null;
 	}
 
+	@Override
 	public Collection<CachedPack> getCachedPacksAndUpdate(
 			BitmapBuilder needBitmap) throws IOException {
 		for (PackFile pack : db.getPacks()) {
@@ -127,15 +142,17 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 			throws IOException {
 		if (id.isComplete())
 			return Collections.singleton(id.toObjectId());
-		HashSet<ObjectId> matches = new HashSet<ObjectId>(4);
+		HashSet<ObjectId> matches = new HashSet<>(4);
 		db.resolve(matches, id);
 		return matches;
 	}
 
+	@Override
 	public boolean has(AnyObjectId objectId) throws IOException {
 		return db.has(objectId);
 	}
 
+	@Override
 	public ObjectLoader open(AnyObjectId objectId, int typeHint)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
@@ -156,6 +173,7 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 		return db.getShallowCommits();
 	}
 
+	@Override
 	public long getObjectSize(AnyObjectId objectId, int typeHint)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
@@ -169,10 +187,12 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 		return sz;
 	}
 
+	@Override
 	public LocalObjectToPack newObjectToPack(AnyObjectId objectId, int type) {
 		return new LocalObjectToPack(objectId, type);
 	}
 
+	@Override
 	public void selectObjectRepresentation(PackWriter packer,
 			ProgressMonitor monitor, Iterable<ObjectToPack> objects)
 			throws IOException, MissingObjectException {
@@ -182,6 +202,7 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 		}
 	}
 
+	@Override
 	public void copyObjectAsIs(PackOutputStream out, ObjectToPack otp,
 			boolean validate) throws IOException,
 			StoredObjectRepresentationNotAvailableException {
@@ -189,6 +210,7 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 		src.pack.copyAsIs(out, src, validate, this);
 	}
 
+	@Override
 	public void writeObjects(PackOutputStream out, List<ObjectToPack> list)
 			throws IOException {
 		for (ObjectToPack otp : list)
@@ -231,6 +253,7 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 		return cnt - need;
 	}
 
+	@Override
 	public void copyPackAsIs(PackOutputStream out, CachedPack pack)
 			throws IOException {
 		((LocalCachedPack) pack).copyAsIs(out, this);
@@ -325,8 +348,10 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 		}
 	}
 
-	int getStreamFileThreshold() {
-		return WindowCache.getStreamFileThreshold();
+	@Override
+	@Nullable
+	public ObjectInserter getCreatedFromInserter() {
+		return createdFromInserter;
 	}
 
 	/** Release the current window cursor. */

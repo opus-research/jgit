@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008-2013, Google Inc.
+ * Copyright (C) 2016, Laurent Delaigue <laurent.delaigue@obeo.fr>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -46,14 +47,17 @@ package org.eclipse.jgit.merge;
 import java.io.IOException;
 import java.text.MessageFormat;
 
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.NoMergeBaseException;
 import org.eclipse.jgit.errors.NoMergeBaseException.MergeBaseFailureReason;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
@@ -67,7 +71,15 @@ import org.eclipse.jgit.treewalk.CanonicalTreeParser;
  * Instance of a specific {@link MergeStrategy} for a single {@link Repository}.
  */
 public abstract class Merger {
-	/** The repository this merger operates on. */
+	/**
+	 * The repository this merger operates on.
+	 * <p>
+	 * Null if and only if the merger was constructed with {@link
+	 * #Merger(ObjectInserter)}. Callers that want to assume the repo is not null
+	 * (e.g. because of a previous check that the merger is not in-core) may use
+	 * {@link #nonNullRepo()}.
+	 */
+	@Nullable
 	protected final Repository db;
 
 	/** Reader to support {@link #walk} and other object loading. */
@@ -88,26 +100,68 @@ public abstract class Merger {
 	protected RevTree[] sourceTrees;
 
 	/**
+	 * A progress monitor.
+	 *
+	 * @since 4.2
+	 */
+	protected ProgressMonitor monitor = NullProgressMonitor.INSTANCE;
+
+	/**
 	 * Create a new merge instance for a repository.
 	 *
 	 * @param local
 	 *            the repository this merger will read and write data on.
 	 */
 	protected Merger(final Repository local) {
+		if (local == null) {
+			throw new NullPointerException(JGitText.get().repositoryIsRequired);
+		}
 		db = local;
-		inserter = db.newObjectInserter();
+		inserter = local.newObjectInserter();
 		reader = inserter.newReader();
+		walk = new RevWalk(reader);
+	}
+
+	/**
+	 * Create a new in-core merge instance from an inserter.
+	 *
+	 * @param oi
+	 *            the inserter to write objects to. Will be closed at the
+	 *            conclusion of {@code merge}, unless {@code flush} is false.
+	 * @since 4.8
+	 */
+	protected Merger(ObjectInserter oi) {
+		db = null;
+		inserter = oi;
+		reader = oi.newReader();
 		walk = new RevWalk(reader);
 	}
 
 	/**
 	 * @return the repository this merger operates on.
 	 */
+	@Nullable
 	public Repository getRepository() {
 		return db;
 	}
 
-	/** @return an object writer to create objects in {@link #getRepository()}. */
+	/**
+	 * @return non-null repository instance
+	 * @throws NullPointerException
+	 *             if the merger was constructed without a repository.
+	 * @since 4.8
+	 */
+	protected Repository nonNullRepo() {
+		if (db == null) {
+			throw new NullPointerException(JGitText.get().repositoryIsRequired);
+		}
+		return db;
+	}
+
+	/**
+	 * @return an object writer to create objects, writing objects to {@link
+	 * #getRepository()} (if a repository was provided).
+	 */
 	public ObjectInserter getObjectInserter() {
 		return inserter;
 	}
@@ -121,7 +175,9 @@ public abstract class Merger {
 	 *
 	 * @param oi
 	 *            the inserter instance to use. Must be associated with the
-	 *            repository instance returned by {@link #getRepository()}.
+	 *            repository instance returned by {@link #getRepository()} (if a
+	 *            repository was provided). Will be closed at the conclusion of
+	 *            {@code merge}, unless {@code flush} is false.
 	 */
 	public void setObjectInserter(ObjectInserter oi) {
 		walk.close();
@@ -163,9 +219,9 @@ public abstract class Merger {
 	 *
 	 * @since 3.5
 	 * @param flush
-	 *            whether to flush the underlying object inserter when finished to
-	 *            store any content-merged blobs and virtual merged bases; if
-	 *            false, callers are responsible for flushing.
+	 *            whether to flush and close the underlying object inserter when
+	 *            finished to store any content-merged blobs and virtual merged
+	 *            bases; if false, callers are responsible for flushing.
 	 * @param tips
 	 *            source trees to be combined together. The merge base is not
 	 *            included in this set.
@@ -290,4 +346,20 @@ public abstract class Merger {
 	 * @return resulting tree, if {@link #merge(AnyObjectId[])} returned true.
 	 */
 	public abstract ObjectId getResultTreeId();
+
+	/**
+	 * Set a progress monitor.
+	 *
+	 * @param monitor
+	 *            Monitor to use, can be null to indicate no progress reporting
+	 *            is desired.
+	 * @since 4.2
+	 */
+	public void setProgressMonitor(ProgressMonitor monitor) {
+		if (monitor == null) {
+			this.monitor = NullProgressMonitor.INSTANCE;
+		} else {
+			this.monitor = monitor;
+		}
+	}
 }

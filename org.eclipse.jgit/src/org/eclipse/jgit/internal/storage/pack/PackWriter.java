@@ -80,6 +80,7 @@ import java.util.zip.CheckedOutputStream;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 
+import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.LargeObjectException;
@@ -99,6 +100,7 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdOwnerMap;
+import org.eclipse.jgit.lib.ObjectIdSet;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
@@ -161,28 +163,21 @@ import org.eclipse.jgit.util.TemporaryBuffer;
 public class PackWriter implements AutoCloseable {
 	private static final int PACK_VERSION_GENERATED = 2;
 
-	/** A collection of object ids. */
-	public interface ObjectIdSet {
-		/**
-		 * Returns true if the objectId is contained within the collection.
-		 *
-		 * @param objectId
-		 *            the objectId to find
-		 * @return whether the collection contains the objectId.
-		 */
-		boolean contains(AnyObjectId objectId);
-	}
+	/** Empty set of objects for {@code preparePack()}. */
+	public static final Set<ObjectId> NONE = Collections.emptySet();
 
 	private static final Map<WeakReference<PackWriter>, Boolean> instances =
-			new ConcurrentHashMap<WeakReference<PackWriter>, Boolean>();
+			new ConcurrentHashMap<>();
 
 	private static final Iterable<PackWriter> instancesIterable = new Iterable<PackWriter>() {
+		@Override
 		public Iterator<PackWriter> iterator() {
 			return new Iterator<PackWriter>() {
 				private final Iterator<WeakReference<PackWriter>> it =
 						instances.keySet().iterator();
 				private PackWriter next;
 
+				@Override
 				public boolean hasNext() {
 					if (next != null)
 						return true;
@@ -196,6 +191,7 @@ public class PackWriter implements AutoCloseable {
 					return false;
 				}
 
+				@Override
 				public PackWriter next() {
 					if (hasNext()) {
 						PackWriter result = next;
@@ -205,6 +201,7 @@ public class PackWriter implements AutoCloseable {
 					throw new NoSuchElementException();
 				}
 
+				@Override
 				public void remove() {
 					throw new UnsupportedOperationException();
 				}
@@ -220,23 +217,25 @@ public class PackWriter implements AutoCloseable {
 	@SuppressWarnings("unchecked")
 	BlockList<ObjectToPack> objectsLists[] = new BlockList[OBJ_TAG + 1];
 	{
-		objectsLists[OBJ_COMMIT] = new BlockList<ObjectToPack>();
-		objectsLists[OBJ_TREE] = new BlockList<ObjectToPack>();
-		objectsLists[OBJ_BLOB] = new BlockList<ObjectToPack>();
-		objectsLists[OBJ_TAG] = new BlockList<ObjectToPack>();
+		objectsLists[OBJ_COMMIT] = new BlockList<>();
+		objectsLists[OBJ_TREE] = new BlockList<>();
+		objectsLists[OBJ_BLOB] = new BlockList<>();
+		objectsLists[OBJ_TAG] = new BlockList<>();
 	}
 
-	private ObjectIdOwnerMap<ObjectToPack> objectsMap = new ObjectIdOwnerMap<ObjectToPack>();
+	private ObjectIdOwnerMap<ObjectToPack> objectsMap = new ObjectIdOwnerMap<>();
 
 	// edge objects for thin packs
-	private List<ObjectToPack> edgeObjects = new BlockList<ObjectToPack>();
+	private List<ObjectToPack> edgeObjects = new BlockList<>();
 
 	// Objects the client is known to have already.
 	private BitmapBuilder haveObjects;
 
-	private List<CachedPack> cachedPacks = new ArrayList<CachedPack>(2);
+	private List<CachedPack> cachedPacks = new ArrayList<>(2);
 
-	private Set<ObjectId> tagTargets = Collections.emptySet();
+	private Set<ObjectId> tagTargets = NONE;
+
+	private Set<? extends ObjectId> excludeFromBitmapSelection = NONE;
 
 	private ObjectIdSet[] excludeInPacks;
 
@@ -362,7 +361,7 @@ public class PackWriter implements AutoCloseable {
 		reuseValidate = true; // be paranoid by default
 		stats = new PackStatistics.Accumulator();
 		state = new MutableState();
-		selfRef = new WeakReference<PackWriter>(this);
+		selfRef = new WeakReference<>(this);
 		instances.put(selfRef, Boolean.TRUE);
 	}
 
@@ -376,7 +375,6 @@ public class PackWriter implements AutoCloseable {
 	 *            the callback to set
 	 *
 	 * @return this object for chaining.
-	 * @since 4.1
 	 */
 	public PackWriter setObjectCountCallback(ObjectCountCallback callback) {
 		this.callback = callback;
@@ -388,11 +386,10 @@ public class PackWriter implements AutoCloseable {
 	 *
 	 * @param clientShallowCommits
 	 *            the shallow commits in the client
-	 * @since 4.1
 	 */
 	public void setClientShallowCommits(Set<ObjectId> clientShallowCommits) {
 		stats.clientShallowCommits = Collections
-				.unmodifiableSet(new HashSet<ObjectId>(clientShallowCommits));
+				.unmodifiableSet(new HashSet<>(clientShallowCommits));
 	}
 
 	/**
@@ -571,7 +568,8 @@ public class PackWriter implements AutoCloseable {
 	 * Configure this pack for a shallow clone.
 	 *
 	 * @param depth
-	 *            maximum depth to traverse the commit graph
+	 *            maximum depth of history to return. 1 means return only the
+	 *            "wants".
 	 * @param unshallow
 	 *            objects which used to be shallow on the client, but are being
 	 *            extended as part of this fetch
@@ -681,7 +679,7 @@ public class PackWriter implements AutoCloseable {
 	 * @throws IOException
 	 *             when some I/O problem occur during reading objects.
 	 */
-	public void preparePack(final Iterator<RevObject> objectsSource)
+	public void preparePack(@NonNull Iterator<RevObject> objectsSource)
 			throws IOException {
 		while (objectsSource.hasNext()) {
 			addObject(objectsSource.next());
@@ -704,22 +702,103 @@ public class PackWriter implements AutoCloseable {
 	 *            progress during object enumeration.
 	 * @param want
 	 *            collection of objects to be marked as interesting (start
-	 *            points of graph traversal).
+	 *            points of graph traversal). Must not be {@code null}.
 	 * @param have
 	 *            collection of objects to be marked as uninteresting (end
-	 *            points of graph traversal).
+	 *            points of graph traversal). Pass {@link #NONE} if all objects
+	 *            reachable from {@code want} are desired, such as when serving
+	 *            a clone.
 	 * @throws IOException
 	 *             when some I/O problem occur during reading objects.
 	 */
 	public void preparePack(ProgressMonitor countingMonitor,
-			Set<? extends ObjectId> want,
-			Set<? extends ObjectId> have) throws IOException {
-		ObjectWalk ow;
-		if (shallowPack)
-			ow = new DepthWalk.ObjectWalk(reader, depth);
-		else
-			ow = new ObjectWalk(reader);
-		preparePack(countingMonitor, ow, want, have);
+			@NonNull Set<? extends ObjectId> want,
+			@NonNull Set<? extends ObjectId> have) throws IOException {
+		preparePack(countingMonitor, want, have, NONE, NONE);
+	}
+
+	/**
+	 * Prepare the list of objects to be written to the pack stream.
+	 * <p>
+	 * Like {@link #preparePack(ProgressMonitor, Set, Set)} but also allows
+	 * specifying commits that should not be walked past ("shallow" commits).
+	 * The caller is responsible for filtering out commits that should not be
+	 * shallow any more ("unshallow" commits as in {@link #setShallowPack}) from
+	 * the shallow set.
+	 *
+	 * @param countingMonitor
+	 *            progress during object enumeration.
+	 * @param want
+	 *            objects of interest, ancestors of which will be included in
+	 *            the pack. Must not be {@code null}.
+	 * @param have
+	 *            objects whose ancestors (up to and including {@code shallow}
+	 *            commits) do not need to be included in the pack because they
+	 *            are already available from elsewhere. Must not be
+	 *            {@code null}.
+	 * @param shallow
+	 *            commits indicating the boundary of the history marked with
+	 *            {@code have}. Shallow commits have parents but those parents
+	 *            are considered not to be already available. Parents of
+	 *            {@code shallow} commits and earlier generations will be
+	 *            included in the pack if requested by {@code want}. Must not be
+	 *            {@code null}.
+	 * @throws IOException
+	 *             an I/O problem occurred while reading objects.
+	 */
+	public void preparePack(ProgressMonitor countingMonitor,
+			@NonNull Set<? extends ObjectId> want,
+			@NonNull Set<? extends ObjectId> have,
+			@NonNull Set<? extends ObjectId> shallow) throws IOException {
+		preparePack(countingMonitor, want, have, shallow, NONE);
+	}
+
+	/**
+	 * Prepare the list of objects to be written to the pack stream.
+	 * <p>
+	 * Like {@link #preparePack(ProgressMonitor, Set, Set)} but also allows
+	 * specifying commits that should not be walked past ("shallow" commits).
+	 * The caller is responsible for filtering out commits that should not be
+	 * shallow any more ("unshallow" commits as in {@link #setShallowPack}) from
+	 * the shallow set.
+	 *
+	 * @param countingMonitor
+	 *            progress during object enumeration.
+	 * @param want
+	 *            objects of interest, ancestors of which will be included in
+	 *            the pack. Must not be {@code null}.
+	 * @param have
+	 *            objects whose ancestors (up to and including {@code shallow}
+	 *            commits) do not need to be included in the pack because they
+	 *            are already available from elsewhere. Must not be
+	 *            {@code null}.
+	 * @param shallow
+	 *            commits indicating the boundary of the history marked with
+	 *            {@code have}. Shallow commits have parents but those parents
+	 *            are considered not to be already available. Parents of
+	 *            {@code shallow} commits and earlier generations will be
+	 *            included in the pack if requested by {@code want}. Must not be
+	 *            {@code null}.
+	 * @param noBitmaps
+	 *            collection of objects to be excluded from bitmap commit
+	 *            selection.
+	 * @throws IOException
+	 *             an I/O problem occurred while reading objects.
+	 */
+	public void preparePack(ProgressMonitor countingMonitor,
+			@NonNull Set<? extends ObjectId> want,
+			@NonNull Set<? extends ObjectId> have,
+			@NonNull Set<? extends ObjectId> shallow,
+			@NonNull Set<? extends ObjectId> noBitmaps) throws IOException {
+		try (ObjectWalk ow = getObjectWalk()) {
+			ow.assumeShallow(shallow);
+			preparePack(countingMonitor, ow, want, have, noBitmaps);
+		}
+	}
+
+	private ObjectWalk getObjectWalk() {
+		return shallowPack ? new DepthWalk.ObjectWalk(reader, depth - 1)
+				: new ObjectWalk(reader);
 	}
 
 	/**
@@ -740,24 +819,31 @@ public class PackWriter implements AutoCloseable {
 	 *            ObjectWalk to perform enumeration.
 	 * @param interestingObjects
 	 *            collection of objects to be marked as interesting (start
-	 *            points of graph traversal).
+	 *            points of graph traversal). Must not be {@code null}.
 	 * @param uninterestingObjects
 	 *            collection of objects to be marked as uninteresting (end
-	 *            points of graph traversal).
+	 *            points of graph traversal). Pass {@link #NONE} if all objects
+	 *            reachable from {@code want} are desired, such as when serving
+	 *            a clone.
+	 * @param noBitmaps
+	 *            collection of objects to be excluded from bitmap commit
+	 *            selection.
 	 * @throws IOException
 	 *             when some I/O problem occur during reading objects.
 	 */
 	public void preparePack(ProgressMonitor countingMonitor,
-			ObjectWalk walk,
-			final Set<? extends ObjectId> interestingObjects,
-			final Set<? extends ObjectId> uninterestingObjects)
+			@NonNull ObjectWalk walk,
+			@NonNull Set<? extends ObjectId> interestingObjects,
+			@NonNull Set<? extends ObjectId> uninterestingObjects,
+			@NonNull Set<? extends ObjectId> noBitmaps)
 			throws IOException {
 		if (countingMonitor == null)
 			countingMonitor = NullProgressMonitor.INSTANCE;
 		if (shallowPack && !(walk instanceof DepthWalk.ObjectWalk))
-			walk = new DepthWalk.ObjectWalk(reader, depth);
+			throw new IllegalArgumentException(
+					JGitText.get().shallowPacksRequireDepthWalk);
 		findObjectsToPack(countingMonitor, walk, interestingObjects,
-				uninterestingObjects);
+				uninterestingObjects, noBitmaps);
 	}
 
 	/**
@@ -877,7 +963,7 @@ public class PackWriter implements AutoCloseable {
 			cnt += objectsLists[OBJ_BLOB].size();
 			cnt += objectsLists[OBJ_TAG].size();
 
-			sortedByName = new BlockList<ObjectToPack>(cnt);
+			sortedByName = new BlockList<>(cnt);
 			sortedByName.addAll(objectsLists[OBJ_COMMIT]);
 			sortedByName.addAll(objectsLists[OBJ_TREE]);
 			sortedByName.addAll(objectsLists[OBJ_BLOB]);
@@ -924,8 +1010,9 @@ public class PackWriter implements AutoCloseable {
 	/**
 	 * Write the prepared pack to the supplied stream.
 	 * <p>
-	 * Called after {@link #preparePack(ProgressMonitor, ObjectWalk, Set, Set)}
-	 * or {@link #preparePack(ProgressMonitor, Set, Set)}.
+	 * Called after
+	 * {@link #preparePack(ProgressMonitor, ObjectWalk, Set, Set, Set)} or
+	 * {@link #preparePack(ProgressMonitor, Set, Set)}.
 	 * <p>
 	 * Performs delta search if enabled and writes the pack stream.
 	 * <p>
@@ -1049,8 +1136,6 @@ public class PackWriter implements AutoCloseable {
 
 	/**
 	 * Release all resources used by this writer.
-	 *
-	 * @since 4.0
 	 */
 	@Override
 	public void close() {
@@ -1073,7 +1158,7 @@ public class PackWriter implements AutoCloseable {
 		beginPhase(PackingPhase.FINDING_SOURCES, monitor, cnt);
 		if (cnt <= 4096) {
 			// For small object counts, do everything as one list.
-			BlockList<ObjectToPack> tmp = new BlockList<ObjectToPack>((int) cnt);
+			BlockList<ObjectToPack> tmp = new BlockList<>((int) cnt);
 			tmp.addAll(objectsLists[OBJ_TAG]);
 			tmp.addAll(objectsLists[OBJ_COMMIT]);
 			tmp.addAll(objectsLists[OBJ_TREE]);
@@ -1219,6 +1304,7 @@ public class PackWriter implements AutoCloseable {
 		// bigger ones, because source files grow and hardly ever shrink.
 		//
 		Arrays.sort(list, 0, cnt, new Comparator<ObjectToPack>() {
+			@Override
 			public int compare(ObjectToPack a, ObjectToPack b) {
 				int cmp = (a.isDoNotDelta() ? 1 : 0)
 						- (b.isDoNotDelta() ? 1 : 0);
@@ -1364,6 +1450,7 @@ public class PackWriter implements AutoCloseable {
 			// can schedule these for us.
 			for (final DeltaTask task : taskBlock.tasks) {
 				executor.execute(new Runnable() {
+					@Override
 					public void run() {
 						try {
 							task.call();
@@ -1406,7 +1493,7 @@ public class PackWriter implements AutoCloseable {
 	private static void runTasks(ExecutorService pool,
 			ThreadSafeProgressMonitor pm,
 			DeltaTask.Block tb, List<Throwable> errors) throws IOException {
-		List<Future<?>> futures = new ArrayList<Future<?>>(tb.tasks.size());
+		List<Future<?>> futures = new ArrayList<>(tb.tasks.size());
 		for (DeltaTask task : tb.tasks)
 			futures.add(pool.submit(task));
 
@@ -1551,18 +1638,21 @@ public class PackWriter implements AutoCloseable {
 			if (zbuf != null) {
 				out.writeHeader(otp, otp.getCachedSize());
 				out.write(zbuf);
+				typeStats.cntDeltas++;
+				typeStats.deltaBytes += out.length() - otp.getOffset();
 				return;
 			}
 		}
 
-		TemporaryBuffer.Heap delta = delta(otp);
-		out.writeHeader(otp, delta.length());
+		try (TemporaryBuffer.Heap delta = delta(otp)) {
+			out.writeHeader(otp, delta.length());
 
-		Deflater deflater = deflater();
-		deflater.reset();
-		DeflaterOutputStream dst = new DeflaterOutputStream(out, deflater);
-		delta.writeTo(dst, null);
-		dst.finish();
+			Deflater deflater = deflater();
+			deflater.reset();
+			DeflaterOutputStream dst = new DeflaterOutputStream(out, deflater);
+			delta.writeTo(dst, null);
+			dst.finish();
+		}
 		typeStats.cntDeltas++;
 		typeStats.deltaBytes += out.length() - otp.getOffset();
 	}
@@ -1606,19 +1696,16 @@ public class PackWriter implements AutoCloseable {
 		out.write(packcsum);
 	}
 
-	private void findObjectsToPack(final ProgressMonitor countingMonitor,
-			final ObjectWalk walker, final Set<? extends ObjectId> want,
-			Set<? extends ObjectId> have)
-			throws MissingObjectException, IOException,
-			IncorrectObjectTypeException {
+	private void findObjectsToPack(@NonNull ProgressMonitor countingMonitor,
+			@NonNull ObjectWalk walker, @NonNull Set<? extends ObjectId> want,
+			@NonNull Set<? extends ObjectId> have,
+			@NonNull Set<? extends ObjectId> noBitmaps) throws IOException {
 		final long countingStart = System.currentTimeMillis();
 		beginPhase(PackingPhase.COUNTING, countingMonitor, ProgressMonitor.UNKNOWN);
 
-		if (have == null)
-			have = Collections.emptySet();
-
 		stats.interestingObjects = Collections.unmodifiableSet(new HashSet<ObjectId>(want));
 		stats.uninterestingObjects = Collections.unmodifiableSet(new HashSet<ObjectId>(have));
+		excludeFromBitmapSelection = noBitmaps;
 
 		canBuildBitmaps = config.isBuildBitmaps()
 				&& !shallowPack
@@ -1637,7 +1724,7 @@ public class PackWriter implements AutoCloseable {
 			}
 		}
 
-		List<ObjectId> all = new ArrayList<ObjectId>(want.size() + have.size());
+		List<ObjectId> all = new ArrayList<>(want.size() + have.size());
 		all.addAll(want);
 		all.addAll(have);
 
@@ -1655,10 +1742,12 @@ public class PackWriter implements AutoCloseable {
 				walker.sort(RevSort.BOUNDARY, true);
 		}
 
-		List<RevObject> wantObjs = new ArrayList<RevObject>(want.size());
-		List<RevObject> haveObjs = new ArrayList<RevObject>(haveEst);
-		List<RevTag> wantTags = new ArrayList<RevTag>(want.size());
+		List<RevObject> wantObjs = new ArrayList<>(want.size());
+		List<RevObject> haveObjs = new ArrayList<>(haveEst);
+		List<RevTag> wantTags = new ArrayList<>(want.size());
 
+		// Retrieve the RevWalk's versions of "want" and "have" objects to
+		// maintain any state previously set in the RevWalk.
 		AsyncRevObjectQueue q = walker.parseAny(all, true);
 		try {
 			for (;;) {
@@ -1686,7 +1775,7 @@ public class PackWriter implements AutoCloseable {
 		}
 
 		if (!wantTags.isEmpty()) {
-			all = new ArrayList<ObjectId>(wantTags.size());
+			all = new ArrayList<>(wantTags.size());
 			for (RevTag tag : wantTags)
 				all.add(tag.getObject());
 			q = walker.parseAny(all, true);
@@ -1701,11 +1790,25 @@ public class PackWriter implements AutoCloseable {
 
 		if (walker instanceof DepthWalk.ObjectWalk) {
 			DepthWalk.ObjectWalk depthWalk = (DepthWalk.ObjectWalk) walker;
-			for (RevObject obj : wantObjs)
+			for (RevObject obj : wantObjs) {
 				depthWalk.markRoot(obj);
+			}
+			// Mark the tree objects associated with "have" commits as
+			// uninteresting to avoid writing redundant blobs. A normal RevWalk
+			// lazily propagates the "uninteresting" state from a commit to its
+			// tree during the walk, but DepthWalks can terminate early so
+			// preemptively propagate that state here.
+			for (RevObject obj : haveObjs) {
+				if (obj instanceof RevCommit) {
+					RevTree t = ((RevCommit) obj).getTree();
+					depthWalk.markUninteresting(t);
+				}
+			}
+
 			if (unshallowObjects != null) {
-				for (ObjectId id : unshallowObjects)
+				for (ObjectId id : unshallowObjects) {
 					depthWalk.markUnshallow(walker.parseAny(id));
+				}
 			}
 		} else {
 			for (RevObject obj : wantObjs)
@@ -1715,8 +1818,8 @@ public class PackWriter implements AutoCloseable {
 			walker.markUninteresting(obj);
 
 		final int maxBases = config.getDeltaSearchWindowSize();
-		Set<RevTree> baseTrees = new HashSet<RevTree>();
-		BlockList<RevCommit> commits = new BlockList<RevCommit>();
+		Set<RevTree> baseTrees = new HashSet<>();
+		BlockList<RevCommit> commits = new BlockList<>();
 		Set<ObjectId> roots = new HashSet<>();
 		RevCommit c;
 		while ((c = walker.next()) != null) {
@@ -1819,7 +1922,6 @@ public class PackWriter implements AutoCloseable {
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
 		BitmapBuilder haveBitmap = bitmapWalker.findObjects(have, null, true);
-		bitmapWalker.reset();
 		BitmapBuilder wantBitmap = bitmapWalker.findObjects(want, haveBitmap,
 				false);
 		BitmapBuilder needBitmap = wantBitmap.andNot(haveBitmap);
@@ -2016,19 +2118,17 @@ public class PackWriter implements AutoCloseable {
 		PackWriterBitmapPreparer bitmapPreparer = new PackWriterBitmapPreparer(
 				reader, writeBitmaps, pm, stats.interestingObjects, config);
 
-		Collection<PackWriterBitmapPreparer.BitmapCommit> selectedCommits =
-				bitmapPreparer.selectCommits(numCommits);
+		Collection<PackWriterBitmapPreparer.BitmapCommit> selectedCommits = bitmapPreparer
+				.selectCommits(numCommits, excludeFromBitmapSelection);
 
 		beginPhase(PackingPhase.BUILDING_BITMAPS, pm, selectedCommits.size());
 
 		PackWriterBitmapWalker walker = bitmapPreparer.newBitmapWalker();
 		AnyObjectId last = null;
 		for (PackWriterBitmapPreparer.BitmapCommit cmit : selectedCommits) {
-			if (cmit.isReuseWalker())
-				walker.reset();
-			else
+			if (!cmit.isReuseWalker()) {
 				walker = bitmapPreparer.newBitmapWalker();
-
+			}
 			BitmapBuilder bitmap = walker.findObjects(
 					Collections.singleton(cmit), null, false);
 
@@ -2204,8 +2304,6 @@ public class PackWriter implements AutoCloseable {
 		 * @return the count of objects that needed to be discovered through an
 		 *         object walk because they were not found in bitmap indices.
 		 *         Returns -1 if no bitmap indices were found.
-		 *
-		 * @since 4.0
 		 */
 		public long getBitmapIndexMisses() {
 			return statistics.getBitmapIndexMisses();

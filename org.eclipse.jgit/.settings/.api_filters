@@ -1,75 +1,74 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <component id="org.eclipse.jgit" version="2">
-    <resource path="src/org/eclipse/jgit/attributes/AttributesNode.java" type="org.eclipse.jgit.attributes.AttributesNode">
-        <filter comment="attributes weren't really usable in earlier versions" id="338792546">
+    <resource path="src/org/eclipse/jgit/lib/ConfigConstants.java" type="org.eclipse.jgit.lib.ConfigConstants">
+        <filter id="1141899266">
             <message_arguments>
-                <message_argument value="org.eclipse.jgit.attributes.AttributesNode"/>
-                <message_argument value="getAttributes(String, boolean, Map&lt;String,Attribute&gt;)"/>
+                <message_argument value="4.7"/>
+                <message_argument value="4.8"/>
+                <message_argument value="CONFIG_KEY_AUTODETACH"/>
+            </message_arguments>
+        </filter>
+        <filter id="1141899266">
+            <message_arguments>
+                <message_argument value="4.7"/>
+                <message_argument value="4.8"/>
+                <message_argument value="CONFIG_KEY_LOGEXPIRY"/>
             </message_arguments>
         </filter>
     </resource>
-    <resource path="src/org/eclipse/jgit/lib/BitmapIndex.java" type="org.eclipse.jgit.lib.BitmapIndex$BitmapBuilder">
-        <filter comment="interface is implemented by extenders but not clients of the API" id="403804204">
+    <resource path="src/org/eclipse/jgit/lib/ReflogEntry.java" type="org.eclipse.jgit.lib.ReflogEntry">
+        <filter comment="adding enum constant does not break binary compatibility" id="403767336">
             <message_arguments>
-                <message_argument value="org.eclipse.jgit.lib.BitmapIndex.BitmapBuilder"/>
-                <message_argument value="addObject(AnyObjectId, int)"/>
+                <message_argument value="org.eclipse.jgit.lib.ReflogEntry"/>
+                <message_argument value="PREFIX_CREATED"/>
             </message_arguments>
         </filter>
-        <filter comment="interface is implemented by extenders but not clients of the API" id="403804204">
+        <filter comment="adding enum constant does not break binary compatibility" id="403767336">
             <message_arguments>
-                <message_argument value="org.eclipse.jgit.lib.BitmapIndex.BitmapBuilder"/>
-                <message_argument value="getBitmapIndex()"/>
+                <message_argument value="org.eclipse.jgit.lib.ReflogEntry"/>
+                <message_argument value="PREFIX_FAST_FORWARD"/>
             </message_arguments>
         </filter>
-    </resource>
-    <resource path="src/org/eclipse/jgit/lib/Repository.java" type="org.eclipse.jgit.lib.Repository">
-        <filter comment="Only implementors of Repository are affected. That should be allowed" id="336695337">
+        <filter comment="adding enum constant does not break binary compatibility" id="403767336">
             <message_arguments>
-                <message_argument value="org.eclipse.jgit.lib.Repository"/>
-                <message_argument value="createAttributesNodeProvider()"/>
-            </message_arguments>
-        </filter>
-    </resource>
-    <resource path="src/org/eclipse/jgit/transport/PushCertificate.java" type="org.eclipse.jgit.transport.PushCertificate">
-        <filter comment="PushCertificate wasn't really usable in 4.0" id="338722907">
-            <message_arguments>
-                <message_argument value="org.eclipse.jgit.transport.PushCertificate"/>
-                <message_argument value="PushCertificate()"/>
-            </message_arguments>
-        </filter>
-        <filter comment="PushCertificate wasn't really usable in 4.0" id="338792546">
-            <message_arguments>
-                <message_argument value="org.eclipse.jgit.transport.PushCertificate"/>
-                <message_argument value="getCommandList()"/>
+                <message_argument value="org.eclipse.jgit.lib.ReflogEntry"/>
+                <message_argument value="PREFIX_FORCED_UPDATE"/>
             </message_arguments>
         </filter>
     </resource>
-    <resource path="src/org/eclipse/jgit/transport/PushCertificateParser.java" type="org.eclipse.jgit.transport.PushCertificateParser">
-        <filter comment="PushCertificates haven't been really usable in 4.0" id="338849923">
+    <resource path="src/org/eclipse/jgit/merge/MergeStrategy.java" type="org.eclipse.jgit.merge.MergeStrategy">
+        <filter comment="OSGi semantic versioning allows breaking implementors of an API in a minor version" id="336695337">
             <message_arguments>
-                <message_argument value="org.eclipse.jgit.transport.PushCertificateParser"/>
+                <message_argument value="org.eclipse.jgit.merge.MergeStrategy"/>
+                <message_argument value="newMerger(ObjectInserter, Config)"/>
             </message_arguments>
         </filter>
     </resource>
-    <resource path="src/org/eclipse/jgit/treewalk/WorkingTreeIterator.java" type="org.eclipse.jgit.treewalk.WorkingTreeIterator">
-        <filter comment="attributes weren't really usable in earlier versions" id="338792546">
+    <resource path="src/org/eclipse/jgit/merge/ResolveMerger.java" type="org.eclipse.jgit.merge.ResolveMerger">
+        <filter comment="OSGi semantic versioning allows breaking implementors of an API in a minor version" id="338792546">
             <message_arguments>
-                <message_argument value="org.eclipse.jgit.treewalk.WorkingTreeIterator"/>
-                <message_argument value="getGlobalAttributesNode()"/>
-            </message_arguments>
-        </filter>
-        <filter comment="attributes weren't really usable in earlier versions" id="338792546">
-            <message_arguments>
-                <message_argument value="org.eclipse.jgit.treewalk.WorkingTreeIterator"/>
-                <message_argument value="getInfoAttributesNode()"/>
+                <message_argument value="org.eclipse.jgit.merge.ResolveMerger"/>
+                <message_argument value="processEntry(CanonicalTreeParser, CanonicalTreeParser, CanonicalTreeParser, DirCacheBuildIterator, WorkingTreeIterator, boolean)"/>
             </message_arguments>
         </filter>
     </resource>
-    <resource path="src/org/eclipse/jgit/util/FileUtils.java" type="org.eclipse.jgit.util.FileUtils">
-        <filter id="338792546">
+    <resource path="src/org/eclipse/jgit/transport/http/HttpConnection.java" type="org.eclipse.jgit.transport.http.HttpConnection">
+        <filter id="403767336">
             <message_arguments>
-                <message_argument value="org.eclipse.jgit.util.FileUtils"/>
-                <message_argument value="createSymLink(File, String)"/>
+                <message_argument value="org.eclipse.jgit.transport.http.HttpConnection"/>
+                <message_argument value="HTTP_11_MOVED_TEMP"/>
+            </message_arguments>
+        </filter>
+        <filter id="403767336">
+            <message_arguments>
+                <message_argument value="org.eclipse.jgit.transport.http.HttpConnection"/>
+                <message_argument value="HTTP_MOVED_TEMP"/>
+            </message_arguments>
+        </filter>
+        <filter id="403767336">
+            <message_arguments>
+                <message_argument value="org.eclipse.jgit.transport.http.HttpConnection"/>
+                <message_argument value="HTTP_SEE_OTHER"/>
             </message_arguments>
         </filter>
     </resource>

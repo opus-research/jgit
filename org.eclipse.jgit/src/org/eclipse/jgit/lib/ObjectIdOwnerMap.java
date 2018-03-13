@@ -67,8 +67,8 @@ import java.util.NoSuchElementException;
  * @param <V>
  *            type of subclass of ObjectId that will be stored in the map.
  */
-public class ObjectIdOwnerMap<V extends ObjectIdOwnerMap.Entry> implements
-		Iterable<V> {
+public class ObjectIdOwnerMap<V extends ObjectIdOwnerMap.Entry>
+		implements Iterable<V>, ObjectIdSet {
 	/** Size of the initial directory, will grow as necessary. */
 	private static final int INITIAL_DIRECTORY = 1024;
 
@@ -143,6 +143,7 @@ public class ObjectIdOwnerMap<V extends ObjectIdOwnerMap.Entry> implements
 	 *            object to find.
 	 * @return true if the mapping exists for this object; false otherwise.
 	 */
+	@Override
 	public boolean contains(final AnyObjectId toFind) {
 		return get(toFind) != null;
 	}
@@ -219,20 +220,20 @@ public class ObjectIdOwnerMap<V extends ObjectIdOwnerMap.Entry> implements
 		return size == 0;
 	}
 
+	@Override
 	public Iterator<V> iterator() {
 		return new Iterator<V>() {
 			private int found;
-
 			private int dirIdx;
-
 			private int tblIdx;
-
 			private V next;
 
+			@Override
 			public boolean hasNext() {
 				return found < size;
 			}
 
+			@Override
 			public V next() {
 				if (next != null)
 					return found(next);
@@ -261,6 +262,7 @@ public class ObjectIdOwnerMap<V extends ObjectIdOwnerMap.Entry> implements
 				return v;
 			}
 
+			@Override
 			public void remove() {
 				throw new UnsupportedOperationException();
 			}
@@ -341,7 +343,7 @@ public class ObjectIdOwnerMap<V extends ObjectIdOwnerMap.Entry> implements
 
 	/** Type of entry stored in the {@link ObjectIdOwnerMap}. */
 	public static abstract class Entry extends ObjectId {
-		Entry next;
+		transient Entry next;
 
 		/**
 		 * Initialize this entry with a specific ObjectId.

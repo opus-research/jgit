@@ -80,6 +80,7 @@ public class DirCacheTree {
 	private static final DirCacheTree[] NO_CHILDREN = {};
 
 	private static final Comparator<DirCacheTree> TREE_CMP = new Comparator<DirCacheTree>() {
+		@Override
 		public int compare(final DirCacheTree o1, final DirCacheTree o2) {
 			final byte[] a = o1.encodedName;
 			final byte[] b = o2.encodedName;
@@ -249,7 +250,15 @@ public class DirCacheTree {
 		return children[i];
 	}
 
-	ObjectId getObjectId() {
+	/**
+	 * Get the tree's ObjectId.
+	 * <p>
+	 * If {@link #isValid()} returns false this method will return null.
+	 *
+	 * @return ObjectId of this tree or null.
+	 * @since 4.3
+	 */
+	public ObjectId getObjectId() {
 		return id;
 	}
 

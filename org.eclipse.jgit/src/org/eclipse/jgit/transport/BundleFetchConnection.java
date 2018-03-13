@@ -92,7 +92,7 @@ class BundleFetchConnection extends BaseFetchConnection {
 
 	InputStream bin;
 
-	final Map<ObjectId, String> prereqs = new HashMap<ObjectId, String>();
+	final Map<ObjectId, String> prereqs = new HashMap<>();
 
 	private String lockMessage;
 
@@ -130,7 +130,7 @@ class BundleFetchConnection extends BaseFetchConnection {
 
 	private void readBundleV2() throws IOException {
 		final byte[] hdrbuf = new byte[1024];
-		final LinkedHashMap<String, Ref> avail = new LinkedHashMap<String, Ref>();
+		final LinkedHashMap<String, Ref> avail = new LinkedHashMap<>();
 		for (;;) {
 			String line = readLine(hdrbuf);
 			if (line.length() == 0)
@@ -161,18 +161,26 @@ class BundleFetchConnection extends BaseFetchConnection {
 	}
 
 	private String readLine(final byte[] hdrbuf) throws IOException {
-		bin.mark(hdrbuf.length);
-		final int cnt = bin.read(hdrbuf);
-		int lf = 0;
-		while (lf < cnt && hdrbuf[lf] != '\n')
-			lf++;
-		bin.reset();
-		IO.skipFully(bin, lf);
-		if (lf < cnt && hdrbuf[lf] == '\n')
-			IO.skipFully(bin, 1);
-		return RawParseUtils.decode(Constants.CHARSET, hdrbuf, 0, lf);
+		StringBuilder line = new StringBuilder();
+		boolean done = false;
+		while (!done) {
+			bin.mark(hdrbuf.length);
+			final int cnt = bin.read(hdrbuf);
+			int lf = 0;
+			while (lf < cnt && hdrbuf[lf] != '\n')
+				lf++;
+			bin.reset();
+			IO.skipFully(bin, lf);
+			if (lf < cnt && hdrbuf[lf] == '\n') {
+				IO.skipFully(bin, 1);
+				done = true;
+			}
+			line.append(RawParseUtils.decode(Constants.CHARSET, hdrbuf, 0, lf));
+		}
+		return line.toString();
 	}
 
+	@Override
 	public boolean didFetchTestConnectivity() {
 		return false;
 	}
@@ -200,10 +208,12 @@ class BundleFetchConnection extends BaseFetchConnection {
 		}
 	}
 
+	@Override
 	public void setPackLockMessage(final String message) {
 		lockMessage = message;
 	}
 
+	@Override
 	public Collection<PackLock> getPackLocks() {
 		if (packLock != null)
 			return Collections.singleton(packLock);
@@ -218,8 +228,8 @@ class BundleFetchConnection extends BaseFetchConnection {
 			final RevFlag PREREQ = rw.newFlag("PREREQ"); //$NON-NLS-1$
 			final RevFlag SEEN = rw.newFlag("SEEN"); //$NON-NLS-1$
 
-			final Map<ObjectId, String> missing = new HashMap<ObjectId, String>();
-			final List<RevObject> commits = new ArrayList<RevObject>();
+			final Map<ObjectId, String> missing = new HashMap<>();
+			final List<RevObject> commits = new ArrayList<>();
 			for (final Map.Entry<ObjectId, String> e : prereqs.entrySet()) {
 				ObjectId p = e.getKey();
 				try {

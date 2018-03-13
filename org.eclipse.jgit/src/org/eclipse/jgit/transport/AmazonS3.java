@@ -120,7 +120,7 @@ public class AmazonS3 {
 	private static final String X_AMZ_META = "x-amz-meta-"; //$NON-NLS-1$
 
 	static {
-		SIGNED_HEADERS = new HashSet<String>();
+		SIGNED_HEADERS = new HashSet<>();
 		SIGNED_HEADERS.add("content-type"); //$NON-NLS-1$
 		SIGNED_HEADERS.add("content-md5"); //$NON-NLS-1$
 		SIGNED_HEADERS.add("date"); //$NON-NLS-1$
@@ -529,21 +529,29 @@ public class AmazonS3 {
 				Integer.valueOf(HttpSupport.response(c)),
 				c.getResponseMessage()));
 		final InputStream errorStream = c.getErrorStream();
-		if (errorStream == null)
+		if (errorStream == null) {
 			return err;
-
-		final ByteArrayOutputStream b = new ByteArrayOutputStream();
-		byte[] buf = new byte[2048];
-		for (;;) {
-			final int n = errorStream.read(buf);
-			if (n < 0)
-				break;
-			if (n > 0)
-				b.write(buf, 0, n);
 		}
-		buf = b.toByteArray();
-		if (buf.length > 0)
-			err.initCause(new IOException("\n" + new String(buf))); //$NON-NLS-1$
+
+		try {
+			final ByteArrayOutputStream b = new ByteArrayOutputStream();
+			byte[] buf = new byte[2048];
+			for (;;) {
+				final int n = errorStream.read(buf);
+				if (n < 0) {
+					break;
+				}
+				if (n > 0) {
+					b.write(buf, 0, n);
+				}
+			}
+			buf = b.toByteArray();
+			if (buf.length > 0) {
+				err.initCause(new IOException("\n" + new String(buf))); //$NON-NLS-1$
+			}
+		} finally {
+			errorStream.close();
+		}
 		return err;
 	}
 
@@ -598,7 +606,7 @@ public class AmazonS3 {
 
 	void authorize(final HttpURLConnection c) throws IOException {
 		final Map<String, List<String>> reqHdr = c.getRequestProperties();
-		final SortedMap<String, String> sigHdr = new TreeMap<String, String>();
+		final SortedMap<String, String> sigHdr = new TreeMap<>();
 		for (final Map.Entry<String, List<String>> entry : reqHdr.entrySet()) {
 			final String hdr = entry.getKey();
 			if (isSignedHeader(hdr))
@@ -656,7 +664,7 @@ public class AmazonS3 {
 	}
 
 	private final class ListParser extends DefaultHandler {
-		final List<String> entries = new ArrayList<String>();
+		final List<String> entries = new ArrayList<>();
 
 		private final String bucket;
 
@@ -672,7 +680,7 @@ public class AmazonS3 {
 		}
 
 		void list() throws IOException {
-			final Map<String, String> args = new TreeMap<String, String>();
+			final Map<String, String> args = new TreeMap<>();
 			if (prefix.length() > 0)
 				args.put("prefix", prefix); //$NON-NLS-1$
 			if (!entries.isEmpty())

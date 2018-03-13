@@ -49,6 +49,7 @@ import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -87,6 +88,9 @@ class PushProcess {
 	/** an outputstream to write messages to */
 	private final OutputStream out;
 
+	/** A list of option strings associated with this push */
+	private List<String> pushOptions;
+
 	/**
 	 * Create process for specified transport and refs updates specification.
 	 *
@@ -120,8 +124,9 @@ class PushProcess {
 			throws TransportException {
 		this.walker = new RevWalk(transport.local);
 		this.transport = transport;
-		this.toPush = new HashMap<String, RemoteRefUpdate>();
+		this.toPush = new HashMap<>();
 		this.out = out;
+		this.pushOptions = transport.getPushOptions();
 		for (final RemoteRefUpdate rru : toPush) {
 			if (this.toPush.put(rru.getRemoteName(), rru) != null)
 				throw new TransportException(MessageFormat.format(
@@ -185,11 +190,16 @@ class PushProcess {
 	private Map<String, RemoteRefUpdate> prepareRemoteUpdates()
 			throws TransportException {
 		boolean atomic = transport.isPushAtomic();
-		final Map<String, RemoteRefUpdate> result = new HashMap<String, RemoteRefUpdate>();
+		final Map<String, RemoteRefUpdate> result = new HashMap<>();
 		for (final RemoteRefUpdate rru : toPush.values()) {
 			final Ref advertisedRef = connection.getRef(rru.getRemoteName());
-			final ObjectId advertisedOld = (advertisedRef == null ? ObjectId
-					.zeroId() : advertisedRef.getObjectId());
+			ObjectId advertisedOld = null;
+			if (advertisedRef != null) {
+				advertisedOld = advertisedRef.getObjectId();
+			}
+			if (advertisedOld == null) {
+				advertisedOld = ObjectId.zeroId();
+			}
 
 			if (rru.getNewObjectId().equals(advertisedOld)) {
 				if (rru.isDelete()) {
@@ -211,6 +221,9 @@ class PushProcess {
 					return rejectAll();
 				}
 				continue;
+			}
+			if (!rru.isExpectingOldObjectId()) {
+				rru.setExpectedOldObjectId(advertisedOld);
 			}
 
 			// create ref (hasn't existed on remote side) and delete ref
@@ -285,5 +298,15 @@ class PushProcess {
 				}
 			}
 		}
+	}
+
+	/**
+	 * Gets the list of option strings associated with this push.
+	 *
+	 * @return pushOptions
+	 * @since 4.5
+	 */
+	public List<String> getPushOptions() {
+		return pushOptions;
 	}
 }

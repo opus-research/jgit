@@ -46,6 +46,7 @@
 package org.eclipse.jgit.dircache;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
@@ -86,7 +87,6 @@ import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.MutableInteger;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.TemporaryBuffer;
-import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
  * Support for the Git dircache (aka index file).
@@ -111,6 +111,7 @@ public class DirCache {
 	private static final byte[] NO_CHECKSUM = {};
 
 	static final Comparator<DirCacheEntry> ENT_CMP = new Comparator<DirCacheEntry>() {
+		@Override
 		public int compare(final DirCacheEntry o1, final DirCacheEntry o2) {
 			final int cr = cmp(o1, o2);
 			if (cr != 0)
@@ -344,9 +345,6 @@ public class DirCache {
 	/** Our active lock (if we hold it); null if we don't have it locked. */
 	private LockFile myLock;
 
-	/** file system abstraction **/
-	private final FS fs;
-
 	/** Keep track of whether the index has changed or not */
 	private FileSnapshot snapshot;
 
@@ -376,7 +374,6 @@ public class DirCache {
 	 */
 	public DirCache(final File indexLocation, final FS fs) {
 		liveFile = indexLocation;
-		this.fs = fs;
 		clear();
 	}
 
@@ -611,7 +608,7 @@ public class DirCache {
 	public boolean lock() throws IOException {
 		if (liveFile == null)
 			throw new IOException(JGitText.get().dirCacheDoesNotHaveABackingFile);
-		final LockFile tmp = new LockFile(liveFile, fs);
+		final LockFile tmp = new LockFile(liveFile);
 		if (tmp.lock()) {
 			tmp.setNeedStatInformation(true);
 			myLock = tmp;
@@ -638,9 +635,9 @@ public class DirCache {
 	public void write() throws IOException {
 		final LockFile tmp = myLock;
 		requireLocked(tmp);
-		try {
-			writeTo(liveFile.getParentFile(),
-					new SafeBufferedOutputStream(tmp.getOutputStream()));
+		try (OutputStream o = tmp.getOutputStream();
+				OutputStream bo = new BufferedOutputStream(o)) {
+			writeTo(liveFile.getParentFile(), bo);
 		} catch (IOException err) {
 			tmp.unlock();
 			throw err;
@@ -800,8 +797,11 @@ public class DirCache {
 	 *         information. If &lt; 0 the entry does not exist in the index.
 	 * @since 3.4
 	 */
-	public int findEntry(final byte[] p, final int pLen) {
-		int low = 0;
+	public int findEntry(byte[] p, int pLen) {
+		return findEntry(0, p, pLen);
+	}
+
+	int findEntry(int low, byte[] p, int pLen) {
 		int high = entryCnt;
 		while (low < high) {
 			int mid = (low + high) >>> 1;
@@ -993,7 +993,7 @@ public class DirCache {
 	 * @throws IOException
 	 */
 	private void updateSmudgedEntries() throws IOException {
-		List<String> paths = new ArrayList<String>(128);
+		List<String> paths = new ArrayList<>(128);
 		try (TreeWalk walk = new TreeWalk(repository)) {
 			walk.setOperationType(OperationType.CHECKIN_OP);
 			for (int i = 0; i < entryCnt; i++)

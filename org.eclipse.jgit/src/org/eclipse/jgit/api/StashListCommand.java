@@ -76,12 +76,13 @@ public class StashListCommand extends GitCommand<Collection<RevCommit>> {
 		super(repo);
 	}
 
+	@Override
 	public Collection<RevCommit> call() throws GitAPIException,
 			InvalidRefNameException {
 		checkCallable();
 
 		try {
-			if (repo.getRef(Constants.R_STASH) == null)
+			if (repo.exactRef(Constants.R_STASH) == null)
 				return Collections.emptyList();
 		} catch (IOException e) {
 			throw new InvalidRefNameException(MessageFormat.format(
@@ -94,7 +95,7 @@ public class StashListCommand extends GitCommand<Collection<RevCommit>> {
 		if (stashEntries.isEmpty())
 			return Collections.emptyList();
 
-		final List<RevCommit> stashCommits = new ArrayList<RevCommit>(
+		final List<RevCommit> stashCommits = new ArrayList<>(
 				stashEntries.size());
 		try (RevWalk walk = new RevWalk(repo)) {
 			for (ReflogEntry entry : stashEntries) {

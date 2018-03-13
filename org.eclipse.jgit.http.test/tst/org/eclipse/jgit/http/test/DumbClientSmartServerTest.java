@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2010, 2017 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -60,12 +60,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
-import javax.servlet.http.HttpServletRequest;
-
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jgit.errors.NotSupportedException;
-import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.http.server.GitServlet;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.junit.http.AccessEvent;
@@ -84,8 +81,6 @@ import org.eclipse.jgit.transport.URIish;
 import org.eclipse.jgit.transport.http.HttpConnectionFactory;
 import org.eclipse.jgit.transport.http.JDKHttpConnectionFactory;
 import org.eclipse.jgit.transport.http.apache.HttpClientConnectionFactory;
-import org.eclipse.jgit.transport.resolver.RepositoryResolver;
-import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -114,6 +109,7 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 		HttpTransport.setConnectionFactory(cf);
 	}
 
+	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
@@ -123,18 +119,7 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 
 		ServletContextHandler app = server.addContext("/git");
 		GitServlet gs = new GitServlet();
-		gs.setRepositoryResolver(new RepositoryResolver<HttpServletRequest>() {
-			public Repository open(HttpServletRequest req, String name)
-					throws RepositoryNotFoundException,
-					ServiceNotEnabledException {
-				if (!name.equals(srcName))
-					throw new RepositoryNotFoundException(name);
-
-				final Repository db = src.getRepository();
-				db.incrementOpen();
-				return db;
-			}
-		});
+		gs.setRepositoryResolver(new TestRepositoryResolver(src, srcName));
 		app.addServlet(new ServletHolder(gs), "/*");
 
 		server.setUp();
@@ -199,7 +184,7 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 				.startsWith("JGit/"));
 		assertEquals("*/*", info.getRequestHeader(HDR_ACCEPT));
 		assertEquals(200, info.getStatus());
-		assertEquals("text/plain; charset=UTF-8",
+		assertEquals("text/plain;charset=utf-8",
 				info
 				.getResponseHeader(HDR_CONTENT_TYPE));
 
@@ -239,7 +224,7 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 
 	@Test
 	public void testInitialClone_Packed() throws Exception {
-		new TestRepository<Repository>(remoteRepository).packAndPrune();
+		new TestRepository<>(remoteRepository).packAndPrune();
 
 		Repository dst = createBareRepository();
 		assertFalse(dst.hasObject(A_txt));
@@ -269,7 +254,7 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 		assertEquals("GET", req.get(0).getMethod());
 		assertEquals(0, req.get(0).getParameters().size());
 		assertEquals(200, req.get(0).getStatus());
-		assertEquals("text/plain; charset=UTF-8",
+		assertEquals("text/plain;charset=utf-8",
 				req.get(0).getResponseHeader(
 				HDR_CONTENT_TYPE));
 	}

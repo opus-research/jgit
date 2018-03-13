@@ -55,8 +55,6 @@ import java.util.Set;
 
 import org.eclipse.jgit.internal.storage.file.GcTestCase;
 import org.eclipse.jgit.internal.storage.file.PackBitmapIndexBuilder;
-import org.eclipse.jgit.internal.storage.pack.ObjectToPack;
-import org.eclipse.jgit.internal.storage.pack.PackWriterBitmapPreparer;
 import org.eclipse.jgit.internal.storage.pack.PackWriterBitmapPreparer.BitmapCommit;
 import org.eclipse.jgit.junit.TestRepository.BranchBuilder;
 import org.eclipse.jgit.junit.TestRepository.CommitBuilder;
@@ -71,6 +69,15 @@ public class GcCommitSelectionTest extends GcTestCase {
 
 	@Test
 	public void testBitmapSpansNoMerges() throws Exception {
+		testBitmapSpansNoMerges(false);
+	}
+
+	@Test
+	public void testBitmapSpansNoMergesWithTags() throws Exception {
+		testBitmapSpansNoMerges(true);
+	}
+
+	private void testBitmapSpansNoMerges(boolean withTags) throws Exception {
 		/*
 		 * Commit counts -> expected bitmap counts for history without merges.
 		 * The top 100 contiguous commits should always have bitmaps, and the
@@ -91,11 +98,15 @@ public class GcCommitSelectionTest extends GcTestCase {
 			assertTrue(nextCommitCount > currentCommits); // programming error
 			for (int i = currentCommits; i < nextCommitCount; i++) {
 				String str = "A" + i;
-				bb.commit().message(str).add(str, str).create();
+				RevCommit rc = bb.commit().message(str).add(str, str).create();
+				if (withTags) {
+					tr.lightweightTag(str, rc);
+				}
 			}
 			currentCommits = nextCommitCount;
 
-			gc.setExpireAgeMillis(0); // immediately delete old packs
+			gc.setPackExpireAgeMillis(0); // immediately delete old packs
+			gc.setExpireAgeMillis(0);
 			gc.gc();
 			assertEquals(currentCommits * 3, // commit/tree/object
 					gc.getStatistics().numberOfPackedObjects);
@@ -158,7 +169,8 @@ public class GcCommitSelectionTest extends GcTestCase {
 			}
 			currentCommits = nextCommitCount;
 
-			gc.setExpireAgeMillis(0); // immediately delete old packs
+			gc.setPackExpireAgeMillis(0); // immediately delete old packs
+			gc.setExpireAgeMillis(0);
 			gc.gc();
 			assertEquals(currentCommits + " commits: ", expectedBitmapCount,
 					gc.getStatistics().numberOfBitmaps);
@@ -198,7 +210,8 @@ public class GcCommitSelectionTest extends GcTestCase {
 		final int commitsForShallowBranches = 100;
 
 		// Excessive branch history pruning, one old branch.
-		gc.setExpireAgeMillis(0); // immediately delete old packs
+		gc.setPackExpireAgeMillis(0); // immediately delete old packs
+		gc.setExpireAgeMillis(0);
 		gc.gc();
 		assertEquals(
 				commitsForSparseBranch + commitsForFullBranch
@@ -232,7 +245,7 @@ public class GcCommitSelectionTest extends GcTestCase {
 				m8, m9);
 		PackWriterBitmapPreparer preparer = newPeparer(m9, commits);
 		List<BitmapCommit> selection = new ArrayList<>(
-				preparer.selectCommits(commits.size()));
+				preparer.selectCommits(commits.size(), PackWriter.NONE));
 
 		// Verify that the output is ordered by the separate "chains"
 		String[] expected = { m0.name(), m1.name(), m2.name(), m4.name(),

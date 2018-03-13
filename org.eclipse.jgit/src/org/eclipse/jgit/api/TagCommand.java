@@ -121,6 +121,7 @@ public class TagCommand extends GitCommand<Ref> {
 	 *             when called on a git repo without a HEAD reference
 	 * @since 2.0
 	 */
+	@Override
 	public Ref call() throws GitAPIException, ConcurrentRefUpdateException,
 			InvalidTagNameException, NoHeadException {
 		checkCallable();
@@ -184,7 +185,7 @@ public class TagCommand extends GitCommand<Ref> {
 		switch (updateResult) {
 		case NEW:
 		case FORCED:
-			return repo.getRef(refName);
+			return repo.exactRef(refName);
 		case LOCK_FAILURE:
 			throw new ConcurrentRefUpdateException(
 					JGitText.get().couldNotLockHEAD, tagRef.getRef(),

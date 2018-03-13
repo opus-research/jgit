@@ -129,6 +129,7 @@ class UploadPackServlet extends HttpServlet {
 			this.uploadPackFactory = uploadPackFactory;
 		}
 
+		@Override
 		public void doFilter(ServletRequest request, ServletResponse response,
 				FilterChain chain) throws IOException, ServletException {
 			HttpServletRequest req = (HttpServletRequest) request;
@@ -152,10 +153,12 @@ class UploadPackServlet extends HttpServlet {
 			}
 		}
 
+		@Override
 		public void init(FilterConfig filterConfig) throws ServletException {
 			// Nothing.
 		}
 
+		@Override
 		public void destroy() {
 			// Nothing.
 		}
@@ -197,7 +200,7 @@ class UploadPackServlet extends HttpServlet {
 				out.close();
 			} else if (!rsp.isCommitted()) {
 				rsp.reset();
-				sendError(req, rsp, SC_FORBIDDEN, e.getMessage());
+				sendError(req, rsp, e.getStatusCode(), e.getMessage());
 			}
 			return;
 

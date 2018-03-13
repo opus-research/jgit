@@ -44,14 +44,14 @@
 
 package org.eclipse.jgit.lib;
 
-import org.eclipse.jgit.errors.InvalidObjectIdException;
-import org.eclipse.jgit.util.NB;
-import org.eclipse.jgit.util.RawParseUtils;
-
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+
+import org.eclipse.jgit.errors.InvalidObjectIdException;
+import org.eclipse.jgit.util.NB;
+import org.eclipse.jgit.util.RawParseUtils;
 
 /**
  * A SHA-1 abstraction.
@@ -248,8 +248,17 @@ public class ObjectId extends AnyObjectId implements Serializable {
 		}
 	}
 
-	ObjectId(final int new_1, final int new_2, final int new_3,
-			final int new_4, final int new_5) {
+	/**
+	 * Construct an ObjectId from 160 bits provided in 5 words.
+	 *
+	 * @param new_1
+	 * @param new_2
+	 * @param new_3
+	 * @param new_4
+	 * @param new_5
+	 * @since 4.7
+	 */
+	public ObjectId(int new_1, int new_2, int new_3, int new_4, int new_5) {
 		w1 = new_1;
 		w2 = new_2;
 		w3 = new_3;

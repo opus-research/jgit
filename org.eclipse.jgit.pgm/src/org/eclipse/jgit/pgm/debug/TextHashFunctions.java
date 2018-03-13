@@ -251,16 +251,16 @@ class TextHashFunctions extends TextBuiltin {
 	//
 
 	@Option(name = "--hash", multiValued = true, metaVar = "NAME", usage = "Enable hash function(s)")
-	List<String> hashFunctions = new ArrayList<String>();
+	List<String> hashFunctions = new ArrayList<>();
 
 	@Option(name = "--fold", multiValued = true, metaVar = "NAME", usage = "Enable fold function(s)")
-	List<String> foldFunctions = new ArrayList<String>();
+	List<String> foldFunctions = new ArrayList<>();
 
 	@Option(name = "--text-limit", metaVar = "LIMIT", usage = "Maximum size in KiB to scan")
 	int textLimit = 15 * 1024; // 15 MiB as later we do * 1024.
 
 	@Option(name = "--repository", aliases = { "-r" }, multiValued = true, metaVar = "GIT_DIR", usage = "Repository to scan")
-	List<File> gitDirs = new ArrayList<File>();
+	List<File> gitDirs = new ArrayList<>();
 
 	@Override
 	protected boolean requiresRepository() {
@@ -286,25 +286,25 @@ class TextHashFunctions extends TextBuiltin {
 			else
 				rb.findGitDir(dir);
 
-			Repository db = rb.build();
+			Repository repo = rb.build();
 			try {
-				run(db);
+				run(repo);
 			} finally {
-				db.close();
+				repo.close();
 			}
 		}
 	}
 
-	private void run(Repository db) throws Exception {
+	private void run(Repository repo) throws Exception {
 		List<Function> all = init();
 
 		long fileCnt = 0;
 		long lineCnt = 0;
-		try (ObjectReader or = db.newObjectReader();
+		try (ObjectReader or = repo.newObjectReader();
 			RevWalk rw = new RevWalk(or);
 			TreeWalk tw = new TreeWalk(or)) {
 			final MutableObjectId id = new MutableObjectId();
-			tw.reset(rw.parseTree(db.resolve(Constants.HEAD)));
+			tw.reset(rw.parseTree(repo.resolve(Constants.HEAD)));
 			tw.setRecursive(true);
 
 			while (tw.next()) {
@@ -327,7 +327,7 @@ class TextHashFunctions extends TextBuiltin {
 				RawText txt = new RawText(raw);
 				int[] lines = new int[txt.size()];
 				int cnt = 0;
-				HashSet<Line> u = new HashSet<Line>();
+				HashSet<Line> u = new HashSet<>();
 				for (int i = 0; i < txt.size(); i++) {
 					if (u.add(new Line(txt, i)))
 						lines[cnt++] = i;
@@ -341,7 +341,7 @@ class TextHashFunctions extends TextBuiltin {
 			}
 		}
 
-		File directory = db.getDirectory();
+		File directory = repo.getDirectory();
 		if (directory != null) {
 			String name = directory.getName();
 			File parent = directory.getParentFile();
@@ -349,10 +349,10 @@ class TextHashFunctions extends TextBuiltin {
 				name = parent.getName();
 			outw.println(name + ":"); //$NON-NLS-1$
 		}
-		outw.format("  %6d files; %5d avg. unique lines/file\n", //
+		outw.format("  %6d files; %5d avg. unique lines/file\n", //$NON-NLS-1$
 				valueOf(fileCnt), //
 				valueOf(lineCnt / fileCnt));
-		outw.format("%-20s %-15s %9s\n", "Hash", "Fold", "Max Len");
+		outw.format("%-20s %-15s %9s\n", "Hash", "Fold", "Max Len"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
 		outw.println("-----------------------------------------------"); //$NON-NLS-1$
 		String lastHashName = null;
 		for (Function fun : all) {
@@ -386,8 +386,8 @@ class TextHashFunctions extends TextBuiltin {
 	}
 
 	private List<Function> init() {
-		List<Hash> hashes = new ArrayList<Hash>();
-		List<Fold> folds = new ArrayList<Fold>();
+		List<Hash> hashes = new ArrayList<>();
+		List<Fold> folds = new ArrayList<>();
 
 		try {
 			for (Field f : TextHashFunctions.class.getDeclaredFields()) {
@@ -405,12 +405,12 @@ class TextHashFunctions extends TextBuiltin {
 				}
 			}
 		} catch (IllegalArgumentException e) {
-			throw new RuntimeException("Cannot determine names", e);
+			throw new RuntimeException("Cannot determine names", e); //$NON-NLS-1$
 		} catch (IllegalAccessException e) {
-			throw new RuntimeException("Cannot determine names", e);
+			throw new RuntimeException("Cannot determine names", e); //$NON-NLS-1$
 		}
 
-		List<Function> all = new ArrayList<Function>();
+		List<Function> all = new ArrayList<>();
 		for (Hash cmp : hashes) {
 			if (include(cmp.name, hashFunctions)) {
 				for (Fold f : folds) {

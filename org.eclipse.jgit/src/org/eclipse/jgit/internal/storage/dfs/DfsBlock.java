@@ -52,9 +52,9 @@ import java.util.zip.Inflater;
 
 import org.eclipse.jgit.internal.storage.pack.PackOutputStream;
 
-/** A cached slice of a {@link DfsPackFile}. */
+/** A cached slice of a {@link BlockBasedFile}. */
 final class DfsBlock {
-	final DfsPackKey pack;
+	final DfsStreamKey stream;
 
 	final long start;
 
@@ -62,8 +62,8 @@ final class DfsBlock {
 
 	private final byte[] block;
 
-	DfsBlock(DfsPackKey p, long pos, byte[] buf) {
-		pack = p;
+	DfsBlock(DfsStreamKey p, long pos, byte[] buf) {
+		stream = p;
 		start = pos;
 		end = pos + buf.length;
 		block = buf;
@@ -73,8 +73,8 @@ final class DfsBlock {
 		return block.length;
 	}
 
-	boolean contains(DfsPackKey want, long pos) {
-		return pack == want && start <= pos && pos < end;
+	boolean contains(DfsStreamKey want, long pos) {
+		return stream.equals(want) && start <= pos && pos < end;
 	}
 
 	int copy(long pos, byte[] dstbuf, int dstoff, int cnt) {
@@ -88,9 +88,16 @@ final class DfsBlock {
 		return n;
 	}
 
-	int setInput(long pos, Inflater inf) {
+	int setInput(long pos, Inflater inf) throws DataFormatException {
 		int ptr = (int) (pos - start);
 		int cnt = block.length - ptr;
+		if (cnt <= 0) {
+			throw new DataFormatException(cnt + " bytes to inflate:" //$NON-NLS-1$
+					+ " at pos=" + pos //$NON-NLS-1$
+					+ "; block.start=" + start //$NON-NLS-1$
+					+ "; ptr=" + ptr //$NON-NLS-1$
+					+ "; block.length=" + block.length); //$NON-NLS-1$
+		}
 		inf.setInput(block, ptr, cnt);
 		return cnt;
 	}

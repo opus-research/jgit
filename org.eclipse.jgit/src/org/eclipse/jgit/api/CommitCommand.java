@@ -48,11 +48,13 @@ import java.io.PrintStream;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 
 import org.eclipse.jgit.api.errors.AbortedByHookException;
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
+import org.eclipse.jgit.api.errors.EmtpyCommitException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
@@ -66,7 +68,10 @@ import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.UnmergedPathException;
+import org.eclipse.jgit.hooks.CommitMsgHook;
 import org.eclipse.jgit.hooks.Hooks;
+import org.eclipse.jgit.hooks.PostCommitHook;
+import org.eclipse.jgit.hooks.PreCommitHook;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
@@ -107,7 +112,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 
 	private boolean all;
 
-	private List<String> only = new ArrayList<String>();
+	private List<String> only = new ArrayList<>();
 
 	private boolean[] onlyProcessed;
 
@@ -119,16 +124,20 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 * parents this commit should have. The current HEAD will be in this list
 	 * and also all commits mentioned in .git/MERGE_HEAD
 	 */
-	private List<ObjectId> parents = new LinkedList<ObjectId>();
+	private List<ObjectId> parents = new LinkedList<>();
 
 	private String reflogComment;
+
+	private boolean useDefaultReflogMessage = true;
 
 	/**
 	 * Setting this option bypasses the pre-commit and commit-msg hooks.
 	 */
 	private boolean noVerify;
 
-	private PrintStream hookOutRedirect;
+	private HashMap<String, PrintStream> hookOutRedirect = new HashMap<>(3);
+
+	private Boolean allowEmpty;
 
 	/**
 	 * @param repo
@@ -159,6 +168,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 *             if there are either pre-commit or commit-msg hooks present in
 	 *             the repository and one of them rejects the commit.
 	 */
+	@Override
 	public RevCommit call() throws GitAPIException, NoHeadException,
 			NoMessageException, UnmergedPathsException,
 			ConcurrentRefUpdateException, WrongRepositoryStateException,
@@ -174,12 +184,13 @@ public class CommitCommand extends GitCommand<RevCommit> {
 						state.name()));
 
 			if (!noVerify) {
-				Hooks.preCommit(repo, hookOutRedirect).call();
+				Hooks.preCommit(repo, hookOutRedirect.get(PreCommitHook.NAME))
+						.call();
 			}
 
 			processOptions(state, rw);
 
-			if (all && !repo.isBare() && repo.getWorkTree() != null) {
+			if (all && !repo.isBare()) {
 				try (Git git = new Git(repo)) {
 					git.add()
 							.addFilepattern(".") //$NON-NLS-1$
@@ -190,7 +201,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				}
 			}
 
-			Ref head = repo.getRef(Constants.HEAD);
+			Ref head = repo.exactRef(Constants.HEAD);
 			if (head == null)
 				throw new NoHeadException(
 						JGitText.get().commitOnRepoWithoutHEADCurrentlyNotSupported);
@@ -213,7 +224,9 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				}
 
 			if (!noVerify) {
-				message = Hooks.commitMsg(repo, hookOutRedirect)
+				message = Hooks
+						.commitMsg(repo,
+								hookOutRedirect.get(CommitMsgHook.NAME))
 						.setCommitMessage(message).call();
 			}
 
@@ -231,6 +244,16 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				if (insertChangeId)
 					insertChangeId(indexTreeId);
 
+				// Check for empty commits
+				if (headId != null && !allowEmpty.booleanValue()) {
+					RevCommit headCommit = rw.parseCommit(headId);
+					headCommit.getTree();
+					if (indexTreeId.equals(headCommit.getTree())) {
+						throw new EmtpyCommitException(
+								JGitText.get().emptyCommit);
+					}
+				}
+
 				// Create a Commit object, populate it and write it
 				CommitBuilder commit = new CommitBuilder();
 				commit.setCommitter(committer);
@@ -245,7 +268,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				RevCommit revCommit = rw.parseCommit(commitId);
 				RefUpdate ru = repo.updateRef(Constants.HEAD);
 				ru.setNewObjectId(commitId);
-				if (reflogComment != null) {
+				if (!useDefaultReflogMessage) {
 					ru.setRefLogMessage(reflogComment, false);
 				} else {
 					String prefix = amend ? "commit (amend): " //$NON-NLS-1$
@@ -277,6 +300,9 @@ public class CommitCommand extends GitCommand<RevCommit> {
 						repo.writeMergeCommitMsg(null);
 						repo.writeRevertHead(null);
 					}
+					Hooks.postCommit(repo,
+							hookOutRedirect.get(PostCommitHook.NAME)).call();
+
 					return revCommit;
 				}
 				case REJECTED:
@@ -299,7 +325,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 		}
 	}
 
-	private void insertChangeId(ObjectId treeId) throws IOException {
+	private void insertChangeId(ObjectId treeId) {
 		ObjectId firstParentId = null;
 		if (!parents.isEmpty())
 			firstParentId = parents.get(0);
@@ -456,7 +482,9 @@ public class CommitCommand extends GitCommand<RevCommit> {
 						JGitText.get().entryNotFoundByPath, only.get(i)));
 
 		// there must be at least one change
-		if (emptyCommit)
+		if (emptyCommit && !allowEmpty.booleanValue())
+			// Would like to throw a EmptyCommitException. But this would break the API
+			// TODO(ch): Change this in the next release
 			throw new JGitInternalException(JGitText.get().emptyCommit);
 
 		// update index
@@ -510,6 +538,12 @@ public class CommitCommand extends GitCommand<RevCommit> {
 			committer = new PersonIdent(repo);
 		if (author == null && !amend)
 			author = committer;
+		if (allowEmpty == null)
+			// JGit allows empty commits by default. Only when pathes are
+			// specified the commit should not be empty. This behaviour differs
+			// from native git but can only be adapted in the next release.
+			// TODO(ch) align the defaults with native git
+			allowEmpty = (only.isEmpty()) ? Boolean.TRUE : Boolean.FALSE;
 
 		// when doing a merge commit parse MERGE_HEAD and MERGE_MSG files
 		if (state == RepositoryState.MERGING_RESOLVED
@@ -575,6 +609,27 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	public CommitCommand setMessage(String message) {
 		checkCallable();
 		this.message = message;
+		return this;
+	}
+
+	/**
+	 * @param allowEmpty
+	 *            whether it should be allowed to create a commit which has the
+	 *            same tree as it's sole predecessor (a commit which doesn't
+	 *            change anything). By default when creating standard commits
+	 *            (without specifying paths) JGit allows to create such commits.
+	 *            When this flag is set to false an attempt to create an "empty"
+	 *            standard commit will lead to an EmptyCommitException.
+	 *            <p>
+	 *            By default when creating a commit containing only specified
+	 *            paths an attempt to create an empty commit leads to a
+	 *            {@link JGitInternalException}. By setting this flag to
+	 *            <code>true</code> this exception will not be thrown.
+	 * @return {@code this}
+	 * @since 4.2
+	 */
+	public CommitCommand setAllowEmpty(boolean allowEmpty) {
+		this.allowEmpty = Boolean.valueOf(allowEmpty);
 		return this;
 	}
 
@@ -681,7 +736,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 */
 	public CommitCommand setAll(boolean all) {
 		checkCallable();
-		if (!only.isEmpty())
+		if (all && !only.isEmpty())
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().illegalCombinationOfArguments, "--all", //$NON-NLS-1$
 					"--only")); //$NON-NLS-1$
@@ -748,10 +803,13 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 * Override the message written to the reflog
 	 *
 	 * @param reflogComment
+	 *            the comment to be written into the reflog or <code>null</code>
+	 *            to specify that no reflog should be written
 	 * @return {@code this}
 	 */
 	public CommitCommand setReflogComment(String reflogComment) {
 		this.reflogComment = reflogComment;
+		useDefaultReflogMessage = false;
 		return this;
 	}
 
@@ -775,8 +833,9 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	}
 
 	/**
-	 * Set the output stream for hook scripts executed by this command. If not
-	 * set it defaults to {@code System.out}.
+	 * Set the output stream for all hook scripts executed by this command
+	 * (pre-commit, commit-msg, post-commit). If not set it defaults to
+	 * {@code System.out}.
 	 *
 	 * @param hookStdOut
 	 *            the output stream for hook scripts executed by this command
@@ -784,7 +843,34 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 * @since 3.7
 	 */
 	public CommitCommand setHookOutputStream(PrintStream hookStdOut) {
-		this.hookOutRedirect = hookStdOut;
+		setHookOutputStream(PreCommitHook.NAME, hookStdOut);
+		setHookOutputStream(CommitMsgHook.NAME, hookStdOut);
+		setHookOutputStream(PostCommitHook.NAME, hookStdOut);
+		return this;
+	}
+
+	/**
+	 * Set the output stream for a selected hook script executed by this command
+	 * (pre-commit, commit-msg, post-commit). If not set it defaults to
+	 * {@code System.out}.
+	 *
+	 * @param hookName
+	 *            name of the hook to set the output stream for
+	 * @param hookStdOut
+	 *            the output stream to use for the selected hook
+	 * @return {@code this}
+	 * @since 4.5
+	 */
+	public CommitCommand setHookOutputStream(String hookName,
+			PrintStream hookStdOut) {
+		if (!(PreCommitHook.NAME.equals(hookName)
+				|| CommitMsgHook.NAME.equals(hookName)
+				|| PostCommitHook.NAME.equals(hookName))) {
+			throw new IllegalArgumentException(
+					MessageFormat.format(JGitText.get().illegalHookName,
+							hookName));
+		}
+		hookOutRedirect.put(hookName, hookStdOut);
 		return this;
 	}
 }

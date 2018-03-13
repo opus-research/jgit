@@ -47,9 +47,6 @@ import java.text.MessageFormat;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
-import com.googlecode.javaewah.EWAHCompressedBitmap;
-import com.googlecode.javaewah.IntIterator;
-
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.BitmapIndex;
@@ -58,6 +55,9 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdOwnerMap;
 import org.eclipse.jgit.util.BlockList;
+
+import com.googlecode.javaewah.EWAHCompressedBitmap;
+import com.googlecode.javaewah.IntIterator;
 
 /** A compressed bitmap representation of the entire object graph. */
 public class BitmapIndexImpl implements BitmapIndex {
@@ -370,6 +370,7 @@ public class BitmapIndexImpl implements BitmapIndex {
 				private int type;
 				private IntIterator cached = dynamic;
 
+				@Override
 				public boolean hasNext() {
 					if (!cached.hasNext()) {
 						if (commits.hasNext()) {
@@ -391,6 +392,7 @@ public class BitmapIndexImpl implements BitmapIndex {
 					return true;
 				}
 
+				@Override
 				public BitmapObject next() {
 					if (!hasNext())
 						throw new NoSuchElementException();
@@ -408,6 +410,7 @@ public class BitmapIndexImpl implements BitmapIndex {
 					return out;
 				}
 
+				@Override
 				public void remove() {
 					throw new UnsupportedOperationException();
 				}
@@ -439,10 +442,10 @@ public class BitmapIndexImpl implements BitmapIndex {
 
 	private static final class MutableBitmapIndex {
 		private final ObjectIdOwnerMap<MutableEntry>
-				revMap = new ObjectIdOwnerMap<MutableEntry>();
+				revMap = new ObjectIdOwnerMap<>();
 
 		private final BlockList<MutableEntry>
-				revList = new BlockList<MutableEntry>();
+				revList = new BlockList<>();
 
 		int findPosition(AnyObjectId objectId) {
 			MutableEntry entry = revMap.get(objectId);
@@ -504,10 +507,10 @@ public class BitmapIndexImpl implements BitmapIndex {
 	static final EWAHCompressedBitmap ones(int sizeInBits) {
 		EWAHCompressedBitmap mask = new EWAHCompressedBitmap();
 		mask.addStreamOfEmptyWords(
-				true, sizeInBits / EWAHCompressedBitmap.wordinbits);
-		int remaining = sizeInBits % EWAHCompressedBitmap.wordinbits;
+				true, sizeInBits / EWAHCompressedBitmap.WORD_IN_BITS);
+		int remaining = sizeInBits % EWAHCompressedBitmap.WORD_IN_BITS;
 		if (remaining > 0)
-			mask.add((1L << remaining) - 1, remaining);
+			mask.addWord((1L << remaining) - 1, remaining);
 		return mask;
 	}
 }

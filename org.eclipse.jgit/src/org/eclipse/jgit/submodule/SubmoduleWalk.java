@@ -45,8 +45,7 @@ package org.eclipse.jgit.submodule;
 import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Locale;
 
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheIterator;
@@ -266,7 +265,7 @@ public class SubmoduleWalk implements AutoCloseable {
 
 		String remoteName = null;
 		// Look up remote URL associated wit HEAD ref
-		Ref ref = parent.getRef(Constants.HEAD);
+		Ref ref = parent.exactRef(Constants.HEAD);
 		if (ref != null) {
 			if (ref.isSymbolic())
 				ref = ref.getLeaf();
@@ -331,8 +330,6 @@ public class SubmoduleWalk implements AutoCloseable {
 
 	private String path;
 
-	private Map<String, String> pathToName;
-
 	/**
 	 * Create submodule generator
 	 *
@@ -358,7 +355,6 @@ public class SubmoduleWalk implements AutoCloseable {
 	 */
 	public SubmoduleWalk setModulesConfig(final Config config) {
 		modulesConfig = config;
-		loadPathNames();
 		return this;
 	}
 
@@ -423,7 +419,6 @@ public class SubmoduleWalk implements AutoCloseable {
 					repository.getFS());
 			config.load();
 			modulesConfig = config;
-			loadPathNames();
 		} else {
 			try (TreeWalk configWalk = new TreeWalk(repository)) {
 				configWalk.addTree(rootTree);
@@ -443,7 +438,6 @@ public class SubmoduleWalk implements AutoCloseable {
 						if (filter.isDone(configWalk)) {
 							modulesConfig = new BlobBasedConfig(null, repository,
 									configWalk.getObjectId(0));
-							loadPathNames();
 							return this;
 						}
 					}
@@ -455,22 +449,6 @@ public class SubmoduleWalk implements AutoCloseable {
 			}
 		}
 		return this;
-	}
-
-	private void loadPathNames() {
-		pathToName = null;
-		if (modulesConfig != null) {
-			HashMap<String, String> pathNames = new HashMap<>(modulesConfig
-					.getSubsections(ConfigConstants.CONFIG_SUBMODULE_SECTION)
-					.size());
-			for (String name : modulesConfig
-					.getSubsections(ConfigConstants.CONFIG_SUBMODULE_SECTION)) {
-				pathNames.put(modulesConfig.getString(
-						ConfigConstants.CONFIG_SUBMODULE_SECTION, name,
-						ConfigConstants.CONFIG_KEY_PATH), name);
-			}
-			pathToName = pathNames;
-		}
 	}
 
 	/**
@@ -608,8 +586,8 @@ public class SubmoduleWalk implements AutoCloseable {
 	 */
 	public String getModulesPath() throws IOException, ConfigInvalidException {
 		lazyLoadModulesConfig();
-		return modulesConfig.getString(ConfigConstants.CONFIG_SUBMODULE_SECTION,
-				(pathToName.get(path) != null) ? pathToName.get(path) : path,
+		return modulesConfig.getString(
+				ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
 				ConfigConstants.CONFIG_KEY_PATH);
 	}
 
@@ -636,8 +614,8 @@ public class SubmoduleWalk implements AutoCloseable {
 	 */
 	public String getModulesUrl() throws IOException, ConfigInvalidException {
 		lazyLoadModulesConfig();
-		return modulesConfig.getString(ConfigConstants.CONFIG_SUBMODULE_SECTION,
-				(pathToName.get(path) != null) ? pathToName.get(path) : path,
+		return modulesConfig.getString(
+				ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
 				ConfigConstants.CONFIG_KEY_URL);
 	}
 
@@ -664,8 +642,8 @@ public class SubmoduleWalk implements AutoCloseable {
 	 */
 	public String getModulesUpdate() throws IOException, ConfigInvalidException {
 		lazyLoadModulesConfig();
-		return modulesConfig.getString(ConfigConstants.CONFIG_SUBMODULE_SECTION,
-				(pathToName.get(path) != null) ? pathToName.get(path) : path,
+		return modulesConfig.getString(
+				ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
 				ConfigConstants.CONFIG_KEY_UPDATE);
 	}
 
@@ -682,12 +660,12 @@ public class SubmoduleWalk implements AutoCloseable {
 			ConfigInvalidException {
 		lazyLoadModulesConfig();
 		String name = modulesConfig.getString(
-				ConfigConstants.CONFIG_SUBMODULE_SECTION,
-				(pathToName.get(path) != null) ? pathToName.get(path) : path,
+				ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
 				ConfigConstants.CONFIG_KEY_IGNORE);
 		if (name == null)
 			return null;
-		return IgnoreSubmoduleMode.valueOf(name.trim().toUpperCase());
+		return IgnoreSubmoduleMode
+				.valueOf(name.trim().toUpperCase(Locale.ROOT));
 	}
 
 	/**
@@ -728,7 +706,7 @@ public class SubmoduleWalk implements AutoCloseable {
 		if (subRepo == null)
 			return null;
 		try {
-			Ref head = subRepo.getRef(Constants.HEAD);
+			Ref head = subRepo.exactRef(Constants.HEAD);
 			return head != null ? head.getLeaf().getName() : null;
 		} finally {
 			subRepo.close();

@@ -51,12 +51,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.pgm.internal.CLIText;
+import org.eclipse.jgit.pgm.opt.CmdLineParser;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.Option;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.pgm.internal.CLIText;;
 
 @Command(usage = "usage_RevParse")
 class RevParse extends TextBuiltin {
@@ -67,18 +68,25 @@ class RevParse extends TextBuiltin {
 	boolean verify;
 
 	@Argument(index = 0, metaVar = "metaVar_commitish")
-	private final List<ObjectId> commits = new ArrayList<ObjectId>();
+	private final List<ObjectId> commits = new ArrayList<>();
 
 	@Override
 	protected void run() throws Exception {
 		if (all) {
 			Map<String, Ref> allRefs = db.getRefDatabase().getRefs(ALL);
 			for (final Ref r : allRefs.values()) {
-				outw.println(r.getObjectId().name());
+				ObjectId objectId = r.getObjectId();
+				// getRefs skips dangling symrefs, so objectId should never be
+				// null.
+				if (objectId == null) {
+					throw new NullPointerException();
+				}
+				outw.println(objectId.name());
 			}
 		} else {
 			if (verify && commits.size() > 1) {
-				throw new CmdLineException(CLIText.get().needSingleRevision);
+				final CmdLineParser clp = new CmdLineParser(this);
+				throw new CmdLineException(clp, CLIText.get().needSingleRevision);
 			}
 
 			for (final ObjectId o : commits) {
