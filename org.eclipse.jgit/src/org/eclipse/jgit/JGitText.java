@@ -201,7 +201,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String daysAgo;
 	/***/ public String deleteBranchUnexpectedResult;
 	/***/ public String deleteFileFailed;
-	/***/ public String deleteTagUnexpectedResult;
 	/***/ public String deletingNotSupported;
 	/***/ public String destinationIsNotAWildcard;
 	/***/ public String detachedHeadDetected;
@@ -419,7 +418,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String readTimedOut;
 	/***/ public String readingObjectsFromLocalRepositoryFailed;
 	/***/ public String receivingObjects;
-	/***/ public String refAlreadyExists;
+	/***/ public String refAlreadExists;
 	/***/ public String refNotResolved;
 	/***/ public String refUpdateReturnCodeWas;
 	/***/ public String reflogsNotYetSupportedByRevisionParser;
@@ -553,6 +552,4 @@ public class JGitText extends TranslationBundle {
 	/***/ public String years;
 	/***/ public String yearsAgo;
 	/***/ public String yearsMonthsAgo;
-	/***/ public String treeWalkMustHaveExactlyTwoTrees;
-	/***/ public String cannotBeRecursiveWhenTreesAreIncluded;
 }
