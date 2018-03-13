@@ -56,7 +56,6 @@ import java.io.OutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Constants;
@@ -110,14 +109,6 @@ class TransportLocal extends Transport implements PackTransport {
 		if (new File(d, Constants.DOT_GIT).isDirectory())
 			d = new File(d, Constants.DOT_GIT);
 		remoteGitDir = d;
-	}
-
-	UploadPack createUploadPack(final Repository dst) {
-		return new UploadPack(dst);
-	}
-
-	ReceivePack createReceivePack(final Repository dst) {
-		return new ReceivePack(dst);
 	}
 
 	@Override
@@ -176,7 +167,7 @@ class TransportLocal extends Transport implements PackTransport {
 			try {
 				dst = new Repository(remoteGitDir);
 			} catch (IOException err) {
-				throw new TransportException(uri, JGitText.get().notAGitDirectory);
+				throw new TransportException(uri, "not a git directory");
 			}
 
 			final PipedInputStream in_r;
@@ -200,13 +191,13 @@ class TransportLocal extends Transport implements PackTransport {
 				out_w = new PipedOutputStream(out_r);
 			} catch (IOException err) {
 				dst.close();
-				throw new TransportException(uri, JGitText.get().cannotConnectPipes, err);
+				throw new TransportException(uri, "cannot connect pipes", err);
 			}
 
 			worker = new Thread("JGit-Upload-Pack") {
 				public void run() {
 					try {
-						final UploadPack rp = createUploadPack(dst);
+						final UploadPack rp = new UploadPack(dst);
 						rp.upload(out_r, in_w, null);
 					} catch (IOException err) {
 						// Client side of the pipes should report the problem.
@@ -316,7 +307,7 @@ class TransportLocal extends Transport implements PackTransport {
 			try {
 				dst = new Repository(remoteGitDir);
 			} catch (IOException err) {
-				throw new TransportException(uri, JGitText.get().notAGitDirectory);
+				throw new TransportException(uri, "not a git directory");
 			}
 
 			final PipedInputStream in_r;
@@ -332,13 +323,13 @@ class TransportLocal extends Transport implements PackTransport {
 				out_w = new PipedOutputStream(out_r);
 			} catch (IOException err) {
 				dst.close();
-				throw new TransportException(uri, JGitText.get().cannotConnectPipes, err);
+				throw new TransportException(uri, "cannot connect pipes", err);
 			}
 
 			worker = new Thread("JGit-Receive-Pack") {
 				public void run() {
 					try {
-						final ReceivePack rp = createReceivePack(dst);
+						final ReceivePack rp = new ReceivePack(dst);
 						rp.receive(out_r, in_w, System.err);
 					} catch (IOException err) {
 						// Client side of the pipes should report the problem.

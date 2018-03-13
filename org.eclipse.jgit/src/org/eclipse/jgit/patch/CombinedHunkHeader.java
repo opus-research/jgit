@@ -48,9 +48,7 @@ import static org.eclipse.jgit.util.RawParseUtils.parseBase10;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.util.MutableInteger;
 
@@ -185,14 +183,16 @@ public class CombinedHunkHeader extends HunkHeader {
 			final int cmp = o.nContext + o.nDeleted;
 			if (cmp < o.lineCount) {
 				final int missingCnt = o.lineCount - cmp;
-				script.error(buf, startOffset, MessageFormat.format(
-						JGitText.get().truncatedHunkLinesMissingForAncestor, missingCnt, (ancestor + 1)));
+				script.error(buf, startOffset, "Truncated hunk, at least "
+						+ missingCnt + " lines is missing for ancestor "
+						+ (ancestor + 1));
 			}
 		}
 
 		if (nContext + nAdded < newLineCount) {
 			final int missingCount = newLineCount - (nContext + nAdded);
-			script.error(buf, startOffset, MessageFormat.format(JGitText.get().truncatedHunkNewLinesMissing, missingCount));
+			script.error(buf, startOffset, "Truncated hunk, at least "
+					+ missingCount + " new lines is missing");
 		}
 
 		return c;

@@ -43,7 +43,6 @@
 
 package org.eclipse.jgit.pgm;
 
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -110,10 +109,10 @@ abstract class RevWalkTextBuiltin extends TextBuiltin {
 		enableRevSort(RevSort.BOUNDARY, on);
 	}
 
-	@Argument(index = 0, metaVar = "metaVar_commitish")
+	@Argument(index = 0, metaVar = "commit-ish")
 	private final List<RevCommit> commits = new ArrayList<RevCommit>();
 
-	@Option(name = "--", metaVar = "metaVar_path", multiValued = true, handler = PathTreeFilterHandler.class)
+	@Option(name = "--", metaVar = "path", multiValued = true, handler = PathTreeFilterHandler.class)
 	private TreeFilter pathFilter = TreeFilter.ALL;
 
 	private final List<RevFilter> revLimiter = new ArrayList<RevFilter>();
@@ -151,7 +150,7 @@ abstract class RevWalkTextBuiltin extends TextBuiltin {
 		if (commits.isEmpty()) {
 			final ObjectId head = db.resolve(Constants.HEAD);
 			if (head == null)
-				throw die(MessageFormat.format(CLIText.get().cannotResolve, Constants.HEAD));
+				throw die("Cannot resolve " + Constants.HEAD);
 			commits.add(walk.parseCommit(head));
 		}
 		for (final RevCommit c : commits) {
@@ -168,8 +167,9 @@ abstract class RevWalkTextBuiltin extends TextBuiltin {
 			final long end = System.currentTimeMillis();
 			System.err.print(n);
 			System.err.print(' ');
-			System.err.println(MessageFormat.format(
-					CLIText.get().timeInMilliSeconds, end - start));
+			System.err.print(end - start);
+			System.err.print(" ms");
+			System.err.println();
 		}
 	}
 

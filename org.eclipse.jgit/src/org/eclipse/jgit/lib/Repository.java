@@ -47,9 +47,7 @@
 package org.eclipse.jgit.lib;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -62,14 +60,10 @@ import java.util.Set;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.RevisionSyntaxException;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.IO;
-import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.SystemReader;
 
 /**
@@ -101,8 +95,6 @@ public class Repository {
 	private final AtomicInteger useCnt = new AtomicInteger(1);
 
 	private final File gitDir;
-
-	private final FileBasedConfig userConfig;
 
 	private final RepositoryConfig config;
 
@@ -196,14 +188,29 @@ public class Repository {
 			if (d != null)
 				gitDir = d;
 			else
-				throw new IllegalArgumentException(JGitText.get().eitherGIT_DIRorGIT_WORK_TREEmustBePassed);
+				throw new IllegalArgumentException("Either GIT_DIR or GIT_WORK_TREE must be passed to Repository constructor");
 		}
 
+		final FileBasedConfig userConfig;
 		userConfig = SystemReader.getInstance().openUserConfig();
+		try {
+			userConfig.load();
+		} catch (ConfigInvalidException e1) {
+			IOException e2 = new IOException("User config file "
+					+ userConfig.getFile().getAbsolutePath() + " invalid: "
+					+ e1);
+			e2.initCause(e1);
+			throw e2;
+		}
 		config = new RepositoryConfig(userConfig, FS.resolve(gitDir, "config"));
 
-		loadUserConfig();
-		loadConfig();
+		try {
+			getConfig().load();
+		} catch (ConfigInvalidException e1) {
+			IOException e2 = new IOException("Unknown repository format");
+			e2.initCause(e1);
+			throw e2;
+		}
 
 		if (workDir == null) {
 			String workTreeConfig = getConfig().getString("core", null, "worktree");
@@ -231,33 +238,11 @@ public class Repository {
 			final String repositoryFormatVersion = getConfig().getString(
 					"core", null, "repositoryFormatVersion");
 			if (!"0".equals(repositoryFormatVersion)) {
-				throw new IOException(MessageFormat.format(
-						JGitText.get().unknownRepositoryFormat2, repositoryFormatVersion));
+				throw new IOException("Unknown repository format \""
+						+ repositoryFormatVersion + "\"; expected \"0\".");
 			}
 		}
 	}
-
-	private void loadUserConfig() throws IOException {
-		try {
-			userConfig.load();
-		} catch (ConfigInvalidException e1) {
-			IOException e2 = new IOException(MessageFormat.format(
-					JGitText.get().userConfigFileInvalid, userConfig.getFile().getAbsolutePath(), e1));
-			e2.initCause(e1);
-			throw e2;
-		}
-	}
-
-	private void loadConfig() throws IOException {
-		try {
-			config.load();
-		} catch (ConfigInvalidException e1) {
-			IOException e2 = new IOException(JGitText.get().unknownRepositoryFormat);
-			e2.initCause(e1);
-			throw e2;
-		}
-	}
-
 
 	/**
 	 * Create a new Git repository initializing the necessary files and
@@ -283,7 +268,8 @@ public class Repository {
 	public void create(boolean bare) throws IOException {
 		final RepositoryConfig cfg = getConfig();
 		if (cfg.getFile().exists()) {
-			throw new IllegalStateException(MessageFormat.format(JGitText.get().repositoryAlreadyExists, gitDir));
+			throw new IllegalStateException("Repository already exists: "
+					+ gitDir);
 		}
 		gitDir.mkdirs();
 		refs.create();
@@ -334,20 +320,6 @@ public class Repository {
 	 * @return the configuration of this repository
 	 */
 	public RepositoryConfig getConfig() {
-		if (userConfig.isOutdated()) {
-			try {
-				loadUserConfig();
-			} catch (IOException e) {
-				throw new RuntimeException(e);
-			}
-		}
-		if (config.isOutdated()) {
-				try {
-					loadConfig();
-				} catch (IOException e) {
-					throw new RuntimeException(e);
-				}
-		}
 		return config;
 	}
 
@@ -509,7 +481,7 @@ public class Repository {
 
 		default:
 			throw new IncorrectObjectTypeException(id,
-				JGitText.get().incorrectObjectType_COMMITnorTREEnorBLOBnorTAG);
+				"COMMIT nor TREE nor BLOB nor TAG");
 		}
 	}
 
@@ -730,7 +702,7 @@ public class Repository {
 							pnum = Integer.parseInt(parentnum);
 						} catch (NumberFormatException e) {
 							throw new RevisionSyntaxException(
-									JGitText.get().invalidCommitParentNumber,
+									"Invalid commit parent number",
 									revstr);
 						}
 						if (pnum != 0) {
@@ -856,7 +828,7 @@ public class Repository {
 					dist = Integer.parseInt(distnum);
 				} catch (NumberFormatException e) {
 					throw new RevisionSyntaxException(
-							JGitText.get().invalidAncestryLength, revstr);
+							"Invalid ancestry length", revstr);
 				}
 				while (dist > 0) {
 					final ObjectId[] parents = ((Commit) ref).getParentIds();
@@ -880,7 +852,7 @@ public class Repository {
 					}
 				}
 				if (time != null)
-					throw new RevisionSyntaxException(JGitText.get().reflogsNotYetSupportedByRevisionParser, revstr);
+					throw new RevisionSyntaxException("reflogs not yet supported by revision parser", revstr);
 				i = m - 1;
 				break;
 			default:
@@ -1121,22 +1093,8 @@ public class Repository {
 			return RepositoryState.REBASING_MERGE;
 
 		// Both versions
-		if (new File(gitDir, "MERGE_HEAD").exists()) {
-			// we are merging - now check whether we have unmerged paths
-			try {
-				if (!DirCache.read(this).hasUnmergedPaths()) {
-					// no unmerged paths -> return the MERGING_RESOLVED state
-					return RepositoryState.MERGING_RESOLVED;
-				}
-			} catch (IOException e) {
-				// Can't decide whether unmerged paths exists. Return
-				// MERGING state to be on the safe side (in state MERGING
-				// you are not allow to do anything)
-				e.printStackTrace();
-			}
+		if (new File(gitDir,"MERGE_HEAD").exists())
 			return RepositoryState.MERGING;
-		}
-
 		if (new File(gitDir,"BISECT_LOG").exists())
 			return RepositoryState.BISECTING;
 
@@ -1340,56 +1298,5 @@ public class Repository {
 		if (ref != null)
 			return new ReflogReader(this, ref.getName());
 		return null;
-	}
-
-	/**
-	 * Return the information stored in the file $GIT_DIR/MERGE_MSG. In this
-	 * file operations triggering a merge will store a template for the commit
-	 * message of the merge commit.
-	 *
-	 * @return a String containing the content of the MERGE_MSG file or
-	 *         {@code null} if this file doesn't exist
-	 * @throws IOException
-	 */
-	public String readMergeCommitMsg() throws IOException {
-		File mergeMsgFile = new File(gitDir, Constants.MERGE_MSG);
-		try {
-			return new String(IO.readFully(mergeMsgFile));
-		} catch (FileNotFoundException e) {
-			// MERGE_MSG file has disappeared in the meantime
-			// ignore it
-			return null;
-		}
-	}
-
-	/**
-	 * Return the information stored in the file $GIT_DIR/MERGE_HEAD. In this
-	 * file operations triggering a merge will store the IDs of all heads which
-	 * should be merged together with HEAD.
-	 *
-	 * @return a list of {@link Commit}s which IDs are listed in the MERGE_HEAD
-	 *         file or {@code null} if this file doesn't exist. Also if the file
-	 *         exists but is empty {@code null} will be returned
-	 * @throws IOException
-	 */
-	public List<ObjectId> readMergeHeads() throws IOException {
-		File mergeHeadFile = new File(gitDir, Constants.MERGE_HEAD);
-		byte[] raw;
-		try {
-			raw = IO.readFully(mergeHeadFile);
-		} catch (FileNotFoundException notFound) {
-			return new LinkedList<ObjectId>();
-		}
-
-		if (raw.length == 0)
-			throw new IOException("MERGE_HEAD file empty: " + mergeHeadFile);
-
-		LinkedList<ObjectId> heads = new LinkedList<ObjectId>();
-		for (int p = 0; p < raw.length;) {
-			heads.add(ObjectId.fromString(raw, p));
-			p = RawParseUtils
-					.nextLF(raw, p + Constants.OBJECT_ID_STRING_LENGTH);
-		}
-		return heads;
 	}
 }

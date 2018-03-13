@@ -43,10 +43,6 @@
 
 package org.eclipse.jgit.util;
 
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.JGitText;
-
 /** Miscellaneous string comparison utility methods. */
 public final class StringUtils {
 	private static final char[] LC;
@@ -139,7 +135,7 @@ public final class StringUtils {
 	 */
 	public static boolean toBoolean(final String stringValue) {
 		if (stringValue == null)
-			throw new NullPointerException(JGitText.get().expectedBooleanStringValue);
+			throw new NullPointerException("Expected boolean string value");
 
 		if (equalsIgnoreCase("yes", stringValue)
 				|| equalsIgnoreCase("true", stringValue)
@@ -154,7 +150,7 @@ public final class StringUtils {
 			return false;
 
 		} else {
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().notABoolean, stringValue));
+			throw new IllegalArgumentException("Not a boolean: " + stringValue);
 		}
 	}
 

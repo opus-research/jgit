@@ -56,11 +56,9 @@ import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.security.DigestOutputStream;
 import java.security.MessageDigest;
-import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Comparator;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.lib.Constants;
@@ -202,7 +200,7 @@ public class DirCache {
 			throws CorruptObjectException, IOException {
 		final DirCache c = new DirCache(indexLocation);
 		if (!c.lock())
-			throw new IOException(MessageFormat.format(JGitText.get().cannotLock, indexLocation));
+			throw new IOException("Cannot lock " + indexLocation);
 
 		try {
 			c.read();
@@ -321,7 +319,7 @@ public class DirCache {
 	 */
 	public void read() throws IOException, CorruptObjectException {
 		if (liveFile == null)
-			throw new IOException(JGitText.get().dirCacheDoesNotHaveABackingFile);
+			throw new IOException("DirCache does not have a backing file");
 		if (!liveFile.exists())
 			clear();
 		else if (liveFile.lastModified() != lastModified) {
@@ -365,13 +363,13 @@ public class DirCache {
 		IO.readFully(in, hdr, 0, 12);
 		md.update(hdr, 0, 12);
 		if (!is_DIRC(hdr))
-			throw new CorruptObjectException(JGitText.get().notADIRCFile);
+			throw new CorruptObjectException("Not a DIRC file.");
 		final int ver = NB.decodeInt32(hdr, 4);
 		if (ver != 2)
-			throw new CorruptObjectException(MessageFormat.format(JGitText.get().unknownDIRCVersion, ver));
+			throw new CorruptObjectException("Unknown DIRC version " + ver);
 		entryCnt = NB.decodeInt32(hdr, 8);
 		if (entryCnt < 0)
-			throw new CorruptObjectException(JGitText.get().DIRCHasTooManyEntries);
+			throw new CorruptObjectException("DIRC has too many entries.");
 
 		// Load the individual file entries.
 		//
@@ -400,8 +398,9 @@ public class DirCache {
 			switch (NB.decodeInt32(hdr, 0)) {
 			case EXT_TREE: {
 				if (Integer.MAX_VALUE < sz) {
-					throw new CorruptObjectException(MessageFormat.format(JGitText.get().DIRCExtensionIsTooLargeAt
-							, formatExtensionName(hdr), sz));
+					throw new CorruptObjectException("DIRC extension "
+							+ formatExtensionName(hdr) + " is too large at "
+							+ sz + " bytes.");
 				}
 				final byte[] raw = new byte[(int) sz];
 				IO.readFully(in, raw, 0, raw.length);
@@ -422,15 +421,16 @@ public class DirCache {
 					// _required_ to understand this index format.
 					// Since we did not trap it above we must abort.
 					//
-					throw new CorruptObjectException(MessageFormat.format(JGitText.get().DIRCExtensionNotSupportedByThisVersion
-							, formatExtensionName(hdr)));
+					throw new CorruptObjectException("DIRC extension "
+							+ formatExtensionName(hdr)
+							+ " not supported by this version.");
 				}
 			}
 		}
 
 		final byte[] exp = md.digest();
 		if (!Arrays.equals(exp, hdr)) {
-			throw new CorruptObjectException(JGitText.get().DIRCChecksumMismatch);
+			throw new CorruptObjectException("DIRC checksum mismatch");
 		}
 	}
 
@@ -441,8 +441,9 @@ public class DirCache {
 		while (0 < sz) {
 			int n = in.read(b, 0, (int) Math.min(b.length, sz));
 			if (n < 0) {
-				throw new EOFException(MessageFormat.format(JGitText.get().shortReadOfOptionalDIRCExtensionExpectedAnotherBytes
-						, formatExtensionName(hdr), sz));
+				throw new EOFException("Short read of optional DIRC extension "
+						+ formatExtensionName(hdr) + "; expected another " + sz
+						+ " bytes within the section.");
 			}
 			md.update(b, 0, n);
 			sz -= n;
@@ -474,7 +475,7 @@ public class DirCache {
 	 */
 	public boolean lock() throws IOException {
 		if (liveFile == null)
-			throw new IOException(JGitText.get().dirCacheDoesNotHaveABackingFile);
+			throw new IOException("DirCache does not have a backing file");
 		final LockFile tmp = new LockFile(liveFile);
 		if (tmp.lock()) {
 			tmp.setNeedStatInformation(true);
@@ -584,10 +585,10 @@ public class DirCache {
 
 	private void requireLocked(final LockFile tmp) {
 		if (liveFile == null)
-			throw new IllegalStateException(JGitText.get().dirCacheIsNotLocked);
+			throw new IllegalStateException("DirCache is not locked");
 		if (tmp == null)
-			throw new IllegalStateException(MessageFormat.format(JGitText.get().dirCacheFileIsNotLocked
-					, liveFile.getAbsolutePath()));
+			throw new IllegalStateException("DirCache "
+					+ liveFile.getAbsolutePath() + " not locked.");
 	}
 
 	/**
@@ -782,21 +783,5 @@ public class DirCache {
 	public ObjectId writeTree(final ObjectWriter ow)
 			throws UnmergedPathException, IOException {
 		return getCacheTree(true).writeTree(sortedEntries, 0, 0, ow);
-	}
-
-	/**
-	 * Tells whether this index contains unmerged paths.
-	 *
-	 * @return {@code true} if this index contains unmerged paths. Means: at
-	 *         least one entry is of a stage different from 0. {@code false}
-	 *         will be returned if all entries are of stage 0.
-	 */
-	public boolean hasUnmergedPaths() {
-		for (int i = 0; i < entryCnt; i++) {
-			if (sortedEntries[i].getStage() > 0) {
-				return true;
-			}
-		}
-		return false;
 	}
 }

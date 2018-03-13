@@ -68,8 +68,7 @@ import org.eclipse.jgit.errors.TranslationStringMissingException;
  * </pre>
  */
 public class NLS {
-	/** The root locale constant. It is defined here because the Locale.ROOT is not defined in Java 5 */
-	public static final Locale ROOT_LOCALE = new Locale("", "", "");
+	static final Locale ROOT_LOCALE = new Locale("", "", "");
 
 	private static final InheritableThreadLocal<NLS> local = new InheritableThreadLocal<NLS>() {
 		protected NLS initialValue() {

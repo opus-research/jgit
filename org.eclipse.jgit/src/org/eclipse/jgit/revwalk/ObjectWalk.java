@@ -44,9 +44,7 @@
 package org.eclipse.jgit.revwalk;
 
 import java.io.IOException;
-import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -275,8 +273,10 @@ public class ObjectWalk extends RevWalk {
 				if (FileMode.GITLINK.equals(mode))
 					break;
 				treeWalk.getEntryObjectId(idBuffer);
-				throw new CorruptObjectException(MessageFormat.format(JGitText.get().corruptObjectInvalidMode3
-						, mode , idBuffer.name() , treeWalk.getEntryPathString() , currentTree.name()));
+				throw new CorruptObjectException("Invalid mode " + mode
+						+ " for " + idBuffer.name() + " '"
+						+ treeWalk.getEntryPathString() + "' in "
+						+ currentTree.name() + ".");
 			}
 
 			treeWalk = treeWalk.next();
@@ -428,8 +428,9 @@ public class ObjectWalk extends RevWalk {
 				if (FileMode.GITLINK.equals(mode))
 					break;
 				treeWalk.getEntryObjectId(idBuffer);
-				throw new CorruptObjectException(MessageFormat.format(JGitText.get().corruptObjectInvalidMode3
-						, mode , idBuffer.name() , treeWalk.getEntryPathString() , tree));
+				throw new CorruptObjectException("Invalid mode " + mode
+						+ " for " + idBuffer.name() + " "
+						+ treeWalk.getEntryPathString() + " in " + tree + ".");
 			}
 
 			treeWalk = treeWalk.next();

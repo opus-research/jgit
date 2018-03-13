@@ -47,9 +47,7 @@ package org.eclipse.jgit.lib;
 
 import java.io.File;
 import java.io.IOException;
-import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.GitlinksNotSupportedException;
 import org.eclipse.jgit.errors.SymlinksNotSupportedException;
 
@@ -77,8 +75,10 @@ public class WriteTree extends TreeVisitorWithCurrentDirectory {
 
 	public void visitSymlink(final SymlinkTreeEntry s) throws IOException {
 		if (s.isModified()) {
-			throw new SymlinksNotSupportedException(MessageFormat.format(
-					JGitText.get().symlinkCannotBeWrittenAsTheLinkTarget, s.getFullName()));
+			throw new SymlinksNotSupportedException("Symlink \""
+					+ s.getFullName()
+					+ "\" cannot be written as the link target"
+					+ " cannot be read from within Java.");
 		}
 	}
 

@@ -44,7 +44,6 @@
 package org.eclipse.jgit.http.server.glue;
 
 import java.io.IOException;
-import java.text.MessageFormat;
 
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
@@ -52,8 +51,6 @@ import javax.servlet.FilterConfig;
 import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
-
-import org.eclipse.jgit.http.server.HttpServerText;
 
 /**
  * Switch servlet path and path info to use another regex match group.
@@ -72,7 +69,7 @@ public class RegexGroupFilter implements Filter {
 	 */
 	public RegexGroupFilter(final int groupIdx) {
 		if (groupIdx < 1)
-			throw new IllegalArgumentException(MessageFormat.format(HttpServerText.get().invalidIndex, groupIdx));
+			throw new IllegalArgumentException("Invalid index: " + groupIdx);
 		this.groupIdx = groupIdx - 1;
 	}
 
@@ -91,7 +88,7 @@ public class RegexGroupFilter implements Filter {
 		if (groupIdx < g.length)
 			chain.doFilter(g[groupIdx], rsp);
 		else
-			throw new ServletException(MessageFormat.format(HttpServerText.get().invalidRegexGroup, (groupIdx + 1)));
+			throw new ServletException("Invalid regex group " + (groupIdx + 1));
 	}
 
 	private static WrappedRequest[] groupsFor(final ServletRequest r) {

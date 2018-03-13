@@ -50,7 +50,6 @@ package org.eclipse.jgit.transport;
 import java.net.ConnectException;
 import java.net.UnknownHostException;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Repository;
 
@@ -97,10 +96,10 @@ public abstract class SshTransport extends TcpTransport {
 	 */
 	public void setSshSessionFactory(SshSessionFactory factory) {
 		if (factory == null)
-			throw new NullPointerException(JGitText.get().theFactoryMustNotBeNull);
+			throw new NullPointerException("The factory must not be null");
 		if (sock != null)
 			throw new IllegalStateException(
-					JGitText.get().anSSHSessionHasBeenAlreadyCreated);
+					"An SSH session has been already created");
 		sch = factory;
 	}
 
@@ -134,7 +133,7 @@ public abstract class SshTransport extends TcpTransport {
 		} catch (JSchException je) {
 			final Throwable c = je.getCause();
 			if (c instanceof UnknownHostException)
-				throw new TransportException(uri, JGitText.get().unknownHost);
+				throw new TransportException(uri, "unknown host");
 			if (c instanceof ConnectException)
 				throw new TransportException(uri, c.getMessage());
 			throw new TransportException(uri, je.getMessage(), je);

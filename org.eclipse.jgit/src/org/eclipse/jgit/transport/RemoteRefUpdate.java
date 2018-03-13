@@ -44,9 +44,7 @@
 package org.eclipse.jgit.transport;
 
 import java.io.IOException;
-import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -186,13 +184,13 @@ public class RemoteRefUpdate {
 			final String localName, final ObjectId expectedOldObjectId)
 			throws IOException {
 		if (remoteName == null)
-			throw new IllegalArgumentException(JGitText.get().remoteNameCantBeNull);
+			throw new IllegalArgumentException("Remote name can't be null.");
 		this.srcRef = srcRef;
 		this.newObjectId = (srcRef == null ? ObjectId.zeroId() : localDb
 				.resolve(srcRef));
 		if (newObjectId == null)
-			throw new IOException(MessageFormat.format(
-					JGitText.get().sourceRefDoesntResolveToAnyObject, srcRef));
+			throw new IOException("Source ref " + srcRef
+					+ " doesn't resolve to any object.");
 		this.remoteName = remoteName;
 		this.forceUpdate = forceUpdate;
 		if (localName != null && localDb != null)

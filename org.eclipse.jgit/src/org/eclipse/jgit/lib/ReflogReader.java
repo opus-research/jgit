@@ -51,7 +51,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 
@@ -76,24 +75,24 @@ public class ReflogReader {
 			pos += Constants.OBJECT_ID_STRING_LENGTH;
 			if (raw[pos++] != ' ')
 				throw new IllegalArgumentException(
-						JGitText.get().rawLogMessageDoesNotParseAsLogEntry);
+						"Raw log message does not parse as log entry");
 			newId = ObjectId.fromString(raw, pos);
 			pos += Constants.OBJECT_ID_STRING_LENGTH;
 			if (raw[pos++] != ' ') {
 				throw new IllegalArgumentException(
-						JGitText.get().rawLogMessageDoesNotParseAsLogEntry);
+						"Raw log message does not parse as log entry");
 			}
 			who = RawParseUtils.parsePersonIdentOnly(raw, pos);
 			int p0 = RawParseUtils.next(raw, pos, '\t'); // personident has no
 															// \t
 			if (p0 == -1) {
 				throw new IllegalArgumentException(
-						JGitText.get().rawLogMessageDoesNotParseAsLogEntry);
+						"Raw log message does not parse as log entry");
 			}
 			int p1 = RawParseUtils.nextLF(raw, p0);
 			if (p1 == -1) {
 				throw new IllegalArgumentException(
-						JGitText.get().rawLogMessageDoesNotParseAsLogEntry);
+						"Raw log message does not parse as log entry");
 			}
 			comment = RawParseUtils.decode(raw, p0, p1 - 1);
 		}

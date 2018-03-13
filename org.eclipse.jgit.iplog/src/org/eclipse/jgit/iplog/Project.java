@@ -43,7 +43,6 @@
 
 package org.eclipse.jgit.iplog;
 
-import java.text.MessageFormat;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Set;
@@ -129,6 +128,6 @@ class Project {
 
 	@Override
 	public String toString() {
-		return MessageFormat.format(IpLogText.get().projectString, getID(), getName());
+		return "Project " + getID() + " (" + getName() + ")";
 	}
 }

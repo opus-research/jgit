@@ -47,9 +47,7 @@
 package org.eclipse.jgit.errors;
 
 import java.io.IOException;
-import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 
@@ -71,7 +69,7 @@ public class IncorrectObjectTypeException extends IOException {
 	 * @param type object type
 	 */
 	public IncorrectObjectTypeException(final ObjectId id, final String type) {
-		super(MessageFormat.format(JGitText.get().objectIsNotA, id.name(), type));
+		super("Object " + id.name() + " is not a " + type + ".");
 	}
 
 	/**

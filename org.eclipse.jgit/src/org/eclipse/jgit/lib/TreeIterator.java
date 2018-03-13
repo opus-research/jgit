@@ -47,8 +47,6 @@ package org.eclipse.jgit.lib;
 import java.io.IOException;
 import java.util.Iterator;
 
-import org.eclipse.jgit.JGitText;
-
 /**
  * A tree iterator iterates over a tree and all its members recursing into
  * subtrees according to order.
@@ -206,6 +204,6 @@ public class TreeIterator implements Iterator<TreeEntry> {
 
 	public void remove() {
 		throw new IllegalStateException(
-				JGitText.get().treeIteratorDoesNotSupportRemove);
+				"TreeIterator does not support remove()");
 	}
 }

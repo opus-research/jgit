@@ -67,13 +67,11 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.ObjectWritingException;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
@@ -333,19 +331,18 @@ public class RefDirectory extends RefDatabase {
 			}
 		}
 
-		private boolean scanTree(String prefix, File dir) {
+		private void scanTree(String prefix, File dir) {
 			final String[] entries = dir.list(LockFile.FILTER);
-			if (entries == null) // not a directory or an I/O error
-				return false;
-			if (0 < entries.length) {
+			if (entries != null && 0 < entries.length) {
 				Arrays.sort(entries);
 				for (String name : entries) {
 					File e = new File(dir, name);
-					if (!scanTree(prefix + name + '/', e))
+					if (e.isDirectory())
+						scanTree(prefix + name + '/', e);
+					else
 						scanOne(prefix + name);
 				}
 			}
-			return true;
 		}
 
 		private void scanOne(String name) {
@@ -495,8 +492,7 @@ public class RefDirectory extends RefDatabase {
 		if (packed.contains(name)) {
 			LockFile lck = new LockFile(packedRefsFile);
 			if (!lck.lock())
-				throw new IOException(MessageFormat.format(
-					JGitText.get().cannotLockFile, packedRefsFile));
+				throw new IOException("Cannot lock " + packedRefsFile);
 			try {
 				PackedRefList cur = readPackedRefs(0, 0);
 				int idx = cur.find(name);
@@ -577,7 +573,7 @@ public class RefDirectory extends RefDatabase {
 				if (dir.exists())
 					throw err;
 				if (!dir.mkdirs() && !dir.isDirectory())
-					throw new IOException(MessageFormat.format(JGitText.get().cannotCreateDirectory, dir));
+					throw new IOException("Cannot create directory " + dir);
 				out = new FileOutputStream(log, true);
 			}
 			try {
@@ -680,7 +676,7 @@ public class RefDirectory extends RefDatabase {
 
 			if (p.charAt(0) == '^') {
 				if (last == null)
-					throw new IOException(JGitText.get().peeledLineBeforeRef);
+					throw new IOException("Peeled line before ref.");
 
 				ObjectId id = ObjectId.fromString(p.substring(1));
 				last = new ObjectIdRef.PeeledTag(PACKED, last.getName(), last
@@ -724,16 +720,18 @@ public class RefDirectory extends RefDatabase {
 				try {
 					lck.write(content);
 				} catch (IOException ioe) {
-					throw new ObjectWritingException(MessageFormat.format(JGitText.get().unableToWrite, name), ioe);
+					throw new ObjectWritingException("Unable to write " + name,
+							ioe);
 				}
 				try {
 					lck.waitForStatChange();
 				} catch (InterruptedException e) {
 					lck.unlock();
-					throw new ObjectWritingException(MessageFormat.format(JGitText.get().interruptedWriting, name));
+					throw new ObjectWritingException("Interrupted writing "
+							+ name);
 				}
 				if (!lck.commit())
-					throw new ObjectWritingException(MessageFormat.format(JGitText.get().unableToWrite, name));
+					throw new ObjectWritingException("Unable to write " + name);
 
 				packedRefs.compareAndSet(oldPackedList, new PackedRefList(refs,
 						content.length, lck.getCommitLastModified()));
@@ -796,7 +794,7 @@ public class RefDirectory extends RefDatabase {
 				n--;
 			if (n < 6) {
 				String content = RawParseUtils.decode(buf, 0, n);
-				throw new IOException(MessageFormat.format(JGitText.get().notARef, name, content));
+				throw new IOException("Not a ref: " + name + ": " + content);
 			}
 			final String target = RawParseUtils.decode(buf, 5, n);
 			return newSymbolicRef(modified, name, target);
@@ -812,7 +810,7 @@ public class RefDirectory extends RefDatabase {
 			while (0 < n && Character.isWhitespace(buf[n - 1]))
 				n--;
 			String content = RawParseUtils.decode(buf, 0, n);
-			throw new IOException(MessageFormat.format(JGitText.get().notARef, name, content));
+			throw new IOException("Not a ref: " + name + ": " + content);
 		}
 		return new LooseUnpeeled(modified, name, id);
 	}
@@ -890,7 +888,7 @@ public class RefDirectory extends RefDatabase {
 
 	static void delete(final File file, final int depth) throws IOException {
 		if (!file.delete() && file.isFile())
-			throw new IOException(MessageFormat.format(JGitText.get().fileCannotBeDeleted, file));
+			throw new IOException("File cannot be deleted: " + file);
 
 		File dir = file.getParentFile();
 		for (int i = 0; i < depth; ++i) {

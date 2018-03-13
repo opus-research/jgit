@@ -43,9 +43,6 @@
 
 package org.eclipse.jgit.lib;
 
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.InvalidObjectIdException;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.RawParseUtils;
@@ -77,8 +74,7 @@ public final class AbbreviatedObjectId {
 	public static final AbbreviatedObjectId fromString(final byte[] buf,
 			final int offset, final int end) {
 		if (end - offset > Constants.OBJECT_ID_STRING_LENGTH)
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidIdLength
-					, end - offset, Constants.OBJECT_ID_STRING_LENGTH));
+			throw new IllegalArgumentException("Invalid id");
 		return fromHexString(buf, offset, end);
 	}
 
@@ -91,7 +87,7 @@ public final class AbbreviatedObjectId {
 	 */
 	public static final AbbreviatedObjectId fromString(final String str) {
 		if (str.length() > Constants.OBJECT_ID_STRING_LENGTH)
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidId, str));
+			throw new IllegalArgumentException("Invalid id: " + str);
 		final byte[] b = Constants.encodeASCII(str);
 		return fromHexString(b, 0, b.length);
 	}
