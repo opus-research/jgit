@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2017, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,33 +40,66 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs.internal;
 
-import org.eclipse.jgit.nls.NLS;
-import org.eclipse.jgit.nls.TranslationBundle;
+package org.eclipse.jgit.internal.revwalk;
+
+import org.eclipse.jgit.lib.BitmapIndex.Bitmap;
+import org.eclipse.jgit.lib.BitmapIndex.BitmapBuilder;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.revwalk.filter.RevFilter;
+import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevFlag;
 
 /**
- * Translation bundle for JGit LFS server
+ * A RevFilter that adds the visited commits to {@code bitmap} as a side
+ * effect.
+ * <p>
+ * When the walk hits a commit that is part of {@code bitmap}'s
+ * BitmapIndex, that entire bitmap is ORed into {@code bitmap} and the
+ * commit and its parents are marked as SEEN so that the walk does not
+ * have to visit its ancestors.  This ensures the walk is very short if
+ * there is good bitmap coverage.
  */
-public class LfsText extends TranslationBundle {
+public class AddToBitmapFilter extends RevFilter {
+	private final BitmapBuilder bitmap;
 
 	/**
-	 * @return an instance of this translation bundle
+	 * Create a filter that adds visited commits to the given bitmap.
+	 *
+	 * @param bitmap bitmap to write visited commits to
 	 */
-	public static LfsText get() {
-		return NLS.getBundleFor(LfsText.class);
+	public AddToBitmapFilter(BitmapBuilder bitmap) {
+		this.bitmap = bitmap;
 	}
 
-	// @formatter:off
-	/***/ public String corruptLongObject;
-	/***/ public String inconsistentMediafileLength;
-	/***/ public String incorrectLONG_OBJECT_ID_LENGTH;
-	/***/ public String invalidLongId;
-	/***/ public String invalidLongIdLength;
-	/***/ public String requiredHashFunctionNotAvailable;
-	/***/ public String repositoryNotFound;
-	/***/ public String repositoryReadOnly;
-	/***/ public String lfsUnavailable;
-	/***/ public String lfsUnathorized;
-	/***/ public String lfsFailedToGetRepository;
+	@Override
+	public final boolean include(RevWalk walker, RevCommit cmit) {
+		Bitmap visitedBitmap;
+
+		if (bitmap.contains(cmit)) {
+			// already included
+		} else if ((visitedBitmap = bitmap.getBitmapIndex()
+				.getBitmap(cmit)) != null) {
+			bitmap.or(visitedBitmap);
+		} else {
+			bitmap.addObject(cmit, Constants.OBJ_COMMIT);
+			return true;
+		}
+
+		for (RevCommit p : cmit.getParents()) {
+			p.add(RevFlag.SEEN);
+		}
+		return false;
+	}
+
+	@Override
+	public final RevFilter clone() {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public final boolean requiresCommitBody() {
+		return false;
+	}
 }
