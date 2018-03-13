@@ -51,6 +51,8 @@ import org.eclipse.jgit.util.PathMatcher;
 
 /**
  * Registry of all merge drivers.
+ * 
+ * @since 3.4
  */
 public class MergeDriverRegistry {
 	/**

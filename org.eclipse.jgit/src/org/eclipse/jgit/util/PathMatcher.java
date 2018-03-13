@@ -45,6 +45,8 @@ package org.eclipse.jgit.util;
 /**
  * Interface that can be implemented to perform matching operations against
  * paths.
+ * 
+ * @since 3.4
  */
 public interface PathMatcher {
 	/**

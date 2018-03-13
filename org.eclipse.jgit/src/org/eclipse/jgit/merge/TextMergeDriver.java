@@ -63,6 +63,8 @@ import org.eclipse.jgit.util.IO;
 /**
  * This merge driver can be used on any file. It will merge the files using
  * their textual content through the use of a {@link MergeAlgorithm}.
+ * 
+ * @since 3.4
  */
 public class TextMergeDriver implements MergeDriver {
 	// FIXME delete when API makes it possible.

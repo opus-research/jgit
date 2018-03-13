@@ -1,5 +1,5 @@
-/*******************************************************************************
- * Copyright (C) 2014, Obeo
+/*
+ * Copyright (C) 2014, Sasa Zivkov <sasa.zivkov@sap.com>, SAP AG
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -39,35 +39,31 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *******************************************************************************/
-package org.eclipse.jgit.merge;
+ */
+
+package org.eclipse.jgit.errors;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.text.MessageFormat;
 
-import org.eclipse.jgit.lib.Config;
+import org.eclipse.jgit.internal.JGitText;
 
 /**
- * This merge driver should be used for binary files instead of the textual
- * merge driver. Its only action is to take the local version of the file,
- * whatever changes happened.
+ * Thrown when a pack exceeds a given size limit
+ *
+ * @since 3.3
  */
-public class BinaryMergeDriver implements MergeDriver {
-	public boolean merge(Config configuration, InputStream ours,
-			InputStream theirs, InputStream base, OutputStream output,
-			String[] commitNames) throws IOException {
-		// Keep local file without pre-merging
-		byte[] buffer = new byte[8192];
-		int read = ours.read(buffer);
-		while (read > 0) {
-			output.write(buffer, 0, read);
-			read = ours.read(buffer);
-		}
-		return false;
-	}
+public class TooLargePackException extends IOException {
+	private static final long serialVersionUID = 1L;
 
-	public String getName() {
-		return "Binary"; //$NON-NLS-1$
+	/**
+	 * Construct a too large pack exception.
+	 *
+	 * @param packSizeLimit
+	 *            the pack size limit (in bytes) that was exceeded
+	 */
+	public TooLargePackException(long packSizeLimit) {
+		super(MessageFormat.format(JGitText.get().receivePackTooLarge,
+				Long.valueOf(packSizeLimit)));
 	}
 }

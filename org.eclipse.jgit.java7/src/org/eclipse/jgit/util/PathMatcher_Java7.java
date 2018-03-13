@@ -50,6 +50,7 @@ import java.nio.file.Path;
  * delegating to a java.nio.file.PathMatcher.
  * 
  * @see java.nio.file.FileSystem#getPathMatcher(String)
+ * @since 3.4
  */
 public class PathMatcher_Java7 implements PathMatcher {
 	/** The actual matcher we'll delegate to. */

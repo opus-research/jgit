@@ -631,10 +631,11 @@ public abstract class FS {
 	/**
 	 * Returns an implementation-dependent {@link PathMatcher path matcher} that
 	 * will match file paths against the given glob pattern.
-	 *
+	 * 
 	 * @param globPattern
 	 *            The pattern for which we need a matcher.
 	 * @return A matcher that will match paths against the given pattern.
+	 * @since 3.4
 	 */
 	public PathMatcher getPathMatcher(String globPattern) {
 		return new PathMatcher_Java5(globPattern);

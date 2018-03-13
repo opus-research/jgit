@@ -184,11 +184,25 @@ public class ResolveMerger extends ThreeWayMerger {
 	protected WorkingTreeIterator workingTreeIterator;
 
 	/**
+	 * our merge algorithm
+	 *
+	 * @since 3.0
+	 * @deprecated
+	 */
+	@Deprecated
+	protected MergeAlgorithm mergeAlgorithm;
+
+	/**
 	 * @param local
 	 * @param inCore
 	 */
 	protected ResolveMerger(Repository local, boolean inCore) {
 		super(local);
+		SupportedAlgorithm diffAlg = local.getConfig().getEnum(
+				ConfigConstants.CONFIG_DIFF_SECTION, null,
+				ConfigConstants.CONFIG_KEY_ALGORITHM,
+				SupportedAlgorithm.HISTOGRAM);
+		mergeAlgorithm = new MergeAlgorithm(DiffAlgorithm.getAlgorithm(diffAlg));
 		commitNames = new String[] { "BASE", "OURS", "THEIRS" }; //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
 		this.inCore = inCore;
 
@@ -434,7 +448,7 @@ public class ResolveMerger extends ThreeWayMerger {
 					else {
 						// the preferred version THEIRS has a different mode
 						// than ours. Check it out!
-						if (isWorktreeDirty(tw, work)) {
+						if (isWorktreeDirty(tw, work, ourDce)) {
 							failingPaths.put(tw.getPathString(),
 									MergeFailureReason.DIRTY_WORKTREE);
 							return false;
@@ -475,7 +489,7 @@ public class ResolveMerger extends ThreeWayMerger {
 			// THEIRS. THEIRS is chosen.
 
 			// Check worktree before checking out THEIRS
-			if (isWorktreeDirty(tw, work)) {
+			if (isWorktreeDirty(tw, work, ourDce)) {
 				failingPaths.put(tw.getPathString(),
 						MergeFailureReason.DIRTY_WORKTREE);
 				return false;
@@ -536,7 +550,7 @@ public class ResolveMerger extends ThreeWayMerger {
 
 		if (nonTree(modeO) && nonTree(modeT)) {
 			// Check worktree before modifying files
-			if (isWorktreeDirty(tw, work)) {
+			if (isWorktreeDirty(tw, work, ourDce)) {
 				failingPaths.put(tw.getPathString(),
 						MergeFailureReason.DIRTY_WORKTREE);
 				return false;
@@ -616,7 +630,7 @@ public class ResolveMerger extends ThreeWayMerger {
 				// OURS was deleted checkout THEIRS
 				if (modeO == 0) {
 					// Check worktree before checking out THEIRS
-					if (isWorktreeDirty(tw, work)) {
+					if (isWorktreeDirty(tw, work, ourDce)) {
 						failingPaths.put(tw.getPathString(), MergeFailureReason.DIRTY_WORKTREE);
 						return false;
 					}
@@ -686,7 +700,8 @@ public class ResolveMerger extends ThreeWayMerger {
 		return isDirty;
 	}
 
-	private boolean isWorktreeDirty(TreeWalk tw, WorkingTreeIterator work) {
+	private boolean isWorktreeDirty(TreeWalk tw, WorkingTreeIterator work,
+			DirCacheEntry ourDce) throws IOException {
 		if (work == null)
 			return false;
 
@@ -694,9 +709,15 @@ public class ResolveMerger extends ThreeWayMerger {
 		final int modeO = tw.getRawMode(T_OURS);
 
 		// Worktree entry has to match ours to be considered clean
-		boolean isDirty = work.isModeDifferent(modeO);
-		if (!isDirty && nonTree(modeF))
-			isDirty = !tw.idEqual(T_FILE, T_OURS);
+		boolean isDirty;
+		if (ourDce != null)
+			isDirty = work.isModified(ourDce, true, reader);
+		else {
+			isDirty = work.isModeDifferent(modeO);
+			if (!isDirty && nonTree(modeF))
+				isDirty = !tw.idEqual(T_FILE, T_OURS);
+		}
+
 		// Ignore existing empty directories
 		if (isDirty && modeF == FileMode.TYPE_TREE
 				&& modeO == FileMode.TYPE_MISSING)
@@ -776,24 +797,9 @@ public class ResolveMerger extends ThreeWayMerger {
 			throws IOException {
 		MergeDriver driver = MergeDriverRegistry.findMergeDriver(filePath);
 		if (driver == null) {
-			// if any of the three versions is binary, use the binary merge
-			// driver
-			if (isBinaryEntry(repository, ours)
-					|| isBinaryEntry(repository, theirs)
-					|| isBinaryEntry(repository, base))
-				driver = new BinaryMergeDriver();
-			else
-				driver = new TextMergeDriver();
+			driver = new TextMergeDriver();
 		}
 		return driver;
-	}
-
-	private static boolean isBinaryEntry(Repository repository,
-			CanonicalTreeParser tree) throws IOException {
-		if (tree != null && !tree.getEntryObjectId().equals(ObjectId.zeroId()))
-			return RawText.isBinary(repository.open(tree.getEntryObjectId(),
-					Constants.OBJ_BLOB).getCachedBytes());
-		return false;
 	}
 
 	/**

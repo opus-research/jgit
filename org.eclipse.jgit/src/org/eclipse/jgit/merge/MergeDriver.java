@@ -51,6 +51,8 @@ import org.eclipse.jgit.lib.Config;
 /**
  * This interface describes the general contract expected out of a merge driver
  * as can be registered against JGit.
+ * 
+ * @since 3.4
  */
 public interface MergeDriver {
 	/**
@@ -60,7 +62,7 @@ public interface MergeDriver {
 	 * <p>
 	 * Merge drivers are not expected to close the streams they are passed.
 	 * </p>
-	 * 
+	 *
 	 * @param configuration
 	 *            Configuration of the repository in which we're merging files.
 	 * @param ours
