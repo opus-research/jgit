@@ -353,12 +353,8 @@ public class PushCommand extends GitCommand<Iterable<PushResult>> {
 	/**
 	 * @param credentialsProvider
 	 *            the {@link CredentialsProvider} to use
-	 * @return {@code this}
 	 */
-	public PushCommand setCredentialsProvider(
-			CredentialsProvider credentialsProvider) {
-		checkCallable();
+	public void setCredentialsProvider(CredentialsProvider credentialsProvider) {
 		this.credentialsProvider = credentialsProvider;
-		return this;
 	}
 }
