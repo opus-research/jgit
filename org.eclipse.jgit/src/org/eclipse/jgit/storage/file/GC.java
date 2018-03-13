@@ -47,18 +47,14 @@ import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
@@ -103,8 +99,8 @@ public class GC {
 		if (pm == null)
 			pm = NullProgressMonitor.INSTANCE;
 
-		packRefs(pm, repo);
-		// TODO: implment reflog_expire(pm, repo);
+		// TODO: implement pack_refs(pm, repo);
+		// TODO: implement reflog_expire(pm, repo);
 		Collection<PackFile> newPacks = repack(pm, repo);
 		prunePacked(pm, repo, Collections.<ObjectId> emptySet());
 		// TODO: implement rerere_gc(pm);
@@ -124,10 +120,16 @@ public class GC {
 	 *            the repo to work on
 	 * @param oldPacks
 	 * @param newPacks
+	 * @param ignoreErrors
+	 *            <code>true</code> if we should ignore the fact that a certain
+	 *            packfile or indexfile couldn't be deleted. If set to
+	 *            <code>false</code> and {@link IOException} is thrown in such
+	 *            cases
 	 * @throws IOException
 	 */
 	private static void deleteOldPacks(ProgressMonitor pm, FileRepository repo,
-			Collection<PackFile> oldPacks, Collection<PackFile> newPacks)
+			Collection<PackFile> oldPacks, Collection<PackFile> newPacks,
+			boolean ignoreErrors)
 			throws IOException {
 		oldPackLoop: for (PackFile oldPack : oldPacks) {
 			String oldName = oldPack.getPackName();
@@ -136,8 +138,15 @@ public class GC {
 			for (PackFile newPack : newPacks)
 				if (oldName.equals(newPack.getPackName()))
 					continue oldPackLoop;
-			FileUtils.delete(nameFor(repo, oldName, ".pack"));
-			FileUtils.delete(nameFor(repo, oldName, ".idx"));
+			try {
+				FileUtils.delete(nameFor(repo, oldName, ".pack"),
+						FileUtils.RETRY | FileUtils.SKIP_MISSING);
+				FileUtils.delete(nameFor(repo, oldName, ".idx"),
+						FileUtils.RETRY | FileUtils.SKIP_MISSING);
+			} catch (IOException e) {
+				if (!ignoreErrors)
+					throw e;
+			}
 		}
 	}
 
@@ -164,59 +173,39 @@ public class GC {
 		if (fanout == null)
 			fanout = new String[0];
 		pm.beginTask("prune loose objects", fanout.length);
-		for (String d : fanout) {
-			pm.update(1);
-			if (d.length() != 2)
-				continue;
-			String[] entries = new File(objects, d).list();
-			if (entries == null)
-				continue;
-			for (String e : entries) {
-				boolean found = false;
-				if (e.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
+		try {
+			for (String d : fanout) {
+				pm.update(1);
+				if (d.length() != 2)
 					continue;
-				ObjectId id;
-				try {
-					id = ObjectId.fromString(d + e);
-				} catch (IllegalArgumentException notAnObject) {
-					// ignoring the file that does not represent loose object
+				String[] entries = new File(objects, d).list();
+				if (entries == null)
 					continue;
-				}
-				for (PackFile p : packs)
-					if (p.hasObject(id)) {
-						found = true;
-						break;
+				for (String e : entries) {
+					boolean found = false;
+					if (e.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
+						continue;
+					ObjectId id;
+					try {
+						id = ObjectId.fromString(d + e);
+					} catch (IllegalArgumentException notAnObject) {
+						// ignoring the file that does not represent loose
+						// object
+						continue;
 					}
-				if (found && !objectsToKeep.contains(id))
-					FileUtils.delete(objdb.fileFor(id));
+					for (PackFile p : packs)
+						if (p.hasObject(id)) {
+							found = true;
+							break;
+						}
+					if (found && !objectsToKeep.contains(id))
+						FileUtils.delete(objdb.fileFor(id), FileUtils.RETRY
+								| FileUtils.SKIP_MISSING);
+				}
 			}
+		} finally {
+			pm.endTask();
 		}
-		pm.endTask();
-	}
-
-	/**
-	 * packs all non-symbolic, loose refs into the packed-refs.
-	 *
-	 * @param pm
-	 *            a progressmonitor
-	 * @param repo
-	 *            the repo to work on
-	 * @throws IOException
-	 */
-	public static void packRefs(ProgressMonitor pm, FileRepository repo)
-			throws IOException {
-		Set<Entry<String, Ref>> refEntries = repo.getAllRefs().entrySet();
-		pm.beginTask("pack refs", refEntries.size());
-		Collection<RefDirectoryUpdate> updates = new LinkedList<RefDirectoryUpdate>();
-		for (Map.Entry<String, Ref> entry : refEntries) {
-			Ref ref = entry.getValue();
-			if (!ref.isSymbolic() && ref.getStorage().isLoose()) {
-				updates.add(new RefDirectoryUpdate((RefDirectory) repo
-						.getRefDatabase(), ref));
-			}
-			pm.update(1);
-		}
-		((RefDirectory) repo.getRefDatabase()).pack(updates);
 	}
 
 	/**
@@ -268,7 +257,7 @@ public class GC {
 		List<PackFile> ret = new ArrayList<PackFile>(2);
 		if (!allHeads.isEmpty()) {
 			PackFile heads = writePack(pm, repo, allHeads,
-					Collections.<ObjectId> emptySet());
+					Collections.<ObjectId> emptySet(), tagTargets);
 			if (heads != null)
 				ret.add(heads);
 		}
@@ -280,11 +269,11 @@ public class GC {
 			// stop traversing when he finds a head?
 			// My problem: I don't have the PackIndex anymore and PackFile
 			// doesn't expose it.
-			PackFile rest = writePack(pm, repo, nonHeads, allHeads);
+			PackFile rest = writePack(pm, repo, nonHeads, allHeads, tagTargets);
 			if (rest != null)
 				ret.add(rest);
 		}
-		deleteOldPacks(pm, repo, toBeDeleted, ret);
+		deleteOldPacks(pm, repo, toBeDeleted, ret, true);
 
 		// packGarbage(pm);
 		return ret;
@@ -342,29 +331,20 @@ public class GC {
 	}
 
 	private static PackFile writePack(ProgressMonitor pm, FileRepository repo,
-			Set<? extends ObjectId> want, Set<? extends ObjectId> have)
+			Set<? extends ObjectId> want, Set<? extends ObjectId> have,
+			Set<ObjectId> tagTargets)
 			throws IOException {
+
 		PackWriter pw = new PackWriter(repo);
+		pw.setDeltaBaseAsOffset(true);
+		pw.setReuseDeltaCommits(false);
+		if (tagTargets != null)
+			pw.setTagTargets(tagTargets);
 		try {
 			pw.preparePack(pm, want, have);
 			if (0 < pw.getObjectCount()) {
 				String id = pw.computeName().getName();
 				File pack = nameFor(repo, id, ".pack");
-				File idx = nameFor(repo, id, ".idx");
-				if (!pack.createNewFile()) {
-					for (PackFile f : repo.getObjectDatabase().getPacks())
-						if (f.getPackName().equals(id))
-							return (f);
-					throw new IOException(
-							MessageFormat.format(
-									JGitText.get().cannotCreatePackfile,
-									pack.getPath()));
-				}
-				if (!idx.createNewFile())
-					throw new IOException(
-							MessageFormat.format(
-									JGitText.get().cannotCreateIndexfile,
-									idx.getPath()));
 				BufferedOutputStream out = new BufferedOutputStream(
 						new FileOutputStream(pack));
 				try {
@@ -374,6 +354,7 @@ public class GC {
 				}
 				pack.setReadOnly();
 
+				File idx = nameFor(repo, id, ".idx");
 				out = new BufferedOutputStream(new FileOutputStream(idx));
 				try {
 					pw.writeIndex(out);
