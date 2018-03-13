@@ -64,7 +64,6 @@ import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
-import org.eclipse.jgit.dircache.UnmodifiableDirCacheEntry;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.ignore.IgnoreNode;
 import org.eclipse.jgit.ignore.IgnoreRule;
@@ -624,8 +623,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			// Caution: we are unsmudging just by setting the length of the
 			// in-memory entry object. It's the callers task to detect that we
 			// have modified the entry and to persist the modified index.
-			if (!(entry instanceof UnmodifiableDirCacheEntry))
-				entry.setLength((int) getEntryLength());
+			entry.setLength((int) getEntryLength());
+
 			return false;
 		} else {
 			// Content differs: that's a real change!

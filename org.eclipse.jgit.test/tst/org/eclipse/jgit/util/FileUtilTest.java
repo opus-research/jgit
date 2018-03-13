@@ -175,19 +175,4 @@ public class FileUtilTest {
 		assertTrue(f.delete());
 	}
 
-	public void testCreateNewFile() throws IOException {
-		File f = new File(trash, "x");
-		FileUtils.createNewFile(f);
-		assertTrue(f.exists());
-
-		try {
-			FileUtils.createNewFile(f);
-			fail("creation of already existing file must fail");
-		} catch (IOException e) {
-			// expected
-		}
-
-		FileUtils.delete(f);
-	}
-
 }

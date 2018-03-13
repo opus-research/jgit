@@ -238,7 +238,7 @@ public class DirCache {
 	public DirCache(final File indexLocation, final FS fs) {
 		liveFile = indexLocation;
 		this.fs = fs;
-		clearInternal();
+		clear();
 	}
 
 	/**
@@ -286,23 +286,15 @@ public class DirCache {
 	 *             library does not support.
 	 */
 	public void read() throws IOException, CorruptObjectException {
-		readInternal();
-	}
-
-	/**
-	 * @throws IOException
-	 * @throws CorruptObjectException
-	 */
-	protected void readInternal() throws IOException, CorruptObjectException {
 		if (liveFile == null)
 			throw new IOException(JGitText.get().dirCacheDoesNotHaveABackingFile);
 		if (!liveFile.exists())
-			clearInternal();
+			clear();
 		else if (liveFile.lastModified() != lastModified) {
 			try {
 				final FileInputStream inStream = new FileInputStream(liveFile);
 				try {
-					clearInternal();
+					clear();
 					readFrom(inStream);
 				} finally {
 					try {
@@ -315,27 +307,13 @@ public class DirCache {
 				// Someone must have deleted it between our exists test
 				// and actually opening the path. That's fine, its empty.
 				//
-				clearInternal();
+				clear();
 			}
 		}
 	}
 
-	/**
-	 * @return true if the memory state differs from the index file
-	 * @throws IOException
-	 */
-	public boolean isOutdated() throws IOException {
-		if (liveFile == null || !liveFile.exists())
-			return false;
-		return liveFile.lastModified() != lastModified;
-	}
-
 	/** Empty this index, removing all entries. */
 	public void clear() {
-		clearInternal();
-	}
-
-	private void clearInternal() {
 		lastModified = 0;
 		sortedEntries = NO_ENTRIES;
 		entryCnt = 0;
@@ -372,7 +350,7 @@ public class DirCache {
 
 		final MutableInteger infoAt = new MutableInteger();
 		for (int i = 0; i < entryCnt; i++)
-			sortedEntries[i] = createDirCacheEntry(in, md, infos, infoAt);
+			sortedEntries[i] = new DirCacheEntry(infos, infoAt, in, md);
 		lastModified = liveFile.lastModified();
 
 		// After the file entries are index extensions, and then a footer.
@@ -426,12 +404,6 @@ public class DirCache {
 		if (!Arrays.equals(exp, hdr)) {
 			throw new CorruptObjectException(JGitText.get().DIRCChecksumMismatch);
 		}
-	}
-
-	DirCacheEntry createDirCacheEntry(final BufferedInputStream in,
-			final MessageDigest md, final byte[] infos,
-			final MutableInteger infoAt) throws IOException {
-		return new DirCacheEntry(infos, infoAt, in, md);
 	}
 
 	private void skipOptionalExtension(final InputStream in,
