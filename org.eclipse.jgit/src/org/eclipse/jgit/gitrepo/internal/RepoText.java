@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Google Inc.
+ * Copyright (C) 2014, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,53 +40,27 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.archive;
 
-import java.util.ArrayList;
-import java.util.List;
+package org.eclipse.jgit.gitrepo.internal;
 
-import org.eclipse.jgit.api.ArchiveCommand;
+import org.eclipse.jgit.nls.NLS;
+import org.eclipse.jgit.nls.TranslationBundle;
 
 /**
- * Registers all format types from the org.eclipse.jgit.archive
- * package for use via the ArchiveCommand API.
- *
- * See {@link FormatActivator} for an OSGi bundle activator
- * that performs the same registration automatically.
+ * Translation bundle for repo command
  */
-public class ArchiveFormats {
-	private static final List<String> myFormats = new ArrayList<String>();
-
-	private static final void register(String name, ArchiveCommand.Format<?> fmt) {
-		myFormats.add(name);
-		ArchiveCommand.registerFormat(name, fmt);
-	}
+public class RepoText extends TranslationBundle {
 
 	/**
-	 * Register all included archive formats so they can be used
-	 * as arguments to the ArchiveCommand.setFormat() method.
-	 *
-	 * Should not be called twice without a call to stop() in between.
-	 * Not thread-safe.
+	 * @return an instance of this translation bundle
 	 */
-	public static void registerAll() {
-		register("tar", new TarFormat()); //$NON-NLS-1$
-		register("tgz", new TgzFormat()); //$NON-NLS-1$
-		register("tbz2", new Tbz2Format()); //$NON-NLS-1$
-		register("txz", new TxzFormat()); //$NON-NLS-1$
-		register("zip", new ZipFormat()); //$NON-NLS-1$
+	public static RepoText get() {
+		return NLS.getBundleFor(RepoText.class);
 	}
 
-	/**
-	 * Clean up by deregistering all formats that were registered
-	 * by registerAll().
-	 *
-	 * Not thread-safe.
-	 */
-	public static void unregisterAll() {
-		for (String name : myFormats) {
-			ArchiveCommand.unregisterFormat(name);
-		}
-		myFormats.clear();
-	}
+	// @formatter:off
+	/***/ public String copyFileFailed;
+	/***/ public String errorNoDefault;
+	/***/ public String errorParsingManifestFile;
+	/***/ public String invalidManifest;
 }

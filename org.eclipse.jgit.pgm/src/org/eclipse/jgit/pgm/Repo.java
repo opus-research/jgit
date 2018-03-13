@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Google Inc.
+ * Copyright (C) 2014, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,53 +40,30 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.archive;
+package org.eclipse.jgit.pgm;
 
-import java.util.ArrayList;
-import java.util.List;
+import org.eclipse.jgit.gitrepo.RepoCommand;
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.Option;
 
-import org.eclipse.jgit.api.ArchiveCommand;
+@Command(common = true, usage = "usage_parseRepoManifest")
+class Repo extends TextBuiltin {
 
-/**
- * Registers all format types from the org.eclipse.jgit.archive
- * package for use via the ArchiveCommand API.
- *
- * See {@link FormatActivator} for an OSGi bundle activator
- * that performs the same registration automatically.
- */
-public class ArchiveFormats {
-	private static final List<String> myFormats = new ArrayList<String>();
+	@Option(name = "--base-uri", aliases = { "-u" }, usage = "usage_baseUri")
+	private String uri;
 
-	private static final void register(String name, ArchiveCommand.Format<?> fmt) {
-		myFormats.add(name);
-		ArchiveCommand.registerFormat(name, fmt);
-	}
+	@Option(name = "--groups", aliases = { "-g" }, usage = "usage_groups")
+	private String groups = "default"; //$NON-NLS-1$
 
-	/**
-	 * Register all included archive formats so they can be used
-	 * as arguments to the ArchiveCommand.setFormat() method.
-	 *
-	 * Should not be called twice without a call to stop() in between.
-	 * Not thread-safe.
-	 */
-	public static void registerAll() {
-		register("tar", new TarFormat()); //$NON-NLS-1$
-		register("tgz", new TgzFormat()); //$NON-NLS-1$
-		register("tbz2", new Tbz2Format()); //$NON-NLS-1$
-		register("txz", new TxzFormat()); //$NON-NLS-1$
-		register("zip", new ZipFormat()); //$NON-NLS-1$
-	}
+	@Argument(required = true, usage = "usage_pathToXml")
+	private String path;
 
-	/**
-	 * Clean up by deregistering all formats that were registered
-	 * by registerAll().
-	 *
-	 * Not thread-safe.
-	 */
-	public static void unregisterAll() {
-		for (String name : myFormats) {
-			ArchiveCommand.unregisterFormat(name);
-		}
-		myFormats.clear();
+	@Override
+	protected void run() throws Exception {
+		new RepoCommand(db)
+			.setURI(uri)
+			.setPath(path)
+			.setGroups(groups)
+			.call();
 	}
 }
