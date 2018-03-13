@@ -172,7 +172,6 @@ public class FsckPackParser extends PackParser {
 
 	@Override
 	protected void onPackFooter(byte[] hash) throws IOException {
-		// Do nothing.
 	}
 
 	@Override
@@ -184,7 +183,6 @@ public class FsckPackParser extends PackParser {
 
 	@Override
 	protected void onEndThinPack() throws IOException {
-		// Do nothing.
 	}
 
 	@Override
@@ -255,7 +253,6 @@ public class FsckPackParser extends PackParser {
 	@Override
 	protected void onStoreStream(byte[] raw, int pos, int len)
 			throws IOException {
-		// Do nothing.
 	}
 
 	/**
@@ -286,7 +283,7 @@ public class FsckPackParser extends PackParser {
 						MessageFormat.format(JGitText.get().missingObject,
 								entry.getType(), entry.getName()),
 						ErrorType.MISSING_OBJ);
-			} else if (offset != entry.getOffset()) {
+			} else if (offs != entry.getOffset()) {
 				throw new CorruptPackIndexException(MessageFormat
 						.format(JGitText.get().mismatchOffset, entry.getName()),
 						ErrorType.MISMATCH_OFFSET);
