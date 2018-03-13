@@ -133,7 +133,7 @@ public class ObjectToPack extends PackedObjectInfo {
 	 *         representation; null otherwise - if going to be packed as a
 	 *         whole object.
 	 */
-	public ObjectId getDeltaBaseId() {
+	ObjectId getDeltaBaseId() {
 		return deltaBase;
 	}
 
@@ -143,7 +143,7 @@ public class ObjectToPack extends PackedObjectInfo {
 	 *         pack; null otherwise - if going to be packed as a whole
 	 *         object or delta base is specified only as id.
 	 */
-	public ObjectToPack getDeltaBase() {
+	ObjectToPack getDeltaBase() {
 		if (deltaBase instanceof ObjectToPack)
 			return (ObjectToPack) deltaBase;
 		return null;
@@ -188,7 +188,7 @@ public class ObjectToPack extends PackedObjectInfo {
 	 * @return true if object is going to be written as delta; false
 	 *         otherwise.
 	 */
-	public boolean isDeltaRepresentation() {
+	boolean isDeltaRepresentation() {
 		return deltaBase != null;
 	}
 
@@ -198,7 +198,7 @@ public class ObjectToPack extends PackedObjectInfo {
 	 *
 	 * @return true if object is already written; false otherwise.
 	 */
-	public boolean isWritten() {
+	boolean isWritten() {
 		return getOffset() != 0;
 	}
 
@@ -223,11 +223,7 @@ public class ObjectToPack extends PackedObjectInfo {
 		flags |= WANT_WRITE;
 	}
 
-	/**
-	 * @return true if an existing representation was selected to be reused
-	 *         as-is into the pack stream.
-	 */
-	public boolean isReuseAsIs() {
+	boolean isReuseAsIs() {
 		return (flags & REUSE_AS_IS) != 0;
 	}
 
