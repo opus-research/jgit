@@ -130,12 +130,11 @@ public class SubmoduleUpdateCommand extends
 				// Clone repository is not present
 				if (submoduleRepo == null) {
 					CloneCommand clone = Git.cloneRepository();
+					configure(clone);
 					clone.setURI(url);
 					clone.setDirectory(generator.getDirectory());
 					if (monitor != null)
 						clone.setProgressMonitor(monitor);
-					if (credentialsProvider != null)
-						clone.setCredentialsProvider(credentialsProvider);
 					submoduleRepo = clone.call().getRepository();
 				}
 
