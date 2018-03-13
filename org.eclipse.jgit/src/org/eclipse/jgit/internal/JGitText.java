@@ -58,7 +58,6 @@ public class JGitText extends TranslationBundle {
 		return NLS.getBundleFor(JGitText.class);
 	}
 
-	// @formatter:off
 	/***/ public String abbreviationLengthMustBeNonNegative;
 	/***/ public String abortingRebase;
 	/***/ public String abortingRebaseFailed;
@@ -92,6 +91,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cachedPacksPreventsIndexCreation;
 	/***/ public String cannotBeCombined;
 	/***/ public String cannotBeRecursiveWhenTreesAreIncluded;
+	/***/ public String cannotCombineSquashWithNoff;
 	/***/ public String cannotCombineTreeFilterWithRevFilter;
 	/***/ public String cannotCommitOnARepoWithState;
 	/***/ public String cannotCommitWriteTo;
@@ -512,6 +512,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String submoduleParentRemoteUrlInvalid;
 	/***/ public String symlinkCannotBeWrittenAsTheLinkTarget;
 	/***/ public String systemConfigFileInvalid;
+	/***/ public String tagAlreadyExists;
 	/***/ public String tagNameInvalid;
 	/***/ public String tagOnRepoWithoutHEADCurrentlyNotSupported;
 	/***/ public String theFactoryMustNotBeNull;

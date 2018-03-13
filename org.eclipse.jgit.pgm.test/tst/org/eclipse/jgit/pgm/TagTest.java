@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2012, Tomasz Zarna <tomasz.zarna@tasktop.com> and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,39 +40,34 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.pgm;
 
-package org.eclipse.jgit.iplog;
+import static org.junit.Assert.assertEquals;
 
-import org.eclipse.jgit.nls.NLS;
-import org.eclipse.jgit.nls.TranslationBundle;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.junit.Before;
+import org.junit.Test;
 
-/**
- * Translation bundle for JGit IP Log
- */
-public class IpLogText extends TranslationBundle {
+public class TagTest extends CLIRepositoryTestCase {
+	private Git git;
 
-	/**
-	 * @return an instance of this translation bundle
-	 */
-	public static IpLogText get() {
-		return NLS.getBundleFor(IpLogText.class);
+	@Override
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		git = new Git(db);
+		git.commit().setMessage("initial commit").call();
 	}
 
-	/***/ public String CQString;
-	/***/ public String CSVParsingError;
-	/***/ public String cannotLock;
-	/***/ public String cannotSerializeXML;
-	/***/ public String cannotWrite;
-	/***/ public String committerString;
-	/***/ public String configurationFileInCommitHasNoProjectsDeclared;
-	/***/ public String configurationFileInCommitIsInvalid;
-	/***/ public String contributorString;
-	/***/ public String incorrectlyScanned;
-	/***/ public String invalidDate;
-	/***/ public String invalidURIFormat;
-	/***/ public String loginFailed;
-	/***/ public String pageTitleWas;
-	/***/ public String projectString;
-	/***/ public String queryFailed;
-	/***/ public String responseNotHTMLAsExpected;
+	@Test
+	public void testTagTwice() throws Exception {
+		git.tag().setName("test").call();
+		writeTrashFile("file", "content");
+		git.add().addFilepattern("file").call();
+		git.commit().setMessage("commit").call();
+
+		assertEquals("fatal: tag 'test' already exists",
+				execute("git tag test")[0]);
+	}
 }
