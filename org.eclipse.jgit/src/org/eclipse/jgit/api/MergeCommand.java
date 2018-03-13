@@ -269,7 +269,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 						headCommit, srcCommit },
 						MergeStatus.ALREADY_UP_TO_DATE, mergeStrategy, null, null);
 			} else if (revWalk.isMergedInto(headCommit, srcCommit)
-					&& fastForwardMode != FastForwardMode.NO_FF) {
+					&& fastForwardMode == FastForwardMode.FF) {
 				// FAST_FORWARD detected: skip doing a real merge but only
 				// update HEAD
 				refLogMessage.append(": " + MergeStatus.FAST_FORWARD); //$NON-NLS-1$
