@@ -393,14 +393,10 @@ public class FileRepository extends Repository {
 		File indexFile = getIndexFile();
 		if (snapshot == null)
 			snapshot = FileSnapshot.save(indexFile);
-		else if (snapshot.isModified(indexFile))
-			notifyIndexChanged();
-	}
-
-	@Override
-	public void notifyIndexChanged() {
-		snapshot = FileSnapshot.save(getIndexFile());
-		fireEvent(new IndexChangedEvent());
+		else if (snapshot.isModified(indexFile)) {
+			snapshot = FileSnapshot.save(indexFile);
+			fireEvent(new IndexChangedEvent());
+		}
 	}
 
 	/**
