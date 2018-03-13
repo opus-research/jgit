@@ -200,7 +200,8 @@ public class BlameCommand extends GitCommand<BlameResult> {
 	 */
 	public BlameResult call() throws GitAPIException {
 		checkCallable();
-		try (BlameGenerator gen = new BlameGenerator(repo, path)) {
+		BlameGenerator gen = new BlameGenerator(repo, path);
+		try {
 			if (diffAlgorithm != null)
 				gen.setDiffAlgorithm(diffAlgorithm);
 			if (textComparator != null)
@@ -230,6 +231,8 @@ public class BlameCommand extends GitCommand<BlameResult> {
 			return gen.computeBlameResult();
 		} catch (IOException e) {
 			throw new JGitInternalException(e.getMessage(), e);
+		} finally {
+			gen.release();
 		}
 	}
 

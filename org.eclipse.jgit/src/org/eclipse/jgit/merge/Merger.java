@@ -51,6 +51,7 @@ import org.eclipse.jgit.errors.NoMergeBaseException;
 import org.eclipse.jgit.errors.NoMergeBaseException.MergeBaseFailureReason;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectReader;
@@ -124,9 +125,9 @@ public abstract class Merger {
 	 *            repository instance returned by {@link #getRepository()}.
 	 */
 	public void setObjectInserter(ObjectInserter oi) {
-		walk.close();
-		reader.close();
-		inserter.close();
+		walk.release();
+		reader.release();
+		inserter.release();
 		inserter = oi;
 		reader = oi.newReader();
 		walk = new RevWalk(reader);
@@ -205,8 +206,8 @@ public abstract class Merger {
 			return ok;
 		} finally {
 			if (flush)
-				inserter.close();
-			reader.close();
+				inserter.release();
+			reader.release();
 		}
 	}
 
@@ -216,6 +217,38 @@ public abstract class Merger {
 	 * @since 3.2
 	 */
 	public abstract ObjectId getBaseCommitId();
+
+	/**
+	 * Return the merge base of two commits.
+	 * <p>
+	 * May only be called after {@link #merge(RevCommit...)}.
+	 *
+	 * @param aIdx
+	 *            index of the first commit in tips passed to
+	 *            {@link #merge(RevCommit...)}.
+	 * @param bIdx
+	 *            index of the second commit in tips passed to
+	 *            {@link #merge(RevCommit...)}.
+	 * @return the merge base of two commits
+	 * @throws IncorrectObjectTypeException
+	 *             one of the input objects is not a commit.
+	 * @throws IOException
+	 *             objects are missing or multiple merge bases were found.
+	 * @deprecated use {@link #getBaseCommitId()} instead, as that does not
+	 *             require walking the commits again
+	 */
+	@Deprecated
+	public RevCommit getBaseCommit(final int aIdx, final int bIdx)
+			throws IncorrectObjectTypeException,
+			IOException {
+		if (sourceCommits[aIdx] == null)
+			throw new IncorrectObjectTypeException(sourceObjects[aIdx],
+					Constants.TYPE_COMMIT);
+		if (sourceCommits[bIdx] == null)
+			throw new IncorrectObjectTypeException(sourceObjects[bIdx],
+					Constants.TYPE_COMMIT);
+		return getBaseCommit(sourceCommits[aIdx], sourceCommits[bIdx]);
+	}
 
 	/**
 	 * Return the merge base of two commits.

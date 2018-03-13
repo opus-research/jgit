@@ -102,9 +102,10 @@ public abstract class FS {
 					return new FS_Win32_Cygwin();
 				else
 					return new FS_Win32();
-			} else {
-				return new FS_POSIX();
-			}
+			} else if (FS_POSIX_Java6.hasExecute())
+				return new FS_POSIX_Java6();
+			else
+				return new FS_POSIX_Java5();
 		}
 	}
 
@@ -147,7 +148,22 @@ public abstract class FS {
 	 */
 	public static FS detect(Boolean cygwinUsed) {
 		if (factory == null) {
-			factory = new FS.FSFactory();
+			try {
+				Class<?> activatorClass = Class
+						.forName("org.eclipse.jgit.util.Java7FSFactory"); //$NON-NLS-1$
+				// found Java7
+				factory = (FSFactory) activatorClass.newInstance();
+			} catch (ClassNotFoundException e) {
+				// Java7 module not found
+				// Silently ignore failure to find Java7 FS factory
+				factory = new FS.FSFactory();
+			} catch (UnsupportedClassVersionError e) {
+				factory = new FS.FSFactory();
+			} catch (InstantiationException e) {
+				factory = new FS.FSFactory();
+			} catch (IllegalAccessException e) {
+				factory = new FS.FSFactory();
+			}
 		}
 		return factory.detect(cygwinUsed);
 	}
@@ -481,7 +497,7 @@ public abstract class FS {
 				}
 			}
 		} catch (IOException e) {
-			LOG.debug("Caught exception in FS.readPipe()", e); //$NON-NLS-1$
+			LOG.error("Caught exception in FS.readPipe()", e); //$NON-NLS-1$
 		}
 		if (debug) {
 			LOG.debug("readpipe returns null"); //$NON-NLS-1$
@@ -644,8 +660,8 @@ public abstract class FS {
 	 *
 	 * @param repository
 	 *            The repository for which a hook should be run.
-	 * @param hookName
-	 *            The name of the hook to be executed.
+	 * @param hook
+	 *            The hook to be executed.
 	 * @param args
 	 *            Arguments to pass to this hook. Cannot be <code>null</code>,
 	 *            but can be an empty array.
@@ -653,12 +669,11 @@ public abstract class FS {
 	 * @throws JGitInternalException
 	 *             if we fail to run the hook somehow. Causes may include an
 	 *             interrupted process or I/O errors.
-	 * @since 4.0
+	 * @since 3.7
 	 */
-	public ProcessResult runHookIfPresent(Repository repository,
-			final String hookName,
+	public ProcessResult runIfPresent(Repository repository, final Hook hook,
 			String[] args) throws JGitInternalException {
-		return runHookIfPresent(repository, hookName, args, System.out, System.err,
+		return runIfPresent(repository, hook, args, System.out, System.err,
 				null);
 	}
 
@@ -668,8 +683,8 @@ public abstract class FS {
 	 *
 	 * @param repository
 	 *            The repository for which a hook should be run.
-	 * @param hookName
-	 *            The name of the hook to be executed.
+	 * @param hook
+	 *            The hook to be executed.
 	 * @param args
 	 *            Arguments to pass to this hook. Cannot be <code>null</code>,
 	 *            but can be an empty array.
@@ -688,10 +703,9 @@ public abstract class FS {
 	 * @throws JGitInternalException
 	 *             if we fail to run the hook somehow. Causes may include an
 	 *             interrupted process or I/O errors.
-	 * @since 4.0
+	 * @since 3.7
 	 */
-	public ProcessResult runHookIfPresent(Repository repository,
-			final String hookName,
+	public ProcessResult runIfPresent(Repository repository, final Hook hook,
 			String[] args, PrintStream outRedirect, PrintStream errRedirect,
 			String stdinArgs) throws JGitInternalException {
 		return new ProcessResult(Status.NOT_SUPPORTED);
@@ -699,13 +713,13 @@ public abstract class FS {
 
 	/**
 	 * See
-	 * {@link #runHookIfPresent(Repository, String, String[], PrintStream, PrintStream, String)}
+	 * {@link #runIfPresent(Repository, Hook, String[], PrintStream, PrintStream, String)}
 	 * . Should only be called by FS supporting shell scripts execution.
 	 *
 	 * @param repository
 	 *            The repository for which a hook should be run.
-	 * @param hookName
-	 *            The name of the hook to be executed.
+	 * @param hook
+	 *            The hook to be executed.
 	 * @param args
 	 *            Arguments to pass to this hook. Cannot be <code>null</code>,
 	 *            but can be an empty array.
@@ -724,13 +738,13 @@ public abstract class FS {
 	 * @throws JGitInternalException
 	 *             if we fail to run the hook somehow. Causes may include an
 	 *             interrupted process or I/O errors.
-	 * @since 4.0
+	 * @since 3.7
 	 */
-	protected ProcessResult internalRunHookIfPresent(Repository repository,
-			final String hookName, String[] args, PrintStream outRedirect,
+	protected ProcessResult internalRunIfPresent(Repository repository,
+			final Hook hook, String[] args, PrintStream outRedirect,
 			PrintStream errRedirect, String stdinArgs)
 			throws JGitInternalException {
-		final File hookFile = findHook(repository, hookName);
+		final File hookFile = findHook(repository, hook);
 		if (hookFile == null)
 			return new ProcessResult(Status.NOT_PRESENT);
 
@@ -750,11 +764,11 @@ public abstract class FS {
 		} catch (IOException e) {
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().exceptionCaughtDuringExecutionOfHook,
-					hookName), e);
+					hook.getName()), e);
 		} catch (InterruptedException e) {
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().exceptionHookExecutionInterrupted,
-							hookName), e);
+					hook.getName()), e);
 		}
 	}
 
@@ -764,15 +778,15 @@ public abstract class FS {
 	 *
 	 * @param repository
 	 *            The repository within which to find a hook.
-	 * @param hookName
-	 *            The name of the hook we're trying to find.
+	 * @param hook
+	 *            The hook we're trying to find.
 	 * @return The {@link File} containing this particular hook if it exists in
 	 *         the given repository, <code>null</code> otherwise.
-	 * @since 4.0
+	 * @since 3.7
 	 */
-	public File findHook(Repository repository, final String hookName) {
+	public File findHook(Repository repository, final Hook hook) {
 		final File hookFile = new File(new File(repository.getDirectory(),
-				Constants.HOOKS), hookName);
+				Constants.HOOKS), hook.getName());
 		return hookFile.isFile() ? hookFile : null;
 	}
 

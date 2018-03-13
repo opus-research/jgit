@@ -51,6 +51,9 @@ import org.junit.Test;
 
 /**
  * Tests git attributes pattern matches
+ * <p>
+ * Inspired by {@link org.eclipse.jgit.ignore.IgnoreMatcherTest}
+ * </p>
  */
 public class AttributesMatcherTest {
 
