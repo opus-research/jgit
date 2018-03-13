@@ -292,10 +292,10 @@ public class AmazonS3 {
 			case HttpURLConnection.HTTP_INTERNAL_ERROR:
 				continue;
 			default:
-				throw error(JGitText.get().s3ActionReading, key, c);
+				throw error("Reading", key, c);
 			}
 		}
-		throw maxAttempts(JGitText.get().s3ActionReading, key);
+		throw maxAttempts("Reading", key);
 	}
 
 	/**
@@ -365,10 +365,10 @@ public class AmazonS3 {
 			case HttpURLConnection.HTTP_INTERNAL_ERROR:
 				continue;
 			default:
-				throw error(JGitText.get().s3ActionDeletion, key, c);
+				throw error("Deletion", key, c);
 			}
 		}
-		throw maxAttempts(JGitText.get().s3ActionDeletion, key);
+		throw maxAttempts("Deletion", key);
 	}
 
 	/**
@@ -426,10 +426,10 @@ public class AmazonS3 {
 			case HttpURLConnection.HTTP_INTERNAL_ERROR:
 				continue;
 			default:
-				throw error(JGitText.get().s3ActionWriting, key, c);
+				throw error("Writing", key, c);
 			}
 		}
-		throw maxAttempts(JGitText.get().s3ActionWriting, key);
+		throw maxAttempts("Writing", key);
 	}
 
 	/**
@@ -514,10 +514,10 @@ public class AmazonS3 {
 			case HttpURLConnection.HTTP_INTERNAL_ERROR:
 				continue;
 			default:
-				throw error(JGitText.get().s3ActionWriting, key, c);
+				throw error("Writing", key, c);
 			}
 		}
-		throw maxAttempts(JGitText.get().s3ActionWriting, key);
+		throw maxAttempts("Writing", key);
 	}
 
 	private IOException error(final String action, final String key,
