@@ -52,6 +52,10 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.text.MessageFormat;
 import java.text.ParseException;
@@ -62,12 +66,16 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.dircache.DirCacheIterator;
@@ -100,6 +108,8 @@ import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.GitDateParser;
 import org.eclipse.jgit.util.SystemReader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A garbage collector for git {@link FileRepository}. Instances of this class
@@ -109,9 +119,26 @@ import org.eclipse.jgit.util.SystemReader;
  * adapted to FileRepositories.
  */
 public class GC {
+	private final static Logger LOG = LoggerFactory
+			.getLogger(GC.class);
+
 	private static final String PRUNE_EXPIRE_DEFAULT = "2.weeks.ago"; //$NON-NLS-1$
 
 	private static final String PRUNE_PACK_EXPIRE_DEFAULT = "1.hour.ago"; //$NON-NLS-1$
+
+	private static final Pattern PATTERN_LOOSE_OBJECT = Pattern
+			.compile("[0-9a-fA-F]{38}"); //$NON-NLS-1$
+
+	private static final String PACK_EXT = "." + PackExt.PACK.getExtension();//$NON-NLS-1$
+
+	private static final String BITMAP_EXT = "." //$NON-NLS-1$
+			+ PackExt.BITMAP_INDEX.getExtension();
+
+	private static final String INDEX_EXT = "." + PackExt.INDEX.getExtension(); //$NON-NLS-1$
+
+	private static final int DEFAULT_AUTOPACKLIMIT = 50;
+
+	private static final int DEFAULT_AUTOLIMIT = 6700;
 
 	private final FileRepository repo;
 
@@ -143,6 +170,11 @@ public class GC {
 	private long lastRepackTime;
 
 	/**
+	 * Whether gc should do automatic housekeeping
+	 */
+	private boolean automatic;
+
+	/**
 	 * Creates a new garbage collector with default values. An expirationTime of
 	 * two weeks and <code>null</code> as progress monitor will be used.
 	 *
@@ -163,6 +195,10 @@ public class GC {
 	 * <li>prune all loose objects which are now reachable by packs</li>
 	 * </ul>
 	 *
+	 * If {@link #setAuto(boolean)} was set to {@code true} {@code gc} will
+	 * first check whether any housekeeping is required; if not, it exits
+	 * without performing any work.
+	 *
 	 * @return the collection of {@link PackFile}'s which are newly created
 	 * @throws IOException
 	 * @throws ParseException
@@ -170,6 +206,9 @@ public class GC {
 	 *             parsed
 	 */
 	public Collection<PackFile> gc() throws IOException, ParseException {
+		if (automatic && !needGc()) {
+			return Collections.emptyList();
+		}
 		pm.start(6 /* tasks */);
 		packRefs();
 		// TODO: implement reflog_expire(pm, repo);
@@ -325,45 +364,48 @@ public class GC {
 		Set<ObjectId> indexObjects = null;
 		File objects = repo.getObjectsDirectory();
 		String[] fanout = objects.list();
-		if (fanout != null && fanout.length > 0) {
-			pm.beginTask(JGitText.get().pruneLooseUnreferencedObjects,
-					fanout.length);
-			try {
-				for (String d : fanout) {
-					pm.update(1);
-					if (d.length() != 2)
+		if (fanout == null || fanout.length == 0) {
+			return;
+		}
+		pm.beginTask(JGitText.get().pruneLooseUnreferencedObjects,
+				fanout.length);
+		try {
+			for (String d : fanout) {
+				pm.update(1);
+				if (d.length() != 2)
+					continue;
+				File[] entries = new File(objects, d).listFiles();
+				if (entries == null)
+					continue;
+				for (File f : entries) {
+					String fName = f.getName();
+					if (fName.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
 						continue;
-					File[] entries = new File(objects, d).listFiles();
-					if (entries == null)
+					if (repo.getFS().lastModified(f) >= expireDate)
 						continue;
-					for (File f : entries) {
-						String fName = f.getName();
-						if (fName.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
+					try {
+						ObjectId id = ObjectId.fromString(d + fName);
+						if (objectsToKeep.contains(id))
 							continue;
-						if (repo.getFS().lastModified(f) >= expireDate)
+						if (indexObjects == null)
+							indexObjects = listNonHEADIndexObjects();
+						if (indexObjects.contains(id))
 							continue;
-						try {
-							ObjectId id = ObjectId.fromString(d + fName);
-							if (objectsToKeep.contains(id))
-								continue;
-							if (indexObjects == null)
-								indexObjects = listNonHEADIndexObjects();
-							if (indexObjects.contains(id))
-								continue;
-							deletionCandidates.put(id, f);
-						} catch (IllegalArgumentException notAnObject) {
-							// ignoring the file that does not represent loose
-							// object
-							continue;
-						}
+						deletionCandidates.put(id, f);
+					} catch (IllegalArgumentException notAnObject) {
+						// ignoring the file that does not represent loose
+						// object
+						continue;
 					}
 				}
-			} finally {
-				pm.endTask();
 			}
+		} finally {
+			pm.endTask();
 		}
-		if (deletionCandidates.isEmpty())
+
+		if (deletionCandidates.isEmpty()) {
 			return;
+		}
 
 		// From the set of current refs remove all those which have been handled
 		// during last repack(). Only those refs will survive which have been
@@ -433,10 +475,17 @@ public class GC {
 		// loose objects. Make a last check, though, to avoid deleting objects
 		// that could have been referenced while the candidates list was being
 		// built (by an incoming push, for example).
+		Set<File> touchedFanout = new HashSet<>();
 		for (File f : deletionCandidates.values()) {
 			if (f.lastModified() < expireDate) {
 				f.delete();
+				touchedFanout.add(f.getParentFile());
 			}
+		}
+
+		for (File f : touchedFanout) {
+			FileUtils.delete(f,
+					FileUtils.EMPTY_DIRECTORIES_ONLY | FileUtils.IGNORE_ERRORS);
 		}
 
 		repo.getObjectDatabase().close();
@@ -625,10 +674,53 @@ public class GC {
 			throw new IOException(e);
 		}
 		prunePacked();
+		deleteOrphans();
 
 		lastPackedRefs = refsBefore;
 		lastRepackTime = time;
 		return ret;
+	}
+
+	/**
+	 * Deletes orphans
+	 * <p>
+	 * A file is considered an orphan if it is either a "bitmap" or an index
+	 * file, and its corresponding pack file is missing in the list.
+	 * </p>
+	 */
+	private void deleteOrphans() {
+		Path packDir = Paths.get(repo.getObjectsDirectory().getAbsolutePath(),
+				"pack"); //$NON-NLS-1$
+		List<String> fileNames = null;
+		try (Stream<Path> files = Files.list(packDir)) {
+			fileNames = files.map(path -> path.getFileName().toString())
+					.filter(name -> {
+						return (name.endsWith(PACK_EXT)
+								|| name.endsWith(BITMAP_EXT)
+								|| name.endsWith(INDEX_EXT));
+					}).sorted(Collections.reverseOrder())
+					.collect(Collectors.toList());
+		} catch (IOException e1) {
+			// ignore
+		}
+		if (fileNames == null) {
+			return;
+		}
+
+		String base = null;
+		for (String n : fileNames) {
+			if (n.endsWith(PACK_EXT)) {
+				base = n.substring(0, n.lastIndexOf('.'));
+			} else {
+				if (base == null || !n.startsWith(base)) {
+					try {
+						Files.delete(new File(packDir.toFile(), n).toPath());
+					} catch (IOException e) {
+						LOG.error(e.getMessage(), e);
+					}
+				}
+			}
+		}
 	}
 
 	/**
@@ -1080,5 +1172,115 @@ public class GC {
 	public void setPackExpire(Date packExpire) {
 		this.packExpire = packExpire;
 		packExpireAgeMillis = -1;
+	}
+
+	/**
+	 * Set the {@code gc --auto} option.
+	 *
+	 * With this option, gc checks whether any housekeeping is required; if not,
+	 * it exits without performing any work. Some JGit commands run
+	 * {@code gc --auto} after performing operations that could create many
+	 * loose objects.
+	 * <p/>
+	 * Housekeeping is required if there are too many loose objects or too many
+	 * packs in the repository. If the number of loose objects exceeds the value
+	 * of the gc.auto option JGit GC consolidates all existing packs into a
+	 * single pack (equivalent to {@code -A} option), whereas git-core would
+	 * combine all loose objects into a single pack using {@code repack -d -l}.
+	 * Setting the value of {@code gc.auto} to 0 disables automatic packing of
+	 * loose objects.
+	 * <p/>
+	 * If the number of packs exceeds the value of {@code gc.autoPackLimit},
+	 * then existing packs (except those marked with a .keep file) are
+	 * consolidated into a single pack by using the {@code -A} option of repack.
+	 * Setting {@code gc.autoPackLimit} to 0 disables automatic consolidation of
+	 * packs.
+	 * <p/>
+	 * Like git the following jgit commands run auto gc:
+	 * <ul>
+	 * <li>fetch</li>
+	 * <li>merge</li>
+	 * <li>rebase</li>
+	 * <li>receive-pack</li>
+	 * </ul>
+	 * The auto gc for receive-pack can be suppressed by setting the config
+	 * option {@code receive.autogc = false}
+	 *
+	 * @param auto
+	 *            defines whether gc should do automatic housekeeping
+	 * @since 4.5
+	 */
+	public void setAuto(boolean auto) {
+		this.automatic = auto;
+	}
+
+	private boolean needGc() {
+		if (tooManyPacks()) {
+			addRepackAllOption();
+		} else if (!tooManyLooseObjects()) {
+			return false;
+		}
+		// TODO run pre-auto-gc hook, if it fails return false
+		return true;
+	}
+
+	private void addRepackAllOption() {
+		// TODO: if JGit GC is enhanced to support repack's option -l this
+		// method needs to be implemented
+	}
+
+	/**
+	 * @return {@code true} if number of packs > gc.autopacklimit (default 50)
+	 */
+	boolean tooManyPacks() {
+		int autopacklimit = repo.getConfig().getInt(
+				ConfigConstants.CONFIG_GC_SECTION,
+				ConfigConstants.CONFIG_KEY_AUTOPACKLIMIT,
+				DEFAULT_AUTOPACKLIMIT);
+		if (autopacklimit <= 0) {
+			return false;
+		}
+		// JGit always creates two packfiles, one for the objects reachable from
+		// branches, and another one for the rest
+		return repo.getObjectDatabase().getPacks().size() > (autopacklimit + 1);
+	}
+
+	/**
+	 * Quickly estimate number of loose objects, SHA1 is distributed evenly so
+	 * counting objects in one directory (bucket 17) is sufficient
+	 *
+	 * @return {@code true} if number of loose objects > gc.auto (default 6700)
+	 */
+	boolean tooManyLooseObjects() {
+		int auto = repo.getConfig().getInt(ConfigConstants.CONFIG_GC_SECTION,
+				ConfigConstants.CONFIG_KEY_AUTO, DEFAULT_AUTOLIMIT);
+		if (auto <= 0) {
+			return false;
+		}
+		int n = 0;
+		int threshold = (auto + 255) / 256;
+		Path dir = repo.getObjectsDirectory().toPath().resolve("17"); //$NON-NLS-1$
+		if (!Files.exists(dir)) {
+			return false;
+		}
+		try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir,
+				new DirectoryStream.Filter<Path>() {
+
+					public boolean accept(Path file) throws IOException {
+						return Files.isRegularFile(file) && PATTERN_LOOSE_OBJECT
+								.matcher(file.getFileName().toString())
+								.matches();
+					}
+				})) {
+			for (Iterator<Path> iter = stream.iterator(); iter.hasNext();
+					iter.next()) {
+				if (++n > threshold) {
+					return true;
+				}
+			}
+		} catch (IOException e) {
+			LOG.error(e.getMessage(), e);
+		}
+		return false;
 	}
 }
