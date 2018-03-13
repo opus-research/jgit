@@ -184,8 +184,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String countingObjects;
 	/***/ public String createBranchFailedUnknownReason;
 	/***/ public String createBranchUnexpectedResult;
-	/***/ public String credentialPassword;
-	/***/ public String credentialUsername;
+	/***/ public String creatingDeltasIsNotImplemented;
 	/***/ public String daemonAlreadyRunning;
 	/***/ public String deleteBranchUnexpectedResult;
 	/***/ public String deletingNotSupported;
