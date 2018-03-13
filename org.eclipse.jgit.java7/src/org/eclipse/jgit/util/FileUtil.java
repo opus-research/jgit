@@ -58,6 +58,7 @@ import java.nio.file.attribute.PosixFilePermission;
 import java.text.Normalizer;
 import java.text.Normalizer.Form;
 
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.util.FS.Attributes;
 
 class FileUtil {
@@ -130,7 +131,8 @@ class FileUtil {
 	public static long getLength(File path) throws IOException {
 		Path nioPath = path.toPath();
 		if (Files.isSymbolicLink(nioPath))
-			return Files.readSymbolicLink(nioPath).toString().length();
+			return Files.readSymbolicLink(nioPath).toString()
+					.getBytes(Constants.CHARSET).length;
 		return Files.size(nioPath);
 	}
 
@@ -178,7 +180,9 @@ class FileUtil {
 					readAttributes.isRegularFile(), //
 					readAttributes.creationTime().toMillis(), //
 					readAttributes.lastModifiedTime().toMillis(),
-					readAttributes.size());
+					readAttributes.isSymbolicLink() ? Constants
+							.encode(FileUtils.readSymLink(path)).length
+							: readAttributes.size());
 			return attributes;
 		} catch (NoSuchFileException e) {
 			return new FileUtil.Java7BasicAttributes(fs, path, false, false,
