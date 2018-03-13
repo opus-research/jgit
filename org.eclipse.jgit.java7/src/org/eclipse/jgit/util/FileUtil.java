@@ -62,9 +62,8 @@ class FileUtil {
 		String targetString = target.toString();
 		if (SystemReader.getInstance().isWindows())
 			targetString = targetString.replace('\\', '/');
-		else if (SystemReader.getInstance().isMacOS()) {
+		else if (SystemReader.getInstance().isMacOS())
 			targetString = Normalizer.normalize(targetString, Form.NFC);
-		}
 		return targetString;
 	}
 
@@ -138,11 +137,6 @@ class FileUtil {
 		if (!isFile(path))
 			return false;
 		return path.setExecutable(executable);
-	}
-
-	public static void delete(File path) throws IOException {
-		Path nioPath = path.toPath();
-		Files.delete(nioPath);
 	}
 
 }

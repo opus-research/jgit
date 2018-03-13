@@ -50,7 +50,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
-import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -60,7 +59,8 @@ import org.eclipse.jgit.internal.JGitText;
 /** Abstraction to support various file system operations not in Java. */
 public abstract class FS {
 	/**
-	 * Thie class creates FS instances. It may be overr
+	 * This class creates FS instances. It will be overridden by a Java7 variant
+	 * if such can be detected in {@link #detect(Boolean)}.
 	 */
 	public static class FSFactory {
 		/**
@@ -278,19 +278,6 @@ public abstract class FS {
 	 */
 	public long length(File path) throws IOException {
 		return path.length();
-	}
-
-	/**
-	 * Delete a file. Throws an exception if delete fails.
-	 * 
-	 * @param f
-	 * @throws IOException
-	 *             , this may be a Java7 subclass with detailed information
-	 */
-	public void delete(File f) throws IOException {
-		if (!f.delete())
-			throw new IOException(MessageFormat.format(
-					JGitText.get().deleteFileFailed, f.getAbsolutePath()));
 	}
 
 	/**
@@ -535,8 +522,7 @@ public abstract class FS {
 
 	/**
 	 * @param path
-	 * @return true if the path is a symlink, or we do not support symbolic
-	 *         links
+	 * @return true if the path is a symbolic link (and we support these)
 	 * @throws IOException
 	 */
 	public boolean isSymLink(File path) throws IOException {
@@ -544,8 +530,8 @@ public abstract class FS {
 	}
 
 	/**
-	 * Tests if the path exists, in case of a symlink, true even if the target
-	 * does not exist
+	 * Tests if the path exists, in case of a symbolic link, true even if the
+	 * target does not exist
 	 *
 	 * @param path
 	 * @return true if path exists
@@ -556,8 +542,8 @@ public abstract class FS {
 
 	/**
 	 * Check if path is a directory. If the OS/JRE supports symbolic links and
-	 * path is a symbolic link to a directory, this method return false.
-	 *
+	 * path is a symbolic link to a directory, this method returns false.
+	 * 
 	 * @param path
 	 * @return true if file is a directory,
 	 */

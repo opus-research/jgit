@@ -73,12 +73,12 @@ public class FSJava7Test {
 	}
 
 	/**
-	 * The old File methods traverses symbolic links and look at the targets. With
-	 * symbolic links we usually want to modify/look at the link. For some reason
-	 * the executable attribute seems to always look at the target, but for the
-	 * other attributes like lastModified, hidden and exists we must differ between
-	 * the link and the target.
-	 *
+	 * The old File methods traverse symbolic links and look at the targets.
+	 * With symbolic links we usually want to modify/look at the link. For some
+	 * reason the executable attribute seems to always look at the target, but
+	 * for the other attributes like lastModified, hidden and exists we must
+	 * differ between the link and the target.
+	 * 
 	 * @throws IOException
 	 * @throws InterruptedException
 	 */
