@@ -125,8 +125,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	private final File packDirectory;
 
-	private final File preservedDirectory;
-
 	private final File alternatesFile;
 
 	private final AtomicReference<PackList> packList;
@@ -167,7 +165,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 		objects = dir;
 		infoDirectory = new File(objects, "info"); //$NON-NLS-1$
 		packDirectory = new File(objects, "pack"); //$NON-NLS-1$
-		preservedDirectory = new File(packDirectory, "preserved"); //$NON-NLS-1$
 		alternatesFile = new File(infoDirectory, "alternates"); //$NON-NLS-1$
 		packList = new AtomicReference<PackList>(NO_PACKS);
 		unpackedObjectCache = new UnpackedObjectCache();
@@ -190,13 +187,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 	 */
 	public final File getDirectory() {
 		return objects;
-	}
-
-	/**
-	 * @return the location of the <code>preserved</code> directory.
-	 */
-	public final File getPreservedDirectory() {
-		return preservedDirectory;
 	}
 
 	@Override
@@ -577,7 +567,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 				warnTmpl = JGitText.get().packWasDeleted;
 			}
 			removePack(p);
-		} else if (FileUtils.isStaleFileHandleInCausalChain(e)) {
+		} else if (FileUtils.isStaleFileHandle(e)) {
 			warnTmpl = JGitText.get().packHandleIsStale;
 			removePack(p);
 		}

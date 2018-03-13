@@ -53,7 +53,6 @@ import java.net.URL;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 import org.eclipse.jgit.awtui.AwtAuthenticator;
 import org.eclipse.jgit.awtui.AwtCredentialsProvider;
@@ -241,8 +240,7 @@ public class Main {
 		}
 
 		if (version) {
-			String cmdId = Version.class.getSimpleName()
-					.toLowerCase(Locale.ROOT);
+			String cmdId = Version.class.getSimpleName().toLowerCase();
 			subcommand = CommandCatalog.get(cmdId).create();
 		}
 

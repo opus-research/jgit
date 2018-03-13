@@ -63,6 +63,7 @@ public class InMemoryRepository extends DfsRepository {
 	 *
 	 * @param repoDesc
 	 *            description of the repository.
+	 * @since 2.0
 	 */
 	public InMemoryRepository(DfsRepositoryDescription repoDesc) {
 		this(new Builder().setRepositoryDescription(repoDesc));

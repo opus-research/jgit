@@ -52,7 +52,6 @@ import static org.eclipse.jgit.util.HttpSupport.HDR_ACCEPT;
 import static org.eclipse.jgit.util.HttpSupport.HDR_ACCEPT_ENCODING;
 import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_ENCODING;
 import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_TYPE;
-import static org.eclipse.jgit.util.HttpSupport.HDR_LOCATION;
 import static org.eclipse.jgit.util.HttpSupport.HDR_PRAGMA;
 import static org.eclipse.jgit.util.HttpSupport.HDR_USER_AGENT;
 import static org.eclipse.jgit.util.HttpSupport.HDR_WWW_AUTHENTICATE;
@@ -100,7 +99,6 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.SymbolicRef;
 import org.eclipse.jgit.transport.HttpAuthMethod.Type;
-import org.eclipse.jgit.transport.http.HttpConfig;
 import org.eclipse.jgit.transport.http.HttpConnection;
 import org.eclipse.jgit.util.HttpSupport;
 import org.eclipse.jgit.util.IO;
@@ -224,6 +222,21 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			return new HttpConfig(cfg);
 		}
 	};
+
+	private static class HttpConfig {
+		final int postBuffer;
+
+		final boolean sslVerify;
+
+		HttpConfig(final Config rc) {
+			postBuffer = rc.getInt("http", "postbuffer", 1 * 1024 * 1024); //$NON-NLS-1$  //$NON-NLS-2$
+			sslVerify = rc.getBoolean("http", "sslVerify", true); //$NON-NLS-1$ //$NON-NLS-2$
+		}
+
+		HttpConfig() {
+			this(new Config());
+		}
+	}
 
 	final URL baseUrl;
 
@@ -574,7 +587,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		final Proxy proxy = HttpSupport.proxyFor(proxySelector, u);
 		HttpConnection conn = connectionFactory.create(u, proxy);
 
-		if (!http.isSslVerify() && "https".equals(u.getProtocol())) { //$NON-NLS-1$
+		if (!http.sslVerify && "https".equals(u.getProtocol())) { //$NON-NLS-1$
 			HttpSupport.disableSslVerify(conn);
 		}
 
@@ -885,13 +898,9 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 
 		void openStream() throws IOException {
-			openStream(null);
-		}
-
-		void openStream(final String redirectUrl) throws IOException {
 			conn = httpOpen(
 					METHOD_POST,
-					redirectUrl == null ? new URL(baseUrl, serviceName) : new URL(redirectUrl),
+					new URL(baseUrl, serviceName),
 					AcceptEncoding.GZIP);
 			conn.setInstanceFollowRedirects(false);
 			conn.setDoOutput(true);
@@ -900,13 +909,8 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 
 		void sendRequest() throws IOException {
-			sendRequest(null);
-		}
-
-		void sendRequest(final String redirectUrl) throws IOException {
 			// Try to compress the content, but only if that is smaller.
-			TemporaryBuffer buf = new TemporaryBuffer.Heap(
-					http.getPostBuffer());
+			TemporaryBuffer buf = new TemporaryBuffer.Heap(http.postBuffer);
 			try {
 				GZIPOutputStream gzip = new GZIPOutputStream(buf);
 				out.writeTo(gzip, null);
@@ -919,7 +923,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				buf = out;
 			}
 
-			openStream(redirectUrl);
+			openStream();
 			if (buf != out)
 				conn.setRequestProperty(HDR_CONTENT_ENCODING, ENCODING_GZIP);
 			conn.setFixedLengthStreamingMode((int) buf.length());
@@ -928,22 +932,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				buf.writeTo(httpOut, null);
 			} finally {
 				httpOut.close();
-			}
-
-			final int status = HttpSupport.response(conn);
-			if (status == HttpConnection.HTTP_MOVED_PERM) {
-				String locationHeader = HttpSupport.responseHeader(conn,
-						HDR_LOCATION);
-				switch (http.getRedirect()) {
-				case INITIAL: // TODO how to detect this is an initial request ?
-				case TRUE:
-					sendRequest(locationHeader);
-					break;
-				case FALSE:
-					throw new RedirectForbiddenException(MessageFormat.format(
-							JGitText.get().redirectForbidden, locationHeader,
-							http.getRedirect().name()));
-				}
 			}
 		}
 
@@ -990,7 +978,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		class HttpOutputStream extends TemporaryBuffer {
 			HttpOutputStream() {
-				super(http.getPostBuffer());
+				super(http.postBuffer);
 			}
 
 			@Override

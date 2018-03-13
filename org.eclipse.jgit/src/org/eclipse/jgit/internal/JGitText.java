@@ -419,7 +419,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidPathPeriodAtEndWindows;
 	/***/ public String invalidPathSpaceAtEndWindows;
 	/***/ public String invalidPathReservedOnWindows;
-	/***/ public String invalidRedirectLocation;
 	/***/ public String invalidReflogRevision;
 	/***/ public String invalidRefName;
 	/***/ public String invalidRemote;
@@ -577,7 +576,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String receivePackInvalidLimit;
 	/***/ public String receivePackTooLarge;
 	/***/ public String receivingObjects;
-	/***/ public String redirectForbidden;
 	/***/ public String refAlreadyExists;
 	/***/ public String refAlreadyExists1;
 	/***/ public String reflogEntryNotFound;

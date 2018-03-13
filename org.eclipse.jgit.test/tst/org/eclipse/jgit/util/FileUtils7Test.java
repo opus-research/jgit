@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2013, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,25 +40,60 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.transport;
 
-import org.eclipse.jgit.errors.TransportException;
+package org.eclipse.jgit.util;
 
-/**
- * Thrown on attempt to redirect a http transport request and git configuration
- * didn't allow redirect
- *
- * @since 4.7
- */
-public class RedirectForbiddenException extends TransportException {
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
-	private static final long serialVersionUID = 1L;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 
-	/**
-	 * @param message
-	 *            error message
-	 */
-	public RedirectForbiddenException(String message) {
-		super(message);
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
+public class FileUtils7Test {
+
+	private final File trash = new File(new File("target"), "trash");
+
+	@Before
+	public void setUp() throws Exception {
+		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY | FileUtils.SKIP_MISSING);
+		assertTrue(trash.mkdirs());
+	}
+
+	@After
+	public void tearDown() throws Exception {
+		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY);
+	}
+
+	@Test
+	public void testDeleteSymlinkToDirectoryDoesNotDeleteTarget()
+			throws IOException {
+		org.junit.Assume.assumeTrue(FS.DETECTED.supportsSymlinks());
+		FS fs = FS.DETECTED;
+		File dir = new File(trash, "dir");
+		File file = new File(dir, "file");
+		File link = new File(trash, "link");
+		FileUtils.mkdirs(dir);
+		FileUtils.createNewFile(file);
+		fs.createSymLink(link, "dir");
+		FileUtils.delete(link, FileUtils.RECURSIVE);
+		assertFalse(link.exists());
+		assertTrue(dir.exists());
+		assertTrue(file.exists());
+	}
+
+	@Test
+	public void testAtomicMove() throws IOException {
+		File src = new File(trash, "src");
+		Files.createFile(src.toPath());
+		File dst = new File(trash, "dst");
+		FileUtils.rename(src, dst, StandardCopyOption.ATOMIC_MOVE);
+		assertFalse(Files.exists(src.toPath()));
+		assertTrue(Files.exists(dst.toPath()));
 	}
 }
