@@ -43,76 +43,110 @@
 package org.eclipse.jgit.ant.tasks;
 
 import java.io.File;
+import java.io.IOException;
 
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.Project;
 import org.apache.tools.ant.Task;
-import org.eclipse.jgit.api.CloneCommand;
+import org.apache.tools.ant.types.DirSet;
+import org.apache.tools.ant.types.FileSet;
+import org.apache.tools.ant.types.resources.Union;
+import org.eclipse.jgit.api.AddCommand;
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.transport.URIish;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.RepositoryCache;
+import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
+import org.eclipse.jgit.util.FS;
 
 /**
- * Clone a repository into a new directory.
- * 
- * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-clone.html"
- *      >git-clone(1)</a>
+ * Adds a file to the git index.
+ *
+ * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-add.html"
+ *      >git-add(1)</a>
  */
-public class GitCloneTask extends Task {
+public class GitAddTask extends Task {
 
-	private String uri;
-	private File destination;
-	private boolean bare;
-	private String branch = Constants.HEAD;
+	private File src;
+	private Union path;
 
 	/**
-	 * @param uri
-	 *            the uri to clone from
+	 * @param src
+	 *            the src to set
 	 */
-	public void setUri(String uri) {
-		this.uri = uri;
+	public void setSrc(File src) {
+		this.src = src;
 	}
 
 	/**
-	 * The optional directory associated with the clone operation. If the
-	 * directory isn't set, a name associated with the source uri will be used.
-	 * 
-	 * @see URIish#getHumanishName()
-	 * 
-	 * @param destination
-	 *            the directory to clone to
+	 * Add a set of files to add.
+	 *
+	 * @param set
+	 *            a set of files to add.
 	 */
-	public void setDest(File destination) {
-		this.destination = destination;
+	public void addFileset(FileSet set) {
+		getPath().add(set);
 	}
 
 	/**
-	 * @param bare
-	 *            whether the cloned repository is bare or not
+	 * Add a set of files to add.
+	 *
+	 * @param set
+	 *            a set of files to add.
 	 */
-	public void setBare(boolean bare) {
-		this.bare = bare;
+	public void addDirset(DirSet set) {
+		getPath().add(set);
 	}
 
-	/**
-	 * @param branch
-	 *            the initial branch to check out when cloning the repository
-	 */
-	public void setBranch(String branch) {
-		this.branch = branch;
+	private synchronized Union getPath() {
+		if (path == null) {
+			path = new Union();
+			path.setProject(getProject());
+		}
+		return path;
 	}
 
 	@Override
 	public void execute() throws BuildException {
-		log("Cloning repository " + uri);
-		
-		CloneCommand clone = Git.cloneRepository();
-		try {
-			clone.setURI(uri).setDirectory(destination).setBranch(branch).setBare(bare);
-			clone.call();
-		} catch (RuntimeException e) {
-			log("Could not clone repository: " + e, e, Project.MSG_ERR);
-			throw new BuildException("Could not clone repository: " + e.getMessage(), e);
+		if (src == null) {
+			throw new BuildException("Repository path not specified.");
 		}
+		if (!RepositoryCache.FileKey.isGitRepository(new File(src, ".git"),
+				FS.DETECTED)) {
+			throw new BuildException("Specified path (" + src
+					+ ") is not a git repository.");
+		}
+
+		AddCommand gitAdd;
+		try {
+			Repository repo = new FileRepositoryBuilder().readEnvironment()
+					.findGitDir(src).build();
+			gitAdd = new Git(repo).add();
+		} catch (IOException e) {
+			throw new BuildException("Could not access repository " + src, e);
+		}
+
+		try {
+			String prefix = src.getCanonicalPath();
+			String[] allFiles = getPath().list();
+
+			for (String file : allFiles) {
+				String toAdd = translateFilePathUsingPrefix(file, prefix);
+				log("Adding " + toAdd, Project.MSG_VERBOSE);
+				gitAdd.addFilepattern(toAdd);
+			}
+			gitAdd.call();
+		} catch (Exception e) {
+			throw new BuildException("Could not add files to index." + src, e);
+		}
+
 	}
+
+	private String translateFilePathUsingPrefix(String file, String prefix)
+			throws IOException {
+		if (file.equals(prefix)) {
+			return ".";
+		}
+		return new File(file).getCanonicalPath().substring(prefix.length() + 1);
+	}
+
 }
