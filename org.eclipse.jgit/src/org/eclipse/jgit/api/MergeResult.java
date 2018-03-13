@@ -324,7 +324,6 @@ public class MergeResult {
 		return base;
 	}
 
-	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
 		boolean first = true;

@@ -96,7 +96,7 @@ import org.eclipse.jgit.util.GitDateParser;
  * adapted to FileRepositories.
  */
 public class GC {
-	private static final String PRUNE_EXPIRE_DEFAULT = "2.weeks.ago"; //$NON-NLS-1$
+	private static final String PRUNE_EXPIRE_DEFAULT = "2.weeks.ago";
 
 	private final FileRepository repo;
 
@@ -190,8 +190,8 @@ public class GC {
 
 			if (!oldPack.shouldBeKept()) {
 				oldPack.close();
-				FileUtils.delete(nameFor(oldName, ".pack"), deleteOptions); //$NON-NLS-1$
-				FileUtils.delete(nameFor(oldName, ".idx"), deleteOptions); //$NON-NLS-1$
+				FileUtils.delete(nameFor(oldName, ".pack"), deleteOptions);
+				FileUtils.delete(nameFor(oldName, ".idx"), deleteOptions);
 			}
 		}
 		// close the complete object database. Thats my only chance to force
@@ -614,9 +614,9 @@ public class GC {
 			      default:
 					throw new IOException(MessageFormat.format(
 							JGitText.get().corruptObjectInvalidMode3, String
-									.format("%o", Integer.valueOf(treeWalk //$NON-NLS-1$
+									.format("%o", Integer.valueOf(treeWalk
 											.getRawMode(0)),
-											(objectId == null) ? "null" //$NON-NLS-1$
+											(objectId == null) ? "null"
 													: objectId.name(), treeWalk
 											.getPathString(), repo
 											.getIndexFile())));
@@ -651,11 +651,11 @@ public class GC {
 
 			// create temporary files
 			String id = pw.computeName().getName();
-			File packdir = new File(repo.getObjectsDirectory(), "pack"); //$NON-NLS-1$
-			tmpPack = File.createTempFile("gc_", ".pack_tmp", packdir); //$NON-NLS-1$ //$NON-NLS-2$
+			File packdir = new File(repo.getObjectsDirectory(), "pack");
+			tmpPack = File.createTempFile("gc_", ".pack_tmp", packdir);
 			tmpIdx = new File(packdir, tmpPack.getName().substring(0,
 					tmpPack.getName().lastIndexOf('.'))
-					+ ".idx_tmp"); //$NON-NLS-1$
+					+ ".idx_tmp");
 
 			if (!tmpIdx.createNewFile())
 				throw new IOException(MessageFormat.format(
@@ -686,9 +686,9 @@ public class GC {
 			}
 
 			// rename the temporary files to real files
-			File realPack = nameFor(id, ".pack"); //$NON-NLS-1$
+			File realPack = nameFor(id, ".pack");
 			tmpPack.setReadOnly();
-			File realIdx = nameFor(id, ".idx"); //$NON-NLS-1$
+			File realIdx = nameFor(id, ".idx");
 			realIdx.setReadOnly();
 			boolean delete = true;
 			try {
@@ -697,7 +697,7 @@ public class GC {
 				delete = false;
 				if (!tmpIdx.renameTo(realIdx)) {
 					File newIdx = new File(realIdx.getParentFile(),
-							realIdx.getName() + ".new"); //$NON-NLS-1$
+							realIdx.getName() + ".new");
 					if (!tmpIdx.renameTo(newIdx))
 						newIdx = tmpIdx;
 					throw new IOException(MessageFormat.format(
@@ -721,8 +721,8 @@ public class GC {
 	}
 
 	private File nameFor(String name, String ext) {
-		File packdir = new File(repo.getObjectsDirectory(), "pack"); //$NON-NLS-1$
-		return new File(packdir, "pack-" + name + ext); //$NON-NLS-1$
+		File packdir = new File(repo.getObjectsDirectory(), "pack");
+		return new File(packdir, "pack-" + name + ext);
 	}
 
 	/**

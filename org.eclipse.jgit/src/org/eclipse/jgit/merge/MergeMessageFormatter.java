@@ -67,7 +67,7 @@ public class MergeMessageFormatter {
 	 */
 	public String format(List<Ref> refsToMerge, Ref target) {
 		StringBuilder sb = new StringBuilder();
-		sb.append("Merge "); //$NON-NLS-1$
+		sb.append("Merge ");
 
 		List<String> branches = new ArrayList<String>();
 		List<String> remoteBranches = new ArrayList<String>();
@@ -76,18 +76,18 @@ public class MergeMessageFormatter {
 		List<String> others = new ArrayList<String>();
 		for (Ref ref : refsToMerge) {
 			if (ref.getName().startsWith(Constants.R_HEADS))
-				branches.add("'" + Repository.shortenRefName(ref.getName()) //$NON-NLS-1$
-						+ "'"); //$NON-NLS-1$
+				branches.add("'" + Repository.shortenRefName(ref.getName())
+						+ "'");
 
 			else if (ref.getName().startsWith(Constants.R_REMOTES))
-				remoteBranches.add("'" //$NON-NLS-1$
-						+ Repository.shortenRefName(ref.getName()) + "'"); //$NON-NLS-1$
+				remoteBranches.add("'"
+						+ Repository.shortenRefName(ref.getName()) + "'");
 
 			else if (ref.getName().startsWith(Constants.R_TAGS))
-				tags.add("'" + Repository.shortenRefName(ref.getName()) + "'"); //$NON-NLS-1$ //$NON-NLS-2$
+				tags.add("'" + Repository.shortenRefName(ref.getName()) + "'");
 
 			else if (ref.getName().equals(ref.getObjectId().getName()))
-				commits.add("'" + ref.getName() + "'"); //$NON-NLS-1$ //$NON-NLS-2$
+				commits.add("'" + ref.getName() + "'");
 
 			else
 				others.add(ref.getName());
@@ -109,9 +109,9 @@ public class MergeMessageFormatter {
 			listings.add(joinNames(commits, "commit", "commits"));
 
 		if (!others.isEmpty())
-			listings.add(StringUtils.join(others, ", ", " and ")); //$NON-NLS-1$
+			listings.add(StringUtils.join(others, ", ", " and "));
 
-		sb.append(StringUtils.join(listings, ", ")); //$NON-NLS-1$
+		sb.append(StringUtils.join(listings, ", "));
 
 		String targetName = target.getLeaf().getName();
 		if (!targetName.equals(Constants.R_HEADS + Constants.MASTER)) {
@@ -134,9 +134,9 @@ public class MergeMessageFormatter {
 	public String formatWithConflicts(String message,
 			List<String> conflictingPaths) {
 		StringBuilder sb = new StringBuilder(message);
-		if (!message.endsWith("\n") && message.length() != 0) //$NON-NLS-1$
-			sb.append("\n"); //$NON-NLS-1$
-		sb.append("\n"); //$NON-NLS-1$
+		if (!message.endsWith("\n") && message.length() != 0)
+			sb.append("\n");
+		sb.append("\n");
 		sb.append("Conflicts:\n");
 		for (String conflictingPath : conflictingPaths)
 			sb.append('\t').append(conflictingPath).append('\n');
@@ -146,8 +146,8 @@ public class MergeMessageFormatter {
 	private static String joinNames(List<String> names, String singular,
 			String plural) {
 		if (names.size() == 1)
-			return singular + " " + names.get(0); //$NON-NLS-1$
+			return singular + " " + names.get(0);
 		else
-			return plural + " " + StringUtils.join(names, ", ", " and "); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+			return plural + " " + StringUtils.join(names, ", ", " and ");
 	}
 }
