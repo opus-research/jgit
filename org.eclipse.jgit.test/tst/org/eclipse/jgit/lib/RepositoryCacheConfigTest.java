@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2008-2011, Google Inc.
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2016 Ericsson
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,75 +41,67 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.dfs;
+package org.eclipse.jgit.lib;
 
-import java.io.IOException;
-import java.util.zip.CRC32;
-import java.util.zip.DataFormatException;
-import java.util.zip.Inflater;
+import static org.eclipse.jgit.lib.RepositoryCacheConfig.AUTO_CLEANUP_DELAY;
+import static org.eclipse.jgit.lib.RepositoryCacheConfig.NO_CLEANUP;
+import static org.junit.Assert.assertEquals;
 
-import org.eclipse.jgit.internal.storage.pack.PackOutputStream;
+import java.util.concurrent.TimeUnit;
 
-/** A cached slice of a {@link DfsPackFile}. */
-final class DfsBlock {
-	final DfsPackKey pack;
+import org.eclipse.jgit.errors.ConfigInvalidException;
+import org.junit.Before;
+import org.junit.Test;
 
-	final long start;
+public class RepositoryCacheConfigTest {
 
-	final long end;
+	private RepositoryCacheConfig config;
 
-	private final byte[] block;
-
-	DfsBlock(DfsPackKey p, long pos, byte[] buf) {
-		pack = p;
-		start = pos;
-		end = pos + buf.length;
-		block = buf;
+	@Before
+	public void setUp() {
+		config = new RepositoryCacheConfig();
 	}
 
-	int size() {
-		return block.length;
+	@Test
+	public void testDefaultValues() {
+		assertEquals(TimeUnit.HOURS.toMillis(1), config.getExpireAfter());
+		assertEquals(config.getExpireAfter() / 10, config.getCleanupDelay());
 	}
 
-	boolean contains(DfsPackKey want, long pos) {
-		return pack == want && start <= pos && pos < end;
+	@Test
+	public void testCleanupDelay() {
+		config.setCleanupDelay(TimeUnit.HOURS.toMillis(1));
+		assertEquals(TimeUnit.HOURS.toMillis(1), config.getCleanupDelay());
 	}
 
-	int copy(long pos, byte[] dstbuf, int dstoff, int cnt) {
-		int ptr = (int) (pos - start);
-		return copy(ptr, dstbuf, dstoff, cnt);
+	@Test
+	public void testAutoCleanupDelay() {
+		config.setExpireAfter(TimeUnit.MINUTES.toMillis(20));
+		config.setCleanupDelay(AUTO_CLEANUP_DELAY);
+		assertEquals(TimeUnit.MINUTES.toMillis(20), config.getExpireAfter());
+		assertEquals(config.getExpireAfter() / 10, config.getCleanupDelay());
 	}
 
-	int copy(int p, byte[] b, int o, int n) {
-		n = Math.min(block.length - p, n);
-		System.arraycopy(block, p, b, o, n);
-		return n;
+	@Test
+	public void testAutoCleanupDelayShouldBeMax10minutes() {
+		config.setExpireAfter(TimeUnit.HOURS.toMillis(10));
+		assertEquals(TimeUnit.HOURS.toMillis(10), config.getExpireAfter());
+		assertEquals(TimeUnit.MINUTES.toMillis(10), config.getCleanupDelay());
 	}
 
-	int setInput(long pos, Inflater inf) {
-		int ptr = (int) (pos - start);
-		int cnt = block.length - ptr;
-		inf.setInput(block, ptr, cnt);
-		return cnt;
+	@Test
+	public void testDisabledCleanupDelay() {
+		config.setCleanupDelay(NO_CLEANUP);
+		assertEquals(NO_CLEANUP, config.getCleanupDelay());
 	}
 
-	void crc32(CRC32 out, long pos, int cnt) {
-		int ptr = (int) (pos - start);
-		out.update(block, ptr, cnt);
-	}
-
-	void write(PackOutputStream out, long pos, int cnt)
-			throws IOException {
-		out.write(block, (int) (pos - start), cnt);
-	}
-
-	void check(Inflater inf, byte[] tmp, long pos, int cnt)
-			throws DataFormatException {
-		// Unlike inflate() above the exact byte count is known by the caller.
-		// Push all of it in a single invocation to avoid unnecessary loops.
-		//
-		inf.setInput(block, (int) (pos - start), cnt);
-		while (inf.inflate(tmp, 0, tmp.length) > 0)
-			continue;
+	@Test
+	public void testFromConfig() throws ConfigInvalidException {
+		Config otherConfig = new Config();
+		otherConfig.fromText("[core]\nrepositoryCacheExpireAfter=1000\n"
+				+ "repositoryCacheCleanupDelay=500");
+		config.fromConfig(otherConfig);
+		assertEquals(1000, config.getExpireAfter());
+		assertEquals(500, config.getCleanupDelay());
 	}
 }

@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2008-2011, Google Inc.
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2008-2016, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,75 +41,59 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.dfs;
+package org.eclipse.jgit.lib;
 
-import java.io.IOException;
-import java.util.zip.CRC32;
-import java.util.zip.DataFormatException;
-import java.util.zip.Inflater;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
 
-import org.eclipse.jgit.internal.storage.pack.PackOutputStream;
+/**
+ * Simple work queue to run tasks in the background
+ */
+class WorkQueue {
+	private static final ScheduledThreadPoolExecutor executor;
 
-/** A cached slice of a {@link DfsPackFile}. */
-final class DfsBlock {
-	final DfsPackKey pack;
+	static final Object executorKiller;
 
-	final long start;
-
-	final long end;
-
-	private final byte[] block;
-
-	DfsBlock(DfsPackKey p, long pos, byte[] buf) {
-		pack = p;
-		start = pos;
-		end = pos + buf.length;
-		block = buf;
-	}
-
-	int size() {
-		return block.length;
-	}
-
-	boolean contains(DfsPackKey want, long pos) {
-		return pack == want && start <= pos && pos < end;
-	}
-
-	int copy(long pos, byte[] dstbuf, int dstoff, int cnt) {
-		int ptr = (int) (pos - start);
-		return copy(ptr, dstbuf, dstoff, cnt);
-	}
-
-	int copy(int p, byte[] b, int o, int n) {
-		n = Math.min(block.length - p, n);
-		System.arraycopy(block, p, b, o, n);
-		return n;
-	}
-
-	int setInput(long pos, Inflater inf) {
-		int ptr = (int) (pos - start);
-		int cnt = block.length - ptr;
-		inf.setInput(block, ptr, cnt);
-		return cnt;
-	}
-
-	void crc32(CRC32 out, long pos, int cnt) {
-		int ptr = (int) (pos - start);
-		out.update(block, ptr, cnt);
-	}
-
-	void write(PackOutputStream out, long pos, int cnt)
-			throws IOException {
-		out.write(block, (int) (pos - start), cnt);
-	}
-
-	void check(Inflater inf, byte[] tmp, long pos, int cnt)
-			throws DataFormatException {
-		// Unlike inflate() above the exact byte count is known by the caller.
-		// Push all of it in a single invocation to avoid unnecessary loops.
+	static {
+		// To support garbage collection, start our thread but
+		// swap out the thread factory. When our class is GC'd
+		// the executorKiller will finalize and ask the executor
+		// to shutdown, ending the worker.
 		//
-		inf.setInput(block, (int) (pos - start), cnt);
-		while (inf.inflate(tmp, 0, tmp.length) > 0)
-			continue;
+		int threads = 1;
+		executor = new ScheduledThreadPoolExecutor(threads,
+				new ThreadFactory() {
+					private final ThreadFactory baseFactory = Executors
+							.defaultThreadFactory();
+
+					public Thread newThread(Runnable taskBody) {
+						Thread thr = baseFactory.newThread(taskBody);
+						thr.setName("JGit-WorkQueue"); //$NON-NLS-1$
+						thr.setDaemon(true);
+						return thr;
+					}
+				});
+		executor.setRemoveOnCancelPolicy(true);
+		executor.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
+		executor.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
+		executor.prestartAllCoreThreads();
+
+		// Now that the threads are running, its critical to swap out
+		// our own thread factory for one that isn't in the ClassLoader.
+		// This allows the class to GC.
+		//
+		executor.setThreadFactory(Executors.defaultThreadFactory());
+
+		executorKiller = new Object() {
+			@Override
+			protected void finalize() {
+				executor.shutdownNow();
+			}
+		};
+	}
+
+	static ScheduledThreadPoolExecutor getExecutor() {
+		return executor;
 	}
 }
