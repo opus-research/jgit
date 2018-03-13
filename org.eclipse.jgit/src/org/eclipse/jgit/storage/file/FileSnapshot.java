@@ -45,6 +45,8 @@ package org.eclipse.jgit.storage.file;
 
 import java.io.File;
 
+import org.eclipse.jgit.util.SystemReader;
+
 /**
  * Caches when a file was last read, making it possible to detect future edits.
  * <p>
@@ -96,7 +98,7 @@ public class FileSnapshot {
 	 * @return the snapshot.
 	 */
 	public static FileSnapshot save(File path) {
-		final long read = System.currentTimeMillis();
+		final long read = SystemReader.getInstance().getCurrentTime();
 		final long modified = path.lastModified();
 		return new FileSnapshot(read, modified);
 	}
@@ -188,10 +190,10 @@ public class FileSnapshot {
 
 	private boolean notRacyClean(final long read) {
 		// The last modified time granularity of FAT filesystems is 2 seconds.
-		// Using 3 seconds here provides a reasonably high assurance that
-		// the a modification was not missed.
+		// Using 2.5 seconds here provides a reasonably high assurance that
+		// a modification was not missed.
 		//
-		return read - lastModified > 3 * 60 * 1000L;
+		return read - lastModified > 2500;
 	}
 
 	private boolean isModified(final long currLastModified) {
