@@ -460,29 +460,31 @@ public class DfsInserter extends ObjectInserter {
 			}
 
 			Inflater inf = ctx.inflater();
-			pos += setInput(pos, inf);
+			DfsBlock b = setInput(inf, pos);
 			for (int dstoff = 0;;) {
 				int n = inf.inflate(dstbuf, dstoff, dstbuf.length - dstoff);
-				dstoff += n;
-				if (inf.finished())
+				if (n > 0)
+					dstoff += n;
+				else if (inf.needsInput() && b != null) {
+					pos += b.remaining(pos);
+					b = setInput(inf, pos);
+				} else if (inf.needsInput())
+					throw new EOFException(DfsText.get().unexpectedEofInPack);
+				else if (inf.finished())
 					return dstbuf;
-				if (inf.needsInput())
-					pos += setInput(pos, inf);
-				else if (n == 0)
+				else
 					throw new DataFormatException();
 			}
 		}
 
-		private int setInput(long pos, Inflater inf) throws IOException {
-			if (pos < currPos)
-				return getOrLoadBlock(pos).setInput(pos, inf);
-			if (pos < currPos + currPtr) {
-				int s = (int) (pos - currPos);
-				int n = currPtr - s;
-				inf.setInput(currBuf, s, n);
-				return n;
+		private DfsBlock setInput(Inflater inf, long pos) throws IOException {
+			if (pos < currPos) {
+				DfsBlock b = getOrLoadBlock(pos);
+				b.setInput(inf, pos);
+				return b;
 			}
-			throw new EOFException(DfsText.get().unexpectedEofInPack);
+			inf.setInput(currBuf, (int) (pos - currPos), currPtr);
+			return null;
 		}
 
 		private DfsBlock getOrLoadBlock(long pos) throws IOException {
