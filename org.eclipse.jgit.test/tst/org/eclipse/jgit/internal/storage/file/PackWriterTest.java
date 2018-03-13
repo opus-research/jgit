@@ -233,7 +233,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	@Test
 	public void testWritePack1() throws IOException {
 		config.setReuseDeltas(false);
-		config.setDeltaCompress(false);
 		writeVerifyPack1();
 	}
 
@@ -247,7 +246,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	public void testWritePack1NoObjectReuse() throws IOException {
 		config.setReuseDeltas(false);
 		config.setReuseObjects(false);
-		config.setDeltaCompress(false);
 		writeVerifyPack1();
 	}
 
@@ -260,17 +258,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	@Test
 	public void testWritePack2() throws IOException {
 		writeVerifyPack2(false);
-	}
-
-	/**
-	 * Test pack writing with delta compress, delta-base first rule. Pack
-	 * content/preparation as in {@link #testWritePack2()}.
-	 *
-	 * @throws IOException
-	 */
-	@Test
-	public void testWritePack2DeltaCompress() throws IOException {
-		writeVerifyPack2(false, true);
 	}
 
 	/**
@@ -329,7 +316,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	@Test
 	public void testWritePack3() throws MissingObjectException, IOException {
 		config.setReuseDeltas(false);
-		config.setDeltaCompress(false);
 		final ObjectId forcedOrder[] = new ObjectId[] {
 				ObjectId.fromString("82c6b885ff600be425b4ea96dee75dca255b69e7"),
 				ObjectId.fromString("c59759f143fb1fe21c197981df75a7ee00290799"),
@@ -371,25 +357,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	@Test
 	public void testWritePack4ThinPack() throws IOException {
 		writeVerifyPack4(true);
-	}
-
-	/**
-	 * Compare sizes of packs created using {@link #testWritePack2()} and
-	 * {@link #testWritePack2DeltaCompress()}. The pack using delta compression should
-	 * be smaller.
-	 *
-	 * @throws Exception
-	 */
-	@Test
-	public void testWritePack2SizeDeltaCompressVsNoDeltas() throws Exception {
-		testWritePack2();
-		final long sizePack2NoDeltas = os.size();
-		tearDown();
-		setUp();
-		testWritePack2DeltaCompress();
-		final long sizePack2DeltasRefs = os.size();
-
-		assertTrue(sizePack2NoDeltas > sizePack2DeltasRefs);
 	}
 
 	/**
@@ -575,12 +542,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	}
 
 	private void writeVerifyPack2(boolean deltaReuse) throws IOException {
-	    writeVerifyPack2(deltaReuse,false);
-	}
-
-	private void writeVerifyPack2(boolean deltaReuse, boolean deltaCompress) throws IOException {
 		config.setReuseDeltas(deltaReuse);
-		config.setDeltaCompress(deltaCompress);
 		final HashSet<ObjectId> interestings = new HashSet<ObjectId>();
 		interestings.add(ObjectId
 				.fromString("82c6b885ff600be425b4ea96dee75dca255b69e7"));
@@ -596,7 +558,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 				ObjectId.fromString("902d5476fa249b7abc9d84c611577a81381f0327"),
 				ObjectId.fromString("5b6e7c66c276e7610d4a73c70ec1a1f7c1003259"),
 				ObjectId.fromString("6ff87c4664981e4397625791c8ea3bbb5f2279a3") };
-		if (deltaReuse || deltaCompress) {
+		if (deltaReuse) {
 			// objects order influenced (swapped) by delta-base first rule
 			ObjectId temp = expectedOrder[4];
 			expectedOrder[4] = expectedOrder[5];
