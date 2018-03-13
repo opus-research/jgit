@@ -57,13 +57,19 @@ import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.util.TemporaryBuffer;
 
 final class DeltaWindow {
-	private static final boolean NEXT_RES = false;
-	private static final boolean NEXT_SRC = true;
+	private static final int NEXT_RES = 0;
+
+	private static final int NEXT_SRC = 1;
 
 	private final PackConfig config;
+
 	private final DeltaCache deltaCache;
+
 	private final ObjectReader reader;
+
 	private final ProgressMonitor monitor;
+
+	private final DeltaWindowEntry[] window;
 
 	/** Maximum number of bytes to admit to the window at once. */
 	private final long maxMemory;
@@ -72,13 +78,18 @@ final class DeltaWindow {
 	private final int maxDepth;
 
 	private final ObjectToPack[] toSearch;
+
 	private int cur;
+
 	private int end;
 
 	/** Amount of memory we have loaded right now. */
 	private long loaded;
 
 	// The object we are currently considering needs a lot of state:
+
+	/** Position of {@link #res} within {@link #window} array. */
+	private int resSlot;
 
 	/**
 	 * Maximum delta chain depth the current object can have.
@@ -93,8 +104,8 @@ final class DeltaWindow {
 	/** If we have a delta for {@link #res}, this is the shortest found yet. */
 	private TemporaryBuffer.Heap bestDelta;
 
-	/** If we have {@link #bestDelta}, the window entry it was created from. */
-	private DeltaWindowEntry bestBase;
+	/** If we have {@link #bestDelta}, the window position it was created by. */
+	private int bestSlot;
 
 	/** Used to compress cached deltas. */
 	private Deflater deflater;
@@ -110,42 +121,45 @@ final class DeltaWindow {
 		cur = beginIndex;
 		end = endIndex;
 
-		maxMemory = Math.max(0, config.getDeltaSearchMemoryLimit());
+		// C Git increases the window size supplied by the user by 1.
+		// We don't know why it does this, but if the user asks for
+		// window=10, it actually processes with window=11. Because
+		// the window size has the largest direct impact on the final
+		// pack file size, we match this odd behavior here to give us
+		// a better chance of producing a similar sized pack as C Git.
+		//
+		// We would prefer to directly honor the user's request since
+		// PackWriter has a minimum of 2 for the window size, but then
+		// users might complain that JGit is creating a bigger pack file.
+		//
+		window = new DeltaWindowEntry[config.getDeltaSearchWindowSize() + 1];
+		for (int i = 0; i < window.length; i++)
+			window[i] = new DeltaWindowEntry();
+
+		maxMemory = config.getDeltaSearchMemoryLimit();
 		maxDepth = config.getMaxDeltaDepth();
-		res = DeltaWindowEntry.createWindow(config.getDeltaSearchWindowSize());
 	}
 
-	synchronized DeltaTask.Slice remaining() {
+	synchronized int remaining() {
+		return end - cur;
+	}
+
+	synchronized DeltaTask.Slice stealWork() {
 		int e = end;
-		int halfRemaining = (e - cur) >>> 1;
-		if (0 == halfRemaining)
+		int n = (e - cur) >>> 1;
+		if (0 == n)
 			return null;
 
-		int split = e - halfRemaining;
-		int h = toSearch[split].getPathHash();
-
-		// Attempt to split on the next path after the 50% split point.
-		for (int n = split + 1; n < e; n++) {
-			if (h != toSearch[n].getPathHash())
-				return new DeltaTask.Slice(n, e);
+		int t = e - n;
+		int h = toSearch[t].getPathHash();
+		while (cur < t) {
+			if (h == toSearch[t - 1].getPathHash())
+				t--;
+			else
+				break;
 		}
-
-		if (h != toSearch[cur].getPathHash()) {
-			// Try to split on the path before the 50% split point.
-			// Do not split the path currently being processed.
-			for (int p = split - 1; cur < p; p--) {
-				if (h != toSearch[p].getPathHash())
-					return new DeltaTask.Slice(p + 1, e);
-			}
-		}
-		return null;
-	}
-
-	synchronized boolean tryStealWork(DeltaTask.Slice s) {
-		if (s.beginIndex <= cur)
-			return false;
-		end = s.beginIndex;
-		return true;
+		end = t;
+		return new DeltaTask.Slice(t, e);
 	}
 
 	void search() throws IOException {
@@ -157,12 +171,15 @@ final class DeltaWindow {
 						break;
 					next = toSearch[cur++];
 				}
-				if (maxMemory != 0) {
+				res = window[resSlot];
+				if (0 < maxMemory) {
 					clear(res);
+					int tail = next(resSlot);
 					final long need = estimateSize(next);
-					DeltaWindowEntry n = res.next;
-					for (; maxMemory < loaded + need && n != res; n = n.next)
-						clear(n);
+					while (maxMemory < loaded + need && tail != resSlot) {
+						clear(window[tail]);
+						tail = next(tail);
+					}
 				}
 				res.set(next);
 
@@ -218,13 +235,14 @@ final class DeltaWindow {
 		// Loop through the window backwards, considering every entry.
 		// This lets us look at the bigger objects that came before.
 		//
-		for (DeltaWindowEntry src = res.prev; src != res; src = src.prev) {
+		for (int srcSlot = prior(resSlot); srcSlot != resSlot; srcSlot = prior(srcSlot)) {
+			DeltaWindowEntry src = window[srcSlot];
 			if (src.empty())
 				break;
-			if (delta(src) /* == NEXT_SRC */)
-				continue;
-			bestDelta = null;
-			return;
+			if (delta(src, srcSlot) == NEXT_RES) {
+				bestDelta = null;
+				return;
+			}
 		}
 
 		// We couldn't find a suitable delta for this object, but it may
@@ -237,7 +255,7 @@ final class DeltaWindow {
 
 		// Select this best matching delta as the base for the object.
 		//
-		ObjectToPack srcObj = bestBase.object;
+		ObjectToPack srcObj = window[bestSlot].object;
 		ObjectToPack resObj = res.object;
 		if (srcObj.isEdge()) {
 			// The source (the delta base) is an edge object outside of the
@@ -271,7 +289,7 @@ final class DeltaWindow {
 		keepInWindow();
 	}
 
-	private boolean delta(final DeltaWindowEntry src)
+	private int delta(final DeltaWindowEntry src, final int srcSlot)
 			throws IOException {
 		// Objects must use only the same type as their delta base.
 		// If we are looking at something where that isn't true we
@@ -305,12 +323,12 @@ final class DeltaWindow {
 			srcIndex = index(src);
 		} catch (LargeObjectException tooBig) {
 			// If the source is too big to work on, skip it.
-			dropFromWindow(src);
+			dropFromWindow(srcSlot);
 			return NEXT_SRC;
 		} catch (IOException notAvailable) {
 			if (src.object.isEdge()) {
 				// This is an edge that is suddenly not available.
-				dropFromWindow(src);
+				dropFromWindow(srcSlot);
 				return NEXT_SRC;
 			} else {
 				throw notAvailable;
@@ -341,7 +359,7 @@ final class DeltaWindow {
 
 		if (isBetterDelta(src, delta)) {
 			bestDelta = delta;
-			bestBase = src;
+			bestSlot = srcSlot;
 		}
 
 		return NEXT_SRC;
@@ -376,17 +394,39 @@ final class DeltaWindow {
 	}
 
 	private void shuffleBaseUpInPriority() {
-		// Reorder the window so that the best match we just used
-		// is the current one, and the now current object is before.
-		res.makeNext(bestBase);
-		res = bestBase;
+		// Shuffle the entire window so that the best match we just used
+		// is at our current index, and our current object is at the index
+		// before it. Slide any entries in between to make space.
+		//
+		window[resSlot] = window[bestSlot];
+
+		DeltaWindowEntry next = res;
+		int slot = prior(resSlot);
+		for (; slot != bestSlot; slot = prior(slot)) {
+			DeltaWindowEntry e = window[slot];
+			window[slot] = next;
+			next = e;
+		}
+		window[slot] = next;
 	}
 
 	private void keepInWindow() {
-		res = res.next;
+		resSlot = next(resSlot);
 	}
 
-	private void dropFromWindow(@SuppressWarnings("unused") DeltaWindowEntry src) {
+	private int next(int slot) {
+		if (++slot == window.length)
+			return 0;
+		return slot;
+	}
+
+	private int prior(int slot) {
+		if (slot == 0)
+			return window.length - 1;
+		return slot - 1;
+	}
+
+	private void dropFromWindow(@SuppressWarnings("unused") int srcSlot) {
 		// We should drop the current source entry from the window,
 		// it is somehow invalid for us to work with.
 	}
@@ -401,7 +441,7 @@ final class DeltaWindow {
 		// to access during reads.
 		//
 		if (resDelta.length() == bestDelta.length())
-			return src.depth() < bestBase.depth();
+			return src.depth() < window[bestSlot].depth();
 
 		return resDelta.length() < bestDelta.length();
 	}
@@ -440,7 +480,7 @@ final class DeltaWindow {
 				e.setObjectId(ent.object);
 				throw e;
 			}
-			if (maxMemory != 0)
+			if (0 < maxMemory)
 				loaded += idx.getIndexSize() - idx.getSourceSize();
 			ent.index = idx;
 		}
@@ -454,7 +494,7 @@ final class DeltaWindow {
 			checkLoadable(ent, ent.size());
 
 			buf = PackWriter.buffer(config, reader, ent.object);
-			if (maxMemory != 0)
+			if (0 < maxMemory)
 				loaded += buf.length;
 			ent.buffer = buf;
 		}
@@ -462,15 +502,17 @@ final class DeltaWindow {
 	}
 
 	private void checkLoadable(DeltaWindowEntry ent, long need) {
-		if (maxMemory == 0)
+		if (maxMemory <= 0)
 			return;
 
-		DeltaWindowEntry n = res.next;
-		for (; maxMemory < loaded + need; n = n.next) {
-			clear(n);
-			if (n == ent)
+		int tail = next(resSlot);
+		while (maxMemory < loaded + need) {
+			DeltaWindowEntry cur = window[tail];
+			clear(cur);
+			if (cur == ent)
 				throw new LargeObjectException.ExceedsLimit(
 						maxMemory, loaded + need);
+			tail = next(tail);
 		}
 	}
 
