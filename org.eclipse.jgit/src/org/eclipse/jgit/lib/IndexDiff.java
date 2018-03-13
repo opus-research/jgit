@@ -169,7 +169,6 @@ public class IndexDiff {
 		boolean changesExist = false;
 		DirCache dirCache = repository.readDirCache();
 		TreeWalk treeWalk = new TreeWalk(repository);
-		treeWalk.reset();
 		treeWalk.setRecursive(true);
 		// add the trees (tree, dirchache, workdir)
 		if (tree != null)
@@ -196,7 +195,7 @@ public class IndexDiff {
 
 			if (dirCacheIterator != null) {
 				if (dirCacheIterator.getDirCacheEntry().isAssumeValid())
-					assumeUnchanged.add(treeWalk.getPathString());
+					assumeUnchanged.add(dirCacheIterator.getEntryPathString());
 			}
 
 			if (treeIterator != null) {
@@ -204,28 +203,29 @@ public class IndexDiff {
 					if (!treeIterator.getEntryObjectId().equals(
 							dirCacheIterator.getEntryObjectId())) {
 						// in repo, in index, content diff => changed
-						changed.add(treeWalk.getPathString());
+						changed.add(dirCacheIterator.getEntryPathString());
 						changesExist = true;
 					}
 				} else {
 					// in repo, not in index => removed
 					if (!fileModeTree.equals(FileMode.TYPE_TREE)) {
-						removed.add(treeWalk.getPathString());
+						removed.add(treeIterator.getEntryPathString());
 						changesExist = true;
 						if (workingTreeIterator != null)
-							untracked.add(treeWalk.getPathString());
+							untracked.add(workingTreeIterator
+									.getEntryPathString());
 					}
 				}
 			} else {
 				if (dirCacheIterator != null) {
 					// not in repo, in index => added
-					added.add(treeWalk.getPathString());
+					added.add(dirCacheIterator.getEntryPathString());
 					changesExist = true;
 				} else {
 					// not in repo, not in index => untracked
 					if (workingTreeIterator != null
 							&& !workingTreeIterator.isEntryIgnored()) {
-						untracked.add(treeWalk.getPathString());
+						untracked.add(workingTreeIterator.getEntryPathString());
 						changesExist = true;
 					}
 				}
@@ -234,12 +234,12 @@ public class IndexDiff {
 			if (dirCacheIterator != null) {
 				if (workingTreeIterator == null) {
 					// in index, not in workdir => missing
-					missing.add(treeWalk.getPathString());
+					missing.add(dirCacheIterator.getEntryPathString());
 					changesExist = true;
 				} else {
 					if (!dirCacheIterator.idEqual(workingTreeIterator)) {
 						// in index, in workdir, content differs => modified
-						modified.add(treeWalk.getPathString());
+						modified.add(dirCacheIterator.getEntryPathString());
 						changesExist = true;
 					}
 				}
