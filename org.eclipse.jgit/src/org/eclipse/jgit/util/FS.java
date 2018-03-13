@@ -266,10 +266,10 @@ public abstract class FS {
 	 *
 	 * @param path
 	 * @return length of a file
-	 * @throws Exception
+	 * @throws IOException
 	 * @since 3.0
 	 */
-	public long length(File path) throws Exception {
+	public long length(File path) throws IOException {
 		return path.length();
 	}
 
