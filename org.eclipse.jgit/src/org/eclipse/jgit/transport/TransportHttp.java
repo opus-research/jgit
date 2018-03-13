@@ -685,13 +685,8 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			switch (HttpSupport.response(c)) {
 			case HttpConnection.HTTP_OK:
 				final InputStream in = openInputStream(c);
-				// If content is being gzipped and then transferred, the content length
-				// is the zipped content length, but not the actually content length
-				if (!ENCODING_GZIP.equals(c.getHeaderField(HDR_CONTENT_ENCODING))) {
-					final int len = c.getContentLength();
-					return new FileStream(in, len);
-				}
-				return new FileStream(in);
+				final int len = c.getContentLength();
+				return new FileStream(in, len);
 			case HttpConnection.HTTP_NOT_FOUND:
 				throw new FileNotFoundException(u.toString());
 			default:
