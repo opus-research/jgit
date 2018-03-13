@@ -74,12 +74,12 @@ import org.junit.Test;
 
 /**
  * Testing the git commit and log commands
- * 
+ *
  * Testing the 'commit only' option:
- * 
+ *
  * I. A single file (f1.txt) specified as part of the --only/ -o option can have
  * one of the following (14) states:
- * 
+ *
  * <pre>
  *        |                          | expected result
  * ---------------------------------------------------------------------
@@ -102,11 +102,11 @@ import org.junit.Test;
  * ---------------------------------------------------------------------
  * f1_14  |  c       c'      c''     |  c''     c''
  * </pre>
- * 
+ *
  * II. Scenarios that do not end with a successful commit (1, 2, 6, 7, 12) have
  * to be tested with a second file (f2.txt) specified that would lead to a
  * successful commit, if it were executed separately (e.g. scenario 14).
- * 
+ *
  * <pre>
  *              |                          | expected result
  * ---------------------------------------------------------------------------
@@ -119,12 +119,12 @@ import org.junit.Test;
  * ---------------------------------------------------------------------------
  * f1_12_f2_14  |  c       c'      c       |  c       c
  * </pre>
- * 
+ *
  * III. All scenarios (1-14, I-II) have to be tested with different repository
  * states, to check that the --only/ -o option does not change existing content
  * (HEAD and DirCache). The following states for a file (f3.txt) not specified
  * shall be tested:
- * 
+ *
  * <pre>
  *       | HEAD  DirCache
  * --------------------
