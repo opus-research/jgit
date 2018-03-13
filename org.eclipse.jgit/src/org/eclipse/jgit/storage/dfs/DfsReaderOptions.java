@@ -43,6 +43,11 @@
 
 package org.eclipse.jgit.storage.dfs;
 
+import static org.eclipse.jgit.lib.ConfigConstants.CONFIG_CORE_SECTION;
+import static org.eclipse.jgit.lib.ConfigConstants.CONFIG_DFS_SECTION;
+import static org.eclipse.jgit.lib.ConfigConstants.CONFIG_KEY_DELTA_BASE_CACHE_LIMIT;
+import static org.eclipse.jgit.lib.ConfigConstants.CONFIG_KEY_STREAM_FILE_TRESHOLD;
+
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.storage.pack.PackConfig;
 
@@ -110,10 +115,18 @@ public class DfsReaderOptions {
 	 * @return {@code this}
 	 */
 	public DfsReaderOptions fromConfig(Config rc) {
-		setDeltaBaseCacheLimit(rc.getInt("core", "dfs", "deltaBaseCacheLimit", getDeltaBaseCacheLimit()));
+		setDeltaBaseCacheLimit(rc.getInt(
+				CONFIG_CORE_SECTION,
+				CONFIG_DFS_SECTION,
+				CONFIG_KEY_DELTA_BASE_CACHE_LIMIT,
+				getDeltaBaseCacheLimit()));
 
 		long maxMem = Runtime.getRuntime().maxMemory();
-		long sft = rc.getLong("core", "dfs", "streamfilethreshold", getStreamFileThreshold());
+		long sft = rc.getLong(
+				CONFIG_CORE_SECTION,
+				CONFIG_DFS_SECTION,
+				CONFIG_KEY_STREAM_FILE_TRESHOLD,
+				getStreamFileThreshold());
 		sft = Math.min(sft, maxMem / 4); // don't use more than 1/4 of the heap
 		sft = Math.min(sft, Integer.MAX_VALUE); // cannot exceed array length
 		setStreamFileThreshold((int) sft);
