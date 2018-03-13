@@ -49,12 +49,7 @@ import org.eclipse.jgit.lib.CoreConfig;
 
 class WriteConfig {
 	/** Key for {@link Config#get(SectionParser)}. */
-	static final Config.SectionParser<WriteConfig> KEY = new SectionParser<WriteConfig>() {
-		@Override
-		public WriteConfig parse(final Config cfg) {
-			return new WriteConfig(cfg);
-		}
-	};
+	static final Config.SectionParser<WriteConfig> KEY = WriteConfig::new;
 
 	private final int compression;
 
@@ -63,12 +58,7 @@ class WriteConfig {
 	private final boolean fsyncRefFiles;
 
 	private WriteConfig(final Config rc) {
-		// Only needed for getCompression, which doesn't depend on non-Config
-		// properties of repo. Not worth making KEY in this class non-constant
-		// just to be able to pass in a repo here.
-		@SuppressWarnings("deprecation")
-		SectionParser<CoreConfig> cc = CoreConfig.KEY;
-		compression = rc.get(cc).getCompression();
+		compression = rc.get(CoreConfig.KEY).getCompression();
 		fsyncObjectFiles = rc.getBoolean("core", "fsyncobjectfiles", false); //$NON-NLS-1$ //$NON-NLS-2$
 		fsyncRefFiles = rc.getBoolean("core", "fsyncreffiles", false); //$NON-NLS-1$ //$NON-NLS-2$
 	}
