@@ -63,13 +63,11 @@ import java.util.Comparator;
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.UnmergedPathException;
-import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.storage.file.FileSnapshot;
 import org.eclipse.jgit.storage.file.LockFile;
-import org.eclipse.jgit.treewalk.TreeOptions;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.MutableInteger;
@@ -131,7 +129,7 @@ public class DirCache {
 	 *         memory).
 	 */
 	public static DirCache newInCore() {
-		return new DirCache(null, null, new TreeOptions(new Config()));
+		return new DirCache(null, null);
 	}
 
 	/**
@@ -146,8 +144,6 @@ public class DirCache {
 	 * @param fs
 	 *            the file system abstraction which will be necessary to perform
 	 *            certain file system operations.
-	 * @param options
-	 *            config options for the dircache
 	 * @return a cache representing the contents of the specified index file (if
 	 *         it exists) or an empty cache if the file does not exist.
 	 * @throws IOException
@@ -156,10 +152,9 @@ public class DirCache {
 	 *             the index file is using a format or extension that this
 	 *             library does not support.
 	 */
-	public static DirCache read(final File indexLocation, final FS fs,
-			final TreeOptions options)
+	public static DirCache read(final File indexLocation, final FS fs)
 			throws CorruptObjectException, IOException {
-		final DirCache c = new DirCache(indexLocation, fs, options);
+		final DirCache c = new DirCache(indexLocation, fs);
 		c.read();
 		return c;
 	}
@@ -177,8 +172,6 @@ public class DirCache {
 	 * @param fs
 	 *            the file system abstraction which will be necessary to perform
 	 *            certain file system operations.
-	 * @param options
-	 *            config options used by the dircache
 	 * @return a cache representing the contents of the specified index file (if
 	 *         it exists) or an empty cache if the file does not exist.
 	 * @throws IOException
@@ -188,10 +181,9 @@ public class DirCache {
 	 *             the index file is using a format or extension that this
 	 *             library does not support.
 	 */
-	public static DirCache lock(final File indexLocation, final FS fs,
-			final TreeOptions options)
+	public static DirCache lock(final File indexLocation, final FS fs)
 			throws CorruptObjectException, IOException {
-		final DirCache c = new DirCache(indexLocation, fs, options);
+		final DirCache c = new DirCache(indexLocation, fs);
 		if (!c.lock())
 			throw new IOException(MessageFormat.format(JGitText.get().cannotLock, indexLocation));
 
@@ -232,8 +224,6 @@ public class DirCache {
 	/** Keep track of whether the index has changed or not */
 	private FileSnapshot snapshot;
 
-	private final TreeOptions options;
-
 	/**
 	 * Create a new in-core index representation.
 	 * <p>
@@ -245,15 +235,10 @@ public class DirCache {
 	 * @param fs
 	 *            the file system abstraction which will be necessary to perform
 	 *            certain file system operations.
-	 * @param options
-	 *            options used by the dircache
 	 */
-	public DirCache(final File indexLocation, final FS fs,
-			final TreeOptions options) {
+	public DirCache(final File indexLocation, final FS fs) {
 		liveFile = indexLocation;
 		this.fs = fs;
-		this.options = options;
-		assert options != null;
 		clear();
 	}
 
@@ -405,8 +390,7 @@ public class DirCache {
 				final byte[] raw = new byte[(int) sz];
 				IO.readFully(in, raw, 0, raw.length);
 				md.update(raw, 0, raw.length);
-				tree = new DirCacheTree(raw, new MutableInteger(), null,
-						options);
+				tree = new DirCacheTree(raw, new MutableInteger(), null);
 				break;
 			}
 			default:
@@ -624,7 +608,7 @@ public class DirCache {
 	 *         information. If < 0 the entry does not exist in the index.
 	 */
 	public int findEntry(final String path) {
-		final byte[] p = Constants.encode(path, options.getPathEncoding());
+		final byte[] p = Constants.encode(path);
 		return findEntry(p, p.length);
 	}
 
@@ -730,7 +714,7 @@ public class DirCache {
 	public DirCacheEntry[] getEntriesWithin(String path) {
 		if (!path.endsWith("/"))
 			path += "/";
-		final byte[] p = Constants.encode(path, options.getPathEncoding());
+		final byte[] p = Constants.encode(path);
 		final int pLen = p.length;
 
 		int eIdx = findEntry(p, pLen);
@@ -762,7 +746,7 @@ public class DirCache {
 	public DirCacheTree getCacheTree(final boolean build) {
 		if (build) {
 			if (tree == null)
-				tree = new DirCacheTree(options);
+				tree = new DirCacheTree();
 			tree.validate(sortedEntries, entryCnt, 0, 0);
 		}
 		return tree;
@@ -804,13 +788,5 @@ public class DirCache {
 			}
 		}
 		return false;
-	}
-
-	/**
-	 * @return the {@link TreeOptions}
-	 */
-	public TreeOptions getAbstractTreeOptions() {
-		assert options != null;
-		return options;
 	}
 }

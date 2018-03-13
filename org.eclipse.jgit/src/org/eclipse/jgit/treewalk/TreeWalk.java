@@ -45,13 +45,13 @@
 package org.eclipse.jgit.treewalk;
 
 import java.io.IOException;
-import java.nio.charset.Charset;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StopWalkException;
 import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
@@ -114,10 +114,11 @@ public class TreeWalk {
 			final AnyObjectId... trees) throws MissingObjectException,
 			IncorrectObjectTypeException, CorruptObjectException, IOException {
 		TreeWalk tw = new TreeWalk(reader);
-		PathFilter f = PathFilter.create(path, tw.getPathEncoding());
+		PathFilter f = PathFilter.create(path);
 		tw.setFilter(f);
 		tw.reset(trees);
 		tw.setRecursive(false);
+
 		while (tw.next()) {
 			if (f.isDone(tw)) {
 				return tw;
@@ -720,9 +721,7 @@ public class TreeWalk {
 		final AbstractTreeIterator t = currentHead;
 		final int off = t.pathOffset;
 		final int end = t.pathLen;
-		return RawParseUtils.decode(t.getTreeOptions().getPathEncoding(),
-				t.path,
-				off, end);
+		return RawParseUtils.decode(Constants.CHARSET, t.path, off, end);
 	}
 
 	/**
@@ -742,8 +741,8 @@ public class TreeWalk {
 	}
 
 	/**
-	 * Get the current entry's complete path as a byte array.
-	 * 
+	 * Get the current entry's complete path as a UTF-8 byte array.
+	 *
 	 * @return complete path of the current entry, from the root of the
 	 *         repository. If the current entry is in a subtree there will be at
 	 *         least one '/' in the returned string.
@@ -979,20 +978,16 @@ public class TreeWalk {
 
 	private CanonicalTreeParser parserFor(final AnyObjectId id)
 			throws IncorrectObjectTypeException, IOException {
-		final CanonicalTreeParser p = new CanonicalTreeParser(new TreeOptions(getPathEncoding()));
+		final CanonicalTreeParser p = new CanonicalTreeParser();
 		p.reset(reader, id);
 		return p;
 	}
 
-	/**
-	 * @return the {@link Charset} assumed for encoding paths
-	 */
-	public Charset getPathEncoding() {
-		return reader.getPathEncoding();
+	static String pathOf(final AbstractTreeIterator t) {
+		return RawParseUtils.decode(Constants.CHARSET, t.path, 0, t.pathLen);
 	}
 
-	static String pathOf(final AbstractTreeIterator t) {
-		return RawParseUtils.decode(t.getTreeOptions().getPathEncoding(), t.path, 0,
-				t.pathLen);
+	static String pathOf(final byte[] buf, int pos, int end) {
+		return RawParseUtils.decode(Constants.CHARSET, buf, pos, end);
 	}
 }

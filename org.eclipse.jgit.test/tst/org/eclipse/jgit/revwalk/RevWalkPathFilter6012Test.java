@@ -122,8 +122,7 @@ public class RevWalkPathFilter6012Test extends RevWalkTestCase {
 
 	protected void filter(final String path) {
 		rw.setTreeFilter(AndTreeFilter.create(PathFilterGroup
-				.createFromStrings(Collections.singleton(path), rw
-						.getObjectReader().getPathEncoding()),
+				.createFromStrings(Collections.singleton(path)),
 				TreeFilter.ANY_DIFF));
 	}
 

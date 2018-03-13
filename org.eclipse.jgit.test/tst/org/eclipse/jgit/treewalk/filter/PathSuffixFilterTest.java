@@ -69,12 +69,10 @@ public class PathSuffixFilterTest extends RepositoryTestCase {
 		final ObjectId aTxt = odi.insert(OBJ_BLOB, "a.txt".getBytes());
 		final DirCache dc = db.readDirCache();
 		final DirCacheBuilder builder = dc.builder();
-		final DirCacheEntry aSthEntry = new DirCacheEntry("a.sth",
-				dc.getAbstractTreeOptions());
+		final DirCacheEntry aSthEntry = new DirCacheEntry("a.sth");
 		aSthEntry.setFileMode(FileMode.REGULAR_FILE);
 		aSthEntry.setObjectId(aSth);
-		final DirCacheEntry aTxtEntry = new DirCacheEntry("a.txt",
-				dc.getAbstractTreeOptions());
+		final DirCacheEntry aTxtEntry = new DirCacheEntry("a.txt");
 		aTxtEntry.setFileMode(FileMode.REGULAR_FILE);
 		aTxtEntry.setObjectId(aTxt);
 		builder.add(aSthEntry);
@@ -85,7 +83,7 @@ public class PathSuffixFilterTest extends RepositoryTestCase {
 
 
 		final TreeWalk tw = new TreeWalk(db);
-		tw.setFilter(PathSuffixFilter.create(".txt", tw.getPathEncoding()));
+		tw.setFilter(PathSuffixFilter.create(".txt"));
 		tw.addTree(treeId);
 
 		List<String> paths = new LinkedList<String>();
@@ -108,22 +106,18 @@ public class PathSuffixFilterTest extends RepositoryTestCase {
 		final ObjectId bTxt = odi.insert(OBJ_BLOB, "b.txt".getBytes());
 		final DirCache dc = db.readDirCache();
 		final DirCacheBuilder builder = dc.builder();
-		final DirCacheEntry aSthEntry = new DirCacheEntry("a.sth",
-				dc.getAbstractTreeOptions());
+		final DirCacheEntry aSthEntry = new DirCacheEntry("a.sth");
 		aSthEntry.setFileMode(FileMode.REGULAR_FILE);
 		aSthEntry.setObjectId(aSth);
-		final DirCacheEntry aTxtEntry = new DirCacheEntry("a.txt",
-				dc.getAbstractTreeOptions());
+		final DirCacheEntry aTxtEntry = new DirCacheEntry("a.txt");
 		aTxtEntry.setFileMode(FileMode.REGULAR_FILE);
 		aTxtEntry.setObjectId(aTxt);
 		builder.add(aSthEntry);
 		builder.add(aTxtEntry);
-		final DirCacheEntry bSthEntry = new DirCacheEntry("sub/b.sth",
-				dc.getAbstractTreeOptions());
+		final DirCacheEntry bSthEntry = new DirCacheEntry("sub/b.sth");
 		bSthEntry.setFileMode(FileMode.REGULAR_FILE);
 		bSthEntry.setObjectId(bSth);
-		final DirCacheEntry bTxtEntry = new DirCacheEntry("sub/b.txt",
-				dc.getAbstractTreeOptions());
+		final DirCacheEntry bTxtEntry = new DirCacheEntry("sub/b.txt");
 		bTxtEntry.setFileMode(FileMode.REGULAR_FILE);
 		bTxtEntry.setObjectId(bTxt);
 		builder.add(bSthEntry);
@@ -135,7 +129,7 @@ public class PathSuffixFilterTest extends RepositoryTestCase {
 
 		final TreeWalk tw = new TreeWalk(db);
 		tw.setRecursive(true);
-		tw.setFilter(PathSuffixFilter.create(".txt", tw.getPathEncoding()));
+		tw.setFilter(PathSuffixFilter.create(".txt"));
 		tw.addTree(treeId);
 
 		List<String> paths = new LinkedList<String>();

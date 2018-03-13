@@ -58,8 +58,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class CanonicalTreeParserTest {
-	private final CanonicalTreeParser ctp = new CanonicalTreeParser(
-			new TreeOptions(Constants.FILENAME_CHARSET));
+	private final CanonicalTreeParser ctp = new CanonicalTreeParser();
 
 	private final FileMode m644 = FileMode.REGULAR_FILE;
 

@@ -86,7 +86,6 @@ import org.eclipse.jgit.storage.dht.spi.WriteBuffer;
 import org.eclipse.jgit.storage.file.PackLock;
 import org.eclipse.jgit.transport.PackParser;
 import org.eclipse.jgit.transport.PackedObjectInfo;
-import org.eclipse.jgit.treewalk.TreeOptions;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.util.LongList;
 
@@ -210,8 +209,7 @@ public class DhtPackParser extends PackParser {
 		dirtyMeta = new HashMap<ChunkKey, ChunkMeta>();
 		chunkMeta = new HashMap<ChunkKey, ChunkMeta>();
 		chunkEdges = new HashMap<ChunkKey, Edges>();
-		treeParser = new CanonicalTreeParser(new TreeOptions(objdb
-				.getRepository().getConfig()));
+		treeParser = new CanonicalTreeParser();
 		idBuffer = new MutableObjectId();
 		objectMap = new ObjectIdSubclassMap<DhtInfo>();
 

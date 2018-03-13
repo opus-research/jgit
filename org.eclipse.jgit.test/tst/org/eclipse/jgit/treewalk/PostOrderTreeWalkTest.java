@@ -183,8 +183,7 @@ public class PostOrderTreeWalkTest extends RepositoryTestCase {
 	}
 
 	private DirCacheEntry makeFile(final String path) throws Exception {
-		final DirCacheEntry ent = new DirCacheEntry(path, new TreeOptions(
-				db.getConfig()));
+		final DirCacheEntry ent = new DirCacheEntry(path);
 		ent.setFileMode(REGULAR_FILE);
 		ent.setObjectId(new ObjectInserter.Formatter().idFor(
 				Constants.OBJ_BLOB, Constants.encode(path)));

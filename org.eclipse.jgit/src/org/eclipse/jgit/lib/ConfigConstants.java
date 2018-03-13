@@ -66,9 +66,6 @@ public class ConfigConstants {
 	/** The "gerrit" section */
 	public static final String CONFIG_GERRIT_SECTION = "gerrit";
 
-	/** JGit non-standard section */
-	public static final String CONFIG_JGIT_SECTION = "jgit";
-
 	/** The "algorithm" key */
 	public static final String CONFIG_KEY_ALGORITHM = "algorithm";
 
@@ -136,8 +133,4 @@ public class ConfigConstants {
 
 	/** The "createchangeid" key */
 	public static final String CONFIG_KEY_CREATECHANGEID = "createchangeid";
-
-	/** The character set for encoding filenames in the database */
-	public static final String CONFIG_KEY_PATHENCODING = "pathencoding";
-
 }

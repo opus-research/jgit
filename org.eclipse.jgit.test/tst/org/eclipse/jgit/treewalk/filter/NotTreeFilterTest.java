@@ -67,7 +67,7 @@ public class NotTreeFilterTest extends RepositoryTestCase {
 
 	@Test
 	public void testNegateIsUnwrap() throws Exception {
-		final TreeFilter a = PathFilter.create("a/b", db.getPathEncoding());
+		final TreeFilter a = PathFilter.create("a/b");
 		final TreeFilter n = NotTreeFilter.create(a);
 		assertSame(a, n.negate());
 	}
@@ -81,7 +81,7 @@ public class NotTreeFilterTest extends RepositoryTestCase {
 
 	@Test
 	public void testShouldBeRecursive_PathFilter() throws Exception {
-		final TreeFilter a = PathFilter.create("a/b", db.getPathEncoding());
+		final TreeFilter a = PathFilter.create("a/b");
 		assertTrue(a.shouldBeRecursive());
 		final TreeFilter n = NotTreeFilter.create(a);
 		assertTrue(n.shouldBeRecursive());

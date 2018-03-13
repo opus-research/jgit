@@ -299,7 +299,6 @@ public class DirCacheCheckout {
 	 */
 	void processEntry(CanonicalTreeParser m, DirCacheBuildIterator i,
 			WorkingTreeIterator f) throws IOException {
-		String name = walk.getPathString();
 		if (m != null) {
 			// There is an entry in the merge commit. Means: we want to update
 			// what's currently in the index and working-tree to that one
@@ -308,17 +307,14 @@ public class DirCacheCheckout {
 				if (f != null && !FileMode.TREE.equals(f.getEntryFileMode())
 						&& !f.isEntryIgnored()) {
 					// don't overwrite an untracked and not ignored file
-					conflicts.add(name);
+					conflicts.add(walk.getPathString());
 				} else
-					update(name, m.getEntryPathBuffer(),
-							m.getEntryPathLength(),
-							m.getEntryObjectId(),
+					update(m.getEntryPathString(), m.getEntryObjectId(),
 						m.getEntryFileMode());
 			} else if (f == null || !m.idEqual(i)) {
 				// The working tree file is missing or the merge content differs
 				// from index content
-				update(name, m.getEntryPathBuffer(), m.getEntryPathLength(),
-						m.getEntryObjectId(),
+				update(m.getEntryPathString(), m.getEntryObjectId(),
 						m.getEntryFileMode());
 			} else if (i.getDirCacheEntry() != null) {
 				// The index contains a file (and not a folder)
@@ -326,9 +322,7 @@ public class DirCacheCheckout {
 						|| i.getDirCacheEntry().getStage() != 0)
 					// The working tree file is dirty or the index contains a
 					// conflict
-					update(name, m.getEntryPathBuffer(),
-							m.getEntryPathLength(),
-							m.getEntryObjectId(),
+					update(m.getEntryPathString(), m.getEntryObjectId(),
 							m.getEntryFileMode());
 				else
 					keep(i.getDirCacheEntry());
@@ -481,8 +475,6 @@ public class DirCacheCheckout {
 		DirCacheEntry dce;
 
 		String name = walk.getPathString();
-		byte[] nameb = walk.getRawPath();
-		int namel = walk.getPathLength();
 
 		if (i == null && m == null && h == null) {
 			// File/Directory conflict case #20
@@ -568,8 +560,7 @@ public class DirCacheCheckout {
 				if (isModified(name)) {
 					conflict(name, i.getDirCacheEntry(), h, m); // 1
 				} else {
-					update(name, nameb, namel, m.getEntryObjectId(),
-							m.getEntryFileMode()); // 2
+					update(name, m.getEntryObjectId(), m.getEntryFileMode()); // 2
 				}
 
 				break;
@@ -593,7 +584,7 @@ public class DirCacheCheckout {
 				// are found later
 				break;
 			case 0xD0F: // 19
-				update(name, nameb, namel, mId, m.getEntryFileMode());
+				update(name, mId, m.getEntryFileMode());
 				break;
 			case 0xDF0: // conflict without a rule
 			case 0x0FD: // 15
@@ -604,9 +595,9 @@ public class DirCacheCheckout {
 					if (isModified(name))
 						conflict(name, i.getDirCacheEntry(), h, m); // 8
 					else
-						update(name, nameb, namel, mId, m.getEntryFileMode()); // 7
+						update(name, mId, m.getEntryFileMode()); // 7
 				} else if (!isModified(name))
-					update(name, nameb, namel, mId, m.getEntryFileMode()); // 9
+					update(name, mId, m.getEntryFileMode());  // 9
 				else
 					// To be confirmed - this case is not in the table.
 					conflict(name, i.getDirCacheEntry(), h, m);
@@ -626,7 +617,7 @@ public class DirCacheCheckout {
 				break;
 			case 0x0DF: // 16 17
 				if (!isModified(name))
-					update(name, nameb, namel, mId, m.getEntryFileMode());
+					update(name, mId, m.getEntryFileMode());
 				else
 					conflict(name, i.getDirCacheEntry(), h, m);
 				break;
@@ -668,11 +659,11 @@ public class DirCacheCheckout {
 			 */
 
 			if (h == null)
-				update(name, nameb, namel, mId, m.getEntryFileMode()); // 1
+				update(name, mId, m.getEntryFileMode()); // 1
 			else if (m == null)
 				remove(name); // 2
 			else
-				update(name, nameb, namel, mId, m.getEntryFileMode()); // 3
+				update(name, mId, m.getEntryFileMode()); // 3
 		} else {
 			dce = i.getDirCacheEntry();
 			if (h == null) {
@@ -728,7 +719,7 @@ public class DirCacheCheckout {
 					if (dce != null && (f == null || f.isModified(dce, true)))
 						conflict(name, i.getDirCacheEntry(), h, m);
 					else
-						update(name, nameb, namel, mId, m.getEntryFileMode());
+						update(name, mId, m.getEntryFileMode());
 				} else {
 					keep(i.getDirCacheEntry());
 				}
@@ -754,16 +745,14 @@ public class DirCacheCheckout {
 		}
 
 		if (h != null && !FileMode.TREE.equals(h.getEntryFileMode())) {
-			entry = new DirCacheEntry(h.getEntryPathBuffer(),
-					h.getEntryPathLength(), DirCacheEntry.STAGE_2);
+			entry = new DirCacheEntry(h.getEntryPathString(), DirCacheEntry.STAGE_2);
 			entry.setFileMode(h.getEntryFileMode());
 			entry.setObjectId(h.getEntryObjectId());
 			builder.add(entry);
 		}
 
 		if (m != null && !FileMode.TREE.equals(m.getEntryFileMode())) {
-			entry = new DirCacheEntry(m.getEntryPathBuffer(),
-					m.getEntryPathLength(), DirCacheEntry.STAGE_3);
+			entry = new DirCacheEntry(m.getEntryPathString(), DirCacheEntry.STAGE_3);
 			entry.setFileMode(m.getEntryFileMode());
 			entry.setObjectId(m.getEntryObjectId());
 			builder.add(entry);
@@ -779,12 +768,10 @@ public class DirCacheCheckout {
 		removed.add(path);
 	}
 
-	private void update(String spath, byte[] path, int pathLength,
-			ObjectId mId, FileMode mode) {
+	private void update(String path, ObjectId mId, FileMode mode) {
 		if (!FileMode.TREE.equals(mode)) {
-			updated.put(spath, mId);
-			DirCacheEntry entry = new DirCacheEntry(path, pathLength,
-					DirCacheEntry.STAGE_0);
+			updated.put(path, mId);
+			DirCacheEntry entry = new DirCacheEntry(path, DirCacheEntry.STAGE_0);
 			entry.setObjectId(mId);
 			entry.setFileMode(mode);
 			builder.add(entry);
@@ -832,7 +819,7 @@ public class DirCacheCheckout {
 		tw.addTree(new DirCacheIterator(dc));
 		tw.addTree(new FileTreeIterator(repo));
 		tw.setRecursive(true);
-		tw.setFilter(PathFilter.create(path, tw.getPathEncoding()));
+		tw.setFilter(PathFilter.create(path));
 		DirCacheIterator dcIt;
 		WorkingTreeIterator wtIt;
 		while(tw.next()) {

@@ -112,8 +112,7 @@ public class RmCommand extends GitCommand<DirCache> {
 			final TreeWalk tw = new TreeWalk(repo);
 			tw.reset(); // drop the first empty tree, which we do not need here
 			tw.setRecursive(true);
-			tw.setFilter(PathFilterGroup.createFromStrings(filepatterns,
-					tw.getPathEncoding()));
+			tw.setFilter(PathFilterGroup.createFromStrings(filepatterns));
 			tw.addTree(new DirCacheBuildIterator(builder));
 
 			while (tw.next()) {

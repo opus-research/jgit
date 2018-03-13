@@ -100,5 +100,4 @@ public class DhtObjDatabase extends ObjectDatabase {
 	public ObjectInserter newInserter() {
 		return new DhtInserter(this);
 	}
-
 }
