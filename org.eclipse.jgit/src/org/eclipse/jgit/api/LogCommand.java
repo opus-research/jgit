@@ -47,7 +47,6 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -107,12 +106,11 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	 * {@link #not(AnyObjectId)}, ..) of this class. Each instance of this class
 	 * should only be used for one invocation of the command. Don't call this
 	 * method twice on an instance.
-	 * 
+	 *
 	 * @return an iteration over RevCommits
-	 * @throws NoHeadException
-	 *             of the references ref cannot be resolved
 	 */
-	public Iterable<RevCommit> call() throws GitAPIException, NoHeadException {
+	public Iterable<RevCommit> call() throws NoHeadException,
+			JGitInternalException {
 		checkCallable();
 		if (pathFilters.size() > 0)
 			walk.setTreeFilter(AndTreeFilter.create(

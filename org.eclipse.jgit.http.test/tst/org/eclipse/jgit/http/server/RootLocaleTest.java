@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,60 +40,21 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
 
-import java.io.IOException;
-import java.text.MessageFormat;
-import java.util.Collection;
+package org.eclipse.jgit.http.server;
 
-import org.eclipse.jgit.api.errors.InvalidRefNameException;
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.storage.file.ReflogEntry;
-import org.eclipse.jgit.storage.file.ReflogReader;
+import org.eclipse.jgit.nls.NLS;
+import org.junit.Before;
+import org.junit.Test;
 
-/**
- * The reflog command
- *
- * @see <a
- *      href="http://www.kernel.org/pub/software/scm/git/docs/git-reflog.html"
- *      >Git documentation about reflog</a>
- */
-public class ReflogCommand extends GitCommand<Collection<ReflogEntry>> {
-
-	private String ref = Constants.HEAD;
-
-	/**
-	 * @param repo
-	 */
-	public ReflogCommand(Repository repo) {
-		super(repo);
+public class RootLocaleTest {
+	@Before
+	public void setUp() {
+		NLS.setLocale(NLS.ROOT_LOCALE);
 	}
 
-	/**
-	 * The ref used for the reflog operation. If no ref is set, the default
-	 * value of HEAD will be used.
-	 *
-	 * @param ref
-	 * @return {@code this}
-	 */
-	public ReflogCommand setRef(String ref) {
-		checkCallable();
-		this.ref = ref;
-		return this;
+	@Test
+	public void testHttpServerText() {
+		NLS.getBundleFor(HttpServerText.class);
 	}
-
-	public Collection<ReflogEntry> call() throws Exception {
-		checkCallable();
-
-		try {
-			ReflogReader reader = new ReflogReader(repo, ref);
-			return reader.getReverseEntries();
-		} catch (IOException e) {
-			throw new InvalidRefNameException(MessageFormat.format(
-					JGitText.get().cannotRead, ref), e);
-		}
-	}
-
 }

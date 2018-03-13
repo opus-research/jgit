@@ -47,7 +47,6 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
@@ -102,16 +101,18 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 	 * collected by the setter methods of this class. Each instance of this
 	 * class should only be used for one invocation of the command (means: one
 	 * call to {@link #call()})
-	 * 
+	 *
 	 * @return a {@link FetchResult} object representing the successful fetch
 	 *         result
 	 * @throws InvalidRemoteException
 	 *             when called with an invalid remote uri
-	 * @throws org.eclipse.jgit.api.errors.TransportException
-	 *             when an error occurs during transport
+	 * @throws JGitInternalException
+	 *             a low-level exception of JGit has occurred. The original
+	 *             exception can be retrieved by calling
+	 *             {@link Exception#getCause()}.
 	 */
-	public FetchResult call() throws GitAPIException, InvalidRemoteException,
-			org.eclipse.jgit.api.errors.TransportException {
+	public FetchResult call() throws JGitInternalException,
+			InvalidRemoteException {
 		checkCallable();
 
 		try {
@@ -134,7 +135,7 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 			throw new InvalidRemoteException(MessageFormat.format(
 					JGitText.get().invalidRemote, remote), e);
 		} catch (TransportException e) {
-			throw new org.eclipse.jgit.api.errors.TransportException(
+			throw new JGitInternalException(
 					JGitText.get().exceptionCaughtDuringExecutionOfFetchCommand,
 					e);
 		} catch (URISyntaxException e) {

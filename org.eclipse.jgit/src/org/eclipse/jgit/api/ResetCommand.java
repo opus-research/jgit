@@ -47,7 +47,6 @@ import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.LinkedList;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
@@ -134,7 +133,7 @@ public class ResetCommand extends GitCommand<Ref> {
 	 *
 	 * @return the Ref after reset
 	 */
-	public Ref call() throws GitAPIException {
+	public Ref call() throws IOException {
 		checkCallable();
 
 		Ref r;
@@ -151,7 +150,7 @@ public class ResetCommand extends GitCommand<Ref> {
 			// resolve the ref to a commit
 			final ObjectId commitId;
 			try {
-				commitId = repo.resolve(ref);
+				commitId = repo.resolve(ref + "^{commit}");
 				if (commitId == null) {
 					// @TODO throw an InvalidRefNameException. We can't do that
 					// now because this would break the API

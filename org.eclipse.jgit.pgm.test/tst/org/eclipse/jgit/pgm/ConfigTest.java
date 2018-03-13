@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2012, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,60 +40,31 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
+package org.eclipse.jgit.pgm;
 
-import java.io.IOException;
-import java.text.MessageFormat;
-import java.util.Collection;
+import static org.junit.Assert.assertArrayEquals;
 
-import org.eclipse.jgit.api.errors.InvalidRefNameException;
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.storage.file.ReflogEntry;
-import org.eclipse.jgit.storage.file.ReflogReader;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.junit.Before;
+import org.junit.Test;
 
-/**
- * The reflog command
- *
- * @see <a
- *      href="http://www.kernel.org/pub/software/scm/git/docs/git-reflog.html"
- *      >Git documentation about reflog</a>
- */
-public class ReflogCommand extends GitCommand<Collection<ReflogEntry>> {
-
-	private String ref = Constants.HEAD;
-
-	/**
-	 * @param repo
-	 */
-	public ReflogCommand(Repository repo) {
-		super(repo);
+public class ConfigTest extends CLIRepositoryTestCase {
+	@Override
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		new Git(db).commit().setMessage("initial commit").call();
 	}
 
-	/**
-	 * The ref used for the reflog operation. If no ref is set, the default
-	 * value of HEAD will be used.
-	 *
-	 * @param ref
-	 * @return {@code this}
-	 */
-	public ReflogCommand setRef(String ref) {
-		checkCallable();
-		this.ref = ref;
-		return this;
+	@Test
+	public void testListConfig() throws Exception {
+		String[] output = execute("git config --list");
+		assertArrayEquals("expected default configuration", //
+				new String[] { "core.autocrlf=false", //
+						"core.filemode=true", //
+						"core.logallrefupdates=true", //
+						"core.repositoryformatversion=0", //
+						"" /* ends with LF (last line empty) */}, output);
 	}
-
-	public Collection<ReflogEntry> call() throws Exception {
-		checkCallable();
-
-		try {
-			ReflogReader reader = new ReflogReader(repo, ref);
-			return reader.getReverseEntries();
-		} catch (IOException e) {
-			throw new InvalidRefNameException(MessageFormat.format(
-					JGitText.get().cannotRead, ref), e);
-		}
-	}
-
 }
