@@ -80,8 +80,6 @@ import com.jcraft.jsch.JSchException;
  * enumeration, save file modification and hook execution.
  */
 public class TransportGitSsh extends SshTransport implements PackTransport {
-	RemoteCommandConnectionFactory fConnectionFactory = null;
-
 	static boolean canHandle(final URIish uri) {
 		if (!uri.isRemote())
 			return false;
@@ -111,15 +109,10 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		return new SshPushConnection(newConnection());
 	}
 
-	/**
-	 * @return new RemoteCommandConnection
-	 */
-	private RemoteCommandConnection newConnection() {
-		if (fConnectionFactory != null)
-			return fConnectionFactory.getConnection(this);
+	private Connection newConnection() {
 		if (useExtConnection())
-			return new ExtConnection(this);
-		return new JschConnection(this);
+			return new ExtConnection();
+		return new JschConnection();
 	}
 
 	String commandFor(final String exe) {
@@ -164,45 +157,56 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		return new NoRemoteRepositoryException(uri, why);
 	}
 
-	private class JschConnection extends RemoteCommandConnection {
+	private abstract class Connection {
+		abstract void exec(String commandName) throws TransportException;
+
+		abstract void connect() throws TransportException;
+
+		abstract InputStream getInputStream() throws IOException;
+
+		abstract OutputStream getOutputStream() throws IOException;
+
+		abstract InputStream getErrorStream() throws IOException;
+
+		abstract int getExitStatus();
+
+		abstract void close();
+	}
+
+	private class JschConnection extends Connection {
 		private ChannelExec channel;
 
 		private int exitStatus;
 
-		public JschConnection(TransportGitSsh transport) {
-			super(transport);
-		}
-
 		@Override
-		public void exec(String commandName, URIish uriLocal)
-				throws TransportException {
+		void exec(String commandName) throws TransportException {
 			initSession();
 			try {
 				channel = (ChannelExec) sock.openChannel("exec");
-				channel.setCommand(commandName);
+				channel.setCommand(commandFor(commandName));
 			} catch (JSchException je) {
-				throw new TransportException(uriLocal, je.getMessage(), je);
+				throw new TransportException(uri, je.getMessage(), je);
 			}
 		}
 
 		@Override
-		public void connect(URIish uriLocal) throws TransportException {
+		void connect() throws TransportException {
 			try {
 				channel.connect(getTimeout() > 0 ? getTimeout() * 1000 : 0);
 				if (!channel.isConnected())
-					throw new TransportException(uriLocal, "connection failed");
+					throw new TransportException(uri, "connection failed");
 			} catch (JSchException e) {
-				throw new TransportException(uriLocal, e.getMessage(), e);
+				throw new TransportException(uri, e.getMessage(), e);
 			}
 		}
 
 		@Override
-		public InputStream getInputStream() throws IOException {
+		InputStream getInputStream() throws IOException {
 			return channel.getInputStream();
 		}
 
 		@Override
-		public OutputStream getOutputStream() throws IOException {
+		OutputStream getOutputStream() throws IOException {
 			// JSch won't let us interrupt writes when we use our InterruptTimer
 			// to break out of a long-running write operation. To work around
 			// that we spawn a background thread to shuttle data through a pipe,
@@ -236,17 +240,17 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		}
 
 		@Override
-		public InputStream getErrorStream() throws IOException {
+		InputStream getErrorStream() throws IOException {
 			return channel.getErrStream();
 		}
 
 		@Override
-		public int getExitStatus() {
+		int getExitStatus() {
 			return exitStatus;
 		}
 
 		@Override
-		public void close() {
+		void close() {
 			if (channel != null) {
 				try {
 					exitStatus = channel.getExitStatus();
@@ -263,18 +267,13 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		return SystemReader.getInstance().getenv("GIT_SSH") != null;
 	}
 
-	private class ExtConnection extends RemoteCommandConnection {
+	private class ExtConnection extends Connection {
 		private Process proc;
 
 		private int exitStatus;
 
-		public ExtConnection(TransportGitSsh transport) {
-			super(transport);
-		}
-
 		@Override
-		public void exec(String commandName, URIish uriLocal)
-				throws TransportException {
+		void exec(String commandName) throws TransportException {
 			String ssh = SystemReader.getInstance().getenv("GIT_SSH");
 			boolean putty = ssh.toLowerCase().contains("plink");
 
@@ -290,7 +289,7 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 				args.add(getURI().getUser() + "@" + getURI().getHost());
 			else
 				args.add(getURI().getHost());
-			args.add(commandName);
+			args.add(commandFor(commandName));
 
 			ProcessBuilder pb = new ProcessBuilder();
 			pb.command(args);
@@ -302,37 +301,37 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 			try {
 				proc = pb.start();
 			} catch (IOException err) {
-				throw new TransportException(uriLocal, err.getMessage(), err);
+				throw new TransportException(uri, err.getMessage(), err);
 			}
 		}
 
 		@Override
-		public void connect(URIish uriLocal) throws TransportException {
+		void connect() throws TransportException {
 			// Nothing to do, the process was already opened.
 		}
 
 		@Override
-		public InputStream getInputStream() throws IOException {
+		InputStream getInputStream() throws IOException {
 			return proc.getInputStream();
 		}
 
 		@Override
-		public OutputStream getOutputStream() throws IOException {
+		OutputStream getOutputStream() throws IOException {
 			return proc.getOutputStream();
 		}
 
 		@Override
-		public InputStream getErrorStream() throws IOException {
+		InputStream getErrorStream() throws IOException {
 			return proc.getErrorStream();
 		}
 
 		@Override
-		public int getExitStatus() {
+		int getExitStatus() {
 			return exitStatus;
 		}
 
 		@Override
-		public void close() {
+		void close() {
 			if (proc != null) {
 				try {
 					try {
@@ -348,26 +347,25 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 	}
 
 	class SshFetchConnection extends BasePackFetchConnection {
-		private RemoteCommandConnection conn;
+		private Connection conn;
 
 		private StreamCopyThread errorThread;
 
-		SshFetchConnection(RemoteCommandConnection conn)
-				throws TransportException {
+		SshFetchConnection(Connection conn) throws TransportException {
 			super(TransportGitSsh.this);
 			this.conn = conn;
 			try {
 				final MessageWriter msg = new MessageWriter();
 				setMessageWriter(msg);
 
-				conn.exec(commandFor(getOptionUploadPack()), uri);
+				conn.exec(getOptionUploadPack());
 
 				final InputStream upErr = conn.getErrorStream();
 				errorThread = new StreamCopyThread(upErr, msg.getRawStream());
 				errorThread.start();
 
 				init(conn.getInputStream(), conn.getOutputStream());
-				conn.connect(uri);
+				conn.connect();
 
 			} catch (TransportException err) {
 				close();
@@ -408,26 +406,25 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 	}
 
 	class SshPushConnection extends BasePackPushConnection {
-		private RemoteCommandConnection conn;
+		private Connection conn;
 
 		private StreamCopyThread errorThread;
 
-		SshPushConnection(RemoteCommandConnection conn)
-				throws TransportException {
+		SshPushConnection(Connection conn) throws TransportException {
 			super(TransportGitSsh.this);
 			this.conn = conn;
 			try {
 				final MessageWriter msg = new MessageWriter();
 				setMessageWriter(msg);
 
-				conn.exec(commandFor(getOptionReceivePack()), uri);
+				conn.exec(getOptionReceivePack());
 
 				final InputStream rpErr = conn.getErrorStream();
 				errorThread = new StreamCopyThread(rpErr, msg.getRawStream());
 				errorThread.start();
 
 				init(conn.getInputStream(), conn.getOutputStream());
-				conn.connect(uri);
+				conn.connect();
 
 			} catch (TransportException err) {
 				close();
@@ -465,16 +462,5 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 			super.close();
 			conn.close();
 		}
-	}
-
-	/**
-	 * Set the {@link RemoteCommandConnectionFactory} to be used by this
-	 * transport for getting {@link RemoteCommandConnection} instances, which
-	 * are used for executing remote commands.
-	 * 
-	 * @param factory
-	 */
-	public void setConnectionFactory(RemoteCommandConnectionFactory factory) {
-		fConnectionFactory = factory;
 	}
 }
