@@ -73,12 +73,11 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.notes.NoteMap;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
-import org.eclipse.jgit.util.SystemReader;
 import org.kohsuke.args4j.Option;
 
 @Command(common = true, usage = "usage_viewCommitHistory")
 class Log extends RevWalkTextBuiltin {
-	private final TimeZone myTZ = SystemReader.getInstance().getTimeZone();
+	private final TimeZone myTZ = TimeZone.getDefault();
 
 	private final DateFormat fmt;
 
