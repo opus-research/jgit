@@ -52,13 +52,9 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.net.ConnectException;
-import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.util.FS;
 
 import com.jcraft.jsch.JSch;
@@ -75,10 +71,10 @@ import com.jcraft.jsch.UserInfo;
  * used by C Git.
  * <p>
  * The factory does not provide UI behavior. Override the method
- * {@link #configure(org.eclipse.jgit.transport.OpenSshConfig.Host, Session)} to
- * supply appropriate {@link UserInfo} to the session.
+ * {@link #configure(org.eclipse.jgit.transport.OpenSshConfig.Host, Session)}
+ * to supply appropriate {@link UserInfo} to the session.
  */
-public abstract class JschConfigSessionFactory extends SshSessionFactory {
+public abstract class SshConfigSessionFactory extends SshSessionFactory {
 	private final Map<String, JSch> byIdentityFile = new HashMap<String, JSch>();
 
 	private JSch defaultJSch;
@@ -86,59 +82,37 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 	private OpenSshConfig config;
 
 	@Override
-	public synchronized RemoteSession getSession(URIish uri,
-			CredentialsProvider credentialsProvider, FS fs, int tms)
-			throws TransportException {
+	public synchronized Session getSession(String user, String pass,
+			String host, int port, CredentialsProvider credentialsProvider,
+			FS fs) throws JSchException {
+		if (config == null)
+			config = OpenSshConfig.get(fs);
 
-		String user = uri.getUser();
-		final String pass = uri.getPass();
-		String host = uri.getHost();
-		int port = uri.getPort();
+		final OpenSshConfig.Host hc = config.lookup(host);
+		host = hc.getHostName();
+		if (port <= 0)
+			port = hc.getPort();
+		if (user == null)
+			user = hc.getUser();
 
-		try {
-			if (config == null)
-				config = OpenSshConfig.get(fs);
-
-			final OpenSshConfig.Host hc = config.lookup(host);
-			host = hc.getHostName();
-			if (port <= 0)
-				port = hc.getPort();
-			if (user == null)
-				user = hc.getUser();
-
-			final Session session = createSession(hc, user, host, port, fs);
-			if (pass != null)
-				session.setPassword(pass);
-			final String strictHostKeyCheckingPolicy = hc
-					.getStrictHostKeyChecking();
-			if (strictHostKeyCheckingPolicy != null)
-				session.setConfig("StrictHostKeyChecking",
-						strictHostKeyCheckingPolicy);
-			final String pauth = hc.getPreferredAuthentications();
-			if (pauth != null)
-				session.setConfig("PreferredAuthentications", pauth);
-			if (credentialsProvider != null
-					&& (!hc.isBatchMode() || !credentialsProvider
-							.isInteractive())) {
-				session.setUserInfo(new CredentialsProviderUserInfo(session,
-						credentialsProvider));
-			}
-			configure(hc, session);
-
-			if (!session.isConnected())
-				session.connect(tms);
-
-			return new JschSession(session, uri);
-
-		} catch (final JSchException je) {
-			final Throwable c = je.getCause();
-			if (c instanceof UnknownHostException)
-				throw new TransportException(uri, JGitText.get().unknownHost);
-			if (c instanceof ConnectException)
-				throw new TransportException(uri, c.getMessage());
-			throw new TransportException(uri, je.getMessage(), je);
+		final Session session = createSession(hc, user, host, port, fs);
+		if (pass != null)
+			session.setPassword(pass);
+		final String strictHostKeyCheckingPolicy = hc
+				.getStrictHostKeyChecking();
+		if (strictHostKeyCheckingPolicy != null)
+			session.setConfig("StrictHostKeyChecking",
+					strictHostKeyCheckingPolicy);
+		final String pauth = hc.getPreferredAuthentications();
+		if (pauth != null)
+			session.setConfig("PreferredAuthentications", pauth);
+		if (credentialsProvider != null
+				&& (!hc.isBatchMode() || !credentialsProvider.isInteractive())) {
+			session.setUserInfo(new CredentialsProviderUserInfo(session,
+					credentialsProvider));
 		}
-
+		configure(hc, session);
+		return session;
 	}
 
 	/**
@@ -153,8 +127,8 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 	 * @param port
 	 *            port number of the SSH daemon (typically 22).
 	 * @param fs
-	 *            the file system abstraction which will be necessary to perform
-	 *            certain file system operations.
+	 *            the file system abstraction which will be necessary to
+	 *            perform certain file system operations.
 	 * @return new session instance, but otherwise unconfigured.
 	 * @throws JSchException
 	 *             the session could not be created.
@@ -182,17 +156,16 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 	 * @param hc
 	 *            host configuration
 	 * @param fs
-	 *            the file system abstraction which will be necessary to perform
-	 *            certain file system operations.
+	 *            the file system abstraction which will be necessary to
+	 *            perform certain file system operations.
 	 * @return the JSch instance to use.
 	 * @throws JSchException
 	 *             the user configuration could not be created.
 	 */
-	protected JSch getJSch(final OpenSshConfig.Host hc, FS fs)
-			throws JSchException {
+	protected JSch getJSch(final OpenSshConfig.Host hc, FS fs) throws JSchException {
 		if (defaultJSch == null) {
 			defaultJSch = createDefaultJSch(fs);
-			for (final Object name : defaultJSch.getIdentityNames()) {
+			for (Object name : defaultJSch.getIdentityNames()) {
 				byIdentityFile.put((String) name, defaultJSch);
 			}
 		}
@@ -215,8 +188,8 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 
 	/**
 	 * @param fs
-	 *            the file system abstraction which will be necessary to perform
-	 *            certain file system operations.
+	 *            the file system abstraction which will be necessary to
+	 *            perform certain file system operations.
 	 * @return the new default JSch implementation.
 	 * @throws JSchException
 	 *             known host keys cannot be loaded.
@@ -240,9 +213,9 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 			} finally {
 				in.close();
 			}
-		} catch (final FileNotFoundException none) {
+		} catch (FileNotFoundException none) {
 			// Oh well. They don't have a known hosts in home.
-		} catch (final IOException err) {
+		} catch (IOException err) {
 			// Oh well. They don't have a known hosts in home.
 		}
 	}
@@ -263,7 +236,7 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 		if (priv.isFile()) {
 			try {
 				sch.addIdentity(priv.getAbsolutePath());
-			} catch (final JSchException e) {
+			} catch (JSchException e) {
 				// Instead, pretend the key doesn't exist.
 			}
 		}
