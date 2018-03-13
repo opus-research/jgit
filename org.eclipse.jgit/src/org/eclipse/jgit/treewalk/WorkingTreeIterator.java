@@ -61,11 +61,7 @@ import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
-import java.util.Map;
 
-import org.eclipse.jgit.api.errors.FilterFailedException;
-import org.eclipse.jgit.attributes.Attribute;
 import org.eclipse.jgit.attributes.AttributesNode;
 import org.eclipse.jgit.attributes.AttributesRule;
 import org.eclipse.jgit.diff.RawText;
@@ -78,12 +74,12 @@ import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.ignore.FastIgnoreRule;
 import org.eclipse.jgit.ignore.IgnoreNode;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.internal.storage.file.GlobalAttributesNode;
+import org.eclipse.jgit.internal.storage.file.InfoAttributesNode;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig;
-import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
 import org.eclipse.jgit.lib.CoreConfig.CheckStat;
 import org.eclipse.jgit.lib.CoreConfig.SymLinks;
-import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
@@ -92,9 +88,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.submodule.SubmoduleWalk;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
-import org.eclipse.jgit.util.QuotedString;
 import org.eclipse.jgit.util.RawParseUtils;
-import org.eclipse.jgit.util.TemporaryBuffer;
 import org.eclipse.jgit.util.io.EolCanonicalizingInputStream;
 
 /**
@@ -145,17 +139,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	/** If there is a .gitattributes file present, the parsed rules from it. */
 	private AttributesNode attributesNode;
 
-	/**
-	 * The filter command as defined in gitattributes. The keys are
-	 * filterName+"."+filterCommandType. E.g. "lfs.clean"
-	 */
-	private Map<String, String> filterCommandsByNameDotType = new HashMap<String, String>();
-
-	private String cleanFilterCommand;
-
-	/** The config to be used */
-	private Config config;
-
 	/** Repository that is the root level being iterated over */
 	protected Repository repository;
 
@@ -169,14 +152,14 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 * Holds the {@link AttributesNode} that is stored in
 	 * $GIT_DIR/info/attributes file.
 	 */
-	private AttributesNode infoAttributeNode;
+	private AttributesNode infoAttributesNode;
 
 	/**
 	 * Holds the {@link AttributesNode} that is stored in global attribute file.
 	 *
 	 * @see CoreConfig#getAttributesFile()
 	 */
-	private AttributesNode globalAttributeNode;
+	private AttributesNode globalAttributesNode;
 
 	/**
 	 * Create a new iterator with no parent.
@@ -221,8 +204,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	protected WorkingTreeIterator(final WorkingTreeIterator p) {
 		super(p);
 		state = p.state;
-		infoAttributeNode = p.infoAttributeNode;
-		globalAttributeNode = p.globalAttributeNode;
+		infoAttributesNode = p.infoAttributesNode;
+		globalAttributesNode = p.globalAttributesNode;
 	}
 
 	/**
@@ -243,9 +226,9 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			entry = null;
 		ignoreNode = new RootIgnoreNode(entry, repo);
 
-		infoAttributeNode = new InfoAttributesNode(repo);
+		infoAttributesNode = new InfoAttributesNode(repo);
 
-		globalAttributeNode = new GlobalAttributesNode(repo);
+		globalAttributesNode = new GlobalAttributesNode(repo);
 	}
 
 	/**
@@ -435,12 +418,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		switch (getOptions().getAutoCRLF()) {
 		case FALSE:
 		default:
-			try {
-				if (getCleanFilterCommand() != null)
-					return true;
-			} catch (IOException e) {
-				// TODO
-			}
 			return false;
 
 		case TRUE:
@@ -462,7 +439,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private ByteBuffer filterClean(byte[] src, int n) throws IOException {
+	private static ByteBuffer filterClean(byte[] src, int n)
+			throws IOException {
 		InputStream in = new ByteArrayInputStream(src);
 		try {
 			return IO.readWholeStream(filterClean(in), n);
@@ -471,24 +449,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private InputStream filterClean(InputStream in) throws IOException {
-		AutoCRLF autoCRLF = getOptions().getAutoCRLF();
-		if (autoCRLF == AutoCRLF.TRUE || autoCRLF == AutoCRLF.INPUT) {
-			in = new EolCanonicalizingInputStream(in, true);
-		}
-		String filterCommand = getCleanFilterCommand();
-		if (filterCommand != null) {
-			TemporaryBuffer attributeProcessedContent = null;
-			try {
-				attributeProcessedContent = processFilter(filterCommand,
-						getEntryPathString(), in);
-			} catch (FilterFailedException e) {
-				throw new IOException(e);
-			}
-			if (attributeProcessedContent != null)
-				in = attributeProcessedContent.openInputStream();
-		}
-		return in;
+	private static InputStream filterClean(InputStream in) {
+		return new EolCanonicalizingInputStream(in, true);
 	}
 
 	/**
@@ -547,7 +509,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		System.arraycopy(e.encodedName, 0, path, pathOffset, nameLen);
 		pathLen = pathOffset + nameLen;
 		canonLen = -1;
-		cleanFilterCommand = null;
 	}
 
 	/**
@@ -637,7 +598,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *             a relevant ignore rule file exists but cannot be read.
 	 */
 	protected boolean isEntryIgnored(final int pLen) throws IOException {
-		return isEntryIgnored(pLen, false);
+		return isEntryIgnored(pLen, mode, false);
 	}
 
 	/**
@@ -646,13 +607,16 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *
 	 * @param pLen
 	 *            the length of the path in the path buffer.
+	 * @param fileMode
+	 *            the original iterator file mode
 	 * @param negatePrevious
 	 *            true if the previous matching iterator rule was negation
 	 * @return true if the entry is ignored by an ignore rule.
 	 * @throws IOException
 	 *             a relevant ignore rule file exists but cannot be read.
 	 */
-	private boolean isEntryIgnored(final int pLen, boolean negatePrevious)
+	private boolean isEntryIgnored(final int pLen, int fileMode,
+			boolean negatePrevious)
 			throws IOException {
 		IgnoreNode rules = getIgnoreNode();
 		if (rules != null) {
@@ -664,7 +628,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			if (0 < pOff)
 				pOff--;
 			String p = TreeWalk.pathOf(path, pOff, pLen);
-			switch (rules.isIgnored(p, FileMode.TREE.equals(mode),
+			switch (rules.isIgnored(p, FileMode.TREE.equals(fileMode),
 					negatePrevious)) {
 			case IGNORED:
 				return true;
@@ -679,7 +643,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			}
 		}
 		if (parent instanceof WorkingTreeIterator)
-			return ((WorkingTreeIterator) parent).isEntryIgnored(pLen,
+			return ((WorkingTreeIterator) parent).isEntryIgnored(pLen, fileMode,
 					negatePrevious);
 		return false;
 	}
@@ -716,9 +680,9 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 * @since 3.7
 	 */
 	public AttributesNode getInfoAttributesNode() throws IOException {
-		if (infoAttributeNode instanceof InfoAttributesNode)
-			infoAttributeNode = ((InfoAttributesNode) infoAttributeNode).load();
-		return infoAttributeNode;
+		if (infoAttributesNode instanceof InfoAttributesNode)
+			infoAttributesNode = ((InfoAttributesNode) infoAttributesNode).load();
+		return infoAttributesNode;
 	}
 
 	/**
@@ -734,10 +698,10 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 * @since 3.7
 	 */
 	public AttributesNode getGlobalAttributesNode() throws IOException {
-		if (globalAttributeNode instanceof GlobalAttributesNode)
-			globalAttributeNode = ((GlobalAttributesNode) globalAttributeNode)
+		if (globalAttributesNode instanceof GlobalAttributesNode)
+			globalAttributesNode = ((GlobalAttributesNode) globalAttributesNode)
 					.load();
-		return globalAttributeNode;
+		return globalAttributesNode;
 	}
 
 	private static final Comparator<Entry> ENTRY_CMP = new Comparator<Entry>() {
@@ -1334,68 +1298,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	/**
-	 * Attributes node loaded from global system-wide file.
-	 */
-	private static class GlobalAttributesNode extends AttributesNode {
-		final Repository repository;
-
-		GlobalAttributesNode(Repository repository) {
-			this.repository = repository;
-		}
-
-		AttributesNode load() throws IOException {
-			AttributesNode r = new AttributesNode();
-
-			FS fs = repository.getFS();
-			String path = repository.getConfig().get(CoreConfig.KEY)
-					.getAttributesFile();
-			if (path != null) {
-				File attributesFile;
-				if (path.startsWith("~/")) //$NON-NLS-1$
-					attributesFile = fs.resolve(fs.userHome(),
-							path.substring(2));
-				else
-					attributesFile = fs.resolve(null, path);
-				loadRulesFromFile(r, attributesFile);
-			}
-			return r.getRules().isEmpty() ? null : r;
-		}
-	}
-
-	/** Magic type indicating there may be rules for the top level. */
-	private static class InfoAttributesNode extends AttributesNode {
-		final Repository repository;
-
-		InfoAttributesNode(Repository repository) {
-			this.repository = repository;
-		}
-
-		AttributesNode load() throws IOException {
-			AttributesNode r = new AttributesNode();
-
-			FS fs = repository.getFS();
-
-			File attributes = fs.resolve(repository.getDirectory(),
-					"info/attributes"); //$NON-NLS-1$
-			loadRulesFromFile(r, attributes);
-
-			return r.getRules().isEmpty() ? null : r;
-		}
-
-	}
-
-	private static void loadRulesFromFile(AttributesNode r, File attrs)
-			throws FileNotFoundException, IOException {
-		if (attrs.exists()) {
-			FileInputStream in = new FileInputStream(attrs);
-			try {
-				r.parse(in);
-			} finally {
-				in.close();
-			}
-		}
-	}
 
 	private static final class IteratorState {
 		/** Options used to process the working tree. */
@@ -1427,132 +1329,5 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				contentReadBuffer = new byte[BUFFER_SIZE];
 			}
 		}
-	}
-
-	/**
-	 * Run a filter command
-	 *
-	 * @param filterCommand
-	 *            then command to be executed
-	 * @param path
-	 *            the path on which to run a filter
-	 * @param in
-	 *            an {@link InputStream} to read the unfiltered content from
-	 * @return a {@link TemporaryBuffer} containing the output of the filter
-	 *         command. It is responsibility of the caller to destroy this
-	 *         Buffer
-	 * @throws FilterFailedException
-	 *             if execution of the filter command failed
-	 * @since 4.1
-	 */
-	public TemporaryBuffer processFilter(String filterCommand, String path,
-			InputStream in) throws FilterFailedException {
-		if (repository == null)
-			return null;
-		TemporaryBuffer outBuffer = new TemporaryBuffer.LocalFile(
-				repository.getDirectory());
-		TemporaryBuffer errorBuffer = new TemporaryBuffer.Heap(1024,
-				1024 * 1024);
-		int rc;
-
-		try {
-			FS fs = repository.getFS();
-			ProcessBuilder filterProcessBuilder = fs.runInShell(
-					filterCommand, new String[0]);
-			rc = fs.runProcess(filterProcessBuilder, outBuffer,
-					errorBuffer, in);
-			if (rc != 0) {
-				throw new FilterFailedException(rc, filterCommand, path,
-						outBuffer, errorBuffer);
-			}
-			return outBuffer;
-		} catch (IOException | InterruptedException e) {
-			throw new FilterFailedException(e, filterCommand, path, outBuffer,
-					errorBuffer);
-		} finally {
-			errorBuffer.destroy();
-		}
-	}
-
-	/**
-	 * Inspect config and attributes to return a filtercommand applicable for
-	 * the current path
-	 *
-	 * @param filterCommandType
-	 *            which type of filterCommand should be executed. E.g. "clean",
-	 *            "smudge"
-	 * @return a filter command
-	 * @throws IOException
-	 * @since 4.1
-	 */
-	public String getFilterCommand(String filterCommandType)
-			throws IOException {
-		if (repository == null)
-			return null;
-		Map<String, Attribute> attributes = new HashMap<String, Attribute>();
-		AttributesNode entryAttributesNode = getEntryAttributesNode();
-		if (entryAttributesNode == null)
-			return null;
-		entryAttributesNode.getAttributes(getEntryPathString(), false,
-				attributes);
-		Attribute filter = attributes.get(Constants.ATTR_FILTER);
-		if (filter == null || filter.getValue() == null) {
-			return null;
-		}
-		String filterCommand = getFilterCommandDefinition(filter.getValue(),
-				filterCommandType);
-		if (filterCommand == null) {
-			return null;
-		}
-		return filterCommand.replaceAll(
-				"%f", QuotedString.BOURNE.quote(getEntryPathString())); //$NON-NLS-1$
-	}
-
-	/**
-	 * Get the filter command how it is defined in gitconfig. The returned
-	 * string may contain "%f" which needs to be replaced by the current path
-	 * before executing the filter command. These filter definitions are cached
-	 * for better performance.
-	 *
-	 * @param filterDriverName
-	 *            The name of the filter driver as it is referenced in the
-	 *            gitattributes file. E.g. "lfs". For each filter driver there
-	 *            may be many commands defined in the .gitconfig
-	 * @param filterCommandType
-	 *            The type of the filter command for a specific filter driver.
-	 *            May be "clean" or "smudge".
-	 * @return the definition of the command to be executed for this filter
-	 *         driver and filter command
-	 */
-	private String getFilterCommandDefinition(String filterDriverName,
-			String filterCommandType) {
-		String key = filterDriverName + "." + filterCommandType; //$NON-NLS-1$
-		String filterCommand = filterCommandsByNameDotType.get(key);
-		if (filterCommand != null)
-			return filterCommand;
-		if (config == null) {
-			if (repository == null) {
-				return null;
-			}
-			config=repository.getConfig();
-		}
-		filterCommand = config.getString(Constants.ATTR_FILTER,
-				filterDriverName,
-				filterCommandType);
-		if (filterCommand != null)
-			filterCommandsByNameDotType.put(key, filterCommand);
-		return filterCommand;
-	}
-
-	/**
-	 * @return the clean filter command for the current entry or
-	 *         <code>null</code> if no such command is defined
-	 * @throws IOException
-	 * @since 4.1
-	 */
-	public String getCleanFilterCommand() throws IOException {
-		if (cleanFilterCommand == null)
-			cleanFilterCommand = getFilterCommand(Constants.ATTR_FILTER_TYPE_CLEAN);
-		return cleanFilterCommand;
 	}
 }

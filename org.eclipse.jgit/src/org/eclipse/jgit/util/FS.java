@@ -65,7 +65,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.errors.SymlinksNotSupportedException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
@@ -106,6 +105,53 @@ public abstract class FS {
 			} else {
 				return new FS_POSIX();
 			}
+		}
+	}
+
+	/**
+	 * Result of an executed process. The caller is responsible to close the
+	 * contained {@link TemporaryBuffer}s
+	 *
+	 * @since 4.2
+	 */
+	public static class ExecutionResult {
+		private TemporaryBuffer stdout;
+
+		private TemporaryBuffer stderr;
+
+		private int rc;
+
+		/**
+		 * @param stdout
+		 * @param stderr
+		 * @param rc
+		 */
+		public ExecutionResult(TemporaryBuffer stdout, TemporaryBuffer stderr,
+				int rc) {
+			this.stdout = stdout;
+			this.stderr = stderr;
+			this.rc = rc;
+		}
+
+		/**
+		 * @return buffered standard output stream
+		 */
+		public TemporaryBuffer getStdout() {
+			return stdout;
+		}
+
+		/**
+		 * @return buffered standard error stream
+		 */
+		public TemporaryBuffer getStderr() {
+			return stderr;
+		}
+
+		/**
+		 * @return the return code of the process
+		 */
+		public int getRc() {
+			return rc;
 		}
 	}
 
@@ -246,7 +292,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public long lastModified(File f) throws IOException {
-		return f.lastModified();
+		return FileUtils.lastModified(f);
 	}
 
 	/**
@@ -259,7 +305,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public void setLastModified(File f, long time) throws IOException {
-		f.setLastModified(time);
+		FileUtils.setLastModified(f, time);
 	}
 
 	/**
@@ -272,7 +318,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public long length(File path) throws IOException {
-		return path.length();
+		return FileUtils.getLength(path);
 	}
 
 	/**
@@ -284,9 +330,7 @@ public abstract class FS {
 	 * @since 3.3
 	 */
 	public void delete(File f) throws IOException {
-		if (!f.delete())
-			throw new IOException(MessageFormat.format(
-					JGitText.get().deleteFileFailed, f.getAbsolutePath()));
+		FileUtils.delete(f);
 	}
 
 	/**
@@ -621,8 +665,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public String readSymLink(File path) throws IOException {
-		throw new SymlinksNotSupportedException(
-				JGitText.get().errorSymlinksNotSupported);
+		return FileUtils.readSymLink(path);
 	}
 
 	/**
@@ -632,7 +675,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public boolean isSymLink(File path) throws IOException {
-		return false;
+		return FileUtils.isSymlink(path);
 	}
 
 	/**
@@ -644,7 +687,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public boolean exists(File path) {
-		return path.exists();
+		return FileUtils.exists(path);
 	}
 
 	/**
@@ -656,7 +699,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public boolean isDirectory(File path) {
-		return path.isDirectory();
+		return FileUtils.isDirectory(path);
 	}
 
 	/**
@@ -668,7 +711,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public boolean isFile(File path) {
-		return path.isFile();
+		return FileUtils.isFile(path);
 	}
 
 	/**
@@ -679,7 +722,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public boolean isHidden(File path) throws IOException {
-		return path.isHidden();
+		return FileUtils.isHidden(path);
 	}
 
 	/**
@@ -691,9 +734,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public void setHidden(File path, boolean hidden) throws IOException {
-		if (!path.getName().startsWith(".")) //$NON-NLS-1$
-			throw new IllegalArgumentException(
-					JGitText.get().hiddenFilesStartWithDot);
+		FileUtils.setHidden(path, hidden);
 	}
 
 	/**
@@ -705,8 +746,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public void createSymLink(File path, String target) throws IOException {
-		throw new SymlinksNotSupportedException(
-				JGitText.get().errorSymlinksNotSupported);
+		FileUtils.createSymLink(path, target);
 	}
 
 	/**
@@ -864,7 +904,10 @@ public abstract class FS {
 	 * @since 4.0
 	 */
 	public File findHook(Repository repository, final String hookName) {
-		final File hookFile = new File(new File(repository.getDirectory(),
+		File gitDir = repository.getDirectory();
+		if (gitDir == null)
+			return null;
+		final File hookFile = new File(new File(gitDir,
 				Constants.HOOKS), hookName);
 		return hookFile.isFile() ? hookFile : null;
 	}
@@ -892,7 +935,7 @@ public abstract class FS {
 	 * @throws InterruptedException
 	 *             if the current thread is interrupted while waiting for the
 	 *             process to end.
-	 * @since 4.1
+	 * @since 4.2
 	 */
 	public int runProcess(ProcessBuilder processBuilder,
 			OutputStream outRedirect, OutputStream errRedirect, String stdinArgs)
@@ -930,7 +973,7 @@ public abstract class FS {
 	 * @throws InterruptedException
 	 *             if the current thread is interrupted while waiting for the
 	 *             process to end.
-	 * @since 4.1
+	 * @since 4.2
 	 */
 	public int runProcess(ProcessBuilder processBuilder,
 			OutputStream outRedirect, OutputStream errRedirect,
@@ -1043,6 +1086,32 @@ public abstract class FS {
 	 */
 	public abstract ProcessBuilder runInShell(String cmd, String[] args);
 
+	/**
+	 * Execute a command defined by a {@link ProcessBuilder}.
+	 *
+	 * @param pb
+	 *            The command to be executed
+	 * @param in
+	 *            The standard input stream passed to the process
+	 * @return The result of the executed command
+	 * @throws InterruptedException
+	 * @throws IOException
+	 * @since 4.2
+	 */
+	public ExecutionResult execute(ProcessBuilder pb, InputStream in)
+			throws IOException, InterruptedException {
+		TemporaryBuffer stdout = new TemporaryBuffer.LocalFile(null);
+		TemporaryBuffer stderr = new TemporaryBuffer.Heap(1024, 1024 * 1024);
+		try {
+			int rc = runProcess(pb, stdout, stderr, in);
+			return new ExecutionResult(stdout, stderr, rc);
+		} catch (Exception e) {
+			stdout.close();
+			stderr.close();
+			throw e;
+		}
+	}
+
 	private static class Holder<V> {
 		final V value;
 
@@ -1101,28 +1170,28 @@ public abstract class FS {
 			return lastModifiedTime;
 		}
 
-		private boolean isDirectory;
+		private final boolean isDirectory;
 
-		private boolean isSymbolicLink;
+		private final boolean isSymbolicLink;
 
-		private boolean isRegularFile;
+		private final boolean isRegularFile;
 
-		private long creationTime;
+		private final long creationTime;
 
-		private long lastModifiedTime;
+		private final long lastModifiedTime;
 
-		private boolean isExecutable;
+		private final boolean isExecutable;
 
-		private File file;
+		private final File file;
 
-		private boolean exists;
+		private final boolean exists;
 
 		/**
 		 * file length
 		 */
 		protected long length = -1;
 
-		FS fs;
+		final FS fs;
 
 		Attributes(FS fs, File file, boolean exists, boolean isDirectory,
 				boolean isExecutable, boolean isSymbolicLink,
@@ -1141,14 +1210,14 @@ public abstract class FS {
 		}
 
 		/**
-		 * Constructor when there are issues with reading
+		 * Constructor when there are issues with reading. All attributes except
+		 * given will be set to the default values.
 		 *
 		 * @param fs
 		 * @param path
 		 */
 		public Attributes(File path, FS fs) {
-			this.file = path;
-			this.fs = fs;
+			this(fs, path, false, false, false, false, false, 0L, 0L, 0L);
 		}
 
 		/**
