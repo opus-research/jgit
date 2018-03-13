@@ -52,7 +52,7 @@ import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_B
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_CHAINED;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_DATA;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_NONE;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_SAME_COMMITTER;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_SAME_IDENT;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_SAME_MESSAGE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.OBJ_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.REF_BLOCK_TYPE;
@@ -256,7 +256,7 @@ class BlockReader {
 			logNewIdPtr = ptr;
 			oldId = readValueId();
 			long timeSecs = readVarint64();
-			if ((valueType & LOG_SAME_COMMITTER) == LOG_SAME_COMMITTER) {
+			if ((valueType & LOG_SAME_IDENT) == LOG_SAME_IDENT) {
 				int savePtr = ptr;
 				ptr = logCommitterPtr;
 				who = readPersonIdent(timeSecs);
@@ -387,11 +387,10 @@ class BlockReader {
 		}
 
 		if (blockType != FILE_BLOCK_TYPE) {
-			restartCnt = NB.decodeUInt16(buf, ptr);
-			restartTbl = ptr + 2;
-			keysStart = restartTbl + restartCnt * 3;
-			keysEnd = bufLen;
-			ptr = keysStart;
+			restartCnt = NB.decodeUInt16(buf, bufLen - 2);
+			restartTbl = bufLen - (restartCnt * 3 + 2);
+			keysStart = ptr;
+			keysEnd = restartTbl;
 		} else {
 			keysStart = ptr;
 			keysEnd = ptr;
@@ -552,7 +551,7 @@ class BlockReader {
 			} else if ((valueType & LOG_CHAINED) == LOG_CHAINED) {
 				logNewIdPtr = ptr;
 				ptr += OBJECT_ID_LENGTH;
-				if ((valueType & LOG_SAME_COMMITTER) == 0) {
+				if ((valueType & LOG_SAME_IDENT) == 0) {
 					logCommitterPtr = ptr;
 					ptr += 2; // tz
 					skipString(); // name
