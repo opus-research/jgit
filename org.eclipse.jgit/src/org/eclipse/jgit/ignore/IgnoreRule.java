@@ -233,9 +233,8 @@ public class IgnoreRule {
 
 					matcher.append("/" + segmentName); //$NON-NLS-1$
 
-					if (matcher.isMatch()
-							&& doesMatchDirectoryExpectations(isDirectory, idx,
-									segments.length))
+					if (matcher.isMatch() && 
+							doesMatchDirectoryExpectations(isDirectory, idx, segments.length))
 						return true;
 				}
 			}
