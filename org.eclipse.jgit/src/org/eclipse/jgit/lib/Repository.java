@@ -65,8 +65,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.dircache.DirCacheCheckout;
-import org.eclipse.jgit.dircache.InvalidPathException;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -259,10 +257,9 @@ public abstract class Repository {
 	 * @param objectId
 	 *            identity of the object to open.
 	 * @param typeHint
-	 *            hint about the type of object being requested, e.g.
-	 *            {@link Constants#OBJ_BLOB}; {@link ObjectReader#OBJ_ANY} if
-	 *            the object type is not known, or does not matter to the
-	 *            caller.
+	 *            hint about the type of object being requested;
+	 *            {@link ObjectReader#OBJ_ANY} if the object type is not known,
+	 *            or does not matter to the caller.
 	 * @return a {@link ObjectLoader} for accessing the object.
 	 * @throws MissingObjectException
 	 *             the object does not exist.
@@ -1153,14 +1150,6 @@ public abstract class Repository {
 		if (refName.endsWith(".lock")) //$NON-NLS-1$
 			return false;
 
-		// Borrow logic for filterig out invalid paths. These
-		// are also invalid ref
-		try {
-			DirCacheCheckout.checkValidPath(refName);
-		} catch (InvalidPathException e) {
-			return false;
-		}
-
 		int components = 1;
 		char p = '\0';
 		for (int i = 0; i < len; i++) {
@@ -1574,42 +1563,4 @@ public abstract class Repository {
 		}
 	}
 
-	/**
-	 * Read a file formatted like the git-rebase-todo file. The "done" file is
-	 * also formatted like the git-rebase-todo file. These files can be found in
-	 * .git/rebase-merge/ or .git/rebase-append/ folders.
-	 *
-	 * @param path
-	 *            path to the file relative to the repository's git-dir. E.g.
-	 *            "rebase-merge/git-rebase-todo" or "rebase-append/done"
-	 * @param includeComments
-	 *            <code>true</code> if also comments should be reported
-	 * @return the list of steps
-	 * @throws IOException
-	 * @since 3.2
-	 */
-	public List<RebaseTodoLine> readRebaseTodo(String path,
-			boolean includeComments)
-			throws IOException {
-		return new RebaseTodoFile(this).readRebaseTodo(path, includeComments);
-	}
-
-	/**
-	 * Write a file formatted like a git-rebase-todo file.
-	 *
-	 * @param path
-	 *            path to the file relative to the repository's git-dir. E.g.
-	 *            "rebase-merge/git-rebase-todo" or "rebase-append/done"
-	 * @param steps
-	 *            the steps to be written
-	 * @param append
-	 *            whether to append to an existing file or to write a new file
-	 * @throws IOException
-	 * @since 3.2
-	 */
-	public void writeRebaseTodoFile(String path, List<RebaseTodoLine> steps,
-			boolean append)
-			throws IOException {
-		new RebaseTodoFile(this).writeRebaseTodoFile(path, steps, append);
-	}
 }
