@@ -45,8 +45,6 @@
 package org.eclipse.jgit.pgm;
 
 import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.List;
 
 import org.eclipse.jgit.api.CheckoutCommand;
 import org.eclipse.jgit.api.Git;
@@ -60,7 +58,6 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.pgm.internal.CLIText;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.StopOptionHandler;
 
 @Command(common = true, usage = "usage_checkout")
 class Checkout extends TextBuiltin {
@@ -71,12 +68,8 @@ class Checkout extends TextBuiltin {
 	@Option(name = "--force", aliases = { "-f" }, usage = "usage_forceCheckout")
 	private boolean force = false;
 
-	@Argument(required = true, index = 0, metaVar = "metaVar_name", usage = "usage_checkout")
+	@Argument(required = true, metaVar = "metaVar_name", usage = "usage_checkout")
 	private String name;
-
-	@Argument(index = 1)
-	@Option(name = "--", metaVar = "metaVar_paths", multiValued = true, handler = StopOptionHandler.class)
-	private List<String> paths = new ArrayList<String>();
 
 	@Override
 	protected void run() throws Exception {
@@ -87,15 +80,9 @@ class Checkout extends TextBuiltin {
 		}
 
 		CheckoutCommand command = new Git(db).checkout();
-		if (paths.size() > 0) {
-			command.setStartPoint(name);
-			for (String path : paths)
-				command.addPath(path);
-		} else {
-			command.setCreateBranch(createBranch);
-			command.setName(name);
-			command.setForce(force);
-		}
+		command.setCreateBranch(createBranch);
+		command.setName(name);
+		command.setForce(force);
 		try {
 			String oldBranch = db.getBranch();
 			Ref ref = command.call();

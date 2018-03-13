@@ -147,7 +147,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotWorkWithOtherStagesThanZeroRightNow;
 	/***/ public String canOnlyCherryPickCommitsWithOneParent;
 	/***/ public String canOnlyRevertCommitsWithOneParent;
-	/***/ public String commitDoesNotHaveGivenParent;
 	/***/ public String cantFindObjectInReversePackIndexForTheSpecifiedOffset;
 	/***/ public String cantPassMeATree;
 	/***/ public String channelMustBeInRange0_255;
@@ -538,7 +537,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String stashApplyFailed;
 	/***/ public String stashApplyWithoutHead;
 	/***/ public String stashApplyOnUnsafeRepository;
-	/***/ public String stashCommitIncorrectNumberOfParents;
+	/***/ public String stashCommitMissingTwoParents;
 	/***/ public String stashDropDeleteRefFailed;
 	/***/ public String stashDropFailed;
 	/***/ public String stashDropMissingReflog;
