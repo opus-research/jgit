@@ -1622,9 +1622,8 @@ public class UploadPack {
 		}
 
 		void stopBuffering() throws IOException {
-			ByteArrayOutputStream b = buffer;
-			if (b != null) {
-				b.writeTo(rawOut);
+			if (buffer != null) {
+				buffer.writeTo(rawOut);
 				buffer = null;
 				out = rawOut;
 			}
