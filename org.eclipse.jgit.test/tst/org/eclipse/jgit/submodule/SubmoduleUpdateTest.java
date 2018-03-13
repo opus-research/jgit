@@ -52,7 +52,6 @@ import java.util.Collection;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.SubmoduleUpdateCommand;
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
@@ -74,7 +73,7 @@ import org.junit.Test;
 public class SubmoduleUpdateTest extends RepositoryTestCase {
 
 	@Test
-	public void repositoryWithNoSubmodules() throws GitAPIException {
+	public void repositoryWithNoSubmodules() {
 		SubmoduleUpdateCommand command = new SubmoduleUpdateCommand(db);
 		Collection<String> modules = command.call();
 		assertNotNull(modules);
@@ -126,8 +125,7 @@ public class SubmoduleUpdateTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void repositoryWithUnconfiguredSubmodule() throws IOException,
-			GitAPIException {
+	public void repositoryWithUnconfiguredSubmodule() throws IOException {
 		final ObjectId id = ObjectId
 				.fromString("abcd1234abcd1234abcd1234abcd1234abcd1234");
 		final String path = "sub";
@@ -161,8 +159,7 @@ public class SubmoduleUpdateTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void repositoryWithInitializedSubmodule() throws IOException,
-			GitAPIException {
+	public void repositoryWithInitializedSubmodule() throws IOException {
 		final ObjectId id = ObjectId
 				.fromString("abcd1234abcd1234abcd1234abcd1234abcd1234");
 		final String path = "sub";
