@@ -45,25 +45,22 @@
 package org.eclipse.jgit.treewalk;
 
 import java.io.IOException;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.attributes.Attribute;
+import org.eclipse.jgit.attributes.Attributes;
 import org.eclipse.jgit.attributes.AttributesNode;
 import org.eclipse.jgit.attributes.AttributesNodeProvider;
 import org.eclipse.jgit.attributes.AttributesProvider;
+import org.eclipse.jgit.attributes.Attribute.State;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StopWalkException;
 import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.MutableObjectId;
@@ -73,7 +70,6 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
-import org.eclipse.jgit.util.QuotedString;
 import org.eclipse.jgit.util.RawParseUtils;
 
 /**
@@ -119,12 +115,6 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 *            Type of operation you want to retrieve the git attributes for.
 	 */
 	private OperationType operationType = OperationType.CHECKOUT_OP;
-
-	/**
-	 * The filter command as defined in gitattributes. The keys are
-	 * filterName+"."+filterCommandType. E.g. "lfs.clean"
-	 */
-	private Map<String, String> filterCommandsByNameDotType = new HashMap<String, String>();
 
 	/**
 	 * @param operationType
@@ -267,9 +257,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	AbstractTreeIterator currentHead;
 
 	/** Cached attribute for the current entry */
-	private Map<String, Attribute> attrs = null;
-
-	private Config config;
+	private Attributes attrs = null;
 
 	/**
 	 * Create a new tree walker for a given repository.
@@ -281,7 +269,6 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 */
 	public TreeWalk(final Repository repo) {
 		this(repo.newObjectReader(), true);
-		config = repo.getConfig();
 		attributesNodeProvider = repo.createAttributesNodeProvider();
 	}
 
@@ -1131,7 +1118,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 * @return a {@link Set} of {@link Attribute}s that match the current entry.
 	 * @since 4.2
 	 */
-	public Map<String, Attribute> getAttributes() {
+	public Attributes getAttributes() {
 		if (attrs != null)
 			return attrs;
 
@@ -1150,34 +1137,41 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 				&& other == null) {
 			// Can not retrieve the attributes without at least one of the above
 			// iterators.
-			return Collections.<String, Attribute> emptyMap();
+			return new Attributes();
 		}
 
 		String path = currentHead.getEntryPathString();
 		final boolean isDir = FileMode.TREE.equals(currentHead.mode);
-		Map<String, Attribute> attributes = new LinkedHashMap<String, Attribute>();
+		Attributes attributes = new Attributes();
 		try {
-			// Gets the info attributes
+			// Gets the global attributes node
+			AttributesNode globalNodeAttr = attributesNodeProvider
+					.getGlobalAttributesNode();
+			// Gets the info attributes node
 			AttributesNode infoNodeAttr = attributesNodeProvider
 					.getInfoAttributesNode();
+
+			// Gets the info attributes
 			if (infoNodeAttr != null) {
 				infoNodeAttr.getAttributes(path, isDir, attributes);
 			}
 
-
 			// Gets the attributes located on the current entry path
 			getPerDirectoryEntryAttributes(path, isDir, operationType,
-					workingTreeIterator, dirCacheIterator, other,
-					attributes);
+					workingTreeIterator, dirCacheIterator, other, attributes);
 
 			// Gets the attributes located in the global attribute file
-			AttributesNode globalNodeAttr = attributesNodeProvider
-					.getGlobalAttributesNode();
 			if (globalNodeAttr != null) {
 				globalNodeAttr.getAttributes(path, isDir, attributes);
 			}
 		} catch (IOException e) {
 			throw new JGitInternalException("Error while parsing attributes", e); //$NON-NLS-1$
+		}
+		// now after all attributes are collected - in the correct hierarchy
+		// order - remove all unspecified entries (the ! marker)
+		for (Attribute a : attributes.getAttributes()) {
+			if (a.getState() == State.UNSPECIFIED)
+				attributes.removeAttribute(a.getKey());
 		}
 		return attributes;
 	}
@@ -1207,7 +1201,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	private void getPerDirectoryEntryAttributes(String path, boolean isDir,
 			OperationType opType, WorkingTreeIterator workingTreeIterator,
 			DirCacheIterator dirCacheIterator, CanonicalTreeParser other,
-			Map<String, Attribute> attributes)
+			Attributes attributes)
 			throws IOException {
 		// Prevents infinite recurrence
 		if (workingTreeIterator != null || dirCacheIterator != null
@@ -1220,12 +1214,11 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 			getPerDirectoryEntryAttributes(path, isDir, opType,
 					getParent(workingTreeIterator, WorkingTreeIterator.class),
 					getParent(dirCacheIterator, DirCacheIterator.class),
-					getParent(other, CanonicalTreeParser.class),
-					attributes);
+					getParent(other, CanonicalTreeParser.class), attributes);
 		}
 	}
 
-	private <T extends AbstractTreeIterator> T getParent(T current,
+	private static <T extends AbstractTreeIterator> T getParent(T current,
 			Class<T> type) {
 		if (current != null) {
 			AbstractTreeIterator parent = current.parent;
@@ -1236,7 +1229,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 		return null;
 	}
 
-	private <T> T getTree(Class<T> type) {
+	private <T extends AbstractTreeIterator> T getTree(Class<T> type) {
 		for (int i = 0; i < trees.length; i++) {
 			AbstractTreeIterator tree = trees[i];
 			if (type.isInstance(tree)) {
@@ -1314,67 +1307,5 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	private static AttributesNode getAttributesNode(AttributesNode value,
 			AttributesNode defaultValue) {
 		return (value == null) ? defaultValue : value;
-	}
-
-	/**
-	 * Inspect config and attributes to return a filtercommand applicable for
-	 * the current path
-	 *
-	 * @param filterCommandType
-	 *            which type of filterCommand should be executed. E.g. "clean",
-	 *            "smudge"
-	 * @return a filter command
-	 * @throws IOException
-	 * @since 4.2
-	 */
-	public String getFilterCommand(String filterCommandType)
-			throws IOException {
-		Map<String, Attribute> attributes = getAttributes();
-
-		Attribute f = attributes.get(Constants.ATTR_FILTER);
-		if (f == null) {
-			return null;
-		}
-		String filterValue = f.getValue();
-		if (filterValue == null) {
-			return null;
-		}
-
-		String filterCommand = getFilterCommandDefinition(filterValue,
-				filterCommandType);
-		if (filterCommand == null) {
-			return null;
-		}
-		return filterCommand.replaceAll("%f", //$NON-NLS-1$
-				QuotedString.BOURNE.quote((getPathString())));
-	}
-
-	/**
-	 * Get the filter command how it is defined in gitconfig. The returned
-	 * string may contain "%f" which needs to be replaced by the current path
-	 * before executing the filter command. These filter definitions are cached
-	 * for better performance.
-	 *
-	 * @param filterDriverName
-	 *            The name of the filter driver as it is referenced in the
-	 *            gitattributes file. E.g. "lfs". For each filter driver there
-	 *            may be many commands defined in the .gitconfig
-	 * @param filterCommandType
-	 *            The type of the filter command for a specific filter driver.
-	 *            May be "clean" or "smudge".
-	 * @return the definition of the command to be executed for this filter
-	 *         driver and filter command
-	 */
-	private String getFilterCommandDefinition(String filterDriverName,
-			String filterCommandType) {
-		String key = filterDriverName + "." + filterCommandType; //$NON-NLS-1$
-		String filterCommand = filterCommandsByNameDotType.get(key);
-		if (filterCommand != null)
-			return filterCommand;
-		filterCommand = config.getString(Constants.ATTR_FILTER,
-				filterDriverName, filterCommandType);
-		if (filterCommand != null)
-			filterCommandsByNameDotType.put(key, filterCommand);
-		return filterCommand;
 	}
 }
