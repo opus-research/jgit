@@ -47,6 +47,8 @@ package org.eclipse.jgit.lib;
 
 import java.io.IOException;
 
+import org.eclipse.jgit.storage.file.FileBasedConfig;
+
 public class ReflogConfigTest extends RepositoryTestCase {
 	public void testlogAllRefUpdates() throws Exception {
 		long commitTime = 1154236443000L;
@@ -55,7 +57,9 @@ public class ReflogConfigTest extends RepositoryTestCase {
 		// check that there are no entries in the reflog and turn off writing
 		// reflogs
 		assertEquals(0, db.getReflogReader(Constants.HEAD).getReverseEntries().size());
-		db.getConfig().setBoolean("core", null, "logallrefupdates", false);
+		final FileBasedConfig cfg = db.getConfig();
+		cfg.setBoolean("core", null, "logallrefupdates", false);
+		cfg.save();
 
 		// do one commit and check that reflog size is 0: no reflogs should be
 		// written
@@ -67,8 +71,9 @@ public class ReflogConfigTest extends RepositoryTestCase {
 				db.getReflogReader(Constants.HEAD).getReverseEntries().size() == 0);
 
 		// set the logAllRefUpdates parameter to true and check it
-		db.getConfig().setBoolean("core", null, "logallrefupdates", true);
-		assertTrue(db.getConfig().get(CoreConfig.KEY).isLogAllRefUpdates());
+		cfg.setBoolean("core", null, "logallrefupdates", true);
+		cfg.save();
+		assertTrue(cfg.get(CoreConfig.KEY).isLogAllRefUpdates());
 
 		// do one commit and check that reflog size is increased to 1
 		commit("A Commit\n", new PersonIdent(author, commitTime, tz),
@@ -79,8 +84,9 @@ public class ReflogConfigTest extends RepositoryTestCase {
 				db.getReflogReader(Constants.HEAD).getReverseEntries().size() == 1);
 
 		// set the logAllRefUpdates parameter to false and check it
-		db.getConfig().setBoolean("core", null, "logallrefupdates", false);
-		assertFalse(db.getConfig().get(CoreConfig.KEY).isLogAllRefUpdates());
+		cfg.setBoolean("core", null, "logallrefupdates", false);
+		cfg.save();
+		assertFalse(cfg.get(CoreConfig.KEY).isLogAllRefUpdates());
 
 		// do one commit and check that reflog size is 2
 		commit("A Commit\n", new PersonIdent(author, commitTime, tz),
