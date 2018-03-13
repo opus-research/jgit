@@ -110,7 +110,8 @@ public abstract class Repository implements AutoCloseable {
 		return globalListeners;
 	}
 
-	private final AtomicInteger useCnt = new AtomicInteger(1);
+	/** Use counter */
+	final AtomicInteger useCnt = new AtomicInteger(1);
 
 	/** Metadata directory holding the repository's critical files. */
 	private final File gitDir;
@@ -864,6 +865,7 @@ public abstract class Repository implements AutoCloseable {
 	public void close() {
 		if (useCnt.decrementAndGet() == 0) {
 			doClose();
+			RepositoryCache.unregister(this);
 		}
 	}
 
@@ -896,7 +898,7 @@ public abstract class Repository implements AutoCloseable {
 	 * This is essentially the same as doing:
 	 *
 	 * <pre>
-	 * return getRef(Constants.HEAD).getTarget().getName()
+	 * return exactRef(Constants.HEAD).getTarget().getName()
 	 * </pre>
 	 *
 	 * Except when HEAD is detached, in which case this method returns the
@@ -910,7 +912,7 @@ public abstract class Repository implements AutoCloseable {
 	 */
 	@Nullable
 	public String getFullBranch() throws IOException {
-		Ref head = getRef(Constants.HEAD);
+		Ref head = exactRef(Constants.HEAD);
 		if (head == null) {
 			return null;
 		}

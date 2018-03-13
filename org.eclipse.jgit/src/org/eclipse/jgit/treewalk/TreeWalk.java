@@ -580,16 +580,30 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	}
 
 	/**
+	 * @param opType
+	 *            the operationtype (checkin/checkout) which should be used
+	 * @return the EOL stream type of the current entry using the config and
+	 *         {@link #getAttributes()} Note that this method may return null if
+	 *         the {@link TreeWalk} is not based on a working tree
+	 */
+	// TODO(msohn) make this method public in 4.4
+	@Nullable
+	EolStreamType getEolStreamType(OperationType opType) {
+			if (attributesNodeProvider == null || config == null)
+				return null;
+		return EolStreamTypeUtil.detectStreamType(opType,
+					config.get(WorkingTreeOptions.KEY), getAttributes());
+	}
+
+	/**
 	 * @return the EOL stream type of the current entry using the config and
 	 *         {@link #getAttributes()} Note that this method may return null if
 	 *         the {@link TreeWalk} is not based on a working tree
 	 * @since 4.3
 	 */
+	// TODO(msohn) deprecate this method in 4.4
 	public @Nullable EolStreamType getEolStreamType() {
-			if (attributesNodeProvider == null || config == null)
-				return null;
-			return EolStreamTypeUtil.detectStreamType(operationType,
-					config.get(WorkingTreeOptions.KEY), getAttributes());
+		return (getEolStreamType(operationType));
 	}
 
 	/** Reset this walker so new tree iterators can be added to it. */
@@ -781,7 +795,6 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	public boolean next() throws MissingObjectException,
 			IncorrectObjectTypeException, CorruptObjectException, IOException {
 		try {
-			attrs = null;
 			if (advance) {
 				advance = false;
 				postChildren = false;
@@ -789,6 +802,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 			}
 
 			for (;;) {
+				attrs = null;
 				final AbstractTreeIterator t = min();
 				if (t.eof()) {
 					if (depth > 0) {
@@ -1187,7 +1201,12 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 		for (int i = 0; i < trees.length; i++) {
 			final AbstractTreeIterator t = trees[i];
 			final AbstractTreeIterator n;
-			if (t.matches == ch && !t.eof() && FileMode.TREE.equals(t.mode))
+			// If we find a GITLINK when attempting to enter a subtree, then the
+			// GITLINK must exist as a TREE in the index, meaning the working tree
+			// entry should be treated as a TREE
+			if (t.matches == ch && !t.eof() &&
+					(FileMode.TREE.equals(t.mode)
+							|| (FileMode.GITLINK.equals(t.mode) && t.isWorkTree())))
 				n = t.createSubtreeIterator(reader, idBuffer);
 			else
 				n = t.createEmptyTreeIterator();

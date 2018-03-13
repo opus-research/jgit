@@ -203,10 +203,10 @@ public class RefDirectory extends RefDatabase {
 
 	@Override
 	public void close() {
-		// We have no resources to close.
+		clearReferences();
 	}
 
-	void rescan() {
+	private void clearReferences() {
 		looseRefs.set(RefList.<LooseRef> emptyList());
 		packedRefs.set(PackedRefList.NO_PACKED_REFS);
 	}
@@ -214,7 +214,7 @@ public class RefDirectory extends RefDatabase {
 	@Override
 	public void refresh() {
 		super.refresh();
-		rescan();
+		clearReferences();
 	}
 
 	@Override
@@ -312,11 +312,10 @@ public class RefDirectory extends RefDatabase {
 
 	@Override
 	public Map<String, Ref> getRefs(String prefix) throws IOException {
-		final RefList<Ref> packed = getPackedRefs();
 		final RefList<LooseRef> oldLoose = looseRefs.get();
-
 		LooseScanner scan = new LooseScanner(oldLoose);
 		scan.scan(prefix);
+		final RefList<Ref> packed = getPackedRefs();
 
 		RefList<LooseRef> loose;
 		if (scan.newLoose != null) {
