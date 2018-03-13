@@ -60,7 +60,6 @@ import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.FileRepository;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.io.MessageWriter;
@@ -175,7 +174,7 @@ class TransportLocal extends Transport implements PackTransport {
 
 			final Repository dst;
 			try {
-				dst = new FileRepository(remoteGitDir);
+				dst = new Repository(remoteGitDir);
 			} catch (IOException err) {
 				throw new TransportException(uri, JGitText.get().notAGitDirectory);
 			}
@@ -315,7 +314,7 @@ class TransportLocal extends Transport implements PackTransport {
 
 			final Repository dst;
 			try {
-				dst = new FileRepository(remoteGitDir);
+				dst = new Repository(remoteGitDir);
 			} catch (IOException err) {
 				throw new TransportException(uri, JGitText.get().notAGitDirectory);
 			}
