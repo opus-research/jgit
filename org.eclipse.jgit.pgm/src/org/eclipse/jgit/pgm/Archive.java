@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2012 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,60 +41,64 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.iplog;
+package org.eclipse.jgit.pgm;
 
+import java.lang.String;
+import java.lang.System;
 import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
-/** A project contributor (non-committer). */
-class Contributor {
-	/** Sorts contributors by their name first name, then last name. */
-	static final Comparator<Contributor> COMPARATOR = new Comparator<Contributor>() {
-		public int compare(Contributor a, Contributor b) {
-			return a.name.compareTo(b.name);
-		}
-	};
+import org.eclipse.jgit.lib.FileMode;
+import org.eclipse.jgit.lib.MutableObjectId;
+import org.eclipse.jgit.lib.ObjectLoader;
+import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.pgm.CLIText;
+import org.eclipse.jgit.pgm.TextBuiltin;
+import org.eclipse.jgit.treewalk.AbstractTreeIterator;
+import org.eclipse.jgit.treewalk.TreeWalk;
+import org.kohsuke.args4j.Argument;
 
-	private final String id;
-
-	private final String name;
-
-	private final List<SingleContribution> contributions = new ArrayList<SingleContribution>();
-
-	/**
-	 * @param id
-	 * @param name
-	 */
-	Contributor(String id, String name) {
-		this.id = id;
-		this.name = name;
-	}
-
-	/** @return unique identity of this contributor in the foundation database. */
-	String getID() {
-		return id;
-	}
-
-	/** @return name of the contributor. */
-	String getName() {
-		return name;
-	}
-
-	/** @return all known contributions. */
-	Collection<SingleContribution> getContributions() {
-		return Collections.unmodifiableCollection(contributions);
-	}
-
-	void add(SingleContribution bug) {
-		contributions.add(bug);
-	}
+@Command(common = true, usage = "usage_archive")
+class Archive extends TextBuiltin {
+	@Argument(index = 0, metaVar = "metaVar_treeish")
+	private AbstractTreeIterator tree;
 
 	@Override
-	public String toString() {
-		return MessageFormat.format(IpLogText.get().contributorString, getName());
+	protected void run() throws Exception {
+		final TreeWalk walk = new TreeWalk(db);
+		final ObjectReader reader = walk.getObjectReader();
+		final MutableObjectId idBuf = new MutableObjectId();
+		final ZipOutputStream out = new ZipOutputStream(outs);
+
+		if (tree == null)
+			throw die(CLIText.get().treeIsRequired);
+
+		walk.reset();
+		walk.addTree(tree);
+		walk.setRecursive(true);
+		while (walk.next()) {
+			final String name = walk.getPathString();
+			final FileMode mode = walk.getFileMode(0);
+
+			if (mode == FileMode.TREE)
+				// ZIP entries for directories are optional.
+				// Leave them out, mimicking "git archive".
+				continue;
+
+			walk.getObjectId(idBuf, 0);
+			final ZipEntry entry = new ZipEntry(name);
+			final ObjectLoader loader = reader.open(idBuf);
+			entry.setSize(loader.getSize());
+			out.putNextEntry(entry);
+			loader.copyTo(out);
+
+			if (mode != FileMode.REGULAR_FILE)
+				System.err.println(MessageFormat.format( //
+						CLIText.get().archiveEntryModeIgnored, //
+						name));
+		}
+
+		out.close();
 	}
 }

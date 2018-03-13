@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2012, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,61 +40,51 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.api;
 
-package org.eclipse.jgit.iplog;
+import static org.junit.Assert.assertTrue;
 
-import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
+import java.util.Date;
+import java.util.Properties;
 
-/** A project contributor (non-committer). */
-class Contributor {
-	/** Sorts contributors by their name first name, then last name. */
-	static final Comparator<Contributor> COMPARATOR = new Comparator<Contributor>() {
-		public int compare(Contributor a, Contributor b) {
-			return a.name.compareTo(b.name);
-		}
-	};
+import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.util.GitDateParser;
+import org.junit.Before;
+import org.junit.Test;
 
-	private final String id;
-
-	private final String name;
-
-	private final List<SingleContribution> contributions = new ArrayList<SingleContribution>();
-
-	/**
-	 * @param id
-	 * @param name
-	 */
-	Contributor(String id, String name) {
-		this.id = id;
-		this.name = name;
-	}
-
-	/** @return unique identity of this contributor in the foundation database. */
-	String getID() {
-		return id;
-	}
-
-	/** @return name of the contributor. */
-	String getName() {
-		return name;
-	}
-
-	/** @return all known contributions. */
-	Collection<SingleContribution> getContributions() {
-		return Collections.unmodifiableCollection(contributions);
-	}
-
-	void add(SingleContribution bug) {
-		contributions.add(bug);
-	}
+public class GarbageCollectCommandTest extends RepositoryTestCase {
+	private Git git;
 
 	@Override
-	public String toString() {
-		return MessageFormat.format(IpLogText.get().contributorString, getName());
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		git = new Git(db);
+		String path = "a.txt";
+		writeTrashFile(path, "content");
+		git.add().addFilepattern(path).call();
+		git.commit().setMessage("commit").call();
+	}
+
+	@Test
+	public void testGConeCommit() throws Exception {
+		Date expire = GitDateParser.parse("now", null);
+		Properties res = git.gc().setExpire(expire).call();
+		assertTrue(res.size() == 7);
+	}
+
+	@Test
+	public void testGCmoreCommits() throws Exception {
+		writeTrashFile("a.txt", "a couple of words for gc to pack");
+		writeTrashFile("b.txt", "a couple of words for gc to pack 2");
+		writeTrashFile("c.txt", "a couple of words for gc to pack 3");
+		git.commit().setAll(true).setMessage("commit2").call();
+		writeTrashFile("a.txt", "a couple of words for gc to pack more");
+		writeTrashFile("b.txt", "a couple of words for gc to pack more 2");
+		writeTrashFile("c.txt", "a couple of words for gc to pack more 3");
+		git.commit().setAll(true).setMessage("commit3").call();
+		Properties res = git.gc().setExpire(GitDateParser.parse("now", null))
+				.call();
+		assertTrue(res.size() == 7);
 	}
 }
