@@ -897,13 +897,12 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 					boolean changed = getEntryObjectId().compareTo(
 							autoCrLfHash, 0) != 0;
 					if (!changed) {
-						// Update the index so we can detect this "no change"
-						// faster, next time.
+						// Unsmudge and update the index with the eol'ed
+						// hash, so we can detect the no-change faster
+						// next time.
 						entry.setLength((int) getEntryLength());
 						entry.setObjectIdFromRaw(autoCrLfHash, 0);
 					}
-					// Ok, e know it's different so unsmudge
-					entry.setLength(loader.getSize());
 					return changed;
 				} catch (IOException e) {
 					return true;
@@ -916,17 +915,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 						}
 				}
 			case FALSE:
-				// Ok, we know it's different so unsmudge
-				try {
-					if (repository != null) {
-						ObjectId id = entry.getObjectId();
-						ObjectLoader loader = repository.open(id);
-						if (loader != null)
-							entry.setLength((int) loader.getSize());
-					}
-				} catch (IOException e) {
-					// panic, no, but don't unsmudge
-				}
 				break;
 			}
 			return true;
