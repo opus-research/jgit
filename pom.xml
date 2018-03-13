@@ -440,24 +440,16 @@
   </distributionManagement>
 
   <profiles>
+    <!-- Set -Djgit.java6.skip=true to compile with only Java 5 -->
     <profile>
       <id>jgit.java6</id>
-	  <activation>
-	    <jdk>1.6</jdk>
-	  </activation>
+      <activation>
+        <property>
+          <name>!jgit.java6.skip</name>
+        </property>
+      </activation>
       <modules>
         <module>org.eclipse.jgit.console</module>
-      </modules>
-    </profile>
-    <profile>
-      <id>jgit.java7</id>
-	  <activation>
-	    <jdk>1.7</jdk>
-	  </activation>
-      <modules>
-        <module>org.eclipse.jgit.console</module>
-        <module>org.eclipse.jgit.java7</module>
-        <module>org.eclipse.jgit.java7.test</module>
       </modules>
     </profile>
     <profile>
@@ -482,7 +474,6 @@
     <module>org.eclipse.jgit.ant</module>
     <module>org.eclipse.jgit.ui</module>
     <module>org.eclipse.jgit.http.server</module>
-    <module>org.eclipse.jgit.iplog</module>
     <module>org.eclipse.jgit.pgm</module>
     <module>org.eclipse.jgit.junit</module>
     <module>org.eclipse.jgit.junit.http</module>
