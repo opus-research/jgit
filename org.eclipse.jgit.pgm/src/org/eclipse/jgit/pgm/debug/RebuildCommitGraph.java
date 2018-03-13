@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.pgm.debug;
 
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -116,8 +114,8 @@ class RebuildCommitGraph extends TextBuiltin {
 
 	@Override
 	protected void run() throws Exception {
-		if (!really && !db.getRefDatabase().getRefs(ALL).isEmpty()) {
-			errw.println(
+		if (!really && !db.getAllRefs().isEmpty()) {
+			System.err.println(
 				MessageFormat.format(CLIText.get().fatalThisProgramWillDestroyTheRepository
 					, db.getDirectory().getAbsolutePath(), REALLY));
 			throw die(CLIText.get().needApprovalToDestroyCurrentRepository);
@@ -243,8 +241,7 @@ class RebuildCommitGraph extends TextBuiltin {
 
 	private void deleteAllRefs() throws Exception {
 		final RevWalk rw = new RevWalk(db);
-		Map<String, Ref> refs = db.getRefDatabase().getRefs(ALL);
-		for (final Ref r : refs.values()) {
+		for (final Ref r : db.getAllRefs().values()) {
 			if (Constants.HEAD.equals(r.getName()))
 				continue;
 			final RefUpdate u = db.updateRef(r.getName());
@@ -294,7 +291,7 @@ class RebuildCommitGraph extends TextBuiltin {
 					rw.parseAny(id);
 				} catch (MissingObjectException mue) {
 					if (!Constants.TYPE_COMMIT.equals(type)) {
-						errw.println(MessageFormat.format(CLIText.get().skippingObject, type, name));
+						System.err.println(MessageFormat.format(CLIText.get().skippingObject, type, name));
 						continue;
 					}
 					throw new MissingObjectException(id, type);

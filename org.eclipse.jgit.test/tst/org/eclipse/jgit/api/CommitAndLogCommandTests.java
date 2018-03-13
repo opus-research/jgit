@@ -72,7 +72,7 @@ import org.junit.Test;
 /**
  * Testing the git commit and log commands
  */
-public class CommitAndLogCommandTest extends RepositoryTestCase {
+public class CommitAndLogCommandTests extends RepositoryTestCase {
 	@Test
 	public void testSomeCommits() throws JGitInternalException, IOException,
 			GitAPIException {

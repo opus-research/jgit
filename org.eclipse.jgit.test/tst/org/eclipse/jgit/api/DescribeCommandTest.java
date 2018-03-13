@@ -42,19 +42,16 @@
  */
 package org.eclipse.jgit.api;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.junit.RepositoryTestCase;
+import org.eclipse.jgit.lib.ObjectId;
+import org.junit.Test;
 
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.RefNotFoundException;
-import org.eclipse.jgit.junit.RepositoryTestCase;
-import org.eclipse.jgit.lib.ObjectId;
-import org.junit.Test;
+import static org.junit.Assert.*;
 
 public class DescribeCommandTest extends RepositoryTestCase {
 
@@ -66,7 +63,7 @@ public class DescribeCommandTest extends RepositoryTestCase {
 		git = new Git(db);
 	}
 
-	@Test(expected = RefNotFoundException.class)
+	@Test(expected = IllegalArgumentException.class)
 	public void noTargetSet() throws Exception {
 		git.describe().call();
 	}
@@ -90,9 +87,6 @@ public class DescribeCommandTest extends RepositoryTestCase {
 		assertNameStartsWith(c4, "3e563c5");
 		// the value verified with git-describe(1)
 		assertEquals("t2-1-g3e563c5", describe(c4));
-
-		// test default target
-		assertEquals("t2-1-g3e563c5", git.describe().call());
 	}
 
 	/**

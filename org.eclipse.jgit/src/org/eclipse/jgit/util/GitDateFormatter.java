@@ -134,7 +134,7 @@ public class GitDateFormatter {
 					Locale.US);
 			break;
 		case LOCAL:
-			dateTimeInstance = new SimpleDateFormat("EEE MMM dd HH:mm:ss yyyy", //$NON-NLS-1$
+			dateTimeInstance = new SimpleDateFormat("EEE MMM dd HH:mm:ss yyyy",
 					Locale.US);
 			break;
 		case RFC:
