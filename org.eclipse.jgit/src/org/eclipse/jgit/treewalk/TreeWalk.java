@@ -45,26 +45,27 @@
 package org.eclipse.jgit.treewalk;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.attributes.Attribute;
+import org.eclipse.jgit.attributes.Attribute.State;
 import org.eclipse.jgit.attributes.Attributes;
 import org.eclipse.jgit.attributes.AttributesNode;
 import org.eclipse.jgit.attributes.AttributesNodeProvider;
 import org.eclipse.jgit.attributes.AttributesProvider;
 import org.eclipse.jgit.attributes.MacroExpanderImpl;
-import org.eclipse.jgit.attributes.Attribute.State;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StopWalkException;
-import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.CoreConfig.StreamType;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
@@ -73,9 +74,8 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
+import org.eclipse.jgit.util.QuotedString;
 import org.eclipse.jgit.util.RawParseUtils;
-import org.eclipse.jgit.util.io.StreamTypeProvider;
-import org.eclipse.jgit.util.io.StreamTypeUtil;
 
 /**
  * Walks one or more {@link AbstractTreeIterator}s in parallel.
@@ -97,8 +97,7 @@ import org.eclipse.jgit.util.io.StreamTypeUtil;
  * Multiple simultaneous TreeWalk instances per {@link Repository} are
  * permitted, even from concurrent threads.
  */
-public class TreeWalk
-		implements AutoCloseable, AttributesProvider, StreamTypeProvider {
+public class TreeWalk implements AutoCloseable, AttributesProvider {
 	private static final AbstractTreeIterator[] NO_TREES = {};
 
 	/**
@@ -118,9 +117,15 @@ public class TreeWalk
 	}
 
 	/**
-	 * Type of operation you want to retrieve the git attributes for.
+	 *            Type of operation you want to retrieve the git attributes for.
 	 */
 	private OperationType operationType = OperationType.CHECKOUT_OP;
+
+	/**
+	 * The filter command as defined in gitattributes. The keys are
+	 * filterName+"."+filterCommandType. E.g. "lfs.clean"
+	 */
+	private Map<String, String> filterCommandsByNameDotType = new HashMap<String, String>();
 
 	/**
 	 * @param operationType
@@ -260,14 +265,14 @@ public class TreeWalk
 
 	private AttributesNodeProvider attributesNodeProvider;
 
-	private StreamTypeProvider streamTypeProvider;
-
 	private final MacroExpanderImpl macroExpander = new MacroExpanderImpl();
 
 	AbstractTreeIterator currentHead;
 
 	/** Cached attribute for the current entry */
 	private Attributes attrs = null;
+
+	private Config config;
 
 	/**
 	 * Create a new tree walker for a given repository.
@@ -279,9 +284,8 @@ public class TreeWalk
 	 */
 	public TreeWalk(final Repository repo) {
 		this(repo.newObjectReader(), true);
+		config = repo.getConfig();
 		attributesNodeProvider = repo.createAttributesNodeProvider();
-		streamTypeProvider = new StreamTypeProviderImpl(repo, operationType,
-				this);
 	}
 
 	/**
@@ -431,23 +435,6 @@ public class TreeWalk
 	 */
 	public void setAttributesNodeProvider(AttributesNodeProvider provider) {
 		attributesNodeProvider = provider;
-	}
-
-	/**
-	 * Sets the {@link StreamTypeProvider} for this {@link TreeWalk}.
-	 * <p>
-	 * This is a requirement for a correct computation of
-	 * {@link #getStreamType()}. If this {@link TreeWalk} has been built using
-	 * {@link #TreeWalk(Repository)} constructor, the {@link StreamTypeProvider}
-	 * has already been set. Otherwise you should provide one with
-	 * {@link #setStreamTypeProvider(StreamTypeProvider)}.
-	 * </p>
-	 *
-	 * @param provider
-	 * @since 4.2
-	 */
-	public void setStreamTypeProvider(StreamTypeProvider provider) {
-		streamTypeProvider = provider;
 	}
 
 	/** Reset this walker so new tree iterators can be added to it. */
@@ -1215,14 +1202,6 @@ public class TreeWalk
 		return attributes;
 	}
 
-	@Override
-	public StreamType getStreamType() {
-		if (streamTypeProvider == null)
-			throw new IllegalStateException(
-					"cannot detect the stream type with a null StreamTypeProvider"); //$NON-NLS-1$
-		return streamTypeProvider.getStreamType();
-	}
-
 	/**
 	 * Get the attributes located on the current entry path.
 	 *
@@ -1256,8 +1235,7 @@ public class TreeWalk
 			AttributesNode currentAttributesNode = getCurrentAttributesNode(
 					opType, workingTreeIterator, dirCacheIterator, other);
 			if (currentAttributesNode != null) {
-				currentAttributesNode.getAttributes(macroExpander, path, isDir,
-						attributes);
+				currentAttributesNode.getAttributes(macroExpander, path, isDir,	attributes);
 			}
 			getPerDirectoryEntryAttributes(path, isDir, opType,
 					getParent(workingTreeIterator, WorkingTreeIterator.class),
@@ -1272,17 +1250,6 @@ public class TreeWalk
 			AbstractTreeIterator parent = current.parent;
 			if (type.isInstance(parent)) {
 				return type.cast(parent);
-			}
-		}
-		return null;
-	}
-
-	private static <T extends AbstractTreeIterator> T getRoot(T current,
-			Class<T> type) {
-		if (current != null) {
-			AbstractTreeIterator root = current.root;
-			if (type.isInstance(root)) {
-				return type.cast(root);
 			}
 		}
 		return null;
@@ -1363,9 +1330,15 @@ public class TreeWalk
 		return attributesNode;
 	}
 
-	private static AttributesNode getAttributesNode(AttributesNode value,
-			AttributesNode defaultValue) {
-		return (value == null) ? defaultValue : value;
+	private static <T extends AbstractTreeIterator> T getRoot(T current,
+			Class<T> type) {
+		if (current != null) {
+			AbstractTreeIterator root = current.root;
+			if (type.isInstance(root)) {
+				return type.cast(root);
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -1452,27 +1425,70 @@ public class TreeWalk
 		return attributesNode;
 	}
 
+	private static AttributesNode getAttributesNode(AttributesNode value,
+			AttributesNode defaultValue) {
+		return (value == null) ? defaultValue : value;
+	}
+
 	/**
-	 * Implementation a {@link StreamTypeProvider} for a {@link FileRepository}.
+	 * Inspect config and attributes to return a filtercommand applicable for
+	 * the current path
+	 *
+	 * @param filterCommandType
+	 *            which type of filterCommand should be executed. E.g. "clean",
+	 *            "smudge"
+	 * @return a filter command
+	 * @throws IOException
+	 * @since 4.2
 	 */
-	private static class StreamTypeProviderImpl implements StreamTypeProvider {
-		private final WorkingTreeOptions options;
+	public String getFilterCommand(String filterCommandType)
+			throws IOException {
+		Attributes attributes = getAttributes();
 
-		private final OperationType op;
-
-		private final AttributesProvider attributesProvider;
-
-		StreamTypeProviderImpl(Repository repo, OperationType op,
-				AttributesProvider attributesProvider) {
-			this.options = repo.getConfig().get(WorkingTreeOptions.KEY);
-			this.op = op;
-			this.attributesProvider = attributesProvider;
+		Attribute f = attributes.get(Constants.ATTR_FILTER);
+		if (f == null) {
+			return null;
+		}
+		String filterValue = f.getValue();
+		if (filterValue == null) {
+			return null;
 		}
 
-		@Override
-		public StreamType getStreamType() {
-			return StreamTypeUtil.detectStreamType(op, options,
-					attributesProvider.getAttributes());
+		String filterCommand = getFilterCommandDefinition(filterValue,
+				filterCommandType);
+		if (filterCommand == null) {
+			return null;
 		}
+		return filterCommand.replaceAll("%f", //$NON-NLS-1$
+				QuotedString.BOURNE.quote((getPathString())));
+	}
+
+	/**
+	 * Get the filter command how it is defined in gitconfig. The returned
+	 * string may contain "%f" which needs to be replaced by the current path
+	 * before executing the filter command. These filter definitions are cached
+	 * for better performance.
+	 *
+	 * @param filterDriverName
+	 *            The name of the filter driver as it is referenced in the
+	 *            gitattributes file. E.g. "lfs". For each filter driver there
+	 *            may be many commands defined in the .gitconfig
+	 * @param filterCommandType
+	 *            The type of the filter command for a specific filter driver.
+	 *            May be "clean" or "smudge".
+	 * @return the definition of the command to be executed for this filter
+	 *         driver and filter command
+	 */
+	private String getFilterCommandDefinition(String filterDriverName,
+			String filterCommandType) {
+		String key = filterDriverName + "." + filterCommandType; //$NON-NLS-1$
+		String filterCommand = filterCommandsByNameDotType.get(key);
+		if (filterCommand != null)
+			return filterCommand;
+		filterCommand = config.getString(Constants.ATTR_FILTER,
+				filterDriverName, filterCommandType);
+		if (filterCommand != null)
+			filterCommandsByNameDotType.put(key, filterCommand);
+		return filterCommand;
 	}
 }
