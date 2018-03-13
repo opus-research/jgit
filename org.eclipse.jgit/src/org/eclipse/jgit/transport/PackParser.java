@@ -173,8 +173,8 @@ public abstract class PackParser {
 
 	private LongMap<UnresolvedDelta> baseByPos;
 
-	/** Objects need to be double-checked for collision after indexing. */
-	private BlockList<PackedObjectInfo> collisionCheckObjs;
+	/** Blobs whose contents need to be double-checked after indexing. */
+	private BlockList<PackedObjectInfo> deferredCheckBlobs;
 
 	private MessageDigest packDigest;
 
@@ -528,7 +528,7 @@ public abstract class PackParser {
 			entries = new PackedObjectInfo[(int) objectCount];
 			baseById = new ObjectIdOwnerMap<>();
 			baseByPos = new LongMap<>();
-			collisionCheckObjs = new BlockList<>();
+			deferredCheckBlobs = new BlockList<>();
 
 			receiving.beginTask(JGitText.get().receivingObjects,
 					(int) objectCount);
@@ -545,10 +545,8 @@ public abstract class PackParser {
 				receiving.endTask();
 			}
 
-			if (!collisionCheckObjs.isEmpty()) {
-				checkObjectCollision();
-			}
-
+			if (!deferredCheckBlobs.isEmpty())
+				doDeferredCheckBlobs();
 			if (deltaCount > 0) {
 				if (resolving instanceof BatchingProgressMonitor) {
 					((BatchingProgressMonitor) resolving).setDelayStart(
@@ -677,9 +675,6 @@ public abstract class PackParser {
 			objectDigest.digest(tempObjectId);
 
 			verifySafeObject(tempObjectId, type, visit.data);
-			if (isCheckObjectCollisions() && readCurs.has(tempObjectId)) {
-				checkObjectCollision(tempObjectId, type, visit.data);
-			}
 
 			PackedObjectInfo oe;
 			oe = newInfo(tempObjectId, visit.delta, visit.parent.id);
@@ -1036,6 +1031,7 @@ public abstract class PackParser {
 		objectDigest.update((byte) 0);
 
 		final byte[] data;
+		boolean checkContentLater = false;
 		if (type == Constants.OBJ_BLOB) {
 			byte[] readBuffer = buffer();
 			InputStream inf = inflate(Source.INPUT, sz);
@@ -1049,7 +1045,10 @@ public abstract class PackParser {
 			}
 			inf.close();
 			objectDigest.digest(tempObjectId);
+			checkContentLater = isCheckObjectCollisions()
+					&& readCurs.has(tempObjectId);
 			data = null;
+
 		} else {
 			data = inflateAndReturn(Source.INPUT, sz);
 			objectDigest.update(data);
@@ -1063,10 +1062,8 @@ public abstract class PackParser {
 		if (data != null)
 			onInflatedObjectData(obj, type, data);
 		addObjectAndTrack(obj);
-
-		if (isCheckObjectCollisions()) {
-			collisionCheckObjs.add(obj);
-		}
+		if (checkContentLater)
+			deferredCheckBlobs.add(obj);
 	}
 
 	private void verifySafeObject(final AnyObjectId id, final int type,
@@ -1081,69 +1078,62 @@ public abstract class PackParser {
 				throw new CorruptObjectException(MessageFormat.format(
 						JGitText.get().invalidObject,
 						Constants.typeString(type),
-						id.name(),
+						readCurs.abbreviate(id, 10).name(),
 						e.getMessage()), e);
 			}
 		}
-	}
 
-	private void checkObjectCollision() throws IOException {
-		for (PackedObjectInfo obj : collisionCheckObjs) {
-			if (!readCurs.has(obj)) {
-				return;
+		if (isCheckObjectCollisions()) {
+			try {
+				final ObjectLoader ldr = readCurs.open(id, type);
+				final byte[] existingData = ldr.getCachedBytes(data.length);
+				if (!Arrays.equals(data, existingData)) {
+					throw new IOException(MessageFormat.format(
+							JGitText.get().collisionOn, id.name()));
+				}
+			} catch (MissingObjectException notLocal) {
+				// This is OK, we don't have a copy of the object locally
+				// but the API throws when we try to read it as usually its
+				// an error to read something that doesn't exist.
 			}
-			checkObjectCollision(obj);
 		}
 	}
 
-	private void checkObjectCollision(PackedObjectInfo obj)
-			throws IOException {
-		ObjectTypeAndSize info = openDatabase(obj, new ObjectTypeAndSize());
+	private void doDeferredCheckBlobs() throws IOException {
 		final byte[] readBuffer = buffer();
 		final byte[] curBuffer = new byte[readBuffer.length];
-		long sz = info.size;
-		ObjectStream cur = readCurs.open(obj, info.type).openStream();
-		InputStream pck = inflate(Source.DATABASE, sz);
-		try {
-			if (cur.getSize() != sz) {
-				throw new IOException(MessageFormat.format(
-						JGitText.get().collisionOn, obj.name()));
-			}
-			while (0 < sz) {
-				int n = (int) Math.min(readBuffer.length, sz);
-				IO.readFully(cur, curBuffer, 0, n);
-				IO.readFully(pck, readBuffer, 0, n);
-				for (int i = 0; i < n; i++) {
-					if (curBuffer[i] != readBuffer[i]) {
-						throw new IOException(MessageFormat.format(JGitText
-								.get().collisionOn, obj.name()));
-					}
-				}
-				sz -= n;
-			}
-		} catch (MissingObjectException notLocal) {
-			// This is OK, we don't have a copy of the object locally
-			// but the API throws when we try to read it as usually its
-			// an error to read something that doesn't exist.
-		} finally {
-			pck.close();
-			cur.close();
-		}
-	}
+		ObjectTypeAndSize info = new ObjectTypeAndSize();
 
-	private void checkObjectCollision(AnyObjectId obj, int type, byte[] data)
-			throws IOException {
-		try {
-			final ObjectLoader ldr = readCurs.open(obj, type);
-			final byte[] existingData = ldr.getCachedBytes(data.length);
-			if (!Arrays.equals(data, existingData)) {
+		for (PackedObjectInfo obj : deferredCheckBlobs) {
+			info = openDatabase(obj, info);
+
+			if (info.type != Constants.OBJ_BLOB)
 				throw new IOException(MessageFormat.format(
-						JGitText.get().collisionOn, obj.name()));
+						JGitText.get().unknownObjectType,
+						Integer.valueOf(info.type)));
+
+			ObjectStream cur = readCurs.open(obj, info.type).openStream();
+			try {
+				long sz = info.size;
+				if (cur.getSize() != sz)
+					throw new IOException(MessageFormat.format(
+							JGitText.get().collisionOn, obj.name()));
+				InputStream pck = inflate(Source.DATABASE, sz);
+				while (0 < sz) {
+					int n = (int) Math.min(readBuffer.length, sz);
+					IO.readFully(cur, curBuffer, 0, n);
+					IO.readFully(pck, readBuffer, 0, n);
+					for (int i = 0; i < n; i++) {
+						if (curBuffer[i] != readBuffer[i])
+							throw new IOException(MessageFormat.format(JGitText
+									.get().collisionOn, obj.name()));
+					}
+					sz -= n;
+				}
+				pck.close();
+			} finally {
+				cur.close();
 			}
-		} catch (MissingObjectException notLocal) {
-			// This is OK, we don't have a copy of the object locally
-			// but the API throws when we try to read it as usually its
-			// an error to read something that doesn't exist.
 		}
 	}
 
