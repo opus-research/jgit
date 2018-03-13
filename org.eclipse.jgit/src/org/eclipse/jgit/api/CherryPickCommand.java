@@ -82,8 +82,6 @@ import org.eclipse.jgit.treewalk.FileTreeIterator;
  *      >Git documentation about cherry-pick</a>
  */
 public class CherryPickCommand extends GitCommand<CherryPickResult> {
-	private String reflogPrefix = "cherry-pick:"; //$NON-NLS-1$
-
 	private List<Ref> commits = new LinkedList<Ref>();
 
 	private String ourCommitName = null;
@@ -124,8 +122,9 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 			if (headRef == null)
 				throw new NoHeadException(
 						JGitText.get().commitOnRepoWithoutHEADCurrentlyNotSupported);
+			RevCommit headCommit = revWalk.parseCommit(headRef.getObjectId());
 
-			newHead = revWalk.parseCommit(headRef.getObjectId());
+			newHead = headCommit;
 
 			// loop through all refs to be cherry-picked
 			for (Ref src : commits) {
@@ -151,25 +150,26 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 				String cherryPickName = srcCommit.getId().abbreviate(7).name()
 						+ " " + srcCommit.getShortMessage(); //$NON-NLS-1$
 
-				ResolveMerger merger = (ResolveMerger) MergeStrategy.RECURSIVE
+				ResolveMerger merger = (ResolveMerger) MergeStrategy.RESOLVE
 						.newMerger(repo);
 				merger.setWorkingTreeIterator(new FileTreeIterator(repo));
 				merger.setBase(srcParent.getTree());
 				merger.setCommitNames(new String[] { "BASE", ourName,
 						cherryPickName });
-				if (merger.merge(newHead, srcCommit)) {
-					if (AnyObjectId.equals(newHead.getTree().getId(), merger
+				if (merger.merge(headCommit, srcCommit)) {
+					if (AnyObjectId.equals(headCommit.getTree().getId(), merger
 							.getResultTreeId()))
 						continue;
 					DirCacheCheckout dco = new DirCacheCheckout(repo,
-							newHead.getTree(), repo.lockDirCache(),
+							headCommit.getTree(), repo.lockDirCache(),
 							merger.getResultTreeId());
 					dco.setFailOnConflict(true);
 					dco.checkout();
 					newHead = new Git(getRepository()).commit()
 							.setMessage(srcCommit.getFullMessage())
-							.setReflogComment(reflogPrefix + " " //$NON-NLS-1$
-									+ srcCommit.getShortMessage())
+							.setReflogComment(
+									"cherry-pick: " //$NON-NLS-1$
+											+ srcCommit.getShortMessage())
 							.setAuthor(srcCommit.getAuthorIdent()).call();
 					cherryPickedRefs.add(src);
 				} else {
@@ -240,22 +240,6 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 	 */
 	public CherryPickCommand setOurCommitName(String ourCommitName) {
 		this.ourCommitName = ourCommitName;
-		return this;
-	}
-
-	/**
-	 * Set the prefix to use in the reflog.
-	 * <p>
-	 * This is primarily needed for implementing rebase in terms of
-	 * cherry-picking
-	 *
-	 * @param prefix
-	 *            including ":"
-	 * @return {@code this}
-	 * @since 3.1
-	 */
-	public CherryPickCommand setReflogPrefix(final String prefix) {
-		this.reflogPrefix = prefix;
 		return this;
 	}
 

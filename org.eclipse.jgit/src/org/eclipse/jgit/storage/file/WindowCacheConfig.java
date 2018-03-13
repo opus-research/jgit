@@ -43,11 +43,10 @@
 
 package org.eclipse.jgit.storage.file;
 
-import org.eclipse.jgit.internal.storage.file.WindowCache;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.storage.pack.PackConfig;
 
-/** Configuration parameters for JVM-wide buffer cache used by JGit. */
+/** Configuration parameters for {@link WindowCache}. */
 public class WindowCacheConfig {
 	/** 1024 (number of bytes in one kibibyte/kilobyte) */
 	public static final int KB = 1024;
@@ -147,8 +146,8 @@ public class WindowCacheConfig {
 	}
 
 	/**
-	 * @return maximum number of bytes to cache in delta base cache for
-	 *         inflated, recently accessed objects, without delta chains.
+	 * @return maximum number of bytes to cache in {@link DeltaBaseCache}
+	 *         for inflated, recently accessed objects, without delta chains.
 	 *         <b>Default 10 MB.</b>
 	 */
 	public int getDeltaBaseCacheLimit() {
@@ -157,8 +156,9 @@ public class WindowCacheConfig {
 
 	/**
 	 * @param newLimit
-	 *            maximum number of bytes to cache in delta base cache for
-	 *            inflated, recently accessed objects, without delta chains.
+	 *            maximum number of bytes to cache in
+	 *            {@link DeltaBaseCache} for inflated, recently accessed
+	 *            objects, without delta chains.
 	 */
 	public void setDeltaBaseCacheLimit(final int newLimit) {
 		deltaBaseCacheLimit = newLimit;
@@ -186,12 +186,9 @@ public class WindowCacheConfig {
 	 * If a property is not defined in the configuration, then it is left
 	 * unmodified.
 	 *
-	 * @param rc
-	 *            configuration to read properties from.
-	 * @return {@code this}.
-	 * @since 3.0
+	 * @param rc configuration to read properties from.
 	 */
-	public WindowCacheConfig fromConfig(final Config rc) {
+	public void fromConfig(final Config rc) {
 		setPackedGitOpenFiles(rc.getInt(
 				"core", null, "packedgitopenfiles", getPackedGitOpenFiles())); //$NON-NLS-1$ //$NON-NLS-2$
 		setPackedGitLimit(rc.getLong(
@@ -209,19 +206,5 @@ public class WindowCacheConfig {
 		sft = Math.min(sft, maxMem / 4); // don't use more than 1/4 of the heap
 		sft = Math.min(sft, Integer.MAX_VALUE); // cannot exceed array length
 		setStreamFileThreshold((int) sft);
-		return this;
-	}
-
-	/**
-	 * Install this configuration as the live settings.
-	 * <p>
-	 * The new configuration is applied immediately. If the new limits are
-	 * smaller than what what is currently cached, older entries will be purged
-	 * as soon as possible to allow the cache to meet the new limit.
-	 *
-	 * @since 3.0
-	 */
-	public void install() {
-		WindowCache.reconfigure(this);
 	}
 }
