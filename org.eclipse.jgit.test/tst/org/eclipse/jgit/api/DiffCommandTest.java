@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2011, Tomasz Zarna <Tomasz.Zarna@pl.ibm.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,36 +40,58 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.api;
 
-package org.eclipse.jgit.errors;
+import static org.junit.Assert.assertEquals;
 
 import java.io.File;
-import java.io.IOException;
-import java.text.MessageFormat;
+import java.util.List;
 
-import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.diff.DiffEntry;
+import org.eclipse.jgit.diff.DiffEntry.ChangeType;
+import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.junit.Test;
 
-/** Thrown when a PackFile previously failed and is known to be unusable */
-public class PackInvalidException extends IOException {
-	private static final long serialVersionUID = 1L;
+public class DiffCommandTest extends RepositoryTestCase {
+	@Test
+	public void testDiffModified() throws Exception {
+		write(new File(db.getDirectory().getParent(), "test.txt"), "test");
+		File folder = new File(db.getDirectory().getParent(), "folder");
+		folder.mkdir();
+		write(new File(folder, "folder.txt"), "folder");
+		Git git = new Git(db);
+		git.add().addFilepattern(".").call();
+		git.commit().setMessage("Initial commit").call();
+		write(new File(folder, "folder.txt"), "folder change");
 
-	/**
-	 * Construct a pack invalid error.
-	 *
-	 * @param path
-	 *            path of the invalid pack file.
-	 */
-	public PackInvalidException(final File path) {
-		this(path.getAbsolutePath());
+		List<DiffEntry> entries = git.diff().call();
+		assertEquals(1, entries.size());
+		assertEquals(ChangeType.MODIFY, entries.get(0)
+				.getChangeType());
+		assertEquals("folder/folder.txt", entries.get(0)
+				.getOldPath());
+		assertEquals("folder/folder.txt", entries.get(0)
+				.getNewPath());
 	}
 
-	/**
-	 * Construct a pack invalid error.
-	 *
-	 * @param path
-	 *            path of the invalid pack file.
-	 */
-	public PackInvalidException(final String path) {
-		super(MessageFormat.format(JGitText.get().packFileInvalid, path));
+	@Test
+	public void testDiffCached() throws Exception {
+		write(new File(db.getDirectory().getParent(), "test.txt"), "test");
+		File folder = new File(db.getDirectory().getParent(), "folder");
+		folder.mkdir();
+		Git git = new Git(db);
+		git.add().addFilepattern(".").call();
+		git.commit().setMessage("Initial commit").call();
+		write(new File(folder, "folder.txt"), "folder");
+		git.add().addFilepattern(".").call();
+
+		List<DiffEntry> entries = git.diff().setCached(true).call();
+		assertEquals(1, entries.size());
+		assertEquals(ChangeType.ADD, entries.get(0)
+				.getChangeType());
+		assertEquals("/dev/null", entries.get(0)
+				.getOldPath());
+		assertEquals("folder/folder.txt", entries.get(0)
+				.getNewPath());
 	}
 }
