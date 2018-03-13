@@ -70,7 +70,6 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.ObjectWritingException;
 import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.Commit;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -82,7 +81,7 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefWriter;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.Tag;
+import org.eclipse.jgit.lib.TagBuilder;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -359,7 +358,9 @@ public class TestRepository<R extends Repository> {
 			final RevCommit... parents) throws Exception {
 		tick(secDelta);
 
-		final Commit c = new Commit(db);
+		final org.eclipse.jgit.lib.CommitBuilder c;
+
+		c = new org.eclipse.jgit.lib.CommitBuilder();
 		c.setTreeId(tree);
 		c.setParentIds(parents);
 		c.setAuthor(new PersonIdent(author, new Date(now)));
@@ -367,7 +368,7 @@ public class TestRepository<R extends Repository> {
 		c.setMessage("");
 		ObjectId id;
 		try {
-			id = inserter.insert(Constants.OBJ_COMMIT, inserter.format(c));
+			id = inserter.insert(c);
 			inserter.flush();
 		} finally {
 			inserter.release();
@@ -397,15 +398,14 @@ public class TestRepository<R extends Repository> {
 	 * @throws Exception
 	 */
 	public RevTag tag(final String name, final RevObject dst) throws Exception {
-		final Tag t = new Tag(db);
-		t.setType(Constants.typeString(dst.getType()));
-		t.setObjId(dst.toObjectId());
+		final TagBuilder t = new TagBuilder();
+		t.setObjectId(dst);
 		t.setTag(name);
 		t.setTagger(new PersonIdent(committer, new Date(now)));
 		t.setMessage("");
 		ObjectId id;
 		try {
-			id = inserter.insert(Constants.OBJ_TAG, inserter.format(t));
+			id = inserter.insert(t);
 			inserter.flush();
 		} finally {
 			inserter.release();
@@ -586,7 +586,7 @@ public class TestRepository<R extends Repository> {
 		md.update(Constants.encodeASCII(bin.length));
 		md.update((byte) 0);
 		md.update(bin);
-		Assert.assertEquals(id.copy(), ObjectId.fromRaw(md.digest()));
+		Assert.assertEquals(id, ObjectId.fromRaw(md.digest()));
 	}
 
 	/**
@@ -811,8 +811,10 @@ public class TestRepository<R extends Repository> {
 			if (self == null) {
 				TestRepository.this.tick(tick);
 
-				final Commit c = new Commit(db);
-				c.setParentIds(parents.toArray(new RevCommit[parents.size()]));
+				final org.eclipse.jgit.lib.CommitBuilder c;
+
+				c = new org.eclipse.jgit.lib.CommitBuilder();
+				c.setParentIds(parents);
 				c.setAuthor(new PersonIdent(author, new Date(now)));
 				c.setCommitter(new PersonIdent(committer, new Date(now)));
 				c.setMessage(message);
@@ -820,8 +822,7 @@ public class TestRepository<R extends Repository> {
 				ObjectId commitId;
 				try {
 					c.setTreeId(tree.writeTree(inserter));
-					commitId = inserter.insert(Constants.OBJ_COMMIT, inserter
-							.format(c));
+					commitId = inserter.insert(c);
 					inserter.flush();
 				} finally {
 					inserter.release();

@@ -54,7 +54,6 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.revwalk.filter.AndRevFilter;
 import org.eclipse.jgit.revwalk.filter.RevFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
-import org.eclipse.jgit.revwalk.DepthWalk;
 
 /**
  * Initial RevWalk generator that bootstraps a new walk.
@@ -85,6 +84,8 @@ class StartGenerator extends Generator {
 		RevFilter rf = w.getRevFilter();
 		final TreeFilter tf = w.getTreeFilter();
 		AbstractRevQueue q = walker.queue;
+
+		w.reader.walkAdviceBeginCommits(w, w.roots);
 
 		if (rf == RevFilter.MERGE_BASE) {
 			// Computing for merge bases is a special case and does not
@@ -131,20 +132,14 @@ class StartGenerator extends Generator {
 		}
 
 		walker.queue = q;
+		g = new PendingGenerator(w, pending, rf, pendingOutputType);
 
-		if (walker instanceof DepthWalk) {
-			DepthWalk dw = (DepthWalk) walker;
-			g = new DepthGenerator(w, pending, dw.getDepth(), dw.getCompareMode());
-		} else {
-			g = new PendingGenerator(w, pending, rf, pendingOutputType);
-
-			if (boundary) {
-				// Because the boundary generator may produce uninteresting
-				// commits we cannot allow the pending generator to dispose
-				// of them early.
-				//
-				((PendingGenerator) g).canDispose = false;
-			}
+		if (boundary) {
+			// Because the boundary generator may produce uninteresting
+			// commits we cannot allow the pending generator to dispose
+			// of them early.
+			//
+			((PendingGenerator) g).canDispose = false;
 		}
 
 		if ((g.outputType() & NEEDS_REWRITE) != 0) {
