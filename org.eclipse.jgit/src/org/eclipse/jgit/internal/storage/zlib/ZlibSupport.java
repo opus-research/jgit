@@ -43,10 +43,7 @@
 
 package org.eclipse.jgit.internal.storage.zlib;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.util.zip.DataFormatException;
-import java.util.zip.InflaterOutputStream;
+import java.util.zip.Inflater;
 
 /**
  * Utility class to inflate zlib
@@ -61,17 +58,17 @@ public class ZlibSupport {
 	 * @param expectedSize
 	 *            expected result size
 	 * @return inflated bytes
-	 * @throws DataFormatException
 	 */
-	public static byte[] inflate(byte[] bytes, int expectedSize)
-			throws DataFormatException {
-
-		try (ByteArrayOutputStream baos = new ByteArrayOutputStream(expectedSize);
-			 InflaterOutputStream ios = new InflaterOutputStream(baos)) {
-			ios.write(bytes, 0, bytes.length);
-			return baos.toByteArray();
-		} catch (IOException e) {
-			throw new DataFormatException();
+	public static byte[] inflate(byte[] bytes, int expectedSize) {
+		try {
+			Inflater decompressor = new Inflater();
+			decompressor.setInput(bytes, 0, bytes.length);
+			byte[] result = new byte[expectedSize];
+			decompressor.inflate(result);
+			decompressor.end();
+			return result;
+		} catch (Exception e) {
+			throw new RuntimeException("Unable to inflate binary data", e); //$NON-NLS-1$
 		}
 	}
 
