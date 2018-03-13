@@ -50,6 +50,8 @@ import java.io.OutputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.eclipse.jgit.http.server.resolver.ReceivePackFactory;
+import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.ReceivePack;
 
@@ -60,6 +62,11 @@ class ReceivePackServlet extends RepositoryServlet {
 	private static final String RSP_TYPE = "application/x-git-receive-pack-status";
 
 	private static final long serialVersionUID = 1L;
+	private final ReceivePackFactory receivePackFactory;
+
+	ReceivePackServlet(final ReceivePackFactory receivePackFactory) {
+		this.receivePackFactory = receivePackFactory;
+	}
 
 	@Override
 	public void doPost(final HttpServletRequest req,
@@ -72,9 +79,14 @@ class ReceivePackServlet extends RepositoryServlet {
 		final Repository db = getRepository(req);
 		final ByteArrayOutputStream out = new ByteArrayOutputStream();
 		try {
-			final ReceivePack rp = new ReceivePack(db);
+			final ReceivePack rp = receivePackFactory.create(req, db);
 			rp.setBiDirectionalPipe(false);
 			rp.receive(req.getInputStream(), out, null);
+
+		} catch (ServiceNotEnabledException e) {
+			rsp.sendError(HttpServletResponse.SC_FORBIDDEN);
+			return;
+
 		} catch (IOException e) {
 			getServletContext().log("Internal error during receive-pack", e);
 			rsp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);

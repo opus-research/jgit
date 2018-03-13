@@ -139,7 +139,8 @@ public class RepositoryRouter implements Filter {
 		bind("^/(.*)/objects/(pack/pack-[0-9a-f]{40}\\.(?:pack|idx))$",
 				new PackFileServlet());
 
-		bind("^/(.*)/git-receive-pack$", new ReceivePackServlet());
+		bind("^/(.*)/git-receive-pack$", //
+				new ReceivePackServlet(receivePackFactory));
 
 		for (ServletDefinition d : servlets)
 			d.init(context);
