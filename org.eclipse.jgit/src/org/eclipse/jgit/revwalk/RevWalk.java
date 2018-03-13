@@ -95,7 +95,7 @@ import org.eclipse.jgit.treewalk.filter.TreeFilter;
  * the same RevWalk at the same time. The Iterator may buffer RevCommits, while
  * {@link #next()} does not.
  */
-public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
+public class RevWalk implements Iterable<RevCommit> {
 	private static final int MB = 1 << 20;
 
 	/**
@@ -166,8 +166,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 
 	final ObjectReader reader;
 
-	private final boolean closeReader;
-
 	final MutableObjectId idBuffer;
 
 	ObjectIdOwnerMap<RevObject> objects;
@@ -175,8 +173,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	private int freeFlags = APP_FLAGS;
 
 	private int delayFreeFlags;
-
-	private int retainOnReset;
 
 	int carryFlags = UNINTERESTING;
 
@@ -203,27 +199,22 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	 *
 	 * @param repo
 	 *            the repository the walker will obtain data from. An
-	 *            ObjectReader will be created by the walker, and will be closed
-	 *            when the walker is closed.
+	 *            ObjectReader will be created by the walker, and must be
+	 *            released by the caller.
 	 */
 	public RevWalk(final Repository repo) {
-		this(repo.newObjectReader(), true);
+		this(repo.newObjectReader());
 	}
 
 	/**
 	 * Create a new revision walker for a given repository.
-	 * <p>
 	 *
 	 * @param or
-	 *            the reader the walker will obtain data from. The reader is not
-	 *            closed when the walker is closed (but is closed by {@link
-	 *            #dispose()}.
+	 *            the reader the walker will obtain data from. The reader should
+	 *            be released by the caller when the walker is no longer
+	 *            required.
 	 */
 	public RevWalk(ObjectReader or) {
-		this(or, false);
-	}
-
-	private RevWalk(ObjectReader or, boolean closeReader) {
 		reader = or;
 		idBuffer = new MutableObjectId();
 		objects = new ObjectIdOwnerMap<RevObject>();
@@ -234,7 +225,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 		filter = RevFilter.ALL;
 		treeFilter = TreeFilter.ALL;
 		retainBody = true;
-		this.closeReader = closeReader;
 	}
 
 	/** @return the reader this walker is using to load objects. */
@@ -246,26 +236,10 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	 * Release any resources used by this walker's reader.
 	 * <p>
 	 * A walker that has been released can be used again, but may need to be
-	 * released after the subsequent usage. Use {@link #close()} instead.
-	 */
-	@Deprecated
-	public void release() {
-		close();
-	}
-
-	/**
-	 * Release any resources used by this walker's reader.
-	 * <p>
-	 * A walker that has been released can be used again, but may need to be
 	 * released after the subsequent usage.
-	 *
-	 * @since 4.0
 	 */
-	@Override
-	public void close() {
-		if (closeReader) {
-			reader.close();
-		}
+	public void release() {
+		reader.release();
 	}
 
 	/**
@@ -1119,47 +1093,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	}
 
 	/**
-	 * Preserve a RevFlag during all {@code reset} methods.
-	 * <p>
-	 * Calling {@code retainOnReset(flag)} avoids needing to pass the flag
-	 * during each {@code resetRetain()} invocation on this instance.
-	 * <p>
-	 * Clearing flags marked retainOnReset requires disposing of the flag with
-	 * {@code #disposeFlag(RevFlag)} or disposing of the entire RevWalk by
-	 * {@code #dispose()}.
-	 *
-	 * @param flag
-	 *            the flag to retain during all resets.
-	 * @since 3.6
-	 */
-	public final void retainOnReset(RevFlag flag) {
-		if ((freeFlags & flag.mask) != 0)
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().flagIsDisposed, flag.name));
-		if (flag.walker != this)
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().flagNotFromThis, flag.name));
-		retainOnReset |= flag.mask;
-	}
-
-	/**
-	 * Preserve a set of RevFlags during all {@code reset} methods.
-	 * <p>
-	 * Calling {@code retainOnReset(set)} avoids needing to pass the flags
-	 * during each {@code resetRetain()} invocation on this instance.
-	 * <p>
-	 * Clearing flags marked retainOnReset requires disposing of the flag with
-	 * {@code #disposeFlag(RevFlag)} or disposing of the entire RevWalk by
-	 * {@code #dispose()}.
-	 *
-	 * @param flags
-	 *            the flags to retain during all resets.
-	 * @since 3.6
-	 */
-	public final void retainOnReset(Collection<RevFlag> flags) {
-		for (RevFlag f : flags)
-			retainOnReset(f);
-	}
-
-	/**
 	 * Allow a flag to be recycled for a different use.
 	 * <p>
 	 * Recycled flags always come back as a different Java object instance when
@@ -1177,7 +1110,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	}
 
 	void freeFlag(final int mask) {
-		retainOnReset &= ~mask;
 		if (isNotStarted()) {
 			freeFlags |= mask;
 			carryFlags &= ~mask;
@@ -1226,9 +1158,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	 * Unlike {@link #dispose()} previously acquired RevObject (and RevCommit)
 	 * instances are not invalidated. RevFlag instances are not invalidated, but
 	 * are removed from all RevObjects.
-	 * <p>
-	 * See {@link #retainOnReset(RevFlag)} for an alternative that does not
-	 * require passing the flags during each reset.
 	 *
 	 * @param retainFlags
 	 *            application flags that should <b>not</b> be cleared from
@@ -1254,7 +1183,7 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	 */
 	protected void reset(int retainFlags) {
 		finishDelayedFreeFlags();
-		retainFlags |= PARSED | retainOnReset;
+		retainFlags |= PARSED;
 		final int clearFlags = ~retainFlags;
 
 		final FIFORevQueue q = new FIFORevQueue();
@@ -1295,13 +1224,12 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 	 * All RevFlag instances are also invalidated, and must not be reused.
 	 */
 	public void dispose() {
-		reader.close();
+		reader.release();
 		freeFlags = APP_FLAGS;
 		delayFreeFlags = 0;
-		retainOnReset = 0;
 		carryFlags = UNINTERESTING;
 		objects.clear();
-		reader.close();
+		reader.release();
 		roots.clear();
 		queue = new DateRevQueue();
 		pending = new StartGenerator(this);

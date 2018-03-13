@@ -53,13 +53,13 @@
 
   <groupId>org.eclipse.jgit</groupId>
   <artifactId>jgit.tycho.parent</artifactId>
-  <version>4.0.0-SNAPSHOT</version>
+  <version>3.6.0-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <name>JGit Tycho Parent</name>
 
   <properties>
-    <tycho-version>0.22.0</tycho-version>
+    <tycho-version>0.21.0</tycho-version>
     <tycho-extras-version>${tycho-version}</tycho-extras-version>
   </properties>
 
@@ -74,6 +74,7 @@
     <module>org.eclipse.jgit.target</module>
     <module>org.eclipse.jgit.feature</module>
     <module>org.eclipse.jgit.http.apache.feature</module>
+    <module>org.eclipse.jgit.java7.feature</module>
     <module>org.eclipse.jgit.pgm.feature</module>
     <module>org.eclipse.jgit.source.feature</module>
     <module>org.eclipse.jgit.pgm.source.feature</module>
@@ -100,6 +101,12 @@
     <dependency>
       <groupId>org.eclipse.jgit</groupId>
       <artifactId>org.eclipse.jgit</artifactId>
+      <version>${project.version}</version>
+      <classifier>sources</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jgit</groupId>
+      <artifactId>org.eclipse.jgit.java7</artifactId>
       <version>${project.version}</version>
       <classifier>sources</classifier>
     </dependency>
@@ -136,8 +143,6 @@
           <version>${tycho-version}</version>
           <configuration>
             <encoding>UTF-8</encoding>
-            <source>1.7</source>
-            <target>1.7</target>
           </configuration>
         </plugin>
         <plugin>
@@ -245,18 +250,6 @@
       </activation>
       <properties>
         <target-platform>jgit-4.4</target-platform>
-      </properties>
-    </profile>
-    <profile>
-      <id>platform-mars</id>
-      <activation>
-        <property>
-          <name>platform-version-name</name>
-          <value>mars</value>
-        </property>
-      </activation>
-      <properties>
-        <target-platform>jgit-4.5</target-platform>
       </properties>
     </profile>
     <profile>
@@ -384,3 +377,4 @@
     </profile>
   </profiles>
 </project>
+

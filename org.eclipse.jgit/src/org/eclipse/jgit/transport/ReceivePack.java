@@ -43,7 +43,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_ATOMIC;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_REPORT_STATUS;
 
 import java.io.IOException;
@@ -200,14 +199,8 @@ public class ReceivePack extends BaseReceivePack {
 			}
 
 			if (unpackError == null) {
-				boolean atomic = isCapabilityEnabled(CAPABILITY_ATOMIC);
 				validateCommands();
-				if (atomic && anyRejects())
-					failPendingCommands();
-
 				preReceive.onPreReceive(this, filterCommands(Result.NOT_ATTEMPTED));
-				if (atomic && anyRejects())
-					failPendingCommands();
 				executeCommands();
 			}
 			unlockPack();

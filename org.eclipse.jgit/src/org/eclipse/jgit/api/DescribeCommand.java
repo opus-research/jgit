@@ -42,17 +42,6 @@
  */
 package org.eclipse.jgit.api;
 
-import static org.eclipse.jgit.lib.Constants.R_TAGS;
-
-import java.io.IOException;
-import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
@@ -63,10 +52,18 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevFlag;
-import org.eclipse.jgit.revwalk.RevFlagSet;
-import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.revwalk.*;
+
+import java.io.IOException;
+import java.text.MessageFormat;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import static org.eclipse.jgit.lib.Constants.R_TAGS;
 
 /**
  * Given a commit, show the most recent tag that is reachable from a commit.
@@ -87,11 +84,6 @@ public class DescribeCommand extends GitCommand<String> {
 	 * which is 24.
 	 */
 	private int maxCandidates = 10;
-
-	/**
-	 * Whether to always use long output format or not.
-	 */
-	private boolean longDesc;
 
 	/**
 	 *
@@ -141,32 +133,6 @@ public class DescribeCommand extends GitCommand<String> {
 		if (id == null)
 			throw new RefNotFoundException(MessageFormat.format(JGitText.get().refNotResolved, rev));
 		return setTarget(id);
-	}
-
-	/**
-	 * Determine whether always to use the long format or not. When set to
-	 * <code>true</code> the long format is used even the commit matches a tag.
-	 *
-	 * @param longDesc
-	 *            <code>true</code> if always the long format should be used.
-	 * @return {@code this}
-	 *
-	 * @see <a
-	 *      href="https://www.kernel.org/pub/software/scm/git/docs/git-describe.html"
-	 *      >Git documentation about describe</a>
-	 * @since 4.0
-	 */
-	public DescribeCommand setLong(boolean longDesc) {
-		this.longDesc = longDesc;
-		return this;
-	}
-
-	private String longDescription(Ref tag, int depth, ObjectId tip)
-			throws IOException {
-		return String.format(
-				"%s-%d-g%s", tag.getName().substring(R_TAGS.length()), //$NON-NLS-1$
-				Integer.valueOf(depth), w.getObjectReader().abbreviate(tip)
-						.name());
 	}
 
 	/**
@@ -236,18 +202,16 @@ public class DescribeCommand extends GitCommand<String> {
 				}
 
 				String describe(ObjectId tip) throws IOException {
-					return longDescription(tag, depth, tip);
+					return String.format("%s-%d-g%s", tag.getName().substring(R_TAGS.length()), //$NON-NLS-1$
+							Integer.valueOf(depth), w.getObjectReader().abbreviate(tip).name());
 				}
-
 			}
 			List<Candidate> candidates = new ArrayList<Candidate>();    // all the candidates we find
 
 			// is the target already pointing to a tag? if so, we are done!
 			Ref lucky = tags.get(target);
-			if (lucky != null) {
-				return longDesc ? longDescription(lucky, 0, target) : lucky
-						.getName().substring(R_TAGS.length());
-			}
+			if (lucky != null)
+				return lucky.getName().substring(R_TAGS.length());
 
 			w.markStart(target);
 
