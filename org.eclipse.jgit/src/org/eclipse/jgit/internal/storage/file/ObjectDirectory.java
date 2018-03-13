@@ -110,8 +110,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	private final File objects;
 
-	private final AtomicReference<WindowCache> windowCache;
-
 	private final File infoDirectory;
 
 	private final File packDirectory;
@@ -151,11 +149,9 @@ public class ObjectDirectory extends FileObjectDatabase {
 	 *             an alternate object cannot be opened.
 	 */
 	public ObjectDirectory(final Config cfg, final File dir,
-			File[] alternatePaths, FS fs, File shallowFile,
-			AtomicReference<WindowCache> wc) throws IOException {
+			File[] alternatePaths, FS fs, File shallowFile) throws IOException {
 		config = cfg;
 		objects = dir;
-		windowCache = wc;
 		infoDirectory = new File(objects, "info"); //$NON-NLS-1$
 		packDirectory = new File(objects, "pack"); //$NON-NLS-1$
 		alternatesFile = new File(infoDirectory, "alternates"); //$NON-NLS-1$
@@ -262,7 +258,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 			}
 		}
 
-		PackFile res = new PackFile(pack, extensions, windowCache);
+		PackFile res = new PackFile(pack, extensions);
 		insertPack(res);
 		return res;
 	}
@@ -623,11 +619,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 	}
 
 	@Override
-	AtomicReference<WindowCache> getWindowCache() {
-		return windowCache;
-	}
-
-	@Override
 	Set<ObjectId> getShallowCommits() throws IOException {
 		if (shallowFile == null || !shallowFile.isFile())
 			return Collections.emptySet();
@@ -756,7 +747,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 			}
 
 			final File packFile = new File(packDirectory, packName);
-			list.add(new PackFile(packFile, extensions, windowCache));
+			list.add(new PackFile(packFile, extensions));
 			foundNew = true;
 		}
 
@@ -871,8 +862,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 			return new AlternateRepository(db);
 		}
 
-		ObjectDirectory db =
-			new ObjectDirectory(config, objdir, null, fs, null, windowCache);
+		ObjectDirectory db = new ObjectDirectory(config, objdir, null, fs, null);
 		return new AlternateHandle(db);
 	}
 

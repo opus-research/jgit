@@ -41,68 +41,32 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.file;
+package org.eclipse.jgit.lib;
 
 import java.io.File;
-import java.io.IOException;
-import java.util.Collection;
-import java.util.Set;
 
-import org.eclipse.jgit.internal.storage.pack.ObjectToPack;
-import org.eclipse.jgit.internal.storage.pack.PackWriter;
-import org.eclipse.jgit.lib.AbbreviatedObjectId;
-import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.ObjectDatabase;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectLoader;
-import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.util.FS;
-
-abstract class FileObjectDatabase extends ObjectDatabase {
-	static enum InsertLooseObjectResult {
-		INSERTED, EXISTS_PACKED, EXISTS_LOOSE, FAILURE;
-	}
-
-	@Override
-	public ObjectReader newReader() {
-		return new WindowCursor(this);
-	}
-
-	@Override
-	public ObjectDirectoryInserter newInserter() {
-		return new ObjectDirectoryInserter(this, getConfig());
-	}
-
-	abstract void resolve(Set<ObjectId> matches, AbbreviatedObjectId id)
-			throws IOException;
-
-	abstract Config getConfig();
-
-	abstract FS getFS();
-
-	abstract Set<ObjectId> getShallowCommits() throws IOException;
-
-	abstract void selectObjectRepresentation(PackWriter packer,
-			ObjectToPack otp, WindowCursor curs) throws IOException;
-
-	abstract File getDirectory();
-
-	abstract File fileFor(AnyObjectId id);
-
-	abstract ObjectLoader openObject(WindowCursor curs, AnyObjectId objectId)
-			throws IOException;
-
-	abstract long getObjectSize(WindowCursor curs, AnyObjectId objectId)
-			throws IOException;
-
-	abstract ObjectLoader openLooseObject(WindowCursor curs, AnyObjectId id)
-			throws IOException;
-
-	abstract InsertLooseObjectResult insertUnpackedObject(File tmp,
-			ObjectId id, boolean createDuplicate) throws IOException;
-
-	abstract PackFile openPack(File pack) throws IOException;
-
-	abstract Collection<PackFile> getPacks();
+/**
+ * Base class to support constructing a {@link Repository}.
+ * <p>
+ * Applications must set one of {@link #setGitDir(File)} or
+ * {@link #setWorkTree(File)}, or use {@link #readEnvironment()} or
+ * {@link #findGitDir()} in order to configure the minimum property set
+ * necessary to open a repository.
+ * <p>
+ * Single repository applications trying to be compatible with other Git
+ * implementations are encouraged to use a model such as:
+ * 
+ * <pre>
+ * new RepositoryBuilder() //
+ * 		.setGitDir(gitDirArgument) // --git-dir if supplied, no-op if null
+ * 		.readEnviroment() // scan environment GIT_* variables
+ * 		.findGitDir() // scan up the file system tree
+ * 		.build()
+ * </pre>
+ * 
+ * @see org.eclipse.jgit.storage.file.FileRepositoryBuilder
+ */
+public class RepositoryBuilder extends
+		BaseRepositoryBuilder<RepositoryBuilder, Repository> {
+	// Empty implementation, everything is inherited.
 }

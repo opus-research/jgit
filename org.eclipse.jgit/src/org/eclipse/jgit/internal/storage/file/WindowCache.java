@@ -50,7 +50,6 @@ import java.lang.ref.SoftReference;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -133,15 +132,16 @@ public class WindowCache {
 
 	private static final Random rng = new Random();
 
-	private static final AtomicReference<WindowCache> defaultCache =
-			new AtomicReference<WindowCache>();
+	private static volatile WindowCache cache;
+
+	private static volatile int streamFileThreshold;
 
 	static {
 		reconfigure(new WindowCacheConfig());
 	}
 
 	/**
-	 * Modify the configuration of the default window cache.
+	 * Modify the configuration of the window cache.
 	 * <p>
 	 * The new configuration is applied immediately. If the new limits are
 	 * smaller than what what is currently cached, older entries will be purged
@@ -156,33 +156,40 @@ public class WindowCache {
 	 */
 	@Deprecated
 	public static void reconfigure(final WindowCacheConfig cfg) {
-		final WindowCache oc = defaultCache.getAndSet(new WindowCache(cfg));
+		final WindowCache nc = new WindowCache(cfg);
+		final WindowCache oc = cache;
 		if (oc != null)
 			oc.removeAll();
+		cache = nc;
+		streamFileThreshold = cfg.getStreamFileThreshold();
 		DeltaBaseCache.reconfigure(cfg);
 	}
 
-	int getStreamFileThreshold() {
+	static int getStreamFileThreshold() {
 		return streamFileThreshold;
 	}
 
-	/**
-	 * @return the current default WindowCache
-	 */
 	static WindowCache getInstance() {
-		return defaultCache.get();
+		return cache;
 	}
 
-	/**
-	 * @return the atomic-reference for the default JVM-wide WindowCache
-	 */
-	public static AtomicReference<WindowCache> getDefaultCache() {
-		return defaultCache;
-	}
-
-	final ByteWindow get(final PackFile pack, final long offset)
+	static final ByteWindow get(final PackFile pack, final long offset)
 			throws IOException {
-		return getOrLoad(pack, toStart(offset));
+		final WindowCache c = cache;
+		final ByteWindow r = c.getOrLoad(pack, c.toStart(offset));
+		if (c != cache) {
+			// The cache was reconfigured while we were using the old one
+			// to load this window. The window is still valid, but our
+			// cache may think its still live. Ensure the window is removed
+			// from the old cache so resources can be released.
+			//
+			c.removeAll();
+		}
+		return r;
+	}
+
+	static final void purge(final PackFile pack) {
+		cache.removeAll(pack);
 	}
 
 	/** ReferenceQueue to cleanup released and garbage collected windows. */
@@ -216,13 +223,11 @@ public class WindowCache {
 
 	private final int windowSize;
 
-    private final int streamFileThreshold;
-
 	private final AtomicInteger openFiles;
 
 	private final AtomicLong openBytes;
 
-	public WindowCache(final WindowCacheConfig cfg) {
+	private WindowCache(final WindowCacheConfig cfg) {
 		tableSize = tableSize(cfg);
 		final int lockCount = lockCount(cfg);
 		if (tableSize < 1)
@@ -252,7 +257,6 @@ public class WindowCache {
 		mmap = cfg.isPackedGitMMAP();
 		windowSizeShift = bits(cfg.getPackedGitWindowSize());
 		windowSize = 1 << windowSizeShift;
-		streamFileThreshold = cfg.getStreamFileThreshold();
 
 		openFiles = new AtomicInteger();
 		openBytes = new AtomicLong();
@@ -449,7 +453,7 @@ public class WindowCache {
 	 * subclass. A concurrent reader loading entries while this method is
 	 * running may cause resource accounting failures.
 	 */
-	void removeAll() {
+	private void removeAll() {
 		for (int s = 0; s < tableSize; s++) {
 			Entry e1;
 			do {
@@ -472,7 +476,7 @@ public class WindowCache {
 	 * @param pack
 	 *            the file to purge all entries of.
 	 */
-	void removeAll(final PackFile pack) {
+	private void removeAll(final PackFile pack) {
 		for (int s = 0; s < tableSize; s++) {
 			final Entry e1 = table.get(s);
 			boolean hasDead = false;

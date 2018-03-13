@@ -53,7 +53,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
@@ -77,8 +76,6 @@ import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
 
-import static org.eclipse.jgit.internal.storage.file.WindowCache.getDefaultCache;
-
 /** Active handle to a ByteWindow. */
 final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 	/** Temporary buffer large enough for at least one raw object id. */
@@ -92,11 +89,8 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 
 	final FileObjectDatabase db;
 
-	final AtomicReference<WindowCache> windowCache;
-
 	WindowCursor(FileObjectDatabase db) {
 		this.db = db;
-		windowCache = (db == null) ? getDefaultCache() : db.getWindowCache();
 	}
 
 	DeltaBaseCache getDeltaBaseCache() {
@@ -360,12 +354,12 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 			// it again.
 			//
 			window = null;
-			window = pack.getWindow(position);
+			window = WindowCache.get(pack, position);
 		}
 	}
 
 	int getStreamFileThreshold() {
-		return windowCache.get().getStreamFileThreshold();
+		return WindowCache.getStreamFileThreshold();
 	}
 
 	/** Release the current window cursor. */
