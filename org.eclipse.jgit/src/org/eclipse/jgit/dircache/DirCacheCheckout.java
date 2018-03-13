@@ -45,7 +45,6 @@ package org.eclipse.jgit.dircache;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -63,7 +62,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.EmptyTreeIterator;
@@ -75,7 +73,6 @@ import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
-import org.eclipse.jgit.util.io.AutoCRLFOutputStream;
 
 /**
  * This class handles checking out one or two trees merging with the index.
@@ -656,9 +653,6 @@ public class DirCacheCheckout {
 		}
 
 		if (i == null) {
-			// Nothing in Index
-			// At least one of Head, Index, Merge is not empty
-
 			// make sure not to overwrite untracked files
 			if (f != null) {
 				// A submodule is not a file. We should ignore it
@@ -684,36 +678,14 @@ public class DirCacheCheckout {
 			 */
 
 			if (h == null)
-				// Nothing in Head
-				// Nothing in Index
-				// At least one of Head, Index, Merge is not empty
-				// -> only Merge contains something for this path. Use it!.
-				// Potentially update the file
 				update(name, mId, m.getEntryFileMode()); // 1
 			else if (m == null)
-				// Nothing in Merge
-				// Something in Head
-				// Nothing in Index
-				// -> only Head contains something for this path and it should
-				// be deleted. Potentially removes the file!
 				remove(name); // 2
 			else
-				// Something in Merge
-				// Something in Head
-				// Nothing in Index
-				// -> Head and Merge contain something (maybe not the same) and
-				// in the index there is nothing (e.g. 'git rm ...' was
-				// called before). Ignore the cached deletion and use what we
-				// find in Merge. Potentially updates the file.
 				update(name, mId, m.getEntryFileMode()); // 3
 		} else {
-			// Something in Index
-
 			dce = i.getDirCacheEntry();
 			if (h == null) {
-				// Nothing in Head
-				// Something in Index
-
 				/**
 				 * <pre>
 				 * 	          clean I==H  I==M       H        M        Result
@@ -729,56 +701,17 @@ public class DirCacheCheckout {
 				 */
 
 				if (m == null || mId.equals(iId)) {
-					// Merge contains nothing or the same as Index
-					// Nothing in Head
-					// Something in Index
-
 					if (m==null && walk.isDirectoryFileConflict()) {
-						// Nothing in Merge and current path is part of
-						// File/Folder conflict
-						// Nothing in Head
-						// Something in Index
-
 						if (dce != null
 								&& (f == null || f.isModified(dce, true)))
-							// No file or file is dirty
-							// Nothing in Merge and current path is part of
-							// File/Folder conflict
-							// Nothing in Head
-							// Something in Index
-							// -> File folder conflict and Merge wants this path
-							// to be removed. Since the file is dirty report a
-							// conflict
 							conflict(name, dce, h, m);
 						else
-							// A file is present and file is not dirty
-							// Nothing in Merge and current path is part of
-							// File/Folder conflict
-							// Nothing in Head
-							// Something in Index
-							// -> File folder conflict and Merge wants this path
-							// to be removed. Since the file is not dirty remove
-							// file and index entry
 							remove(name);
 					} else
-						// Something in Merge or current path is not part of
-						// File/Folder conflict
-						// Merge contains nothing or the same as Index
-						// Nothing in Head
-						// Something in Index
-						// -> Merge contains nothing new. Keep the index.
 						keep(dce);
 				} else
-					// Merge contains something and it is not the same as Index
-					// Nothing in Head
-					// Something in Index
-					// -> Index contains something new (different from Head)
-					// and Merge is different from Index. Report a conflict
 					conflict(name, dce, h, m);
 			} else if (m == null) {
-				// Nothing in Merge
-				// Something in Head
-				// Something in Index
 
 				/**
 				 * <pre>
@@ -792,116 +725,33 @@ public class DirCacheCheckout {
 				 */
 
 				if (dce.getFileMode() == FileMode.GITLINK) {
-					// A submodule in Index
-					// Nothing in Merge
-					// Something in Head
-
 					// Submodules that disappear from the checkout must
 					// be removed from the index, but not deleted from disk.
 					remove(name);
 				} else {
-					// Something different from a submodule in Index
-					// Nothing in Merge
-					// Something in Head
-
 					if (hId.equals(iId)) {
-						// Index contains the same as Head
-						// Something different from a submodule in Index
-						// Nothing in Merge
-						// Something in Head
 						if (f == null || f.isModified(dce, true))
-							// file is dirty
-							// Index contains the same as Head
-							// Something different from a submodule in Index
-							// Nothing in Merge
-							// Something in Head
-							// -> file is dirty but is should be removed. That's
-							// a conflict
 							conflict(name, dce, h, m);
 						else
-							// file doesn't exist or is clean
-							// Index contains the same as Head
-							// Something different from a submodule in Index
-							// Nothing in Merge
-							// Something in Head
-							// -> Remove from index and delete the file
 							remove(name);
 					} else
-						// Index contains something different from Head
-						// Something different from a submodule in Index
-						// Nothing in Merge
-						// Something in Head
-						// -> Something new is in index (and maybe even on the
-						// filesystem). But Merge wants the path to be removed.
-						// Report a conflict
 						conflict(name, dce, h, m);
 				}
 			} else {
-				// Something in Merge
-				// Something in Head
-				// Something in Index
 				if (!hId.equals(mId) && !hId.equals(iId) && !mId.equals(iId))
-					// All three contents in Head, Merge, Index differ from each
-					// other
-					// -> All contents differ. Report a conflict.
 					conflict(name, dce, h, m);
-				else
-				// At least two of the contents of Head, Index, Merge
-				// are
-				// the same
-				// Something in Merge
-				// Something in Head
-				// Something in Index
-
-				if (hId.equals(iId) && !mId.equals(iId)) {
-					// Head contains the same as Index. Merge differs
-					// Something in Merge
-
+				else if (hId.equals(iId) && !mId.equals(iId)) {
 					// For submodules just update the index with the new SHA-1
 					if (dce != null
 							&& FileMode.GITLINK.equals(dce.getFileMode())) {
-						// Index and Head contain the same submodule. Merge
-						// differs
-						// Something in Merge
-						// -> Nothing new in index. Move to merge.
-						// Potentially updates the file
-
-						// TODO check that we don't overwrite some unsaved
-						// file content
 						update(name, mId, m.getEntryFileMode());
 					} else if (dce != null
 							&& (f == null || f.isModified(dce, true))) {
-						// File doesn't exist or is dirty
-						// Head and Index don't contain a submodule
-						// Head contains the same as Index. Merge differs
-						// Something in Merge
-						// -> Merge wants the index and file to be updated
-						// but the file is dirty. Report a conflict
 						conflict(name, dce, h, m);
 					} else {
-						// File exists and is clean
-						// Head and Index don't contain a submodule
-						// Head contains the same as Index. Merge differs
-						// Something in Merge
-						// -> Standard case when switching between branches:
-						// Nothing new in index but something different in
-						// Merge. Update index and file
 						update(name, mId, m.getEntryFileMode());
 					}
 				} else {
-					// Head differs from index or merge is same as index
-					// At least two of the contents of Head, Index, Merge
-					// are
-					// the same
-					// Something in Merge
-					// Something in Head
-					// Something in Index
-
-					// Can be formulated as: Either all three states are
-					// equal or Merge is equal to Head or Index and differs
-					// to the other one.
-					// -> In all three cases we don't touch index and file.
-
 					keep(dce);
 				}
 			}
@@ -1076,19 +926,14 @@ public class DirCacheCheckout {
 		ObjectLoader ol = or.open(entry.getObjectId());
 		File parentDir = f.getParentFile();
 		File tmpFile = File.createTempFile("._" + f.getName(), null, parentDir);
-		WorkingTreeOptions opt = repo.getConfig().get(WorkingTreeOptions.KEY);
-		FileOutputStream rawChannel = new FileOutputStream(tmpFile);
-		OutputStream channel;
-		if (opt.getAutoCRLF() == AutoCRLF.TRUE)
-			channel = new AutoCRLFOutputStream(rawChannel);
-		else
-			channel = rawChannel;
+		FileOutputStream channel = new FileOutputStream(tmpFile);
 		try {
 			ol.copyTo(channel);
 		} finally {
 			channel.close();
 		}
 		FS fs = repo.getFS();
+		WorkingTreeOptions opt = repo.getConfig().get(WorkingTreeOptions.KEY);
 		if (opt.isFileMode() && fs.supportsExecute()) {
 			if (FileMode.EXECUTABLE_FILE.equals(entry.getRawMode())) {
 				if (!fs.canExecute(tmpFile))
@@ -1109,9 +954,6 @@ public class DirCacheCheckout {
 			}
 		}
 		entry.setLastModified(f.lastModified());
-		if (opt.getAutoCRLF() != AutoCRLF.FALSE)
-			entry.setLength(f.length()); // AutoCRLF wants on-disk-size
-		else
-			entry.setLength((int) ol.getSize());
+		entry.setLength((int) ol.getSize());
 	}
 }

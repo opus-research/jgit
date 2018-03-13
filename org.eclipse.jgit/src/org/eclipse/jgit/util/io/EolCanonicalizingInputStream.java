@@ -46,11 +46,8 @@ package org.eclipse.jgit.util.io;
 import java.io.IOException;
 import java.io.InputStream;
 
-import org.eclipse.jgit.diff.RawText;
-
 /**
- * An input stream which canonicalizes EOLs bytes on the fly to '\n', unless the
- * first 8000 bytes indicate the stream is binary.
+ * An input stream which canonicalizes EOLs bytes on the fly to '\n'.
  *
  * Note: Make sure to apply this InputStream only to text files!
  */
@@ -64,10 +61,6 @@ public class EolCanonicalizingInputStream extends InputStream {
 	private int cnt;
 
 	private int ptr;
-
-	private boolean isBinary;
-
-	private boolean modeDetected;
 
 	/**
 	 * Creates a new InputStream, wrapping the specified stream
@@ -102,8 +95,7 @@ public class EolCanonicalizingInputStream extends InputStream {
 			}
 
 			byte b = buf[ptr++];
-			if (isBinary || b != '\r') {
-				// Logic for binary files ends here
+			if (b != '\r') {
 				bs[off++] = b;
 				continue;
 			}
@@ -132,10 +124,6 @@ public class EolCanonicalizingInputStream extends InputStream {
 		cnt = in.read(buf, 0, buf.length);
 		if (cnt < 1)
 			return false;
-		if (!modeDetected) {
-			isBinary = RawText.isBinary(buf, cnt);
-			modeDetected = true;
-		}
 		ptr = 0;
 		return true;
 	}
