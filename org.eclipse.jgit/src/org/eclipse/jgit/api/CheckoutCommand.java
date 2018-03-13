@@ -457,7 +457,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 
 	private void checkoutPath(DirCacheEntry entry, ObjectReader reader) {
 		try {
-			DirCacheCheckout.checkoutEntry(repo, entry, reader, true);
+			DirCacheCheckout.checkoutEntry(repo, entry, reader);
 		} catch (IOException e) {
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().checkoutConflictWithFile,
