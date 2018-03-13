@@ -54,7 +54,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.jgit.annotations.Nullable;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.reftree.Command;
 import org.eclipse.jgit.internal.storage.reftree.RefTree;
 import org.eclipse.jgit.lib.CommitBuilder;
@@ -72,7 +71,7 @@ class ProposalRound extends Round {
 	private final List<Proposal> todo;
 	private RefTree queuedTree;
 
-	ProposalRound(KetchLeader leader, LogId head, List<Proposal> todo,
+	ProposalRound(KetchLeader leader, LogIndex head, List<Proposal> todo,
 			@Nullable RefTree tree) {
 		super(leader, head);
 		this.todo = todo;
@@ -88,7 +87,7 @@ class ProposalRound extends Round {
 			try (Repository git = leader.openRepository()) {
 				id = insertProposals(git);
 			}
-			acceptAsync(id);
+			runAsync(id);
 		} catch (NoOp e) {
 			for (Proposal p : todo) {
 				p.success();
@@ -100,7 +99,7 @@ class ProposalRound extends Round {
 				leader.lock.unlock();
 			}
 		} catch (IOException e) {
-			abort(JGitText.get().transactionAborted);
+			abort();
 			throw e;
 		}
 	}
@@ -116,7 +115,7 @@ class ProposalRound extends Round {
 			} else {
 				if (queuedTree != null) {
 					queuedTree = null;
-					leader.copyOnQueue = false;
+					leader.roundHoldsReferenceToRefTree = false;
 				}
 				id = insertMultiProposal(git, inserter);
 			}
@@ -129,15 +128,15 @@ class ProposalRound extends Round {
 
 	private ObjectId insertSingleProposal(Repository git,
 			ObjectInserter inserter) throws IOException, NoOp {
-		// Fast path of tree passed in with only one proposal to run.
-		// Tree already has the proposal applied.
+		// Fast path: tree is passed in with only one proposal to run,
+		// and it already has the proposal applied.
 		ObjectId treeId = queuedTree.writeTree(inserter);
 		queuedTree = null;
-		leader.copyOnQueue = false;
+		leader.roundHoldsReferenceToRefTree = false;
 
-		if (!ObjectId.zeroId().equals(acceptedOld)) {
+		if (!ObjectId.zeroId().equals(acceptedOldIndex)) {
 			try (RevWalk rw = new RevWalk(git)) {
-				RevCommit c = rw.parseCommit(acceptedOld);
+				RevCommit c = rw.parseCommit(acceptedOldIndex);
 				if (treeId.equals(c.getTree())) {
 					throw new NoOp();
 				}
@@ -147,8 +146,8 @@ class ProposalRound extends Round {
 		Proposal p = todo.get(0);
 		CommitBuilder b = new CommitBuilder();
 		b.setTreeId(treeId);
-		if (!ObjectId.zeroId().equals(acceptedOld)) {
-			b.setParentId(acceptedOld);
+		if (!ObjectId.zeroId().equals(acceptedOldIndex)) {
+			b.setParentId(acceptedOldIndex);
 		}
 		b.setCommitter(leader.getSystem().newCommitter());
 		b.setAuthor(p.getAuthor() != null ? p.getAuthor() : b.getCommitter());
@@ -162,16 +161,16 @@ class ProposalRound extends Round {
 		// The tree was not passed in, or there are multiple proposals
 		// each needing their own commit. Reset the tree to acceptedOld
 		// and replay the proposals.
-		ObjectId last = acceptedOld;
-		ObjectId oldTree;
+		ObjectId lastIndex = acceptedOldIndex;
+		ObjectId oldTreeId;
 		RefTree tree;
-		if (ObjectId.zeroId().equals(last)) {
-			oldTree = ObjectId.zeroId();
+		if (ObjectId.zeroId().equals(lastIndex)) {
+			oldTreeId = ObjectId.zeroId();
 			tree = RefTree.newEmptyTree();
 		} else {
 			try (RevWalk rw = new RevWalk(git)) {
-				RevCommit c = rw.parseCommit(last);
-				oldTree = c.getTree();
+				RevCommit c = rw.parseCommit(lastIndex);
+				oldTreeId = c.getTree();
 				tree = RefTree.read(rw.getObjectReader(), c.getTree());
 			}
 		}
@@ -187,24 +186,24 @@ class ProposalRound extends Round {
 			}
 
 			ObjectId treeId = tree.writeTree(inserter);
-			if (treeId.equals(oldTree)) {
+			if (treeId.equals(oldTreeId)) {
 				continue;
 			}
 
 			CommitBuilder b = new CommitBuilder();
 			b.setTreeId(treeId);
-			if (!ObjectId.zeroId().equals(last)) {
-				b.setParentId(last);
+			if (!ObjectId.zeroId().equals(lastIndex)) {
+				b.setParentId(lastIndex);
 			}
 			b.setAuthor(p.getAuthor() != null ? p.getAuthor() : committer);
 			b.setCommitter(committer);
 			b.setMessage(message(p));
-			last = inserter.insert(b);
+			lastIndex = inserter.insert(b);
 		}
-		if (last.equals(acceptedOld)) {
+		if (lastIndex.equals(acceptedOldIndex)) {
 			throw new NoOp();
 		}
-		return last;
+		return lastIndex;
 	}
 
 	private String message(Proposal p) {
@@ -218,14 +217,14 @@ class ProposalRound extends Round {
 			}
 		}
 		m.append(KetchConstants.TERM.getName())
-		 .append(": ") //$NON-NLS-1$
-		 .append(leader.getTerm());
+				.append(": ") //$NON-NLS-1$
+				.append(leader.getTerm());
 		return m.toString();
 	}
 
-	void abort(String msg) {
+	void abort() {
 		for (Proposal p : todo) {
-			p.abort(msg);
+			p.abort();
 		}
 	}
 
@@ -237,8 +236,9 @@ class ProposalRound extends Round {
 
 	private List<ReceiveCommand> makeStageList(Repository git,
 			ObjectInserter inserter) throws IOException {
-		// Collapse consecutive updates to only most recent, avoiding sending
-		// multiple objects in a rapid fast-forward chain, or rewritten content.
+		// For each branch, collapse consecutive updates to only most recent,
+		// avoiding sending multiple objects in a rapid fast-forward chain, or
+		// rewritten content.
 		Map<String, ObjectId> byRef = new HashMap<>();
 		for (Proposal p : todo) {
 			for (Command c : p.getCommands()) {
@@ -255,7 +255,7 @@ class ProposalRound extends Round {
 		Set<ObjectId> newObjs = new HashSet<>(byRef.values());
 		StageBuilder b = new StageBuilder(
 				leader.getSystem().getTxnStage(),
-				acceptedNew);
+				acceptedNewIndex);
 		return b.makeStageList(newObjs, git, inserter);
 	}
 

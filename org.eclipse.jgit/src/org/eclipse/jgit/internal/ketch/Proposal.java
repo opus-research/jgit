@@ -48,7 +48,6 @@ import static org.eclipse.jgit.internal.ketch.Proposal.State.EXECUTED;
 import static org.eclipse.jgit.internal.ketch.Proposal.State.NEW;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.NOT_ATTEMPTED;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.OK;
-import static org.eclipse.jgit.transport.ReceiveCommand.Result.REJECTED_OTHER_REASON;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -61,7 +60,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.reftree.Command;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
@@ -79,7 +77,7 @@ import org.eclipse.jgit.transport.ReceiveCommand;
  * area under the {@code refs/txn/stage/} namespace. If the proposal succeeds
  * then the changes are durable and the leader can commit the proposal.
  * <p>
- * Proposals are executed by {@link KetchLeader#executeAsync(Proposal)}, which
+ * Proposals are executed by {@link KetchLeader#queueProposal(Proposal)}, which
  * runs them asynchronously in the background. Proposals are thread-safe futures
  * allowing callers to {@link #await()} for results or be notified by callback
  * using {@link #addListener(Runnable)}.
@@ -231,7 +229,7 @@ public class Proposal {
 	 *
 	 * @param callback
 	 *            method to run after the proposal is done. The callback may be
-	 *            run on the leader thread and should be completed quick.
+	 *            run on the leader thread and should be completed quickly.
 	 */
 	public void addListener(Runnable callback) {
 		boolean runNow = false;
@@ -259,23 +257,7 @@ public class Proposal {
 
 	/** Mark commands as "transaction aborted". */
 	void abort() {
-		abort(JGitText.get().transactionAborted);
-	}
-
-	/**
-	 * Abort the proposal with the specified reason.
-	 *
-	 * @param msg
-	 *            message to apply on first failed reference. Other references
-	 *            will use the generic {@code "transaction aborted"} text.
-	 */
-	void abort(String msg) {
-		for (Command cmd : commands) {
-			if (cmd.getResult() == NOT_ATTEMPTED) {
-				cmd.setResult(REJECTED_OTHER_REASON, msg);
-				msg = JGitText.get().transactionAborted;
-			}
-		}
+		Command.abort(commands, null);
 		notifyState(ABORTED);
 	}
 

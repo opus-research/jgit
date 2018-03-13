@@ -52,7 +52,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.ReceiveCommand;
 
 /**
- * Request made to a replica, and its result.
+ * A request made to a replica, and its result.
  * <p>
  * Implementors of {@link KetchReplica} must populate the command result fields,
  * {@link #setRefs(Map)}, and call one of

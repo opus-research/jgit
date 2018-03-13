@@ -59,16 +59,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A {@link Round} for a leaderless repository. Inserts a new "term" commit
- * object that is used to guarantee election safety, preventing two replicas
- * from thinking that they are the leader at the same time.
+ * The initial {@link Round} for a leaderless repository, used to establish a
+ * leader.
  */
 class ElectionRound extends Round {
 	private static final Logger log = LoggerFactory.getLogger(ElectionRound.class);
 
 	private long term;
 
-	ElectionRound(KetchLeader leader, LogId head) {
+	ElectionRound(KetchLeader leader, LogIndex head) {
 		super(leader, head);
 	}
 
@@ -80,7 +79,7 @@ class ElectionRound extends Round {
 			id = bumpTerm(git, inserter);
 			inserter.flush();
 		}
-		acceptAsync(id);
+		runAsync(id);
 	}
 
 	@Override
@@ -94,24 +93,23 @@ class ElectionRound extends Round {
 
 	private ObjectId bumpTerm(Repository git, ObjectInserter inserter)
 			throws IOException {
-		long newTerm;
 		CommitBuilder b = new CommitBuilder();
-		if (!ObjectId.zeroId().equals(acceptedOld)) {
+		if (!ObjectId.zeroId().equals(acceptedOldIndex)) {
 			try (RevWalk rw = new RevWalk(git)) {
-				RevCommit c = rw.parseCommit(acceptedOld);
+				RevCommit c = rw.parseCommit(acceptedOldIndex);
 				b.setTreeId(c.getTree());
-				b.setParentId(acceptedOld);
-				newTerm = parseTerm(c.getFooterLines(TERM)) + 1;
+				b.setParentId(acceptedOldIndex);
+				term = parseTerm(c.getFooterLines(TERM)) + 1;
 			}
 		} else {
-			newTerm = 1;
+			term = 1;
 			b.setTreeId(inserter.insert(new TreeFormatter()));
 		}
 
 		StringBuilder msg = new StringBuilder();
 		msg.append(KetchConstants.TERM.getName())
 				.append(": ") //$NON-NLS-1$
-				.append(newTerm);
+				.append(term);
 
 		String tag = leader.getSystem().newLeaderTag();
 		if (tag != null && !tag.isEmpty()) {
@@ -125,7 +123,6 @@ class ElectionRound extends Round {
 		if (log.isDebugEnabled()) {
 			log.debug("Trying to elect myself " + b.getMessage()); //$NON-NLS-1$
 		}
-		term = newTerm;
 		return inserter.insert(b);
 	}
 
