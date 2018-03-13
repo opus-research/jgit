@@ -439,7 +439,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		// representation for date and timezone
 		sb.append(GIT_AUTHOR_DATE);
 		sb.append("='");
-		sb.append("@"); // @ for time on seconds since 1970
+		sb.append("@"); // @ for time in seconds since 1970
 		String externalString = author.toExternalString();
 		sb
 				.append(externalString.substring(externalString
