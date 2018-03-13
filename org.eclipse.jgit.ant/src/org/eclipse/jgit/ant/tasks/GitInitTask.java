@@ -48,6 +48,7 @@ import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.Task;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.InitCommand;
+import org.eclipse.jgit.api.errors.JGitInternalException;
 
 /**
  * Create an empty git repository.
@@ -90,7 +91,7 @@ public class GitInitTask extends Task {
 			InitCommand init = Git.init();
 			init.setBare(bare).setDirectory(destination);
 			init.call();
-		} catch (Exception e) {
+		} catch (JGitInternalException e) {
 			throw new BuildException("Could not initialize repository", e);
 		}
 	}

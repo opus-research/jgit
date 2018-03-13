@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2008, Google Inc.
  * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2012, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2006-2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -51,8 +51,8 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.MessageFormat;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.util.MutableInteger;
 
 /** Misc. constants used throughout JGit. */
@@ -231,9 +231,6 @@ public final class Constants {
 	/** Default main branch name */
 	public static final String MASTER = "master";
 
-	/** Default stash branch name */
-	public static final String STASH = "stash";
-
 	/** Prefix for branch refs */
 	public static final String R_HEADS = "refs/heads/";
 
@@ -251,9 +248,6 @@ public final class Constants {
 
 	/** Prefix for any ref */
 	public static final String R_REFS = "refs/";
-
-	/** Standard stash ref */
-	public static final String R_STASH = R_REFS + STASH;
 
 	/** Logs folder name */
 	public static final String LOGS = "logs";
@@ -375,8 +369,7 @@ public final class Constants {
 		case OBJ_TAG:
 			return TYPE_TAG;
 		default:
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().badObjectType, Integer.valueOf(typeCode)));
+			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().badObjectType, typeCode));
 		}
 	}
 
@@ -400,8 +393,7 @@ public final class Constants {
 		case OBJ_TAG:
 			return ENCODED_TYPE_TAG;
 		default:
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().badObjectType, Integer.valueOf(typeCode)));
+			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().badObjectType, typeCode));
 		}
 	}
 
@@ -552,9 +544,6 @@ public final class Constants {
 
 	/** name of the file containing the ID of a cherry pick commit in case of conflicts */
 	public static final String CHERRY_PICK_HEAD = "CHERRY_PICK_HEAD";
-
-	/** name of the file containing the commit msg for a squash commit */
-	public static final String SQUASH_MSG = "SQUASH_MSG";
 
 	/**
 	 * name of the ref ORIG_HEAD used by certain commands to store the original

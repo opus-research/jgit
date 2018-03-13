@@ -55,8 +55,6 @@ public class CheckoutConflictException extends GitAPIException {
 	 *            list of conflicting paths
 	 *
 	 * @param e
-	 *            a {@link org.eclipse.jgit.errors.CheckoutConflictException}
-	 *            exception
 	 */
 	public CheckoutConflictException(List<String> conflictingPaths,
 			org.eclipse.jgit.errors.CheckoutConflictException e) {

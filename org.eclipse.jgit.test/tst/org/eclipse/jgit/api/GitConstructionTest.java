@@ -48,8 +48,6 @@ import static org.junit.Assert.fail;
 import java.io.IOException;
 
 import org.eclipse.jgit.api.ListBranchCommand.ListMode;
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryTestCase;
@@ -86,7 +84,7 @@ public class GitConstructionTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testWrap() throws JGitInternalException, GitAPIException {
+	public void testWrap() {
 		Git git = Git.wrap(db);
 		assertEquals(1, git.branchList().call().size());
 
@@ -103,8 +101,7 @@ public class GitConstructionTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testOpen() throws IOException, JGitInternalException,
-			GitAPIException {
+	public void testOpen() throws IOException {
 		Git git = Git.open(db.getDirectory());
 		assertEquals(1, git.branchList().call().size());
 
