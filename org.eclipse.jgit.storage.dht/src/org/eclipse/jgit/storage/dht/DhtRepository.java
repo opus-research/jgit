@@ -154,11 +154,6 @@ public class DhtRepository extends Repository {
 	}
 
 	@Override
-	public void notifyIndexChanged() {
-		// we do not support non-bare repositories yet
-	}
-
-	@Override
 	public String toString() {
 		return "DhtRepostitory[" + key + " / " + name + "]";
 	}
