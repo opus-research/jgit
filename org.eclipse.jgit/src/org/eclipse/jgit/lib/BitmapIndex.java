@@ -125,9 +125,7 @@ public interface BitmapIndex {
 		 * @param type
 		 *            the Git object type. See {@link Constants}.
 		 * @return true if the value was not contained or able to be loaded.
-		 * @deprecated use {@link #or} or {@link #set} instead.
 		 */
-		@Deprecated
 		boolean add(AnyObjectId objectId, int type);
 
 		/**
@@ -138,18 +136,6 @@ public interface BitmapIndex {
 		 * @return whether the bitmap currently contains the object ID
 		 */
 		boolean contains(AnyObjectId objectId);
-
-		/**
-		 * Adds the id to the bitmap.
-		 *
-		 * @param objectId
-		 *            the object ID
-		 * @param type
-		 *            the Git object type. See {@link Constants}.
-		 * @return the current builder.
-		 * @since 4.2
-		 */
-		BitmapBuilder set(AnyObjectId objectId, int type);
 
 		/**
 		 * Remove the id from the bitmap.
