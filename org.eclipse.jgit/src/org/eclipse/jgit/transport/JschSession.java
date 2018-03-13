@@ -220,7 +220,6 @@ public class JschSession implements RemoteSession {
 		public void destroy() {
 			if (channel.isConnected())
 				channel.disconnect();
-			closeOutputStream();
 		}
 
 		@Override
