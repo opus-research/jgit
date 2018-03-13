@@ -55,6 +55,7 @@ import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.fsck.FsckError;
 import org.eclipse.jgit.internal.fsck.FsckError.CorruptIndex;
 import org.eclipse.jgit.internal.fsck.FsckPackParser;
+import org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectChecker;
@@ -68,6 +69,7 @@ public class DfsFsck {
 	private final DfsRepository repo;
 	private final DfsObjDatabase objdb;
 	private ObjectChecker objChecker = new ObjectChecker();
+	private boolean connectivityOnly;
 
 	/**
 	 * Initialize DFS fsck.
@@ -96,7 +98,9 @@ public class DfsFsck {
 		}
 
 		FsckError errors = new FsckError();
-		checkPacks(pm, errors);
+		if (!connectivityOnly) {
+			checkPacks(pm, errors);
+		}
 		checkConnectivity(pm, errors);
 		return errors;
 	}
@@ -106,6 +110,10 @@ public class DfsFsck {
 		try (DfsReader ctx = objdb.newReader()) {
 			for (DfsPackFile pack : objdb.getPacks()) {
 				DfsPackDescription packDesc = pack.getPackDescription();
+				if (packDesc.getPackSource()
+						== PackSource.UNREACHABLE_GARBAGE) {
+					continue;
+				}
 				try (ReadableChannel rc = objdb.openFile(packDesc, PACK)) {
 					verifyPack(pm, errors, ctx, pack, rc);
 				} catch (MissingObjectException e) {
@@ -168,5 +176,15 @@ public class DfsFsck {
 	 */
 	public void setObjectChecker(ObjectChecker objChecker) {
 		this.objChecker = objChecker;
+	}
+
+	/**
+	 * @param connectivityOnly
+	 *             whether fsck should bypass object validity and integrity
+	 *             checks and only check connectivity. The default is
+	 *             {@code false}, meaning to run all checks.
+	 */
+	public void setConnectivityOnly(boolean connectivityOnly) {
+		this.connectivityOnly = connectivityOnly;
 	}
 }

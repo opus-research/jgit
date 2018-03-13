@@ -77,6 +77,8 @@ import org.slf4j.LoggerFactory;
 
 /** Abstraction to support various file system operations not in Java. */
 public abstract class FS {
+	private static final Logger LOG = LoggerFactory.getLogger(FS.class);
+
 	/**
 	 * This class creates FS instances. It will be overridden by a Java7 variant
 	 * if such can be detected in {@link #detect(Boolean)}.
@@ -158,8 +160,6 @@ public abstract class FS {
 		}
 	}
 
-	private final static Logger LOG = LoggerFactory.getLogger(FS.class);
-
 	/** The auto-detected implementation selected for this operating system and JRE. */
 	public static final FS DETECTED = detect();
 
@@ -234,21 +234,6 @@ public abstract class FS {
 	 *         executable bit information; false otherwise.
 	 */
 	public abstract boolean supportsExecute();
-
-	/**
-	 * Does this file system support atomic file creation via
-	 * java.io.File#createNewFile()? In certain environments (e.g. on NFS) it is
-	 * not guaranteed that when two file system clients run createNewFile() in
-	 * parallel only one will succeed. In such cases both clients may think they
-	 * created a new file.
-	 *
-	 * @return true if this implementation support atomic creation of new
-	 *         Files by {@link File#createNewFile()}
-	 * @since 4.5
-	 */
-	public boolean supportsAtomicCreateNewFile() {
-		return true;
-	}
 
 	/**
 	 * Does this operating system and JRE supports symbolic links. The
@@ -795,22 +780,6 @@ public abstract class FS {
 	 */
 	public void createSymLink(File path, String target) throws IOException {
 		FileUtils.createSymLink(path, target);
-	}
-
-	/**
-	 * Create a new file. See {@link File#createNewFile()}. Subclasses of this
-	 * class may take care to provide a safe implementation for this even if
-	 * {@link #supportsAtomicCreateNewFile()} is <code>false</code>
-	 *
-	 * @param path
-	 *            the file to be created
-	 * @return <code>true</code> if the file was created, <code>false</code> if
-	 *         the file already existed
-	 * @throws IOException
-	 * @since 4.5
-	 */
-	public boolean createNewFile(File path) throws IOException {
-		return path.createNewFile();
 	}
 
 	/**
