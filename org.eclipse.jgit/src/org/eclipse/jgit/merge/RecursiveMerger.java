@@ -146,6 +146,7 @@ public class RecursiveMerger extends ResolveMerger {
 	 */
 	protected RevCommit getBaseCommit(RevCommit a, RevCommit b, int callDepth)
 			throws IOException {
+		getObjectInserter();
 		ArrayList<RevCommit> baseCommits = new ArrayList<RevCommit>();
 		walk.reset();
 		walk.setRevFilter(RevFilter.MERGE_BASE);

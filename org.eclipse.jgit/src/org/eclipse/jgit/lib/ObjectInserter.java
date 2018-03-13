@@ -391,10 +391,9 @@ public abstract class ObjectInserter {
 
 	/**
 	 * @return a reader for objects that may have been written by this inserter,
-	 *         without having to flush first. Should only be used from the same
-	 *         thread as this inserter; objects written by this inserter may not
-	 *         be visible to {@code this.newReader().newReader()}.
-	 * @since 3.0
+	 *     without having to flush first. Should only be used from the same thread as
+	 *     this inserter; objects written by this inserter may not be visible to
+	 *     {@code this.newReader().newReader()}.
 	 */
 	public abstract ObjectReader newReader();
 
