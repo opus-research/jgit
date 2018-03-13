@@ -338,7 +338,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String expectedPktLineWithService;
 	/***/ public String expectedReceivedContentType;
 	/***/ public String expectedReportForRefNotReceived;
-	/***/ public String failedToDetermineFilterDefinition;
 	/***/ public String failedUpdatingRefs;
 	/***/ public String failureDueToOneOfTheFollowing;
 	/***/ public String failureUpdatingFETCH_HEAD;
@@ -364,7 +363,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String hunkHeaderDoesNotMatchBodyLineCountOf;
 	/***/ public String illegalArgumentNotA;
 	/***/ public String illegalCombinationOfArguments;
-	/***/ public String illegalHookName;
 	/***/ public String illegalPackingPhase;
 	/***/ public String illegalStateExists;
 	/***/ public String improperlyPaddedBase64Input;
@@ -425,7 +423,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidTimeout;
 	/***/ public String invalidTimeUnitValue2;
 	/***/ public String invalidTimeUnitValue3;
-	/***/ public String invalidTreeZeroLengthName;
 	/***/ public String invalidURL;
 	/***/ public String invalidWildcards;
 	/***/ public String invalidRefSpec;
@@ -524,7 +521,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String packedRefsHandleIsStale;
 	/***/ public String packetSizeMustBeAtLeast;
 	/***/ public String packetSizeMustBeAtMost;
-	/***/ public String packedRefsCorruptionDetected;
 	/***/ public String packfileCorruptionDetected;
 	/***/ public String packFileInvalid;
 	/***/ public String packfileIsTruncated;

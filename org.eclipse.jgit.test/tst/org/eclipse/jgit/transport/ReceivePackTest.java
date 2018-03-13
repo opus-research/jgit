@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2016, Christian Halstrick <christian.halstrick@sap.com>
- * and other copyright owners as documented in the project's IP log.
+ * Copyright (C) 2015, Google Inc.
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -40,55 +39,47 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.attributes;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+package org.eclipse.jgit.transport;
 
-/**
- * An abstraction for JGit's builtin implementations for hooks and filters.
- * Instead of spawning an external processes to start a filter/hook and to pump
- * data from/to stdin/stdout these builtin commmands may be used. They are
- * constructed by {@link FilterCommandFactory}.
- *
- * @since 4.6
- */
-public abstract class FilterCommand {
-	/**
-	 * The {@link InputStream} this command should read from
-	 */
-	protected InputStream in;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
-	/**
-	 * The {@link OutputStream} this command should write to
-	 */
-	protected OutputStream out;
+import org.eclipse.jgit.errors.PackProtocolException;
+import org.eclipse.jgit.lib.ObjectId;
+import org.junit.Test;
 
-	/**
-	 * @param in
-	 *            The {@link InputStream} this command should read from
-	 * @param out
-	 *            The {@link OutputStream} this command should write to
-	 */
-	public FilterCommand(InputStream in, OutputStream out) {
-		this.in = in;
-		this.out = out;
+/** Tests for receive-pack utilities. */
+public class ReceivePackTest {
+	@Test
+	public void parseCommand() throws Exception {
+		String o = "0000000000000000000000000000000000000000";
+		String n = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
+		String r = "refs/heads/master";
+		ReceiveCommand cmd = ReceivePack.parseCommand(o + " " + n + " " + r);
+		assertEquals(ObjectId.zeroId(), cmd.getOldId());
+		assertEquals("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+				cmd.getNewId().name());
+		assertEquals("refs/heads/master", cmd.getRefName());
+
+		assertParseCommandFails(null);
+		assertParseCommandFails("");
+		assertParseCommandFails(o.substring(35) + " " + n.substring(35)
+				+ " " + r + "\n");
+		assertParseCommandFails(o + " " + n + " " + r + "\n");
+		assertParseCommandFails(o + " " + n + " " + "refs^foo");
+		assertParseCommandFails(o + " " + n.substring(10) + " " + r);
+		assertParseCommandFails(o.substring(10) + " " + n + " " + r);
+		assertParseCommandFails("X" + o.substring(1) + " " + n + " " + r);
+		assertParseCommandFails(o + " " + "X" + n.substring(1) + " " + r);
 	}
 
-	/**
-	 * Execute the command. The command is supposed to read data from
-	 * {@link #in} and to write the result to {@link #out}. It returns the
-	 * number of bytes it read from {@link #in}. It should be called in a loop
-	 * until it returns -1 signaling that the {@link InputStream} is completely
-	 * processed.
-	 *
-	 * @return the number of bytes read from the {@link InputStream} or -1. -1
-	 *         means that the {@link InputStream} is completely processed.
-	 * @throws IOException
-	 *             when {@link IOException} occured while reading from
-	 *             {@link #in} or writing to {@link #out}
-	 *
-	 */
-	public abstract int run() throws IOException;
+	private void assertParseCommandFails(String input) {
+		try {
+			ReceivePack.parseCommand(input);
+			fail();
+		} catch (PackProtocolException e) {
+			// Expected.
+		}
+	}
 }

@@ -101,7 +101,7 @@ class Daemon extends TextBuiltin {
 	@Option(name = "--export-all", usage = "usage_exportWithoutGitDaemonExportOk")
 	boolean exportAll;
 
-	@Option(name = "--ketch", metaVar = "metaVar_ketchServerType", usage = "usage_ketchServerType")
+	@Option(name = "--ketch")
 	KetchServerType ketchServerType;
 
 	enum KetchServerType {

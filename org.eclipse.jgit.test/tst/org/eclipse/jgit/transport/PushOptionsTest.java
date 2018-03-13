@@ -96,13 +96,14 @@ public class PushOptionsTest extends RepositoryTestCase {
 		testProtocol = new TestProtocol<>(null,
 				new ReceivePackFactory<Object>() {
 					@Override
-					public ReceivePack create(Object req, Repository git)
+					public ReceivePack create(Object req, Repository database)
 							throws ServiceNotEnabledException,
 							ServiceNotAuthorizedException {
-						receivePack = new ReceivePack(git);
-						receivePack.setAllowPushOptions(true);
-						receivePack.setAtomic(true);
-						return receivePack;
+						ReceivePack rp = new ReceivePack(database);
+						rp.setAllowPushOptions(true);
+						rp.setAtomic(true);
+						receivePack = rp;
+						return rp;
 					}
 				});
 
@@ -117,6 +118,7 @@ public class PushOptionsTest extends RepositoryTestCase {
 
 	@After
 	public void tearDown() {
+		receivePack = null;
 		Transport.unregister(testProtocol);
 	}
 
@@ -218,7 +220,7 @@ public class PushOptionsTest extends RepositoryTestCase {
 				one.getStatus());
 		assertSame(RemoteRefUpdate.Status.REJECTED_REMOTE_CHANGED,
 				two.getStatus());
-		assertNull(receivePack.getPushOptions());
+		assertEquals(new ArrayList<String>(), receivePack.getPushOptions());
 	}
 
 	@Test
