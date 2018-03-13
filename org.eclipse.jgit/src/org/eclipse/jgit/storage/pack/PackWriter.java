@@ -1116,7 +1116,6 @@ public class PackWriter {
 		final Map<ObjectId, CachedPack> tipToPack = new HashMap<ObjectId, CachedPack>();
 		final RevFlag inCachedPack = walker.newFlag("inCachedPack");
 		final RevFlag include = walker.newFlag("include");
-		final RevFlag added = walker.newFlag("added");
 
 		final RevFlagSet keepOnRestart = new RevFlagSet();
 		keepOnRestart.add(inCachedPack);
@@ -1178,15 +1177,13 @@ public class PackWriter {
 		int typesToPrune = 0;
 		final int maxBases = config.getDeltaSearchWindowSize();
 		Set<RevTree> baseTrees = new HashSet<RevTree>();
-		List<RevCommit> commits = new ArrayList<RevCommit>();
-		RevCommit c;
-		while ((c = walker.next()) != null) {
-			if (c.has(inCachedPack)) {
-				CachedPack pack = tipToPack.get(c);
+		RevObject o;
+		while ((o = walker.next()) != null) {
+			if (o.has(inCachedPack)) {
+				CachedPack pack = tipToPack.get(o);
 				if (includesAllTips(pack, include, walker)) {
 					useCachedPack(walker, keepOnRestart, //
 							wantObjs, haveObjs, pack);
-					commits = new ArrayList<RevCommit>();
 
 					countingMonitor.endTask();
 					countingMonitor.beginTask(JGitText.get().countingObjects,
@@ -1195,35 +1192,15 @@ public class PackWriter {
 				}
 			}
 
-			if (c.has(RevFlag.UNINTERESTING)) {
+			if (o.has(RevFlag.UNINTERESTING)) {
 				if (baseTrees.size() <= maxBases)
-					baseTrees.add(c.getTree());
+					baseTrees.add(((RevCommit) o).getTree());
 				continue;
 			}
 
-			commits.add(c);
+			addObject(o, 0);
 			countingMonitor.update(1);
 		}
-
-		if (objectsLists[Constants.OBJ_COMMIT] instanceof ArrayList) {
-			ArrayList<ObjectToPack> list = (ArrayList<ObjectToPack>) objectsLists[Constants.OBJ_COMMIT];
-			list.ensureCapacity(list.size() + commits.size());
-		}
-		for (RevCommit cmit : commits) {
-			if (!cmit.has(added)) {
-				cmit.add(added);
-				addObject(cmit, 0);
-			}
-
-			for (int i = 0; i < cmit.getParentCount(); i++) {
-				RevCommit p = cmit.getParent(i);
-				if (!p.has(added) && !p.has(RevFlag.UNINTERESTING)) {
-					p.add(added);
-					addObject(p, 0);
-				}
-			}
-		}
-		commits = null;
 
 		for (CachedPack p : cachedPacks) {
 			for (ObjectId d : p.hasObject(objectsLists[Constants.OBJ_COMMIT])) {
@@ -1236,7 +1213,6 @@ public class PackWriter {
 
 		BaseSearch bases = new BaseSearch(countingMonitor, baseTrees, //
 				objectsMap, edgeObjects, reader);
-		RevObject o;
 		while ((o = walker.nextObject()) != null) {
 			if (o.has(RevFlag.UNINTERESTING))
 				continue;
@@ -1307,6 +1283,9 @@ public class PackWriter {
 		cachedPacks.add(pack);
 		for (ObjectId id : pack.getTips())
 			baseObj.add(walker.lookupOrNull(id));
+
+		objectsMap.clear();
+		objectsLists[Constants.OBJ_COMMIT] = new ArrayList<ObjectToPack>();
 
 		setThin(true);
 		walker.resetRetain(keepOnRestart);
