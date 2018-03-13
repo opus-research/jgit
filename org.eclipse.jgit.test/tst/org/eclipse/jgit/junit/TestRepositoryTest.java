@@ -64,7 +64,7 @@ import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.treewalk.TreeWalk;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -79,6 +79,12 @@ public class TestRepositoryTest {
 				new DfsRepositoryDescription("test")));
 		repo = tr.getRepository();
 		rw = tr.getRevWalk();
+	}
+
+	@After
+	public void tearDown() {
+		rw.close();
+		repo.close();
 	}
 
 	@Test
