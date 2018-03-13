@@ -49,12 +49,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
@@ -80,7 +78,6 @@ import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.transport.BasePackFetchConnection.MultiAck;
 import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 import org.eclipse.jgit.util.io.InterruptTimer;
-import org.eclipse.jgit.util.io.TeeOutputStream;
 import org.eclipse.jgit.util.io.TimeoutInputStream;
 import org.eclipse.jgit.util.io.TimeoutOutputStream;
 
@@ -150,9 +147,6 @@ public class UploadPack {
 
 	/** Hook handling the various upload phases. */
 	private PreUploadHook preUploadHook = PreUploadHook.NULL;
-
-	/** Cache storing and replaying prior results. */
-	private UploadPackCache uploadPackCache;
 
 	/** Capabilities requested by the client. */
 	private final Set<String> options = new HashSet<String>();
@@ -313,16 +307,6 @@ public class UploadPack {
 	 */
 	public void setPreUploadHook(PreUploadHook hook) {
 		preUploadHook = hook != null ? hook : PreUploadHook.NULL;
-	}
-
-	/**
-	 * Set the cache used to store and replay results.
-	 *
-	 * @param cache
-	 *            the cache; null if it will be disabled.
-	 */
-	public void setUploadPackCache(UploadPackCache cache) {
-		uploadPackCache = cache;
 	}
 
 	/**
@@ -861,11 +845,12 @@ public class UploadPack {
 			}
 		}
 
-		Collection<? extends ObjectId> want = wantAll.isEmpty()
-				? wantIds
-				: wantAll;
 		try {
-			preUploadHook.onSendPack(this, want, commonBase);
+			if (wantAll.isEmpty()) {
+				preUploadHook.onSendPack(this, wantIds, commonBase);
+			} else {
+				preUploadHook.onSendPack(this, wantAll, commonBase);
+			}
 		} catch (UploadPackMayNotContinueException noPack) {
 			if (sideband && noPack.getMessage() != null) {
 				noPack.setOutput();
@@ -877,18 +862,6 @@ public class UploadPack {
 			}
 			throw noPack;
 		}
-
-		Set<String> cacheOptions = new TreeSet<String>();
-		if (options.contains(OPTION_OFS_DELTA))
-			cacheOptions.add(OPTION_OFS_DELTA);
-		if (options.contains(OPTION_THIN_PACK))
-			cacheOptions.add(OPTION_THIN_PACK);
-		if (options.contains(OPTION_INCLUDE_TAG))
-			cacheOptions.add(OPTION_INCLUDE_TAG);
-		if (uploadPackCache != null
-			&& uploadPackCache.sendFromCache(packOut, cacheOptions,
-					want, commonBase))
-			return;
 
 		PackConfig cfg = packConfig;
 		if (cfg == null)
@@ -952,21 +925,7 @@ public class UploadPack {
 				}
 			}
 
-			boolean success = false;
-			OutputStream cacheOut = null;
-			try {
-				if (uploadPackCache != null) {
-					cacheOut = uploadPackCache.newEntry(cacheOptions,
-							want, commonBase);
-					if (cacheOut != null)
-						packOut = new TeeOutputStream(packOut, cacheOut);
-				}
-				pw.writePack(pm, NullProgressMonitor.INSTANCE, packOut);
-				success = true;
-			} finally {
-				if (cacheOut != null)
-					uploadPackCache.finishEntry(cacheOut, success);
-			}
+			pw.writePack(pm, NullProgressMonitor.INSTANCE, packOut);
 			statistics = pw.getStatistics();
 
 			if (msgOut != null) {
