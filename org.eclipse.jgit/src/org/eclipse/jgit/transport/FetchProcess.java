@@ -412,7 +412,7 @@ class FetchProcess {
 
 	private void wantTag(final Ref r) throws TransportException {
 		want(r, new RefSpec().setSource(r.getName())
-				.setDestination(r.getName()).setForceUpdate(true));
+				.setDestination(r.getName()));
 	}
 
 	private void want(final Ref src, final RefSpec spec)

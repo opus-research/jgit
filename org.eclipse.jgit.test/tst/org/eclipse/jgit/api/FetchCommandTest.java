@@ -43,6 +43,7 @@
 package org.eclipse.jgit.api;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -51,10 +52,8 @@ import java.util.Collection;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.junit.RepositoryTestCase;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -120,6 +119,30 @@ public class FetchCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
+	public void fetchShouldAutoFollowTagForFetchedObjects() throws Exception {
+		remoteGit.commit().setMessage("commit").call();
+		Ref tagRef = remoteGit.tag().setName("foo").call();
+		remoteGit.commit().setMessage("commit2").call();
+		RefSpec spec = new RefSpec("refs/heads/*:refs/remotes/origin/*");
+		git.fetch().setRemote("test").setRefSpecs(spec)
+				.setTagOpt(TagOpt.AUTO_FOLLOW).call();
+		assertEquals(tagRef.getObjectId(), db.resolve("foo"));
+	}
+
+	@Test
+	public void fetchShouldNotFetchTagsFromOtherBranches() throws Exception {
+		remoteGit.commit().setMessage("commit").call();
+		remoteGit.checkout().setName("other").setCreateBranch(true).call();
+		remoteGit.commit().setMessage("commit2").call();
+		remoteGit.tag().setName("foo").call();
+		RefSpec spec = new RefSpec(
+				"refs/heads/master:refs/remotes/origin/master");
+		git.fetch().setRemote("test").setRefSpecs(spec)
+				.setTagOpt(TagOpt.AUTO_FOLLOW).call();
+		assertNull(db.resolve("foo"));
+	}
+
+	@Test
 	public void fetchWithUpdatedTagShouldNotTryToUpdateLocal() throws Exception {
 		final String tagName = "foo";
 		remoteGit.commit().setMessage("commit").call();
@@ -144,28 +167,5 @@ public class FetchCommandTest extends RepositoryTestCase {
 		assertEquals("refs/heads/master", update.getRemoteName());
 
 		assertEquals(originalId, db.resolve(tagName));
-	}
-
-	@Test
-	public void fetchWithExplicitTagsShouldUpdateLocal() throws Exception {
-		final String tagName = "foo";
-		remoteGit.commit().setMessage("commit").call();
-		Ref tagRef1 = remoteGit.tag().setName(tagName).call();
-
-		RefSpec spec = new RefSpec("refs/heads/*:refs/remotes/origin/*");
-		git.fetch().setRemote("test").setRefSpecs(spec)
-				.setTagOpt(TagOpt.AUTO_FOLLOW).call();
-		assertEquals(tagRef1.getObjectId(), db.resolve(tagName));
-
-		remoteGit.commit().setMessage("commit 2").call();
-		Ref tagRef2 = remoteGit.tag().setName(tagName).setForceUpdate(true)
-				.call();
-
-		FetchResult result = git.fetch().setRemote("test").setRefSpecs(spec)
-				.setTagOpt(TagOpt.FETCH_TAGS).call();
-		TrackingRefUpdate update = result.getTrackingRefUpdate(Constants.R_TAGS
-				+ tagName);
-		assertEquals(RefUpdate.Result.FORCED, update.getResult());
-		assertEquals(tagRef2.getObjectId(), db.resolve(tagName));
 	}
 }
