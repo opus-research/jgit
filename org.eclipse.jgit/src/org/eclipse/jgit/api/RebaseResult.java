@@ -131,18 +131,6 @@ public class RebaseResult {
 			public boolean isSuccessful() {
 				return false;
 			}
-		},
-
-		/**
-		 * Aborted, the git-rebase-todo file contained no Steps to process
-		 */
-		NOTHING_TO_DO {
-
-			@Override
-			public boolean isSuccessful() {
-				// TODO Auto-generated method stub
-				return false;
-			}
 		};
 
 		/**
@@ -163,9 +151,6 @@ public class RebaseResult {
 
 	static final RebaseResult NOTHING_TO_COMMIT_RESULT = new RebaseResult(
 			Status.NOTHING_TO_COMMIT);
-
-	static final RebaseResult NOTHING_TO_DO_RESULT = new RebaseResult(
-			Status.NOTHING_TO_DO);
 
 	private final Status status;
 
