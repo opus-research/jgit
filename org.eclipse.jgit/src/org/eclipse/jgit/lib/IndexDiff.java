@@ -48,9 +48,7 @@ package org.eclipse.jgit.lib;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 import org.eclipse.jgit.dircache.DirCache;
@@ -164,8 +162,6 @@ public class IndexDiff {
 	private Set<String> assumeUnchanged;
 
 	private DirCache dirCache;
-
-	private IndexDiffFilter indexDiffFilter;
 
 	/**
 	 * Construct an IndexDiff
@@ -282,7 +278,7 @@ public class IndexDiff {
 		if (filter != null)
 			filters.add(filter);
 		filters.add(new SkipWorkTreeFilter(INDEX));
-		indexDiffFilter = new IndexDiffFilter(INDEX, WORKDIR);
+		IndexDiffFilter indexDiffFilter = new IndexDiffFilter(INDEX, WORKDIR);
 		filters.add(indexDiffFilter);
 		treeWalk.setFilter(AndTreeFilter.create(filters));
 		while (treeWalk.next()) {
@@ -430,13 +426,5 @@ public class IndexDiff {
 			assumeUnchanged = unchanged;
 		}
 		return assumeUnchanged;
-	}
-
-	/**
-	 * @return list of folders containing only untracked files/folders
-	 */
-	public List<String> getUntrackedFolders() {
-		return ((indexDiffFilter == null) ? Collections.<String>emptyList()
-				: indexDiffFilter.getUntrackedFolders());
 	}
 }
