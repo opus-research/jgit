@@ -80,12 +80,7 @@ public class RevCommit extends RevObject {
 	 *         available to the caller.
 	 */
 	public static RevCommit parse(byte[] raw) {
-		try {
-			return parse(new RevWalk((ObjectReader) null), raw);
-		}
-		catch (IOException ex) {
-			throw new RuntimeException(ex);
-		}
+		return parse(new RevWalk((ObjectReader) null), raw);
 	}
 
 	/**
@@ -103,7 +98,7 @@ public class RevCommit extends RevObject {
 	 * @return the parsed commit, in an isolated revision pool that is not
 	 *         available to the caller.
 	 */
-	public static RevCommit parse(RevWalk rw, byte[] raw) throws IOException {
+	public static RevCommit parse(RevWalk rw, byte[] raw) {
 		ObjectInserter.Formatter fmt = new ObjectInserter.Formatter();
 		boolean retain = rw.isRetainBody();
 		rw.setRetainBody(true);
@@ -151,11 +146,7 @@ public class RevCommit extends RevObject {
 		}
 	}
 
-	void parseCanonical(final RevWalk walk, final byte[] raw)
-			throws IOException {
-		if (!walk.shallowCommitsInitialized)
-			walk.initializeShallowCommits();
-
+	void parseCanonical(final RevWalk walk, final byte[] raw) {
 		final MutableObjectId idBuffer = walk.idBuffer;
 		idBuffer.fromString(raw, 5);
 		tree = walk.lookupTree(idBuffer);
