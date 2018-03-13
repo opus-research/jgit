@@ -52,7 +52,6 @@ import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_ENCODING;
 import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_TYPE;
 import static org.eclipse.jgit.util.HttpSupport.HDR_PRAGMA;
 import static org.eclipse.jgit.util.HttpSupport.HDR_USER_AGENT;
-import static org.eclipse.jgit.util.HttpSupport.HDR_WWW_AUTHENTICATE;
 import static org.eclipse.jgit.util.HttpSupport.METHOD_GET;
 import static org.eclipse.jgit.util.HttpSupport.METHOD_POST;
 
@@ -246,7 +245,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 	private boolean useSmartHttp = true;
 
-	private HttpAuthMethod authMethod = HttpAuthMethod.Type.NONE.method(null);
+	private HttpAuthMethod authMethod = HttpAuthMethod.NONE;
 
 	private Map<String, String> headers;
 
@@ -475,13 +474,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				final int status = HttpSupport.response(conn);
 				switch (status) {
 				case HttpConnection.HTTP_OK:
-					// Check if HttpConnection did some authentication in the
-					// background (e.g Kerberos/SPNEGO).
-					// That may not work for streaming requests and jgit
-					// explicit authentication would be required
-					if (authMethod.getType() == HttpAuthMethod.Type.NONE
-							&& conn.getHeaderField(HDR_WWW_AUTHENTICATE) != null)
-						authMethod = HttpAuthMethod.scanResponse(conn);
 					return conn;
 
 				case HttpConnection.HTTP_NOT_FOUND:
@@ -490,7 +482,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 				case HttpConnection.HTTP_UNAUTHORIZED:
 					authMethod = HttpAuthMethod.scanResponse(conn);
-					if (authMethod.getType() == HttpAuthMethod.Type.NONE)
+					if (authMethod == HttpAuthMethod.NONE)
 						throw new TransportException(uri, MessageFormat.format(
 								JGitText.get().authenticationNotSupported, uri));
 					CredentialsProvider credentialsProvider = getCredentialsProvider();
