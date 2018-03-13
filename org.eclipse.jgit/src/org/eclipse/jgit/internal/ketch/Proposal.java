@@ -223,13 +223,15 @@ public class Proposal {
 	}
 
 	/**
-	 * Add a callback to be invoked when the proposal is finished.
+	 * Add a callback to be invoked when the proposal is done.
 	 * <p>
-	 * If the proposal is already completed the callback is run immediately.
+	 * A proposal is done when it has entered either {@link State#EXECUTED} or
+	 * {@link State#ABORTED} state. If the proposal is already done
+	 * {@code callback.run()} is immediately invoked on the caller's thread.
 	 *
 	 * @param callback
 	 *            method to run after the proposal is done. The callback may be
-	 *            run on the leader thread and should be completed quickly.
+	 *            run on a Ketch system thread and should be completed quickly.
 	 */
 	public void addListener(Runnable callback) {
 		boolean runNow = false;

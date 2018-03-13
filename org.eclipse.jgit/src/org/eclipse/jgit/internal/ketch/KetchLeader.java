@@ -86,7 +86,7 @@ import org.slf4j.LoggerFactory;
  * leader is discarded.
  * <p>
  * In Ketch all push requests are issued through the leader. The steps are as
- * follows (see {@link KetchPreReceive} for an example):
+ * follows:
  * <ul>
  * <li>Create a {@link Proposal} with the
  * {@link org.eclipse.jgit.transport.ReceiveCommand}s that represent the push.
@@ -177,7 +177,7 @@ public abstract class KetchLeader {
 	 * the object store. This field is set {@code true} when the proposal begins
 	 * execution and set {@code false} once tree objects are persisted in the
 	 * local repository's object store or {@link #refTree} is replaced with a
-	 * copy to isolate it from any running rounds
+	 * copy to isolate it from any running rounds.
 	 * <p>
 	 * If proposals arrive less frequently than the {@code RefTree} is written
 	 * out to the repository the {@link #roundHoldsReferenceToRefTree} behavior
@@ -410,7 +410,7 @@ public abstract class KetchLeader {
 			round.start();
 		} catch (IOException e) {
 			// TODO(sop) Depose leader if it cannot use its repository.
-			log.error(KetchText.get().leaderFailedStore, e);
+			log.error(KetchText.get().leaderFailedToStore, e);
 			lock.lock();
 			try {
 				nextRound();
@@ -520,9 +520,9 @@ public abstract class KetchLeader {
 						committedIndex.describeForLog(),
 						Long.valueOf(term));
 			}
-			runningRound.success();
 			nextRound();
 			commitAsync(replica);
+			notifySuccess(runningRound);
 			if (log.isDebugEnabled()) {
 				log.debug("Leader state:\n{}", snapshot()); //$NON-NLS-1$
 			}
@@ -534,15 +534,31 @@ public abstract class KetchLeader {
 		}
 	}
 
+	private void notifySuccess(Round round) {
+		// Drop the leader lock while notifying Proposal listeners.
+		lock.unlock();
+		try {
+			round.success();
+		} finally {
+			lock.lock();
+		}
+	}
+
 	private void commitAsync(KetchReplica caller) {
 		for (KetchReplica r : voters) {
-			if (r != caller && r.hasAccepted(committedIndex)) {
-				r.pushCommitAsync(committedIndex, isIdle());
+			if (r == caller) {
+				continue;
+			}
+			if (r.shouldPushUnbatchedCommit(committedIndex, isIdle())) {
+				r.pushCommitAsync(committedIndex);
 			}
 		}
 		for (KetchReplica r : followers) {
-			if (r != caller && r.hasAccepted(committedIndex)) {
-				r.pushCommitAsync(committedIndex, isIdle());
+			if (r == caller) {
+				continue;
+			}
+			if (r.shouldPushUnbatchedCommit(committedIndex, isIdle())) {
+				r.pushCommitAsync(committedIndex);
 			}
 		}
 	}
