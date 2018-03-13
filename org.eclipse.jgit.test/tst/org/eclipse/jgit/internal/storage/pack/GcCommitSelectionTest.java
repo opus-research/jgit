@@ -68,6 +68,7 @@ import org.eclipse.jgit.storage.pack.PackConfig;
 import org.junit.Test;
 
 public class GcCommitSelectionTest extends GcTestCase {
+
 	@Test
 	public void testBitmapSpansNoMerges() throws Exception {
 		/*
