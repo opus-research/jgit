@@ -234,7 +234,6 @@ public class MergeCommand extends GitCommand<MergeResult> {
 			refLogMessage.append(ref.getName());
 
 			// handle annotated tags
-			ref = repo.peel(ref);
 			ObjectId objectId = ref.getPeeledObjectId();
 			if (objectId == null)
 				objectId = ref.getObjectId();
