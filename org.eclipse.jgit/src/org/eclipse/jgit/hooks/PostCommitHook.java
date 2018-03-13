@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Tomasz Zarna <tomasz.zarna@tasktop.com> and others.
+ * Copyright (C) 2015 Obeo.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,57 +40,45 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm;
+package org.eclipse.jgit.hooks;
 
-import static org.junit.Assert.assertEquals;
+import java.io.IOException;
+import java.io.PrintStream;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.lib.CLIRepositoryTestCase;
-import org.eclipse.jgit.lib.Ref;
-import org.junit.Before;
-import org.junit.Test;
+import org.eclipse.jgit.api.errors.AbortedByHookException;
+import org.eclipse.jgit.lib.Repository;
 
-public class TagTest extends CLIRepositoryTestCase {
-	private Git git;
+/**
+ * The <code>post-commit</code> hook implementation. This hook is run after the
+ * commit was successfully executed.
+ *
+ * @since 4.5
+ */
+public class PostCommitHook extends GitHook<Void> {
+
+	/** The post-commit hook name. */
+	public static final String NAME = "post-commit"; //$NON-NLS-1$
+
+	/**
+	 * @param repo
+	 *            The repository
+	 * @param outputStream
+	 *            The output stream the hook must use. {@code null} is allowed,
+	 *            in which case the hook will use {@code System.out}.
+	 */
+	protected PostCommitHook(Repository repo, PrintStream outputStream) {
+		super(repo, outputStream);
+	}
 
 	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
-		git = new Git(db);
-		git.commit().setMessage("initial commit").call();
+	public Void call() throws IOException, AbortedByHookException {
+		doRun();
+		return null;
 	}
 
-	@Test
-	public void testTagTwice() throws Exception {
-		git.tag().setName("test").call();
-		writeTrashFile("file", "content");
-		git.add().addFilepattern("file").call();
-		git.commit().setMessage("commit").call();
-
-		assertEquals("fatal: tag 'test' already exists",
-				executeUnchecked("git tag test")[0]);
+	@Override
+	public String getHookName() {
+		return NAME;
 	}
 
-	@Test
-	public void testTagDelete() throws Exception {
-		git.tag().setName("test").call();
-
-		Ref ref = git.getRepository().getTags().get("test");
-		assertEquals("refs/tags/test", ref.getName());
-
-		assertEquals("", executeUnchecked("git tag -d test")[0]);
-		Ref deletedRef = git.getRepository().getTags().get("test");
-		assertEquals(null, deletedRef);
-	}
-
-	@Test
-	public void testTagDeleteFail() throws Exception {
-		try {
-			assertEquals("fatal: error: tag 'test' not found.",
-					executeUnchecked("git tag -d test")[0]);
-		} catch (Die e) {
-			assertEquals("fatal: error: tag 'test' not found", e.getMessage());
-		}
-	}
 }

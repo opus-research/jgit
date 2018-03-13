@@ -96,30 +96,36 @@ public class ReceivePack extends BaseReceivePack {
 	 * Gets an unmodifiable view of the option strings associated with the push.
 	 *
 	 * @return an unmodifiable view of pushOptions, or null (if pushOptions is).
-	 * @throws IllegalStateException
-	 *             if allowPushOptions has not been set to true.
-	 * @throws RequestNotYetReadException
-	 *             if the client's request has not yet been read from the wire,
-	 *             so we do not know if they expect push options. Note that the
-	 *             client may have already written the request, it just has not
-	 *             been read.
 	 * @since 4.5
 	 */
 	@Nullable
 	public List<String> getPushOptions() {
-		if (!isAllowPushOptions()) {
-			// Reading push options without a prior setAllowPushOptions(true)
-			// call doesn't make sense.
-			throw new IllegalStateException();
+		if (isAllowPushOptions() && usePushOptions) {
+			return Collections.unmodifiableList(pushOptions);
 		}
-		checkRequestWasRead();
-		if (!usePushOptions) {
-			// The client doesn't support push options. Return null to
-			// distinguish this from the case where the client declared support
-			// for push options and sent an empty list of them.
-			return null;
-		}
-		return Collections.unmodifiableList(pushOptions);
+
+		// The client doesn't support push options. Return null to
+		// distinguish this from the case where the client declared support
+		// for push options and sent an empty list of them.
+		return null;
+	}
+
+	/**
+	 * Set the push options supplied by the client.
+	 * <p>
+	 * Should only be called if reconstructing an instance without going through
+	 * the normal {@link #recvCommands()} flow.
+	 *
+	 * @param options
+	 *            the list of options supplied by the client. The
+	 *            {@code ReceivePack} instance takes ownership of this list.
+	 *            Callers are encouraged to first create a copy if the list may
+	 *            be modified later.
+	 * @since 4.5
+	 */
+	public void setPushOptions(@Nullable List<String> options) {
+		usePushOptions = options != null;
+		pushOptions = options;
 	}
 
 	/** @return the hook invoked before updates occur. */
@@ -214,14 +220,17 @@ public class ReceivePack extends BaseReceivePack {
 		super.enableCapabilities();
 	}
 
-	private void readPushOptions() throws IOException {
-		pushOptions = new ArrayList<>(4);
-		for (;;) {
-			String option = pckIn.readString();
-			if (option == PacketLineIn.END) {
-				break;
+	@Override
+	void readPostCommands(PacketLineIn in) throws IOException {
+		if (usePushOptions) {
+			pushOptions = new ArrayList<>(4);
+			for (;;) {
+				String option = in.readString();
+				if (option == PacketLineIn.END) {
+					break;
+				}
+				pushOptions.add(option);
 			}
-			pushOptions.add(option);
 		}
 	}
 
@@ -235,10 +244,6 @@ public class ReceivePack extends BaseReceivePack {
 			return;
 		recvCommands();
 		if (hasCommands()) {
-			if (usePushOptions) {
-				readPushOptions();
-			}
-
 			Throwable unpackError = null;
 			if (needPack()) {
 				try {

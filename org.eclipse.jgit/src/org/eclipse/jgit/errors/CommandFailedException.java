@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Tomasz Zarna <tomasz.zarna@tasktop.com> and others.
+ * Copyright (C) 2016, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,57 +40,48 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm;
+package org.eclipse.jgit.errors;
 
-import static org.junit.Assert.assertEquals;
+/**
+ * Thrown when an external command failed
+ *
+ * @since 4.5
+ */
+public class CommandFailedException extends Exception {
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.lib.CLIRepositoryTestCase;
-import org.eclipse.jgit.lib.Ref;
-import org.junit.Before;
-import org.junit.Test;
+	private static final long serialVersionUID = 1L;
 
-public class TagTest extends CLIRepositoryTestCase {
-	private Git git;
+	private int returnCode;
 
-	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
-		git = new Git(db);
-		git.commit().setMessage("initial commit").call();
+	/**
+	 * @param returnCode
+	 *            return code returned by the command
+	 * @param message
+	 *            error message
+	 */
+	public CommandFailedException(int returnCode, String message) {
+		super(message);
+		this.returnCode = returnCode;
 	}
 
-	@Test
-	public void testTagTwice() throws Exception {
-		git.tag().setName("test").call();
-		writeTrashFile("file", "content");
-		git.add().addFilepattern("file").call();
-		git.commit().setMessage("commit").call();
-
-		assertEquals("fatal: tag 'test' already exists",
-				executeUnchecked("git tag test")[0]);
+	/**
+	 * @param returnCode
+	 *            return code returned by the command
+	 * @param message
+	 *            error message
+	 * @param cause
+	 *            exception causing this exception
+	 */
+	public CommandFailedException(int returnCode, String message,
+			Throwable cause) {
+		super(message, cause);
+		this.returnCode = returnCode;
 	}
 
-	@Test
-	public void testTagDelete() throws Exception {
-		git.tag().setName("test").call();
-
-		Ref ref = git.getRepository().getTags().get("test");
-		assertEquals("refs/tags/test", ref.getName());
-
-		assertEquals("", executeUnchecked("git tag -d test")[0]);
-		Ref deletedRef = git.getRepository().getTags().get("test");
-		assertEquals(null, deletedRef);
-	}
-
-	@Test
-	public void testTagDeleteFail() throws Exception {
-		try {
-			assertEquals("fatal: error: tag 'test' not found.",
-					executeUnchecked("git tag -d test")[0]);
-		} catch (Die e) {
-			assertEquals("fatal: error: tag 'test' not found", e.getMessage());
-		}
+	/**
+	 * @return return code returned by the command
+	 */
+	public int getReturnCode() {
+		return returnCode;
 	}
 }
