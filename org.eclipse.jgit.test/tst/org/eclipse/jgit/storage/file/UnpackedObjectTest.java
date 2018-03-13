@@ -43,12 +43,6 @@
 
 package org.eclipse.jgit.storage.file;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -63,7 +57,6 @@ import java.util.zip.DeflaterOutputStream;
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.LargeObjectException;
-import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.junit.TestRng;
 import org.eclipse.jgit.lib.Constants;
@@ -72,9 +65,6 @@ import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectStream;
 import org.eclipse.jgit.util.IO;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
 
 public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 	private int streamThreshold = 16 * 1024;
@@ -85,36 +75,28 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 
 	private WindowCursor wc;
 
-	private TestRng getRng() {
-		if (rng == null)
-			rng = new TestRng(JGitTestUtil.getName());
-		return rng;
-	}
-
-	@Before
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
 		super.setUp();
 
 		WindowCacheConfig cfg = new WindowCacheConfig();
 		cfg.setStreamFileThreshold(streamThreshold);
 		WindowCache.reconfigure(cfg);
 
+		rng = new TestRng(getName());
 		repo = createBareRepository();
 		wc = (WindowCursor) repo.newObjectReader();
 	}
 
-	@After
-	public void tearDown() throws Exception {
+	protected void tearDown() throws Exception {
 		if (wc != null)
 			wc.release();
 		WindowCache.reconfigure(new WindowCacheConfig());
 		super.tearDown();
 	}
 
-	@Test
 	public void testStandardFormat_SmallObject() throws Exception {
 		final int type = Constants.OBJ_BLOB;
-		byte[] data = getRng().nextBytes(300);
+		byte[] data = rng.nextBytes(300);
 		byte[] gz = compressStandardFormat(type, data);
 		ObjectId id = ObjectId.zeroId();
 
@@ -137,10 +119,9 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 		in.close();
 	}
 
-	@Test
 	public void testStandardFormat_LargeObject() throws Exception {
 		final int type = Constants.OBJ_BLOB;
-		byte[] data = getRng().nextBytes(streamThreshold + 5);
+		byte[] data = rng.nextBytes(streamThreshold + 5);
 		ObjectId id = new ObjectInserter.Formatter().idFor(type, data);
 		write(id, compressStandardFormat(type, data));
 
@@ -178,10 +159,9 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 		in.close();
 	}
 
-	@Test
 	public void testStandardFormat_NegativeSize() throws Exception {
 		ObjectId id = ObjectId.zeroId();
-		byte[] data = getRng().nextBytes(300);
+		byte[] data = rng.nextBytes(300);
 
 		try {
 			byte[] gz = compressStandardFormat("blob", "-1", data);
@@ -194,10 +174,9 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testStandardFormat_InvalidType() throws Exception {
 		ObjectId id = ObjectId.zeroId();
-		byte[] data = getRng().nextBytes(300);
+		byte[] data = rng.nextBytes(300);
 
 		try {
 			byte[] gz = compressStandardFormat("not.a.type", "1", data);
@@ -210,7 +189,6 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testStandardFormat_NoHeader() throws Exception {
 		ObjectId id = ObjectId.zeroId();
 		byte[] data = {};
@@ -226,10 +204,9 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testStandardFormat_GarbageAfterSize() throws Exception {
 		ObjectId id = ObjectId.zeroId();
-		byte[] data = getRng().nextBytes(300);
+		byte[] data = rng.nextBytes(300);
 
 		try {
 			byte[] gz = compressStandardFormat("blob", "1foo", data);
@@ -242,11 +219,10 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testStandardFormat_SmallObject_CorruptZLibStream()
 			throws Exception {
 		ObjectId id = ObjectId.zeroId();
-		byte[] data = getRng().nextBytes(300);
+		byte[] data = rng.nextBytes(300);
 
 		try {
 			byte[] gz = compressStandardFormat(Constants.OBJ_BLOB, data);
@@ -261,11 +237,10 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testStandardFormat_SmallObject_TruncatedZLibStream()
 			throws Exception {
 		ObjectId id = ObjectId.zeroId();
-		byte[] data = getRng().nextBytes(300);
+		byte[] data = rng.nextBytes(300);
 
 		try {
 			byte[] gz = compressStandardFormat(Constants.OBJ_BLOB, data);
@@ -280,11 +255,10 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testStandardFormat_SmallObject_TrailingGarbage()
 			throws Exception {
 		ObjectId id = ObjectId.zeroId();
-		byte[] data = getRng().nextBytes(300);
+		byte[] data = rng.nextBytes(300);
 
 		try {
 			byte[] gz = compressStandardFormat(Constants.OBJ_BLOB, data);
@@ -299,11 +273,10 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testStandardFormat_LargeObject_CorruptZLibStream()
 			throws Exception {
 		final int type = Constants.OBJ_BLOB;
-		byte[] data = getRng().nextBytes(streamThreshold + 5);
+		byte[] data = rng.nextBytes(streamThreshold + 5);
 		ObjectId id = new ObjectInserter.Formatter().idFor(type, data);
 		byte[] gz = compressStandardFormat(type, data);
 		gz[gz.length - 1] = 0;
@@ -337,11 +310,10 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testStandardFormat_LargeObject_TruncatedZLibStream()
 			throws Exception {
 		final int type = Constants.OBJ_BLOB;
-		byte[] data = getRng().nextBytes(streamThreshold + 5);
+		byte[] data = rng.nextBytes(streamThreshold + 5);
 		ObjectId id = new ObjectInserter.Formatter().idFor(type, data);
 		byte[] gz = compressStandardFormat(type, data);
 		byte[] tr = new byte[gz.length - 1];
@@ -372,11 +344,10 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testStandardFormat_LargeObject_TrailingGarbage()
 			throws Exception {
 		final int type = Constants.OBJ_BLOB;
-		byte[] data = getRng().nextBytes(streamThreshold + 5);
+		byte[] data = rng.nextBytes(streamThreshold + 5);
 		ObjectId id = new ObjectInserter.Formatter().idFor(type, data);
 		byte[] gz = compressStandardFormat(type, data);
 		byte[] tr = new byte[gz.length + 1];
@@ -407,10 +378,9 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testPackFormat_SmallObject() throws Exception {
 		final int type = Constants.OBJ_BLOB;
-		byte[] data = getRng().nextBytes(300);
+		byte[] data = rng.nextBytes(300);
 		byte[] gz = compressPackFormat(type, data);
 		ObjectId id = ObjectId.zeroId();
 
@@ -432,10 +402,9 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 		in.close();
 	}
 
-	@Test
 	public void testPackFormat_LargeObject() throws Exception {
 		final int type = Constants.OBJ_BLOB;
-		byte[] data = getRng().nextBytes(streamThreshold + 5);
+		byte[] data = rng.nextBytes(streamThreshold + 5);
 		ObjectId id = new ObjectInserter.Formatter().idFor(type, data);
 		write(id, compressPackFormat(type, data));
 
@@ -473,10 +442,9 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 		in.close();
 	}
 
-	@Test
 	public void testPackFormat_DeltaNotAllowed() throws Exception {
 		ObjectId id = ObjectId.zeroId();
-		byte[] data = getRng().nextBytes(300);
+		byte[] data = rng.nextBytes(300);
 
 		try {
 			byte[] gz = compressPackFormat(Constants.OBJ_OFS_DELTA, data);

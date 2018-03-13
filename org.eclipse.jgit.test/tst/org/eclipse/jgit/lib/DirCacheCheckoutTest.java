@@ -37,9 +37,6 @@
  */
 package org.eclipse.jgit.lib;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -56,7 +53,6 @@ import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.junit.Test;
 
 public class DirCacheCheckoutTest extends ReadTreeTest {
 	private DirCacheCheckout dco;
@@ -98,7 +94,6 @@ public class DirCacheCheckoutTest extends ReadTreeTest {
 		return dco.getConflicts();
 	}
 
-	@Test
 	public void testResetHard() throws IOException, NoFilepatternException,
 			GitAPIException {
 		Git git = new Git(db);

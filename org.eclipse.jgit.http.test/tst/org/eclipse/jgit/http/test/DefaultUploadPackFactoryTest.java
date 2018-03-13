@@ -43,10 +43,6 @@
 
 package org.eclipse.jgit.http.test;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.fail;
-
 import java.io.IOException;
 
 import javax.servlet.http.HttpServletRequestWrapper;
@@ -60,23 +56,19 @@ import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.transport.UploadPack;
-import org.junit.Before;
-import org.junit.Test;
 
 public class DefaultUploadPackFactoryTest extends LocalDiskRepositoryTestCase {
 	private Repository db;
 
 	private UploadPackFactory factory;
 
-	@Before
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
 		super.setUp();
 
 		db = createBareRepository();
 		factory = new DefaultUploadPackFactory();
 	}
 
-	@Test
 	public void testDisabledSingleton() throws ServiceNotAuthorizedException {
 		factory = UploadPackFactory.DISABLED;
 
@@ -102,7 +94,6 @@ public class DefaultUploadPackFactoryTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testCreate_Default() throws ServiceNotEnabledException,
 			ServiceNotAuthorizedException {
 		UploadPack up;
@@ -116,7 +107,6 @@ public class DefaultUploadPackFactoryTest extends LocalDiskRepositoryTestCase {
 		assertSame(db, up.getRepository());
 	}
 
-	@Test
 	public void testCreate_Disabled() throws ServiceNotAuthorizedException,
 			IOException {
 		final StoredConfig cfg = db.getConfig();
@@ -138,7 +128,6 @@ public class DefaultUploadPackFactoryTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testCreate_Enabled() throws ServiceNotEnabledException,
 			ServiceNotAuthorizedException {
 		db.getConfig().setBoolean("http", null, "uploadpack", true);
