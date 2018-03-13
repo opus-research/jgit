@@ -202,7 +202,8 @@ public class PullCommand extends GitCommand<PullResult> {
 
 			FetchCommand fetch = new FetchCommand(repo);
 			fetch.setRemote(remote);
-			fetch.setProgressMonitor(monitor);
+			if (monitor != null)
+				fetch.setProgressMonitor(monitor);
 			fetch.setTimeout(this.timeout);
 
 			fetchRes = fetch.call();

@@ -517,6 +517,7 @@ public class DirCacheCheckout {
 				conflict(name, (i != null) ? i.getDirCacheEntry() : null, h, m);
 				break;
 			case 0xFDF: // 7 8 9
+				dce = i.getDirCacheEntry();
 				if (hId.equals(mId)) {
 					if (isModified(name))
 						conflict(name, i.getDirCacheEntry(), h, m); // 8
