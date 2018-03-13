@@ -64,10 +64,10 @@ import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.LockFile;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectWriter;
-import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.storage.file.LockFile;
+import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.MutableInteger;
 import org.eclipse.jgit.util.NB;
@@ -130,7 +130,7 @@ public class DirCache {
 	 *         memory).
 	 */
 	public static DirCache newInCore() {
-		return new DirCache(null);
+		return new DirCache(null, null);
 	}
 
 	/**
@@ -142,6 +142,9 @@ public class DirCache {
 	 *
 	 * @param indexLocation
 	 *            location of the index file on disk.
+	 * @param fs
+	 *            the file system abstraction which will be necessary to perform
+	 *            certain file system operations.
 	 * @return a cache representing the contents of the specified index file (if
 	 *         it exists) or an empty cache if the file does not exist.
 	 * @throws IOException
@@ -150,33 +153,11 @@ public class DirCache {
 	 *             the index file is using a format or extension that this
 	 *             library does not support.
 	 */
-	public static DirCache read(final File indexLocation)
+	public static DirCache read(final File indexLocation, final FS fs)
 			throws CorruptObjectException, IOException {
-		final DirCache c = new DirCache(indexLocation);
+		final DirCache c = new DirCache(indexLocation, fs);
 		c.read();
 		return c;
-	}
-
-	/**
-	 * Create a new in-core index representation and read an index from disk.
-	 * <p>
-	 * The new index will be read before it is returned to the caller. Read
-	 * failures are reported as exceptions and therefore prevent the method from
-	 * returning a partially populated index.
-	 *
-	 * @param db
-	 *            repository the caller wants to read the default index of.
-	 * @return a cache representing the contents of the specified index file (if
-	 *         it exists) or an empty cache if the file does not exist.
-	 * @throws IOException
-	 *             the index file is present but could not be read.
-	 * @throws CorruptObjectException
-	 *             the index file is using a format or extension that this
-	 *             library does not support.
-	 */
-	public static DirCache read(final Repository db)
-			throws CorruptObjectException, IOException {
-		return read(new File(db.getDirectory(), "index"));
 	}
 
 	/**
@@ -184,11 +165,14 @@ public class DirCache {
 	 * <p>
 	 * The new index will be locked and then read before it is returned to the
 	 * caller. Read failures are reported as exceptions and therefore prevent
-	 * the method from returning a partially populated index.  On read failure,
+	 * the method from returning a partially populated index. On read failure,
 	 * the lock is released.
 	 *
 	 * @param indexLocation
 	 *            location of the index file on disk.
+	 * @param fs
+	 *            the file system abstraction which will be necessary to perform
+	 *            certain file system operations.
 	 * @return a cache representing the contents of the specified index file (if
 	 *         it exists) or an empty cache if the file does not exist.
 	 * @throws IOException
@@ -198,9 +182,9 @@ public class DirCache {
 	 *             the index file is using a format or extension that this
 	 *             library does not support.
 	 */
-	public static DirCache lock(final File indexLocation)
+	public static DirCache lock(final File indexLocation, final FS fs)
 			throws CorruptObjectException, IOException {
-		final DirCache c = new DirCache(indexLocation);
+		final DirCache c = new DirCache(indexLocation, fs);
 		if (!c.lock())
 			throw new IOException(MessageFormat.format(JGitText.get().cannotLock, indexLocation));
 
@@ -218,29 +202,6 @@ public class DirCache {
 		}
 
 		return c;
-	}
-
-	/**
-	 * Create a new in-core index representation, lock it, and read from disk.
-	 * <p>
-	 * The new index will be locked and then read before it is returned to the
-	 * caller. Read failures are reported as exceptions and therefore prevent
-	 * the method from returning a partially populated index.
-	 *
-	 * @param db
-	 *            repository the caller wants to read the default index of.
-	 * @return a cache representing the contents of the specified index file (if
-	 *         it exists) or an empty cache if the file does not exist.
-	 * @throws IOException
-	 *             the index file is present but could not be read, or the lock
-	 *             could not be obtained.
-	 * @throws CorruptObjectException
-	 *             the index file is using a format or extension that this
-	 *             library does not support.
-	 */
-	public static DirCache lock(final Repository db)
-			throws CorruptObjectException, IOException {
-		return lock(new File(db.getDirectory(), "index"));
 	}
 
 	/** Location of the current version of the index file. */
@@ -261,6 +222,9 @@ public class DirCache {
 	/** Our active lock (if we hold it); null if we don't have it locked. */
 	private LockFile myLock;
 
+	/** file system abstraction **/
+	private final FS fs;
+
 	/**
 	 * Create a new in-core index representation.
 	 * <p>
@@ -269,9 +233,13 @@ public class DirCache {
 	 *
 	 * @param indexLocation
 	 *            location of the index file on disk.
+	 * @param fs
+	 *            the file system abstraction which will be necessary to perform
+	 *            certain file system operations.
 	 */
-	public DirCache(final File indexLocation) {
+	public DirCache(final File indexLocation, final FS fs) {
 		liveFile = indexLocation;
+		this.fs = fs;
 		clear();
 	}
 
@@ -475,7 +443,7 @@ public class DirCache {
 	public boolean lock() throws IOException {
 		if (liveFile == null)
 			throw new IOException(JGitText.get().dirCacheDoesNotHaveABackingFile);
-		final LockFile tmp = new LockFile(liveFile);
+		final LockFile tmp = new LockFile(liveFile, fs);
 		if (tmp.lock()) {
 			tmp.setNeedStatInformation(true);
 			myLock = tmp;
@@ -768,7 +736,9 @@ public class DirCache {
 	 * Write all index trees to the object store, returning the root tree.
 	 *
 	 * @param ow
-	 *            the writer to use when serializing to the store.
+	 *            the writer to use when serializing to the store. The caller is
+	 *            responsible for flushing the inserter before trying to use the
+	 *            returned tree identity.
 	 * @return identity for the root tree.
 	 * @throws UnmergedPathException
 	 *             one or more paths contain higher-order stages (stage > 0),
@@ -779,7 +749,7 @@ public class DirCache {
 	 * @throws IOException
 	 *             an unexpected error occurred writing to the object store.
 	 */
-	public ObjectId writeTree(final ObjectWriter ow)
+	public ObjectId writeTree(final ObjectInserter ow)
 			throws UnmergedPathException, IOException {
 		return getCacheTree(true).writeTree(sortedEntries, 0, 0, ow);
 	}

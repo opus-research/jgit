@@ -47,6 +47,7 @@
 package org.eclipse.jgit.lib;
 
 import static java.util.zip.Deflater.DEFAULT_COMPRESSION;
+import static org.eclipse.jgit.lib.ObjectLoader.STREAM_THRESHOLD;
 
 import org.eclipse.jgit.lib.Config.SectionParser;
 
@@ -67,17 +68,21 @@ public class CoreConfig {
 
 	private final boolean logAllRefUpdates;
 
-	private final boolean autocrlf;
+	private final int streamFileThreshold;
 
 	private CoreConfig(final Config rc) {
 		compression = rc.getInt("core", "compression", DEFAULT_COMPRESSION);
 		packIndexVersion = rc.getInt("pack", "indexversion", 2);
 		logAllRefUpdates = rc.getBoolean("core", "logallrefupdates", true);
-		autocrlf = rc.getBoolean("core", "autocrlf", false);
+
+		long maxMem = Runtime.getRuntime().maxMemory();
+		long sft = rc.getLong("core", null, "streamfilethreshold", STREAM_THRESHOLD);
+		sft = Math.min(sft, maxMem / 4); // don't use more than 1/4 of the heap
+		sft = Math.min(sft, Integer.MAX_VALUE); // cannot exceed array length
+		streamFileThreshold = (int) sft;
 	}
 
 	/**
-	 * @see ObjectWriter
 	 * @return The compression level to use when storing loose objects
 	 */
 	public int getCompression() {
@@ -99,10 +104,8 @@ public class CoreConfig {
 		return logAllRefUpdates;
 	}
 
-	/**
-	 * @return whether automatic CRLF conversion has been configured
-	 */
-	public boolean isAutocrlf() {
-		return autocrlf;
+	/** @return the size threshold beyond which objects must be streamed. */
+	public int getStreamFileThreshold() {
+		return streamFileThreshold;
 	}
 }
