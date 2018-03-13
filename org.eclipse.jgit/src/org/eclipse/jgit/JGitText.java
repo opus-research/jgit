@@ -69,7 +69,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String aNewObjectIdIsRequired;
 	/***/ public String abbreviationLengthMustBeNonNegative;
 	/***/ public String abortingRebase;
-	/***/ public String abortingRebaseFailed;
 	/***/ public String advertisementCameBefore;
 	/***/ public String advertisementOfCameBefore;
 	/***/ public String amazonS3ActionFailed;
@@ -138,6 +137,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cantPassMeATree;
 	/***/ public String channelMustBeInRange0_255;
 	/***/ public String characterClassIsNotSupported;
+	/***/ public String checkoutUnexpectedResult;
 	/***/ public String checkoutConflictWithFile;
 	/***/ public String checkoutConflictWithFiles;
 	/***/ public String classCastNotA;
