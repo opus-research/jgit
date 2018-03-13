@@ -116,9 +116,6 @@ public class ConfigConstants {
 	/** The "deltaBaseCacheLimit" key */
 	public static final String CONFIG_KEY_DELTA_BASE_CACHE_LIMIT = "deltaBaseCacheLimit";
 
-	/** The "symlinks key */
-	public static final String CONFIG_KEY_SYMLINKS = "symlinks";
-
 	/** The "streamFileThreshold" key */
 	public static final String CONFIG_KEY_STREAM_FILE_TRESHOLD = "streamFileThreshold";
 
@@ -180,9 +177,6 @@ public class ConfigConstants {
 
 	/** The "indexversion" key */
 	public static final String CONFIG_KEY_INDEXVERSION = "indexversion";
-
-	/** The "hidedotfiles" key */
-	public static final String CONFIG_KEY_HIDEDOTFILES = "hidedotfiles";
 
 	/** The "precomposeunicode" key */
 	public static final String CONFIG_KEY_PRECOMPOSEUNICODE = "precomposeunicode";

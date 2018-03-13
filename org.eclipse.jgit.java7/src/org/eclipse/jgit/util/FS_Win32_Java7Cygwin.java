@@ -84,11 +84,6 @@ public class FS_Win32_Java7Cygwin extends FS_Win32_Cygwin {
 	}
 
 	@Override
-	public void delete(File path) throws IOException {
-		FileUtil.delete(path);
-	}
-
-	@Override
 	public long length(File f) throws IOException {
 		return FileUtil.getLength(f);
 	}
@@ -126,10 +121,5 @@ public class FS_Win32_Java7Cygwin extends FS_Win32_Cygwin {
 	@Override
 	public void createSymLink(File path, String target) throws IOException {
 		FileUtil.createSymLink(path, target);
-	}
-
-	@Override
-	public Attributes getAttributes(File path) {
-		return FileUtil.getFileAttributes(this, path);
 	}
 }
