@@ -56,7 +56,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 
 /**
  * Caches slices of a {@link DfsPackFile} in memory for faster read access.
