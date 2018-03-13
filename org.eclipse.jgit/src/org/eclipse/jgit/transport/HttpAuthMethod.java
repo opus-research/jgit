@@ -61,12 +61,6 @@ import java.util.Random;
 
 import org.eclipse.jgit.transport.http.HttpConnection;
 import org.eclipse.jgit.util.Base64;
-import org.eclipse.jgit.util.GSSManagerFactory;
-import org.ietf.jgss.GSSContext;
-import org.ietf.jgss.GSSException;
-import org.ietf.jgss.GSSManager;
-import org.ietf.jgss.GSSName;
-import org.ietf.jgss.Oid;
 
 /**
  * Support class to populate user authentication data on a connection.
@@ -75,45 +69,8 @@ import org.ietf.jgss.Oid;
  * may need to maintain per-connection state information.
  */
 abstract class HttpAuthMethod {
-	/**
-	 * Enum listing the http authentication method types supported by jgit. They
-	 * are sorted by priority order!!!
-	 */
-	public enum Type {
-		NONE {
-			@Override
-			public HttpAuthMethod method(String hdr) {
-				return None.INSTANCE;
-			}
-		},
-		BASIC {
-			@Override
-			public HttpAuthMethod method(String hdr) {
-				return new Basic();
-			}
-		},
-		DIGEST {
-			@Override
-			public HttpAuthMethod method(String hdr) {
-				return new Digest(hdr);
-			}
-		},
-		NEGOTIATE {
-			@Override
-			public HttpAuthMethod method(String hdr) {
-				return new Negotiate(hdr);
-			}
-		};
-		/**
-		 * Creates a HttpAuthMethod instance configured with the provided HTTP
-		 * WWW-Authenticate header.
-		 *
-		 * @param hdr the http header
-		 * @return a configured HttpAuthMethod instance
-		 */
-		public abstract HttpAuthMethod method(String hdr);
-	}
-
+	/** No authentication is configured. */
+	static final HttpAuthMethod NONE = new None();
 	static final String EMPTY_STRING = ""; //$NON-NLS-1$
 	static final String SCHEMA_NAME_SEPARATOR = " "; //$NON-NLS-1$
 
@@ -126,7 +83,7 @@ abstract class HttpAuthMethod {
 	 */
 	static HttpAuthMethod scanResponse(final HttpConnection conn) {
 		final Map<String, List<String>> headers = conn.getHeaderFields();
-		HttpAuthMethod authentication = Type.NONE.method(EMPTY_STRING);
+		HttpAuthMethod authentication = NONE;
 
 		for (final Entry<String, List<String>> entry : headers.entrySet()) {
 			if (HDR_WWW_AUTHENTICATE.equalsIgnoreCase(entry.getKey())) {
@@ -136,23 +93,19 @@ abstract class HttpAuthMethod {
 							final String[] valuePart = value.split(
 									SCHEMA_NAME_SEPARATOR, 2);
 
-							try {
-								Type methodType = Type.valueOf(valuePart[0].toUpperCase());
-								if (authentication.getType().compareTo(methodType) >= 0) {
-									continue;
-								}
-
+							if (Digest.NAME.equalsIgnoreCase(valuePart[0])) {
 								final String param;
 								if (valuePart.length == 1)
 									param = EMPTY_STRING;
 								else
 									param = valuePart[1];
 
-								authentication = methodType
-										.method(param);
-							} catch (IllegalArgumentException e) {
-								// This auth method is not supported
+								authentication = new Digest(param);
+								break;
 							}
+
+							if (Basic.NAME.equalsIgnoreCase(valuePart[0]))
+								authentication = new Basic();
 						}
 					}
 				}
@@ -161,12 +114,6 @@ abstract class HttpAuthMethod {
 		}
 
 		return authentication;
-	}
-
-	protected final Type type;
-
-	protected HttpAuthMethod(Type type) {
-		this.type = type;
 	}
 
 	/**
@@ -223,22 +170,8 @@ abstract class HttpAuthMethod {
 	 */
 	abstract void configureRequest(HttpConnection conn) throws IOException;
 
-	/**
-	 * Gives the method type associated to this http auth method
-	 *
-	 * @return the method type
-	 */
-	public Type getType() {
-		return type;
-	}
-
 	/** Performs no user authentication. */
 	private static class None extends HttpAuthMethod {
-		static final None INSTANCE = new None();
-		public None() {
-			super(Type.NONE);
-		}
-
 		@Override
 		void authorize(String user, String pass) {
 			// Do nothing when no authentication is enabled.
@@ -252,13 +185,11 @@ abstract class HttpAuthMethod {
 
 	/** Performs HTTP basic authentication (plaintext username/password). */
 	private static class Basic extends HttpAuthMethod {
+		static final String NAME = "Basic"; //$NON-NLS-1$
+
 		private String user;
 
 		private String pass;
-
-		public Basic() {
-			super(Type.BASIC);
-		}
 
 		@Override
 		void authorize(final String username, final String password) {
@@ -270,13 +201,14 @@ abstract class HttpAuthMethod {
 		void configureRequest(final HttpConnection conn) throws IOException {
 			String ident = user + ":" + pass; //$NON-NLS-1$
 			String enc = Base64.encodeBytes(ident.getBytes("UTF-8")); //$NON-NLS-1$
-			conn.setRequestProperty(HDR_AUTHORIZATION, type.name()
-					+ " " + enc); //$NON-NLS-1$
+			conn.setRequestProperty(HDR_AUTHORIZATION, NAME + " " + enc); //$NON-NLS-1$
 		}
 	}
 
 	/** Performs HTTP digest authentication. */
 	private static class Digest extends HttpAuthMethod {
+		static final String NAME = "Digest"; //$NON-NLS-1$
+
 		private static final Random PRNG = new Random();
 
 		private final Map<String, String> params;
@@ -288,7 +220,6 @@ abstract class HttpAuthMethod {
 		private String pass;
 
 		Digest(String hdr) {
-			super(Type.DIGEST);
 			params = parse(hdr);
 
 			final String qop = params.get("qop"); //$NON-NLS-1$
@@ -357,8 +288,7 @@ abstract class HttpAuthMethod {
 				v.append(e.getValue());
 				v.append('"');
 			}
-			conn.setRequestProperty(HDR_AUTHORIZATION, type.name()
-					+ " " + v); //$NON-NLS-1$
+			conn.setRequestProperty(HDR_AUTHORIZATION, NAME + " " + v); //$NON-NLS-1$
 		}
 
 		private static String uri(URL u) {
@@ -468,57 +398,6 @@ abstract class HttpAuthMethod {
 				p.put(name, value);
 			}
 			return p;
-		}
-	}
-
-	private static class Negotiate extends HttpAuthMethod {
-		private static final GSSManagerFactory GSS_MANAGER_FACTORY = GSSManagerFactory
-				.detect();
-
-		private static final Oid OID;
-		static {
-			try {
-				// OID for SPNEGO
-				OID = new Oid("1.3.6.1.5.5.2"); //$NON-NLS-1$
-			} catch (GSSException e) {
-				throw new Error("Cannot create NEGOTIATE oid.", e); //$NON-NLS-1$
-			}
-		}
-
-		private final byte[] prevToken;
-
-		public Negotiate(String hdr) {
-			super(Type.NEGOTIATE);
-			prevToken = Base64.decode(hdr);
-		}
-
-		@Override
-		void authorize(String user, String pass) {
-			// not used
-		}
-
-		@Override
-		void configureRequest(HttpConnection conn) throws IOException {
-			GSSManager gssManager = GSS_MANAGER_FACTORY.newInstance(conn
-					.getURL());
-			String host = conn.getURL().getHost();
-			String peerName = "HTTP@" + host.toLowerCase(); //$NON-NLS-1$
-			try {
-				GSSName gssName = gssManager.createName(peerName,
-						GSSName.NT_HOSTBASED_SERVICE);
-				GSSContext context = gssManager.createContext(gssName, OID,
-						null, GSSContext.DEFAULT_LIFETIME);
-				// Respect delegation policy in HTTP/SPNEGO.
-				context.requestCredDeleg(true);
-
-				byte[] token = context.initSecContext(prevToken, 0,
-						prevToken.length);
-
-				conn.setRequestProperty(HDR_AUTHORIZATION, getType().name()
-						+ " " + Base64.encodeBytes(token)); //$NON-NLS-1$
-			} catch (GSSException e) {
-				throw new IOException(e);
-			}
 		}
 	}
 }
