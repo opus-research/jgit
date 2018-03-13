@@ -265,6 +265,9 @@ public final class Constants {
 	/** Packed refs file */
 	public static final String PACKED_REFS = "packed-refs";
 
+	/** Excludes-file */
+	public static final String INFO_EXCLUDE = "info/exclude";
+
 	/** The environment variable that contains the system user name */
 	public static final String OS_USER_NAME_KEY = "user.name";
 
@@ -334,9 +337,6 @@ public final class Constants {
 
 	/** A bare repository typically ends with this string */
 	public static final String DOT_GIT_EXT = ".git";
-
-	/** Name of the attributes file */
-	public static final String DOT_GIT_ATTRIBUTES = ".gitattributes";
 
 	/** Name of the ignore file */
 	public static final String DOT_GIT_IGNORE = ".gitignore";

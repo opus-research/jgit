@@ -54,6 +54,8 @@ import java.util.List;
 
 import org.eclipse.jgit.api.errors.UnmergedPathsException;
 import org.eclipse.jgit.diff.DiffEntry;
+import org.eclipse.jgit.internal.storage.file.ReflogEntry;
+import org.eclipse.jgit.internal.storage.file.ReflogReader;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -61,8 +63,6 @@ import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.file.ReflogEntry;
-import org.eclipse.jgit.storage.file.ReflogReader;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.FileUtils;
@@ -88,6 +88,7 @@ public class StashCreateCommandTest extends RepositoryTestCase {
 		git.add().addFilepattern("file.txt").call();
 		head = git.commit().setMessage("add file").call();
 		assertNotNull(head);
+		writeTrashFile("untracked.txt", "content");
 	}
 
 	/**
@@ -155,6 +156,18 @@ public class StashCreateCommandTest extends RepositoryTestCase {
 		}
 	}
 
+	private List<DiffEntry> diffIndexAgainstWorking(final RevCommit commit)
+			throws IOException {
+		TreeWalk walk = createTreeWalk();
+		try {
+			walk.addTree(commit.getParent(1).getTree());
+			walk.addTree(commit.getTree());
+			return DiffEntry.scan(walk);
+		} finally {
+			walk.release();
+		}
+	}
+
 	@Test
 	public void noLocalChanges() throws Exception {
 		assertNull(git.stashCreate().call());
@@ -192,6 +205,26 @@ public class StashCreateCommandTest extends RepositoryTestCase {
 		assertEquals(1, diffs.size());
 		assertEquals(DiffEntry.ChangeType.ADD, diffs.get(0).getChangeType());
 		assertEquals("file2.txt", diffs.get(0).getNewPath());
+	}
+
+	@Test
+	public void newFileInIndexThenModifiedInWorkTree() throws Exception {
+		writeTrashFile("file", "content");
+		git.add().addFilepattern("file").call();
+		writeTrashFile("file", "content2");
+		RevCommit stashedWorkTree = Git.wrap(db).stashCreate().call();
+		validateStashedCommit(stashedWorkTree);
+		RevWalk walk = new RevWalk(db);
+		RevCommit stashedIndex = stashedWorkTree.getParent(1);
+		walk.parseBody(stashedIndex);
+		walk.parseBody(stashedIndex.getTree());
+		walk.parseBody(stashedIndex.getParent(0));
+		List<DiffEntry> workTreeStashAgainstWorkTree = diffWorkingAgainstHead(stashedWorkTree);
+		assertEquals(1, workTreeStashAgainstWorkTree.size());
+		List<DiffEntry> workIndexAgainstWorkTree = diffIndexAgainstHead(stashedWorkTree);
+		assertEquals(1, workIndexAgainstWorkTree.size());
+		List<DiffEntry> indexStashAgainstWorkTree = diffIndexAgainstWorking(stashedWorkTree);
+		assertEquals(1, indexStashAgainstWorkTree.size());
 	}
 
 	@Test

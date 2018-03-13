@@ -184,9 +184,8 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				if (amend) {
 					RevCommit previousCommit = new RevWalk(repo)
 							.parseCommit(headId);
-					RevCommit[] p = previousCommit.getParents();
-					for (int i = 0; i < p.length; i++)
-						parents.add(0, p[i].getId());
+					for (RevCommit p : previousCommit.getParents())
+						parents.add(p.getId());
 					if (author == null)
 						author = previousCommit.getAuthorIdent();
 				} else {
@@ -229,7 +228,8 @@ public class CommitCommand extends GitCommand<RevCommit> {
 							ru.setRefLogMessage(reflogComment, false);
 						} else {
 							String prefix = amend ? "commit (amend): " //$NON-NLS-1$
-									: "commit: ";
+									: parents.size() == 0 ? "commit (initial): "
+											: "commit: ";
 							ru.setRefLogMessage(
 									prefix + revCommit.getShortMessage(), false);
 						}
