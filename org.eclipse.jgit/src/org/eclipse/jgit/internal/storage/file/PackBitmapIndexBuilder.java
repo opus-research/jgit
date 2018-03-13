@@ -115,10 +115,6 @@ public class PackBitmapIndexBuilder extends BasePackBitmapIndex {
 						JGitText.get().badObjectType, String.valueOf(type)));
 			}
 		}
-		commits.trim();
-		trees.trim();
-		blobs.trim();
-		tags.trim();
 	}
 
 	private ObjectToPack[] sortByOffset(List<ObjectToPack> entries) {
@@ -172,7 +168,6 @@ public class PackBitmapIndexBuilder extends BasePackBitmapIndex {
 	 */
 	public void addBitmap(
 			AnyObjectId objectId, EWAHCompressedBitmap bitmap, int flags) {
-		bitmap.trim();
 		StoredBitmap result = new StoredBitmap(objectId, bitmap, null, flags);
 		getBitmaps().add(result);
 		byAddOrder.add(result);

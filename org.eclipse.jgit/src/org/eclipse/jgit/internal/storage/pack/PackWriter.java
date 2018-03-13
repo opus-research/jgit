@@ -136,14 +136,12 @@ import org.eclipse.jgit.util.TemporaryBuffer;
  * order of objects in pack</li>
  * </ul>
  * <p>
- * Typical usage consists of creating an instance, configuring options,
- * preparing the list of objects by calling {@link #preparePack(Iterator)} or
- * {@link #preparePack(ProgressMonitor, Set, Set)}, and streaming with
- * {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)}. If the
- * pack is being stored as a file the matching index can be written out after
- * writing the pack by {@link #writeIndex(OutputStream)}. An optional bitmap
- * index can be made by calling {@link #prepareBitmapIndex(ProgressMonitor)}
- * followed by {@link #writeBitmapIndex(OutputStream)}.
+ * Typical usage consists of creating instance intended for some pack,
+ * configuring options, preparing the list of objects by calling
+ * {@link #preparePack(Iterator)} or
+ * {@link #preparePack(ProgressMonitor, Set, Set)}, and finally producing the
+ * stream with
+ * {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)}.
  * </p>
  * <p>
  * Class provide set of configurable options and {@link ProgressMonitor}
@@ -152,10 +150,9 @@ import org.eclipse.jgit.util.TemporaryBuffer;
  * relies only on deltas and objects reuse.
  * </p>
  * <p>
- * This class is not thread safe. It is intended to be used in one thread as a
- * single pass to produce one pack. Invoking methods multiple times or out of
- * order is not supported as internal data structures are destroyed during
- * certain phases to save memory when packing large repositories.
+ * This class is not thread safe, it is intended to be used in one thread, with
+ * one instance per created pack. Subsequent calls to writePack result in
+ * undefined behavior.
  * </p>
  */
 public class PackWriter implements AutoCloseable {
@@ -218,7 +215,7 @@ public class PackWriter implements AutoCloseable {
 	}
 
 	@SuppressWarnings("unchecked")
-	private BlockList<ObjectToPack> objectsLists[] = new BlockList[OBJ_TAG + 1];
+	private final BlockList<ObjectToPack> objectsLists[] = new BlockList[OBJ_TAG + 1];
 	{
 		objectsLists[OBJ_COMMIT] = new BlockList<ObjectToPack>();
 		objectsLists[OBJ_TREE] = new BlockList<ObjectToPack>();
@@ -226,7 +223,7 @@ public class PackWriter implements AutoCloseable {
 		objectsLists[OBJ_TAG] = new BlockList<ObjectToPack>();
 	}
 
-	private ObjectIdOwnerMap<ObjectToPack> objectsMap = new ObjectIdOwnerMap<ObjectToPack>();
+	private final ObjectIdOwnerMap<ObjectToPack> objectsMap = new ObjectIdOwnerMap<ObjectToPack>();
 
 	// edge objects for thin packs
 	private List<ObjectToPack> edgeObjects = new BlockList<ObjectToPack>();
@@ -821,11 +818,10 @@ public class PackWriter implements AutoCloseable {
 	/**
 	 * Create an index file to match the pack file just written.
 	 * <p>
-	 * Called after
-	 * {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)}.
-	 * <p>
-	 * Writing an index is only required for local pack storage. Packs sent on
-	 * the network do not need to create an index.
+	 * This method can only be invoked after
+	 * {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)} has
+	 * been invoked and completed successfully. Writing a corresponding index is
+	 * an optional feature that not all pack users may require.
 	 *
 	 * @param indexStream
 	 *            output for the index data. Caller is responsible for closing
@@ -847,7 +843,10 @@ public class PackWriter implements AutoCloseable {
 	/**
 	 * Create a bitmap index file to match the pack file just written.
 	 * <p>
-	 * Called after {@link #prepareBitmapIndex(ProgressMonitor)}.
+	 * This method can only be invoked after
+	 * {@link #prepareBitmapIndex(ProgressMonitor)} has been invoked and
+	 * completed successfully. Writing a corresponding bitmap index is an
+	 * optional feature that not all pack users may require.
 	 *
 	 * @param bitmapIndexStream
 	 *            output for the bitmap index data. Caller is responsible for
@@ -921,13 +920,14 @@ public class PackWriter implements AutoCloseable {
 	/**
 	 * Write the prepared pack to the supplied stream.
 	 * <p>
-	 * Called after {@link #preparePack(ProgressMonitor, ObjectWalk, Set, Set)}
-	 * or {@link #preparePack(ProgressMonitor, Set, Set)}.
-	 * <p>
-	 * Performs delta search if enabled and writes the pack stream.
+	 * At first, this method collects and sorts objects to pack, then deltas
+	 * search is performed if set up accordingly, finally pack stream is
+	 * written.
+	 * </p>
 	 * <p>
 	 * All reused objects data checksum (Adler32/CRC32) is computed and
 	 * validated against existing checksum.
+	 * </p>
 	 *
 	 * @param compressMonitor
 	 *            progress monitor to report object compression work.
@@ -941,8 +941,8 @@ public class PackWriter implements AutoCloseable {
 	 *             the pack, or writing compressed object data to the output
 	 *             stream.
 	 * @throws WriteAbortedException
-	 *             the write operation is aborted by {@link ObjectCountCallback}
-	 *             .
+	 *             the write operation is aborted by
+	 *             {@link ObjectCountCallback}.
 	 */
 	public void writePack(ProgressMonitor compressMonitor,
 			ProgressMonitor writeMonitor, OutputStream packStream)
@@ -1972,17 +1972,14 @@ public class PackWriter implements AutoCloseable {
 	}
 
 	/**
-	 * Prepares the bitmaps to be written to the bitmap index file.
-	 * <p>
-	 * Bitmaps can be used to speed up fetches and clones by storing the entire
-	 * object graph at selected commits. Writing a bitmap index is an optional
-	 * feature that not all pack users may require.
-	 * <p>
-	 * Called after {@link #writeIndex(OutputStream)}.
-	 * <p>
-	 * To reduce memory internal state is cleared during this method, rendering
-	 * the PackWriter instance useless for anything further than a call to write
-	 * out the new bitmaps with {@link #writeBitmapIndex(OutputStream)}.
+	 * Prepares the bitmaps to be written to the pack index. Bitmaps can be used
+	 * to speed up fetches and clones by storing the entire object graph at
+	 * selected commits.
+	 *
+	 * This method can only be invoked after
+	 * {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)} has
+	 * been invoked and completed successfully. Writing a corresponding bitmap
+	 * index is an optional feature that not all pack users may require.
 	 *
 	 * @param pm
 	 *            progress monitor to report bitmap building work.
@@ -1998,17 +1995,11 @@ public class PackWriter implements AutoCloseable {
 		if (pm == null)
 			pm = NullProgressMonitor.INSTANCE;
 
-		int numCommits = objectsLists[OBJ_COMMIT].size();
-		List<ObjectToPack> byName = sortByName();
-		sortedByName = null;
-		objectsLists = null;
-		objectsMap = null;
-		writeBitmaps = new PackBitmapIndexBuilder(byName);
-		byName = null;
-
+		writeBitmaps = new PackBitmapIndexBuilder(sortByName());
 		PackWriterBitmapPreparer bitmapPreparer = new PackWriterBitmapPreparer(
 				reader, writeBitmaps, pm, stats.interestingObjects);
 
+		int numCommits = objectsLists[OBJ_COMMIT].size();
 		Collection<PackWriterBitmapPreparer.BitmapCommit> selectedCommits =
 				bitmapPreparer.doCommitSelection(numCommits);
 
@@ -2365,14 +2356,11 @@ public class PackWriter implements AutoCloseable {
 
 		State snapshot() {
 			long objCnt = 0;
-			BlockList<ObjectToPack>[] lists = objectsLists;
-			if (lists != null) {
-				objCnt += lists[OBJ_COMMIT].size();
-				objCnt += lists[OBJ_TREE].size();
-				objCnt += lists[OBJ_BLOB].size();
-				objCnt += lists[OBJ_TAG].size();
-				// Exclude CachedPacks.
-			}
+			objCnt += objectsLists[OBJ_COMMIT].size();
+			objCnt += objectsLists[OBJ_TREE].size();
+			objCnt += objectsLists[OBJ_BLOB].size();
+			objCnt += objectsLists[OBJ_TAG].size();
+			// Exclude CachedPacks.
 
 			long bytesUsed = OBJECT_TO_PACK_SIZE * objCnt;
 			PackingPhase curr = phase;
