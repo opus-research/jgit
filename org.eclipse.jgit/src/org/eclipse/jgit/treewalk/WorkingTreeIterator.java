@@ -62,6 +62,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 
+import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
@@ -808,11 +809,13 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *            modification time differs.
 	 * @return true if content is most likely different.
 	 * @deprecated Use {@link #isModified(DirCacheEntry, boolean, ObjectReader)}
-	 * @throws IOException
 	 */
-	public boolean isModified(DirCacheEntry entry, boolean forceContentCheck)
-			throws IOException {
-		return isModified(entry, forceContentCheck, null);
+	public boolean isModified(DirCacheEntry entry, boolean forceContentCheck) {
+		try {
+			return isModified(entry, forceContentCheck, null);
+		} catch (IOException e) {
+			throw new JGitInternalException(e.getMessage(), e);
+		}
 	}
 
 	/**
