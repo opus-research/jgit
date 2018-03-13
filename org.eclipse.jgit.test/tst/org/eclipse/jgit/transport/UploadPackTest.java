@@ -124,10 +124,10 @@ public class UploadPackTest {
 
 		assertFalse(client.hasObject(blob.toObjectId()));
 
-		thrown.expect(TransportException.class);
-		thrown.expectMessage(Matchers.containsString("want " + blob.name() + " not valid"));
-
 		try (Transport tn = testProtocol.open(uri, client, "server")) {
+			thrown.expect(TransportException.class);
+			thrown.expectMessage(Matchers.containsString(
+						"want " + blob.name() + " not valid"));
 			tn.fetch(NullProgressMonitor.INSTANCE,
 					Collections.singletonList(new RefSpec(blob.name())));
 		}
@@ -163,10 +163,10 @@ public class UploadPackTest {
 
 		assertFalse(client.hasObject(blob.toObjectId()));
 
-		thrown.expect(TransportException.class);
-		thrown.expectMessage(Matchers.containsString("want " + blob.name() + " not valid"));
-
 		try (Transport tn = testProtocol.open(uri, client, "server")) {
+			thrown.expect(TransportException.class);
+			thrown.expectMessage(Matchers.containsString(
+						"want " + blob.name() + " not valid"));
 			tn.fetch(NullProgressMonitor.INSTANCE,
 					Collections.singletonList(new RefSpec(blob.name())));
 		}
