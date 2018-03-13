@@ -110,12 +110,8 @@ class FetchProcess {
 		try {
 			executeImp(monitor, result);
 		} finally {
-			try {
 			for (final PackLock lock : packLocks)
 				lock.unlock();
-			} catch (IOException e) {
-				throw new TransportException(e.getMessage(), e);
-			}
 		}
 	}
 

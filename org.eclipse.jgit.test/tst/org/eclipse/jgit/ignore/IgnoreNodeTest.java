@@ -51,7 +51,6 @@ import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
-import org.eclipse.jgit.util.FileUtils;
 
 /**
  * Tests ignore node behavior on the local filesystem.
@@ -129,7 +128,7 @@ public class IgnoreNodeTest extends RepositoryTestCase {
 		assertEntry(F, tracked, ".gitignore");
 		assertEntry(F, tracked, "out");
 
-		FileUtils.delete(new File(trash, "out"));
+		new File(trash, "out").delete();
 		writeTrashFile("out/foo", "");
 
 		beginWalk();
