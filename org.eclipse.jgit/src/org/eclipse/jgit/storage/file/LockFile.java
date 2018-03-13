@@ -52,14 +52,16 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
 import java.text.MessageFormat;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.io.ChannelOutputStream;
 
 /**
  * Git style file locking and replacement.
@@ -84,6 +86,8 @@ public class LockFile {
 	private final File ref;
 
 	private final File lck;
+
+	private FileLock fLck;
 
 	private boolean haveLck;
 
@@ -127,6 +131,23 @@ public class LockFile {
 			haveLck = true;
 			try {
 				os = new FileOutputStream(lck);
+				try {
+					fLck = os.getChannel().tryLock();
+					if (fLck == null)
+						throw new OverlappingFileLockException();
+				} catch (OverlappingFileLockException ofle) {
+					// We cannot use unlock() here as this file is not
+					// held by us, but we thought we created it. We must
+					// not delete it, as it belongs to some other process.
+					//
+					haveLck = false;
+					try {
+						os.close();
+					} catch (IOException ioe) {
+						// Fail by returning haveLck = false.
+					}
+					os = null;
+				}
 			} catch (IOException ioe) {
 				unlock();
 				throw ioe;
@@ -255,6 +276,7 @@ public class LockFile {
 			} else {
 				os.write(content);
 			}
+			fLck.release();
 			os.close();
 			os = null;
 		} catch (IOException ioe) {
@@ -283,7 +305,7 @@ public class LockFile {
 
 		final OutputStream out;
 		if (fsync)
-			out = new ChannelOutputStream(os.getChannel());
+			out = Channels.newOutputStream(os.getChannel());
 		else
 			out = os;
 
@@ -315,6 +337,7 @@ public class LockFile {
 					out.flush();
 					if (fsync)
 						os.getChannel().force(true);
+					fLck.release();
 					out.close();
 					os = null;
 				} catch (IOException ioe) {
@@ -449,6 +472,14 @@ public class LockFile {
 	 */
 	public void unlock() {
 		if (os != null) {
+			if (fLck != null) {
+				try {
+					fLck.release();
+				} catch (IOException ioe) {
+					// Huh?
+				}
+				fLck = null;
+			}
 			try {
 				os.close();
 			} catch (IOException ioe) {
