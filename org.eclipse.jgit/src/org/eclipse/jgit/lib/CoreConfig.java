@@ -74,6 +74,25 @@ public class CoreConfig {
 		INPUT;
 	}
 
+	/**
+	 * Permissible values for {@code core.checkstat}
+	 *
+	 * @since 2.3
+	 */
+	public static enum CheckStat {
+		/**
+		 * Only check the size and whole second part of time stamp when
+		 * comparing the stat info in the dircache with actual file stat info.
+		 */
+		MINIMAL,
+
+		/**
+		 * Check as much of the dircache stat info as possible. Implementation
+		 * limits may apply.
+		 */
+		DEFAULT
+	}
+
 	private final int compression;
 
 	private final int packIndexVersion;
@@ -81,16 +100,6 @@ public class CoreConfig {
 	private final boolean logAllRefUpdates;
 
 	private final String excludesfile;
-
-	/**
-	 * Options for symlink handling
-	 */
-	public static enum SymLinks {
-		/** Checkout symbolic links as plain files */
-		FALSE,
-		/** Checkout symbolic links as links */
-		TRUE
-	}
 
 	private CoreConfig(final Config rc) {
 		compression = rc.getInt(ConfigConstants.CONFIG_CORE_SECTION,

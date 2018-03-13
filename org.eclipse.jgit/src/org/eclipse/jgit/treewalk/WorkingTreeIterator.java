@@ -2,6 +2,7 @@
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>
  * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2012-2013, Robin Rosenberg
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -72,10 +73,10 @@ import org.eclipse.jgit.ignore.IgnoreRule;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig;
-import org.eclipse.jgit.lib.CoreConfig.SymLinks;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.CoreConfig.CheckStat;
 import org.eclipse.jgit.submodule.SubmoduleWalk;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
@@ -200,13 +201,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	}
 
 	/**
-	 * @return the repositoryt this iterator works with
-	 */
-	public Repository getRepository() {
-		return repository;
-	}
-
-	/**
 	 * Define the matching {@link DirCacheIterator}, to optimize ObjectIds.
 	 *
 	 * Once the DirCacheIterator has been set this iterator must only be
@@ -256,10 +250,14 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			}
 		}
 		switch (mode & FileMode.TYPE_MASK) {
-		case FileMode.TYPE_SYMLINK:
 		case FileMode.TYPE_FILE:
 			contentIdFromPtr = ptr;
 			return contentId = idBufferBlob(entries[ptr]);
+		case FileMode.TYPE_SYMLINK:
+			// Java does not support symbolic links, so we should not
+			// have reached this particular part of the walk code.
+			//
+			return zeroid;
 		case FileMode.TYPE_GITLINK:
 			contentIdFromPtr = ptr;
 			return contentId = idSubmodule(entries[ptr]);
@@ -723,9 +721,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			return false;
 
 		// Do not rely on filemode differences in case of symbolic links
-		if (getOptions().getSymLinks() == SymLinks.FALSE)
-			if (FileMode.SYMLINK.equals(rawMode))
-				return false;
+		if (FileMode.SYMLINK.equals(rawMode))
+			return false;
 
 		// Ignore the executable file bits if WorkingTreeOptions tell me to
 		// do so. Ignoring is done by setting the bits representing a
@@ -759,15 +756,23 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 		// Git under windows only stores seconds so we round the timestamp
 		// Java gives us if it looks like the timestamp in index is seconds
-		// only. Otherwise we compare the timestamp at millisecond precision.
+		// only. Otherwise we compare the timestamp at millisecond precision,
+		// unless core.checkstat is set to "minimal", in which case we only
+		// compare the whole second part.
 		long cacheLastModified = entry.getLastModified();
 		long fileLastModified = getEntryLastModified();
-		if (cacheLastModified % 1000 == 0)
-			fileLastModified = fileLastModified - fileLastModified % 1000;
+		long lastModifiedMillis = fileLastModified % 1000;
+		long cacheMillis = cacheLastModified % 1000;
+		if (getOptions().getCheckStat() == CheckStat.MINIMAL) {
+			fileLastModified = fileLastModified - lastModifiedMillis;
+			cacheLastModified = cacheLastModified - cacheMillis;
+		} else if (cacheMillis == 0)
+			fileLastModified = fileLastModified - lastModifiedMillis;
 		// Some Java version on Linux return whole seconds only even when
 		// the file systems supports more precision.
-		else if (fileLastModified % 1000 == 0)
-			cacheLastModified = cacheLastModified - cacheLastModified % 1000;
+		else if (lastModifiedMillis == 0)
+			cacheLastModified = cacheLastModified - cacheMillis;
+
 		if (fileLastModified != cacheLastModified)
 			return MetadataDiff.DIFFER_BY_TIMESTAMP;
 		else if (!entry.isSmudged())
@@ -791,10 +796,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *            True if the actual file content should be checked if
 	 *            modification time differs.
 	 * @return true if content is most likely different.
-	 * @throws IOException
 	 */
-	public boolean isModified(DirCacheEntry entry, boolean forceContentCheck)
-			throws IOException {
+	public boolean isModified(DirCacheEntry entry, boolean forceContentCheck) {
 		MetadataDiff diff = compareMetadata(entry);
 		switch (diff) {
 		case DIFFER_BY_TIMESTAMP:
@@ -853,9 +856,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *            the entry to be checked
 	 * @return <code>true</code> if the content matches, <code>false</code>
 	 *         otherwise
-	 * @throws IOException
 	 */
-	private boolean contentCheck(DirCacheEntry entry) throws IOException {
+	private boolean contentCheck(DirCacheEntry entry) {
 		if (getEntryObjectId().equals(entry.getObjectId())) {
 			// Content has not changed
 
