@@ -45,7 +45,6 @@ package org.eclipse.jgit.http.server;
 
 import java.io.IOException;
 
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -57,34 +56,17 @@ import org.eclipse.jgit.lib.Repository;
 class GetRefServlet extends RepositoryServlet {
 	private static final long serialVersionUID = 1L;
 
-	private static final String ENCODING = "UTF-8";
-
-	@Override
 	public void doGet(final HttpServletRequest req,
 			final HttpServletResponse rsp) throws IOException {
-		serve(req, rsp, true);
-	}
-
-	@Override
-	protected void doHead(final HttpServletRequest req,
-			final HttpServletResponse rsp) throws ServletException, IOException {
-		serve(req, rsp, false);
-	}
-
-	private void serve(final HttpServletRequest req,
-			final HttpServletResponse rsp, final boolean sendBody)
-			throws IOException {
-		final byte[] raw = read(req);
-		if (raw != null) {
-			rsp.setContentType("text/plain");
-			rsp.setCharacterEncoding(ENCODING);
-			send(raw, req, rsp, sendBody);
-		} else {
+		nocache(rsp);
+		final String content = read(req);
+		if (content != null)
+			sendPlainText(content, req, rsp);
+		else
 			rsp.sendError(HttpServletResponse.SC_NOT_FOUND);
-		}
 	}
 
-	private static byte[] read(final HttpServletRequest req) throws IOException {
+	private static String read(final HttpServletRequest req) throws IOException {
 		final String refName = req.getPathInfo();
 		if (!isValidName(refName))
 			return null;
@@ -101,7 +83,7 @@ class GetRefServlet extends RepositoryServlet {
 			out.append(ref.getObjectId().getName());
 		}
 		out.append('\n');
-		return out.toString().getBytes(ENCODING);
+		return out.toString();
 	}
 
 	private static boolean isValidName(final String refName) {

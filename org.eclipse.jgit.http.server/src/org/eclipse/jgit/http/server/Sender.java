@@ -62,10 +62,13 @@ abstract class Sender {
 	abstract void sendBody(HttpServletResponse out) throws IOException;
 
 	static class FileSender extends Sender {
+		private final File path;
+
 		private final RandomAccessFile source;
 
 		FileSender(final File path) throws FileNotFoundException {
-			source = new RandomAccessFile(path, "r");
+			this.path = path;
+			this.source = new RandomAccessFile(path, "r");
 		}
 
 		void close() {
@@ -106,6 +109,10 @@ abstract class Sender {
 			} finally {
 				out.close();
 			}
+		}
+
+		long getLastModified() {
+			return path.lastModified();
 		}
 	}
 }
