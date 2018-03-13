@@ -63,7 +63,7 @@ class MergeBase extends TextBuiltin {
 	}
 
 	@Argument(index = 1, metaVar = "metaVar_commitish", required = true)
-	private final List<RevCommit> commits = new ArrayList<>();
+	private final List<RevCommit> commits = new ArrayList<RevCommit>();
 
 	@Override
 	protected void run() throws Exception {

@@ -169,12 +169,12 @@ public class ObjectDirectory extends FileObjectDatabase {
 		packDirectory = new File(objects, "pack"); //$NON-NLS-1$
 		preservedDirectory = new File(packDirectory, "preserved"); //$NON-NLS-1$
 		alternatesFile = new File(infoDirectory, "alternates"); //$NON-NLS-1$
-		packList = new AtomicReference<>(NO_PACKS);
+		packList = new AtomicReference<PackList>(NO_PACKS);
 		unpackedObjectCache = new UnpackedObjectCache();
 		this.fs = fs;
 		this.shallowFile = shallowFile;
 
-		alternates = new AtomicReference<>();
+		alternates = new AtomicReference<AlternateHandle[]>();
 		if (alternatePaths != null) {
 			AlternateHandle[] alt;
 
@@ -188,7 +188,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 	/**
 	 * @return the location of the <code>objects</code> directory.
 	 */
-	@Override
 	public final File getDirectory() {
 		return objects;
 	}
@@ -261,7 +260,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 	 *             index file could not be opened, read, or is not recognized as
 	 *             a Git pack file index.
 	 */
-	@Override
 	public PackFile openPack(final File pack)
 			throws IOException {
 		final String p = pack.getName();
@@ -446,7 +444,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 		return null;
 	}
 
-	@Override
 	ObjectLoader openLooseObject(WindowCursor curs, AnyObjectId id)
 			throws IOException {
 		File path = fileFor(id);
@@ -462,7 +459,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 		}
 	}
 
-	@Override
 	long getObjectSize(WindowCursor curs, AnyObjectId id)
 			throws IOException {
 		if (unpackedObjectCache.isUnpacked(id)) {
@@ -683,7 +679,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 				&& old != scanPacks(old);
 	}
 
-	@Override
 	Config getConfig() {
 		return config;
 	}
@@ -700,7 +695,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 		if (shallowFileSnapshot == null
 				|| shallowFileSnapshot.isModified(shallowFile)) {
-			shallowCommitsIds = new HashSet<>();
+			shallowCommitsIds = new HashSet<ObjectId>();
 
 			final BufferedReader reader = open(shallowFile);
 			try {
@@ -797,7 +792,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 		final Map<String, PackFile> forReuse = reuseMap(old);
 		final FileSnapshot snapshot = FileSnapshot.save(packDirectory);
 		final Set<String> names = listPackDirectory();
-		final List<PackFile> list = new ArrayList<>(names.size() >> 2);
+		final List<PackFile> list = new ArrayList<PackFile>(names.size() >> 2);
 		boolean foundNew = false;
 		for (final String indexName : names) {
 			// Must match "pack-[0-9a-f]{40}.idx" to be an index.
@@ -855,7 +850,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 	}
 
 	private static Map<String, PackFile> reuseMap(final PackList old) {
-		final Map<String, PackFile> forReuse = new HashMap<>();
+		final Map<String, PackFile> forReuse = new HashMap<String, PackFile>();
 		for (final PackFile p : old.packs) {
 			if (p.invalid()) {
 				// The pack instance is corrupted, and cannot be safely used
@@ -884,7 +879,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 		final String[] nameList = packDirectory.list();
 		if (nameList == null)
 			return Collections.emptySet();
-		final Set<String> nameSet = new HashSet<>(nameList.length << 1);
+		final Set<String> nameSet = new HashSet<String>(nameList.length << 1);
 		for (final String name : nameList) {
 			if (name.startsWith("pack-")) //$NON-NLS-1$
 				nameSet.add(name);
@@ -911,7 +906,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 	}
 
 	private AlternateHandle[] loadAlternates() throws IOException {
-		final List<AlternateHandle> l = new ArrayList<>(4);
+		final List<AlternateHandle> l = new ArrayList<AlternateHandle>(4);
 		final BufferedReader br = open(alternatesFile);
 		try {
 			String line;
@@ -954,7 +949,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 	 *            identity of the loose object to map to the directory.
 	 * @return location of the object, if it were to exist as a loose object.
 	 */
-	@Override
 	public File fileFor(AnyObjectId objectId) {
 		String n = objectId.name();
 		String d = n.substring(0, 2);
@@ -995,7 +989,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 			repository = r;
 		}
 
-		@Override
 		void close() {
 			repository.close();
 		}
