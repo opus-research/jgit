@@ -44,30 +44,54 @@
 package org.eclipse.jgit.internal.storage.dfs;
 
 import static org.eclipse.jgit.internal.storage.pack.PackExt.REFTABLE;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_HEADER_LEN;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.eclipse.jgit.internal.storage.io.BlockSource;
-import org.eclipse.jgit.internal.storage.reftable.RefCursor;
 import org.eclipse.jgit.internal.storage.reftable.ReftableReader;
-import org.eclipse.jgit.util.NB;
 
 /** A reftable stored in {@link DfsBlockCache}. */
 public class DfsReftable extends BlockBasedFile {
-	DfsReftable(DfsBlockCache cache, DfsPackDescription desc) {
-		super(cache, desc, REFTABLE);
-		length = desc.getFileSize(REFTABLE);
-		if (length <= 0) {
-			length = -1;
-		}
+	/**
+	 * Construct a reader for an existing reftable.
+	 *
+	 * @param desc
+	 *            description of the reftable within the DFS.
+	 */
+	public DfsReftable(DfsPackDescription desc) {
+		this(DfsBlockCache.getInstance(), desc);
 	}
 
 	/**
-	 * Open a cursor to read from the reftable.
+	 * Construct a reader for an existing reftable.
+	 *
+	 * @param cache
+	 *            cache that will store the reftable data.
+	 * @param desc
+	 *            description of the reftable within the DFS.
+	 */
+	public DfsReftable(DfsBlockCache cache, DfsPackDescription desc) {
+		super(cache, desc, REFTABLE);
+
+		int bs = desc.getBlockSize(REFTABLE);
+		if (bs > 0) {
+			setBlockSize(bs);
+		}
+
+		long sz = desc.getFileSize(REFTABLE);
+		length = sz > 0 ? sz : -1;
+	}
+
+	/** @return description that was originally used to configure this file. */
+	public DfsPackDescription getPackDescription() {
+		return desc;
+	}
+
+	/**
+	 * Open reader on the reftable.
 	 * <p>
-	 * The returned cursor is not thread safe.
+	 * The returned reader is not thread safe.
 	 *
 	 * @param ctx
 	 *            reader to access the DFS storage.
@@ -75,84 +99,42 @@ public class DfsReftable extends BlockBasedFile {
 	 * @throws IOException
 	 *             table cannot be opened.
 	 */
-	public RefCursor open(DfsReader ctx) throws IOException {
-		return new ReftableReader(new CacheSource(this, key, cache, ctx));
+	public ReftableReader open(DfsReader ctx) throws IOException {
+		return new ReftableReader(new CacheSource(this, cache, ctx));
 	}
 
 	private static final class CacheSource extends BlockSource {
 		private final DfsReftable file;
-		private final DfsStreamKey key;
 		private final DfsBlockCache cache;
 		private final DfsReader ctx;
 		private ReadableChannel ch;
+		private int readAhead;
 
-		CacheSource(DfsReftable file, DfsStreamKey key,
-				DfsBlockCache cache, DfsReader ctx) {
+		CacheSource(DfsReftable file, DfsBlockCache cache, DfsReader ctx) {
 			this.file = file;
-			this.key = key;
 			this.cache = cache;
 			this.ctx = ctx;
 		}
 
 		@Override
-		public ByteBuffer read(long pos, int want) throws IOException {
-			if (want == 0) {
-				return ByteBuffer.allocate(0);
+		public ByteBuffer read(long pos, int cnt) throws IOException {
+			if (ch == null && readAhead > 0 && notInCache(pos)) {
+				open().setReadAheadBytes(readAhead);
 			}
 
-			int bs = file.blockSize;
-			DfsBlock block = cache.get(key, pos);
-			if (block != null && isAlignedToRequest(block, pos, want)) {
-				if (bs == 0 && pos == 0) {
-					file.setBlockSize(readBlockSize(block));
-				}
-				return block.zeroCopyByteBuffer(want);
+			DfsBlock block = cache.getOrLoad(file, pos, ctx, ch);
+			if (block.start == pos && block.size() >= cnt) {
+				return block.zeroCopyByteBuffer(cnt);
 			}
 
-			if (bs == 0) {
-				bs = readBlockSize();
-				file.setBlockSize(bs);
-			}
-
-			block = cache.getOrLoad(file, pos, ctx, ch);
-			if (isAlignedToRequest(block, pos, want)) {
-				return block.zeroCopyByteBuffer(want);
-			}
-
-			byte[] dst = new byte[want];
+			byte[] dst = new byte[cnt];
 			ByteBuffer buf = ByteBuffer.wrap(dst);
-			buf.position(want);
-			for (int off = 0;;) {
-				int r = block.copy(pos, dst, off, want);
-				pos += r;
-				off += r;
-				want -= r;
-				if (want == 0) {
-					return buf;
-				}
-				block = cache.getOrLoad(file, pos, ctx, ch);
-			}
+			buf.position(ctx.copy(file, pos, dst, 0, cnt));
+			return buf;
 		}
 
-		private static boolean isAlignedToRequest(DfsBlock b, long p, int n) {
-			return b.start == p && b.end >= p + n;
-		}
-
-		private int readBlockSize() throws IOException {
-			int bs = open().blockSize();
-			if (bs <= 0) {
-				byte[] tmp = new byte[FILE_HEADER_LEN];
-				ch.position(0);
-				BlockBasedFile.read(ch, ByteBuffer.wrap(tmp));
-				bs = NB.decodeInt32(tmp, 4) & 0xffffff;
-			}
-			return bs;
-		}
-
-		private int readBlockSize(DfsBlock block) {
-			byte[] tmp = new byte[4];
-			block.copy(4, tmp, 0, 4);
-			return NB.decodeInt32(tmp, 0) & 0xffffff;
+		private boolean notInCache(long pos) {
+			return cache.get(file.key, file.alignToBlock(pos)) == null;
 		}
 
 		@Override
@@ -169,11 +151,7 @@ public class DfsReftable extends BlockBasedFile {
 		public void adviseSequentialRead(long start, long end) {
 			int sz = ctx.getOptions().getStreamPackBufferSize();
 			if (sz > 0) {
-				try {
-					open().setReadAheadBytes((int) Math.min(end - start, sz));
-				} catch (IOException e) {
-					// Ignore failed read-ahead advice.
-				}
+				readAhead = (int) Math.min(sz, end - start);
 			}
 		}
 

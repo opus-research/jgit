@@ -49,7 +49,6 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.ReflogEntry;
 
 /**
@@ -66,12 +65,22 @@ import org.eclipse.jgit.lib.ReflogEntry;
  */
 public class ReftableCompactor {
 	private final ReftableWriter writer = new ReftableWriter();
-	private final ArrayDeque<RefCursor> tables = new ArrayDeque<>();
+	private final ArrayDeque<Reftable> tables = new ArrayDeque<>();
 
 	private long compactBytesLimit;
 	private long bytesToCompact;
 	private boolean includeDeletes;
 	private long oldestReflogTimeUsec;
+
+	/**
+	 * @param cfg
+	 *            configuration for the reftable.
+	 * @return {@code this}
+	 */
+	public ReftableCompactor setConfig(ReftableConfig cfg) {
+		writer.setConfig(cfg);
+		return this;
+	}
 
 	/**
 	 * @param bytes
@@ -80,38 +89,6 @@ public class ReftableCompactor {
 	 */
 	public ReftableCompactor setCompactBytesLimit(long bytes) {
 		compactBytesLimit = bytes;
-		return this;
-	}
-
-	/**
-	 * @param szBytes
-	 *            desired output block size for references, in bytes.
-	 * @return {@code this}
-	 */
-	public ReftableCompactor setRefBlockSize(int szBytes) {
-		writer.setRefBlockSize(szBytes);
-		return this;
-	}
-
-	/**
-	 * @param szBytes
-	 *            desired output block size for log entries, in bytes.
-	 * @return {@code this}
-	 */
-	public ReftableCompactor setLogBlockSize(int szBytes) {
-		writer.setLogBlockSize(szBytes);
-		return this;
-	}
-
-	/**
-	 * @param interval
-	 *            number of references between binary search markers. If
-	 *            {@code interval} is 0 (default), the writer will select a
-	 *            default value based on the block size.
-	 * @return {@code this}
-	 */
-	public ReftableCompactor setRestartInterval(int interval) {
-		writer.setRestartInterval(interval);
 		return this;
 	}
 
@@ -150,7 +127,7 @@ public class ReftableCompactor {
 	 *            recent last so that the more recent tables can shadow the
 	 *            older results. Caller is responsible for closing the readers.
 	 */
-	public void addAll(List<RefCursor> readers) {
+	public void addAll(List<Reftable> readers) {
 		tables.addAll(readers);
 	}
 
@@ -200,26 +177,27 @@ public class ReftableCompactor {
 	}
 
 	private void mergeRefs(MergedReftable mr) throws IOException {
-		mr.seekToFirstRef();
-		while (mr.next()) {
-			writer.writeRef(mr.getRef());
+		try (RefCursor rc = mr.allRefs()) {
+			while (rc.next()) {
+				writer.writeRef(rc.getRef());
+			}
 		}
 	}
 
 	private void mergeLogs(MergedReftable mr) throws IOException {
-		mr.seekToFirstLog();
-		while (mr.next()) {
-			long timeUsec = mr.getReflogTimeUsec();
-			ReflogEntry log = mr.getReflogEntry();
-			PersonIdent who = log.getWho();
-			if (timeUsec >= oldestReflogTimeUsec) {
-				writer.writeLog(
-						mr.getRefName(),
-						timeUsec,
-						who,
-						log.getOldId(),
-						log.getNewId(),
-						log.getComment());
+		try (LogCursor lc = mr.allLogs()) {
+			while (lc.next()) {
+				long timeUsec = lc.getReflogTimeUsec();
+				if (timeUsec >= oldestReflogTimeUsec) {
+					ReflogEntry log = lc.getReflogEntry();
+					writer.writeLog(
+							lc.getRefName(),
+							timeUsec,
+							log.getWho(),
+							log.getOldId(),
+							log.getNewId(),
+							log.getComment());
+				}
 			}
 		}
 	}

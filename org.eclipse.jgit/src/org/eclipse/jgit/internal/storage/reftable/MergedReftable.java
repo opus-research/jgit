@@ -47,6 +47,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.PriorityQueue;
 
+import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.ReflogEntry;
 
@@ -63,15 +64,8 @@ import org.eclipse.jgit.lib.ReflogEntry;
  * <p>
  * A {@code MergedReftable} is not thread-safe.
  */
-public class MergedReftable extends RefCursor {
-	private final TableRef[] tables;
-	private PriorityQueue<TableRef> queue;
-
-	private boolean useGetRef;
-	private String refName;
-	private Ref ref;
-	private long logTimeUsec;
-	private ReflogEntry log;
+public class MergedReftable extends Reftable {
+	private final Reftable[] tables;
 
 	/**
 	 * Initialize a merged table reader.
@@ -85,177 +79,233 @@ public class MergedReftable extends RefCursor {
 	 *            {@code tableStack.size() - 1}. The top of the stack (higher
 	 *            index) shadows the base of the stack (lower index).
 	 */
-	public MergedReftable(List<RefCursor> tableStack) {
-		tables = new TableRef[tableStack.size()];
-		for (int i = 0; i < tableStack.size(); i++) {
-			RefCursor rc = tableStack.get(i);
-			rc.setIncludeDeletes(includeDeletes);
-			tables[i] = new TableRef(rc, i);
+	public MergedReftable(List<Reftable> tableStack) {
+		tables = tableStack.toArray(new Reftable[0]);
+
+		// Tables must expose deletes to this instance to correctly
+		// shadow references from lower tables.
+		for (Reftable t : tables) {
+			t.setIncludeDeletes(true);
 		}
 	}
 
 	@Override
-	public void setIncludeDeletes(boolean deletes) {
-		for (TableRef t : tables) {
-			t.table.setIncludeDeletes(deletes);
+	public RefCursor allRefs() throws IOException {
+		MergedRefCursor m = new MergedRefCursor();
+		for (int i = 0; i < tables.length; i++) {
+			m.add(new RefQueueEntry(tables[i].allRefs(), i));
 		}
-		super.setIncludeDeletes(deletes);
+		return m;
 	}
 
 	@Override
-	public void seekToFirstRef() throws IOException {
-		queue = new PriorityQueue<>(tables.length, TableRef::compareRef);
-		useGetRef = true;
-		for (TableRef t : tables) {
-			t.table.seekToFirstRef();
-			next(t);
+	public RefCursor seek(String name) throws IOException {
+		MergedRefCursor m = new MergedRefCursor();
+		for (int i = 0; i < tables.length; i++) {
+			m.add(new RefQueueEntry(tables[i].seek(name), i));
 		}
+		return m;
 	}
 
 	@Override
-	public void seek(String name) throws IOException {
-		queue = new PriorityQueue<>(tables.length, TableRef::compareRef);
-		useGetRef = true;
-		for (TableRef t : tables) {
-			t.table.seek(name);
-			next(t);
+	public RefCursor byObjectId(AnyObjectId name) throws IOException {
+		MergedRefCursor m = new MergedRefCursor();
+		for (int i = 0; i < tables.length; i++) {
+			m.add(new RefQueueEntry(tables[i].byObjectId(name), i));
 		}
+		return m;
 	}
 
 	@Override
-	public void seekToFirstLog() throws IOException {
-		queue = new PriorityQueue<>(tables.length, TableRef::compareLog);
-		useGetRef = false;
-		for (TableRef t : tables) {
-			t.table.seekToFirstLog();
-			next(t);
+	public LogCursor allLogs() throws IOException {
+		MergedLogCursor m = new MergedLogCursor();
+		for (int i = 0; i < tables.length; i++) {
+			m.add(new LogQueueEntry(tables[i].allLogs(), i));
 		}
+		return m;
 	}
 
 	@Override
-	public void seekLog(String name, long timeUsec) throws IOException {
-		queue = new PriorityQueue<>(tables.length, TableRef::compareLog);
-		useGetRef = false;
-		for (TableRef t : tables) {
-			t.table.seekLog(name, timeUsec);
-			next(t);
+	public LogCursor seekLog(String refName, long timeUsec) throws IOException {
+		MergedLogCursor m = new MergedLogCursor();
+		for (int i = 0; i < tables.length; i++) {
+			m.add(new LogQueueEntry(tables[i].seekLog(refName, timeUsec), i));
 		}
-	}
-
-	@Override
-	public boolean next() throws IOException {
-		for (;;) {
-			TableRef t = queue.poll();
-			if (t == null) {
-				refName = null;
-				ref = null;
-				log = null;
-				return false;
-			}
-
-			refName = t.table.getRefName();
-			if (useGetRef) {
-				ref = t.table.getRef();
-				boolean include = includeDeletes || !t.table.wasDeleted();
-				skipShadowedRefs();
-				next(t);
-				if (include) {
-					return true;
-				}
-			} else {
-				logTimeUsec = t.table.getReflogTimeUsec();
-				log = t.table.getReflogEntry();
-				next(t);
-				return true;
-			}
-		}
-	}
-
-	private void skipShadowedRefs() throws IOException {
-		for (;;) {
-			TableRef t = queue.peek();
-			if (t == null) {
-				break;
-			} else if (refName.equals(t.table.getRefName())) {
-				next(queue.remove());
-			} else {
-				break;
-			}
-		}
-	}
-
-	private void next(TableRef t) throws IOException {
-		if (t.table.next()) {
-			queue.add(t);
-		}
-	}
-
-	@Override
-	public String getRefName() {
-		return refName;
-	}
-
-	@Override
-	public Ref getRef() {
-		return ref;
-	}
-
-	@Override
-	public long getReflogTimeUsec() {
-		return logTimeUsec;
-	}
-
-	@Override
-	public ReflogEntry getReflogEntry() {
-		return log;
+		return m;
 	}
 
 	@Override
 	public void close() throws IOException {
-		for (TableRef t : tables) {
-			t.table.close();
+		for (Reftable t : tables) {
+			t.close();
 		}
 	}
 
-	private static class TableRef {
-		static int compareRef(TableRef ta, TableRef tb) {
-			String an = ta.table.getRefName();
-			String bn = tb.table.getRefName();
-			int cmp = an.compareTo(bn);
+	private class MergedRefCursor extends RefCursor {
+		private final PriorityQueue<RefQueueEntry> queue;
+		private Ref ref;
+
+		MergedRefCursor() {
+			queue = new PriorityQueue<>(tables.length, RefQueueEntry::compare);
+		}
+
+		void add(RefQueueEntry t) throws IOException {
+			if (t.rc.next()) {
+				queue.add(t);
+			} else {
+				t.rc.close();
+			}
+		}
+
+		@Override
+		public boolean next() throws IOException {
+			for (;;) {
+				RefQueueEntry t = queue.poll();
+				if (t == null) {
+					return false;
+				}
+
+				ref = t.rc.getRef();
+				boolean include = includeDeletes || !t.rc.wasDeleted();
+				skipShadowedRefs(ref.getName());
+				add(t);
+				if (include) {
+					return true;
+				}
+			}
+		}
+
+		private void skipShadowedRefs(String name) throws IOException {
+			for (;;) {
+				RefQueueEntry t = queue.peek();
+				if (t != null && name.equals(t.name())) {
+					add(queue.remove());
+				} else {
+					break;
+				}
+			}
+		}
+
+		@Override
+		public Ref getRef() {
+			return ref;
+		}
+
+		@Override
+		public void close() {
+			while (!queue.isEmpty()) {
+				queue.remove().rc.close();
+			}
+		}
+	}
+
+	private static class RefQueueEntry {
+		static int compare(RefQueueEntry a, RefQueueEntry b) {
+			int cmp = a.name().compareTo(b.name());
 			if (cmp == 0) {
 				// higher index shadows lower index, so higher index first.
-				cmp = tb.stackIdx - ta.stackIdx;
+				cmp = b.stackIdx - a.stackIdx;
 			}
 			return cmp;
 		}
 
-		static int compareLog(TableRef ta, TableRef tb) {
-			String an = ta.table.getRefName();
-			String bn = tb.table.getRefName();
-			int cmp = an.compareTo(bn);
-			if (cmp == 0) {
-				// higher time sorts first, so higher index first.
-				long at = time(ta.table.getReflogEntry());
-				long bt = time(ta.table.getReflogEntry());
-				cmp = Long.signum(bt - at);
-			}
-			if (cmp == 0) {
-				// higher index shadows lower index, so higher index first.
-				cmp = tb.stackIdx - ta.stackIdx;
-			}
-			return cmp;
-		}
-
-		private static long time(ReflogEntry log) {
-			return log.getWho().getWhen().getTime();
-		}
-
-		final RefCursor table;
+		final RefCursor rc;
 		final int stackIdx;
 
-		TableRef(RefCursor table, int stackIdx) {
-			this.table = table;
+		RefQueueEntry(RefCursor rc, int stackIdx) {
+			this.rc = rc;
 			this.stackIdx = stackIdx;
+		}
+
+		String name() {
+			return rc.getRef().getName();
+		}
+	}
+
+	private class MergedLogCursor extends LogCursor {
+		private final PriorityQueue<LogQueueEntry> queue;
+		private String refName;
+		private long timeUsec;
+		private ReflogEntry entry;
+
+		MergedLogCursor() {
+			queue = new PriorityQueue<>(tables.length, LogQueueEntry::compare);
+		}
+
+		void add(LogQueueEntry t) throws IOException {
+			if (t.lc.next()) {
+				queue.add(t);
+			} else {
+				t.lc.close();
+			}
+		}
+
+		@Override
+		public boolean next() throws IOException {
+			for (;;) {
+				LogQueueEntry t = queue.poll();
+				if (t == null) {
+					return false;
+				}
+				refName = t.lc.getRefName();
+				timeUsec = t.lc.getReflogTimeUsec();
+				entry = t.lc.getReflogEntry();
+				add(t);
+				return true;
+			}
+		}
+
+		@Override
+		public String getRefName() {
+			return refName;
+		}
+
+		@Override
+		public long getReflogTimeUsec() {
+			return timeUsec;
+		}
+
+		@Override
+		public ReflogEntry getReflogEntry() {
+			return entry;
+		}
+
+		@Override
+		public void close() {
+			while (!queue.isEmpty()) {
+				queue.remove().lc.close();
+			}
+		}
+	}
+
+	private static class LogQueueEntry {
+		static int compare(LogQueueEntry a, LogQueueEntry b) {
+			int cmp = a.name().compareTo(b.name());
+			if (cmp == 0) {
+				// higher time sorts first.
+				cmp = Long.signum(b.time() - a.time());
+			}
+			if (cmp == 0) {
+				// higher index comes first.
+				cmp = b.stackIdx - a.stackIdx;
+			}
+			return cmp;
+		}
+
+		final LogCursor lc;
+		final int stackIdx;
+
+		LogQueueEntry(LogCursor lc, int stackIdx) {
+			this.lc = lc;
+			this.stackIdx = stackIdx;
+		}
+
+		String name() {
+			return lc.getRefName();
+		}
+
+		long time() {
+			return lc.getReflogTimeUsec();
 		}
 	}
 }

@@ -41,57 +41,103 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.pgm.debug;
+package org.eclipse.jgit.internal.storage.reftable;
 
-import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.eclipse.jgit.internal.storage.io.BlockSource;
-import org.eclipse.jgit.internal.storage.reftable.RefCursor;
-import org.eclipse.jgit.internal.storage.reftable.ReftableReader;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.pgm.Command;
-import org.eclipse.jgit.pgm.TextBuiltin;
-import org.kohsuke.args4j.Argument;
 
-@Command
-class ReadReftable extends TextBuiltin {
-	@Argument(index = 0)
-	private String input;
+class MemoryReftable {
+	final int blockSize;
+	final List<byte[]> blocks;
+	long size;
+	byte[] buf;
+	int bufPtr;
 
-	@Argument(index = 1, required = false)
-	private String ref;
+	MemoryReftable(int blockSize) {
+		this.blockSize = blockSize;
 
-	@Override
-	protected void run() throws Exception {
-		try (FileInputStream in = new FileInputStream(input);
-				BlockSource src = BlockSource.from(in);
-				ReftableReader reader = new ReftableReader(src)) {
-			try (RefCursor rc = ref != null
-					? reader.seek(ref)
-					: reader.allRefs()) {
-				while (rc.next()) {
-					write(rc.getRef());
-				}
-			}
+		buf = new byte[blockSize];
+		blocks = new ArrayList<>();
+		blocks.add(buf);
+	}
+
+	void checkBuffer() {
+		if (bufPtr == blockSize) {
+			bufPtr = 0;
+			buf = new byte[blockSize];
+			blocks.add(buf);
 		}
 	}
 
-	private void write(Ref r) throws IOException {
-		if (r.isSymbolic()) {
-			outw.println(r.getTarget().getName() + '\t' + r.getName());
-			return;
-		}
+	OutputStream getOutput() {
+		return new OutputStream() {
+			@Override
+			public void write(int b) {
+				checkBuffer();
+				buf[bufPtr++] = (byte) b;
+				size++;
+			}
 
-		ObjectId id1 = r.getObjectId();
-		if (id1 != null) {
-			outw.println(id1.name() + '\t' + r.getName());
-		}
+			@Override
+			public void write(byte[] src, int p, int n) {
+				while (n > 0) {
+					checkBuffer();
+					int c = Math.min(n, blockSize - bufPtr);
+					System.arraycopy(src, p, buf, bufPtr, c);
+					bufPtr += c;
+					size += c;
+					n -= c;
+					p += c;
+				}
+			}
+		};
+	}
 
-		ObjectId id2 = r.getPeeledObjectId();
-		if (id2 != null) {
-			outw.println('^' + id2.name());
-		}
+	BlockSource getBlockSource() {
+		return new BlockSource() {
+			@Override
+			public ByteBuffer read(long pos, int sz) {
+				if (pos >= size) {
+					return ByteBuffer.allocate(0);
+				}
+
+				int idx = (int) (pos / blockSize);
+				int ptr = (int) (pos - (idx * blockSize));
+				byte[] src = blocks.get(idx);
+				int len = src == buf ? bufPtr : blockSize;
+				if (ptr == 0 && sz <= len) {
+					ByteBuffer b = ByteBuffer.wrap(src);
+					b.position(Math.min(sz, len));
+					return b;
+				}
+
+				ByteBuffer b = ByteBuffer.allocate(sz);
+				while (pos < size && b.hasRemaining()) {
+					idx = (int) (pos / blockSize);
+					ptr = (int) (pos - (idx * blockSize));
+					src = blocks.get(idx);
+					len = src == buf ? bufPtr : blockSize;
+					int n = Math.min(b.remaining(), len);
+					b.put(src, ptr, n);
+					pos += n;
+				}
+				return b;
+			}
+
+			@Override
+			public long size() throws IOException {
+				return size;
+			}
+
+			@Override
+			public void close() {
+				// Do nothing.
+			}
+		};
 	}
 }
