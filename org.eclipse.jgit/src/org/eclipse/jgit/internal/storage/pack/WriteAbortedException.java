@@ -41,72 +41,43 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.transport;
+package org.eclipse.jgit.internal.storage.pack;
+
+import java.io.IOException;
 
 /**
- * The required information to verify the push.
+ * An exception to be thrown when the write operation is aborted.
+ * <p>
+ * That can be thrown inside
+ * {@link PackWriter.ObjectCountCallback#setObjectCount(long)}.
  *
- * @since 4.0
+ * @since 4.1
  */
-public class PushCertificate {
-	/** The tuple "name &lt;email&gt;" as presented in the push certificate. */
-	String pusher;
-
-	/** The remote URL the signed push goes to. */
-	String pushee;
-
-	/** What we think about the returned signed nonce. */
-	NonceStatus nonceStatus;
-
-	/** Verification result of the nonce returned during push. */
-	public enum NonceStatus {
-		/** Nonce was not expected, yet client sent one anyway. */
-		UNSOLICITED,
-		/** Nonce is invalid and did not match server's expectations. */
-		BAD,
-		/** Nonce is required, but was not sent by client. */
-		MISSING,
-		/** Received nonce is valid. */
-		OK,
-		/** Received nonce is valid and within the accepted slop window. */
-		SLOP
-	}
-
-	String commandList;
-	String signature;
-
+public class WriteAbortedException extends IOException {
 	/**
-	 * @return the signature, consisting of the lines received between the lines
-	 *         '----BEGIN GPG SIGNATURE-----\n' and the '----END GPG
-	 *         SIGNATURE-----\n'
+	 * Construct a {@code WriteAbortedException}.
 	 */
-	public String getSignature() {
-		return signature;
+	public WriteAbortedException() {
 	}
 
 	/**
-	 * @return the list of commands as one string to be feed into the signature
-	 *         verifier.
+	 * Construct a {@code WriteAbortedException}.
+	 *
+	 * @param s message describing the issue
 	 */
-	public String getCommandList() {
-		return commandList;
+	public WriteAbortedException(String s) {
+		super(s);
 	}
 
 	/**
-	 * @return the tuple "name &lt;email&gt;" as presented by the client in the
-	 *         push certificate.
+	 * Construct a {@code WriteAbortedException}.
+	 *
+	 * @param s
+	 *            message describing the issue
+	 * @param why
+	 *            a lower level implementation specific issue.
 	 */
-	public String getPusher() {
-		return pusher;
-	}
-
-	/** @return URL of the repository the push was originally sent to. */
-	public String getPushee() {
-		return pushee;
-	}
-
-	/** @return verification status of the nonce embedded in the certificate. */
-	public NonceStatus getNonceStatus() {
-		return nonceStatus;
+	public WriteAbortedException(String s, Throwable why) {
+		super(s, why);
 	}
 }

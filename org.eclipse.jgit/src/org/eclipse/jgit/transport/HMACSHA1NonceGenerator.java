@@ -56,8 +56,10 @@ import org.eclipse.jgit.transport.PushCertificate.NonceStatus;
 
 /**
  * The nonce generator which was first introduced to git-core.
+ *
+ * @since 4.0
  */
-class HMACSHA1NonceGenerator implements NonceGenerator {
+public class HMACSHA1NonceGenerator implements NonceGenerator {
 
 	private Mac mac;
 
