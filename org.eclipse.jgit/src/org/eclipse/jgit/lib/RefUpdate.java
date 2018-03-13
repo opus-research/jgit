@@ -524,7 +524,7 @@ public abstract class RefUpdate {
 	public Result delete(final RevWalk walk) throws IOException {
 		final String myName = getRef().getLeaf().getName();
 		if (myName.startsWith(Constants.R_HEADS)) {
-			Ref head = getRefDatabase().getRef(Constants.HEAD);
+			Ref head = getRefDatabase().exactRef(Constants.HEAD);
 			while (head != null && head.isSymbolic()) {
 				head = head.getTarget();
 				if (myName.equals(head.getName()))
@@ -566,7 +566,7 @@ public abstract class RefUpdate {
 			if (!tryLock(false))
 				return Result.LOCK_FAILURE;
 
-			final Ref old = getRefDatabase().getRef(getName());
+			final Ref old = getRefDatabase().exactRef(getName());
 			if (old != null && old.isSymbolic()) {
 				final Ref dst = old.getTarget();
 				if (target.equals(dst.getName()))
@@ -576,7 +576,7 @@ public abstract class RefUpdate {
 			if (old != null && old.getObjectId() != null)
 				setOldObjectId(old.getObjectId());
 
-			final Ref dst = getRefDatabase().getRef(target);
+			final Ref dst = getRefDatabase().exactRef(target);
 			if (dst != null && dst.getObjectId() != null)
 				setNewObjectId(dst.getObjectId());
 
