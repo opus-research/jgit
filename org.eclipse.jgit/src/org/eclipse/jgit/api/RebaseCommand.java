@@ -595,13 +595,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		// we rewind to the upstream commit
 		monitor.beginTask(MessageFormat.format(JGitText.get().rewinding,
 				upstreamCommit.getShortMessage()), ProgressMonitor.UNKNOWN);
-		boolean checkoutOk = false;
-		try {
-			checkoutOk = checkoutCommit(upstreamCommit);
-		} finally {
-			if (!checkoutOk)
-				FileUtils.delete(rebaseDir, FileUtils.RECURSIVE);
-		}
+		checkoutCommit(upstreamCommit);
 		monitor.endTask();
 
 		return null;
@@ -777,7 +771,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		return RawParseUtils.decode(content, 0, end);
 	}
 
-	private boolean checkoutCommit(RevCommit commit) throws IOException {
+	private void checkoutCommit(RevCommit commit) throws IOException {
 		try {
 			RevCommit head = walk.parseCommit(repo.resolve(Constants.HEAD));
 			DirCacheCheckout dco = new DirCacheCheckout(repo, head.getTree(),
@@ -801,7 +795,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			walk.release();
 			monitor.endTask();
 		}
-		return true;
 	}
 
 	private List<Step> loadSteps() throws IOException {
