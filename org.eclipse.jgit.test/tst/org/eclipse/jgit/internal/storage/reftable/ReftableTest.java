@@ -74,7 +74,6 @@ import org.junit.Test;
 
 public class ReftableTest {
 	private static final String MASTER = "refs/heads/master";
-	private static final String NEXT = "refs/heads/next";
 	private static final String V1_0 = "refs/tags/v1.0";
 
 	private Stats stats;
@@ -112,7 +111,7 @@ public class ReftableTest {
 	public void oneIdRef() throws IOException {
 		Ref exp = ref(MASTER, 1);
 		byte[] table = write(exp);
-		assertEquals(8 + 4 + 2 + MASTER.length() + 20 + 6 + 36, table.length);
+		assertEquals(8 + 4 + 2 + MASTER.length() + 1 + 20 + 6 + 36, table.length);
 
 		ReftableReader r = seekToFirstRef(table);
 		assertTrue(r.next());
@@ -139,7 +138,7 @@ public class ReftableTest {
 	public void oneTagRef() throws IOException {
 		Ref exp = tag(V1_0, 1, 2);
 		byte[] table = write(exp);
-		assertEquals(8 + 4 + 2 + V1_0.length() + 40 + 6 + 36, table.length);
+		assertEquals(8 + 4 + 2 + V1_0.length() + 1 + 40 + 6 + 36, table.length);
 
 		ReftableReader r = seekToFirstRef(table);
 		assertTrue(r.next());
@@ -158,7 +157,7 @@ public class ReftableTest {
 		Ref exp = sym(HEAD, MASTER);
 		byte[] table = write(exp);
 		assertEquals(
-				8 + 4 + 2 + HEAD.length() + 1 + MASTER.length() + 6 + 36,
+				8 + 4 + 2 + HEAD.length() + 2 + MASTER.length() + 6 + 36,
 				table.length);
 
 		ReftableReader r = seekToFirstRef(table);
@@ -177,7 +176,7 @@ public class ReftableTest {
 		String name = "refs/heads/gone";
 		Ref exp = newRef(name);
 		byte[] table = write(exp);
-		assertEquals(8 + 4 + 2 + name.length() + 6 + 36, table.length);
+		assertEquals(8 + 4 + 2 + name.length() + 1 + 6 + 36, table.length);
 
 		ReftableReader r = seekToFirstRef(table);
 		r.setIncludeDeletes(true);
@@ -198,39 +197,6 @@ public class ReftableTest {
 		assertFalse(r.next());
 
 		r.seek("refs/heads/n");
-		assertFalse(r.next());
-	}
-
-	@Test
-	public void namespaceNotFound() throws IOException {
-		Ref exp = ref(MASTER, 1);
-		ReftableReader r = read(write(exp));
-		r.seek("refs/changes/");
-		assertFalse(r.next());
-
-		r.seek("refs/tags/");
-		assertFalse(r.next());
-	}
-
-	@Test
-	public void namespaceHeads() throws IOException {
-		Ref master = ref(MASTER, 1);
-		Ref next = ref(NEXT, 2);
-		Ref v1 = tag(V1_0, 3, 4);
-
-		ReftableReader r = read(write(master, next, v1));
-		r.seek("refs/tags/");
-		assertTrue(r.next());
-		assertEquals(V1_0, r.getRef().getName());
-		assertFalse(r.next());
-
-		r.seek("refs/heads/");
-		assertTrue(r.next());
-		assertEquals(MASTER, r.getRef().getName());
-
-		assertTrue(r.next());
-		assertEquals(NEXT, r.getRef().getName());
-
 		assertFalse(r.next());
 	}
 
