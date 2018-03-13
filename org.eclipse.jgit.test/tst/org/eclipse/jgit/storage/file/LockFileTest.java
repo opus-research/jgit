@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Robin Stocker <robin@nibor.org>
+ * Copyright (C) 2012, GitHub Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,64 +40,44 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.storage.file;
 
-package org.eclipse.jgit.revwalk;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
-import static org.junit.Assert.assertEquals;
-
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.errors.LockFailedException;
+import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.revwalk.RevCommit;
 import org.junit.Test;
 
-public class RevWalkUtilsCountTest extends RevWalkTestCase {
+/**
+ * Unit tests of {@link LockFile}
+ */
+public class LockFileTest extends RepositoryTestCase {
 
 	@Test
-	public void shouldWorkForNormalCase() throws Exception {
-		final RevCommit a = commit();
-		final RevCommit b = commit(a);
+	public void lockFailedExceptionRecovery() throws Exception {
+		Git git = new Git(db);
+		writeTrashFile("file.txt", "content");
+		git.add().addFilepattern("file.txt").call();
+		RevCommit commit1 = git.commit().setMessage("create file").call();
 
-		assertEquals(1, count(b, a));
-	}
+		assertNotNull(commit1);
+		writeTrashFile("file.txt", "content2");
+		git.add().addFilepattern("file.txt").call();
+		assertNotNull(git.commit().setMessage("edit file").call());
 
-	@Test
-	public void shouldReturnZeroOnSameCommit() throws Exception {
-		final RevCommit c1 = commit(commit(commit()));
-		assertEquals(0, count(c1, c1));
-	}
-
-	@Test
-	public void shouldReturnZeroWhenMergedInto() throws Exception {
-		final RevCommit a = commit();
-		final RevCommit b = commit(a);
-
-		assertEquals(0, count(a, b));
-	}
-
-	@Test
-	public void shouldWorkWithMerges() throws Exception {
-		final RevCommit a = commit();
-		final RevCommit b1 = commit(a);
-		final RevCommit b2 = commit(a);
-		final RevCommit c = commit(b1, b2);
-
-		assertEquals(3, count(c, a));
-	}
-
-	@Test
-	public void shouldWorkWithoutCommonAncestor() throws Exception {
-		final RevCommit a1 = commit();
-		final RevCommit a2 = commit();
-		final RevCommit b = commit(a1);
-
-		assertEquals(2, count(b, a2));
-	}
-
-	@Test
-	public void shouldWorkWithZeroAsEnd() throws Exception {
-		final RevCommit c = commit(commit());
-
-		assertEquals(2, count(c, null));
-	}
-
-	private int count(RevCommit start, RevCommit end) throws Exception {
-		return RevWalkUtils.count(rw, start, end);
+		assertTrue(new LockFile(db.getIndexFile(), db.getFS()).lock());
+		try {
+			git.checkout().setName(commit1.name()).call();
+			fail("JGitInternalException not thrown");
+		} catch (JGitInternalException e) {
+			assertTrue(e.getCause() instanceof LockFailedException);
+			LockFile.unlock(((LockFailedException) e.getCause()).getFile());
+			git.checkout().setName(commit1.name()).call();
+		}
 	}
 }

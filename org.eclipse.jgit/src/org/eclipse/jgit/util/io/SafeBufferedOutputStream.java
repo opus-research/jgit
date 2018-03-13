@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Robin Stocker <robin@nibor.org>
+ * Copyright (C) 2011, Robin Rosenberg
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,57 +40,46 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.util.io;
 
-package org.eclipse.jgit.revwalk;
-
+import java.io.BufferedOutputStream;
 import java.io.IOException;
-
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.errors.MissingObjectException;
+import java.io.OutputStream;
 
 /**
- * Utility methods for {@link RevWalk}.
+ * A BufferedOutputStream that throws an error if the final flush fails on
+ * close.
+ * <p>
+ * Java's BufferedOutputStream swallows errors that occur when the output stream
+ * tries to write the final bytes to the output during close. This may result in
+ * corrupted files without notice.
+ * </p>
  */
-public final class RevWalkUtils {
+public class SafeBufferedOutputStream extends BufferedOutputStream {
 
-	private RevWalkUtils() {
-		// Utility class
+	/**
+	 * @see BufferedOutputStream#BufferedOutputStream(OutputStream)
+	 * @param out
+	 */
+	public SafeBufferedOutputStream(OutputStream out) {
+		super(out);
 	}
 
 	/**
-	 * Count the number of commits that are reachable from <code>start</code>
-	 * until a commit that is reachable from <code>end</code> is encountered. In
-	 * other words, count the number of commits that are in <code>start</code>,
-	 * but not in <code>end</code>.
-	 * <p>
-	 * Note that this method calls {@link RevWalk#reset()} at the beginning.
-	 * Also note that the existing rev filter on the walk is left as-is, so be
-	 * sure to set the right rev filter before calling this method.
-	 *
-	 * @param walk
-	 *            the rev walk to use
-	 * @param start
-	 *            the commit to start counting from
-	 * @param end
-	 *            the commit where counting should end, or null if counting
-	 *            should be done until there are no more commits
-	 *
-	 * @return the number of commits
-	 * @throws MissingObjectException
-	 * @throws IncorrectObjectTypeException
-	 * @throws IOException
+	 * @see BufferedOutputStream#BufferedOutputStream(OutputStream, int)
+	 * @param out
+	 * @param size
 	 */
-	public static int count(final RevWalk walk, final RevCommit start,
-			final RevCommit end) throws MissingObjectException,
-			IncorrectObjectTypeException, IOException {
-		walk.reset();
-		walk.markStart(start);
-		if (end != null)
-			walk.markUninteresting(end);
+	public SafeBufferedOutputStream(OutputStream out, int size) {
+		super(out);
+	}
 
-		int count = 0;
-		for (RevCommit c = walk.next(); c != null; c = walk.next())
-			count++;
-		return count;
+	@Override
+	public void close() throws IOException {
+		try {
+			flush();
+		} finally {
+			super.close();
+		}
 	}
 }
