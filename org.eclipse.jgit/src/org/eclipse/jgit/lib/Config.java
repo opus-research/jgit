@@ -600,7 +600,7 @@ public class Config {
 		boolean lastWasMatch = false;
 		for (Entry e : srcState.entryList) {
 			if (e.match(section, subsection)) {
-				// Skip this record, its for the section we are removing.
+				// Skip this record, it's for the section we are removing.
 				lastWasMatch = true;
 				continue;
 			}
