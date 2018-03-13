@@ -49,9 +49,8 @@ import java.text.MessageFormat;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.CheckoutResult.Status;
-import org.eclipse.jgit.api.errors.CheckoutConflictException;
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
@@ -63,7 +62,7 @@ import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.errors.CheckoutConflictException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -103,8 +102,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 
 	private List<String> paths;
 
-	private boolean checkoutAllPaths;
-
 	/**
 	 * @param repo
 	 */
@@ -122,17 +119,14 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	 * @throws InvalidRefNameException
 	 *             if the provided name is <code>null</code> or otherwise
 	 *             invalid
-	 * @throws CheckoutConflictException
-	 *             if the checkout results in a conflict
 	 * @return the newly created branch
 	 */
-	public Ref call() throws GitAPIException, RefAlreadyExistsException,
-			RefNotFoundException, InvalidRefNameException,
-			CheckoutConflictException {
+	public Ref call() throws JGitInternalException, RefAlreadyExistsException,
+			RefNotFoundException, InvalidRefNameException {
 		checkCallable();
 		processOptions();
 		try {
-			if (checkoutAllPaths || !paths.isEmpty()) {
+			if (!paths.isEmpty()) {
 				checkoutPaths();
 				status = CheckoutResult.OK_RESULT;
 				setCallable(false);
@@ -163,21 +157,15 @@ public class CheckoutCommand extends GitCommand<Ref> {
 					.parseCommit(headId);
 			RevCommit newCommit = revWalk.parseCommit(branch);
 			RevTree headTree = headCommit == null ? null : headCommit.getTree();
-			DirCacheCheckout dco;
-			DirCache dc = repo.lockDirCache();
+			DirCacheCheckout dco = new DirCacheCheckout(repo, headTree,
+					repo.lockDirCache(), newCommit.getTree());
+			dco.setFailOnConflict(true);
 			try {
-				dco = new DirCacheCheckout(repo, headTree, dc,
-						newCommit.getTree());
-				dco.setFailOnConflict(true);
-				try {
-					dco.checkout();
-				} catch (org.eclipse.jgit.errors.CheckoutConflictException e) {
-					status = new CheckoutResult(Status.CONFLICTS,
-							dco.getConflicts());
-					throw new CheckoutConflictException(dco.getConflicts(), e);
-				}
-			} finally {
-				dc.unlock();
+				dco.checkout();
+			} catch (CheckoutConflictException e) {
+				status = new CheckoutResult(Status.CONFLICTS, dco
+						.getConflicts());
+				throw e;
 			}
 			Ref ref = repo.getRef(name);
 			if (ref != null && !ref.getName().startsWith(Constants.R_HEADS))
@@ -247,23 +235,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	}
 
 	/**
-	 * Set whether to checkout all paths
-	 * <p>
-	 * This options should be used when you want to do a path checkout on the
-	 * entire repository and so calling {@link #addPath(String)} is not possible
-	 * since empty paths are not allowed.
-	 *
-	 * @param all
-	 *            true to checkout all paths, false otherwise
-	 * @return {@code this}
-	 * @since 2.0
-	 */
-	public CheckoutCommand setAllPaths(boolean all) {
-		checkoutAllPaths = all;
-		return this;
-	}
-
-	/**
 	 * Checkout paths into index and working directory
 	 *
 	 * @return this instance
@@ -278,8 +249,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			DirCacheEditor editor = dc.editor();
 			TreeWalk startWalk = new TreeWalk(revWalk.getObjectReader());
 			startWalk.setRecursive(true);
-			if (!checkoutAllPaths)
-				startWalk.setFilter(PathFilterGroup.createFromStrings(paths));
+			startWalk.setFilter(PathFilterGroup.createFromStrings(paths));
 			boolean checkoutIndex = startCommit == null && startPoint == null;
 			if (!checkoutIndex)
 				startWalk.addTree(revWalk.parseCommit(getStartPoint())
@@ -340,7 +310,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	}
 
 	private void processOptions() throws InvalidRefNameException {
-		if ((!checkoutAllPaths && paths.isEmpty())
+		if (paths.isEmpty()
 				&& (name == null || !Repository
 						.isValidRefName(Constants.R_HEADS + name)))
 			throw new InvalidRefNameException(MessageFormat.format(JGitText

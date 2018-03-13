@@ -46,11 +46,9 @@ import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
-import org.eclipse.jgit.errors.ConfigInvalidException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -135,7 +133,7 @@ public class SubmoduleAddCommand extends
 		return SubmoduleWalk.forIndex(repo).setFilter(filter).next();
 	}
 
-	public Repository call() throws GitAPIException {
+	public Repository call() throws JGitInternalException {
 		checkCallable();
 		if (path == null || path.length() == 0)
 			throw new IllegalArgumentException(JGitText.get().pathNotConfigured);
@@ -179,16 +177,13 @@ public class SubmoduleAddCommand extends
 		// Save path and URL to parent repository's .gitmodules file
 		FileBasedConfig modulesConfig = new FileBasedConfig(new File(
 				repo.getWorkTree(), Constants.DOT_GIT_MODULES), repo.getFS());
+		modulesConfig.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
+				ConfigConstants.CONFIG_KEY_PATH, path);
+		modulesConfig.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
+				ConfigConstants.CONFIG_KEY_URL, uri);
 		try {
-			modulesConfig.load();
-			modulesConfig.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION,
-					path, ConfigConstants.CONFIG_KEY_PATH, path);
-			modulesConfig.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION,
-					path, ConfigConstants.CONFIG_KEY_URL, uri);
 			modulesConfig.save();
 		} catch (IOException e) {
-			throw new JGitInternalException(e.getMessage(), e);
-		} catch (ConfigInvalidException e) {
 			throw new JGitInternalException(e.getMessage(), e);
 		}
 

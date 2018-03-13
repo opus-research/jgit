@@ -88,11 +88,11 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.Constants;
@@ -167,10 +167,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				throws NotSupportedException {
 			return new TransportHttp(local, uri);
 		}
-
-		public Transport open(URIish uri) throws NotSupportedException {
-			return new TransportHttp(uri);
-		}
 	};
 
 	static final TransportProtocol PROTO_FTP = new TransportProtocol() {
@@ -228,10 +224,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			postBuffer = rc.getInt("http", "postbuffer", 1 * 1024 * 1024); //$NON-NLS-1$  //$NON-NLS-2$
 			sslVerify = rc.getBoolean("http", "sslVerify", true);
 		}
-
-		private HttpConfig() {
-			this(new Config());
-		}
 	}
 
 	private final URL baseUrl;
@@ -259,27 +251,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			throw new NotSupportedException(MessageFormat.format(JGitText.get().invalidURL, uri), e);
 		}
 		http = local.getConfig().get(HTTP_KEY);
-		proxySelector = ProxySelector.getDefault();
-	}
-
-	/**
-	 * Create a minimal HTTP transport with default configuration values.
-	 *
-	 * @param uri
-	 * @throws NotSupportedException
-	 */
-	TransportHttp(final URIish uri) throws NotSupportedException {
-		super(uri);
-		try {
-			String uriString = uri.toString();
-			if (!uriString.endsWith("/")) //$NON-NLS-1$
-				uriString += "/"; //$NON-NLS-1$
-			baseUrl = new URL(uriString);
-			objectsUrl = new URL(baseUrl, "objects/"); //$NON-NLS-1$
-		} catch (MalformedURLException e) {
-			throw new NotSupportedException(MessageFormat.format(JGitText.get().invalidURL, uri), e);
-		}
-		http = new HttpConfig();
 		proxySelector = ProxySelector.getDefault();
 	}
 
@@ -373,8 +344,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 			default:
 				throw new TransportException(uri, MessageFormat.format(
-						JGitText.get().cannotReadHEAD, Integer.valueOf(status),
-						conn.getResponseMessage()));
+						JGitText.get().cannotReadHEAD, status, conn.getResponseMessage()));
 			}
 		}
 
@@ -717,8 +687,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 	}
 
 	class SmartHttpFetchConnection extends BasePackFetchConnection {
-		private Service svc;
-
 		SmartHttpFetchConnection(final InputStream advertisement)
 				throws TransportException {
 			super(TransportHttp.this);
@@ -733,18 +701,9 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		protected void doFetch(final ProgressMonitor monitor,
 				final Collection<Ref> want, final Set<ObjectId> have)
 				throws TransportException {
-			try {
-				svc = new Service(SVC_UPLOAD_PACK);
-				init(svc.in, svc.out);
-				super.doFetch(monitor, want, have);
-			} finally {
-				svc = null;
-			}
-		}
-
-		@Override
-		protected void onReceivePack() {
-			svc.finalRequest = true;
+			final Service svc = new Service(SVC_UPLOAD_PACK);
+			init(svc.in, svc.out);
+			super.doFetch(monitor, want, have);
 		}
 	}
 
@@ -797,8 +756,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		private final HttpExecuteStream execute;
 
-		boolean finalRequest;
-
 		final UnionInputStream in;
 
 		final HttpOutputStream out;
@@ -827,14 +784,10 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			out.close();
 
 			if (conn == null) {
+				// Output hasn't started yet, because everything fit into
+				// our request buffer. Send with a Content-Length header.
+				//
 				if (out.length() == 0) {
-					// Request output hasn't started yet, but more data is being
-					// requested. If there is no request data buffered and the
-					// final request was already sent, do nothing to ensure the
-					// caller is shown EOF on the InputStream; otherwise an
-					// programming error has occurred within this module.
-					if (finalRequest)
-						return;
 					throw new TransportException(uri,
 							JGitText.get().startingReadStageWithoutWrittenRequestDataPendingIsNotSupported);
 				}
@@ -880,8 +833,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			}
 
 			in.add(openInputStream(conn));
-			if (!finalRequest)
-				in.add(execute);
+			in.add(execute);
 			conn = null;
 		}
 

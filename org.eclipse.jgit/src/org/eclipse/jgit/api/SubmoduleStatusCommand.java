@@ -48,7 +48,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.lib.Constants;
@@ -90,7 +89,7 @@ public class SubmoduleStatusCommand extends
 		return this;
 	}
 
-	public Map<String, SubmoduleStatus> call() throws GitAPIException {
+	public Map<String, SubmoduleStatus> call() throws JGitInternalException {
 		checkCallable();
 
 		try {
