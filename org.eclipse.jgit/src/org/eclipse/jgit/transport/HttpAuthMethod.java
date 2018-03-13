@@ -85,9 +85,9 @@ abstract class HttpAuthMethod {
 			return NONE;
 
 		String type = hdr.substring(0, sp);
-		if (Basic.NAME.equalsIgnoreCase(type))
+		if (Basic.NAME.equals(type))
 			return new Basic();
-		else if (Digest.NAME.equalsIgnoreCase(type))
+		else if (Digest.NAME.equals(type))
 			return new Digest(hdr.substring(sp + 1));
 		else
 			return NONE;
