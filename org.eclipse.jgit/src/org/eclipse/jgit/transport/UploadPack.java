@@ -132,8 +132,8 @@ public class UploadPack {
 		TIP,
 
 		/**
-		 * Client may ask for any commit reachable from any reference, even if that
-		 * reference wasn't advertised.
+		 * Client may ask for any commit reachable from a any reference, even if
+		 * that reference wasn't advertised.
 		 */
 		REACHABLE_COMMIT_TIP,
 
@@ -144,19 +144,26 @@ public class UploadPack {
 	/** Validator for client requests. */
 	private interface RequestValidator {
 		/**
-		 * Check a list of client wants against the request policy.
+		 * Check that a list of client wants against the request policy.
 		 *
-		 * @param up
-		 *            {@link UploadPack} instance.
+		 * @param db
+		 *            the repository.
+		 * @param walk
+		 *            the {@link UploadPack}'s walker instance.
+		 * @param advertised
+		 *            refs that were previously advertised.
 		 * @param wants
 		 *            objects the client requested that were not advertised.
+		 * @param biDirectionalPipe
+		 *            whether the connection is on a bi-directional pipe.
 		 *
 		 * @throws PackProtocolException
 		 *            if one or more wants is not valid.
 		 * @throws IOException
 		 *            if a low-level exception occurred.
 		 */
-		void checkWants(UploadPack up, List<RevObject> wants)
+		void checkWants(Repository db, RevWalk walk, Set<ObjectId> advertised,
+				List<RevObject> wants, boolean biDirectionalPipe)
 				throws PackProtocolException, IOException;
 	}
 
@@ -330,7 +337,7 @@ public class UploadPack {
 		SAVE.add(COMMON);
 		SAVE.add(SATISFIED);
 
-		setTransferConfig(null);
+		transferConfig = new TransferConfig(db);
 	}
 
 	/** @return the repository this upload is reading from. */
@@ -509,8 +516,6 @@ public class UploadPack {
 	 */
 	public void setTransferConfig(TransferConfig tc) {
 		this.transferConfig = tc != null ? tc : new TransferConfig(db);
-		this.requestPolicy = transferConfig.isAllowTipSha1InWant()
-				? RequestPolicy.TIP : RequestPolicy.ADVERTISED;
 	}
 
 	/** @return the configured logger. */
@@ -1008,7 +1013,8 @@ public class UploadPack {
 				}
 			}
 			if (notAdvertisedWants != null)
-				getRequestValidator().checkWants(this, notAdvertisedWants);
+				getRequestValidator().checkWants(db, walk, advertised,
+						notAdvertisedWants, biDirectionalPipe);
 			wantIds.clear();
 		} catch (MissingObjectException notFound) {
 			ObjectId id = notFound.getObjectId();
@@ -1043,10 +1049,12 @@ public class UploadPack {
 	}
 
 	private static class AdvertisedRequestValidator implements RequestValidator {
-		public void checkWants(UploadPack up, List<RevObject> wants)
-				throws PackProtocolException, IOException {
-			if (!up.isBiDirectionalPipe())
-				new ReachableCommitRequestValidator().checkWants(up, wants);
+		public void checkWants(Repository db, RevWalk walk,
+				Set<ObjectId> advertised, List<RevObject> wants,
+				boolean biDirectionalPipe) throws PackProtocolException, IOException {
+			if (biDirectionalPipe)
+				new ReachableCommitRequestValidator().checkWants(
+						db, walk, advertised, wants, biDirectionalPipe);
 			else if (!wants.isEmpty())
 				throw new PackProtocolException(MessageFormat.format(
 						JGitText.get().wantNotValid, wants.iterator().next().name()));
@@ -1055,21 +1063,24 @@ public class UploadPack {
 
 	private static class ReachableCommitRequestValidator
 			implements RequestValidator {
-		public void checkWants(UploadPack up, List<RevObject> wants)
-				throws PackProtocolException, IOException {
-			checkNotAdvertisedWants(up.getRevWalk(), wants,
-					refIdSet(up.getAdvertisedRefs().values()));
+		public void checkWants(Repository db, RevWalk walk,
+				Set<ObjectId> advertised, List<RevObject> wants,
+				boolean biDirectionalPipe) throws PackProtocolException, IOException {
+			checkNotAdvertisedWants(walk, wants, advertised);
 		}
 	}
 
 	private static class TipRequestValidator implements RequestValidator {
-		public void checkWants(UploadPack up, List<RevObject> wants)
-				throws PackProtocolException, IOException {
-			if (!up.isBiDirectionalPipe())
-				new ReachableCommitTipRequestValidator().checkWants(up, wants);
-			else if (!wants.isEmpty()) {
-				Set<ObjectId> refIds =
-					refIdSet(up.getRepository().getAllRefs().values());
+		public void checkWants(Repository db, RevWalk walk,
+				Set<ObjectId> advertised, List<RevObject> wants,
+				boolean biDirectionalPipe) throws PackProtocolException, IOException {
+			if (biDirectionalPipe) {
+				new ReachableCommitTipRequestValidator().checkWants(
+						db, walk, advertised, wants, biDirectionalPipe);
+				return;
+			}
+			if (!wants.isEmpty()) {
+				Set<ObjectId> refIds = refIdSet(db.getAllRefs().values());
 				for (RevObject obj : wants) {
 					if (!refIds.contains(obj))
 						throw new PackProtocolException(MessageFormat.format(
@@ -1081,16 +1092,17 @@ public class UploadPack {
 
 	private static class ReachableCommitTipRequestValidator
 			implements RequestValidator {
-		public void checkWants(UploadPack up, List<RevObject> wants)
-				throws PackProtocolException, IOException {
-			checkNotAdvertisedWants(up.getRevWalk(), wants,
-					refIdSet(up.getRepository().getAllRefs().values()));
+		public void checkWants(Repository db, RevWalk walk,
+				Set<ObjectId> advertised, List<RevObject> wants,
+				boolean biDirectionalPipe) throws PackProtocolException, IOException {
+			checkNotAdvertisedWants(walk, wants, refIdSet(db.getAllRefs().values()));
 		}
 	}
 
 	private static class AnyRequestValidator implements RequestValidator {
-		public void checkWants(UploadPack up, List<RevObject> wants)
-				throws PackProtocolException, IOException {
+		public void checkWants(Repository db, RevWalk walk,
+				Set<ObjectId> advertised, List<RevObject> wants,
+				boolean biDirectionalPipe) throws PackProtocolException, IOException {
 			// All requests are valid.
 		}
 	}
