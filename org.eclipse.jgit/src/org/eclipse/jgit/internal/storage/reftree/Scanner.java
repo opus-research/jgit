@@ -43,6 +43,7 @@
 
 package org.eclipse.jgit.internal.storage.reftree;
 
+import static org.eclipse.jgit.internal.storage.reftree.RefTreeDb.MAX_SYMREF_DEPTH;
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
 import static org.eclipse.jgit.lib.Constants.OBJ_COMMIT;
 import static org.eclipse.jgit.lib.Constants.R_REFS;
@@ -51,7 +52,6 @@ import static org.eclipse.jgit.lib.FileMode.TYPE_GITLINK;
 import static org.eclipse.jgit.lib.FileMode.TYPE_SYMLINK;
 import static org.eclipse.jgit.lib.FileMode.TYPE_TREE;
 import static org.eclipse.jgit.lib.Ref.Storage.PACKED;
-import static org.eclipse.jgit.internal.storage.reftree.RefTreeDb.MAX_SYMREF_DEPTH;
 
 import java.io.IOException;
 
@@ -72,11 +72,19 @@ import org.eclipse.jgit.util.RefList;
 /** Scans a {@link RefTree} to build a {@link RefList}. */
 class Scanner {
 	private static final int MAX_SYMLINK_BYTES = 10 << 10;
+	private static final byte[] BINARY_R_REFS = encode(R_REFS);
 	private static final byte[] REFS_DOT_DOT = encode("refs/.."); //$NON-NLS-1$
 
 	static class Result {
-		RefList<Ref> all;
-		RefList<Ref> sym;
+		final ObjectId id;
+		final RefList<Ref> all;
+		final RefList<Ref> sym;
+
+		Result(ObjectId id, RefList<Ref> all, RefList<Ref> sym) {
+			this.id = id;
+			this.all = all;
+			this.sym = sym;
+		}
 	}
 
 	static Result scanRefTree(Repository repo, @Nullable Ref src)
@@ -84,28 +92,30 @@ class Scanner {
 		RefList.Builder<Ref> all = new RefList.Builder<>();
 		RefList.Builder<Ref> sym = new RefList.Builder<>();
 
+		ObjectId srcId;
 		if (src != null && src.getObjectId() != null) {
 			try (ObjectReader reader = repo.newObjectReader()) {
-				scan(reader, src, all, sym);
+				srcId = src.getObjectId();
+				scan(reader, srcId, all, sym);
 			}
+		} else {
+			srcId = ObjectId.zeroId();
 		}
 
-		Result refs = new Result();
-		refs.all = all.toRefList();
+		RefList<Ref> aList = all.toRefList();
 		for (int i = 0; i < sym.size(); i++) {
-			sym.set(i, resolve(sym.get(i), 0, refs.all));
+			sym.set(i, resolve(sym.get(i), 0, aList));
 		}
-		refs.sym = sym.toRefList();
-		return refs;
+		return new Result(srcId, aList, sym.toRefList());
 	}
 
-	private static void scan(ObjectReader reader, Ref src,
+	private static void scan(ObjectReader reader, AnyObjectId srcId,
 			RefList.Builder<Ref> all, RefList.Builder<Ref> sym)
 					throws IncorrectObjectTypeException, IOException {
 		CanonicalTreeParser p = new CanonicalTreeParser(
-				encode(R_REFS),
+				BINARY_R_REFS,
 				reader,
-				commitToTree(reader, src.getObjectId()));
+				commitToTree(reader, srcId));
 		while (!p.eof()) {
 			int mode = p.getEntryRawMode();
 			if (mode == TYPE_TREE) {
@@ -140,7 +150,7 @@ class Scanner {
 		return ref;
 	}
 
-	static AnyObjectId commitToTree(ObjectReader reader, ObjectId id)
+	private static AnyObjectId commitToTree(ObjectReader reader, AnyObjectId id)
 			throws IOException {
 		byte[] raw = reader.open(id, OBJ_COMMIT).getCachedBytes();
 		MutableObjectId idBuf = new MutableObjectId();

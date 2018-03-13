@@ -50,10 +50,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.lib.BatchRefUpdate;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
-import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefDatabase;
@@ -79,7 +79,7 @@ public class RefTreeDb extends RefDatabase {
 
 	private final Repository repo;
 	private final RefDatabase bootstrap;
-	private RefTree tree;
+	private volatile Scanner.Result refs;
 
 	/**
 	 * Create a RefTreeDb for a repository.
@@ -103,7 +103,7 @@ public class RefTreeDb extends RefDatabase {
 
 	@Override
 	public void close() {
-		tree = null;
+		refs = null;
 		bootstrap.close();
 	}
 
@@ -123,7 +123,7 @@ public class RefTreeDb extends RefDatabase {
 		if (name.startsWith(R_TXN)) {
 			return bootstrap.exactRef(name);
 		}
-		return read().getRef(name);
+		return getRefs(ALL).get(name);
 	}
 
 	@Override
@@ -142,8 +142,18 @@ public class RefTreeDb extends RefDatabase {
 			src = bootstrap.exactRef(R_TXN_COMMITTED);
 		}
 
-		Scanner.Result refs = Scanner.scanRefTree(repo, src);
-		return new RefMap(prefix, txn, refs.all, refs.sym);
+		Scanner.Result r = refs;
+		if (r == null || !r.id.equals(idOf(src))) {
+			r = Scanner.scanRefTree(repo, src);
+			refs = r;
+		}
+		return new RefMap(prefix, txn, r.all, r.sym);
+	}
+
+	private static ObjectId idOf(@Nullable Ref src) {
+		return src != null && src.getObjectId() != null
+				? src.getObjectId()
+				: ObjectId.zeroId();
 	}
 
 	private RefList<Ref> listRefsTxn() throws IOException {
@@ -153,25 +163,6 @@ public class RefTreeDb extends RefDatabase {
 		}
 		txn.sort();
 		return txn.toRefList();
-	}
-
-	RefTree read() throws IOException {
-		if (tree != null) {
-			return tree;
-		}
-
-		Ref src = bootstrap.exactRef(R_TXN_COMMITTED);
-		if (src == null || src.getObjectId() == null) {
-			tree = RefTree.newEmptyTree();
-			return tree;
-		}
-
-		// Leak the reader as it becomes "owned" by the RefTree.
-		ObjectReader reader = repo.newObjectReader();
-		tree = RefTree.readTree(
-				reader,
-				Scanner.commitToTree(reader, src.getObjectId()));
-		return tree;
 	}
 
 	@Override
@@ -208,7 +199,7 @@ public class RefTreeDb extends RefDatabase {
 
 	@Override
 	public void refresh() {
-		tree = null;
+		refs = null;
 		bootstrap.refresh();
 	}
 
@@ -217,7 +208,7 @@ public class RefTreeDb extends RefDatabase {
 		if (name.startsWith(R_TXN)) {
 			return bootstrap.isNameConflicting(name);
 		}
-		return false; // TODO Check for conflicts for name.
+		return !getConflictingNames(name).isEmpty();
 	}
 
 	@Override
@@ -240,12 +231,20 @@ public class RefTreeDb extends RefDatabase {
 		if (r == null) {
 			r = new ObjectIdRef.Unpeeled(Storage.NEW, name, null);
 		}
+		if (!detach && r.isSymbolic()) {
+			r = r.getLeaf();
+		}
 		return new Update(this, r);
 	}
 
 	@Override
 	public RefRename newRename(String fromName, String toName)
 			throws IOException {
-		throw new UnsupportedOperationException();
+		if (fromName.startsWith(R_TXN) && toName.startsWith(R_TXN)) {
+			return bootstrap.newRename(fromName, toName);
+		}
+		return new Rename(this,
+				newUpdate(fromName, true),
+				newUpdate(toName, true));
 	}
 }

@@ -57,8 +57,8 @@ import static org.eclipse.jgit.transport.ReceiveCommand.Result.REJECTED_OTHER_RE
 
 import java.io.IOException;
 import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.dircache.DirCache;
@@ -67,6 +67,7 @@ import org.eclipse.jgit.dircache.DirCacheEditor.DeletePath;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.errors.CorruptObjectException;
+import org.eclipse.jgit.errors.DirCacheNameConflictException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.JGitText;
@@ -81,7 +82,6 @@ import org.eclipse.jgit.lib.SymbolicRef;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.util.RawParseUtils;
-import org.eclipse.jgit.util.RefList;
 
 /**
  * Tree of references in the reference graph.
@@ -194,7 +194,8 @@ public class RefTree {
 	/** Borrowed reader to access the repository. */
 	private final ObjectReader reader;
 	private DirCache contents;
-	private Set<String> pendingBlobs;
+
+	private Map<ObjectId, String> pendingBlobs;
 
 	private RefTree(ObjectReader reader, DirCache dc) {
 		this.reader = reader;
@@ -227,63 +228,6 @@ public class RefTree {
 		return r;
 	}
 
-	/**
-	 * Read references below the specified prefix.
-	 *
-	 * @param prefix
-	 * @return list of matching references.
-	 * @throws IOException
-	 *             cannot read a symbolic reference target.
-	 */
-	public RefList<Ref> getRefList(String prefix) throws IOException {
-		boolean skipRoot = false;
-		if (prefix.equals(R_REFS)) {
-			prefix = ""; //$NON-NLS-1$
-			skipRoot = true;
-		} else if (prefix.startsWith(R_REFS)) {
-			prefix = prefix.substring(R_REFS.length());
-		}
-
-		RefList.Builder<Ref> out = new RefList.Builder<Ref>();
-		for (DirCacheEntry entry : contents.getEntriesWithin(prefix)) {
-			String path = entry.getPathString();
-			if (skipRoot && path.startsWith(ROOT_DOTDOT)) {
-				continue;
-			} else if (path.endsWith(PEELED_SUFFIX)) {
-				if (entry.getRawMode() == TYPE_GITLINK) {
-					peel(out, path, entry);
-				}
-				continue;
-			}
-
-			Ref r = toRef(entry, path);
-			if (r == null) {
-				continue;
-			} else if (r.isSymbolic()) {
-				r = resolve(r, 0);
-			}
-			out.add(r);
-		}
-		return out.toRefList();
-	}
-
-	private static void peel(RefList.Builder<Ref> all, String path,
-			DirCacheEntry entry) {
-		String name = refName(path.substring(0, path.length() - 3));
-		for (int idx = all.size() - 1; 0 <= idx; idx--) {
-			Ref r = all.get(idx);
-			int cmp = r.getName().compareTo(name);
-			if (cmp == 0) {
-				all.set(idx, new ObjectIdRef.PeeledTag(PACKED, r.getName(),
-						r.getObjectId(), entry.getObjectId()));
-				break;
-			} else if (cmp < 0) {
-				// Stray peeled name without matching base name; skip entry.
-				break;
-			}
-		}
-	}
-
 	private Ref readRef(String name) throws IOException {
 		String path = refPath(name);
 		DirCacheEntry e = contents.getEntry(path);
@@ -299,8 +243,11 @@ public class RefTree {
 
 		} else if (mode == TYPE_SYMLINK) {
 			ObjectId id = e.getObjectId();
-			byte[] bin = reader.open(id, OBJ_BLOB).getCachedBytes();
-			String dst = RawParseUtils.decode(bin);
+			String dst = pendingBlobs != null ? pendingBlobs.get(id) : null;
+			if (dst == null) {
+				byte[] bin = reader.open(id, OBJ_BLOB).getCachedBytes();
+				dst = RawParseUtils.decode(bin);
+			}
 			Ref trg = new ObjectIdRef.Unpeeled(PACKED, dst, null);
 			return new SymbolicRef(name, trg);
 		}
@@ -335,6 +282,16 @@ public class RefTree {
 			}
 			ed.finish();
 			return true;
+		} catch (DirCacheNameConflictException e) {
+			String r1 = refName(e.getPath1());
+			String r2 = refName(e.getPath2());
+			for (Command c : cmdList) {
+				if (r1.equals(c.getRefName()) || r2.equals(c.getRefName())) {
+					c.setResult(LOCK_FAILURE);
+					break;
+				}
+			}
+			return abort(cmdList);
 		} catch (LockFailureException e) {
 			return abort(cmdList);
 		}
@@ -358,12 +315,13 @@ public class RefTree {
 				@Override
 				public void apply(DirCacheEntry ent) {
 					checkRef(ent, cmd);
+					ObjectId id = Command.symref(dst);
 					ent.setFileMode(SYMLINK);
-					ent.setObjectId(Command.symref(dst));
+					ent.setObjectId(id);
 					if (pendingBlobs == null) {
-						pendingBlobs = new HashSet<>();
+						pendingBlobs = new HashMap<>(4);
 					}
-					pendingBlobs.add(dst);
+					pendingBlobs.put(id, dst);
 				}
 			});
 			cleanupPeeledRef(ed, oldRef);
@@ -450,7 +408,7 @@ public class RefTree {
 	 */
 	public ObjectId writeTree(ObjectInserter inserter) throws IOException {
 		if (pendingBlobs != null) {
-			for (String s : pendingBlobs) {
+			for (String s : pendingBlobs.values()) {
 				inserter.insert(OBJ_BLOB, encode(s));
 			}
 			pendingBlobs = null;
