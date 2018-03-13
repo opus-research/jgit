@@ -1130,9 +1130,9 @@ public abstract class BaseReceivePack {
 	}
 
 	static ReceiveCommand parseCommand(String line) throws PackProtocolException {
-		if (line.length() < 83) {
-			String m = JGitText.get().errorInvalidProtocolWantedOldNewRef;
-			throw new PackProtocolException(m);
+          if (line == null || line.length() < 83) {
+			throw new PackProtocolException(
+					JGitText.get().errorInvalidProtocolWantedOldNewRef);
 		}
 		String oldStr = line.substring(0, 40);
 		String newStr = line.substring(41, 81);

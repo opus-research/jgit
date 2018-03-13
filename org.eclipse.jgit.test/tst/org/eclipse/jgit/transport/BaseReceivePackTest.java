@@ -13,17 +13,17 @@
  * conditions are met:
  *
  * - Redistributions of source code must retain the above copyright
- *	 notice, this list of conditions and the following disclaimer.
+ *   notice, this list of conditions and the following disclaimer.
  *
  * - Redistributions in binary form must reproduce the above
- *	 copyright notice, this list of conditions and the following
- *	 disclaimer in the documentation and/or other materials provided
- *	 with the distribution.
+ *   copyright notice, this list of conditions and the following
+ *   disclaimer in the documentation and/or other materials provided
+ *   with the distribution.
  *
  * - Neither the name of the Eclipse Foundation, Inc. nor the
- *	 names of its contributors may be used to endorse or promote
- *	 products derived from this software without specific prior
- *	 written permission.
+ *   names of its contributors may be used to endorse or promote
+ *   products derived from this software without specific prior
+ *   written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
  * CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
@@ -69,6 +69,10 @@ public class BaseReceivePackTest {
 				cmd.getNewId().name());
 		assertEquals("refs/heads/master", cmd.getRefName());
 
+		assertParseCommandFails(null);
+		assertParseCommandFails("");
+		assertParseCommandFails(o.substring(35) + " " + n.substring(35)
+				+ " " + r + "\n");
 		assertParseCommandFails(o + " " + n + " " + r + "\n");
 		assertParseCommandFails(o + " " + n + " " + "refs^foo");
 		assertParseCommandFails(o + " " + n.substring(10) + " " + r);
