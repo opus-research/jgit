@@ -310,24 +310,24 @@ class Branch extends TextBuiltin {
 			throws IOException {
 		String current = db.getBranch();
 		ObjectId head = db.resolve(Constants.HEAD);
-		for (String b : branches) {
-			if (b.equals(current)) {
-				throw die(MessageFormat.format(CLIText.get().cannotDeleteTheBranchWhichYouAreCurrentlyOn, b));
+		for (String branch : branches) {
+			if (branch.equals(current)) {
+				throw die(MessageFormat.format(CLIText.get().cannotDeleteTheBranchWhichYouAreCurrentlyOn, branch));
 			}
 			RefUpdate update = db.updateRef((remote ? Constants.R_REMOTES
 					: Constants.R_HEADS)
-					+ b);
+					+ branch);
 			update.setNewObjectId(head);
 			update.setForceUpdate(force || remote);
 			Result result = update.delete();
 			if (result == Result.REJECTED) {
-				throw die(MessageFormat.format(CLIText.get().branchIsNotAnAncestorOfYourCurrentHEAD, b));
+				throw die(MessageFormat.format(CLIText.get().branchIsNotAnAncestorOfYourCurrentHEAD, branch));
 			} else if (result == Result.NEW)
-				throw die(MessageFormat.format(CLIText.get().branchNotFound, b));
+				throw die(MessageFormat.format(CLIText.get().branchNotFound, branch));
 			if (remote)
-				outw.println(MessageFormat.format(CLIText.get().deletedRemoteBranch, b));
+				outw.println(MessageFormat.format(CLIText.get().deletedRemoteBranch, branch));
 			else if (verbose)
-				outw.println(MessageFormat.format(CLIText.get().deletedBranch, b));
+				outw.println(MessageFormat.format(CLIText.get().deletedBranch, branch));
 		}
 	}
 }
