@@ -345,10 +345,10 @@ public abstract class Transport {
 		else if (TransportAmazonS3.canHandle(remote))
 			return new TransportAmazonS3(local, remote);
 
-		else if (TransportBundleFile.canHandle(remote, local.getFS()))
+		else if (TransportBundleFile.canHandle(remote))
 			return new TransportBundleFile(local, remote);
 
-		else if (TransportLocal.canHandle(remote, local.getFS()))
+		else if (TransportLocal.canHandle(remote))
 			return new TransportLocal(local, remote);
 
 		throw new NotSupportedException("URI not supported: " + remote);

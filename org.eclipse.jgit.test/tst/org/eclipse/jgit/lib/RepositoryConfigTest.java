@@ -54,7 +54,6 @@ import junit.framework.TestCase;
 
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.junit.MockSystemReader;
-import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.SystemReader;
 
 /**
@@ -117,7 +116,7 @@ public class RepositoryConfigTest extends TestCase {
 		final MockSystemReader mockSystemReader = new MockSystemReader();
 		SystemReader.setInstance(mockSystemReader);
 		final String hostname = mockSystemReader.getHostname();
-		final Config userGitConfig = mockSystemReader.openUserConfig(FS.DETECTED);
+		final Config userGitConfig = mockSystemReader.openUserConfig();
 		final Config localConfig = new Config(userGitConfig);
 		mockSystemReader.clearProperties();
 
