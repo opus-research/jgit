@@ -84,7 +84,6 @@ public class FileRepositoryBuilder extends
 	 * @throws IOException
 	 *             the repository could not be accessed to configure the rest of
 	 *             the builder's parameters.
-	 * @since 3.0
 	 */
 	@Override
 	public FileRepository build() throws IOException {
