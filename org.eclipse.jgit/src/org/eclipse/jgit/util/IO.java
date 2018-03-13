@@ -335,16 +335,6 @@ public class IO {
 		}
 	}
 
-	private static void skipFully(Reader fd, long toSkip) throws IOException {
-		while (toSkip > 0) {
-			long r = fd.skip(toSkip);
-			if (r <= 0) {
-				throw new EOFException(JGitText.get().shortSkipOfBlock);
-			}
-			toSkip -= r;
-		}
-	}
-
 	/**
 	 * Divides the given string into lines.
 	 *
@@ -407,10 +397,13 @@ public class IO {
 			while (true) {
 				in.mark(sizeHint);
 				int n = in.read(buf);
+				if (n < 0) {
+					in.reset();
+					return sb.toString();
+				}
 				for (int i = 0; i < n; i++) {
 					if (buf[i] == '\n') {
-						in.reset();
-						skipFully(in, ++i);
+						resetAndSkipFully(in, ++i);
 						sb.append(buf, 0, i);
 						return sb.toString();
 					}
@@ -418,11 +411,7 @@ public class IO {
 				if (n > 0) {
 					sb.append(buf, 0, n);
 				}
-				if (n < buf.length) {
-					in.reset();
-					skipFully(in, n);
-					return sb.toString();
-				}
+				resetAndSkipFully(in, n);
 			}
 		} else {
 			StringBuilder buf = sizeHint > 0
@@ -437,6 +426,17 @@ public class IO {
 				}
 			}
 			return buf.toString();
+		}
+	}
+
+	private static void resetAndSkipFully(Reader fd, long toSkip) throws IOException {
+		fd.reset();
+		while (toSkip > 0) {
+			long r = fd.skip(toSkip);
+			if (r <= 0) {
+				throw new EOFException(JGitText.get().shortSkipOfBlock);
+			}
+			toSkip -= r;
 		}
 	}
 
