@@ -179,7 +179,7 @@ abstract class WalkEncryption {
 	 * <p>
 	 * Note: EncryptionUtil is inadequate:
 	 * <li>EncryptionUtil.isCipherAvailableForUse checks encryption only which
-	 * "always works", but in JetS3t both encryption and decryption uses non-IV
+	 * "always works", but in JetS3t both encryption and decryption use non-IV
 	 * aware algorithm parameters for all PBE specs, which breaks in case of AES
 	 * <li>that means that only non-IV algorithms will work round trip in
 	 * JetS3t, such as PBEWithMD5AndDES and PBEWithSHAAndTwofish-CBC

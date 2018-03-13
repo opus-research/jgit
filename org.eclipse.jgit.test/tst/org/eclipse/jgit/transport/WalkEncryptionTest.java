@@ -83,7 +83,6 @@ import org.eclipse.jgit.test.resources.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.util.FileUtils;
 import org.junit.After;
 import org.junit.AfterClass;
-import org.junit.Assume;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.FixMethodOrder;
@@ -175,6 +174,7 @@ public class WalkEncryptionTest {
 		// Test properties file in [project test source directory] of CI.
 		String TEST_CONFIG_FILE = System.getProperty("user.dir")
 				+ File.separator + "tst-rsrc" + File.separator + CONFIG_FILE;
+
 	}
 
 	/**
@@ -327,8 +327,9 @@ public class WalkEncryptionTest {
 						"Using test properties from hard coded ${project.source} file.");
 				return props;
 			}
-			throw new Error("Can not load test properteis form any source.");
+			throw new Error("Can not load test properties form any source.");
 		}
+
 	}
 
 	/**
@@ -414,14 +415,10 @@ public class WalkEncryptionTest {
 		 * Discover Password-Based Encryption (PBE) engines providing both
 		 * [SecretKeyFactory] and [AlgorithmParameters].
 		 *
-		 * @see <a href="https://www.bouncycastle.org/specifications.html">
-		 *      Bouncycastle Specification</a>
-		 * @see <a href=
-		 *      "https://docs.oracle.com/javase/8/docs/technotes/guides/security/SunProviders.html">
-		 *      Java 8 SunProviders</a>
-		 *
 		 * @return result
 		 */
+		// https://www.bouncycastle.org/specifications.html
+		// https://docs.oracle.com/javase/8/docs/technotes/guides/security/SunProviders.html
 		static List<String> cryptoCipherListPBE() {
 			return cryptoCipherList(WalkEncryption.Vals.REGEX_PBE);
 		}
@@ -474,14 +471,10 @@ public class WalkEncryptionTest {
 		/**
 		 * Setup proxy during CI build.
 		 *
-		 * @see <a href=
-		 *      "https://wiki.eclipse.org/Hudson#Accessing_the_Internet_using_Proxy">
-		 *      Accessing the internet using proxy</a>
-		 * @see <a href=
-		 *      "http://docs.oracle.com/javase/7/docs/api/java/net/doc-files/net-properties.html">
-		 *      Java net properties</a>
 		 * @throws Exception
 		 */
+		// https://wiki.eclipse.org/Hudson#Accessing_the_Internet_using_Proxy
+		// http://docs.oracle.com/javase/7/docs/api/java/net/doc-files/net-properties.html
 		static void proxySetup() throws Exception {
 			String keyNoProxy = "no_proxy";
 			String keyHttpProxy = "http_proxy";
@@ -519,21 +512,12 @@ public class WalkEncryptionTest {
 		}
 
 		/**
-		 * Permit s3 tests.
-		 *
-		 * @return result
-		 */
-		static boolean permitTests() {
-			return Boolean.parseBoolean(System.getProperty("jgit.s3.test"));
-		}
-
-		/**
 		 * Permit long tests on CI or with manual activation.
 		 *
 		 * @return result
 		 */
 		static boolean permitLongTests() {
-			return permitTests() || isBuildCI() || isProfileActive();
+			return isBuildCI() || isProfileActive();
 		}
 
 		/**
@@ -959,20 +943,10 @@ public class WalkEncryptionTest {
 		}
 
 		static void reportLongTests() {
-			if (permitTests()) {
-				logger.info("S3 encryption tests are enabled.");
-			} else {
-				logger.info("S3 encryption tests are disabled."
-						+ " Set Maven profile s3.test "
-						+ "or -Djgit.s3.test=true to enable them");
-
-			}
-			Assume.assumeTrue(permitTests());
 			if (permitLongTests()) {
 				logger.info("Long running tests are enabled.");
 			} else {
-				logger.warn("Long running tests are disabled."
-						+ " Set -Djgit.test.long=true to enable them");
+				logger.warn("Long running tests are disabled.");
 			}
 		}
 
@@ -1229,6 +1203,7 @@ public class WalkEncryptionTest {
 			policySetup(false);
 			cryptoTestIfCan(props);
 		}
+
 	}
 
 	/**
