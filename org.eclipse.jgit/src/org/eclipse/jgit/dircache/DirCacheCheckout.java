@@ -243,6 +243,7 @@ public class DirCacheCheckout {
 		walk = new NameConflictTreeWalk(repo);
 		builder = dc.builder();
 
+		walk.reset();
 		addTree(walk, headCommitTree);
 		addTree(walk, mergeCommitTree);
 		walk.addTree(new DirCacheBuildIterator(builder));
@@ -284,6 +285,7 @@ public class DirCacheCheckout {
 		builder = dc.builder();
 
 		walk = new NameConflictTreeWalk(repo);
+		walk.reset();
 		walk.addTree(mergeCommitTree);
 		walk.addTree(new DirCacheBuildIterator(builder));
 		walk.addTree(workingTree);
@@ -793,6 +795,7 @@ public class DirCacheCheckout {
 
 	private boolean isModified(String path) throws CorruptObjectException, IOException {
 		NameConflictTreeWalk tw = new NameConflictTreeWalk(repo);
+		tw.reset();
 		tw.addTree(new DirCacheIterator(dc));
 		tw.addTree(new FileTreeIterator(repo.getWorkTree(), repo.getFS(),
 				WorkingTreeOptions.createDefaultInstance()));

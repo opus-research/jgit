@@ -84,8 +84,6 @@ import org.eclipse.jgit.util.RawParseUtils;
  * permitted, even from concurrent threads.
  */
 public class TreeWalk {
-	private static final AbstractTreeIterator[] NO_TREES = {};
-
 	/**
 	 * Open a tree walk and filter to exactly one path.
 	 * <p>
@@ -228,7 +226,7 @@ public class TreeWalk {
 	public TreeWalk(final ObjectReader or) {
 		reader = or;
 		filter = TreeFilter.ALL;
-		trees = NO_TREES;
+		trees = new AbstractTreeIterator[] { new EmptyTreeIterator() };
 	}
 
 	/** @return the reader this walker is using to load objects. */
@@ -339,7 +337,7 @@ public class TreeWalk {
 
 	/** Reset this walker so new tree iterators can be added to it. */
 	public void reset() {
-		trees = NO_TREES;
+		trees = new AbstractTreeIterator[0];
 		advance = false;
 		depth = 0;
 	}
@@ -402,7 +400,7 @@ public class TreeWalk {
 	 * @throws IOException
 	 *             a loose object or pack file could not be read.
 	 */
-	public void reset(final AnyObjectId... ids) throws MissingObjectException,
+	public void reset(final AnyObjectId[] ids) throws MissingObjectException,
 			IncorrectObjectTypeException, CorruptObjectException, IOException {
 		final int oldLen = trees.length;
 		final int newLen = ids.length;
