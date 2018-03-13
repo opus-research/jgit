@@ -51,9 +51,9 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.ObjectWriter;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.WindowCursor;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTree;
@@ -70,13 +70,10 @@ public abstract class Merger {
 	/** The repository this merger operates on. */
 	protected final Repository db;
 
-	/** Reader to support {@link #walk} and other object loading. */
-	protected final ObjectReader reader;
-
 	/** A RevWalk for computing merge bases, or listing incoming commits. */
 	protected final RevWalk walk;
 
-	private ObjectInserter inserter;
+	private ObjectWriter writer;
 
 	/** The original objects supplied in the merge; this can be any tree-ish. */
 	protected RevObject[] sourceObjects;
@@ -95,8 +92,7 @@ public abstract class Merger {
 	 */
 	protected Merger(final Repository local) {
 		db = local;
-		reader = db.newObjectReader();
-		walk = new RevWalk(reader);
+		walk = new RevWalk(db);
 	}
 
 	/**
@@ -109,10 +105,10 @@ public abstract class Merger {
 	/**
 	 * @return an object writer to create objects in {@link #getRepository()}.
 	 */
-	public ObjectInserter getObjectInserter() {
-		if (inserter == null)
-			inserter = getRepository().newObjectInserter();
-		return inserter;
+	public ObjectWriter getObjectWriter() {
+		if (writer == null)
+			writer = new ObjectWriter(getRepository());
+		return writer;
 	}
 
 	/**
@@ -152,13 +148,7 @@ public abstract class Merger {
 		for (int i = 0; i < sourceObjects.length; i++)
 			sourceTrees[i] = walk.parseTree(sourceObjects[i]);
 
-		try {
-			return mergeImpl();
-		} finally {
-			if (inserter != null)
-				inserter.release();
-			reader.release();
-		}
+		return mergeImpl();
 	}
 
 	/**
@@ -212,7 +202,12 @@ public abstract class Merger {
 	 */
 	protected AbstractTreeIterator openTree(final AnyObjectId treeId)
 			throws IncorrectObjectTypeException, IOException {
-		return new CanonicalTreeParser(null, reader, treeId);
+		final WindowCursor curs = new WindowCursor();
+		try {
+			return new CanonicalTreeParser(null, db, treeId, curs);
+		} finally {
+			curs.release();
+		}
 	}
 
 	/**
