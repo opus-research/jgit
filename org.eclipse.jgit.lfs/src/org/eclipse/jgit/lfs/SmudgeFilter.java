@@ -48,7 +48,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import org.eclipse.jgit.lfs.lib.LongObjectId;
+import org.eclipse.jgit.lfs.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.FilterCommand;
 import org.eclipse.jgit.util.FilterCommandFactory;
@@ -68,9 +68,7 @@ import org.eclipse.jgit.util.FilterCommandFactory;
  */
 public class SmudgeFilter extends FilterCommand {
 	/**
-	 * The factory is responsible for creating instances of
-	 * {@link SmudgeFilter}. This factory can be registered using
-	 * {@link Repository#registerCommand(String, FilterCommandFactory)}
+	 * The factory is responsible for creating instances of {@link SmudgeFilter}
 	 */
 	public final static FilterCommandFactory FACTORY = new FilterCommandFactory() {
 		@Override
@@ -81,21 +79,16 @@ public class SmudgeFilter extends FilterCommand {
 	};
 
 	/**
-	 * Registers this filter to JGit by calling
-	 * {@link Repository#registerCommand(String, FilterCommandFactory)}
+	 * Registers this filter in JGit by calling
 	 */
 	public final static void register() {
-		Repository.registerCommand(
+		Repository.registerFilterCommand(
 				org.eclipse.jgit.lib.Constants.BUILTIN_FILTER_PREFIX
 						+ "lfs/smudge", //$NON-NLS-1$
 				FACTORY);
-	};
+	}
 
-	LongObjectId id;
-
-	private InputStream in;
-
-	private LfsUtil lfsUtil;
+	private Lfs lfs;
 
 	/**
 	 * @param db
@@ -106,10 +99,10 @@ public class SmudgeFilter extends FilterCommand {
 	public SmudgeFilter(Repository db, InputStream in, OutputStream out)
 			throws IOException {
 		super(in, out);
-		lfsUtil = new LfsUtil(db.getDirectory().toPath().resolve("lfs")); //$NON-NLS-1$
+		lfs = new Lfs(db.getDirectory().toPath().resolve(Constants.LFS));
 		LfsPointer res = LfsPointer.parseLfsPointer(in);
 		if (res != null) {
-			Path mediaFile = lfsUtil.getMediaFile(res.getOid());
+			Path mediaFile = lfs.getMediaFile(res.getOid());
 			if (Files.exists(mediaFile)) {
 				this.in = Files.newInputStream(mediaFile);
 			}

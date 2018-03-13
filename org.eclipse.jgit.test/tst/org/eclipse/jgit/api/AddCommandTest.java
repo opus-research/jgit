@@ -193,7 +193,7 @@ public class AddCommandTest extends RepositoryTestCase {
 		File f = writeTrashFile("src/a.txt", "foo\n");
 
 		// unregister the smudge filter. Only clean filter should be builtin
-		Repository.registerCommand(
+		Repository.registerFilterCommand(
 				org.eclipse.jgit.lib.Constants.BUILTIN_FILTER_PREFIX
 						+ "lfs/smudge", //$NON-NLS-1$
 				null);

@@ -40,7 +40,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs.internal;
+package org.eclipse.jgit.lfs.server.fs;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -53,13 +53,14 @@ import org.eclipse.jgit.lfs.errors.CorruptLongObjectException;
 import org.eclipse.jgit.lfs.lib.AnyLongObjectId;
 import org.eclipse.jgit.lfs.lib.Constants;
 import org.eclipse.jgit.lfs.lib.LongObjectId;
+import org.eclipse.jgit.lfs.server.internal.LfsServerText;
 
 /**
  * Output stream writing content to a {@link LockFile} which is committed on
  * close(). The stream checks if the hash of the stream content matches the
  * id.
  */
-public class AtomicObjectOutputStream extends OutputStream {
+class AtomicObjectOutputStream extends OutputStream {
 
 	private LockFile locked;
 
@@ -69,12 +70,7 @@ public class AtomicObjectOutputStream extends OutputStream {
 
 	private AnyLongObjectId id;
 
-	/**
-	 * @param path
-	 * @param id
-	 * @throws IOException
-	 */
-	public AtomicObjectOutputStream(Path path, AnyLongObjectId id)
+	AtomicObjectOutputStream(Path path, AnyLongObjectId id)
 			throws IOException {
 		locked = new LockFile(path.toFile());
 		locked.lock();
@@ -113,15 +109,12 @@ public class AtomicObjectOutputStream extends OutputStream {
 		if (!contentHash.equals(id)) {
 			abort();
 			throw new CorruptLongObjectException(id, contentHash,
-					MessageFormat.format(LfsText.get().corruptLongObject,
+					MessageFormat.format(LfsServerText.get().corruptLongObject,
 							contentHash, id));
 		}
 	}
 
-	/**
-	 * Aborts the stream. Temporary file will be deleted
-	 */
-	public void abort() {
+	void abort() {
 		locked.unlock();
 		aborted = true;
 	}
