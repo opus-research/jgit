@@ -81,6 +81,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String atLeastTwoFiltersNeeded;
 	/***/ public String atomicPushNotSupported;
 	/***/ public String atomicRefUpdatesNotSupported;
+	/***/ public String atomicSymRefNotSupported;
 	/***/ public String authenticationNotSupported;
 	/***/ public String badBase64InputCharacterAt;
 	/***/ public String badEntryDelimiter;
@@ -100,6 +101,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String blobNotFound;
 	/***/ public String blobNotFoundForPath;
 	/***/ public String blockSizeNotPowerOf2;
+	/***/ public String bothRefTargetsMustNotBeNull;
 	/***/ public String branchNameInvalid;
 	/***/ public String buildingBitmaps;
 	/***/ public String cachedPacksPreventsIndexCreation;
@@ -493,6 +495,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String months;
 	/***/ public String monthsAgo;
 	/***/ public String multipleMergeBasesFor;
+	/***/ public String nameMustNotBeNullOrEmpty;
 	/***/ public String need2Arguments;
 	/***/ public String needPackOut;
 	/***/ public String needsAtLeastOneEntry;
@@ -508,7 +511,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String noMergeHeadSpecified;
 	/***/ public String nonBareLinkFilesNotSupported;
 	/***/ public String noSuchRef;
-	/***/ public String noSuchSubmodule;
 	/***/ public String notABoolean;
 	/***/ public String notABundle;
 	/***/ public String notADIRCFile;
