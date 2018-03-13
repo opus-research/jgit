@@ -159,13 +159,14 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 			monitor.beginTask(MessageFormat.format(
 					JGitText.get().subscribeStart, subscriber.getKey()), 2);
 
+			write("subscribe");
 			// Send restart
 			String restart = subscriber.getRestartToken();
 			if (restart != null) {
 				write("restart " + restart);
 				String number = subscriber.getLastPackNumber();
 				if (number != null)
-					write("last-pack " + number);
+					write("last-pack-number " + number);
 			}
 			pckOut.end();
 
@@ -205,7 +206,7 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 			write("done");
 			monitor.update(1);
 
-			if (!readResponseHeader(subscriber))
+			if (!readResponseHeader())
 				return;
 
 			monitor.update(1);
@@ -219,9 +220,14 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 				String line = pckIn.readString();
 				if (line.equals("heartbeat"))
 					continue;
-				if (line.startsWith("change-restart-token ")) {
+				if (line.startsWith("restart-token ")) {
 					subscriber.setRestartToken(line.substring(
-							"change-restart-token ".length()));
+							"restart-token ".length()));
+					continue;
+				}
+				if (line.startsWith("heartbeat-interval ")) {
+					transport.setTimeout(Integer.parseInt(line.substring(
+							"heartbeat-interval ".length())) + LATENCY_TIMEOUT);
 					continue;
 				}
 				if (!line.startsWith("update "))
@@ -240,11 +246,11 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 				monitor.endTask();
 
 				line = pckIn.readString();
-				if (!line.startsWith("sequence "))
+				if (!line.startsWith("pack-number "))
 					throw new TransportException(MessageFormat.format(
-							JGitText.get().expectedGot, "sequence", line));
+							JGitText.get().expectedGot, "pack-number", line));
 				subscriber.setLastPackNumber(line.substring(
-						"sequence ".length()));
+						"pack-number ".length()));
 			}
 		} finally {
 			close();
@@ -261,46 +267,36 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 	public void doSubscribeAdvertisement(Subscriber subscriber)
 			throws IOException {
 		try {
-			pckOut.end();
+			pckOut.writeString("advertisement");
 			for (String repository : subscriber.getAllRepositories()) {
-				write("repository " + repository);
-				pckOut.end();
+				write("repositoryaccess " + repository);
 			}
-			write("done advertisement");
+			pckOut.end();
 
-			readResponseHeader(subscriber);
+			readResponseHeader();
 		} finally {
 			close();
 		}
 	}
 
-	private boolean readResponseHeader(Subscriber subscriber)
+	/**
+	 * @return true to begin receiving publishes, false for reconnect, exception
+	 *         for remote error.
+	 * @throws IOException
+	 * @throws TransportException
+	 */
+	private boolean readResponseHeader()
 			throws IOException, TransportException {
-		// Read restart token and heartbeat interval
 		String line = pckIn.readString();
 		if ("reconnect".equals(line))
 			return false;
-
+		if (line.startsWith("ERR "))
+			throw new TransportException(line.substring("ERR ".length()));
 		if (line.startsWith("error: "))
 			throw new TransportException(line.substring("error: ".length()));
-		if (!line.startsWith("restart-token "))
+		if (!line.equals("ACK"))
 			throw new TransportException(MessageFormat.format(
-					JGitText.get().expectedGot, "restart-token", line));
-		subscriber.setRestartToken(line.substring(
-				"restart-token ".length()));
-		line = pckIn.readString();
-
-		if (!line.startsWith("heartbeat-interval "))
-			throw new TransportException(MessageFormat.format(
-					JGitText.get().expectedGot, "heartbeat-interval",
-					line));
-		transport.setTimeout(Integer.parseInt(
-				line.substring("heartbeat-interval ".length()))
-				+ LATENCY_TIMEOUT);
-
-		if ((line = pckIn.readString()) != PacketLineIn.END)
-			throw new TransportException(MessageFormat.format(
-					JGitText.get().expectedGot, "END", line));
+					JGitText.get().expectedGot, "ACK", line));
 		return true;
 	}
 
