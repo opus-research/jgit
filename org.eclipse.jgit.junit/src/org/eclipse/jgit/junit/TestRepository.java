@@ -497,8 +497,6 @@ public class TestRepository {
 		 *         the branch already exists, the commit builder will have its
 		 *         first parent as the current commit and its tree will be
 		 *         initialized to the current files.
-		 * @throws Exception
-		 *             the commit builder can't read the current branch state
 		 */
 		public CommitBuilder commit() throws Exception {
 			return new CommitBuilder(this);
