@@ -228,7 +228,7 @@ public class InMemoryRepository extends DfsRepository {
 			return 0;
 		}
 
-		public void setReadAheadBuffer(int b) {
+		public void setReadAheadBytes(int b) {
 			// Unnecessary on a byte array.
 		}
 	}
