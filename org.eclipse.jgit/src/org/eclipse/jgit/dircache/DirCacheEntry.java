@@ -745,7 +745,7 @@ public class DirCacheEntry {
 		}
 	}
 
-	static String toString(final byte[] path) {
+	private static String toString(final byte[] path) {
 		return Constants.CHARSET.decode(ByteBuffer.wrap(path)).toString();
 	}
 
