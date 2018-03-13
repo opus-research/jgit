@@ -46,12 +46,9 @@ package org.eclipse.jgit.internal.storage.reftable;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_FOOTER_LEN;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_HEADER_LEN;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_BLOCK_TYPE;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.REF_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VERSION_1;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.isFileHeaderMagic;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.text.MessageFormat;
@@ -59,10 +56,7 @@ import java.util.Arrays;
 import java.util.zip.CRC32;
 
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.io.BlockSource;
-import org.eclipse.jgit.internal.storage.reftable.BlockWriter.LogEntry;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.ReflogEntry;
 import org.eclipse.jgit.util.NB;
 
 /**
@@ -72,40 +66,17 @@ import org.eclipse.jgit.util.NB;
  * instance to read from the same file.
  */
 public class ReftableReader extends RefCursor {
-	/** @return an empty reftable. */
-	public static ReftableReader emptyTable() {
-		try {
-			int len = FILE_HEADER_LEN + FILE_FOOTER_LEN;
-			ByteArrayOutputStream buf = new ByteArrayOutputStream(len);
-			new ReftableWriter().begin(buf).finish();
-			return new ReftableReader(BlockSource.from(buf.toByteArray()));
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
-	}
-
 	private final BlockSource src;
 
+	/** Size of the reftable, minus index and footer. */
+	private long size;
 	private int blockSize;
-	private long refEnd;
+	private int indexSize = -1;
 
-	private long logOffset;
-	private long logEnd;
-
-	private long refIndexOffset = -1;
-	private long logIndexOffset = -1;
-
-	private BlockReader refIndex;
-	private BlockReader logIndex;
+	private BlockReader index;
 	private BlockReader block;
-
-	private byte blockType;
-	private long scanEnd;
-
-	private byte[] match;
+	private String seeking;
 	private Ref ref;
-	private long logTimeUsec;
-	private ReflogEntry log;
 
 	/**
 	 * Initialize a new reftable reader.
@@ -122,78 +93,39 @@ public class ReftableReader extends RefCursor {
 		if (blockSize == 0) {
 			readFileHeader();
 		}
-		long end = refEnd > 0 ? refEnd : (src.size() - FILE_FOOTER_LEN);
-		initScan(REF_BLOCK_TYPE, end);
-		src.adviseSequentialRead(0, end);
+		src.adviseSequentialRead(0, size());
 		block = readBlock(0);
+		seeking = null;
+		ref = null;
 	}
 
 	@Override
 	public void seek(String refName) throws IOException {
-		byte[] rn = refName.getBytes(UTF_8);
-		byte[] key = rn;
-		if (key[key.length - 1] == '/') {
-			key = Arrays.copyOf(key, key.length + 1);
-			key[key.length - 1] = '\1';
+		byte[] name = refName.getBytes(UTF_8);
+		if (name[name.length - 1] == '/') {
+			name = Arrays.copyOf(name, name.length + 1);
+			name[name.length - 1] = '\1';
 		}
 
-		initRefIndex();
-		initScan(REF_BLOCK_TYPE, refEnd);
-		match = rn;
-		seek(key, refIndex, 0, refEnd);
-	}
-
-	@Override
-	public void seekToFirstLog() throws IOException {
-		initLogIndex();
-		initScan(LOG_BLOCK_TYPE, logEnd);
-		if (logOffset > 0) {
-			src.adviseSequentialRead(logOffset, logEnd);
-			block = readBlock(logOffset);
-		}
-	}
-
-	@Override
-	public void seekLog(String refName, long timeUsec) throws IOException {
-		byte[] key = LogEntry.key(refName, timeUsec);
-
-		initLogIndex();
-		initScan(LOG_BLOCK_TYPE, logEnd);
-		match = refName.getBytes(UTF_8);
-		if (logOffset > 0) {
-			seek(key, logIndex, logOffset, logEnd);
-		}
-	}
-
-	private void initScan(byte bt, long end) {
-		blockType = bt;
-		scanEnd = end;
-		block = null;
-		match = null;
+		seeking = refName;
 		ref = null;
-		log = null;
-	}
 
-	private void seek(byte[] key, BlockReader idx, long start, long end)
-			throws IOException {
-		if (idx != null) {
-			long blockOffset = idx.seek(key) <= 0
-					? idx.readIndex()
-					: ((blocksIn(start, end) - 1) * blockSize);
-			block = readBlock(blockOffset);
-			block.seek(key);
+		if (initIndex()) {
+			int blockIdx = index.seek(name) <= 0
+					? index.readIndexBlock()
+					: (blockCount() - 1);
+			block = readBlock(((long) blockIdx) * blockSize);
+			block.seek(name);
 		}
-		binarySearch(key, start, end);
+		binarySearch(name, 0, blockCount());
 	}
 
-	private void binarySearch(byte[] name, long startPos, long endPos)
+	private void binarySearch(byte[] name, int low, int end)
 			throws IOException {
-		int low = (int) (startPos / blockSize);
-		int end = blocksIn(startPos, endPos);
 		do {
 			int mid = (low + end) >>> 1;
 			block = readBlock(((long) mid) * blockSize);
-			if (blockType != block.type()) {
+			if (!block.isRefBlock()) {
 				break;
 			}
 			int cmp = block.seek(name);
@@ -209,60 +141,38 @@ public class ReftableReader extends RefCursor {
 
 	@Override
 	public boolean next() throws IOException {
-		for (;;) {
-			if (block == null || blockType != block.type()) {
-				return done();
-			} else if (!block.next()) {
-				long p = block.blockEndPosition();
-				if (p >= scanEnd) {
-					return done();
-				}
-				block = readBlock(p);
-				continue;
-			}
-
-			block.parseEntryName();
-			if (match != null && !block.checkNameMatches(match)) {
-				block.skipValue();
-				return done();
-			} else if (blockType == REF_BLOCK_TYPE) {
-				ref = block.readRef();
-				if (!includeDeletes && wasDeleted()) {
-					continue;
-				}
-			} else if (blockType == LOG_BLOCK_TYPE) {
-				logTimeUsec = block.readLogTimeUsec();
-				log = block.readLog(logTimeUsec);
-			}
-			return true;
+		if (!block.isRefBlock()) {
+			ref = null;
+			return false;
+		} else if (block.next()) {
+			return tryNext();
 		}
-	}
 
-	private boolean done() {
-		block = null;
+		long p = block.position() + blockSize;
+		if (p < size()) {
+			block = readBlock(p);
+			if (block.isRefBlock() && block.next()) {
+				return tryNext();
+			}
+		}
 		ref = null;
-		log = null;
 		return false;
 	}
 
-	@Override
-	public String getRefName() {
-		return ref != null ? ref.getName() : block.name();
+	private boolean tryNext() throws IOException {
+		ref = block.readRef();
+		if (seeking != null) {
+			String name = ref.getName();
+			return seeking.endsWith("/") //$NON-NLS-1$
+					? name.startsWith(seeking)
+					: name.equals(seeking);
+		}
+		return true;
 	}
 
 	@Override
 	public Ref getRef() {
 		return ref;
-	}
-
-	@Override
-	public long getReflogTimeUsec() {
-		return logTimeUsec;
-	}
-
-	@Override
-	public ReflogEntry getReflogEntry() {
-		return log;
 	}
 
 	private void readFileHeader() throws IOException {
@@ -279,25 +189,8 @@ public class ReftableReader extends RefCursor {
 			throw new IOException(JGitText.get().invalidReftableCRC);
 		}
 
-		refIndexOffset = NB.decodeInt64(ftr, 8);
-		logOffset = NB.decodeInt64(ftr, 16);
-		logIndexOffset = NB.decodeInt64(ftr, 24);
-
-		if (refIndexOffset > 0) {
-			refEnd = refIndexOffset;
-		} else if (logOffset > 0) {
-			refEnd = logOffset;
-		} else {
-			refEnd = src.size() - ftrLen;
-		}
-
-		if (logOffset > 0) {
-			if (logIndexOffset > 0) {
-				logEnd = logIndexOffset;
-			} else {
-				logEnd = src.size() - ftrLen;
-			}
-		}
+		indexSize = NB.decodeInt32(ftr, 8);
+		size = src.size() - (indexSize + FILE_FOOTER_LEN);
 	}
 
 	private byte[] readHeaderOrFooter(long pos, int len) throws IOException {
@@ -326,38 +219,20 @@ public class ReftableReader extends RefCursor {
 		return tmp;
 	}
 
-	private void initRefIndex() throws IOException {
-		if (blockSize == 0 || refIndexOffset < 0) {
+	private boolean initIndex() throws IOException {
+		if (blockSize == 0 || indexSize < 0) {
 			readFileFooter();
 		}
-		if (refIndex == null && refIndexOffset > 0) {
-			long guessedEnd = logOffset > 0
-					? logOffset
-					: (src.size() - FILE_FOOTER_LEN);
-			int guessedSize = (int) (guessedEnd - refIndexOffset);
-
-			refIndex = new BlockReader();
-			refIndex.readFrom(src, refIndexOffset, guessedSize);
-			refIndex.verifyIndex();
+		if (index == null && indexSize > 0) {
+			index = new BlockReader();
+			index.readFrom(src, size(), indexSize);
+			index.verifyIndex();
 		}
-	}
-
-	private void initLogIndex() throws IOException {
-		if (blockSize == 0 || logIndexOffset < 0) {
-			readFileFooter();
-		}
-		if (logIndex == null && logIndexOffset > 0) {
-			long guessedEnd = (src.size() - FILE_FOOTER_LEN);
-			int guessedSize = (int) (guessedEnd - logIndexOffset);
-
-			logIndex = new BlockReader();
-			logIndex.readFrom(src, logIndexOffset, guessedSize);
-			logIndex.verifyIndex();
-		}
+		return index != null;
 	}
 
 	private BlockReader readBlock(long position) throws IOException {
-		long end = scanEnd;
+		long end = size();
 		int sz = blockSize;
 		if (position + sz > end) {
 			sz = (int) (end - position); // last block may omit padding.
@@ -368,9 +243,17 @@ public class ReftableReader extends RefCursor {
 		return b;
 	}
 
-	private int blocksIn(long pos, long end) {
-		int blocks = (int) ((end - pos) / blockSize);
+	private int blockCount() throws IOException {
+		long end = size();
+		int blocks = (int) (end / blockSize);
 		return end % blockSize == 0 ? blocks : (blocks + 1);
+	}
+
+	private long size() throws IOException {
+		if (size == 0) {
+			size = src.size() - FILE_FOOTER_LEN; // assume no index
+		}
+		return size;
 	}
 
 	@Override

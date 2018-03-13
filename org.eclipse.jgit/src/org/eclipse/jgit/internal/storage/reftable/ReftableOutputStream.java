@@ -43,67 +43,48 @@
 
 package org.eclipse.jgit.internal.storage.reftable;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.INDEX_BLOCK_TYPE;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_BLOCK_TYPE;
 import static org.eclipse.jgit.lib.Constants.OBJECT_ID_LENGTH;
 
+import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Arrays;
-import java.util.zip.Deflater;
-import java.util.zip.DeflaterOutputStream;
 
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.util.NB;
-import org.eclipse.jgit.util.io.CountingOutputStream;
 
 /**
  * Wrapper to assist formatting a reftable to an {@link OutputStream}.
  * <p>
- * Internally buffers at block size boundaries, flushing only complete blocks to
- * the {@code OutputStream}.
+ * Assumes the caller will supply a buffered {@code OutputStream}.
  */
-class ReftableOutputStream extends OutputStream {
-	private final byte[] tmp = new byte[10];
-	private final CountingOutputStream out;
-	private final Deflater deflater;
-	private final DeflaterOutputStream compressor;
+class ReftableOutputStream extends FilterOutputStream {
+	private final byte[] tmp = new byte[OBJECT_ID_LENGTH];
+	private final int blockSize;
 
-	private int blockType;
-	private int blockSize;
-	private int blockStart;
-	private byte[] blockBuf;
 	private int cur;
-
-	private int blockCount;
+	private long size;
 	private long paddingUsed;
+	private int blockCount;
 
-	ReftableOutputStream(OutputStream os, int bs) {
-		blockSize = bs;
-		blockBuf = new byte[bs];
-
-		out = new CountingOutputStream(os);
-		deflater = new Deflater(Deflater.BEST_COMPRESSION);
-		compressor = new DeflaterOutputStream(out, deflater);
-	}
-
-	void setBlockSize(int bs) {
-		blockSize = bs;
+	ReftableOutputStream(OutputStream os, int blockSize) {
+		super(os);
+		this.blockSize = blockSize;
 	}
 
 	@Override
-	public void write(int b) {
-		ensureBytesAvailableInBlockBuf(1);
-		blockBuf[cur++] = (byte) b;
+	public void write(int b) throws IOException {
+		out.write(b);
+		cur++;
+		size++;
 	}
 
 	@Override
-	public void write(byte[] b, int off, int cnt) {
-		ensureBytesAvailableInBlockBuf(cnt);
-		System.arraycopy(b, off, blockBuf, cur, cnt);
+	public void write(byte[] b, int off, int cnt) throws IOException {
+		out.write(b, off, cnt);
 		cur += cnt;
+		size += cnt;
 	}
 
 	int bytesWrittenInBlock() {
@@ -122,12 +103,11 @@ class ReftableOutputStream extends OutputStream {
 		return blockCount;
 	}
 
-	/** @return bytes flushed; excludes {@link #bytesWrittenInBlock()}. */
 	long size() {
-		return out.getCount();
+		return size;
 	}
 
-	static int computeVarintSize(long val) {
+	static int computeVarintSize(int val) {
 		int n = 1;
 		for (; (val >>>= 7) != 0; n++) {
 			val--;
@@ -135,7 +115,7 @@ class ReftableOutputStream extends OutputStream {
 		return n;
 	}
 
-	void writeVarint(long val) {
+	void writeVarint(int val) throws IOException {
 		int n = tmp.length;
 		tmp[--n] = (byte) (val & 0x7f);
 		while ((val >>>= 7) != 0) {
@@ -144,89 +124,33 @@ class ReftableOutputStream extends OutputStream {
 		write(tmp, n, tmp.length - n);
 	}
 
-	void writeInt16(int val) {
-		ensureBytesAvailableInBlockBuf(2);
-		NB.encodeInt16(blockBuf, cur, val);
-		cur += 2;
+	void writeInt32(int val) throws IOException {
+		NB.encodeInt32(tmp, 0, val);
+		write(tmp, 0, 4);
 	}
 
-	void writeInt32(int val) {
-		ensureBytesAvailableInBlockBuf(4);
-		NB.encodeInt32(blockBuf, cur, val);
-		cur += 4;
+	void write(ObjectId id) throws IOException {
+		id.copyRawTo(tmp, 0);
+		write(tmp, 0, OBJECT_ID_LENGTH);
 	}
 
-	void writeId(ObjectId id) {
-		ensureBytesAvailableInBlockBuf(OBJECT_ID_LENGTH);
-		id.copyRawTo(blockBuf, cur);
-		cur += OBJECT_ID_LENGTH;
-	}
-
-	void writeVarintString(String s) {
-		writeVarintString(s.getBytes(UTF_8));
-	}
-
-	void writeVarintString(byte[] msg) {
-		writeVarint(msg.length);
-		write(msg, 0, msg.length);
-	}
-
-	private void ensureBytesAvailableInBlockBuf(int cnt) {
-		if (cur + cnt > blockBuf.length) {
-			int n = Math.max(cur + cnt, blockBuf.length * 2);
-			blockBuf = Arrays.copyOf(blockBuf, n);
+	void pad(int len) throws IOException {
+		paddingUsed += len;
+		Arrays.fill(tmp, (byte) 0);
+		while (len > 0) {
+			int n = Math.min(len, tmp.length);
+			write(tmp, 0, n);
+			len -= n;
 		}
 	}
 
-	void beginBlock(byte id) {
-		blockType = id;
-		blockStart = cur;
-		cur += 4; // reserve space for 4-byte block header.
-	}
-
-	void flushBlock() throws IOException {
-		if (cur > blockSize && !isIndexBlock()) {
+	void finishBlock(boolean mustFillBlock) throws IOException {
+		if (cur < blockSize && mustFillBlock) {
+			throw new IOException(JGitText.get().underflowedReftableBlock);
+		} else if (cur > blockSize) {
 			throw new IOException(JGitText.get().overflowedReftableBlock);
 		}
-		NB.encodeInt32(blockBuf, blockStart, (blockType << 24) | cur);
-
-		if (blockType == LOG_BLOCK_TYPE) {
-			// Log blocks are deflated after the block header.
-			deflater.reset();
-			out.write(blockBuf, 0, 4);
-			compressor.write(blockBuf, 4, cur - 4);
-			compressor.finish();
-		} else {
-			// Other blocks are uncompressed.
-			out.write(blockBuf, 0, cur);
-		}
-
 		cur = 0;
-		blockType = 0;
-		blockStart = 0;
 		blockCount++;
-	}
-
-	void padBetweenBlocksToNextBlock() throws IOException {
-		long m = size() % blockSize;
-		if (m > 0) {
-			int pad = blockSize - (int) m;
-			ensureBytesAvailableInBlockBuf(pad);
-			Arrays.fill(blockBuf, 0, pad, (byte) 0);
-			out.write(blockBuf, 0, pad);
-			paddingUsed += pad;
-		}
-	}
-
-	private boolean isIndexBlock() {
-		return (blockType & INDEX_BLOCK_TYPE) == INDEX_BLOCK_TYPE;
-	}
-
-	void finishFile() throws IOException {
-		// File footer doesn't need patching for the block start.
-		// Just flush what has been buffered.
-		out.write(blockBuf, 0, cur);
-		cur = 0;
-		deflater.end();
 	}
 }

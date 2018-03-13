@@ -47,18 +47,12 @@ import static java.lang.Math.log;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_FOOTER_LEN;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_HEADER_LEN;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_HEADER_MAGIC;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.INDEX_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VERSION_1;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.zip.CRC32;
 
-import org.eclipse.jgit.annotations.Nullable;
-import org.eclipse.jgit.internal.storage.reftable.BlockWriter.LogEntry;
-import org.eclipse.jgit.internal.storage.reftable.BlockWriter.RefEntry;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.util.NB;
 
@@ -69,56 +63,26 @@ import org.eclipse.jgit.util.NB;
  * all references. A {@link ReftableWriter} is single-use, and not thread-safe.
  */
 public class ReftableWriter {
-	private int refBlockSize = 4 << 10;
-	private int logBlockSize;
 	private int restartInterval;
+	private int blockSize = 4 << 10;
 
 	private ReftableOutputStream out;
-
-	private BlockWriter refIndex;
-	private BlockWriter logIndex;
-	private BlockWriter cur;
-
-	private String logLastRef = ""; //$NON-NLS-1$
-	private long logLastTimeUsec;
-
-	private long logOffset;
-	private long refIndexOffset;
-	private long logIndexOffset;
-
-	private long refBytes;
-	private long logBytes;
-	private int refBlocks;
-	private int refIndexSize;
+	private IndexBlockWriter idx;
+	private RefBlockWriter cur;
 	private Stats stats;
 
 	/**
 	 * @param szBytes
-	 *            desired output block size for references, in bytes.
+	 *            desired output block size in bytes.
 	 * @return {@code this}
 	 */
-	public ReftableWriter setRefBlockSize(int szBytes) {
+	public ReftableWriter setBlockSize(int szBytes) {
 		if (out != null) {
 			throw new IllegalStateException();
 		} else if (szBytes <= 1024 || szBytes >= (1 << 24)) {
 			throw new IllegalArgumentException();
 		}
-		refBlockSize = szBytes;
-		return this;
-	}
-
-	/**
-	 * @param szBytes
-	 *            desired output block size for log entries, in bytes.
-	 * @return {@code this}
-	 */
-	public ReftableWriter setLogBlockSize(int szBytes) {
-		if (out != null) {
-			throw new IllegalStateException();
-		} else if (szBytes <= 1024 || szBytes >= (1 << 24)) {
-			throw new IllegalArgumentException();
-		}
-		logBlockSize = szBytes;
+		blockSize = szBytes;
 		return this;
 	}
 
@@ -139,6 +103,11 @@ public class ReftableWriter {
 		return this;
 	}
 
+	/** @return statistics of the last written reftable. */
+	public Stats getStats() {
+		return stats;
+	}
+
 	/**
 	 * Begin writing the reftable.
 	 * <p>
@@ -154,14 +123,11 @@ public class ReftableWriter {
 	 */
 	public ReftableWriter begin(OutputStream os) throws IOException {
 		if (restartInterval <= 0) {
-			restartInterval = refBlockSize < (60 << 10) ? 16 : 64;
+			restartInterval = blockSize < (60 << 10) ? 16 : 64;
 		}
 
-		int ri = restartInterval;
-		refIndex = new BlockWriter(INDEX_BLOCK_TYPE, refBlockSize, ri);
-		out = new ReftableOutputStream(os, refBlockSize);
-		logLastRef = ""; //$NON-NLS-1$
-		logLastTimeUsec = 0;
+		idx = new IndexBlockWriter(restartInterval);
+		out = new ReftableOutputStream(os, blockSize);
 		writeFileHeader();
 		return this;
 	}
@@ -177,112 +143,18 @@ public class ReftableWriter {
 	 * @throws IOException
 	 *             reftable cannot be written.
 	 */
-	public ReftableWriter writeRef(Ref ref) throws IOException {
-		return writeEntry(refIndex, new RefEntry(ref));
-	}
-
-	/**
-	 * Write one reflog entry to the reftable.
-	 * <p>
-	 * Reflog entries must be written in reference name and descending time
-	 * (most recent first) order. If duplicate times are detected by this
-	 * method, the time of older records will be adjusted backwards by a few
-	 * microseconds to maintain uniqueness.
-	 *
-	 * @param name
-	 *            name of the reference.
-	 * @param who
-	 *            committer of the reflog entry.
-	 * @param oldId
-	 *            prior id; pass {@link ObjectId#zeroId()} for creations.
-	 * @param newId
-	 *            new id; pass {@link ObjectId#zeroId()} for deletions.
-	 * @param message
-	 *            optional message (may be null).
-	 * @return {@code this}
-	 * @throws IOException
-	 *             reftable cannot be written.
-	 */
-	public ReftableWriter writeLog(String name, PersonIdent who, ObjectId oldId,
-			ObjectId newId, @Nullable String message) throws IOException {
-		long timeUsec = who.getWhen().getTime() * 1000L + 999L;
-		if (logLastRef.equals(name) && timeUsec >= logLastTimeUsec) {
-			timeUsec = logLastTimeUsec - 1;
-		}
-		return writeLog(name, timeUsec, who, oldId, newId, message);
-	}
-
-	/**
-	 * Write one reflog entry to the reftable.
-	 * <p>
-	 * Reflog entries must be written in reference name and descending time
-	 * (most recent first) order.
-	 *
-	 * @param name
-	 *            name of the reference.
-	 * @param timeUsec
-	 *            time in microseconds since the epoch of the log event. This
-	 *            timestamp must be unique within the scope of {@code name}.
-	 * @param who
-	 *            committer of the reflog entry.
-	 * @param oldId
-	 *            prior id; pass {@link ObjectId#zeroId()} for creations.
-	 * @param newId
-	 *            new id; pass {@link ObjectId#zeroId()} for deletions.
-	 * @param message
-	 *            optional message (may be null).
-	 * @return {@code this}
-	 * @throws IOException
-	 *             reftable cannot be written.
-	 */
-	public ReftableWriter writeLog(String name, long timeUsec, PersonIdent who,
-			ObjectId oldId, ObjectId newId, @Nullable String message)
-					throws IOException {
-		String msg = message != null ? message : ""; //$NON-NLS-1$
-		beginLog();
-		logLastRef = name;
-		logLastTimeUsec = timeUsec;
-		return writeEntry(logIndex,
-				new LogEntry(name, timeUsec, who, oldId, newId, msg));
-	}
-
-	private void beginLog() throws IOException {
-		if (logOffset == 0) {
-			finishRef(); // close prior ref blocks and their index, if present.
-
-			if (logBlockSize == 0) {
-				logBlockSize = refBlockSize * 2;
-			}
-			logIndex = new BlockWriter(INDEX_BLOCK_TYPE, logBlockSize,
-					restartInterval);
-			out.setBlockSize(logBlockSize);
-			logOffset = out.size();
-		}
-	}
-
-	private ReftableWriter writeEntry(
-			BlockWriter idx,
-			BlockWriter.Entry entry)
-			throws IOException {
+	public ReftableWriter write(Ref ref) throws IOException {
 		if (cur == null) {
-			beginBlock(entry);
-		} else if (!cur.tryAdd(entry)) {
-			idx.addIndex(cur.lastKey(), out.size());
-			cur.writeTo(out);
-			if (entry instanceof RefEntry) {
-				out.padBetweenBlocksToNextBlock();
-			}
-			beginBlock(entry);
+			int bs = out.bytesAvailableInBlock();
+			cur = new RefBlockWriter(bs, restartInterval, ref);
+		} else if (!cur.tryAdd(ref)) {
+			idx.addBlock(cur);
+			cur.writeTo(out, true);
+
+			int bs = out.bytesAvailableInBlock();
+			cur = new RefBlockWriter(bs, restartInterval, ref);
 		}
 		return this;
-	}
-
-	private void beginBlock(BlockWriter.Entry entry)
-			throws BlockSizeTooSmallException {
-		byte type = entry.blockType();
-		int bs = out.bytesAvailableInBlock();
-		cur = new BlockWriter(type, bs, restartInterval);
-		cur.addFirst(entry);
 	}
 
 	/**
@@ -293,143 +165,71 @@ public class ReftableWriter {
 	 *             reftable cannot be written.
 	 */
 	public ReftableWriter finish() throws IOException {
-		finishRef();
-		finishLog();
+		if (cur != null) {
+			idx.addBlock(cur);
+			boolean useIdx = idx.shouldWriteIndex();
+			cur.writeTo(out, useIdx);
+			if (useIdx) {
+				idx.writeTo(out);
+			}
+		}
 		writeFileFooter();
 
-		stats = new Stats(this, out, refIndex);
-		refIndex = null;
-		logIndex = null;
+		stats = new Stats(this, out, idx);
+		idx = null;
 		cur = null;
 		out = null;
 		return this;
 	}
 
-	private void finishRef() throws IOException {
-		if (logOffset == 0 && cur != null) {
-			refBlocks = out.blockCount() + 1;
-			refIndexOffset = finishBlockMaybeWriteIndex(refIndex);
-			if (refIndexOffset > 0) {
-				refIndexSize = (int) (out.size() - refIndexOffset);
-			}
-			refBytes = out.size();
-		}
-	}
-
-	private void finishLog() throws IOException {
-		if (logOffset > 0 && cur != null) {
-			logIndexOffset = finishBlockMaybeWriteIndex(logIndex);
-			logBytes = out.size() - refBytes;
-		}
-	}
-
-	private long finishBlockMaybeWriteIndex(BlockWriter idx)
-			throws IOException {
-		idx.addIndex(cur.lastKey(), out.size());
-		cur.writeTo(out);
-		cur = null;
-
-		int mustHaveIndex = idx == refIndex ? 4 : 1;
-		if (idx.entryCount() > mustHaveIndex) {
-			if (idx == refIndex) { // only pad before the ref_index
-				out.padBetweenBlocksToNextBlock();
-			}
-			long offset = out.size();
-			idx.writeTo(out);
-			return offset;
-		} else {
-			return 0;
-		}
-	}
-
 	private void writeFileHeader() throws IOException {
 		byte[] hdr = new byte[FILE_HEADER_LEN];
 		System.arraycopy(FILE_HEADER_MAGIC, 0, hdr, 0, 4);
-		NB.encodeInt32(hdr, 4, (VERSION_1 << 24) | refBlockSize);
+		NB.encodeInt32(hdr, 4, (VERSION_1 << 24) | blockSize);
 		out.write(hdr);
 	}
 
 	private void writeFileFooter() throws IOException {
-		int ftrLen = FILE_FOOTER_LEN;
-		byte[] ftr = new byte[ftrLen];
+		byte[] ftr = new byte[FILE_FOOTER_LEN];
 		System.arraycopy(FILE_HEADER_MAGIC, 0, ftr, 0, 4);
-		NB.encodeInt32(ftr, 4, (VERSION_1 << 24) | refBlockSize);
-
-		NB.encodeInt64(ftr, 8, refIndexOffset);
-		NB.encodeInt64(ftr, 16, logOffset);
-		NB.encodeInt64(ftr, 24, logIndexOffset);
+		NB.encodeInt32(ftr, 4, (VERSION_1 << 24) | blockSize);
+		NB.encodeInt32(ftr, 8, idx.bytesInIndex());
 
 		CRC32 crc = new CRC32();
-		crc.update(ftr, 0, ftrLen - 4);
-		NB.encodeInt32(ftr, ftrLen - 4, (int) crc.getValue());
+		crc.update(ftr, 0, 12);
+		NB.encodeInt32(ftr, 12, (int) crc.getValue());
 
 		out.write(ftr);
-		out.finishFile();
-	}
-
-	/** @return statistics of the last written reftable. */
-	public Stats getStats() {
-		return stats;
 	}
 
 	/** Statistics about a written reftable. */
 	public static class Stats {
-		private final int refBlockSize;
-		private final int logBlockSize;
+		private final int blockSize;
 		private final int restartInterval;
-
-		private final long refBytes;
-		private final long logBytes;
-		private final long paddingUsed;
 		private final long totalBytes;
-		private final int refBlocks;
+		private final int blockCount;
+		private final long paddingUsed;
+		private final int indexKeys;
+		private final int indexSize;
 
-		private final int refIndexKeys;
-		private final int refIndexSize;
-
-		Stats(ReftableWriter w, ReftableOutputStream o, BlockWriter refIdx) {
-			refBlockSize = w.refBlockSize;
-			logBlockSize = w.logBlockSize;
+		Stats(ReftableWriter w, ReftableOutputStream o, IndexBlockWriter idx) {
+			blockSize = w.blockSize;
 			restartInterval = w.restartInterval;
-
-			refBytes = w.refBytes;
-			logBytes = w.logBytes;
-			paddingUsed = o.paddingUsed();
 			totalBytes = o.size();
-			refBlocks = w.refBlocks;
-
-			refIndexKeys = w.refIndexOffset > 0 ? refIdx.entryCount() : 0;
-			refIndexSize = w.refIndexSize;
+			blockCount = o.blockCount();
+			paddingUsed = o.paddingUsed();
+			indexKeys = idx.bytesInIndex() > 0 ? idx.keysInIndex() : 0;
+			indexSize = idx.bytesInIndex();
 		}
 
-		/** @return number of bytes in a ref block. */
-		public int refBlockSize() {
-			return refBlockSize;
-		}
-
-		/** @return number of bytes in a ref block. */
-		public int logBlockSize() {
-			return logBlockSize;
+		/** @return number of bytes in a single block. */
+		public int blockSize() {
+			return blockSize;
 		}
 
 		/** @return number of references between binary search markers. */
 		public int restartInterval() {
 			return restartInterval;
-		}
-
-		/** @return number of ref blocks in the output, excluding index. */
-		public int refBlockCount() {
-			return refBlocks;
-		}
-
-		/** @return number of bytes for references, including ref index. */
-		public long refBytes() {
-			return refBytes;
-		}
-
-		/** @return number of bytes for log, including log index. */
-		public long logBytes() {
-			return logBytes;
 		}
 
 		/** @return total number of bytes in the reftable. */
@@ -442,22 +242,27 @@ public class ReftableWriter {
 			return paddingUsed;
 		}
 
-		/** @return number of keys in the ref index; 0 if no index was used. */
-		public int refIndexKeys() {
-			return refIndexKeys;
+		/** @return number of blocks in the output stream, excluding index. */
+		public int blockCount() {
+			return blockCount;
 		}
 
-		/** @return number of bytes in the ref index; 0 if no index was used. */
-		public int refIndexSize() {
-			return refIndexSize;
+		/** @return number of keys in the index; 0 if no index was used. */
+		public int indexKeys() {
+			return indexKeys;
 		}
 
-		/** @return estimated number of disk seeks per ref read. */
+		/** @return number of bytes in the index; 0 if no index was used. */
+		public int indexSize() {
+			return indexSize;
+		}
+
+		/** @return estimated number of disk seeks per read. */
 		public double diskSeeksPerRead() {
-			if (refIndexKeys() > 0) {
+			if (indexKeys > 0) {
 				return 1;
 			}
-			return log(refBlockCount()) / log(2);
+			return log(blockCount) / log(2);
 		}
 	}
 }
