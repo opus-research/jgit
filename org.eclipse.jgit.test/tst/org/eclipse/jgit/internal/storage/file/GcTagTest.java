@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2012, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,24 +40,39 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.transport.http;
 
-import java.io.IOException;
-import java.net.Proxy;
-import java.net.URL;
+package org.eclipse.jgit.internal.storage.file;
 
-/**
- * A factory returning instances of {@link JDKHttpConnection}
- *
- * @since 3.2
- */
-public class JDKHttpConnectionFactory implements HttpConnectionFactory {
-	public HttpConnection create(URL url) throws IOException {
-		return new JDKHttpConnection(url);
+import static org.junit.Assert.assertTrue;
+
+import java.util.Collections;
+
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.revwalk.RevBlob;
+import org.eclipse.jgit.revwalk.RevTag;
+import org.junit.Test;
+
+public class GcTagTest extends GcTestCase {
+	@Test
+	public void lightweightTag_objectNotPruned() throws Exception {
+		RevBlob a = tr.blob("a");
+		tr.lightweightTag("t", a);
+		gc.setExpireAgeMillis(0);
+		fsTick();
+		gc.prune(Collections.<ObjectId> emptySet());
+		assertTrue(repo.hasObject(a));
 	}
 
-	public HttpConnection create(URL url, Proxy proxy)
-			throws IOException {
-		return new JDKHttpConnection(url, proxy);
+	@Test
+	public void annotatedTag_objectNotPruned() throws Exception {
+		RevBlob a = tr.blob("a");
+		RevTag t = tr.tag("t", a); // this doesn't create the refs/tags/t ref
+		tr.lightweightTag("t", t);
+
+		gc.setExpireAgeMillis(0);
+		fsTick();
+		gc.prune(Collections.<ObjectId> emptySet());
+		assertTrue(repo.hasObject(t));
+		assertTrue(repo.hasObject(a));
 	}
 }
