@@ -479,7 +479,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 						if (checkoutStage != null) {
 							if (stage == checkoutStage.number) {
 								checkoutPath(ent, r, new CheckoutMetadata(
-										eolStreamType, filterCommand, path));
+										eolStreamType, filterCommand));
 								actuallyModifiedPaths.add(path);
 							}
 						} else {
@@ -489,7 +489,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 						}
 					} else {
 						checkoutPath(ent, r, new CheckoutMetadata(eolStreamType,
-								filterCommand, path));
+								filterCommand));
 						actuallyModifiedPaths.add(path);
 					}
 				}
@@ -518,8 +518,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 					ent.setObjectId(blobId);
 					ent.setFileMode(mode);
 					checkoutPath(ent, r,
-							new CheckoutMetadata(eolStreamType, filterCommand,
-									path));
+							new CheckoutMetadata(eolStreamType, filterCommand));
 					actuallyModifiedPaths.add(path);
 				}
 			});
