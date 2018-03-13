@@ -117,10 +117,6 @@ public class ReftableBatchRefUpdate extends BatchRefUpdate {
 
 		Config cfg = refdb.getRepository().getConfig();
 		reftableConfig = new ReftableConfig();
-		if (refdb instanceof InMemoryRepository.MemRefDatabase) {
-			reftableConfig.setAlignBlocks(false);
-			reftableConfig.setIndexObjects(false);
-		}
 		reftableConfig.fromConfig(cfg);
 	}
 
