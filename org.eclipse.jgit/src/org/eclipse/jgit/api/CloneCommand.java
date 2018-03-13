@@ -50,13 +50,13 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -66,6 +66,7 @@ import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.submodule.SubmoduleWalk;
 import org.eclipse.jgit.transport.FetchResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
@@ -229,7 +230,7 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 		}
 	}
 
-	private void cloneSubmodules(Repository clonedRepo) {
+	private void cloneSubmodules(Repository clonedRepo) throws IOException {
 		SubmoduleInitCommand init = new SubmoduleInitCommand(clonedRepo);
 		if (init.call().isEmpty())
 			return;
@@ -237,7 +238,14 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 		SubmoduleUpdateCommand update = new SubmoduleUpdateCommand(clonedRepo);
 		configure(update);
 		update.setProgressMonitor(monitor);
-		update.call();
+		if (!update.call().isEmpty()) {
+			SubmoduleWalk walk = SubmoduleWalk.forIndex(clonedRepo);
+			while (walk.next()) {
+				Repository subRepo = walk.getRepository();
+				if (subRepo != null)
+					cloneSubmodules(subRepo);
+			}
+		}
 	}
 
 	private Ref findBranchToCheckout(FetchResult result) {
@@ -270,6 +278,14 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 				branchName, ConfigConstants.CONFIG_KEY_REMOTE, remote);
 		clonedRepo.getConfig().setString(ConfigConstants.CONFIG_BRANCH_SECTION,
 				branchName, ConfigConstants.CONFIG_KEY_MERGE, head.getName());
+		String autosetupRebase = clonedRepo.getConfig().getString(
+				ConfigConstants.CONFIG_BRANCH_SECTION, null,
+				ConfigConstants.CONFIG_KEY_AUTOSETUPREBASE);
+		if (ConfigConstants.CONFIG_KEY_ALWAYS.equals(autosetupRebase)
+				|| ConfigConstants.CONFIG_KEY_REMOTE.equals(autosetupRebase))
+			clonedRepo.getConfig().setBoolean(
+					ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
+					ConfigConstants.CONFIG_KEY_REBASE, true);
 		clonedRepo.getConfig().save();
 	}
 

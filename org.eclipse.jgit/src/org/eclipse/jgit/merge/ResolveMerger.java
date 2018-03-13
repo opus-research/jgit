@@ -58,7 +58,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.DiffAlgorithm;
 import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
 import org.eclipse.jgit.diff.RawText;
@@ -74,6 +73,7 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.IndexWriteException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -556,7 +556,7 @@ public class ResolveMerger extends ThreeWayMerger {
 
 		// Index entry has to match ours to be considered clean
 		final boolean isDirty = nonTree(modeI)
-				&& !(tw.idEqual(T_INDEX, T_OURS) && modeO == modeI);
+				&& !(modeO == modeI && tw.idEqual(T_INDEX, T_OURS));
 		if (isDirty)
 			failingPaths
 					.put(tw.getPathString(), MergeFailureReason.DIRTY_INDEX);
@@ -572,7 +572,7 @@ public class ResolveMerger extends ThreeWayMerger {
 
 		// Worktree entry has to match ours to be considered clean
 		final boolean isDirty = nonTree(modeF)
-				&& !(tw.idEqual(T_FILE, T_OURS) && modeO == modeF);
+				&& !(modeO == modeF && tw.idEqual(T_FILE, T_OURS));
 		if (isDirty)
 			failingPaths.put(tw.getPathString(),
 					MergeFailureReason.DIRTY_WORKTREE);
