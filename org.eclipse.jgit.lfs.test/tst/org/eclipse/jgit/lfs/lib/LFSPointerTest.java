@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2016, Christian Halstrick <christian.halstrick@sap.com>
- * Copyright (C) 2015, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,76 +40,32 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs;
 
-import java.util.List;
-import java.util.Map;
+package org.eclipse.jgit.lfs.lib;
 
-/**
- * This interface describes the network protocol used between lfs client and lfs
- * server
- *
- * @since 4.6
+import static org.junit.Assert.assertEquals;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+
+import org.eclipse.jgit.lfs.LfsPointer;
+import org.junit.Test;
+
+/*
+ * Test LfsPointer file abstraction
  */
-public interface Protocol {
-	/** A request sent to an LFS server */
-	class Request {
-		/** The operation of this request */
-		public String operation;
-
-		/** The objects of this request */
-		public List<ObjectSpec> objects;
+public class LFSPointerTest {
+	@Test
+	public void testEncoding() throws IOException {
+		final String s = "27e15b72937fc8f558da24ac3d50ec20302a4cf21e33b87ae8e4ce90e89c4b10";
+		AnyLongObjectId id = LongObjectId.fromString(s);
+		LfsPointer ptr = new LfsPointer(id, 4);
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		ptr.encode(baos);
+		baos.close();
+		assertEquals("version https://git-lfs.github.com/spec/v1\noid sha256:"
+				+ s + "\nsize 4\n",
+				baos.toString(StandardCharsets.UTF_8.name()));
 	}
-
-	/** A response received from an LFS server */
-	class Response {
-		public List<ObjectInfo> objects;
-	}
-
-	/**
-	 * MetaData of an LFS object. Needs to be specified when requesting objects
-	 * from the LFS server and is also returned in the response
-	 */
-	class ObjectSpec {
-		public String oid; // the objectid
-
-		public long size; // the size of the object
-	}
-
-	/**
-	 * Describes in a response all actions the LFS server offers for a single
-	 * object
-	 */
-	class ObjectInfo extends ObjectSpec {
-		public Map<String, Action> actions; // Maps operation to action
-
-		public Error error;
-	}
-
-	/**
-	 * Describes in a Response a single action the client can execute on a
-	 * single object
-	 */
-	class Action {
-		public String href;
-
-		public Map<String, String> header;
-	}
-
-	/** Describes an error to be returned by the LFS batch API */
-	class Error {
-		public int code;
-
-		public String message;
-	}
-
-	/**
-	 * The "download" operation
-	 */
-	String OPERATION_DOWNLOAD = "download"; //$NON-NLS-1$
-
-	/**
-	 * The contenttype used in LFS requests
-	 */
-	String CONTENTTYPE_VND_GIT_LFS_JSON = "application/vnd.git-lfs+json; charset=utf-8"; //$NON-NLS-1$
 }
