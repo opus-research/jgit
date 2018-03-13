@@ -76,7 +76,6 @@ import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.merge.Merger;
 import org.eclipse.jgit.merge.ResolveMerger;
 import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
-import org.eclipse.jgit.merge.RecursiveMerger;
 import org.eclipse.jgit.merge.SquashMessageFormatter;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -95,8 +94,6 @@ import org.eclipse.jgit.treewalk.FileTreeIterator;
 public class MergeCommand extends GitCommand<MergeResult> {
 
 	private MergeStrategy mergeStrategy = MergeStrategy.RESOLVE;
-
-	// private MergeStrategy mergeStrategy = MergeStrategy.RECURSIVE;
 
 	private List<Ref> commits = new LinkedList<Ref>();
 
@@ -231,24 +228,14 @@ public class MergeCommand extends GitCommand<MergeResult> {
 				Map<String, org.eclipse.jgit.merge.MergeResult<?>> lowLevelResults = null;
 				Map<String, MergeFailureReason> failingPaths = null;
 				List<String> unmergedPaths = null;
-				if (merger instanceof RecursiveMerger) {
-					RecursiveMerger recursiveMerger = (RecursiveMerger) merger;
-					recursiveMerger.setCommitNames(new String[] { "BASE",
-							"HEAD", ref.getName() });
-					recursiveMerger
-							.setWorkingTreeIterator(new FileTreeIterator(repo));
-					noProblems = merger.merge(headCommit, srcCommit);
-					lowLevelResults = recursiveMerger.getMergeResults();
-					failingPaths = recursiveMerger.getFailingPaths();
-					unmergedPaths = recursiveMerger.getUnmergedPaths();
-				} else if (merger instanceof ResolveMerger) {
+				if (merger instanceof ResolveMerger) {
 					ResolveMerger resolveMerger = (ResolveMerger) merger;
-					resolveMerger.setCommitNames(new String[] { "BASE", "HEAD",
-							ref.getName() });
-					resolveMerger.setWorkingTreeIterator(new FileTreeIterator(
-							repo));
+					resolveMerger.setCommitNames(new String[] {
+							"BASE", "HEAD", ref.getName() });
+					resolveMerger.setWorkingTreeIterator(new FileTreeIterator(repo));
 					noProblems = merger.merge(headCommit, srcCommit);
-					lowLevelResults = resolveMerger.getMergeResults();
+					lowLevelResults = resolveMerger
+							.getMergeResults();
 					failingPaths = resolveMerger.getFailingPaths();
 					unmergedPaths = resolveMerger.getUnmergedPaths();
 				} else
