@@ -189,7 +189,7 @@ public class FileRepository extends Repository {
 		userConfig = SystemReader.getInstance().openUserConfig(systemConfig,
 				getFS());
 		repoConfig = new FileBasedConfig(userConfig, getFS().resolve(
-				getCommonDirectory(), Constants.CONFIG),
+				getDirectory(), Constants.CONFIG),
 				getFS());
 
 		loadSystemConfig();
@@ -222,7 +222,7 @@ public class FileRepository extends Repository {
 				options.getObjectDirectory(), //
 				options.getAlternateObjectDirectories(), //
 				getFS(), //
-				new File(getCommonDirectory(), Constants.SHALLOW));
+				new File(getDirectory(), Constants.SHALLOW));
 
 		if (objectDatabase.exists()) {
 			if (repositoryFormatVersion > 1)
@@ -491,7 +491,7 @@ public class FileRepository extends Repository {
 	 * @throws IOException the ref could not be accessed.
 	 */
 	public ReflogReader getReflogReader(String refName) throws IOException {
-		Ref ref = getRef(refName);
+		Ref ref = findRef(refName);
 		if (ref != null)
 			return new ReflogReaderImpl(this, ref.getName());
 		return null;

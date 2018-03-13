@@ -373,6 +373,8 @@ public class JGitText extends TranslationBundle {
 	/***/ public String indexSignatureIsInvalid;
 	/***/ public String indexWriteException;
 	/***/ public String initFailedBareRepoDifferentDirs;
+	/***/ public String initFailedDirIsNoDirectory;
+	/***/ public String initFailedGitDirIsNoDirectory;
 	/***/ public String initFailedNonBareRepoSameDirs;
 	/***/ public String inMemoryBufferLimitExceeded;
 	/***/ public String inputDidntMatchLength;
@@ -417,6 +419,8 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidStageForPath;
 	/***/ public String invalidTagOption;
 	/***/ public String invalidTimeout;
+	/***/ public String invalidTimeUnitValue2;
+	/***/ public String invalidTimeUnitValue3;
 	/***/ public String invalidURL;
 	/***/ public String invalidWildcards;
 	/***/ public String invalidRefSpec;
