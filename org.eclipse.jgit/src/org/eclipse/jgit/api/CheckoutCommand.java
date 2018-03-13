@@ -43,8 +43,6 @@
  */
 package org.eclipse.jgit.api;
 
-import static org.eclipse.jgit.treewalk.TreeWalk.OperationType.CHECKOUT_OP;
-
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
@@ -470,8 +468,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			if (path.equals(previousPath))
 				continue;
 
-			final EolStreamType eolStreamType = treeWalk
-					.getEolStreamType(CHECKOUT_OP);
+			final EolStreamType eolStreamType = treeWalk.getEolStreamType();
 			final String filterCommand = treeWalk
 					.getFilterCommand(Constants.ATTR_FILTER_TYPE_SMUDGE);
 			editor.add(new PathEdit(path) {
@@ -511,8 +508,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 		while (treeWalk.next()) {
 			final ObjectId blobId = treeWalk.getObjectId(0);
 			final FileMode mode = treeWalk.getFileMode(0);
-			final EolStreamType eolStreamType = treeWalk
-					.getEolStreamType(CHECKOUT_OP);
+			final EolStreamType eolStreamType = treeWalk.getEolStreamType();
 			final String filterCommand = treeWalk
 					.getFilterCommand(Constants.ATTR_FILTER_TYPE_SMUDGE);
 			final String path = treeWalk.getPathString();

@@ -587,7 +587,6 @@ public class TestRepository<R extends Repository> {
 	public void delete(String ref) throws Exception {
 		ref = normalizeRef(ref);
 		RefUpdate u = db.updateRef(ref);
-		u.setForceUpdate(true);
 		switch (u.delete()) {
 		case FAST_FORWARD:
 		case FORCED:
@@ -913,7 +912,7 @@ public class TestRepository<R extends Repository> {
 	}
 
 	private static File nameFor(ObjectDirectory odb, ObjectId name, String t) {
-		File packdir = odb.getPackDirectory();
+		File packdir = new File(odb.getDirectory(), "pack");
 		return new File(packdir, "pack-" + name.name() + t);
 	}
 
