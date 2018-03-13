@@ -54,7 +54,7 @@ import java.io.InputStream;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.util.FS;
 
 /**
@@ -64,16 +64,8 @@ import org.eclipse.jgit.util.FS;
  * specified working directory as part of a {@link TreeWalk}.
  */
 public class FileTreeIterator extends WorkingTreeIterator {
-	/**
-	 * the starting directory. This directory should correspond to
-	 *            the root of the repository.
-	 */
-	protected final File directory;
-	/**
-	 *  the file system abstraction which will be necessary to
-	 *            perform certain file system operations.
-	 */
-	protected final FS fs;
+	private final File directory;
+	private final FS fs;
 
 	/**
 	 * Create a new iterator to traverse the given directory and its children.
@@ -111,22 +103,18 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	}
 
 	@Override
-	public AbstractTreeIterator createSubtreeIterator(final Repository repo)
+	public AbstractTreeIterator createSubtreeIterator(final ObjectReader reader)
 			throws IncorrectObjectTypeException, IOException {
 		return new FileTreeIterator(this, ((FileEntry) current()).file, fs);
 	}
 
 	private Entry[] entries() {
-		gitIgnoreTimeStamp = 0l;
 		final File[] all = directory.listFiles();
 		if (all == null)
 			return EOF;
 		final Entry[] r = new Entry[all.length];
-		for (int i = 0; i < r.length; i++) {
+		for (int i = 0; i < r.length; i++)
 			r[i] = new FileEntry(all[i], fs);
-			if (all[i].getName().equals(Constants.DOT_GIT_IGNORE))
-				gitIgnoreTimeStamp = r[i].getLastModified();
-		}
 		return r;
 	}
 
@@ -193,13 +181,5 @@ public class FileTreeIterator extends WorkingTreeIterator {
 		public File getFile() {
 			return file;
 		}
-	}
-
-	/**
-	 * @return
-	 * 			  The root directory of this iterator
-	 */
-	public File getDirectory() {
-		return directory;
 	}
 }
