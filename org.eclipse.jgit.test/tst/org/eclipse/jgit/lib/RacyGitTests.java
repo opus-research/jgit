@@ -43,10 +43,13 @@
 package org.eclipse.jgit.lib;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.TreeSet;
 
+import org.eclipse.jgit.dircache.DirCacheBuilder;
+import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.FileTreeIteratorWithTimeControl;
 import org.eclipse.jgit.treewalk.NameConflictTreeWalk;
@@ -130,12 +133,12 @@ public class RacyGitTests extends RepositoryTestCase {
 		modTimes.add(fsTick(lastFile));
 
 		// now add both files to the index. No racy git expected
-		resetIndex(new FileTreeIteratorWithTimeControl(db, modTimes));
+		addToIndex(modTimes);
 
 		assertEquals(
-				"[a, mode:100644, time:t0, length:1, content:a]" +
-				"[b, mode:100644, time:t0, length:1, content:b]",
-				indexState(SMUDGE | MOD_TIME | LENGTH | CONTENT));
+				"[a, mode:100644, time:t0, length:1, sha1:2e65efe2a145dda7ee51d1741299f848e5bf752e]" +
+				"[b, mode:100644, time:t0, length:1, sha1:63d8dbd40c23542e740659a7168a0ce3138ea748]",
+				indexState(SMUDGE | MOD_TIME | LENGTH | CONTENT_ID));
 
 		// Remember the last modTime of index file. All modifications times of
 		// further modification are translated to this value so it looks that
@@ -147,14 +150,32 @@ public class RacyGitTests extends RepositoryTestCase {
 		// now update the index the index. 'a' has to be racily clean -- because
 		// it's modification time is exactly the same as the previous index file
 		// mod time.
-		resetIndex(new FileTreeIteratorWithTimeControl(db, modTimes));
+		addToIndex(modTimes);
 
 		db.readDirCache();
 		// although racily clean a should not be reported as being dirty
 		assertEquals(
-				"[a, mode:100644, time:t1, smudged, length:0, content:a2]" +
-				"[b, mode:100644, time:t0, length:1, content:b]",
-				indexState(SMUDGE|MOD_TIME|LENGTH|CONTENT));
+				"[a, mode:100644, time:t1, smudged, length:0]" +
+				"[b, mode:100644, time:t0, length:1]",
+				indexState(SMUDGE|MOD_TIME|LENGTH));
+	}
+
+	private void addToIndex(TreeSet<Long> modTimes)
+			throws FileNotFoundException, IOException {
+		DirCacheBuilder builder = db.lockDirCache().builder();
+		FileTreeIterator fIt = new FileTreeIteratorWithTimeControl(
+				db, modTimes);
+		DirCacheEntry dce;
+		while (!fIt.eof()) {
+			dce = new DirCacheEntry(fIt.getEntryPathString());
+			dce.setFileMode(fIt.getEntryFileMode());
+			dce.setLastModified(fIt.getEntryLastModified());
+			dce.setLength((int) fIt.getEntryLength());
+			dce.setObjectId(fIt.getEntryObjectId());
+			builder.add(dce);
+			fIt.next(1);
+		}
+		builder.commit();
 	}
 
 	private File addToWorkDir(String path, String content) throws IOException {

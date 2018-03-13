@@ -302,13 +302,16 @@ public class RevCommitList<E extends RevCommit> extends RevObjectList<E> {
 		if (walker == null || size > highMark)
 			return;
 
-		RevCommit c = walker.next();
+		Generator p = walker.pending;
+		RevCommit c = p.next();
 		if (c == null) {
+			walker.pending = EndGenerator.INSTANCE;
 			walker = null;
 			return;
 		}
 		enter(size, (E) c);
 		add((E) c);
+		p = walker.pending;
 
 		while (size <= highMark) {
 			int index = size;
@@ -328,8 +331,9 @@ public class RevCommitList<E extends RevCommit> extends RevObjectList<E> {
 
 			final Object[] dst = s.contents;
 			while (size <= highMark && index < BLOCK_SIZE) {
-				c = walker.next();
+				c = p.next();
 				if (c == null) {
+					walker.pending = EndGenerator.INSTANCE;
 					walker = null;
 					return;
 				}
