@@ -57,12 +57,9 @@ import java.nio.channels.FileChannel;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.text.MessageFormat;
 import java.text.ParseException;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -905,7 +902,6 @@ public class GC {
 		}
 		prunePacked();
 		deleteOrphans();
-		deleteTempPacksIdx();
 
 		lastPackedRefs = refsBefore;
 		lastRepackTime = time;
@@ -958,28 +954,6 @@ public class GC {
 					}
 				}
 			}
-		}
-	}
-
-	private void deleteTempPacksIdx() {
-		Path packDir = Paths.get(repo.getObjectsDirectory().getAbsolutePath(),
-				"pack"); //$NON-NLS-1$
-		Instant threshold = Instant.now().minus(1, ChronoUnit.DAYS);
-		try {
-			Files.newDirectoryStream(packDir, "gc_*_tmp") //$NON-NLS-1$
-					.forEach(t -> {
-						try {
-							Instant lastModified = Files.getLastModifiedTime(t)
-									.toInstant();
-							if (lastModified.isBefore(threshold)) {
-								Files.deleteIfExists(t);
-							}
-						} catch (IOException e) {
-							LOG.error(e.getMessage(), e);
-						}
-					});
-		} catch (IOException e) {
-			LOG.error(e.getMessage(), e);
 		}
 	}
 
