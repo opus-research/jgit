@@ -91,6 +91,8 @@ public class DirCache {
 
 	private static final int EXT_TREE = 0x54524545 /* 'TREE' */;
 
+	private static final int EXT_RESOLVE_UNDO = 0x52455543 /* 'REUC' */;
+
 	private static final DirCacheEntry[] NO_ENTRIES = {};
 
 	static final Comparator<DirCacheEntry> ENT_CMP = new Comparator<DirCacheEntry>() {
@@ -126,9 +128,10 @@ public class DirCache {
 	 * @return an empty cache which has no backing store file. The cache may not
 	 *         be read or written, but it may be queried and updated (in
 	 *         memory).
+	 * @param readOnly
 	 */
-	public static DirCache newInCore() {
-		return new DirCache(null, null);
+	public static DirCache newInCore(boolean readOnly) {
+		return new DirCache(null, null, readOnly);
 	}
 
 	/**
@@ -143,6 +146,7 @@ public class DirCache {
 	 * @param fs
 	 *            the file system abstraction which will be necessary to perform
 	 *            certain file system operations.
+	 * @param readOnly
 	 * @return a cache representing the contents of the specified index file (if
 	 *         it exists) or an empty cache if the file does not exist.
 	 * @throws IOException
@@ -151,9 +155,9 @@ public class DirCache {
 	 *             the index file is using a format or extension that this
 	 *             library does not support.
 	 */
-	public static DirCache read(final File indexLocation, final FS fs)
-			throws CorruptObjectException, IOException {
-		final DirCache c = new DirCache(indexLocation, fs);
+	public static DirCache read(final File indexLocation, final FS fs,
+			boolean readOnly) throws CorruptObjectException, IOException {
+		final DirCache c = new DirCache(indexLocation, fs, readOnly);
 		c.read();
 		return c;
 	}
@@ -171,6 +175,7 @@ public class DirCache {
 	 * @param fs
 	 *            the file system abstraction which will be necessary to perform
 	 *            certain file system operations.
+	 * @param readOnly
 	 * @return a cache representing the contents of the specified index file (if
 	 *         it exists) or an empty cache if the file does not exist.
 	 * @throws IOException
@@ -180,11 +185,12 @@ public class DirCache {
 	 *             the index file is using a format or extension that this
 	 *             library does not support.
 	 */
-	public static DirCache lock(final File indexLocation, final FS fs)
-			throws CorruptObjectException, IOException {
-		final DirCache c = new DirCache(indexLocation, fs);
+	public static DirCache lock(final File indexLocation, final FS fs,
+			boolean readOnly) throws CorruptObjectException, IOException {
+		final DirCache c = new DirCache(indexLocation, fs, readOnly);
 		if (!c.lock())
-			throw new IOException(MessageFormat.format(JGitText.get().cannotLock, indexLocation));
+			throw new IOException(MessageFormat.format(
+					JGitText.get().cannotLock, indexLocation));
 
 		try {
 			c.read();
@@ -205,6 +211,12 @@ public class DirCache {
 	/** Location of the current version of the index file. */
 	private final File liveFile;
 
+	/** file system abstraction **/
+	private final FS fs;
+
+	/** Indicates whether the Index file will only be read. **/
+	private final boolean readOnly;
+
 	/** Modification time of the file at the last read/write we did. */
 	private long lastModified;
 
@@ -214,14 +226,17 @@ public class DirCache {
 	/** Number of positions within {@link #sortedEntries} that are valid. */
 	private int entryCnt;
 
+	/**
+	 * Indicates whether Index contains extended entries or resolve-undo
+	 * information.
+	 **/
+	private boolean extended;
+
 	/** Cache tree for this index; null if the cache tree is not available. */
 	private DirCacheTree tree;
 
 	/** Our active lock (if we hold it); null if we don't have it locked. */
 	private LockFile myLock;
-
-	/** file system abstraction **/
-	private final FS fs;
 
 	/**
 	 * Create a new in-core index representation.
@@ -233,11 +248,14 @@ public class DirCache {
 	 *            location of the index file on disk.
 	 * @param fs
 	 *            the file system abstraction which will be necessary to perform
-	 *            certain file system operations.
+	 * @param readOnly
+	 *            true if the Index file only be required to read. This allows
+	 *            to supported Index format "3".
 	 */
-	public DirCache(final File indexLocation, final FS fs) {
+	public DirCache(final File indexLocation, final FS fs, boolean readOnly) {
 		liveFile = indexLocation;
 		this.fs = fs;
+		this.readOnly = readOnly;
 		clear();
 	}
 
@@ -287,7 +305,8 @@ public class DirCache {
 	 */
 	public void read() throws IOException, CorruptObjectException {
 		if (liveFile == null)
-			throw new IOException(JGitText.get().dirCacheDoesNotHaveABackingFile);
+			throw new IOException(
+					JGitText.get().dirCacheDoesNotHaveABackingFile);
 		if (!liveFile.exists())
 			clear();
 		else if (liveFile.lastModified() != lastModified) {
@@ -317,10 +336,11 @@ public class DirCache {
 		lastModified = 0;
 		sortedEntries = NO_ENTRIES;
 		entryCnt = 0;
+		extended = false;
 		tree = null;
 	}
 
-	private void readFrom(final InputStream inStream) throws IOException,
+	private void readFrom(final FileInputStream inStream) throws IOException,
 			CorruptObjectException {
 		final BufferedInputStream in = new BufferedInputStream(inStream);
 		final MessageDigest md = Constants.newMessageDigest();
@@ -333,14 +353,21 @@ public class DirCache {
 		if (!is_DIRC(hdr))
 			throw new CorruptObjectException(JGitText.get().notADIRCFile);
 		final int ver = NB.decodeInt32(hdr, 4);
-		boolean extended = false;
-		if (ver == 3)
+		extended = false;
+		if (ver == 3) {
+			if (!readOnly) {
+				throw new CorruptObjectException(
+						"DIRC version 3 is only supported in read-only mode.");
+			}
+
 			extended = true;
-		else if (ver != 2)
-			throw new CorruptObjectException(MessageFormat.format(JGitText.get().unknownDIRCVersion, ver));
+		} else if (ver != 2)
+			throw new CorruptObjectException(MessageFormat.format(
+					JGitText.get().unknownDIRCVersion, ver));
 		entryCnt = NB.decodeInt32(hdr, 8);
 		if (entryCnt < 0)
-			throw new CorruptObjectException(JGitText.get().DIRCHasTooManyEntries);
+			throw new CorruptObjectException(
+					JGitText.get().DIRCHasTooManyEntries);
 
 		// Load the individual file entries.
 		//
@@ -348,9 +375,11 @@ public class DirCache {
 		final byte[] infos = new byte[infoLength * entryCnt];
 		sortedEntries = new DirCacheEntry[entryCnt];
 
-		final MutableInteger infoAt = new MutableInteger();
-		for (int i = 0; i < entryCnt; i++)
-			sortedEntries[i] = new DirCacheEntry(infos, infoAt, in, md);
+		final int infoAt[] = { 0 };
+		for (int i = 0; i < entryCnt; i++) {
+			final DirCacheEntry entry = new DirCacheEntry(infos, infoAt, in, md);
+			sortedEntries[i] = entry;
+		}
 		lastModified = liveFile.lastModified();
 
 		// After the file entries are index extensions, and then a footer.
@@ -372,13 +401,21 @@ public class DirCache {
 			switch (NB.decodeInt32(hdr, 0)) {
 			case EXT_TREE: {
 				if (Integer.MAX_VALUE < sz) {
-					throw new CorruptObjectException(MessageFormat.format(JGitText.get().DIRCExtensionIsTooLargeAt
-							, formatExtensionName(hdr), sz));
+					throw new CorruptObjectException(MessageFormat.format(
+							JGitText.get().DIRCExtensionIsTooLargeAt,
+							formatExtensionName(hdr), sz));
 				}
 				final byte[] raw = new byte[(int) sz];
 				IO.readFully(in, raw, 0, raw.length);
 				md.update(raw, 0, raw.length);
 				tree = new DirCacheTree(raw, new MutableInteger(), null);
+				break;
+			}
+			case EXT_RESOLVE_UNDO: {
+				if (sz != 0) {
+					throw new IOException(
+							"The Index contains resolve-undo entries. These can't be processed currently.");
+				}
 				break;
 			}
 			default:
@@ -394,15 +431,18 @@ public class DirCache {
 					// _required_ to understand this index format.
 					// Since we did not trap it above we must abort.
 					//
-					throw new CorruptObjectException(MessageFormat.format(JGitText.get().DIRCExtensionNotSupportedByThisVersion
-							, formatExtensionName(hdr)));
+					throw new CorruptObjectException(
+							MessageFormat.format(
+									JGitText.get().DIRCExtensionNotSupportedByThisVersion,
+									formatExtensionName(hdr)));
 				}
 			}
 		}
 
 		final byte[] exp = md.digest();
 		if (!Arrays.equals(exp, hdr)) {
-			throw new CorruptObjectException(JGitText.get().DIRCChecksumMismatch);
+			throw new CorruptObjectException(
+					JGitText.get().DIRCChecksumMismatch);
 		}
 	}
 
@@ -413,8 +453,10 @@ public class DirCache {
 		while (0 < sz) {
 			int n = in.read(b, 0, (int) Math.min(b.length, sz));
 			if (n < 0) {
-				throw new EOFException(MessageFormat.format(JGitText.get().shortReadOfOptionalDIRCExtensionExpectedAnotherBytes
-						, formatExtensionName(hdr), sz));
+				throw new EOFException(
+						MessageFormat.format(
+								JGitText.get().shortReadOfOptionalDIRCExtensionExpectedAnotherBytes,
+								formatExtensionName(hdr), sz));
 			}
 			md.update(b, 0, n);
 			sz -= n;
@@ -446,7 +488,8 @@ public class DirCache {
 	 */
 	public boolean lock() throws IOException {
 		if (liveFile == null)
-			throw new IOException(JGitText.get().dirCacheDoesNotHaveABackingFile);
+			throw new IOException(
+					JGitText.get().dirCacheDoesNotHaveABackingFile);
 		final LockFile tmp = new LockFile(liveFile, fs);
 		if (tmp.lock()) {
 			tmp.setNeedStatInformation(true);
@@ -488,19 +531,20 @@ public class DirCache {
 		}
 	}
 
-	void writeTo(final OutputStream os) throws IOException {
+	private void writeTo(final OutputStream os) throws IOException {
+		if (readOnly) {
+			throw new InternalError(
+					"DirCache has been configured to be read-only.");
+		}
+
 		final MessageDigest foot = Constants.newMessageDigest();
 		final DigestOutputStream dos = new DigestOutputStream(os, foot);
-
-		boolean extended = false;
-		for (int i = 0; i < entryCnt; i++)
-			extended |= sortedEntries[i].isExtended();
 
 		// Write the header.
 		//
 		final byte[] tmp = new byte[128];
 		System.arraycopy(SIG_DIRC, 0, tmp, 0, SIG_DIRC.length);
-		NB.encodeInt32(tmp, 4, extended ? 3 : 2);
+		NB.encodeInt32(tmp, 4, /* version */2);
 		NB.encodeInt32(tmp, 8, entryCnt);
 		dos.write(tmp, 0, 12);
 
@@ -562,8 +606,9 @@ public class DirCache {
 		if (liveFile == null)
 			throw new IllegalStateException(JGitText.get().dirCacheIsNotLocked);
 		if (tmp == null)
-			throw new IllegalStateException(MessageFormat.format(JGitText.get().dirCacheFileIsNotLocked
-					, liveFile.getAbsolutePath()));
+			throw new IllegalStateException(MessageFormat.format(
+					JGitText.get().dirCacheFileIsNotLocked,
+					liveFile.getAbsolutePath()));
 	}
 
 	/**

@@ -62,7 +62,6 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.util.IO;
-import org.eclipse.jgit.util.MutableInteger;
 import org.eclipse.jgit.util.NB;
 
 /**
@@ -114,18 +113,17 @@ public class DirCacheEntry {
 	/** Mask applied to data in {@link #P_FLAGS} to get the name length. */
 	private static final int NAME_MASK = 0xfff;
 
-	private static final int INTENT_TO_ADD = 0x20000000;
-	private static final int SKIP_WORKTREE = 0x40000000;
+	private static final int EXTENDED = 0x4000;
+	private static final int INTENT_TO_ADD = 0x20000000; // CE_INTENT_TO_ADD
+	private static final int SKIP_WORKTREE = 0x40000000; // CE_SKIP_WORKTREE
 	private static final int EXTENDED_FLAGS = (INTENT_TO_ADD | SKIP_WORKTREE);
 
 	private static final int INFO_LEN = 62;
 	private static final int INFO_LEN_EXTENDED = 64;
 
-	private static final int EXTENDED = 0x40;
 	private static final int ASSUME_VALID = 0x80;
 
-	/** In-core flag signaling that the entry should be considered as modified. */
-	private static final int UPDATE_NEEDED = 0x1;
+	private static final int UPDATE_NEEDED = 0x40;
 
 	/** (Possibly shared) header information storage. */
 	private final byte[] info;
@@ -136,28 +134,26 @@ public class DirCacheEntry {
 	/** Our encoded path name, from the root of the repository. */
 	final byte[] path;
 
-	/** Flags which are never stored to disk. */
-	private byte inCoreFlags;
-
-	DirCacheEntry(final byte[] sharedInfo, final MutableInteger infoAt,
-			final InputStream in, final MessageDigest md) throws IOException {
+	DirCacheEntry(final byte[] sharedInfo, final int[] infoAt,
+	              final InputStream in, final MessageDigest md) throws IOException {
 		info = sharedInfo;
-		infoOffset = infoAt.value;
+		infoOffset = infoAt[0];
 
 		IO.readFully(in, info, infoOffset, INFO_LEN);
 
+		final boolean extended = isExtended();
 		final int len;
-		if (isExtended()) {
+		if (extended) {
 			len = INFO_LEN_EXTENDED;
 			IO.readFully(in, info, infoOffset + INFO_LEN, INFO_LEN_EXTENDED - INFO_LEN);
 
 			if ((getExtendedFlags() & ~EXTENDED_FLAGS) != 0)
-				throw new IOException(MessageFormat.format(JGitText.get()
-						.DIRCUnrecognizedExtendedFlags, String.valueOf(getExtendedFlags())));
-		} else
+				throw new IOException("Unrecognized extended flags: " + getExtendedFlags());
+		}
+		else
 			len = INFO_LEN;
 
-		infoAt.value += len;
+		infoAt[0] += len;
 		md.update(info, infoOffset, len);
 
 		int pathLen = NB.decodeUInt16(info, infoOffset + P_FLAGS) & NAME_MASK;
@@ -279,15 +275,14 @@ public class DirCacheEntry {
 	}
 
 	void write(final OutputStream os) throws IOException {
-		final int len = isExtended() ? INFO_LEN_EXTENDED : INFO_LEN;
 		final int pathLen = path.length;
-		os.write(info, infoOffset, len);
+		os.write(info, infoOffset, INFO_LEN);
 		os.write(path, 0, pathLen);
 
 		// Index records are padded out to the next 8 byte alignment
 		// for historical reasons related to how C Git read the files.
 		//
-		final int actLen = len + pathLen;
+		final int actLen = INFO_LEN + pathLen;
 		final int expLen = (actLen + 8) & ~7;
 		if (actLen != expLen)
 			os.write(nullpad, 0, expLen - actLen);
@@ -396,7 +391,7 @@ public class DirCacheEntry {
 	 * @return true if this entry should be checked for changes
 	 */
 	public boolean isUpdateNeeded() {
-		return (inCoreFlags & UPDATE_NEEDED) != 0;
+		return (info[infoOffset + P_FLAGS] & UPDATE_NEEDED) != 0;
 	}
 
 	/**
@@ -406,9 +401,9 @@ public class DirCacheEntry {
 	 */
 	public void setUpdateNeeded(boolean updateNeeded) {
 		if (updateNeeded)
-			inCoreFlags |= UPDATE_NEEDED;
+			info[infoOffset + P_FLAGS] |= UPDATE_NEEDED;
 		else
-			inCoreFlags &= ~UPDATE_NEEDED;
+			info[infoOffset + P_FLAGS] &= ~UPDATE_NEEDED;
 	}
 
 	/**
@@ -428,7 +423,7 @@ public class DirCacheEntry {
 	 * @return true if this entry should be skipepd.
 	 */
 	public boolean isSkipWorkTree() {
-		return (getExtendedFlags() & SKIP_WORKTREE) != 0;
+		return (getExtendedFlags() & SKIP_WORKTREE) == SKIP_WORKTREE;
 	}
 
 	/**
@@ -437,7 +432,7 @@ public class DirCacheEntry {
 	 * @return true if this entry is intent to add.
 	 */
 	public boolean isIntentToAdd() {
-		return (getExtendedFlags() & INTENT_TO_ADD) != 0;
+		return (getExtendedFlags() & INTENT_TO_ADD) == INTENT_TO_ADD;
 	}
 
 	/**
@@ -618,8 +613,8 @@ public class DirCacheEntry {
 	/**
 	 * @return true if the entry contains extended flags.
 	 */
-	boolean isExtended() {
-		return (info[infoOffset + P_FLAGS] & EXTENDED) != 0;
+	public boolean isExtended() {
+		return (NB.decodeUInt16(info, infoOffset + P_FLAGS) & EXTENDED) == EXTENDED;
 	}
 
 	private long decodeTS(final int pIdx) {
@@ -636,10 +631,11 @@ public class DirCacheEntry {
 	}
 
 	private int getExtendedFlags() {
-		if (isExtended())
-			return NB.decodeUInt16(info, infoOffset + P_FLAGS2) << 16;
-		else
+		if (!isExtended()) {
 			return 0;
+		}
+
+		return NB.decodeUInt16(info, infoOffset + P_FLAGS2) << 16;
 	}
 
 	private static String toString(final byte[] path) {

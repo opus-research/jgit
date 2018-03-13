@@ -66,7 +66,7 @@ public abstract class ObjectLoader {
 	 * Objects larger than this size must be accessed as a stream through the
 	 * loader's {@link #openStream()} method.
 	 */
-	public static final int STREAM_THRESHOLD = 5 * 1024 * 1024;
+	public static final int STREAM_THRESHOLD = 15 * 1024 * 1024;
 
 	/**
 	 * @return Git in pack object type, see {@link Constants}.
@@ -139,7 +139,7 @@ public abstract class ObjectLoader {
 		try {
 			return cloneArray(cached);
 		} catch (OutOfMemoryError tooBig) {
-			throw new LargeObjectException.OutOfMemory(tooBig);
+			throw new LargeObjectException();
 		}
 	}
 
@@ -195,17 +195,14 @@ public abstract class ObjectLoader {
 		ObjectStream in = openStream();
 		try {
 			long sz = in.getSize();
-			if (sizeLimit < sz)
-				throw new LargeObjectException.ExceedsLimit(sizeLimit, sz);
-
-			if (Integer.MAX_VALUE < sz)
-				throw new LargeObjectException.ExceedsByteArrayLimit();
+			if (sizeLimit < sz || Integer.MAX_VALUE < sz)
+				throw new LargeObjectException();
 
 			byte[] buf;
 			try {
 				buf = new byte[(int) sz];
 			} catch (OutOfMemoryError notEnoughHeap) {
-				throw new LargeObjectException.OutOfMemory(notEnoughHeap);
+				throw new LargeObjectException();
 			}
 
 			IO.readFully(in, buf, 0, buf.length);

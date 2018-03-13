@@ -135,9 +135,7 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 			ol.getCachedBytes();
 			fail("Should have thrown LargeObjectException");
 		} catch (LargeObjectException tooBig) {
-			assertEquals(MessageFormat.format(
-					JGitText.get().largeObjectException, id.name()), tooBig
-					.getMessage());
+			assertEquals(id.name(), tooBig.getMessage());
 		}
 
 		ObjectStream in = ol.openStream();
@@ -418,9 +416,7 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 			ol.getCachedBytes();
 			fail("Should have thrown LargeObjectException");
 		} catch (LargeObjectException tooBig) {
-			assertEquals(MessageFormat.format(
-					JGitText.get().largeObjectException, id.name()), tooBig
-					.getMessage());
+			assertEquals(id.name(), tooBig.getMessage());
 		}
 
 		ObjectStream in = ol.openStream();
