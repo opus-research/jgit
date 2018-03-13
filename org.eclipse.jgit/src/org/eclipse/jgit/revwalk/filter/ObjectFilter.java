@@ -1,5 +1,5 @@
-/*
- * Copyright (C) 2010, Google Inc.
+/**
+ * Copyright (C) 2015, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,45 +41,53 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.dfs;
+package org.eclipse.jgit.revwalk.filter;
 
 import java.io.IOException;
-import java.io.InputStream;
 
-final class PackInputStream extends InputStream {
-	private final DfsReader ctx;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.revwalk.ObjectWalk;
 
-	private final DfsPackFile pack;
+/**
+ * Selects interesting objects when walking.
+ * <p>
+ * Applications should install the filter on an ObjectWalk by
+ * {@link ObjectWalk#setObjectFilter(ObjectFilter)} prior to starting traversal.
+ *
+ * @since 4.0
+ */
+public abstract class ObjectFilter {
+	/** Default filter that always returns true. */
+	public static final ObjectFilter ALL = new AllFilter();
 
-	private long pos;
-
-	PackInputStream(DfsPackFile pack, long pos, DfsReader ctx)
-			throws IOException {
-		this.pack = pack;
-		this.pos = pos;
-		this.ctx = ctx;
-
-		// Pin the first window, to ensure the pack is open and valid.
-		//
-		ctx.pin(pack, pos);
+	private static final class AllFilter extends ObjectFilter {
+		@Override
+		public boolean include(ObjectWalk walker, AnyObjectId o) {
+			return true;
+		}
 	}
 
-	@Override
-	public int read(byte[] b, int off, int len) throws IOException {
-		int n = ctx.copy(pack, pos, b, off, len);
-		pos += n;
-		return n;
-	}
-
-	@Override
-	public int read() throws IOException {
-		byte[] buf = new byte[1];
-		int n = read(buf, 0, 1);
-		return n == 1 ? buf[0] & 0xff : -1;
-	}
-
-	@Override
-	public void close() {
-		ctx.release();
-	}
+	/**
+	 * Determine if the named object should be included in the walk.
+	 *
+	 * @param walker
+	 *            the active walker this filter is being invoked from within.
+	 * @param objid
+	 *            the object currently being tested.
+	 * @return {@code true} if the named object should be included in the walk.
+	 * @throws MissingObjectException
+	 *             an object the filter needed to consult to determine its
+	 *             answer was missing
+	 * @throws IncorrectObjectTypeException
+	 *             an object the filter needed to consult to determine its
+	 *             answer was of the wrong type
+	 * @throws IOException
+	 *             an object the filter needed to consult to determine its
+	 *             answer could not be read.
+	 */
+	public abstract boolean include(ObjectWalk walker, AnyObjectId objid)
+			throws MissingObjectException, IncorrectObjectTypeException,
+			       IOException;
 }
