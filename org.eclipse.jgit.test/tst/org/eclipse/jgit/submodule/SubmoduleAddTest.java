@@ -53,7 +53,6 @@ import java.text.MessageFormat;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.api.SubmoduleAddCommand;
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEditor;
@@ -76,7 +75,7 @@ import org.junit.Test;
 public class SubmoduleAddTest extends RepositoryTestCase {
 
 	@Test
-	public void commandWithNullPath() throws GitAPIException {
+	public void commandWithNullPath() {
 		try {
 			new SubmoduleAddCommand(db).setURI("uri").call();
 			fail("Exception not thrown");
@@ -86,7 +85,7 @@ public class SubmoduleAddTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void commandWithEmptyPath() throws GitAPIException {
+	public void commandWithEmptyPath() {
 		try {
 			new SubmoduleAddCommand(db).setPath("").setURI("uri").call();
 			fail("Exception not thrown");
@@ -96,7 +95,7 @@ public class SubmoduleAddTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void commandWithNullUri() throws GitAPIException {
+	public void commandWithNullUri() {
 		try {
 			new SubmoduleAddCommand(db).setPath("sub").call();
 			fail("Exception not thrown");
@@ -106,7 +105,7 @@ public class SubmoduleAddTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void commandWithEmptyUri() throws GitAPIException {
+	public void commandWithEmptyUri() {
 		try {
 			new SubmoduleAddCommand(db).setPath("sub").setURI("").call();
 			fail("Exception not thrown");
