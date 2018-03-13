@@ -43,16 +43,15 @@
 
 package org.eclipse.jgit.pgm.debug;
 
-import java.io.IOException;
+import java.io.PrintStream;
 import java.net.URL;
 
+import org.kohsuke.args4j.Option;
 import org.eclipse.jgit.pgm.Command;
 import org.eclipse.jgit.pgm.CommandCatalog;
 import org.eclipse.jgit.pgm.CommandRef;
 import org.eclipse.jgit.pgm.TextBuiltin;
 import org.eclipse.jgit.pgm.internal.CLIText;
-import org.eclipse.jgit.util.io.ThrowingPrintWriter;
-import org.kohsuke.args4j.Option;
 
 @Command(usage = "usage_displayAListOfAllRegisteredJgitCommands")
 class ShowCommands extends TextBuiltin {
@@ -69,23 +68,23 @@ class ShowCommands extends TextBuiltin {
 		width += 2;
 
 		for (final CommandRef c : list) {
-			errw.print(c.isCommon() ? '*' : ' ');
-			errw.print(' ');
+			err.print(c.isCommon() ? '*' : ' ');
+			err.print(' ');
 
-			errw.print(c.getName());
+			err.print(c.getName());
 			for (int i = c.getName().length(); i < width; i++)
-				errw.print(' ');
+				err.print(' ');
 
-			pretty.print(errw, c);
-			errw.println();
+			pretty.print(err, c);
+			err.println();
 		}
-		errw.println();
+		err.println();
 	}
 
 	static enum Format {
 		/** */
 		USAGE {
-			void print(ThrowingPrintWriter err, final CommandRef c) throws IOException {
+			void print(PrintStream err, final CommandRef c) {
 				String usage = c.getUsage();
 				if (usage != null && usage.length() > 0)
 					err.print(CLIText.get().resourceBundle().getString(usage));
@@ -94,14 +93,14 @@ class ShowCommands extends TextBuiltin {
 
 		/** */
 		CLASSES {
-			void print(ThrowingPrintWriter err, final CommandRef c) throws IOException {
+			void print(PrintStream err, final CommandRef c) {
 				err.print(c.getImplementationClassName());
 			}
 		},
 
 		/** */
 		URLS {
-			void print(ThrowingPrintWriter err, final CommandRef c) throws IOException {
+			void print(PrintStream err, final CommandRef c) {
 				final ClassLoader ldr = c.getImplementationClassLoader();
 
 				String cn = c.getImplementationClassName();
@@ -121,6 +120,6 @@ class ShowCommands extends TextBuiltin {
 			}
 		};
 
-		abstract void print(ThrowingPrintWriter err, CommandRef c) throws IOException;
+		abstract void print(PrintStream err, CommandRef c);
 	}
 }

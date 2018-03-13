@@ -56,6 +56,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.text.MessageFormat;
 import java.util.ResourceBundle;
@@ -86,14 +87,14 @@ public abstract class TextBuiltin {
 	@Option(name = "--help", usage = "usage_displayThisHelpText", aliases = { "-h" })
 	private boolean help;
 
-	/**
-	 * Input stream, typically this is standard input.
-	 *
-	 * @since 3.4
-	 */
-	protected InputStream ins;
+    /**
+     * Input stream, typically the is standard input.
+     *
+     * @since 3.3
+     */
+    protected InputStream ins;
 
-	/**
+    /**
 	 * Writer to output to, typically this is standard output.
 	 *
 	 * @since 2.2
@@ -112,24 +113,16 @@ public abstract class TextBuiltin {
 	 *
 	 * @deprecated Use outw instead
 	 */
-	@Deprecated
 	protected PrintWriter out;
 
-	/**
-	 * Error writer, typically this is standard error.
-	 *
-	 * @since 3.4
-	 */
-	protected ThrowingPrintWriter errw;
+    /**
+     * Error output stream, typically this is standard error.
+     *
+     * @since 3.3
+     */
+    protected PrintStream err;
 
-	/**
-	 * Error output stream, typically this is standard error.
-	 *
-	 * @since 3.4
-	 */
-	protected OutputStream errs;
-
-	/** Git repository the command was invoked within. */
+    /** Git repository the command was invoked within. */
 	protected Repository db;
 
 	/** Directory supplied via --git-dir command line option. */
@@ -160,27 +153,22 @@ public abstract class TextBuiltin {
 		try {
 			final String outputEncoding = repository != null ? repository
 					.getConfig().getString("i18n", null, "logOutputEncoding") : null; //$NON-NLS-1$ //$NON-NLS-2$
-			if (ins == null)
-				ins = new FileInputStream(FileDescriptor.in);
+            if (ins == null) {
+                ins = new FileInputStream(FileDescriptor.in);
+            }
 			if (outs == null)
 				outs = new FileOutputStream(FileDescriptor.out);
-			if (errs == null)
-				errs = new FileOutputStream(FileDescriptor.err);
-			BufferedWriter outbufw;
+			BufferedWriter bufw;
 			if (outputEncoding != null)
-				outbufw = new BufferedWriter(new OutputStreamWriter(outs,
+				bufw = new BufferedWriter(new OutputStreamWriter(outs,
 						outputEncoding));
 			else
-				outbufw = new BufferedWriter(new OutputStreamWriter(outs));
-			out = new PrintWriter(outbufw);
-			outw = new ThrowingPrintWriter(outbufw);
-			BufferedWriter errbufw;
-			if (outputEncoding != null)
-				errbufw = new BufferedWriter(new OutputStreamWriter(errs,
-						outputEncoding));
-			else
-				errbufw = new BufferedWriter(new OutputStreamWriter(errs));
-			errw = new ThrowingPrintWriter(errbufw);
+				bufw = new BufferedWriter(new OutputStreamWriter(outs));
+			out = new PrintWriter(bufw);
+			outw = new ThrowingPrintWriter(bufw);
+            if (err == null) {
+                err = System.err;
+            }
 		} catch (IOException e) {
 			throw die(CLIText.get().cannotCreateOutputStream);
 		}
@@ -218,15 +206,14 @@ public abstract class TextBuiltin {
 	 *
 	 * @param args
 	 *            the arguments supplied on the command line, if any.
-	 * @throws IOException
 	 */
-	protected void parseArguments(final String[] args) throws IOException {
+	protected void parseArguments(final String[] args) {
 		final CmdLineParser clp = new CmdLineParser(this);
 		try {
 			clp.parseArgument(args);
 		} catch (CmdLineException err) {
 			if (!help) {
-				this.errw.println(MessageFormat.format(CLIText.get().fatalError, err.getMessage()));
+				this.err.println(MessageFormat.format(CLIText.get().fatalError, err.getMessage()));
 				throw die(true);
 			}
 		}
@@ -242,9 +229,8 @@ public abstract class TextBuiltin {
 	 * Print the usage line
 	 *
 	 * @param clp
-	 * @throws IOException
 	 */
-	public void printUsageAndExit(final CmdLineParser clp) throws IOException {
+	public void printUsageAndExit(final CmdLineParser clp) {
 		printUsageAndExit("", clp); //$NON-NLS-1$
 	}
 
@@ -253,21 +239,21 @@ public abstract class TextBuiltin {
 	 *
 	 * @param message
 	 * @param clp
-	 * @throws IOException
 	 */
-	public void printUsageAndExit(final String message, final CmdLineParser clp) throws IOException {
-		errw.println(message);
-		errw.print("jgit "); //$NON-NLS-1$
-		errw.print(commandName);
-		clp.printSingleLineUsage(errw, getResourceBundle());
-		errw.println();
+	public void printUsageAndExit(final String message, final CmdLineParser clp) {
+		PrintWriter writer = new PrintWriter(err);
+		writer.println(message);
+		writer.print("jgit "); //$NON-NLS-1$
+		writer.print(commandName);
+		clp.printSingleLineUsage(writer, getResourceBundle());
+		writer.println();
 
-		errw.println();
-		clp.printUsage(errw, getResourceBundle());
-		errw.println();
+		writer.println();
+		clp.printUsage(writer, getResourceBundle());
+		writer.println();
 
-		errw.flush();
-		throw die(true);
+		writer.flush();
+        throw die(true);
 	}
 
 	/**
@@ -324,15 +310,13 @@ public abstract class TextBuiltin {
 		return new Die(why, cause);
 	}
 
-	/**
-	 * @param aborted
-	 *            boolean indicating that the execution has been aborted before running
-	 * @return a runtime exception the caller is expected to throw
-	 * @since 3.4
-	 */
-	protected static Die die(boolean aborted) {
-		return new Die(aborted);
-	}
+    /**
+     * @param aborted
+     * @return a runtime exception the caller is expected to throw
+     */
+    protected static Die die(boolean aborted) {
+        return new Die(aborted);
+    }
 
 	String abbreviateRef(String dst, boolean abbreviateRemote) {
 		if (dst.startsWith(R_HEADS))
