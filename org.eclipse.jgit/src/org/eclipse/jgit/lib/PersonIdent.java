@@ -50,13 +50,9 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 import java.util.TimeZone;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.util.SystemReader;
-import org.eclipse.jgit.util.time.Clock;
-import org.eclipse.jgit.util.time.ProposedTimestamp;
 
 /**
  * A combination of a person identity and time in Git.
@@ -188,19 +184,8 @@ public class PersonIdent implements Serializable {
 	 * @param aName
 	 * @param aEmailAddress
 	 */
-	public PersonIdent(String aName, String aEmailAddress) {
-		this(aName, aEmailAddress, now());
-	}
-
-	private static long now() {
-		Clock clock = SystemReader.getInstance().getClock();
-		try (ProposedTimestamp t = clock.propose()) {
-			long s = t.read(TimeUnit.SECONDS);
-			t.blockUntil(5, TimeUnit.SECONDS);
-			return TimeUnit.SECONDS.toMillis(s);
-		} catch (InterruptedException | TimeoutException e) {
-			throw new IllegalStateException(JGitText.get().timeIsUncertain, e);
-		}
+	public PersonIdent(final String aName, final String aEmailAddress) {
+		this(aName, aEmailAddress, SystemReader.getInstance().getCurrentTime());
 	}
 
 	/**
@@ -259,17 +244,10 @@ public class PersonIdent implements Serializable {
 		this(pi.getName(), pi.getEmailAddress(), aWhen, aTZ);
 	}
 
-	/**
-	 * Construct a {@code PersonIdent}.
-	 *
-	 * @param aName
-	 * @param aEmailAddress
-	 * @param when
-	 * @since 4.6
-	 */
-	public PersonIdent(String aName, String aEmailAddress, long when) {
-		this(aName, aEmailAddress, when,
-				SystemReader.getInstance().getTimezone(when));
+	private PersonIdent(final String aName, final String aEmailAddress,
+			long when) {
+		this(aName, aEmailAddress, when, SystemReader.getInstance()
+				.getTimezone(when));
 	}
 
 	private PersonIdent(final UserConfig config) {
