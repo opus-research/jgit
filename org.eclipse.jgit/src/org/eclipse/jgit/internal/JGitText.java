@@ -365,7 +365,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String noApplyInDelete;
 	/***/ public String noClosingBracket;
 	/***/ public String noHEADExistsAndNoExplicitStartingRevisionWasSpecified;
-	/***/ public String noMatchingFetchSpec;
 	/***/ public String noHMACsupport;
 	/***/ public String noMergeHeadSpecified;
 	/***/ public String noSuchRef;
@@ -438,7 +437,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String remoteConfigHasNoURIAssociated;
 	/***/ public String remoteDoesNotHaveSpec;
 	/***/ public String remoteDoesNotSupportSmartHTTPPush;
-	/***/ public String remoteDoesNotSupportSmartHTTPSubscribe;
 	/***/ public String remoteHungUpUnexpectedly;
 	/***/ public String remoteNameCantBeNull;
 	/***/ public String renameBranchFailedBecauseTag;
@@ -504,7 +502,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String submodulesNotSupported;
 	/***/ public String submoduleParentRemoteUrlInvalid;
 	/***/ public String subscribeNewUpdate;
-	/***/ public String subscribeNotSupported;
+	/***/ public String subscribeStart;
 	/***/ public String symlinkCannotBeWrittenAsTheLinkTarget;
 	/***/ public String systemConfigFileInvalid;
 	/***/ public String tagNameInvalid;

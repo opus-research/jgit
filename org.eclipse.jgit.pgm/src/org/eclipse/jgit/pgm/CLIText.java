@@ -83,7 +83,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String cannotRenameDetachedHEAD;
 	/***/ public String cannotResolve;
 	/***/ public String cannotSetupConsole;
-	/***/ public String cannotSubscribeTwice;
 	/***/ public String cannotUseObjectsWithGlog;
 	/***/ public String cannotWrite;
 	/***/ public String cantFindGitDirectory;

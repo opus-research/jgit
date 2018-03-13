@@ -44,322 +44,171 @@
 package org.eclipse.jgit.transport;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.PrintWriter;
 import java.text.MessageFormat;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.errors.UnpackException;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.SubscribeCommand.Command;
-import org.eclipse.jgit.util.RefTranslator;
 
 /**
- * SubscribeConnection implementation over a send-receive connection. The client
- * writes out their current ref state and subscription requests, then receives a
- * continuous stream of packs. The pubsub protocol is designed to operate over
- * HTTP, so the client does not send any data back to the server after it
- * receives data.
+ * Subscribe implementation over a bi-directional connection. Client writes out
+ * their current ref state and subscription requests, then receives a continuous
+ * stream of packs.
  */
 public class BasePackSubscribeConnection extends BasePackConnection implements
 		SubscribeConnection {
-	private static final int LATENCY_TIMEOUT = 15; // seconds
-
-	private static class ReceivePublishedPack extends BaseReceivePack {
-		final String remote;
-
-		private ReceivePublishedPack(Repository into, String remoteName) {
-			super(into);
-			remote = remoteName;
-		}
-
-		private void receive(InputStream input) throws IOException {
-			init(input, null, null);
-			try {
-				execute();
-			} finally {
-				unlockPack();
-			}
-		}
-
-		private void execute() throws IOException {
-			recvCommands();
-			if (hasCommands()) {
-				// Translate refs/* to refs/pubsub/remote/*
-				for (ReceiveCommand c : getAllCommands())
-					c.setRefName(RefTranslator.getPubSubRefFromRemote(
-							remote, c.getRefName()));
-				Throwable unpackError = null;
-				if (needPack()) {
-					try {
-						receivePackAndCheckConnectivity();
-					} catch (IOException err) {
-						unpackError = err;
-					} catch (RuntimeException err) {
-						unpackError = err;
-					} catch (Error err) {
-						unpackError = err;
-					}
-				}
-				if (unpackError == null) {
-					validateCommands();
-					executeCommands();
-				}
-
-				if (unpackError != null)
-					throw new UnpackException(unpackError);
-			}
-		}
-
-		@Override
-		protected String getLockMessageProcessName() {
-			return "pubsub-receive-" + remote;
-		}
-	}
-
-	private volatile boolean closed;
+	private boolean closed;
 
 	/**
 	 * @param packTransport
 	 */
 	BasePackSubscribeConnection(PackTransport packTransport) {
 		super(packTransport);
+		closed = false;
 	}
 
 	/**
-	 * Prepare a new connection.
+	 * Send the subscription requests and wait for new updates.
 	 *
-	 * @param myIn
-	 * @param myOut
+	 * @param subscriber
+	 * @param subscribeCommands
+	 * @param monitor
+	 * @throws InterruptedException
 	 */
-	protected void start(InputStream myIn, OutputStream myOut) {
-		closed = false;
-		init(myIn, myOut);
-	}
-
-	public void subscribe(SubscribeState subscriber,
+	public void doSubscribe(Subscriber subscriber,
 			Map<String, List<SubscribeCommand>> subscribeCommands,
-			PrintWriter output)
+			ProgressMonitor monitor)
 			throws InterruptedException, TransportException, IOException {
 		try {
-			writeSubscribeHeader(subscriber);
+			monitor.beginTask(MessageFormat.format(
+					JGitText.get().subscribeStart, subscriber.getKey()), 2);
+
+			// Send fast restart
+			String restart = subscriber.getRestartToken();
+			if (restart == null)
+				pckOut.writeString("hello");
+			else {
+				String sequence = subscriber.getRestartSequence();
+				if (sequence == null)
+					pckOut.writeString("fast-restart " + restart);
+				else
+					pckOut.writeString(
+							"fast-restart " + restart + " " + sequence);
+			}
 
 			// Send subscription specs
 			for (Map.Entry<String, List<SubscribeCommand>> e :
 					subscribeCommands.entrySet()) {
-				String repoName = e.getKey();
-				writeSubscribeCommands(repoName, e.getValue());
-
-				List<String> subscribeSpecs = new ArrayList<String>();
+				pckOut.writeString("repo " + e.getKey());
 				for (SubscribeCommand cmd : e.getValue()) {
 					if (cmd.getCommand() == Command.SUBSCRIBE)
-						subscribeSpecs.add(cmd.getSpec());
+						pckOut.writeString("subscribe " + cmd.getSpec());
+					else
+						pckOut.writeString("unsubscribe " + cmd.getSpec());
 				}
-				writeRepositoryState(
-						subscriber.getRepository(repoName), subscribeSpecs);
-				pckOut.end();
-			}
-
-			write("done");
-
-			if (!readResponseHeader())
-				return;
-
-			// Receive publishes forever
-			while (!closed) {
-				if (Thread.interrupted())
-					throw new InterruptedException();
-				readUpdate(subscriber, output);
-			}
-		} finally {
-			close();
-		}
-	}
-
-	/**
-	 * @param subscriber
-	 * @param output
-	 * @throws TransportException
-	 * @throws IOException
-	 */
-	private void readUpdate(SubscribeState subscriber, PrintWriter output)
-			throws TransportException, IOException {
-		String line = pckIn.readString();
-		if (line.equals("heartbeat"))
-			return;
-		if (line.startsWith("restart-token ")) {
-			subscriber.setRestartToken(line.substring(
-					"restart-token ".length()));
-			return;
-		}
-		if (line.startsWith("heartbeat-interval ")) {
-			transport.setTimeout(Integer.parseInt(line.substring(
-					"heartbeat-interval ".length())) + LATENCY_TIMEOUT);
-			return;
-		}
-		if (!line.startsWith("update "))
-			throw new TransportException(MessageFormat.format(
-					JGitText.get().expectedGot, "update", line));
-		String repo = line.substring("update ".length());
-
-		SubscribedRepository db = subscriber.getRepository(repo);
-		if (db == null)
-			throw new TransportException(MessageFormat.format(
-					JGitText.get().repositoryNotFound, repo));
-		receivePublish(db, output);
-		line = pckIn.readString();
-		if (!line.startsWith("pack-id "))
-			throw new TransportException(MessageFormat.format(
-					JGitText.get().expectedGot, "pack-id", line));
-		subscriber.setLastPackId(line.substring(
-				"pack-id ".length()));
-	}
-
-	/**
-	 * Send current ref sha1 for all newly matching pubsub refs, but send the
-	 * remote ref names the server recognizes.
-	 *
-	 * @param repository
-	 * @param subscribeSpecs
-	 * @throws IOException
-	 */
-	private void writeRepositoryState(
-			SubscribedRepository repository, List<String> subscribeSpecs)
-			throws IOException {
-		for (Map.Entry<String, Ref> ref :
-				repository.getPubSubRefs().entrySet()) {
-			String refName = ref.getKey();
-			for (String spec : subscribeSpecs) {
-				if (RefSpec.isWildcard(spec) && !refName.startsWith(
-						spec.substring(0, spec.length() - 1)))
-					continue;
-				else if (!RefSpec.isWildcard(spec) && !refName.equals(spec))
-					continue;
-				String objId = ref.getValue().getLeaf().getObjectId().getName();
-				write("have " + objId + " " + refName);
-			}
-		}
-	}
-
-	/**
-	 * @param repoName
-	 * @param commands
-	 * @throws IOException
-	 */
-	private void writeSubscribeCommands(
-			String repoName, List<SubscribeCommand> commands)
-			throws IOException {
-		write("repository " + repoName);
-		for (SubscribeCommand cmd : commands) {
-			switch (cmd.getCommand()) {
-			case SUBSCRIBE:
-				write("want " + cmd.getSpec());
-				break;
-			case UNSUBSCRIBE:
-				write("stop " + cmd.getSpec());
-				break;
-			default:
-				throw new IllegalArgumentException(cmd.toString());
-			}
-		}
-	}
-
-	private void writeSubscribeHeader(SubscribeState subscriber)
-			throws IOException {
-		write("subscribe");
-		// Send restart
-		String restart = subscriber.getRestartToken();
-		if (restart != null) {
-			write("restart " + restart);
-			String id = subscriber.getLastPackId();
-			if (id != null)
-				write("last-pack-id " + id);
-		}
-		pckOut.end();
-	}
-
-	public void sendSubscribeAdvertisement(SubscribeState subscriber)
-			throws IOException, TransportException {
-		try {
-			pckOut.writeString("advertisement");
-			for (String repository : subscriber.getAllRepositories()) {
-				write("repositoryaccess " + repository);
 			}
 			pckOut.end();
 
-			readResponseHeader();
+			// Send current ref sha1 for all matching pubsub refs, but send
+			// the local ref names
+			for (String repoName : subscribeCommands.keySet()) {
+				SubscribedRepository repo = subscriber.getRepository(repoName);
+				pckOut.writeString("repo " + repoName);
+				for (Map.Entry<String, Ref> ref :
+						repo.getPubSubRefs().entrySet()) {
+					pckOut.writeString(ref.getValue().getLeaf().getObjectId()
+							.getName() + " " + ref.getKey());
+				}
+			}
+			pckOut.end();
+			monitor.update(1);
+
+			// Read fast restart token
+			String line = pckIn.readString();
+			String parts[] = line.split(" ", 2);
+			if (parts[0].equals("reconnect")) {
+				subscriber.setRestartToken(null);
+				subscriber.setRestartSequence(null);
+				return;
+			}
+			if (!parts[0].equals("fast-restart"))
+				throw new TransportException(MessageFormat.format(
+						JGitText.get().expectedGot, "fast-restart", line));
+			subscriber.setRestartToken(parts[1]);
+			if ((line = pckIn.readString()) != PacketLineIn.END)
+				throw new TransportException(MessageFormat.format(
+						JGitText.get().expectedGot, "END", line));
+			monitor.update(1);
+			monitor.endTask();
+
+			// Receive publishes forever
+			while (!closed) {
+				line = pckIn.readString();
+				if (line.equals("heartbeat")) {
+					if ((line = pckIn.readString()) != PacketLineIn.END)
+						throw new TransportException(MessageFormat.format(
+								JGitText.get().expectedGot, "END", line));
+					continue;
+				} else if (!line.startsWith("update "))
+					throw new TransportException(MessageFormat.format(
+							JGitText.get().expectedGot, "update", line));
+				String repo = line.split(" ", 2)[1];
+
+				SubscribedRepository db = subscriber.getRepository(repo);
+				if (db == null)
+					throw new TransportException(MessageFormat.format(
+							JGitText.get().repositoryNotFound, repo));
+				monitor.beginTask(MessageFormat.format(
+						JGitText.get().subscribeNewUpdate, repo),
+						ProgressMonitor.UNKNOWN);
+				receivePublish(db);
+				monitor.endTask();
+
+				line = pckIn.readString();
+				if (!line.startsWith("sequence "))
+					throw new TransportException(MessageFormat.format(
+							JGitText.get().expectedGot, "sequence", line));
+				subscriber.setRestartSequence(line.split(" ", 2)[1]);
+				if ((line = pckIn.readString()) != PacketLineIn.END)
+					throw new TransportException(MessageFormat.format(
+							JGitText.get().expectedGot, "END", line));
+
+				if (Thread.interrupted() || monitor.isCancelled())
+					throw new InterruptedException();
+			}
 		} finally {
 			close();
 		}
 	}
 
-	/**
-	 * @return true to begin receiving publishes, false for reconnect, exception
-	 *         for remote error.
-	 * @throws IOException
-	 * @throws TransportException
-	 */
-	private boolean readResponseHeader()
-			throws IOException, TransportException {
-		String line = pckIn.readString();
-		if ("reconnect".equals(line))
-			return false;
-		if (line.startsWith("ERR "))
-			throw new TransportException(line.substring("ERR ".length()));
-		if (line.startsWith("error: "))
-			throw new TransportException(line.substring("error: ".length()));
-		if (!line.equals("ACK"))
-			throw new TransportException(MessageFormat.format(
-					JGitText.get().expectedGot, "ACK", line));
-		return true;
-	}
-
-	private void write(String line) throws IOException {
-		pckOut.writeString(line + "\n");
-	}
-
-	private void receivePublish(SubscribedRepository sr, PrintWriter output)
+	private void receivePublish(SubscribedRepository repo)
 			throws IOException {
-		Repository repository = sr.getRepository();
-		ReceivePublishedPack rp = new ReceivePublishedPack(
-				repository, sr.getRemote());
+		final String remote = repo.getRemote();
+		ReceivePack rp = new ReceivePack(repo.getRepository()) {
+			/** Translate refs/* to refs/pubsub/remote/* before validating. */
+			@Override
+			protected void validateCommands() {
+				for (ReceiveCommand c : getAllCommands())
+					c.setName(SubscribedRepository.getPubSubRefFromLocal(
+							remote, c.getRefName()));
+				super.validateCommands();
+			}
+		};
 		rp.setExpectDataAfterPackFooter(true);
+		rp.setBiDirectionalPipe(false);
 		// Set the advertised refs to be the current refs/pubsub/* refs
-		rp.setAdvertisedRefs(sr.getPubSubRefs(), null);
+		rp.setAdvertisedRefs(repo.getPubSubRefs(), null);
 		try {
-			rp.receive(in);
-			// Check for any errors during receive
-			for (ReceiveCommand rc : rp.getAllCommands()) {
-				if (rc.getResult() != ReceiveCommand.Result.OK)
-					throw new TransportException(rc.getMessage() + " " + rc);
-			}
-			String workDir = JGitText.get().notFound;
-			try {
-				workDir = repository.getWorkTree().getCanonicalPath();
-			} catch (NoWorkTreeException e) {
-				// Nothing
-			}
-			output.println(MessageFormat.format(
-					JGitText.get().subscribeNewUpdate, sr.getName(),
-					workDir));
-			for (ReceiveCommand rc : rp.getAllCommands())
-				output.format("%-10s %-7s -> %-7s %s\n", rc.getType(),
-						rc.getOldId().abbreviate(7).name(),
-						rc.getNewId().abbreviate(7).name(), rc.getRefName());
-			output.flush();
+			rp.receive(in, out, null);
 		} finally {
-			rp.release();
+			rp.unlockPack();
 		}
 	}
 
-	@Override
 	public void close() {
 		closed = true;
 		super.close();

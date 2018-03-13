@@ -44,50 +44,31 @@
 package org.eclipse.jgit.transport;
 
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.List;
 import java.util.Map;
 
 import org.eclipse.jgit.errors.TransportException;
+import org.eclipse.jgit.lib.ProgressMonitor;
 
 /**
- * SubscribeConnection sends a list of repository names with a list of
+ * Subscribe connections send a list of repository names with a list of
  * SubscribeCommands and ref states for each repository to a Publisher instance.
  * The connection is left open, and the Publisher responds by sending any
  * matching ref updates in packs.
  */
 public interface SubscribeConnection extends Connection {
 	/**
-	 * Do the initial advertisement with only repository names to determine if
-	 * authentication is needed for this request.
-	 *
-	 * @param subscriber
-	 * @throws IOException
-	 * @throws TransportException
-	 *             thrown if the client is unauthorized to view the remote
-	 *             repository, the remote repository does not exist, or a
-	 *             protocol level error occurred.
-	 */
-	void sendSubscribeAdvertisement(SubscribeState subscriber)
-			throws IOException, TransportException;
-
-	/**
-	 * Subscribe to a remote Publisher instance by sending the server a list of
-	 * repositories and refspecs it wants to receive updates for. It also sends
-	 * the client's state for all locally-matching refs, and optionally a
-	 * restart token to reconnect a dropped connection.
+	 * Subscribe using this connection.
 	 *
 	 * @param subscriber
 	 * @param subscribeCommands
-	 *            map from repository name to a list of SubscribeCommands to
-	 *            execute for that repository
-	 * @param output
+	 * @param monitor
 	 * @throws InterruptedException
 	 * @throws IOException
 	 * @throws TransportException
 	 */
-	void subscribe(SubscribeState subscriber,
+	void doSubscribe(Subscriber subscriber,
 			Map<String, List<SubscribeCommand>> subscribeCommands,
-			PrintWriter output)
+			ProgressMonitor monitor)
 			throws InterruptedException, TransportException, IOException;
 }
