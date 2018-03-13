@@ -52,7 +52,6 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -64,7 +63,6 @@ import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.PackLock;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
@@ -591,10 +589,10 @@ public class ReceivePack {
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
 		if (allowOfsDelta)
 			adv.advertiseCapability(CAPABILITY_OFS_DELTA);
-		refs = new HashMap<String, Ref>(db.getAllRefs());
+		refs = db.getAllRefs();
 		final Ref head = refs.remove(Constants.HEAD);
 		adv.send(refs.values());
-		if (head instanceof ObjectIdRef)
+		if (!head.isSymbolic())
 			adv.advertiseHave(head.getObjectId());
 		adv.includeAdditionalHaves();
 		if (adv.isEmpty())

@@ -304,7 +304,8 @@ class RebuildCommitGraph extends TextBuiltin {
 					}
 					throw new MissingObjectException(id, type);
 				}
-				refs.put(name, new ObjectIdRef(Ref.Storage.PACKED, name, id));
+				refs.put(name, new ObjectIdRef.Unpeeled(Ref.Storage.PACKED,
+						name, id));
 			}
 		} finally {
 			br.close();

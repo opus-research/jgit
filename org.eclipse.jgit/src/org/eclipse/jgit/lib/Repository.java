@@ -911,10 +911,10 @@ public class Repository {
 	 * This is essentially the same as doing:
 	 *
 	 * <pre>
-	 * return ((SymbolicRef)getRef(Constants.HEAD)).getTarget().getName()
+	 * return getRef(Constants.HEAD).getTarget().getName()
 	 * </pre>
 	 *
-	 * Except when HEAD is detached in which case this method returns the
+	 * Except when HEAD is detached, in which case this method returns the
 	 * current ObjectId in hexadecimal string format.
 	 *
 	 * @return name of current branch (for example {@code refs/heads/master}) or
@@ -923,9 +923,11 @@ public class Repository {
 	 */
 	public String getFullBranch() throws IOException {
 		Ref head = getRef(Constants.HEAD);
-		if (head instanceof SymbolicRef)
-			return ((SymbolicRef)head).getTarget().getName();
-		if (head != null && head.getObjectId() != null)
+		if (head == null)
+			return null;
+		if (head.isSymbolic())
+			return head.getTarget().getName();
+		if (head.getObjectId() != null)
 			return head.getObjectId().name();
 		return null;
 	}
@@ -963,7 +965,7 @@ public class Repository {
 	}
 
 	/**
-	 * @return all known refs (heads, tags, remotes).
+	 * @return mutable map of all known refs (heads, tags, remotes).
 	 */
 	public Map<String, Ref> getAllRefs() {
 		try {
@@ -974,8 +976,9 @@ public class Repository {
 	}
 
 	/**
-	 * @return all tags; key is short tag name ("v1.0") and value of the entry
-	 *         contains the ref with the full tag name ("refs/tags/v1.0").
+	 * @return mutable map of all tags; key is short tag name ("v1.0") and value
+	 *         of the entry contains the ref with the full tag name
+	 *         ("refs/tags/v1.0").
 	 */
 	public Map<String, Ref> getTags() {
 		try {

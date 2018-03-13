@@ -490,8 +490,8 @@ public abstract class RefUpdate {
 		final String myName = getRef().getLeaf().getName();
 		if (myName.startsWith(Constants.R_HEADS)) {
 			Ref head = getRefDatabase().getRef(Constants.HEAD);
-			while (head instanceof SymbolicRef) {
-				head = ((SymbolicRef) head).getTarget();
+			while (head.isSymbolic()) {
+				head = head.getTarget();
 				if (myName.equals(head.getName()))
 					return result = Result.REJECTED_CURRENT_BRANCH;
 			}
@@ -532,8 +532,8 @@ public abstract class RefUpdate {
 				return Result.LOCK_FAILURE;
 
 			final Ref old = getRefDatabase().getRef(getName());
-			if (old instanceof SymbolicRef) {
-				final Ref dst = ((SymbolicRef) old).getTarget();
+			if (old != null && old.isSymbolic()) {
+				final Ref dst = old.getTarget();
 				if (target.equals(dst.getName()))
 					return result = Result.NO_CHANGE;
 			}

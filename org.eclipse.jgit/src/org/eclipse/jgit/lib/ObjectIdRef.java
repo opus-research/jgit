@@ -1,7 +1,6 @@
 /*
  * Copyright (C) 2010, Google Inc.
- * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -46,96 +45,137 @@
 package org.eclipse.jgit.lib;
 
 /** A {@link Ref} that points directly at an {@link ObjectId}. */
-public class ObjectIdRef extends Ref {
+public abstract class ObjectIdRef implements Ref {
+	/** Any reference whose peeled value is not yet known. */
+	public static class Unpeeled extends ObjectIdRef {
+		/**
+		 * Create a new ref pairing.
+		 *
+		 * @param st
+		 *            method used to store this ref.
+		 * @param name
+		 *            name of this ref.
+		 * @param id
+		 *            current value of the ref. May be null to indicate a ref
+		 *            that does not exist yet.
+		 */
+		public Unpeeled(Storage st, String name, ObjectId id) {
+			super(st, name, id);
+		}
+
+		public ObjectId getPeeledObjectId() {
+			return null;
+		}
+
+		public boolean isPeeled() {
+			return false;
+		}
+	}
+
+	/** An annotated tag whose peeled object has been cached. */
+	public static class PeeledTag extends ObjectIdRef {
+		private final ObjectId peeledObjectId;
+
+		/**
+		 * Create a new ref pairing.
+		 *
+		 * @param st
+		 *            method used to store this ref.
+		 * @param name
+		 *            name of this ref.
+		 * @param id
+		 *            current value of the ref.
+		 * @param p
+		 *            the first non-tag object that tag {@code id} points to.
+		 */
+		public PeeledTag(Storage st, String name, ObjectId id, ObjectId p) {
+			super(st, name, id);
+			peeledObjectId = p;
+		}
+
+		public ObjectId getPeeledObjectId() {
+			return peeledObjectId;
+		}
+
+		public boolean isPeeled() {
+			return true;
+		}
+	}
+
+	/** A reference to a non-tag object coming from a cached source. */
+	public static class PeeledNonTag extends ObjectIdRef {
+		/**
+		 * Create a new ref pairing.
+		 *
+		 * @param st
+		 *            method used to store this ref.
+		 * @param name
+		 *            name of this ref.
+		 * @param id
+		 *            current value of the ref. May be null to indicate a ref
+		 *            that does not exist yet.
+		 */
+		public PeeledNonTag(Storage st, String name, ObjectId id) {
+			super(st, name, id);
+		}
+
+		public ObjectId getPeeledObjectId() {
+			return null;
+		}
+
+		public boolean isPeeled() {
+			return true;
+		}
+	}
+
+	private final String name;
+
 	private final Storage storage;
 
 	private final ObjectId objectId;
 
-	private final ObjectId peeledObjectId;
-
-	private final boolean peeled;
-
 	/**
 	 * Create a new ref pairing.
 	 *
 	 * @param st
 	 *            method used to store this ref.
-	 * @param refName
+	 * @param name
 	 *            name of this ref.
 	 * @param id
 	 *            current value of the ref. May be null to indicate a ref that
 	 *            does not exist yet.
 	 */
-	public ObjectIdRef(Storage st, String refName, ObjectId id) {
-		this(st, refName, id, null, false);
-	}
-
-	/**
-	 * Create a new ref pairing.
-	 *
-	 * @param st
-	 *            method used to store this ref.
-	 * @param refName
-	 *            name of this ref.
-	 * @param id
-	 *            current value of the ref. May be null to indicate a ref that
-	 *            does not exist yet.
-	 * @param peel
-	 *            peeled value of the ref's tag. May be null if this is not a
-	 *            tag or the peeled value is not known.
-	 * @param peeled
-	 *            true if peel represents a the peeled value of the object
-	 */
-	public ObjectIdRef(Storage st, String refName, ObjectId id, ObjectId peel,
-			boolean peeled) {
-		super(refName);
+	protected ObjectIdRef(Storage st, String name, ObjectId id) {
+		this.name = name;
 		this.storage = st;
 		this.objectId = id;
-		this.peeledObjectId = peel;
-		this.peeled = peeled;
 	}
 
-	/**
-	 * Cached value of this ref.
-	 *
-	 * @return the value of this ref at the last time we read it.
-	 */
+	public String getName() {
+		return name;
+	}
+
+	public boolean isSymbolic() {
+		return false;
+	}
+
+	public Ref getLeaf() {
+		return this;
+	}
+
+	public Ref getTarget() {
+		return this;
+	}
+
 	public ObjectId getObjectId() {
 		return objectId;
 	}
 
-	/**
-	 * Cached value of <code>ref^{}</code> (the ref peeled to commit).
-	 *
-	 * @return if this ref is an annotated tag the id of the commit (or tree or
-	 *         blob) that the annotated tag refers to; null if this ref does not
-	 *         refer to an annotated tag.
-	 */
-	public ObjectId getPeeledObjectId() {
-		if (!peeled)
-			return null;
-		return peeledObjectId;
-	}
-
-	/**
-	 * @return whether the Ref represents a peeled tag
-	 */
-	public boolean isPeeled() {
-		return peeled;
-	}
-
-	/**
-	 * How was this ref obtained?
-	 * <p>
-	 * The current storage model of a Ref may influence how the ref must be
-	 * updated or deleted from the repository.
-	 *
-	 * @return type of ref.
-	 */
 	public Storage getStorage() {
 		return storage;
 	}
 
+	@Override
 	public String toString() {
 		StringBuilder r = new StringBuilder();
 		r.append("Ref[");

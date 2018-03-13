@@ -396,15 +396,15 @@ public class TransportSftp extends SshTransport implements WalkTransport {
 				if (r == null)
 					r = readRef(avail, ROOT_DIR + target, target);
 				if (r == null)
-					r = new ObjectIdRef(Ref.Storage.NEW, target, null);
-				r = new SymbolicRef(r, name);
+					r = new ObjectIdRef.Unpeeled(Ref.Storage.NEW, target, null);
+				r = new SymbolicRef(name, r);
 				avail.put(r.getName(), r);
 				return r;
 			}
 
 			if (ObjectId.isId(line)) {
-				final Ref r = new ObjectIdRef(loose(avail.get(name)), name,
-						ObjectId.fromString(line));
+				final Ref r = new ObjectIdRef.Unpeeled(loose(avail.get(name)),
+						name, ObjectId.fromString(line));
 				avail.put(r.getName(), r);
 				return r;
 			}

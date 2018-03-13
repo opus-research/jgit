@@ -86,14 +86,10 @@ public abstract class RefDatabase {
 	 * @throws IOException
 	 *             the database could not be created.
 	 */
-	public void create() throws IOException {
-		// Assume no action is required.
-	}
+	public abstract void create() throws IOException;
 
 	/** Close any resources held by this database. */
-	public void close() {
-		// Assume no action is required.
-	}
+	public abstract void close();
 
 	/**
 	 * Determine if a proposed reference name overlaps with an existing one.
@@ -111,6 +107,7 @@ public abstract class RefDatabase {
 	public boolean isNameConflicting(final String name) throws IOException {
 		Map<String, Ref> all = getRefs(ALL);
 
+		// Cannot be nested within an existing reference.
 		int lastSlash = name.lastIndexOf('/');
 		while (0 < lastSlash) {
 			if (all.containsKey(name.substring(0, lastSlash)))
@@ -118,6 +115,7 @@ public abstract class RefDatabase {
 			lastSlash = name.lastIndexOf('/', lastSlash - 1);
 		}
 
+		// Cannot be the container of an existing reference.
 		final String rName = name + '/';
 		for (String other : all.keySet()) {
 			if (other.startsWith(rName))

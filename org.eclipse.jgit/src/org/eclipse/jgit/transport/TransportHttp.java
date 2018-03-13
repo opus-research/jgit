@@ -83,6 +83,7 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.RefDirectory;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.SymbolicRef;
 import org.eclipse.jgit.lib.Config.SectionParser;
@@ -242,15 +243,15 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				br = toBufferedReader(openInputStream(conn));
 				try {
 					String line = br.readLine();
-					if (line != null && line.startsWith("ref: ")) {
-						final String target = line.substring(5);
+					if (line != null && line.startsWith(RefDirectory.SYMREF)) {
+						String target = line.substring(RefDirectory.SYMREF.length());
 						Ref r = refs.get(target);
 						if (r == null)
-							r = new ObjectIdRef(Ref.Storage.NEW, target, null);
-						r = new SymbolicRef(r, Constants.HEAD);
+							r = new ObjectIdRef.Unpeeled(Ref.Storage.NEW, target, null);
+						r = new SymbolicRef(Constants.HEAD, r);
 						refs.put(r.getName(), r);
 					} else if (line != null && ObjectId.isId(line)) {
-						Ref r = new ObjectIdRef(Ref.Storage.NETWORK,
+						Ref r = new ObjectIdRef.Unpeeled(Ref.Storage.NETWORK,
 								Constants.HEAD, ObjectId.fromString(line));
 						refs.put(r.getName(), r);
 					}
@@ -530,10 +531,11 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 					if (prior.getPeeledObjectId() != null)
 						throw duplicateAdvertisement(name + "^{}");
 
-					avail.put(name, new ObjectIdRef(Ref.Storage.NETWORK, name,
-							prior.getObjectId(), id, true));
+					avail.put(name, new ObjectIdRef.PeeledTag(
+							Ref.Storage.NETWORK, name,
+							prior.getObjectId(), id));
 				} else {
-					final Ref prior = avail.put(name, new ObjectIdRef(
+					Ref prior = avail.put(name, new ObjectIdRef.PeeledNonTag(
 							Ref.Storage.NETWORK, name, id));
 					if (prior != null)
 						throw duplicateAdvertisement(name);

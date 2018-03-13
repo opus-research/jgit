@@ -49,6 +49,10 @@ package org.eclipse.jgit.lib;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.util.Collection;
+import java.util.Map;
+
+import org.eclipse.jgit.util.RefList;
+import org.eclipse.jgit.util.RefMap;
 
 /**
  * Writes out refs to the {@link Constants#INFO_REFS} and
@@ -68,6 +72,22 @@ public abstract class RefWriter {
 	 */
 	public RefWriter(Collection<Ref> refs) {
 		this.refs = RefComparator.sort(refs);
+	}
+
+	/**
+	 * @param refs
+	 *            the complete set of references. This should have been computed
+	 *            by applying updates to the advertised refs already discovered.
+	 */
+	public RefWriter(Map<String, Ref> refs) {
+		if (refs instanceof RefMap)
+			this.refs = refs.values();
+		else
+			this.refs = RefComparator.sort(refs.values());
+	}
+
+	RefWriter(RefList<Ref> list) {
+		this.refs = list.asList();
 	}
 
 	/**
@@ -130,9 +150,9 @@ public abstract class RefWriter {
 
 		final StringWriter w = new StringWriter();
 		if (peeled) {
-			w.write("# pack-refs with:");
+			w.write(RefDirectory.PACKED_REFS_HEADER);
 			if (peeled)
-				w.write(" peeled");
+				w.write(RefDirectory.PACKED_REFS_PEELED);
 			w.write('\n');
 		}
 
