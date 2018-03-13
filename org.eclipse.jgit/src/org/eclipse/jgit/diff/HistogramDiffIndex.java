@@ -123,7 +123,16 @@ final class HistogramDiffIndex<S extends Sequence> {
 	 */
 	private int[] next;
 
-	/** For {@code ptr} in A, {@code recs[ptr - ptrShift]} is the record of it. */
+	/**
+	 * For element {@code ptr} in A, index of the record in {@link #recs} array.
+	 *
+	 * The record at {@code recs[recIdx[ptr - ptrShift]]} is the record
+	 * describing all occurrences of the element appearing in sequence A at
+	 * position {@code ptr}. The record is needed to get the occurrence count of
+	 * the element, or to locate all other occurrences of that element within
+	 * sequence A. This index provides constant-time access to the record, and
+	 * avoids needing to scan the hash chain.
+	 */
 	private int[] recIdx;
 
 	/** Value to subtract from element indexes to key {@link #next} array. */
