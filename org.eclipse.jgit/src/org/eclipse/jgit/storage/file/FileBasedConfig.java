@@ -58,6 +58,7 @@ import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
@@ -70,6 +71,7 @@ public class FileBasedConfig extends StoredConfig {
 	private final File configFile;
 	private final FS fs;
 	private volatile FileSnapshot snapshot;
+	private volatile ObjectId hash;
 
 	/**
 	 * Create a configuration with no default fallback.
@@ -100,6 +102,7 @@ public class FileBasedConfig extends StoredConfig {
 		configFile = cfgLocation;
 		this.fs = fs;
 		this.snapshot = FileSnapshot.DIRTY;
+		this.hash = ObjectId.zeroId();
 	}
 
 	@Override
@@ -126,11 +129,24 @@ public class FileBasedConfig extends StoredConfig {
 	 */
 	@Override
 	public void load() throws IOException, ConfigInvalidException {
-		snapshot = FileSnapshot.save(getFile());
+		final FileSnapshot oldSnapshot = snapshot;
+		final FileSnapshot newSnapshot = FileSnapshot.save(getFile());
 		try {
-			fromText(RawParseUtils.decode(IO.readFully(getFile())));
+			final byte[] in = IO.readFully(getFile());
+			final ObjectId newHash = hash(in);
+			if (hash.equals(newHash)) {
+				if (oldSnapshot.equals(newSnapshot))
+					oldSnapshot.setClean(newSnapshot);
+				else
+					snapshot = newSnapshot;
+			} else {
+				fromText(RawParseUtils.decode(in));
+				snapshot = newSnapshot;
+				hash = newHash;
+			}
 		} catch (FileNotFoundException noFile) {
 			clear();
+			snapshot = newSnapshot;
 		} catch (IOException e) {
 			final IOException e2 = new IOException(MessageFormat.format(JGitText.get().cannotReadFile, getFile()));
 			e2.initCause(e);
@@ -166,8 +182,19 @@ public class FileBasedConfig extends StoredConfig {
 			lf.unlock();
 		}
 		snapshot = lf.getCommitSnapshot();
+		hash = hash(out);
 		// notify the listeners
 		fireConfigChangedEvent();
+	}
+
+	@Override
+	public void clear() {
+		hash = hash(new byte[0]);
+		super.clear();
+	}
+
+	private static ObjectId hash(final byte[] rawText) {
+		return ObjectId.fromRaw(Constants.newMessageDigest().digest(rawText));
 	}
 
 	@Override
