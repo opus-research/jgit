@@ -45,6 +45,7 @@ package org.eclipse.jgit.api;
 
 import static org.eclipse.jgit.util.FileUtils.RECURSIVE;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -933,11 +934,7 @@ public class AddCommandTest extends RepositoryTestCase {
 			}
 
 			public boolean canExecute(File f) {
-				try {
-					return read(f).startsWith("binary:");
-				} catch (IOException e) {
-					return false;
-				}
+				return true;
 			}
 
 			@Override
@@ -948,40 +945,61 @@ public class AddCommandTest extends RepositoryTestCase {
 
 		Git git = Git.open(db.getDirectory(), executableFs);
 		String path = "a.txt";
-		String path2 = "a.sh";
 		writeTrashFile(path, "content");
-		writeTrashFile(path2, "binary: content");
-		git.add().addFilepattern(path).addFilepattern(path2).call();
+		git.add().addFilepattern(path).call();
 		RevCommit commit1 = git.commit().setMessage("commit").call();
-		try (TreeWalk walk = new TreeWalk(db)) {
-			walk.addTree(commit1.getTree());
-			walk.next();
-			assertEquals(path2, walk.getPathString());
-			assertEquals(FileMode.EXECUTABLE_FILE, walk.getFileMode(0));
-			walk.next();
-			assertEquals(path, walk.getPathString());
-			assertEquals(FileMode.REGULAR_FILE, walk.getFileMode(0));
-		}
+		TreeWalk walk = TreeWalk.forPath(db, path, commit1.getTree());
+		assertNotNull(walk);
+		assertEquals(FileMode.EXECUTABLE_FILE, walk.getFileMode(0));
+
+		FS nonExecutableFs = new FS() {
+
+			public boolean supportsExecute() {
+				return false;
+			}
+
+			public boolean setExecute(File f, boolean canExec) {
+				return false;
+			}
+
+			public ProcessBuilder runInShell(String cmd, String[] args) {
+				return null;
+			}
+
+			public boolean retryFailedLockFileCommit() {
+				return false;
+			}
+
+			public FS newInstance() {
+				return this;
+			}
+
+			protected File discoverGitExe() {
+				return null;
+			}
+
+			public boolean canExecute(File f) {
+				return false;
+			}
+
+			@Override
+			public boolean isCaseSensitive() {
+				return false;
+			}
+		};
 
 		config = db.getConfig();
 		config.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
 				ConfigConstants.CONFIG_KEY_FILEMODE, false);
 		config.save();
 
-		Git git2 = Git.open(db.getDirectory(), executableFs);
-		writeTrashFile(path2, "content2");
-		writeTrashFile(path, "binary: content2");
-		git2.add().addFilepattern(path).addFilepattern(path2).call();
+		Git git2 = Git.open(db.getDirectory(), nonExecutableFs);
+		writeTrashFile(path, "content2");
+		git2.add().addFilepattern(path).call();
 		RevCommit commit2 = git2.commit().setMessage("commit2").call();
-		try (TreeWalk walk = new TreeWalk(db)) {
-			walk.addTree(commit2.getTree());
-			walk.next();
-			assertEquals(path2, walk.getPathString());
-			assertEquals(FileMode.EXECUTABLE_FILE, walk.getFileMode(0));
-			walk.next();
-			assertEquals(path, walk.getPathString());
-			assertEquals(FileMode.REGULAR_FILE, walk.getFileMode(0));
-		}
+		walk = TreeWalk.forPath(db, path, commit2.getTree());
+		assertNotNull(walk);
+		assertEquals(FileMode.EXECUTABLE_FILE, walk.getFileMode(0));
 	}
 
 	private static DirCacheEntry addEntryToBuilder(String path, File file,
