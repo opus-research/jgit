@@ -83,6 +83,7 @@ import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.pack.CachedPack;
 import org.eclipse.jgit.storage.pack.ObjectReuseAsIs;
@@ -432,8 +433,8 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		throw new MissingObjectException(objectId.copy(), typeHint);
 	}
 
-	public DfsObjectToPack newObjectToPack(AnyObjectId objectId, int type) {
-		return new DfsObjectToPack(objectId, type);
+	public DfsObjectToPack newObjectToPack(RevObject obj) {
+		return new DfsObjectToPack(obj);
 	}
 
 	private static final Comparator<DfsObjectRepresentation> REPRESENTATION_SORT = new Comparator<DfsObjectRepresentation>() {

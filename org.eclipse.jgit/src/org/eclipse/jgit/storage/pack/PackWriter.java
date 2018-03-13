@@ -1826,18 +1826,13 @@ public class PackWriter {
 	}
 
 	private void addObject(final RevObject object, final int pathHashCode) {
-		addObject(object, object.getType(), pathHashCode);
-	}
-
-	private void addObject(
-			final AnyObjectId src, final int type, final int pathHashCode) {
 		final ObjectToPack otp;
 		if (reuseSupport != null)
-			otp = reuseSupport.newObjectToPack(src, type);
+			otp = reuseSupport.newObjectToPack(object);
 		else
-			otp = new ObjectToPack(src, type);
+			otp = new ObjectToPack(object);
 		otp.setPathHash(pathHashCode);
-		objectsLists[type].add(otp);
+		objectsLists[object.getType()].add(otp);
 		objectsMap.add(otp);
 	}
 
