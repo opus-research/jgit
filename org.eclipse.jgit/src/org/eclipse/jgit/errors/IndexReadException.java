@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2015, Christian Halstrick <christian.halstrick@sap.com>
- * and other copyright owners as documented in the project's IP log.
+ * Copyright (C) 2015, Christian Halstrick <christian.halstrick@sap.com> and
+ * other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Distribution License v1.0 which accompanies this
@@ -35,28 +35,48 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api.errors;
+package org.eclipse.jgit.errors;
+
+import java.io.IOException;
+
+import org.eclipse.jgit.internal.JGitText;
 
 /**
- * Exception thrown when a newly created commit does not contain any changes
+ * Cannot read the index. This is a serious error that users need to be made
+ * aware of.
  *
  * @since 4.2
  */
-public class EmtpyCommitException extends GitAPIException {
+public class IndexReadException extends IOException {
 	private static final long serialVersionUID = 1L;
 
 	/**
-	 * @param message
-	 * @param cause
+	 * Constructs an IndexReadException with the default message.
 	 */
-	public EmtpyCommitException(String message, Throwable cause) {
-		super(message, cause);
+	public IndexReadException() {
+		super(JGitText.get().indexWriteException);
 	}
 
 	/**
-	 * @param message
+	 * Constructs an IndexReadException with the specified detail message.
+	 *
+	 * @param s
+	 *            message
 	 */
-	public EmtpyCommitException(String message) {
-		super(message);
+	public IndexReadException(final String s) {
+		super(s);
+	}
+
+	/**
+	 * Constructs an IndexReadException with the specified detail message.
+	 *
+	 * @param s
+	 *            message
+	 * @param cause
+	 *            root cause exception
+	 */
+	public IndexReadException(final String s, final Throwable cause) {
+		super(s);
+		initCause(cause);
 	}
 }
