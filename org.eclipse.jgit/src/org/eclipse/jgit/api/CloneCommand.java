@@ -512,11 +512,11 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	private static void validateDirs(File directory, File gitDir, boolean bare)
 			throws IllegalStateException {
 		if (directory != null) {
-			if (directory.exists() && !directory.isDirectory()) {
+			if (!directory.isDirectory()) {
 				throw new IllegalStateException(MessageFormat.format(
 						JGitText.get().initFailedDirIsNoDirectory, directory));
 			}
-			if (gitDir != null && gitDir.exists() && !gitDir.isDirectory()) {
+			if (gitDir != null && !gitDir.isDirectory()) {
 				throw new IllegalStateException(MessageFormat.format(
 						JGitText.get().initFailedGitDirIsNoDirectory,
 						gitDir));
