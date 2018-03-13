@@ -56,7 +56,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
@@ -169,8 +168,7 @@ abstract class HttpAuthMethod {
 									SCHEMA_NAME_SEPARATOR, 2);
 
 							try {
-								Type methodType = Type.valueOf(
-										valuePart[0].toUpperCase(Locale.ROOT));
+								Type methodType = Type.valueOf(valuePart[0].toUpperCase());
 
 								if ((ignoreTypes != null)
 										&& (ignoreTypes.contains(methodType))) {
@@ -542,7 +540,7 @@ abstract class HttpAuthMethod {
 			GSSManager gssManager = GSS_MANAGER_FACTORY.newInstance(conn
 					.getURL());
 			String host = conn.getURL().getHost();
-			String peerName = "HTTP@" + host.toLowerCase(Locale.ROOT); //$NON-NLS-1$
+			String peerName = "HTTP@" + host.toLowerCase(); //$NON-NLS-1$
 			try {
 				GSSName gssName = gssManager.createName(peerName,
 						GSSName.NT_HOSTBASED_SERVICE);
