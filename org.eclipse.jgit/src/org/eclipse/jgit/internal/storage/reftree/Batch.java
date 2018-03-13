@@ -98,7 +98,9 @@ class Batch extends BatchRefUpdate {
 			throws IOException {
 		List<Command> forTree = new ArrayList<>(getCommands().size());
 		List<ReceiveCommand> forBootstrap = new ArrayList<>();
+		boolean hasRefsTxnCommitted = false;
 		BootstrapBehavior behavior = refdb.getBehavior();
+
 		for (ReceiveCommand c : getCommands()) {
 			if (c.getResult() != NOT_ATTEMPTED) {
 				reject(JGitText.get().transactionAborted);
@@ -124,6 +126,7 @@ class Batch extends BatchRefUpdate {
 			}
 
 			if (behavior == UNION && isBootstrapRef(c)) {
+				hasRefsTxnCommitted |= R_TXN_COMMITTED.equals(c.getRefName());
 				forBootstrap.add(c);
 			} else {
 				forTree.add(new Command(rw, c));
@@ -132,6 +135,10 @@ class Batch extends BatchRefUpdate {
 
 		ReceiveCommand commit = null;
 		if (!forTree.isEmpty()) {
+			if (hasRefsTxnCommitted) {
+				reject(JGitText.get().transactionAborted);
+				return;
+			}
 			init(rw);
 			if (!apply(forTree)) {
 				reject(JGitText.get().transactionAborted);
@@ -162,6 +169,14 @@ class Batch extends BatchRefUpdate {
 		}
 	}
 
+	private void reject(String msg) {
+		for (ReceiveCommand c : getCommands()) {
+			if (c.getResult() == NOT_ATTEMPTED) {
+				c.setResult(REJECTED_OTHER_REASON, msg);
+				msg = JGitText.get().transactionAborted;
+			}
+		}
+	}
 	private static boolean isBootstrapRef(ReceiveCommand c) {
 		return c.getRefName().startsWith(R_TXN);
 	}
@@ -203,7 +218,7 @@ class Batch extends BatchRefUpdate {
 
 	void execute(RevWalk rw, List<Command> todo) throws IOException {
 		if (apply(todo) && nextId != null) {
-			commit(rw);
+			commit(rw, todo);
 		}
 	}
 
@@ -240,34 +255,32 @@ class Batch extends BatchRefUpdate {
 		return true;
 	}
 
-	private void commit(RevWalk rw) throws IOException {
+	private void commit(RevWalk rw, List<Command> todo) throws IOException {
 		RefUpdate u = refdb.getBootstrap().newUpdate(R_TXN_COMMITTED, false);
 		u.setExpectedOldObjectId(parentId);
 		u.setNewObjectId(nextId);
 		u.setRefLogIdent(author);
 		u.setRefLogMessage("commit", false); //$NON-NLS-1$
+
 		Result result = u.update(rw);
 		switch (result) {
 		case NEW:
 		case FAST_FORWARD:
 		case NO_CHANGE:
-			for (ReceiveCommand c : getCommands()) {
+			for (Command c : todo) {
 				c.setResult(OK);
 			}
 			break;
 
 		default:
-			reject(result.name());
-			break;
-		}
-	}
-
-	private void reject(String msg) {
-		for (ReceiveCommand c : getCommands()) {
-			if (c.getResult() == NOT_ATTEMPTED) {
-				c.setResult(REJECTED_OTHER_REASON, msg);
-				msg = JGitText.get().transactionAborted;
+			String msg = result.name();
+			for (Command c : todo) {
+				if (c.getResult() == NOT_ATTEMPTED) {
+					c.setResult(REJECTED_OTHER_REASON, msg);
+					msg = JGitText.get().transactionAborted;
+				}
 			}
+			break;
 		}
 	}
 }

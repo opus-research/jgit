@@ -93,7 +93,7 @@ class Update extends RefUpdate {
 			oldRef = batch.exactRef(rw.getObjectReader(), getName());
 			if (oldRef != null && oldRef.getObjectId() != null) {
 				setOldObjectId(oldRef.getObjectId());
-			} else {
+			} else if (oldRef == null && getExpectedOldObjectId() != null) {
 				setOldObjectId(ObjectId.zeroId());
 			}
 		}
