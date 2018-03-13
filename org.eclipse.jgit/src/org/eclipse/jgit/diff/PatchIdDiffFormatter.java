@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2011, Stefan Lay <stefan.lay@.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,58 +40,49 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.diff;
 
-package org.eclipse.jgit.storage.dht;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.security.DigestOutputStream;
+import java.security.MessageDigest;
 
-import org.eclipse.jgit.lib.Config;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.util.io.NullOutputStream;
 
-/** Configuration parameters for {@link ChunkCache}. */
-public class ChunkCacheConfig {
-	/** 1024 (number of bytes in one kibibyte/kilobyte) */
-	public static final int KiB = 1024;
+/**
+ * A DiffFormatter used to calculate the patch-id of the diff.
+ */
+public class PatchIdDiffFormatter extends DiffFormatter {
 
-	/** 1024 {@link #KiB} (number of bytes in one mebibyte/megabyte) */
-	public static final int MiB = 1024 * KiB;
+	private final MessageDigest digest;
 
-	private long chunkCacheLimit;
-
-	/** Create a default configuration. */
-	public ChunkCacheConfig() {
-		setChunkCacheLimit(10 * MiB);
+	/** Initialize a formatter to compute a patch id. */
+	public PatchIdDiffFormatter() {
+		super(new DigestOutputStream(NullOutputStream.INSTANCE,
+				Constants.newMessageDigest()));
+		digest = ((DigestOutputStream) getOutputStream()).getMessageDigest();
 	}
 
 	/**
-	 * @return maximum number bytes of heap memory to dedicate to caching pack
-	 *         file data. If the limit is configured to 0, the chunk cache is
-	 *         disabled. <b>Default is 10 MB.</b>
-	 */
-	public long getChunkCacheLimit() {
-		return chunkCacheLimit;
-	}
-
-	/**
-	 * @param newLimit
-	 *            maximum number bytes of heap memory to dedicate to caching
-	 *            pack file data.
-	 * @return {@code this}
-	 */
-	public ChunkCacheConfig setChunkCacheLimit(final long newLimit) {
-		chunkCacheLimit = Math.max(0, newLimit);
-		return this;
-	}
-
-	/**
-	 * Update properties by setting fields from the configuration.
-	 * <p>
-	 * If a property is not defined in the configuration, then it is left
-	 * unmodified.
+	 * Should be called after having called one of the format methods
 	 *
-	 * @param rc
-	 *            configuration to read properties from.
-	 * @return {@code this}
+	 * @return the patch id calculated for the provided diff.
 	 */
-	public ChunkCacheConfig fromConfig(final Config rc) {
-		setChunkCacheLimit(rc.getLong("core", "dht", "chunkCacheLimit", getChunkCacheLimit()));
-		return this;
+	public ObjectId getCalulatedPatchId() {
+		return ObjectId.fromRaw(digest.digest());
+	}
+
+	@Override
+	protected void writeHunkHeader(int aStartLine, int aEndLine,
+			int bStartLine, int bEndLine) throws IOException {
+		// The hunk header is not taken into account for patch id calculation
+	}
+
+	@Override
+	protected void formatIndexLine(OutputStream o, DiffEntry ent)
+			throws IOException {
+		// The index line is not taken into account for patch id calculation
 	}
 }

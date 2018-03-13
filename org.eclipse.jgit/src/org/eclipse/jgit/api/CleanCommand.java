@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2011, GitHub Inc.
+ * Copyright (C) 2011, Chris Aniszczyk <zx@redhat.com>
+ * Copyright (C) 2011, Abhishek Bhatnagar <abhatnag@redhat.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,109 +41,71 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.blame;
+package org.eclipse.jgit.api;
 
-import java.util.Arrays;
+import java.io.File;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.Set;
+import java.util.TreeSet;
 
-import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.util.FileUtils;
 
 /**
- * Line class that spans one or more continuous revisions.
+ * Remove untracked files from the working tree
+ *
+ * @see <a
+ *      href="http://www.kernel.org/pub/software/scm/git/docs/git-clean.html"
+ *      >Git documentation about Clean</a>
  */
-public class Line {
+public class CleanCommand extends GitCommand<Set<String>> {
 
-	private RevCommit startCommit;
-
-	private int[] numbers = new int[0];
+	private Set<String> paths = Collections.emptySet();
 
 	/**
-	 * Create line with starting commit
-	 *
-	 * @param start
+	 * @param repo
 	 */
-	public Line(RevCommit start) {
-		startCommit = start;
+	protected CleanCommand(Repository repo) {
+		super(repo);
 	}
 
 	/**
-	 * Get the number of this line in the latest revision it was present in
+	 * Executes the {@code clean} command with all the options and parameters
+	 * collected by the setter methods of this class. Each instance of this
+	 * class should only be used for one invocation of the command (means: one
+	 * call to {@link #call()})
 	 *
-	 * @return number
+	 * @return a set of strings representing each file cleaned.
 	 */
-	public int getNumber() {
-		return getNumber(numbers.length - 1);
-	}
-
-	/**
-	 * Get line number at index.
-	 *
-	 * @param index
-	 * @return line number
-	 */
-	public int getNumber(int index) {
-		return numbers[index];
-	}
-
-	/**
-	 * Set number of line
-	 *
-	 * @param number
-	 * @return this line
-	 */
-	Line setNumber(int number) {
-		int[] newNumbers = new int[numbers.length + 1];
-		newNumbers[0] = number;
-		System.arraycopy(numbers, 0, newNumbers, 1, numbers.length);
-		numbers = newNumbers;
-		return this;
-	}
-
-	/**
-	 * Set start commit
-	 *
-	 * @param start
-	 * @return this line
-	 */
-	Line setStart(RevCommit start) {
-		startCommit = start;
-		return this;
-	}
-
-	/**
-	 * Get the commit in which this line was introduced
-	 *
-	 * @return number
-	 */
-	public RevCommit getStart() {
-		return startCommit;
-	}
-
-	/**
-	 * Get number of consecutive revisions this line occurs in
-	 *
-	 * @return revision count
-	 */
-	public int getAge() {
-		return numbers.length;
-	}
-
-	public String toString() {
-		return "Added in: " + startCommit.abbreviate(7) + ", Revisions:"
-				+ numbers.length;
-	}
-
-	public int hashCode() {
-		return ((startCommit.hashCode() + numbers.length) * 31) + getNumber();
-	}
-
-	public boolean equals(Object obj) {
-		if (obj == this)
-			return true;
-		else if (obj instanceof Line) {
-			Line other = (Line) obj;
-			return startCommit.equals(other.startCommit)
-					&& Arrays.equals(numbers, other.numbers);
+	public Set<String> call() {
+		Set<String> files = new TreeSet<String>();
+		try {
+			StatusCommand command = new StatusCommand(repo);
+			Status status = command.call();
+			for (String file : status.getUntracked()) {
+				if (paths.isEmpty() || paths.contains(file)) {
+					FileUtils.delete(new File(repo.getWorkTree(), file));
+					files.add(file);
+				}
+			}
+		} catch (IOException e) {
+			throw new JGitInternalException(e.getMessage(), e);
 		}
-		return false;
+		return files;
 	}
+
+	/**
+	 * If paths are set, only these paths are affected by the cleaning.
+	 *
+	 * @param paths
+	 *            the paths to set
+	 * @return {@code this}
+	 */
+	public CleanCommand setPaths(Set<String> paths) {
+		this.paths = paths;
+		return this;
+	}
+
 }

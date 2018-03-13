@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, GitHub Inc.
+ * Copyright (C) 2011, Stefan Lay <stefan.lay@.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,21 +40,35 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.blame;
+package org.eclipse.jgit.util.io;
+
+import java.io.OutputStream;
 
 /**
- * Determines when revision building should continue as each revision with line
- * history is generated.
+ * An OutputStream which ignores everything written to it.
  */
-public abstract class RevisionFilter {
+public class NullOutputStream extends OutputStream {
 
-	/**
-	 * Determine if revision building should continue or stop.
-	 *
-	 * @param revision
-	 *            revision with line history relative to previous revisions
-	 * @return true to continue, false to abort
-	 */
-	public abstract boolean include(Revision revision);
+	/** The canonical instance. */
+	public static final NullOutputStream INSTANCE = new NullOutputStream();
 
+	private NullOutputStream() {
+		// Do nothing, but we want to hide our constructor to prevent
+		// more than one instance from being created.
+	}
+
+	@Override
+	public void write(int b) {
+		// Discard.
+	}
+
+	@Override
+	public void write(byte[] buf) {
+		// Discard.
+	}
+
+	@Override
+	public void write(byte[] buf, int pos, int cnt) {
+		// Discard.
+	}
 }
