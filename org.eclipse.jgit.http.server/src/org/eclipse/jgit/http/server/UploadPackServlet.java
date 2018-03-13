@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2009, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,49 +43,23 @@
 
 package org.eclipse.jgit.http.server;
 
-import static javax.servlet.http.HttpServletResponse.SC_FORBIDDEN;
-import static javax.servlet.http.HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
-import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
-import static javax.servlet.http.HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE;
-import static org.eclipse.jgit.http.server.ServletUtils.getInputStream;
-import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
-
 import java.io.IOException;
 
-import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.eclipse.jgit.http.server.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.http.server.resolver.UploadPackFactory;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.UploadPack;
-import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 
 /** Server side implementation of smart fetch over HTTP. */
-class UploadPackServlet extends HttpServlet {
-	private static final String REQ_TYPE = "application/x-git-upload-pack-request";
+class UploadPackServlet extends RepositoryServlet {
+	private static final String REQ_TYPE = "application/x-git-upload-pack-input";
 
-	private static final String RSP_TYPE = "application/x-git-upload-pack-result";
+	private static final String RSP_TYPE = "application/x-git-upload-pack-data";
 
 	private static final long serialVersionUID = 1L;
-
-	static class InfoRefs extends SmartServiceInfoRefs {
-		private final UploadPackFactory uploadPackFactory;
-
-		InfoRefs(final UploadPackFactory uploadPackFactory) {
-			super("git-upload-pack");
-			this.uploadPackFactory = uploadPackFactory;
-		}
-
-		@Override
-		protected void advertise(HttpServletRequest req, Repository db,
-				PacketLineOutRefAdvertiser pck) throws IOException,
-				ServiceNotEnabledException, ServiceNotAuthorizedException {
-			uploadPackFactory.create(req, db).sendAdvertisedRefs(pck);
-		}
-	}
 
 	private final UploadPackFactory uploadPackFactory;
 
@@ -97,7 +71,7 @@ class UploadPackServlet extends HttpServlet {
 	public void doPost(final HttpServletRequest req,
 			final HttpServletResponse rsp) throws IOException {
 		if (!REQ_TYPE.equals(req.getContentType())) {
-			rsp.sendError(SC_UNSUPPORTED_MEDIA_TYPE);
+			rsp.sendError(HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE);
 			return;
 		}
 
@@ -106,22 +80,17 @@ class UploadPackServlet extends HttpServlet {
 			final UploadPack up = uploadPackFactory.create(req, db);
 			up.setBiDirectionalPipe(false);
 			rsp.setContentType(RSP_TYPE);
-			up.upload(getInputStream(req), rsp.getOutputStream(), null);
-
-		} catch (ServiceNotAuthorizedException e) {
-			rsp.reset();
-			rsp.sendError(SC_UNAUTHORIZED);
-			return;
+			up.upload(req.getInputStream(), rsp.getOutputStream(), null);
 
 		} catch (ServiceNotEnabledException e) {
 			rsp.reset();
-			rsp.sendError(SC_FORBIDDEN);
+			rsp.sendError(HttpServletResponse.SC_FORBIDDEN);
 			return;
 
 		} catch (IOException e) {
 			getServletContext().log("Internal error during upload-pack", e);
 			rsp.reset();
-			rsp.sendError(SC_INTERNAL_SERVER_ERROR);
+			rsp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 			return;
 		}
 	}

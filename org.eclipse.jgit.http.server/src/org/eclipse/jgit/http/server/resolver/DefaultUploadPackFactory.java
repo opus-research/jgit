@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2009, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -53,7 +53,7 @@ import org.eclipse.jgit.transport.UploadPack;
 /**
  * Create and configure {@link UploadPack} service instance.
  * <p>
- * Reading by upload-pack is permitted unless {@code http.uploadpack} is
+ * Reading by upload-pack is permitted unless {@code daemon.uploadpack} is
  * explicitly set to false.
  */
 public class DefaultUploadPackFactory implements UploadPackFactory {
@@ -67,12 +67,12 @@ public class DefaultUploadPackFactory implements UploadPackFactory {
 		final boolean enabled;
 
 		ServiceConfig(final Config cfg) {
-			enabled = cfg.getBoolean("http", "uploadpack", true);
+			enabled = cfg.getBoolean("daemon", "uploadpack", true);
 		}
 	}
 
 	public UploadPack create(final HttpServletRequest req, final Repository db)
-			throws ServiceNotEnabledException, ServiceNotAuthorizedException {
+			throws ServiceNotEnabledException {
 		if (db.getConfig().get(CONFIG).enabled)
 			return new UploadPack(db);
 		else

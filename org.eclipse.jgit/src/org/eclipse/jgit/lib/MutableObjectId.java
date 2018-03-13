@@ -1,7 +1,8 @@
 /*
  * Copyright (C) 2008-2009, Google Inc.
+ * Copyright (C) 2009, Jonas Fonseca <fonseca@diku.dk>
  * Copyright (C) 2008, Marek Zawirski <marek.zawirski@gmail.com>
- * Copyright (C) 2007-2009, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2006-2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -63,7 +64,7 @@ public class MutableObjectId extends AnyObjectId {
 
 	/**
 	 * Copying constructor.
-	 *
+	 * 
 	 * @param src
 	 *            original entry, to copy id from
 	 */
@@ -86,7 +87,7 @@ public class MutableObjectId extends AnyObjectId {
 
 	/**
 	 * Convert an ObjectId from raw binary representation.
-	 *
+	 * 
 	 * @param bs
 	 *            the raw byte buffer to read from. At least 20 bytes must be
 	 *            available within this byte array.
@@ -97,7 +98,7 @@ public class MutableObjectId extends AnyObjectId {
 
 	/**
 	 * Convert an ObjectId from raw binary representation.
-	 *
+	 * 
 	 * @param bs
 	 *            the raw byte buffer to read from. At least 20 bytes after p
 	 *            must be available within this byte array.
@@ -114,7 +115,7 @@ public class MutableObjectId extends AnyObjectId {
 
 	/**
 	 * Convert an ObjectId from binary representation expressed in integers.
-	 *
+	 * 
 	 * @param ints
 	 *            the raw int buffer to read from. At least 5 integers must be
 	 *            available within this integers array.
@@ -125,13 +126,13 @@ public class MutableObjectId extends AnyObjectId {
 
 	/**
 	 * Convert an ObjectId from binary representation expressed in integers.
-	 *
+	 * 
 	 * @param ints
 	 *            the raw int buffer to read from. At least 5 integers after p
 	 *            must be available within this integers array.
 	 * @param p
 	 *            position to read the first integer of data from.
-	 *
+	 * 
 	 */
 	public void fromRaw(final int[] ints, final int p) {
 		w1 = ints[p];
@@ -143,7 +144,7 @@ public class MutableObjectId extends AnyObjectId {
 
 	/**
 	 * Convert an ObjectId from hex characters (US-ASCII).
-	 *
+	 * 
 	 * @param buf
 	 *            the US-ASCII buffer to read from. At least 40 bytes after
 	 *            offset must be available within this byte array.
@@ -156,12 +157,12 @@ public class MutableObjectId extends AnyObjectId {
 
 	/**
 	 * Convert an ObjectId from hex characters.
-	 *
+	 * 
 	 * @param str
 	 *            the string to read from. Must be 40 characters long.
 	 */
 	public void fromString(final String str) {
-		if (str.length() != Constants.OBJECT_ID_STRING_LENGTH)
+		if (str.length() != STR_LEN)
 			throw new IllegalArgumentException("Invalid id: " + str);
 		fromHexString(Constants.encodeASCII(str), 0);
 	}
@@ -174,8 +175,7 @@ public class MutableObjectId extends AnyObjectId {
 			w4 = RawParseUtils.parseHexInt32(bs, p + 24);
 			w5 = RawParseUtils.parseHexInt32(bs, p + 32);
 		} catch (ArrayIndexOutOfBoundsException e1) {
-			throw new InvalidObjectIdException(bs, p,
-					Constants.OBJECT_ID_STRING_LENGTH);
+			throw new InvalidObjectIdException(bs, p, STR_LEN);
 		}
 	}
 

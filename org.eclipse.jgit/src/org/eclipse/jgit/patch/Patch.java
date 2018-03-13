@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009, Google Inc.
+ * Copyright (C) 2008, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -138,7 +138,7 @@ public class Patch {
 	}
 
 	private static byte[] readFully(final InputStream is) throws IOException {
-		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
+		final TemporaryBuffer b = new TemporaryBuffer();
 		try {
 			b.copy(is);
 			b.close();

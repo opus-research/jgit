@@ -93,7 +93,7 @@ public abstract class RefAdvertiser {
 
 	private final StringBuilder tmpLine = new StringBuilder(100);
 
-	private final char[] tmpId = new char[Constants.OBJECT_ID_STRING_LENGTH];
+	private final char[] tmpId = new char[2 * Constants.OBJECT_ID_LENGTH];
 
 	private final Set<String> capablities = new LinkedHashSet<String>();
 
@@ -178,7 +178,7 @@ public abstract class RefAdvertiser {
 	}
 
 	/**
-	 * Advertise one object is available using the magic {@code .have}.
+	 * Advertise one object is available using the magic {@code. have}.
 	 * <p>
 	 * The magic {@code .have} advertisement is not available for fetching by a
 	 * client, but can be used by a client when considering a delta base
@@ -300,7 +300,7 @@ public abstract class RefAdvertiser {
 			}
 		}
 		tmpLine.append('\n');
-		writeOne(tmpLine);
+		writeOne(tmpLine.toString());
 	}
 
 	/**

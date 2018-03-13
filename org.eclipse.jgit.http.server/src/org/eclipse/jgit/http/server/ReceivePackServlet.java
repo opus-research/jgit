@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2009, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,52 +43,25 @@
 
 package org.eclipse.jgit.http.server;
 
-import static javax.servlet.http.HttpServletResponse.SC_FORBIDDEN;
-import static javax.servlet.http.HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
-import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
-import static javax.servlet.http.HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE;
-import static org.eclipse.jgit.http.server.ServletUtils.getInputStream;
-import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 
-import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jgit.http.server.resolver.ReceivePackFactory;
-import org.eclipse.jgit.http.server.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.ReceivePack;
-import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 
 /** Server side implementation of smart push over HTTP. */
-class ReceivePackServlet extends HttpServlet {
-	private static final String REQ_TYPE = "application/x-git-receive-pack-request";
+class ReceivePackServlet extends RepositoryServlet {
+	private static final String REQ_TYPE = "application/x-git-receive-pack-input";
 
-	private static final String RSP_TYPE = "application/x-git-receive-pack-result";
+	private static final String RSP_TYPE = "application/x-git-receive-pack-status";
 
 	private static final long serialVersionUID = 1L;
-
-	static class InfoRefs extends SmartServiceInfoRefs {
-		private final ReceivePackFactory receivePackFactory;
-
-		InfoRefs(final ReceivePackFactory receivePackFactory) {
-			super("git-receive-pack");
-			this.receivePackFactory = receivePackFactory;
-		}
-
-		@Override
-		protected void advertise(HttpServletRequest req, Repository db,
-				PacketLineOutRefAdvertiser pck) throws IOException,
-				ServiceNotEnabledException, ServiceNotAuthorizedException {
-			receivePackFactory.create(req, db).sendAdvertisedRefs(pck);
-		}
-	}
-
 	private final ReceivePackFactory receivePackFactory;
 
 	ReceivePackServlet(final ReceivePackFactory receivePackFactory) {
@@ -99,7 +72,7 @@ class ReceivePackServlet extends HttpServlet {
 	public void doPost(final HttpServletRequest req,
 			final HttpServletResponse rsp) throws IOException {
 		if (!REQ_TYPE.equals(req.getContentType())) {
-			rsp.sendError(SC_UNSUPPORTED_MEDIA_TYPE);
+			rsp.sendError(HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE);
 			return;
 		}
 
@@ -108,19 +81,15 @@ class ReceivePackServlet extends HttpServlet {
 		try {
 			final ReceivePack rp = receivePackFactory.create(req, db);
 			rp.setBiDirectionalPipe(false);
-			rp.receive(getInputStream(req), out, null);
-
-		} catch (ServiceNotAuthorizedException e) {
-			rsp.sendError(SC_UNAUTHORIZED);
-			return;
+			rp.receive(req.getInputStream(), out, null);
 
 		} catch (ServiceNotEnabledException e) {
-			rsp.sendError(SC_FORBIDDEN);
+			rsp.sendError(HttpServletResponse.SC_FORBIDDEN);
 			return;
 
 		} catch (IOException e) {
 			getServletContext().log("Internal error during receive-pack", e);
-			rsp.sendError(SC_INTERNAL_SERVER_ERROR);
+			rsp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
 			return;
 		}
 
@@ -129,12 +98,12 @@ class ReceivePackServlet extends HttpServlet {
 
 	private void reply(final HttpServletResponse rsp, final byte[] result)
 			throws IOException {
+		nocache(rsp);
 		rsp.setContentType(RSP_TYPE);
 		rsp.setContentLength(result.length);
 		final OutputStream os = rsp.getOutputStream();
 		try {
 			os.write(result);
-			os.flush();
 		} finally {
 			os.close();
 		}

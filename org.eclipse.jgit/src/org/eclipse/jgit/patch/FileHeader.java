@@ -289,7 +289,7 @@ public class FileHeader {
 		final TemporaryBuffer[] tmp = new TemporaryBuffer[getParentCount() + 1];
 		try {
 			for (int i = 0; i < tmp.length; i++)
-				tmp[i] = new TemporaryBuffer.LocalFile();
+				tmp[i] = new TemporaryBuffer();
 			for (final HunkHeader h : getHunks())
 				h.extractFileLines(tmp);
 
