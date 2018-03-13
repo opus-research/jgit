@@ -133,6 +133,7 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 			@Override
 			protected void writeSubscribePacket(PacketLineOut pckLineOut)
 					throws IOException {
+				pckLineOut.writeString("subscribe");
 				pckLineOut.writeString("restart " + state.getKey());
 				pckLineOut.end();
 				pckLineOut.writeString("repository testrepository");
@@ -211,6 +212,7 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 			@Override
 			protected void writeSubscribePacket(PacketLineOut pckLineOut)
 					throws IOException {
+				pckLineOut.writeString("subscribe");
 				pckLineOut.writeString("restart " + state.getKey());
 				pckLineOut.end();
 				pckLineOut.writeString("repository testrepository");
@@ -240,13 +242,14 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 		String line;
 		String parts[];
 		line = in.readString();
+		assertEquals("ACK", line);
+		line = in.readString();
 		parts = line.split(" ", 2);
 		assertEquals("restart-token", parts[0]);
 		assertEquals(c.getPublisherState().getKey(), parts[1]);
 		line = in.readString();
 		parts = line.split(" ", 2);
 		assertEquals("heartbeat-interval", parts[0]);
-		assertEquals(PacketLineIn.END, in.readString());
 		int updatesLeft = 1;
 		while (updatesLeft > 0) {
 			line = in.readString();
@@ -286,6 +289,7 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 				@Override
 				protected void writeSubscribePacket(PacketLineOut pckLineOut)
 						throws IOException {
+					pckLineOut.writeString("subscribe");
 					pckLineOut.writeString("restart " + state.getKey());
 					pckLineOut.end();
 					pckLineOut.writeString("repository testrepository");
@@ -326,13 +330,14 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 				String line;
 				String parts[];
 				line = in.readString();
+				assertEquals("ACK", line);
+				line = in.readString();
 				parts = line.split(" ", 2);
 				assertEquals("restart-token", parts[0]);
 				assertEquals(c.getPublisherState().getKey(), parts[1]);
 				line = in.readString();
 				parts = line.split(" ", 2);
 				assertEquals("heartbeat-interval", parts[0]);
-				assertEquals(PacketLineIn.END, in.readString());
 				int updatesLeft = updates;
 				while (updatesLeft > 0) {
 					line = in.readString();
@@ -351,7 +356,7 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 
 					line = in.readString();
 					parts = line.split(" ", 2);
-					assertEquals("sequence", parts[0]);
+					assertEquals("pack-number", parts[0]);
 					updatesLeft--;
 				}
 			} catch (Exception e) {

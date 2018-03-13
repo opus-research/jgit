@@ -59,6 +59,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
+import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
@@ -119,8 +120,66 @@ public abstract class PublisherClient {
 		this.in = new PacketLineIn(myIn);
 		this.out = new BufferedOutputStream(myOut);
 
-		readRestart();
-		boolean isAdvertisment = readSubscribeCommands();
+		if (isAdvertisement())
+			doAdvertisement();
+		else
+			doSubscribe();
+	}
+
+	/**
+	 * @return true if this request is an advertisement for the pubsub service.
+	 * @throws TransportException
+	 * @throws IOException
+	 */
+	private boolean isAdvertisement() throws TransportException, IOException {
+		String line = in.readString();
+		if (line.equals("advertisement"))
+			return true;
+		if (line.equals("subscribe"))
+			return false;
+		throw new TransportException(MessageFormat.format(
+				JGitText.get().expectedGot, "advertisement|subscribe", line));
+	}
+
+	/**
+	 * Open all listed repositories and check access.
+	 *
+	 * @throws IOException
+	 * @throws ServiceNotAuthorizedException
+	 */
+	private void doAdvertisement()
+			throws IOException, ServiceNotAuthorizedException {
+		PacketLineOut pktLineOut = new PacketLineOut(out);
+		try {
+			String line;
+			while ((line = in.readString()) != PacketLineIn.END) {
+				if (!line.startsWith("repositoryaccess "))
+					throw new TransportException(MessageFormat.format(
+							JGitText.get().expectedGot, "repositoryaccess",
+							line));
+				Repository r = null;
+				try {
+					r = openRepository(line.substring(
+							"repositoryaccess ".length()));
+				} finally {
+					if (r != null)
+						r.close();
+				}
+			}
+			pktLineOut.writeString("ACK");
+		} catch (TransportException e) {
+			pktLineOut.writeString("ERR " + e.getMessage());
+		} catch (ServiceNotEnabledException e) {
+			pktLineOut.writeString("ERR " + e.getMessage());
+		} finally {
+			pktLineOut.flush();
+		}
+	}
+
+	private void doSubscribe() throws TransportException, IOException,
+			ServiceNotAuthorizedException, ServiceNotEnabledException {
+		readHeaders();
+		readSubscribeCommands();
 
 		// Add client to each of the subscribed repositories.
 		PublisherSession clientState = publisher.connectClient(this);
@@ -142,15 +201,10 @@ public abstract class PublisherClient {
 				return;
 			}
 		}
+		pktLineOut.writeString("ACK");
 		pktLineOut.writeString("restart-token " + clientState.getKey());
 		pktLineOut.writeString(
 				"heartbeat-interval " + HEARTBEAT_INTERVAL / 1000);
-		pktLineOut.end();
-
-		if (isAdvertisment) {
-			clientState.disconnect();
-			return;
-		}
 
 		// Wait here for new PublisherUpdates until the connection is dropped
 		consumeThread = Thread.currentThread();
@@ -172,7 +226,7 @@ public abstract class PublisherClient {
 					for (Iterator<PublisherPackSlice> it = pk.getSlices();
 							it.hasNext();)
 						it.next().writeToStream(out);
-					pktLineOut.writeString("sequence " + pk.getPackNumber());
+					pktLineOut.writeString("pack-number " + pk.getPackNumber());
 					pk.release();
 				}
 				pktLineOut.flush();
@@ -197,14 +251,14 @@ public abstract class PublisherClient {
 	 *
 	 * @throws IOException
 	 */
-	private void readRestart() throws IOException {
+	private void readHeaders() throws IOException {
 		String line;
 		while ((line = in.readString()) != PacketLineIn.END) {
 			if (line.startsWith("restart "))
 				restartToken = line.substring("restart ".length());
-			else if (line.startsWith("last-pack "))
+			else if (line.startsWith("last-pack-number "))
 				lastPackNumber = Integer.parseInt(line.substring(
-						"last-pack ".length()));
+						"last-pack-number ".length()));
 		}
 	}
 
@@ -221,12 +275,9 @@ public abstract class PublisherClient {
 	 * done
 	 * </pre>
 	 *
-	 * @return true if this request is an advertisement to determine if the
-	 *         publish-subscribe service exists and the client is authorized to
-	 *         read all listed repositories.
 	 * @throws IOException
 	 */
-	private boolean readSubscribeCommands() throws IOException {
+	private void readSubscribeCommands() throws IOException {
 		String line;
 		ArrayList<SubscribeCommand> cmdList = null;
 		Map<String, ObjectId> stateList = null;
@@ -258,7 +309,6 @@ public abstract class PublisherClient {
 				}
 			}
 		}
-		return line.endsWith(" advertisement");
 	}
 
 	/** @return restart token, or null if none exists */
