@@ -79,25 +79,31 @@ public class PreUploadHookChain implements PreUploadHook {
 			return new PreUploadHookChain(newHooks, i);
 	}
 
-	public void onBeginNegotiateRound(UploadSession up,
+	public void onPreAdvertiseRefs(UploadPack up)
+			throws UploadPackMayNotContinueException {
+		for (int i = 0; i < count; i++)
+			hooks[i].onPreAdvertiseRefs(up);
+	}
+
+	public void onBeginNegotiateRound(UploadPack up,
 			Collection<? extends ObjectId> wants, int cntOffered)
-			throws ServiceMayNotContinueException {
+			throws UploadPackMayNotContinueException {
 		for (int i = 0; i < count; i++)
 			hooks[i].onBeginNegotiateRound(up, wants, cntOffered);
 	}
 
-	public void onEndNegotiateRound(UploadSession up,
+	public void onEndNegotiateRound(UploadPack up,
 			Collection<? extends ObjectId> wants, int cntCommon,
 			int cntNotFound, boolean ready)
-			throws ServiceMayNotContinueException {
+			throws UploadPackMayNotContinueException {
 		for (int i = 0; i < count; i++)
 			hooks[i].onEndNegotiateRound(up, wants, cntCommon, cntNotFound, ready);
 	}
 
-	public void onSendPack(UploadSession up,
+	public void onSendPack(UploadPack up,
 			Collection<? extends ObjectId> wants,
 			Collection<? extends ObjectId> haves)
-			throws ServiceMayNotContinueException {
+			throws UploadPackMayNotContinueException {
 		for (int i = 0; i < count; i++)
 			hooks[i].onSendPack(up, wants, haves);
 	}

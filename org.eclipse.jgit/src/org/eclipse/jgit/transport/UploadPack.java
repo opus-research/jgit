@@ -80,7 +80,6 @@ import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.transport.BasePackFetchConnection.MultiAck;
 import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
-import org.eclipse.jgit.transport.UploadSession.RequestPolicy;
 import org.eclipse.jgit.util.io.InterruptTimer;
 import org.eclipse.jgit.util.io.TimeoutInputStream;
 import org.eclipse.jgit.util.io.TimeoutOutputStream;
@@ -88,7 +87,7 @@ import org.eclipse.jgit.util.io.TimeoutOutputStream;
 /**
  * Implements the server side of a fetch connection, transmitting objects.
  */
-public class UploadPack implements UploadSession {
+public class UploadPack {
 	static final String OPTION_INCLUDE_TAG = BasePackFetchConnection.OPTION_INCLUDE_TAG;
 
 	static final String OPTION_MULTI_ACK = BasePackFetchConnection.OPTION_MULTI_ACK;
@@ -108,6 +107,16 @@ public class UploadPack implements UploadSession {
 	static final String OPTION_NO_DONE = BasePackFetchConnection.OPTION_NO_DONE;
 
 	static final String OPTION_SHALLOW = BasePackFetchConnection.OPTION_SHALLOW;
+
+	/** Policy the server uses to validate client requests */
+	public static enum RequestPolicy {
+		/** Client may only ask for objects the server advertised a reference for. */
+		ADVERTISED,
+		/** Client may ask for any commit reachable from a reference. */
+		REACHABLE_COMMIT,
+		/** Client may ask for any SHA-1 in the repository. */
+		ANY;
+	}
 
 	/** Database we read the objects from. */
 	private final Repository db;
@@ -148,8 +157,8 @@ public class UploadPack implements UploadSession {
 	/** The refs we advertised as existing at the start of the connection. */
 	private Map<String, Ref> refs;
 
-	/** Hook used while advertising the refs to the client. */
-	private AdvertiseRefsHook advertiseRefsHook = AdvertiseRefsHook.DEFAULT;
+	/** Filter used while advertising the refs to the client. */
+	private RefFilter refFilter;
 
 	/** Hook handling the various upload phases. */
 	private PreUploadHook preUploadHook = PreUploadHook.NULL;
@@ -232,29 +241,38 @@ public class UploadPack implements UploadSession {
 		SAVE.add(PEER_HAS);
 		SAVE.add(COMMON);
 		SAVE.add(SATISFIED);
+		refFilter = RefFilter.DEFAULT;
 	}
 
+	/** @return the repository this upload is reading from. */
 	public final Repository getRepository() {
 		return db;
 	}
 
+	/** @return the RevWalk instance used by this connection. */
 	public final RevWalk getRevWalk() {
 		return walk;
 	}
 
+	/** @return all refs which were advertised to the client. */
 	public final Map<String, Ref> getAdvertisedRefs() {
 		if (refs == null)
-			setAdvertisedRefs(null);
+			setAdvertisedRefs(db.getAllRefs());
 		return refs;
 	}
 
+	/**
+	 * @param allRefs
+	 *            explicit set of references to claim as advertised by this
+	 *            UploadPack instance. This overrides any references that
+	 *            may exist in the source repository. The map is passed
+	 *            to the configured {@link #getRefFilter()}.
+	 */
 	public void setAdvertisedRefs(Map<String, Ref> allRefs) {
-		if (allRefs != null)
-			refs = allRefs;
-		else
-			refs = db.getAllRefs();
+		refs = refFilter.filter(allRefs);
 	}
 
+	/** @return timeout (in seconds) before aborting an IO operation. */
 	public int getTimeout() {
 		return timeout;
 	}
@@ -271,6 +289,10 @@ public class UploadPack implements UploadSession {
 		timeout = seconds;
 	}
 
+	/**
+	 * @return true if this class expects a bi-directional pipe opened between
+	 *         the client and itself. The default is true.
+	 */
 	public boolean isBiDirectionalPipe() {
 		return biDirectionalPipe;
 	}
@@ -290,6 +312,7 @@ public class UploadPack implements UploadSession {
 			requestPolicy = RequestPolicy.REACHABLE_COMMIT;
 	}
 
+	/** @return policy used by the service to validate client requests. */
 	public RequestPolicy getRequestPolicy() {
 		return requestPolicy;
 	}
@@ -307,29 +330,27 @@ public class UploadPack implements UploadSession {
 		requestPolicy = policy != null ? policy : RequestPolicy.ADVERTISED;
 	}
 
-	public AdvertiseRefsHook getAdvertiseRefsHook() {
-		return advertiseRefsHook;
+	/** @return the filter used while advertising the refs to the client */
+	public RefFilter getRefFilter() {
+		return refFilter;
 	}
 
 	/**
-	 * Set the hook used while advertising the refs to the client.
+	 * Set the filter used while advertising the refs to the client.
 	 * <p>
-	 * If the {@link AdvertiseRefsHook} chooses to call
-	 * {@link #setAdvertisedRefs(Map)}, only refs set by this filter will be shown
-	 * to the client. Clients may still attempt to create or update a reference
-	 * not advertised by the configured {@link AdvertiseRefsHook}. These attempts
-	 * should be rejected by a matching {@link PreReceiveHook}.
+	 * Only refs allowed by this filter will be sent to the client. This can
+	 * be used by a server to restrict the list of references the client can
+	 * obtain through clone or fetch, effectively limiting the access to only
+	 * certain refs.
 	 *
-	 * @param advertiseRefsHook
-	 *            the hook; may be null to show all refs.
+	 * @param refFilter
+	 *            the filter; may be null to show all refs.
 	 */
-	public void setAdvertiseRefsHook(final AdvertiseRefsHook advertiseRefsHook) {
-		if (advertiseRefsHook != null)
-			this.advertiseRefsHook = advertiseRefsHook;
-		else
-			this.advertiseRefsHook = AdvertiseRefsHook.DEFAULT;
+	public void setRefFilter(final RefFilter refFilter) {
+		this.refFilter = refFilter != null ? refFilter : RefFilter.DEFAULT;
 	}
 
+	/** @return the configured upload hook. */
 	public PreUploadHook getPreUploadHook() {
 		return preUploadHook;
 	}
@@ -355,6 +376,7 @@ public class UploadPack implements UploadSession {
 		this.packConfig = pc;
 	}
 
+	/** @return the configured logger. */
 	public UploadPackLogger getLogger() {
 		return logger;
 	}
@@ -418,6 +440,13 @@ public class UploadPack implements UploadSession {
 		}
 	}
 
+	/**
+	 * Get the PackWriter's statistics if a pack was sent to the client.
+	 *
+	 * @return statistics about pack output, if a pack was sent. Null if no pack
+	 *         was sent, such as during the negotation phase of a smart HTTP
+	 *         connection, or if the client was already up-to-date.
+	 */
 	public PackWriter.Statistics getPackStatistics() {
 		return statistics;
 	}
@@ -459,7 +488,7 @@ public class UploadPack implements UploadSession {
 			reportErrorDuringNegotiate(err.getMessage());
 			throw err;
 
-		} catch (ServiceMayNotContinueException err) {
+		} catch (UploadPackMayNotContinueException err) {
 			if (!err.isOutput() && err.getMessage() != null) {
 				try {
 					pckOut.writeString("ERR " + err.getMessage() + "\n");
@@ -533,14 +562,14 @@ public class UploadPack implements UploadSession {
 	 *            the advertisement formatter.
 	 * @throws IOException
 	 *             the formatter failed to write an advertisement.
-	 * @throws ServiceMayNotContinueException
+	 * @throws UploadPackMayNotContinueException
 	 *             the hook denied advertisement.
 	 */
 	public void sendAdvertisedRefs(final RefAdvertiser adv) throws IOException,
-			ServiceMayNotContinueException {
+			UploadPackMayNotContinueException {
 		try {
-			advertiseRefsHook.advertiseRefs(this);
-		} catch (ServiceMayNotContinueException fail) {
+			preUploadHook.onPreAdvertiseRefs(this);
+		} catch (UploadPackMayNotContinueException fail) {
 			if (fail.getMessage() != null) {
 				adv.writeOne("ERR " + fail.getMessage());
 				fail.setOutput();
@@ -930,7 +959,7 @@ public class UploadPack implements UploadSession {
 		if (sideband) {
 			try {
 				sendPack(true);
-			} catch (ServiceMayNotContinueException noPack) {
+			} catch (UploadPackMayNotContinueException noPack) {
 				// This was already reported on (below).
 				throw noPack;
 			} catch (IOException err) {
@@ -994,7 +1023,7 @@ public class UploadPack implements UploadSession {
 			} else {
 				preUploadHook.onSendPack(this, wantAll, commonBase);
 			}
-		} catch (ServiceMayNotContinueException noPack) {
+		} catch (UploadPackMayNotContinueException noPack) {
 			if (sideband && noPack.getMessage() != null) {
 				noPack.setOutput();
 				SideBandOutputStream err = new SideBandOutputStream(
