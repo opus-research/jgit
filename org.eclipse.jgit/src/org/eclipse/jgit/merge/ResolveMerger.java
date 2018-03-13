@@ -86,7 +86,6 @@ import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.NameConflictTreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
-import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 
 /**
@@ -256,11 +255,11 @@ public class ResolveMerger extends ThreeWayMerger {
 	}
 
 	private void createDir(File f) throws IOException {
-		if (!db.getFS().isDirectory(f) && !f.mkdirs()) {
+		if (!f.isDirectory() && !f.mkdirs()) {
 			File p = f;
-			while (p != null && !db.getFS().exists(p))
+			while (p != null && !p.exists())
 				p = p.getParentFile();
-			if (p == null || db.getFS().isDirectory(p))
+			if (p == null || p.isDirectory())
 				throw new IOException(JGitText.get().cannotCreateDirectory);
 			FileUtils.delete(p);
 			if (!f.mkdirs())
@@ -720,10 +719,9 @@ public class ResolveMerger extends ThreeWayMerger {
 				// support write operations
 				throw new UnsupportedOperationException();
 
-			FS fs = db.getFS();
 			of = new File(workTree, tw.getPathString());
 			File parentFolder = of.getParentFile();
-			if (!fs.exists(parentFolder))
+			if (!parentFolder.exists())
 				parentFolder.mkdirs();
 			fos = new FileOutputStream(of);
 			try {
