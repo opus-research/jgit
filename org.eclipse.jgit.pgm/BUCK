@@ -13,25 +13,16 @@ java_library(
   visibility = ['PUBLIC'],
 )
 
-prebuilt_jar(
-  name = 'services',
-  binary_jar = ':services__jar',
-)
-
 genrule(
   name = 'services__jar',
-  cmd = 'cd $SRCDIR ; zip -qr $OUT .',
+  cmd = 'zip -qr $OUT .',
   srcs = glob(['META-INF/services/*']),
   out = 'services.jar',
 )
 
-genrule(
-  name = 'jgit',
-  cmd = 'cat $SRCDIR/jgit.sh $(location :jgit_jar) >$OUT;' +
-        'chmod a+x $OUT',
-  srcs = ['jgit.sh'],
-  out = 'jgit',
-  visibility = ['PUBLIC'],
+prebuilt_jar(
+  name = 'services',
+  binary_jar = ':services__jar',
 )
 
 java_binary(
@@ -41,4 +32,13 @@ java_binary(
     ':pgm',
     '//lib:slf4j-simple',
   ],
+)
+
+genrule(
+  name = 'jgit',
+  cmd = 'cat $SRCDIR/jgit.sh $(location :jgit_jar) >$OUT;' +
+        'chmod a+x $OUT',
+  srcs = ['jgit.sh'],
+  out = 'jgit',
+  visibility = ['PUBLIC'],
 )
