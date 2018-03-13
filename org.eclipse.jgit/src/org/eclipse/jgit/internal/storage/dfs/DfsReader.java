@@ -44,14 +44,10 @@
 
 package org.eclipse.jgit.internal.storage.dfs;
 
-import static org.eclipse.jgit.internal.storage.pack.PackExt.PACK;
 import static org.eclipse.jgit.lib.Constants.OBJECT_ID_LENGTH;
 
 import java.io.IOException;
-import java.security.MessageDigest;
-import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -65,7 +61,6 @@ import java.util.zip.Inflater;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.BitmapIndexImpl;
 import org.eclipse.jgit.internal.storage.file.PackBitmapIndex;
 import org.eclipse.jgit.internal.storage.file.PackIndex;
@@ -81,7 +76,6 @@ import org.eclipse.jgit.lib.AsyncObjectLoaderQueue;
 import org.eclipse.jgit.lib.AsyncObjectSizeQueue;
 import org.eclipse.jgit.lib.BitmapIndex;
 import org.eclipse.jgit.lib.BitmapIndex.BitmapBuilder;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.InflaterCache;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
@@ -216,8 +210,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		}
 
 		if (typeHint == OBJ_ANY)
-			throw new MissingObjectException(objectId.copy(),
-					JGitText.get().unknownObjectType2);
+			throw new MissingObjectException(objectId.copy(), "unknown");
 		throw new MissingObjectException(objectId.copy(), typeHint);
 	}
 
@@ -346,8 +339,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 
 			public ObjectLoader open() throws IOException {
 				if (cur.pack == null)
-					throw new MissingObjectException(cur.id,
-							JGitText.get().unknownObjectType2);
+					throw new MissingObjectException(cur.id, "unknown");
 				return cur.pack.load(DfsReader.this, cur.offset);
 			}
 
@@ -384,8 +376,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 				if (idItr.hasNext()) {
 					cur = idItr.next();
 					if (cur.pack == null)
-						throw new MissingObjectException(cur.id,
-								JGitText.get().unknownObjectType2);
+						throw new MissingObjectException(cur.id, "unknown");
 					sz = cur.pack.getObjectSize(DfsReader.this, cur.offset);
 					return true;
 				} else if (findAllError != null) {
@@ -438,8 +429,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		}
 
 		if (typeHint == OBJ_ANY)
-			throw new MissingObjectException(objectId.copy(),
-					JGitText.get().unknownObjectType2);
+			throw new MissingObjectException(objectId.copy(), "unknown");
 		throw new MissingObjectException(objectId.copy(), typeHint);
 	}
 
@@ -502,9 +492,9 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 			out.writeObject(otp);
 	}
 
-	public void copyPackAsIs(PackOutputStream out, CachedPack pack,
-			boolean validate) throws IOException {
-		((DfsCachedPack) pack).copyAsIs(out, validate, this);
+	public void copyPackAsIs(PackOutputStream out, CachedPack pack)
+			throws IOException {
+		((DfsCachedPack) pack).copyAsIs(out, this);
 	}
 
 	/**
@@ -549,52 +539,6 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 				length = pack.length;
 		} while (0 < need && position < length);
 		return cnt - need;
-	}
-
-	void copyPackAsIs(DfsPackFile pack, long length, boolean validate,
-			PackOutputStream out) throws IOException {
-		MessageDigest md = null;
-		if (validate) {
-			md = Constants.newMessageDigest();
-			byte[] buf = out.getCopyBuffer();
-			pin(pack, 0);
-			if (block.copy(0, buf, 0, 12) != 12) {
-				pack.setInvalid();
-				throw new IOException(MessageFormat.format(
-						JGitText.get().packfileIsTruncated, pack.getPackName()));
-			}
-			md.update(buf, 0, 12);
-		}
-
-		long position = 12;
-		long remaining = length - (12 + 20);
-		while (0 < remaining) {
-			pin(pack, position);
-
-			int ptr = (int) (position - block.start);
-			int n = (int) Math.min(block.size() - ptr, remaining);
-			block.write(out, position, n, md);
-			position += n;
-			remaining -= n;
-		}
-
-		if (md != null) {
-			byte[] buf = new byte[20];
-			byte[] actHash = md.digest();
-
-			pin(pack, position);
-			if (block.copy(position, buf, 0, 20) != 20) {
-				pack.setInvalid();
-				throw new IOException(MessageFormat.format(
-						JGitText.get().packfileIsTruncated, pack.getPackName()));
-			}
-			if (!Arrays.equals(actHash, buf)) {
-				pack.setInvalid();
-				throw new IOException(MessageFormat.format(
-						JGitText.get().packfileCorruptionDetected,
-						pack.getPackDescription().getFileName(PACK)));
-			}
-		}
 	}
 
 	/**
@@ -666,6 +610,10 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 			block = null;
 			block = pack.getOrLoadBlock(position, this);
 		}
+	}
+
+	void unpin() {
+		block = null;
 	}
 
 	/** Release the current window cursor. */
