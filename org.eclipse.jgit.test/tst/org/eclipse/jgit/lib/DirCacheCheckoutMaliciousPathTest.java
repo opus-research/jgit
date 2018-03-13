@@ -54,7 +54,6 @@ import org.eclipse.jgit.util.SystemReader;
 import org.junit.Test;
 
 public class DirCacheCheckoutMaliciousPathTest extends RepositoryTestCase {
-
 	protected ObjectId theHead;
 	protected ObjectId theMerge;
 
@@ -231,14 +230,8 @@ public class DirCacheCheckoutMaliciousPathTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testMaliciousPathEmptyUnix() throws Exception {
-		((MockSystemReader) SystemReader.getInstance()).setUnix();
-		testMaliciousPathBadFirstCheckout("", "no");
-	}
-
-	@Test
-	public void testMaliciousPathEmptyWindows() throws Exception {
-		((MockSystemReader) SystemReader.getInstance()).setWindows();
+	public void testMaliciousPathEmpty() throws Exception {
+		((MockSystemReader) SystemReader.getInstance()).setCurrentPlatform();
 		testMaliciousPathBadFirstCheckout("", "no");
 	}
 
@@ -405,7 +398,7 @@ public class DirCacheCheckoutMaliciousPathTest extends RepositoryTestCase {
 		} catch (InvalidPathException e) {
 			if (good)
 				throw e;
-			assertTrue(e.getMessage().startsWith("Invalid path"));
+			assertTrue(e.getMessage().startsWith("Invalid path: "));
 		}
 	}
 
