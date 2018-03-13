@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, David Pursehouse <david.pursehouse@gmail.com>
+ * Copyright (C) 2017, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,53 +43,50 @@
 
 package org.eclipse.jgit.lib;
 
-import java.util.Locale;
-
-import org.eclipse.jgit.util.StringUtils;
+import org.eclipse.jgit.errors.CorruptObjectException;
 
 /**
- * Submodule section of a Git configuration file.
+ * Verifies that a blob object is a valid object.
+ * <p>
+ * Unlike trees, commits and tags, there's no validity of blobs. Implementers
+ * can optionally implement this blob checker to reject certain blobs.
  *
- * @since 4.7
+ * @since 4.9
  */
-public class SubmoduleConfig {
+public interface BlobObjectChecker {
+	/** No-op implementation of {@link BlobObjectChecker}. */
+	public static final BlobObjectChecker NULL_CHECKER =
+			new BlobObjectChecker() {
+				@Override
+				public void update(byte[] in, int p, int len) {
+					// Empty implementation.
+				}
+
+				@Override
+				public void endBlob(AnyObjectId id) {
+					// Empty implementation.
+				}
+			};
 
 	/**
-	 * Config values for submodule.[name].fetchRecurseSubmodules.
+	 * Check a new fragment of the blob.
+	 *
+	 * @param in
+	 *            input array of bytes.
+	 * @param offset
+	 *            offset to start at from {@code in}.
+	 * @param len
+	 *            length of the fragment to check.
 	 */
-	public enum FetchRecurseSubmodulesMode implements Config.ConfigEnum {
-		/** Unconditionally recurse into all populated submodules. */
-		YES("true"), //$NON-NLS-1$
+	void update(byte[] in, int offset, int len);
 
-		/**
-		 * Only recurse into a populated submodule when the superproject
-		 * retrieves a commit that updates the submodule's reference to a commit
-		 * that isn't already in the local submodule clone.
-		 */
-		ON_DEMAND("on-demand"), //$NON-NLS-1$
-
-		/** Completely disable recursion. */
-		NO("false"); //$NON-NLS-1$
-
-		private final String configValue;
-
-		private FetchRecurseSubmodulesMode(String configValue) {
-			this.configValue = configValue;
-		}
-
-		@Override
-		public String toConfigValue() {
-			return name().toLowerCase(Locale.ROOT).replace('_', '-');
-		}
-
-		@Override
-		public boolean matchConfigValue(String s) {
-			if (StringUtils.isEmptyOrNull(s)) {
-				return false;
-			}
-			s = s.replace('-', '_');
-			return name().equalsIgnoreCase(s)
-					|| configValue.equalsIgnoreCase(s);
-		}
-	}
+	/**
+	 * Finalize the blob checking.
+	 *
+	 * @param id
+	 *            identity of the object being checked.
+	 * @throws CorruptObjectException
+	 *             if any error was detected.
+	 */
+	void endBlob(AnyObjectId id) throws CorruptObjectException;
 }
