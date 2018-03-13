@@ -263,7 +263,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String statusDeletedByUs;
 	/***/ public String statusBothAdded;
 	/***/ public String statusBothModified;
-	/***/ public String submoduleRegistered;
 	/***/ public String switchedToNewBranch;
 	/***/ public String switchedToBranch;
 	/***/ public String tagAlreadyExists;
