@@ -170,11 +170,9 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 
 	final MutableObjectId idBuffer;
 
-	/** Cache of objects looked up within this RevWalk. */
-	protected ObjectIdOwnerMap<RevObject> objects;
+	ObjectIdOwnerMap<RevObject> objects;
 
-	/** Flags available to be defined by the client. */
-	protected int freeFlags = APP_FLAGS;
+	private int freeFlags = APP_FLAGS;
 
 	private int delayFreeFlags;
 
