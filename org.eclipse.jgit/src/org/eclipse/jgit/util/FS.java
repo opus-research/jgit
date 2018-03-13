@@ -203,12 +203,13 @@ public abstract class FS {
 		return new File(home).getAbsoluteFile();
 	}
 
-	static File searchPath(final String path, final String... lookFor) {
+	static String scanPath(final String path, String... lookFor) {
 		for (final String p : path.split(File.pathSeparator)) {
 			for (String command : lookFor) {
 				final File e = new File(p, command);
-				if (e.isFile())
-					return e.getAbsoluteFile();
+				if (e.isFile()) {
+					return e.getAbsolutePath();
+				}
 			}
 		}
 		return null;
@@ -224,9 +225,10 @@ public abstract class FS {
 	 * @param encoding
 	 * @return the one-line output of the command
 	 */
-	protected static String readPipe(File dir, String[] command, String encoding) {
+	protected String readPipe(final File dir, String[] command, String encoding) {
 		try {
 			final Process p = Runtime.getRuntime().exec(command, null, dir);
+
 			final BufferedReader lineRead = new BufferedReader(
 					new InputStreamReader(p.getInputStream(), encoding));
 			String r = null;
@@ -234,7 +236,6 @@ public abstract class FS {
 				r = lineRead.readLine();
 			} finally {
 				p.getOutputStream().close();
-				p.getErrorStream().close();
 				lineRead.close();
 			}
 
