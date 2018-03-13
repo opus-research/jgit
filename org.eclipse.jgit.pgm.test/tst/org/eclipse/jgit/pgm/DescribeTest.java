@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2013, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,61 +40,60 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.pgm;
 
-package org.eclipse.jgit.http.server;
+import static org.junit.Assert.assertArrayEquals;
 
-import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.junit.Before;
+import org.junit.Test;
 
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.util.Map;
+public class DescribeTest extends CLIRepositoryTestCase {
 
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+	private Git git;
 
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.RefAdvertiser;
-import org.eclipse.jgit.util.HttpSupport;
+	@Override
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		git = new Git(db);
+	}
 
-/** Send a complete list of current refs, including peeled values for tags. */
-class InfoRefsServlet extends HttpServlet {
-	private static final long serialVersionUID = 1L;
+	private void initialCommitAndTag() throws Exception {
+		git.commit().setMessage("initial commit").call();
+		git.tag().setName("v1.0").call();
+	}
 
-	public void doGet(final HttpServletRequest req,
-			final HttpServletResponse rsp) throws IOException {
-		// Assume a dumb client and send back the dumb client
-		// version of the info/refs file.
-		rsp.setContentType(HttpSupport.TEXT_PLAIN);
-		rsp.setCharacterEncoding(Constants.CHARACTER_ENCODING);
+	@Test
+	public void testNoHead() throws Exception {
+		assertArrayEquals(
+				new String[] { "fatal: No names found, cannot describe anything." },
+				execute("git describe"));
+	}
 
-		final Repository db = getRepository(req);
-		final OutputStreamWriter out = new OutputStreamWriter(
-				new SmartOutputStream(req, rsp, true),
-				Constants.CHARSET);
-		final RefAdvertiser adv = new RefAdvertiser() {
-			@Override
-			protected void writeOne(final CharSequence line) throws IOException {
-				// Whoever decided that info/refs should use a different
-				// delimiter than the native git:// protocol shouldn't
-				// be allowed to design this sort of stuff. :-(
-				out.append(line.toString().replace(' ', '\t'));
-			}
+	@Test
+	public void testHeadNoTag() throws Exception {
+		git.commit().setMessage("initial commit").call();
+		assertArrayEquals(
+				new String[] { "fatal: No names found, cannot describe anything." },
+				execute("git describe"));
+	}
 
-			@Override
-			protected void end() {
-				// No end marker required for info/refs format.
-			}
-		};
-		adv.init(db);
-		adv.setDerefTags(true);
+	@Test
+	public void testDescribeTag() throws Exception {
+		initialCommitAndTag();
+		assertArrayEquals(new String[] { "v1.0", "" },
+				execute("git describe HEAD"));
+	}
 
-		Map<String, Ref> refs = db.getRefDatabase().getRefs(ALL);
-		refs.remove(Constants.HEAD);
-		adv.send(refs);
-		out.close();
+	@Test
+	public void testDescribeCommit() throws Exception {
+		initialCommitAndTag();
+		writeTrashFile("greeting", "Hello, world!");
+		git.add().addFilepattern("greeting").call();
+		git.commit().setMessage("2nd commit").call();
+		assertArrayEquals(new String[] { "v1.0-1-g56f6ceb", "" },
+				execute("git describe"));
 	}
 }
