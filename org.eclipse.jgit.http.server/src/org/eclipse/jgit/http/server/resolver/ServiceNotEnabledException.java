@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2009-2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,24 +41,16 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.transport;
+package org.eclipse.jgit.http.server.resolver;
 
-import org.eclipse.jgit.storage.pack.PackWriter;
+import org.eclipse.jgit.http.server.HttpServerText;
 
-/**
- * Logs activity that occurred within {@link UploadPack}.
- * <p>
- * Implementors of the interface are responsible for associating the current
- * thread to a particular connection, if they need to also include connection
- * information. One method is to use a {@link java.lang.ThreadLocal} to remember
- * the connection information before invoking UploadPack.
- */
-public interface UploadPackLogger {
-	/**
-	 * Notice to the logger after a pack has been sent.
-	 *
-	 * @param stats
-	 *            the statistics after sending a pack to the client.
-	 */
-	public void onPackStatistics(PackWriter.Statistics stats);
+/** Indicates the request service is not enabled on a repository. */
+public class ServiceNotEnabledException extends Exception {
+	private static final long serialVersionUID = 1L;
+
+	/** Indicates the request service is not available. */
+	public ServiceNotEnabledException() {
+		super(HttpServerText.get().serviceNotEnabled);
+	}
 }

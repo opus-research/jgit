@@ -67,11 +67,7 @@ public class RebaseResult {
 		/**
 		 * Already up-to-date
 		 */
-		UP_TO_DATE,
-		/**
-		 * Fast-forward, HEAD points to the new commit
-		 */
-		FAST_FORWARD;
+		UP_TO_DATE;
 	}
 
 	static final RebaseResult UP_TO_DATE_RESULT = new RebaseResult(

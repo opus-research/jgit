@@ -59,7 +59,6 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
@@ -91,8 +90,6 @@ public class PushCommand extends GitCommand<Iterable<PushResult>> {
 	private boolean thin = Transport.DEFAULT_PUSH_THIN;
 
 	private int timeout;
-
-	private CredentialsProvider credentialsProvider;
 
 	/**
 	 * @param repo
@@ -139,8 +136,6 @@ public class PushCommand extends GitCommand<Iterable<PushResult>> {
 				if (receivePack != null)
 					transport.setOptionReceivePack(receivePack);
 				transport.setDryRun(dryRun);
-				if (credentialsProvider != null)
-					transport.setCredentialsProvider(credentialsProvider);
 
 				final Collection<RemoteRefUpdate> toPush = transport
 						.findRemoteRefUpdatesFor(refSpecs);
@@ -351,15 +346,4 @@ public class PushCommand extends GitCommand<Iterable<PushResult>> {
 		return this;
 	}
 
-	/**
-	 * @param credentialsProvider
-	 *            the {@link CredentialsProvider} to use
-	 * @return {@code this}
-	 */
-	public PushCommand setCredentialsProvider(
-			CredentialsProvider credentialsProvider) {
-		checkCallable();
-		this.credentialsProvider = credentialsProvider;
-		return this;
-	}
 }

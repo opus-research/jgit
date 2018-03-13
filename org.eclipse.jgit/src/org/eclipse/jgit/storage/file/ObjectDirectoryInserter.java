@@ -63,7 +63,6 @@ import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
-import org.eclipse.jgit.transport.PackParser;
 import org.eclipse.jgit.util.FileUtils;
 
 /** Creates loose objects in a {@link ObjectDirectory}. */
@@ -99,11 +98,6 @@ class ObjectDirectoryInserter extends ObjectInserter {
 
 		final File dst = db.fileFor(id);
 		throw new ObjectWritingException("Unable to create new object: " + dst);
-	}
-
-	@Override
-	public PackParser newPackParser(InputStream in) throws IOException {
-		return new ObjectDirectoryPackParser(db, in);
 	}
 
 	@Override

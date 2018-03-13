@@ -44,8 +44,6 @@
 package org.eclipse.jgit.storage.pack;
 
 import java.io.IOException;
-import java.util.Collection;
-import java.util.List;
 
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
@@ -137,13 +135,12 @@ public interface ObjectReuseAsIs {
 	 *            the stream to write each object to.
 	 * @param list
 	 *            the list of objects to write. Objects should be written in
-	 *            approximately this order. Implementors may resort the list
-	 *            elements in-place during writing if desired.
+	 *            approximately this order.
 	 * @throws IOException
 	 *             the stream cannot be written to, or one or more required
 	 *             objects cannot be accessed from the object database.
 	 */
-	public void writeObjects(PackOutputStream out, List<ObjectToPack> list)
+	public void writeObjects(PackOutputStream out, Iterable<ObjectToPack> list)
 			throws IOException;
 
 	/**
@@ -181,33 +178,4 @@ public interface ObjectReuseAsIs {
 	 */
 	public void copyObjectAsIs(PackOutputStream out, ObjectToPack otp)
 			throws IOException, StoredObjectRepresentationNotAvailableException;
-
-	/**
-	 * Obtain the available cached packs.
-	 * <p>
-	 * A cached pack has known starting points and may be sent entirely as-is,
-	 * with almost no effort on the sender's part.
-	 *
-	 * @return the available cached packs.
-	 * @throws IOException
-	 *             the cached packs cannot be listed from the repository.
-	 *             Callers may choose to ignore this and continue as-if there
-	 *             were no cached packs.
-	 */
-	public Collection<CachedPack> getCachedPacks() throws IOException;
-
-	/**
-	 * Append an entire pack's contents onto the output stream.
-	 * <p>
-	 * The entire pack, excluding its header and trailing footer is sent.
-	 *
-	 * @param out
-	 *            stream to append the pack onto.
-	 * @param pack
-	 *            the cached pack to send.
-	 * @throws IOException
-	 *             the pack cannot be read, or stream did not accept a write.
-	 */
-	public abstract void copyPackAsIs(PackOutputStream out, CachedPack pack)
-			throws IOException;
 }

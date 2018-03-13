@@ -41,35 +41,32 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.transport.resolver;
+package org.eclipse.jgit.http.server.resolver;
+
+import javax.servlet.http.HttpServletRequest;
 
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.ReceivePack;
+import org.eclipse.jgit.transport.UploadPack;
 
-/**
- * Create and configure {@link ReceivePack} service instance.
- *
- * @param <C>
- *            type of connection
- */
-public interface ReceivePackFactory<C> {
-	/** A factory disabling the ReceivePack service for all repositories */
-	public static final ReceivePackFactory<?> DISABLED = new ReceivePackFactory<Object>() {
-		public ReceivePack create(Object req, Repository db)
+/** Create and configure {@link UploadPack} service instance. */
+public interface UploadPackFactory {
+	/** A factory disabling the UploadPack service for all repositories. */
+	public static final UploadPackFactory DISABLED = new UploadPackFactory() {
+		public UploadPack create(HttpServletRequest req, Repository db)
 				throws ServiceNotEnabledException {
 			throw new ServiceNotEnabledException();
 		}
 	};
 
 	/**
-	 * Create and configure a new ReceivePack instance for a repository.
+	 * Create and configure a new UploadPack instance for a repository.
 	 *
 	 * @param req
-	 *            current request, in case information from the request may help
-	 *            configure the ReceivePack instance.
+	 *            current HTTP request, in case information from the request may
+	 *            help configure the UploadPack instance.
 	 * @param db
-	 *            the repository the receive would write into.
-	 * @return the newly configured ReceivePack instance, must not be null.
+	 *            the repository the upload would read from.
+	 * @return the newly configured UploadPack instance, must not be null.
 	 * @throws ServiceNotEnabledException
 	 *             this factory refuses to create the instance because it is not
 	 *             allowed on the target repository, by any user.
@@ -77,6 +74,6 @@ public interface ReceivePackFactory<C> {
 	 *             this factory refuses to create the instance for this HTTP
 	 *             request and repository, such as due to a permission error.
 	 */
-	ReceivePack create(C req, Repository db) throws ServiceNotEnabledException,
-			ServiceNotAuthorizedException;
+	UploadPack create(HttpServletRequest req, Repository db)
+			throws ServiceNotEnabledException, ServiceNotAuthorizedException;
 }
