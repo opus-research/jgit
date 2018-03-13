@@ -57,8 +57,6 @@ import org.eclipse.jgit.storage.pack.PackWriter;
  * modified once initialized and presented to the JGit DFS library.
  */
 public class DfsPackDescription implements Comparable<DfsPackDescription> {
-	private final DfsRepositoryDescription repoDesc;
-
 	private final String packName;
 
 	private long lastModified;
@@ -76,7 +74,7 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	private PackWriter.Statistics stats;
 
 	/**
-	 * Initialize a description by pack name and repository.
+	 * Initialize a description by pack name.
 	 * <p>
 	 * The corresponding index file is assumed to exist and end with ".idx"
 	 * instead of ".pack". If this is not true implementors must extend the
@@ -87,17 +85,9 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	 *
 	 * @param name
 	 *            name of the pack file. Must end with ".pack".
-	 * @param repoDesc
-	 *            description of the repo containing the pack file.
 	 */
-	public DfsPackDescription(DfsRepositoryDescription repoDesc, String name) {
-		this.repoDesc = repoDesc;
+	public DfsPackDescription(String name) {
 		this.packName = name;
-	}
-
-	/** @return description of the repository. */
-	public DfsRepositoryDescription getRepositoryDescription() {
-		return repoDesc;
 	}
 
 	/** @return name of the pack file. */
@@ -241,11 +231,8 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 
 	@Override
 	public boolean equals(Object b) {
-		if (b instanceof DfsPackDescription) {
-			DfsPackDescription desc = (DfsPackDescription) b;
-			return getPackName().equals(desc.getPackName()) &&
-					getRepositoryDescription().equals(desc.getRepositoryDescription());
-		}
+		if (b instanceof DfsPackDescription)
+			return getPackName().equals(((DfsPackDescription) b).getPackName());
 		return false;
 	}
 
