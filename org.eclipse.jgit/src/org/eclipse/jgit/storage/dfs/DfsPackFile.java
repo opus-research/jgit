@@ -45,6 +45,9 @@
 
 package org.eclipse.jgit.storage.dfs;
 
+import static org.eclipse.jgit.storage.pack.PackConstants.PACK_EXT;
+import static org.eclipse.jgit.storage.pack.PackConstants.PACK_INDEX_EXT;
+
 import java.io.BufferedInputStream;
 import java.io.EOFException;
 import java.io.IOException;
@@ -67,6 +70,7 @@ import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
+import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.PackIndex;
 import org.eclipse.jgit.storage.file.PackReverseIndex;
 import org.eclipse.jgit.storage.pack.BinaryDelta;
@@ -171,13 +175,22 @@ public final class DfsPackFile {
 		return packDesc;
 	}
 
+	/**
+	 * @return whether the pack index file is loaded and cached in memory.
+	 * @since 2.2
+	 */
+	public boolean isIndexLoaded() {
+		DfsBlockCache.Ref<PackIndex> idxref = index;
+		return idxref != null && idxref.get() != null;
+	}
+
 	/** @return bytes cached in memory for this pack, excluding the index. */
 	public long getCachedSize() {
 		return key.cachedSize.get();
 	}
 
 	private String getPackName() {
-		return packDesc.getPackName();
+		return packDesc.getFileName(PACK_EXT);
 	}
 
 	void setBlockSize(int newSize) {
@@ -206,6 +219,9 @@ public final class DfsPackFile {
 		if (invalid)
 			throw new PackInvalidException(getPackName());
 
+		Repository.getGlobalListenerList()
+				.dispatch(new BeforeDfsPackIndexLoadedEvent(this));
+
 		synchronized (initLock) {
 			idxref = index;
 			if (idxref != null) {
@@ -216,7 +232,7 @@ public final class DfsPackFile {
 
 			PackIndex idx;
 			try {
-				ReadableChannel rc = ctx.db.openPackIndex(packDesc);
+				ReadableChannel rc = ctx.db.openFile(packDesc, PACK_INDEX_EXT);
 				try {
 					InputStream in = Channels.newInputStream(rc);
 					int wantSize = 8192;
@@ -233,13 +249,15 @@ public final class DfsPackFile {
 			} catch (EOFException e) {
 				invalid = true;
 				IOException e2 = new IOException(MessageFormat.format(
-						DfsText.get().shortReadOfIndex, packDesc.getIndexName()));
+						DfsText.get().shortReadOfIndex,
+						packDesc.getFileName(PACK_INDEX_EXT)));
 				e2.initCause(e);
 				throw e2;
 			} catch (IOException e) {
 				invalid = true;
 				IOException e2 = new IOException(MessageFormat.format(
-						DfsText.get().cannotReadIndex, packDesc.getIndexName()));
+						DfsText.get().cannotReadIndex,
+						packDesc.getFileName(PACK_INDEX_EXT)));
 				e2.initCause(e);
 				throw e2;
 			}
@@ -603,7 +621,7 @@ public final class DfsPackFile {
 			throw new PackInvalidException(getPackName());
 
 		boolean close = true;
-		ReadableChannel rc = ctx.db.openPackFile(packDesc);
+		ReadableChannel rc = ctx.db.openFile(packDesc, PACK_EXT);
 		try {
 			// If the block alignment is not yet known, discover it. Prefer the
 			// larger size from either the cache or the file itself.

@@ -45,7 +45,6 @@ package org.eclipse.jgit.api;
 
 import java.text.MessageFormat;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.eclipse.jgit.internal.JGitText;
@@ -153,11 +152,13 @@ public class MergeResult {
 				return false;
 			}
 		},
-		/** */
-		NOT_SUPPORTED {
+		/**
+		 * @since 2.2
+		 */
+		ABORTED {
 			@Override
 			public String toString() {
-				return "Not-yet-supported";
+				return "Aborted";
 			}
 
 			@Override
@@ -165,14 +166,11 @@ public class MergeResult {
 				return false;
 			}
 		},
-		/**
-		 * Status representing a checkout conflict, meaning that nothing could
-		 * be merged, as the pre-scan for the trees already failed for certain
-		 * files (i.e. local modifications prevent checkout of files).
-		 */
-		CHECKOUT_CONFLICT {
+		/** */
+		NOT_SUPPORTED {
+			@Override
 			public String toString() {
-				return "Checkout Conflict";
+				return "Not-yet-supported";
 			}
 
 			@Override
@@ -202,8 +200,6 @@ public class MergeResult {
 	private MergeStrategy mergeStrategy;
 
 	private Map<String, MergeFailureReason> failingPaths;
-
-	private List<String> checkoutConflicts;
 
 	/**
 	 * @param newHead
@@ -299,18 +295,6 @@ public class MergeResult {
 	}
 
 	/**
-	 * Creates a new result that represents a checkout conflict before the
-	 * operation even started for real.
-	 *
-	 * @param checkoutConflicts
-	 *            the conflicting files
-	 */
-	public MergeResult(List<String> checkoutConflicts) {
-		this.checkoutConflicts = checkoutConflicts;
-		this.mergeStatus = MergeStatus.CHECKOUT_CONFLICT;
-	}
-
-	/**
 	 * @return the object the head points at after the merge
 	 */
 	public ObjectId getNewHead() {
@@ -340,6 +324,7 @@ public class MergeResult {
 		return base;
 	}
 
+	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
 		boolean first = true;
@@ -464,15 +449,5 @@ public class MergeResult {
 	 */
 	public Map<String, MergeFailureReason> getFailingPaths() {
 		return failingPaths;
-	}
-
-	/**
-	 * Returns a list of paths that cause a checkout conflict. These paths
-	 * prevent the operation from even starting.
-	 *
-	 * @return the list of files that caused the checkout conflict.
-	 */
-	public List<String> getCheckoutConflicts() {
-		return checkoutConflicts;
 	}
 }

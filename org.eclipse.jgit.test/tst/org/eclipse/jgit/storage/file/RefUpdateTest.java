@@ -45,6 +45,7 @@
 
 package org.eclipse.jgit.storage.file;
 
+import static org.eclipse.jgit.junit.Assert.assertEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -862,7 +863,7 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 				"HEAD").getReverseEntries().get(0).getComment());
 	}
 
-	private void writeReflog(Repository db, ObjectId newId, String msg,
+	private static void writeReflog(Repository db, ObjectId newId, String msg,
 			String refName) throws IOException {
 		RefDirectory refs = (RefDirectory) db.getRefDatabase();
 		RefDirectoryUpdate update = refs.newUpdate(refName, true);
