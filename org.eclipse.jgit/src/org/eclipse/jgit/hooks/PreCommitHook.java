@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2015 Obeo.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,55 +40,45 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.hooks;
 
-package org.eclipse.jgit.console;
+import java.io.IOException;
+import java.io.PrintStream;
 
-import java.io.Console;
-import java.net.Authenticator;
-import java.net.PasswordAuthentication;
-import java.text.MessageFormat;
+import org.eclipse.jgit.api.errors.AbortedByHookException;
+import org.eclipse.jgit.lib.Repository;
 
-import org.eclipse.jgit.util.CachedAuthenticator;
+/**
+ * The <code>pre-commit</code> hook implementation. This hook is run before the
+ * commit and can reject the commit.
+ *
+ * @since 4.0
+ */
+public class PreCommitHook extends GitHook<Void> {
 
-/** Basic network prompt for username/password when using the console. */
-public class ConsoleAuthenticator extends CachedAuthenticator {
-	/** Install this authenticator implementation into the JVM. */
-	public static void install() {
-		final ConsoleAuthenticator c = new ConsoleAuthenticator();
-		if (c.cons == null)
-			throw new NoClassDefFoundError(ConsoleText.get().noSystemConsoleAvailable);
-		Authenticator.setDefault(c);
+	/** The pre-commit hook name. */
+	public static final String NAME = "pre-commit"; //$NON-NLS-1$
+
+	/**
+	 * @param repo
+	 *            The repository
+	 * @param outputStream
+	 *            The output stream the hook must use. {@code null} is allowed,
+	 *            in which case the hook will use {@code System.out}.
+	 */
+	protected PreCommitHook(Repository repo, PrintStream outputStream) {
+		super(repo, outputStream);
 	}
-
-	private final Console cons = System.console();
 
 	@Override
-	protected PasswordAuthentication promptPasswordAuthentication() {
-		final String realm = formatRealm();
-		String username = cons.readLine(MessageFormat.format(ConsoleText.get().usernameFor + " ", realm)); //$NON-NLS-1$
-		if (username == null || username.isEmpty()) {
-			return null;
-		}
-		char[] password = cons.readPassword(ConsoleText.get().password + " "); //$NON-NLS-1$
-		if (password == null) {
-			password = new char[0];
-		}
-		return new PasswordAuthentication(username, password);
+	public Void call() throws IOException, AbortedByHookException {
+		doRun();
+		return null;
 	}
 
-	private String formatRealm() {
-		final StringBuilder realm = new StringBuilder();
-		if (getRequestorType() == RequestorType.PROXY) {
-			realm.append(getRequestorType());
-			realm.append(" "); //$NON-NLS-1$
-			realm.append(getRequestingHost());
-			if (getRequestingPort() > 0) {
-				realm.append(":"); //$NON-NLS-1$
-				realm.append(getRequestingPort());
-			}
-		} else {
-			realm.append(getRequestingURL());
-		}
-		return realm.toString();
+	@Override
+	public String getHookName() {
+		return NAME;
 	}
+
 }

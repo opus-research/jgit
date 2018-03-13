@@ -387,6 +387,13 @@ public final class Constants {
 	public static final String MODULES = "modules";
 
 	/**
+	 * Name of the folder (inside gitDir) where the hooks are stored.
+	 *
+	 * @since 3.7
+	 */
+	public static final String HOOKS = "hooks";
+
+	/**
 	 * Create a new digest function for objects.
 	 *
 	 * @return a new digest object.
@@ -610,6 +617,14 @@ public final class Constants {
 	 * value of HEAD
 	 */
 	public static final String ORIG_HEAD = "ORIG_HEAD";
+
+	/**
+	 * Name of the file in which git commands and hooks store and read the
+	 * message prepared for the upcoming commit.
+	 *
+	 * @since 4.0
+	 */
+	public static final String COMMIT_EDITMSG = "COMMIT_EDITMSG";
 
 	/** objectid for the empty blob */
 	public static final ObjectId EMPTY_BLOB_ID = ObjectId
