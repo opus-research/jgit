@@ -265,11 +265,7 @@ public final class Constants {
 	/** Packed refs file */
 	public static final String PACKED_REFS = "packed-refs";
 
-	/**
-	 * Excludes-file
-	 *
-	 * @since 3.0
-	 */
+	/** Excludes-file */
 	public static final String INFO_EXCLUDE = "info/exclude";
 
 	/** The environment variable that contains the system user name */
@@ -286,13 +282,6 @@ public final class Constants {
 
 	/** The environment variable that contains the commiter's email */
 	public static final String GIT_COMMITTER_EMAIL_KEY = "GIT_COMMITTER_EMAIL";
-
-	/**
-	 * The environment variable that blocks use of the system config file
-	 *
-	 * @since 3.3
-	 */
-	public static final String GIT_CONFIG_NOSYSTEM_KEY = "GIT_CONFIG_NOSYSTEM";
 
 	/**
 	 * The environment variable that limits how close to the root of the file

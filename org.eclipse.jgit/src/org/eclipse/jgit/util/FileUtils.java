@@ -126,11 +126,10 @@ public class FileUtils {
 	 *             exception is not thrown when IGNORE_ERRORS is set.
 	 */
 	public static void delete(final File f, int options) throws IOException {
-		FS fs = FS.DETECTED;
-		if ((options & SKIP_MISSING) != 0 && !fs.exists(f))
+		if ((options & SKIP_MISSING) != 0 && !f.exists())
 			return;
 
-		if ((options & RECURSIVE) != 0 && fs.isDirectory(f)) {
+		if ((options & RECURSIVE) != 0 && f.isDirectory()) {
 			final File[] items = f.listFiles();
 			if (items != null) {
 				List<File> files = new ArrayList<File>();
@@ -165,7 +164,7 @@ public class FileUtils {
 		}
 
 		if (delete && !f.delete()) {
-			if ((options & RETRY) != 0 && fs.exists(f)) {
+			if ((options & RETRY) != 0 && f.exists()) {
 				for (int i = 1; i < 10; i++) {
 					try {
 						Thread.sleep(100);
@@ -193,7 +192,7 @@ public class FileUtils {
 	 * the method fails. Furthermore if the destination exists and is a file
 	 * then the file will be deleted and then the rename is retried.
 	 * <p>
-	 * This operation is <em>not</em> atomic.
+	 * This operation is <em>not</me> atomic.
 	 *
 	 * @see FS#retryFailedLockFileCommit()
 	 * @param src
@@ -337,54 +336,5 @@ public class FileUtils {
 		if (!f.createNewFile())
 			throw new IOException(MessageFormat.format(
 					JGitText.get().createNewFileFailed, f));
-	}
-
-	/**
-	 * Create a symbolic link
-	 *
-	 * @param path
-	 * @param target
-	 * @throws IOException
-	 * @since 3.0
-	 */
-	public static void createSymLink(File path, String target)
-			throws IOException {
-		FS.DETECTED.createSymLink(path, target);
-	}
-
-	/**
-	 * @param path
-	 * @return the target of the symbolic link, or null if it is not a symbolic
-	 *         link
-	 * @throws IOException
-	 * @since 3.0
-	 */
-	public static String readSymLink(File path) throws IOException {
-		return FS.DETECTED.readSymLink(path);
-	}
-
-	/**
-	 * Create a temporary directory.
-	 *
-	 * @param prefix
-	 * @param suffix
-	 * @param dir
-	 *            The parent dir, can be null to use system default temp dir.
-	 * @return the temp dir created.
-	 * @throws IOException
-	 * @since 3.4
-	 */
-	public static File createTempDir(String prefix, String suffix, File dir)
-			throws IOException {
-		final int RETRY = 1; // When something bad happens, retry once.
-		for (int i = 0; i < RETRY; i++) {
-			File tmp = File.createTempFile(prefix, suffix, dir);
-			if (!tmp.delete())
-				continue;
-			if (!tmp.mkdir())
-				continue;
-			return tmp;
-		}
-		throw new IOException(JGitText.get().cannotCreateTempDir);
 	}
 }

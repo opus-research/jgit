@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2013, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2011-2012, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -67,7 +67,6 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
-import org.eclipse.jgit.treewalk.EmptyTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 
@@ -115,9 +114,7 @@ public class ResetCommand extends GitCommand<Ref> {
 		KEEP // TODO not implemented yet
 	}
 
-	// We need to be able to distinguish whether the caller set the ref
-	// explicitly or not, so we apply the default (HEAD) only later.
-	private String ref = null;
+	private String ref = Constants.HEAD;
 
 	private ResetType mode;
 
@@ -142,6 +139,9 @@ public class ResetCommand extends GitCommand<Ref> {
 	public Ref call() throws GitAPIException, CheckoutConflictException {
 		checkCallable();
 
+		Ref r;
+		RevCommit commit;
+
 		try {
 			RepositoryState state = repo.getRepositoryState();
 			final boolean merging = state.equals(RepositoryState.MERGING)
@@ -152,55 +152,61 @@ public class ResetCommand extends GitCommand<Ref> {
 			final boolean reverting = state.equals(RepositoryState.REVERTING)
 					|| state.equals(RepositoryState.REVERTING_RESOLVED);
 
-			final ObjectId commitId = resolveRefToCommitId();
-			// When ref is explicitly specified, it has to resolve
-			if (ref != null && commitId == null) {
-				// @TODO throw an InvalidRefNameException. We can't do that
-				// now because this would break the API
-				throw new JGitInternalException("Invalid ref " + ref
-						+ " specified");
+			// resolve the ref to a commit
+			final ObjectId commitId;
+			try {
+				commitId = repo.resolve(ref + "^{commit}"); //$NON-NLS-1$
+				if (commitId == null) {
+					// @TODO throw an InvalidRefNameException. We can't do that
+					// now because this would break the API
+					throw new JGitInternalException("Invalid ref " + ref
+							+ " specified");
+				}
+			} catch (IOException e) {
+				throw new JGitInternalException(
+						MessageFormat.format(JGitText.get().cannotRead, ref),
+						e);
 			}
-
-			final ObjectId commitTree;
-			if (commitId != null)
-				commitTree = parseCommit(commitId).getTree();
-			else
-				commitTree = null;
+			RevWalk rw = new RevWalk(repo);
+			try {
+				commit = rw.parseCommit(commitId);
+			} catch (IOException e) {
+				throw new JGitInternalException(
+						MessageFormat.format(
+						JGitText.get().cannotReadCommit, commitId.toString()),
+						e);
+			} finally {
+				rw.release();
+			}
 
 			if (!filepaths.isEmpty()) {
 				// reset [commit] -- paths
-				resetIndexForPaths(commitTree);
+				resetIndexForPaths(commit);
 				setCallable(false);
 				return repo.getRef(Constants.HEAD);
 			}
 
-			final Ref result;
-			if (commitId != null) {
-				// write the ref
-				final RefUpdate ru = repo.updateRef(Constants.HEAD);
-				ru.setNewObjectId(commitId);
+			// write the ref
+			final RefUpdate ru = repo.updateRef(Constants.HEAD);
+			ru.setNewObjectId(commitId);
 
-				String refName = Repository.shortenRefName(getRefOrHEAD());
-				String message = refName + ": updating " + Constants.HEAD; //$NON-NLS-1$
-				ru.setRefLogMessage(message, false);
-				if (ru.forceUpdate() == RefUpdate.Result.LOCK_FAILURE)
-					throw new JGitInternalException(MessageFormat.format(
-							JGitText.get().cannotLock, ru.getName()));
+			String refName = Repository.shortenRefName(ref);
+			String message = refName + ": updating " + Constants.HEAD; //$NON-NLS-1$
+			ru.setRefLogMessage(message, false);
+			if (ru.forceUpdate() == RefUpdate.Result.LOCK_FAILURE)
+				throw new JGitInternalException(MessageFormat.format(
+						JGitText.get().cannotLock, ru.getName()));
 
-				ObjectId origHead = ru.getOldObjectId();
-				if (origHead != null)
-					repo.writeOrigHead(origHead);
-				result = ru.getRef();
-			} else {
-				result = repo.getRef(Constants.HEAD);
-			}
+			ObjectId origHead = ru.getOldObjectId();
+			if (origHead != null)
+				repo.writeOrigHead(origHead);
 
 			switch (mode) {
 				case HARD:
-					checkoutIndex(commitTree);
+					checkoutIndex(commit);
 					break;
 				case MIXED:
-					resetIndex(commitTree);
+					resetIndex(commit);
 					break;
 				case SOFT: // do nothing, only the ref was changed
 					break;
@@ -222,41 +228,19 @@ public class ResetCommand extends GitCommand<Ref> {
 			}
 
 			setCallable(false);
-			return result;
+			r = ru.getRef();
 		} catch (IOException e) {
 			throw new JGitInternalException(
 					JGitText.get().exceptionCaughtDuringExecutionOfResetCommand,
 					e);
 		}
-	}
 
-	private RevCommit parseCommit(final ObjectId commitId) {
-		RevCommit commit;
-		RevWalk rw = new RevWalk(repo);
-		try {
-			commit = rw.parseCommit(commitId);
-		} catch (IOException e) {
-			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().cannotReadCommit, commitId.toString()), e);
-		} finally {
-			rw.release();
-		}
-		return commit;
-	}
-
-	private ObjectId resolveRefToCommitId() {
-		try {
-			return repo.resolve(getRefOrHEAD() + "^{commit}"); //$NON-NLS-1$
-		} catch (IOException e) {
-			throw new JGitInternalException(
-					MessageFormat.format(JGitText.get().cannotRead, getRefOrHEAD()),
-					e);
-		}
+		return r;
 	}
 
 	/**
 	 * @param ref
-	 *            the ref to reset to, defaults to HEAD if not specified
+	 *            the ref to reset to
 	 * @return this instance
 	 */
 	public ResetCommand setRef(String ref) {
@@ -279,28 +263,20 @@ public class ResetCommand extends GitCommand<Ref> {
 	}
 
 	/**
-	 * @param path
-	 *            repository-relative path of file/directory to reset (with
-	 *            <code>/</code> as separator)
+	 * @param file
+	 *            the file to add
 	 * @return this instance
 	 */
-	public ResetCommand addPath(String path) {
+	public ResetCommand addPath(String file) {
 		if (mode != null)
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().illegalCombinationOfArguments, "<paths>...",
 					"[--mixed | --soft | --hard]")); //$NON-NLS-1$
-		filepaths.add(path);
+		filepaths.add(file);
 		return this;
 	}
 
-	private String getRefOrHEAD() {
-		if (ref != null)
-			return ref;
-		else
-			return Constants.HEAD;
-	}
-
-	private void resetIndexForPaths(ObjectId commitTree) {
+	private void resetIndexForPaths(RevCommit commit) {
 		DirCache dc = null;
 		try {
 			dc = repo.lockDirCache();
@@ -308,10 +284,7 @@ public class ResetCommand extends GitCommand<Ref> {
 
 			final TreeWalk tw = new TreeWalk(repo);
 			tw.addTree(new DirCacheBuildIterator(builder));
-			if (commitTree != null)
-				tw.addTree(commitTree);
-			else
-				tw.addTree(new EmptyTreeIterator());
+			tw.addTree(commit.getTree());
 			tw.setFilter(PathFilterGroup.createFromStrings(filepaths));
 			tw.setRecursive(true);
 
@@ -337,17 +310,14 @@ public class ResetCommand extends GitCommand<Ref> {
 		}
 	}
 
-	private void resetIndex(ObjectId commitTree) throws IOException {
+	private void resetIndex(RevCommit commit) throws IOException {
 		DirCache dc = repo.lockDirCache();
 		TreeWalk walk = null;
 		try {
 			DirCacheBuilder builder = dc.builder();
 
 			walk = new TreeWalk(repo);
-			if (commitTree != null)
-				walk.addTree(commitTree);
-			else
-				walk.addTree(new EmptyTreeIterator());
+			walk.addTree(commit.getTree());
 			walk.addTree(new DirCacheIterator(dc));
 			walk.setRecursive(true);
 
@@ -382,12 +352,12 @@ public class ResetCommand extends GitCommand<Ref> {
 		}
 	}
 
-	private void checkoutIndex(ObjectId commitTree) throws IOException,
+	private void checkoutIndex(RevCommit commit) throws IOException,
 			GitAPIException {
 		DirCache dc = repo.lockDirCache();
 		try {
 			DirCacheCheckout checkout = new DirCacheCheckout(repo, dc,
-					commitTree);
+					commit.getTree());
 			checkout.setFailOnConflict(false);
 			try {
 				checkout.checkout();
