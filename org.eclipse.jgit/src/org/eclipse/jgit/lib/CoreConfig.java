@@ -77,7 +77,7 @@ public class CoreConfig {
 	/**
 	 * Permissible values for {@code core.checkstat}
 	 *
-	 * @since 2.3
+	 * @since 3.0
 	 */
 	public static enum CheckStat {
 		/**
@@ -109,18 +109,6 @@ public class CoreConfig {
 		FALSE,
 		/** Checkout symbolic links as links */
 		TRUE
-	}
-
-	/**
-	 * Options for hiding files whose names start with a period
-	 */
-	public static enum HideDotFiles {
-		/** Do not hide .files */
-		FALSE,
-		/** Hide add .files */
-		TRUE,
-		/** Hide only .git */
-		DOTGITONLY
 	}
 
 	private CoreConfig(final Config rc) {
