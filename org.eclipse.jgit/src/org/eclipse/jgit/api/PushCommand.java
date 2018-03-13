@@ -95,8 +95,6 @@ public class PushCommand extends GitCommand<Iterable<PushResult>> {
 
 	private CredentialsProvider credentialsProvider;
 
-	private TransportConfigCallback transportConfigCallback;
-
 	/**
 	 * @param repo
 	 */
@@ -153,8 +151,6 @@ public class PushCommand extends GitCommand<Iterable<PushResult>> {
 				transport.setDryRun(dryRun);
 				if (credentialsProvider != null)
 					transport.setCredentialsProvider(credentialsProvider);
-				if (transportConfigCallback != null)
-					transportConfigCallback.configure(transport);
 
 				final Collection<RemoteRefUpdate> toPush = transport
 						.findRemoteRefUpdatesFor(refSpecs);
@@ -433,21 +429,6 @@ public class PushCommand extends GitCommand<Iterable<PushResult>> {
 			CredentialsProvider credentialsProvider) {
 		checkCallable();
 		this.credentialsProvider = credentialsProvider;
-		return this;
-	}
-
-	/**
-	 * @param transportConfigCallback
-	 *            if set, the callback will be invoked after the Transport has
-	 *            created, but before the Transport is used. The callback can
-	 *            use this opportunity to set additional type-specific
-	 *            configuration on the Transport instance.
-	 * @return {@code this}
-	 */
-	public PushCommand setTransportConfigCallback(
-			TransportConfigCallback transportConfigCallback) {
-		checkCallable();
-		this.transportConfigCallback = transportConfigCallback;
 		return this;
 	}
 }
