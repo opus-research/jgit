@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2008, Florian Koeberle <florianskarten@web.de>
- * Copyright (C) 2008, Florian Köberle <florianskarten@web.de>
- * and other copyright owners as documented in the project's IP log.
+ * Copyright (C) 2014, Alexey Kuznetsov <axet@me.com>
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -41,24 +39,78 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.transport;
 
-package org.eclipse.jgit.fnmatch;
+import org.eclipse.jgit.errors.UnsupportedCredentialItem;
+import org.eclipse.jgit.transport.NetRC.NetRCEntry;
 
-final class RestrictedWildCardHead extends AbstractHead {
-	private final char excludedCharacter;
+/**
+ * Simple .netrc credentials provider. It can lookup the first machine entry
+ * from your .netrc file.
+ *
+ * @since 3.5
+ */
+public class NetRCCredentialsProvider extends CredentialsProvider {
 
-	RestrictedWildCardHead(final char excludedCharacter, final boolean star) {
-		super(star);
-		this.excludedCharacter = excludedCharacter;
+	NetRC netrc = new NetRC();
+
+	/** */
+	public NetRCCredentialsProvider() {
+	}
+
+	/**
+	 * Install default provider for the .netrc parser.
+	 */
+	public static void install() {
+		CredentialsProvider.setDefault(new NetRCCredentialsProvider());
 	}
 
 	@Override
-	protected final boolean matches(final char c) {
-		return c != excludedCharacter;
+	public boolean supports(CredentialItem... items) {
+		for (CredentialItem i : items) {
+			if (i instanceof CredentialItem.Username)
+				continue;
+			else if (i instanceof CredentialItem.Password)
+				continue;
+			else
+				return false;
+		}
+		return true;
 	}
 
 	@Override
-	public String toString() {
-		return isStar() ? "*" : "?"; //$NON-NLS-1$ //$NON-NLS-2$
+	public boolean get(URIish uri, CredentialItem... items)
+			throws UnsupportedCredentialItem {
+		NetRCEntry cc = netrc.getEntry(uri.getHost());
+
+		if (cc == null)
+			return false;
+
+		for (CredentialItem i : items) {
+			if (i instanceof CredentialItem.Username) {
+				((CredentialItem.Username) i).setValue(cc.login);
+				continue;
+			}
+			if (i instanceof CredentialItem.Password) {
+				((CredentialItem.Password) i).setValue(cc.password);
+				continue;
+			}
+			if (i instanceof CredentialItem.StringType) {
+				if (i.getPromptText().equals("Password: ")) { //$NON-NLS-1$
+					((CredentialItem.StringType) i).setValue(new String(
+							cc.password));
+					continue;
+				}
+			}
+			throw new UnsupportedCredentialItem(uri, i.getClass().getName()
+					+ ":" + i.getPromptText()); //$NON-NLS-1$
+		}
+		return true;
 	}
+
+	@Override
+	public boolean isInteractive() {
+		return false;
+	}
+
 }
