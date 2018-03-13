@@ -95,7 +95,7 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 
 	private TestRng rng;
 
-	private FileRepository repo;
+	private Repository repo;
 
 	private TestRepository<Repository> tr;
 
@@ -274,9 +274,12 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 		deflate(pack, delta);
 		byte[] footer = digest(pack);
 
-		File dir = new File(repo.getObjectDatabase().getDirectory(), "pack");
-		File packName = new File(dir, idA.name() + ".pack");
-		File idxName = new File(dir, idA.name() + ".idx");
+		File packName = new File(new File(
+				((FileObjectDatabase) repo.getObjectDatabase()).getDirectory(),
+				"pack"), idA.name() + ".pack");
+		File idxName = new File(new File(
+				((FileObjectDatabase) repo.getObjectDatabase()).getDirectory(),
+				"pack"), idA.name() + ".idx");
 
 		FileOutputStream f = new FileOutputStream(packName);
 		try {

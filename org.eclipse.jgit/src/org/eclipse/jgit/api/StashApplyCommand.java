@@ -122,12 +122,12 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 	}
 
 	/**
-	 * @param willIgnoreRepositoryState
+	 * @param ignoreRepositoryState
 	 * @return {@code this}
 	 * @since 3.2
 	 */
-	public StashApplyCommand ignoreRepositoryState(boolean willIgnoreRepositoryState) {
-		this.ignoreRepositoryState = willIgnoreRepositoryState;
+	public StashApplyCommand ignoreRepositoryState(boolean ignoreRepositoryState) {
+		this.ignoreRepositoryState = ignoreRepositoryState;
 		return this;
 	}
 
@@ -329,8 +329,9 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 
 	private void resetUntracked(RevTree tree) throws CheckoutConflictException,
 			IOException {
-		TreeWalk walk = new TreeWalk(repo); // maybe NameConflictTreeWalk;
+		TreeWalk walk = null;
 		try {
+			walk = new TreeWalk(repo); // maybe NameConflictTreeWalk?
 			walk.addTree(tree);
 			walk.addTree(new FileTreeIterator(repo));
 			walk.setRecursive(true);
@@ -361,7 +362,8 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 				checkoutPath(entry, reader);
 			}
 		} finally {
-			walk.release();
+			if (walk != null)
+				walk.release();
 		}
 	}
 
