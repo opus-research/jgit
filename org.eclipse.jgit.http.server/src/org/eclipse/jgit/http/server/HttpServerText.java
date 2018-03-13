@@ -63,7 +63,6 @@ public class HttpServerText extends TranslationBundle {
 	/***/ public String encodingNotSupportedByThisLibrary;
 	/***/ public String expectedRepositoryAttribute;
 	/***/ public String filterMustNotBeNull;
-	/***/ public String internalErrorDuringPublishSubscribe;
 	/***/ public String internalErrorDuringReceivePack;
 	/***/ public String internalErrorDuringUploadPack;
 	/***/ public String internalServerError;

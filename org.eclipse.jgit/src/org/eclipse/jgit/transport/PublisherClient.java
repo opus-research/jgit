@@ -111,9 +111,8 @@ public class PublisherClient {
 		this.in = new PacketLineIn(myIn);
 		this.out = new BufferedOutputStream(myOut);
 
-		readFastRestart();
+		readRestart();
 		readSubscribeCommands();
-		readRefState();
 
 		// Add client to each of the subscribed repos
 		PublisherSession clientState = publisher.connectClient(this);
@@ -135,7 +134,9 @@ public class PublisherClient {
 				return;
 			}
 		}
-		pktLineOut.writeString("fast-restart " + clientState.getKey());
+		pktLineOut.writeString("restart-token " + clientState.getKey());
+		pktLineOut.writeString(
+				"heartbeat-interval " + HEARTBEAT_INTERVAL / 1000);
 		pktLineOut.end();
 
 		// Wait here for new PublisherUpdates until the connection is dropped
@@ -146,20 +147,18 @@ public class PublisherClient {
 			while (true) {
 				PublisherPack pk = clientState.getNextUpdate(
 						HEARTBEAT_INTERVAL);
-				if (pk == null) {
+				if (pk == null)
 					pktLineOut.writeString("heartbeat");
-					pktLineOut.end();
-				} else {
+				else {
 					// Write repository line
 					pktLineOut.writeString("update " + pk.getRepositoryName());
 					for (Iterator<PublisherPackSlice> it = pk.getSlices();
-							it.hasNext();) {
+							it.hasNext();)
 						it.next().writeToStream(out);
-					}
 					pktLineOut.writeString("sequence " + pk.getPackNumber());
-					pktLineOut.end();
 					pk.release();
 				}
+				pktLineOut.flush();
 			}
 		} catch (IOException e) {
 			System.err.println("Client disconnected");
@@ -174,63 +173,73 @@ public class PublisherClient {
 		}
 	}
 
-	private void readFastRestart() throws IOException {
-		String parts[] = in.readString().split(" ", 3);
-		if (!parts[0].equals("fast-restart"))
-			return;
-		if (parts.length < 2)
-			throw new IOException("Invalid fast-restart line");
-		restartToken = parts[1];
-		if (parts.length > 2)
-			lastPackNumber = Integer.parseInt(parts[2]);
+	/**
+	 * <pre>
+	 * restart [token]
+	 * last-pack [number]
+	 * [END]
+	 * </pre>
+	 *
+	 * @throws IOException
+	 */
+	private void readRestart() throws IOException {
+		String line;
+		while ((line = in.readString()) != PacketLineIn.END) {
+			if (line.startsWith("restart "))
+				restartToken = line.substring("restart ".length());
+			else if (line.startsWith("last-pack "))
+				lastPackNumber = Integer.parseInt(line.substring(
+						"last-pack ".length()));
+		}
 	}
 
+	/**
+	 * <pre>
+	 * repository [name]
+	 * want [refspec]
+	 * stop [refspec]
+	 * ...
+	 * have [objectid] [refspec]
+	 * ...
+	 * [END]
+	 * ...
+	 * done
+	 * </pre>
+	 *
+	 * @throws IOException
+	 */
 	private void readSubscribeCommands() throws IOException {
 		String line;
 		ArrayList<SubscribeCommand> cmdList = null;
-		String repo = null;
-		while ((line = in.readString()) != PacketLineIn.END) {
-			String parts[] = line.split(" ", 2);
-			String type = parts[0];
-			if (type.equals("repo")) {
-				if (repo != null)
-					commands.put(repo, cmdList);
-				cmdList = new ArrayList<SubscribeCommand>();
-				repo = parts[1];
-			} else {
-				if (cmdList == null)
-					throw new IOException(MessageFormat.format(JGitText
-							.get().invalidSubscribeRequest, type));
-				if (type.equals("subscribe"))
-					cmdList.add(new SubscribeCommand(SUBSCRIBE, parts[1]));
-				else if (type.equals("unsubscribe"))
-					cmdList.add(new SubscribeCommand(UNSUBSCRIBE, parts[1]));
-			}
-		}
-		if (repo != null)
-			commands.put(repo, cmdList); // Trailing add
-	}
-
-	private void readRefState() throws IOException {
-		String line;
 		Map<String, ObjectId> stateList = null;
 		String repo = null;
-		while ((line = in.readString()) != PacketLineIn.END) {
-			String parts[] = line.split(" ", 2);
-			String type = parts[0];
-			if (type.equals("repo")) {
-				if (repo != null)
-					refState.put(repo, stateList);
+		while (!(line = in.readString()).equals("done")) {
+			if (line == PacketLineIn.END) {
+				commands.put(repo, cmdList);
+				refState.put(repo, stateList);
+				repo = null;
+				cmdList = null;
+				stateList = null;
+			} else if (line.startsWith("repository ")) {
+				repo = line.substring("repository ".length());
+				cmdList = new ArrayList<SubscribeCommand>();
 				stateList = new HashMap<String, ObjectId>();
-				repo = parts[1];
 			} else {
-				if (stateList == null)
-					throw new IOException("Invalid subscribe request");
-				stateList.put(parts[1], ObjectId.fromString(parts[0]));
+				if (repo == null || cmdList == null || stateList == null)
+					throw new IOException(MessageFormat.format(JGitText
+							.get().invalidSubscribeRequest, line));
+				if (line.startsWith("want "))
+					cmdList.add(new SubscribeCommand(SUBSCRIBE, line.substring(
+							"want ".length())));
+				else if (line.startsWith("stop "))
+					cmdList.add(new SubscribeCommand(UNSUBSCRIBE, line
+							.substring("stop ".length())));
+				else if (line.startsWith("have ")) {
+					String[] parts = line.split(" ", 3);
+					stateList.put(parts[2], ObjectId.fromString(parts[1]));
+				}
 			}
 		}
-		if (repo != null)
-			refState.put(repo, stateList); // Trailing add
 	}
 
 	/** @return restart token, or null if none exists */

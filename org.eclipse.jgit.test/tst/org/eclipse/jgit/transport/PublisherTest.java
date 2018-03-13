@@ -128,20 +128,18 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 			@Override
 			protected void writeSubscribePacket(PacketLineOut pckLineOut)
 					throws IOException {
-				pckLineOut.writeString("fast-restart " + state.getKey());
-				pckLineOut.writeString("repo testrepository");
-				pckLineOut.writeString("subscribe " + refName);
+				pckLineOut.writeString("restart " + state.getKey());
 				pckLineOut.end();
-				pckLineOut.writeString("repo testrepository");
-				pckLineOut.writeString(OBJECT_ID1.getName() + " " + refName);
+				pckLineOut.writeString("repository testrepository");
+				pckLineOut.writeString("want " + refName);
+				pckLineOut.writeString(
+						"have " + OBJECT_ID1.getName() + " " + refName);
 				pckLineOut.end();
+				pckLineOut.writeString("done");
 			}
 		};
 
 		Thread.sleep(2000);
-		Thread t = pc.getSubscribeThread();
-		t.interrupt();
-		t.join();
 
 		assertEquals(pc.getPublisherState().getKey(), pc.getRestartToken());
 
@@ -197,14 +195,14 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 			@Override
 			protected void writeSubscribePacket(PacketLineOut pckLineOut)
 					throws IOException {
-				pckLineOut.writeString("fast-restart " + state.getKey());
-				pckLineOut.writeString("repo testrepository");
-				pckLineOut.writeString("subscribe refs/heads/a");
+				pckLineOut.writeString("restart " + state.getKey());
 				pckLineOut.end();
-				pckLineOut.writeString("repo testrepository");
-				pckLineOut.writeString(
+				pckLineOut.writeString("repository testrepository");
+				pckLineOut.writeString("want refs/heads/a");
+				pckLineOut.writeString("have " +
 						ObjectId.zeroId().getName() + " refs/heads/a");
 				pckLineOut.end();
+				pckLineOut.writeString("done");
 			}
 		};
 
@@ -218,17 +216,18 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 		String parts[];
 		line = in.readString();
 		parts = line.split(" ", 2);
-		assertEquals("fast-restart", parts[0]);
+		assertEquals("restart-token", parts[0]);
 		assertEquals(c.getPublisherState().getKey(), parts[1]);
+		line = in.readString();
+		parts = line.split(" ", 2);
+		assertEquals("heartbeat-interval", parts[0]);
 		assertEquals(PacketLineIn.END, in.readString());
 		int updatesLeft = 1;
 		while (updatesLeft > 0) {
 			line = in.readString();
 			parts = line.split(" ", 2);
-			if (parts[0].equals("heartbeat")) {
-				assertEquals(PacketLineIn.END, in.readString());
+			if (parts[0].equals("heartbeat"))
 				continue;
-			}
 			assertEquals("update", parts[0]);
 			assertEquals("testrepository", parts[1]);
 			// Read until the end of the commands
@@ -258,14 +257,14 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 				@Override
 				protected void writeSubscribePacket(PacketLineOut pckLineOut)
 						throws IOException {
-					pckLineOut.writeString("fast-restart " + state.getKey());
-					pckLineOut.writeString("repo testrepository");
-					pckLineOut.writeString("subscribe " + refName);
+					pckLineOut.writeString("restart " + state.getKey());
 					pckLineOut.end();
-					pckLineOut.writeString("repo testrepository");
+					pckLineOut.writeString("repository testrepository");
+					pckLineOut.writeString("want " + refName);
 					pckLineOut.writeString(
-							OBJECT_ID1.getName() + " " + refName);
+							"have " + OBJECT_ID1.getName() + " " + refName);
 					pckLineOut.end();
+					pckLineOut.writeString("done");
 				}
 			};
 			testClients.add(t);
@@ -292,19 +291,18 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 				String parts[];
 				line = in.readString();
 				parts = line.split(" ", 2);
-				assertEquals("fast-restart", parts[0]);
+				assertEquals("restart-token", parts[0]);
 				assertEquals(c.getPublisherState().getKey(), parts[1]);
+				line = in.readString();
+				parts = line.split(" ", 2);
+				assertEquals("heartbeat-interval", parts[0]);
 				assertEquals(PacketLineIn.END, in.readString());
 				int updatesLeft = updates;
 				while (updatesLeft > 0) {
 					line = in.readString();
-					parts = line.split(" ", 2);
-					if (parts[0].equals("heartbeat")) {
-						assertEquals(PacketLineIn.END, in.readString());
+					if (line.startsWith("heartbeat "))
 						continue;
-					}
-					assertEquals("update", parts[0]);
-					assertEquals("testrepository", parts[1]);
+					assertEquals("update testrepository", line);
 
 					// Read PACK
 					ReceivePack rp = new ReceivePack(db);
@@ -318,7 +316,6 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 					line = in.readString();
 					parts = line.split(" ", 2);
 					assertEquals("sequence", parts[0]);
-					assertEquals(PacketLineIn.END, in.readString());
 					updatesLeft--;
 				}
 			} catch (Exception e) {

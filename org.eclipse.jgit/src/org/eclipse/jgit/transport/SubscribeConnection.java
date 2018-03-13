@@ -62,6 +62,8 @@ public interface SubscribeConnection extends Connection {
 	 *
 	 * @param subscriber
 	 * @param subscribeCommands
+	 *            map from repository name to a list of SubscribeCommands to
+	 *            execute for that repository
 	 * @param monitor
 	 * @throws InterruptedException
 	 * @throws IOException

@@ -1218,7 +1218,7 @@ public abstract class Transport {
 	 */
 	public SubscribeConnection openSubscribe()
 			throws NotSupportedException, TransportException {
-		throw new NotSupportedException("Subscribe not supported");
+		throw new NotSupportedException(JGitText.get().subscribeNotSupported);
 	}
 
 	/**

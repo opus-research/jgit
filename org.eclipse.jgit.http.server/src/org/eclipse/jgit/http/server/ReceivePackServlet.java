@@ -71,8 +71,6 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jgit.errors.UnpackException;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.PostReceiveHook;
-import org.eclipse.jgit.transport.PostReceiveHookChain;
 import org.eclipse.jgit.transport.ReceivePack;
 import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
@@ -101,10 +99,9 @@ class ReceivePackServlet extends HttpServlet {
 		}
 
 		@Override
-		protected void advertise(
-				HttpServletRequest req, PacketLineOutRefAdvertiser pck)
-				throws IOException, ServiceNotEnabledException,
-				ServiceNotAuthorizedException {
+		protected void advertise(HttpServletRequest req,
+				PacketLineOutRefAdvertiser pck) throws IOException,
+				ServiceNotEnabledException, ServiceNotAuthorizedException {
 			ReceivePack rp = (ReceivePack) req.getAttribute(ATTRIBUTE_HANDLER);
 			try {
 				rp.sendAdvertisedRefs(pck);
@@ -117,8 +114,6 @@ class ReceivePackServlet extends HttpServlet {
 	static class Factory implements Filter {
 		private final ReceivePackFactory<HttpServletRequest> receivePackFactory;
 
-		private PostReceiveHook postReceiveHook;
-
 		Factory(ReceivePackFactory<HttpServletRequest> receivePackFactory) {
 			this.receivePackFactory = receivePackFactory;
 		}
@@ -130,9 +125,6 @@ class ReceivePackServlet extends HttpServlet {
 			ReceivePack rp;
 			try {
 				rp = receivePackFactory.create(req, getRepository(req));
-				if (postReceiveHook != null)
-					rp.setPostReceiveHook(PostReceiveHookChain.newChain(
-							postReceiveHook, rp.getPostReceiveHook()));
 			} catch (ServiceNotAuthorizedException e) {
 				rsp.sendError(SC_UNAUTHORIZED);
 				return;
@@ -157,19 +149,11 @@ class ReceivePackServlet extends HttpServlet {
 		public void destroy() {
 			// Nothing.
 		}
-
-		/**
-		 * @param hook
-		 */
-		public void setPostReceiveHook(PostReceiveHook hook) {
-			this.postReceiveHook = hook;
-		}
 	}
 
 	@Override
-	public void doPost(
-			final HttpServletRequest req, final HttpServletResponse rsp)
-			throws IOException {
+	public void doPost(final HttpServletRequest req,
+			final HttpServletResponse rsp) throws IOException {
 		if (!RECEIVE_PACK_REQUEST_TYPE.equals(req.getContentType())) {
 			rsp.sendError(SC_UNSUPPORTED_MEDIA_TYPE);
 			return;
@@ -198,8 +182,7 @@ class ReceivePackServlet extends HttpServlet {
 			out.close();
 
 		} catch (Throwable e) {
-			getServletContext().log(
-					HttpServerText.get().internalErrorDuringReceivePack, e);
+			getServletContext().log(HttpServerText.get().internalErrorDuringReceivePack, e);
 			if (!rsp.isCommitted()) {
 				rsp.reset();
 				sendError(req, rsp, SC_INTERNAL_SERVER_ERROR);
