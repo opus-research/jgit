@@ -52,7 +52,6 @@ import java.security.GeneralSecurityException;
 import java.security.spec.AlgorithmParameterSpec;
 import java.security.spec.KeySpec;
 import java.text.MessageFormat;
-import java.util.Locale;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -144,6 +143,35 @@ abstract class WalkEncryption {
 		}
 	}
 
+	// PBEParameterSpec factory for Java (version <= 7).
+	// Does not support AlgorithmParameterSpec.
+	static PBEParameterSpec java7PBEParameterSpec(byte[] salt,
+			int iterationCount) {
+		return new PBEParameterSpec(salt, iterationCount);
+	}
+
+	// PBEParameterSpec factory for Java (version >= 8).
+	// Adds support for AlgorithmParameterSpec.
+	static PBEParameterSpec java8PBEParameterSpec(byte[] salt,
+			int iterationCount, AlgorithmParameterSpec paramSpec) {
+		try {
+			@SuppressWarnings("boxing")
+			PBEParameterSpec instance = PBEParameterSpec.class
+					.getConstructor(byte[].class, int.class,
+							AlgorithmParameterSpec.class)
+					.newInstance(salt, iterationCount, paramSpec);
+			return instance;
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	// Current runtime version.
+	// https://docs.oracle.com/javase/7/docs/technotes/guides/versioning/spec/versioning2.html
+	static double javaVersion() {
+		return Double.parseDouble(System.getProperty("java.specification.version")); //$NON-NLS-1$
+	}
+
 	/**
 	 * JetS3t compatibility reference: <a href=
 	 * "https://bitbucket.org/jmurty/jets3t/src/156c00eb160598c2e9937fd6873f00d3190e28ca/src/org/jets3t/service/security/EncryptionUtil.java">
@@ -176,7 +204,7 @@ abstract class WalkEncryption {
 		// Size 16, see com.sun.crypto.provider.AESConstants.AES_BLOCK_SIZE
 		static final byte[] ZERO_AES_IV = new byte[16];
 
-		private static final String CRYPTO_VER = VERSION;
+		private static final String cryptoVer = VERSION;
 
 		private final String cryptoAlg;
 
@@ -189,11 +217,11 @@ abstract class WalkEncryption {
 			cryptoAlg = algo;
 
 			// Verify if cipher is present.
-			Cipher cipher = InsecureCipherFactory.create(cryptoAlg);
+			Cipher cipher = Cipher.getInstance(cryptoAlg);
 
 			// Standard names are not case-sensitive.
 			// http://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html
-			String cryptoName = cryptoAlg.toUpperCase(Locale.ROOT);
+			String cryptoName = cryptoAlg.toUpperCase();
 
 			if (!cryptoName.startsWith("PBE")) //$NON-NLS-1$
 				throw new GeneralSecurityException(JGitText.get().encryptionOnlyPBE);
@@ -205,7 +233,9 @@ abstract class WalkEncryption {
 			boolean useIV = cryptoName.contains("AES"); //$NON-NLS-1$
 
 			// PBEParameterSpec algorithm parameters are supported from Java 8.
-			if (useIV) {
+			boolean isJava8 = javaVersion() >= 1.8;
+
+			if (useIV && isJava8) {
 				// Support IV where possible:
 				// * since JCE provider uses random IV for PBE/AES
 				// * and there is no place to store dynamic IV in JetS3t V2
@@ -215,33 +245,34 @@ abstract class WalkEncryption {
 				// https://bitbucket.org/jmurty/jets3t/raw/156c00eb160598c2e9937fd6873f00d3190e28ca/src/org/jets3t/service/security/EncryptionUtil.java
 				// http://cr.openjdk.java.net/~mullan/webrevs/ascarpin/webrev.00/raw_files/new/src/share/classes/com/sun/crypto/provider/PBES2Core.java
 				IvParameterSpec paramIV = new IvParameterSpec(ZERO_AES_IV);
-				paramSpec = new PBEParameterSpec(SALT, ITERATIONS, paramIV);
+				paramSpec = java8PBEParameterSpec(SALT, ITERATIONS, paramIV);
 			} else {
 				// Strict legacy JetS3t V2 compatibility, with no IV support.
-				paramSpec = new PBEParameterSpec(SALT, ITERATIONS);
+				paramSpec = java7PBEParameterSpec(SALT, ITERATIONS);
 			}
 
 			// Verify if cipher + key are allowed by policy.
 			cipher.init(Cipher.ENCRYPT_MODE, secretKey, paramSpec);
 			cipher.doFinal();
+
 		}
 
 		@Override
 		void request(final HttpURLConnection u, final String prefix) {
-			u.setRequestProperty(prefix + JETS3T_CRYPTO_VER, CRYPTO_VER);
+			u.setRequestProperty(prefix + JETS3T_CRYPTO_VER, cryptoVer);
 			u.setRequestProperty(prefix + JETS3T_CRYPTO_ALG, cryptoAlg);
 		}
 
 		@Override
 		void validate(final HttpURLConnection u, final String prefix)
 				throws IOException {
-			validateImpl(u, prefix, CRYPTO_VER, cryptoAlg);
+			validateImpl(u, prefix, cryptoVer, cryptoAlg);
 		}
 
 		@Override
 		OutputStream encrypt(final OutputStream os) throws IOException {
 			try {
-				final Cipher cipher = InsecureCipherFactory.create(cryptoAlg);
+				final Cipher cipher = Cipher.getInstance(cryptoAlg);
 				cipher.init(Cipher.ENCRYPT_MODE, secretKey, paramSpec);
 				return new CipherOutputStream(os, cipher);
 			} catch (GeneralSecurityException e) {
@@ -252,7 +283,7 @@ abstract class WalkEncryption {
 		@Override
 		InputStream decrypt(final InputStream in) throws IOException {
 			try {
-				final Cipher cipher = InsecureCipherFactory.create(cryptoAlg);
+				final Cipher cipher = Cipher.getInstance(cryptoAlg);
 				cipher.init(Cipher.DECRYPT_MODE, secretKey, paramSpec);
 				return new CipherInputStream(in, cipher);
 			} catch (GeneralSecurityException e) {
@@ -343,7 +374,7 @@ abstract class WalkEncryption {
 			String keySalt = props.getProperty(profile + X_KEY_SALT, DEFAULT_KEY_SALT);
 
 			// Verify if cipher is present.
-			Cipher cipher = InsecureCipherFactory.create(cipherAlgo);
+			Cipher cipher = Cipher.getInstance(cipherAlgo);
 
 			// Verify if key factory is present.
 			SecretKeyFactory factory = SecretKeyFactory.getInstance(keyAlgo);
@@ -374,7 +405,7 @@ abstract class WalkEncryption {
 
 			SecretKey keyBase = factory.generateSecret(keySpec);
 
-			String name = cipherAlgo.toUpperCase(Locale.ROOT);
+			String name = cipherAlgo.toUpperCase();
 			Matcher matcherPBE = Pattern.compile(REGEX_PBE).matcher(name);
 			Matcher matcherTrans = Pattern.compile(REGEX_TRANS).matcher(name);
 			if (matcherPBE.matches()) {
@@ -401,7 +432,7 @@ abstract class WalkEncryption {
 		@Override
 		OutputStream encrypt(OutputStream output) throws IOException {
 			try {
-				Cipher cipher = InsecureCipherFactory.create(cipherAlgo);
+				Cipher cipher = Cipher.getInstance(cipherAlgo);
 				cipher.init(Cipher.ENCRYPT_MODE, secretKey);
 				AlgorithmParameters params = cipher.getParameters();
 				if (params == null) {
@@ -458,7 +489,7 @@ abstract class WalkEncryption {
 						JGitText.get().unsupportedEncryptionVersion, vers));
 			}
 			try {
-				decryptCipher = InsecureCipherFactory.create(cipherAlgo);
+				decryptCipher = Cipher.getInstance(cipherAlgo);
 				if (cont.isEmpty()) {
 					decryptCipher.init(Cipher.DECRYPT_MODE, secretKey);
 				} else {
@@ -507,7 +538,7 @@ abstract class WalkEncryption {
 		JGitV1(String algo, String pass)
 				throws GeneralSecurityException {
 			super(wrap(algo, pass));
-			String name = cipherAlgo.toUpperCase(Locale.ROOT);
+			String name = cipherAlgo.toUpperCase();
 			Matcher matcherPBE = Pattern.compile(REGEX_PBE).matcher(name);
 			if (!matcherPBE.matches())
 				throw new GeneralSecurityException(

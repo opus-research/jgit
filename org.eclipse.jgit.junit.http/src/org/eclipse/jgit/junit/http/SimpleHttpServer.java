@@ -69,15 +69,9 @@ public class SimpleHttpServer {
 
 	private URIish uri;
 
-	private URIish secureUri;
-
 	public SimpleHttpServer(Repository repository) {
-		this(repository, false);
-	}
-
-	public SimpleHttpServer(Repository repository, boolean withSsl) {
 		this.db = repository;
-		server = new AppServer(0, withSsl ? 0 : -1);
+		server = new AppServer();
 	}
 
 	public void start() throws Exception {
@@ -85,10 +79,6 @@ public class SimpleHttpServer {
 		server.setUp();
 		final String srcName = db.getDirectory().getName();
 		uri = toURIish(sBasic, srcName);
-		int sslPort = server.getSecurePort();
-		if (sslPort > 0) {
-			secureUri = uri.setPort(sslPort).setScheme("https");
-		}
 	}
 
 	public void stop() throws Exception {
@@ -99,14 +89,9 @@ public class SimpleHttpServer {
 		return uri;
 	}
 
-	public URIish getSecureUri() {
-		return secureUri;
-	}
-
 	private ServletContextHandler smart(final String path) {
 		GitServlet gs = new GitServlet();
 		gs.setRepositoryResolver(new RepositoryResolver<HttpServletRequest>() {
-			@Override
 			public Repository open(HttpServletRequest req, String name)
 					throws RepositoryNotFoundException,
 					ServiceNotEnabledException {

@@ -71,23 +71,6 @@ import org.junit.Assume;
 import org.junit.Test;
 
 public class CheckoutTest extends CLIRepositoryTestCase {
-	/**
-	 * Executes specified git command (with arguments), captures exception and
-	 * returns its message as an array of lines. Throws an AssertionError if no
-	 * exception is thrown.
-	 *
-	 * @param command
-	 *            a valid git command line, e.g. "git branch -h"
-	 * @return message contained within the exception
-	 */
-	private String[] executeExpectingException(String command) {
-		try {
-			execute(command);
-			throw new AssertionError("Expected Die");
-		} catch (Exception e) {
-			return e.getMessage().split(System.lineSeparator());
-		}
-	}
 
 	@Test
 	public void testCheckoutSelf() throws Exception {
@@ -124,7 +107,7 @@ public class CheckoutTest extends CLIRepositoryTestCase {
 	public void testCheckoutNonExistingBranch() throws Exception {
 		assertStringArrayEquals(
 				"error: pathspec 'side' did not match any file(s) known to git.",
-				executeExpectingException("git checkout side"));
+				execute("git checkout side"));
 	}
 
 	@Test
@@ -148,7 +131,7 @@ public class CheckoutTest extends CLIRepositoryTestCase {
 	public void testCheckoutUnresolvedHead() throws Exception {
 		assertStringArrayEquals(
 				"error: pathspec 'HEAD' did not match any file(s) known to git.",
-				executeExpectingException("git checkout HEAD"));
+				execute("git checkout HEAD"));
 	}
 
 	@Test
@@ -176,8 +159,7 @@ public class CheckoutTest extends CLIRepositoryTestCase {
 			writeTrashFile("a", "New Hello world a");
 			git.add().addFilepattern(".").call();
 
-			String[] execute = executeExpectingException(
-					"git checkout branch_1");
+			String[] execute = execute("git checkout branch_1");
 			assertEquals(
 					"error: Your local changes to the following files would be overwritten by checkout:",
 					execute[0]);
@@ -631,30 +613,7 @@ public class CheckoutTest extends CLIRepositoryTestCase {
 	}
 
 	@Test
-	public void testCheckoutAllPaths() throws Exception {
-		try (Git git = new Git(db)) {
-			writeTrashFile("a", "Hello world a");
-			git.add().addFilepattern(".").call();
-			git.commit().setMessage("commit file a").call();
-			git.branchCreate().setName("branch_1").call();
-			git.checkout().setName("branch_1").call();
-			File b = writeTrashFile("b", "Hello world b");
-			git.add().addFilepattern("b").call();
-			git.commit().setMessage("commit file b").call();
-			File a = writeTrashFile("a", "New Hello world a");
-			git.add().addFilepattern(".").call();
-			git.commit().setMessage("modified a").call();
-			assertArrayEquals(new String[] { "" },
-					execute("git checkout HEAD~2 -- ."));
-			assertEquals("Hello world a", read(a));
-			assertArrayEquals(new String[] { "* branch_1", "  master", "" },
-					execute("git branch"));
-			assertEquals("Hello world b", read(b));
-		}
-	}
-
-	@Test
-	public void testCheckoutSingleFile() throws Exception {
+	public void testCheckouSingleFile() throws Exception {
 		try (Git git = new Git(db)) {
 			File a = writeTrashFile("a", "file a");
 			git.add().addFilepattern(".").call();

@@ -258,7 +258,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	 * @throws NoHeadException
 	 * @throws RefNotFoundException
 	 */
-	@Override
 	public RebaseResult call() throws GitAPIException, NoHeadException,
 			RefNotFoundException, WrongRepositoryStateException {
 		newHead = null;
@@ -299,7 +298,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 					org.eclipse.jgit.api.Status status = Git.wrap(repo)
 							.status().setIgnoreSubmodules(IgnoreSubmoduleMode.ALL).call();
 					if (status.hasUncommittedChanges()) {
-						List<String> list = new ArrayList<>();
+						List<String> list = new ArrayList<String>();
 						list.addAll(status.getUncommittedChanges());
 						return RebaseResult.uncommittedChanges(list);
 					}
@@ -401,8 +400,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		boolean conflicts = false;
 		if (rebaseState.getFile(AUTOSTASH).exists()) {
 			String stash = rebaseState.readFile(AUTOSTASH);
-			try (Git git = Git.wrap(repo)) {
-				git.stashApply().setStashRef(stash)
+			try {
+				Git.wrap(repo).stashApply().setStashRef(stash)
 						.ignoreRepositoryState(true).setStrategy(strategy)
 						.call();
 			} catch (StashApplyFailureException e) {
@@ -425,7 +424,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		refUpdate.setNewObjectId(commitId);
 		refUpdate.setRefLogIdent(refLogIdent);
 		refUpdate.setRefLogMessage(refLogMessage, false);
-		refUpdate.setForceRefLog(true);
 		if (currentRef != null)
 			refUpdate.setExpectedOldObjectId(currentRef.getObjectId());
 		else
@@ -465,10 +463,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			String oldMessage = commitToPick.getFullMessage();
 			String newMessage = interactiveHandler
 					.modifyCommitMessage(oldMessage);
-			try (Git git = new Git(repo)) {
-				newHead = git.commit().setMessage(newMessage).setAmend(true)
-						.setNoVerify(true).call();
-			}
+			newHead = new Git(repo).commit().setMessage(newMessage)
+					.setAmend(true).setNoVerify(true).call();
 			return null;
 		case EDIT:
 			rebaseState.createFile(AMEND, commitToPick.name());
@@ -651,7 +647,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	// Get the rewritten equivalents for the parents of the given commit
 	private List<RevCommit> getNewParents(RevCommit commitToPick)
 			throws IOException {
-		List<RevCommit> newParents = new ArrayList<>();
+		List<RevCommit> newParents = new ArrayList<RevCommit>();
 		for (int p = 0; p < commitToPick.getParentCount(); p++) {
 			String parentHash = commitToPick.getParent(p).getName();
 			if (!new File(rebaseState.getRewrittenDir(), parentHash).exists())
@@ -697,7 +693,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		String headName = rebaseState.readFile(HEAD_NAME);
 		updateHead(headName, finalHead, upstreamCommit);
 		boolean stashConflicts = autoStashApply();
-		getRepository().autoGC(monitor);
 		FileUtils.delete(rebaseState.getDir(), FileUtils.RECURSIVE);
 		if (stashConflicts)
 			return RebaseResult.STASH_APPLY_CONFLICTS_RESULT;
@@ -757,12 +752,12 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			GitAPIException, CheckoutConflictException {
 		Ref ref = repo.exactRef(Constants.ORIG_HEAD);
 		ObjectId orig_head = ref == null ? null : ref.getObjectId();
-		try (Git git = Git.wrap(repo)) {
-			// we have already committed the cherry-picked commit.
+		try {
+			// we have already commited the cherry-picked commit.
 			// what we need is to have changes introduced by this
 			// commit to be on the index
 			// resetting is a workaround
-			git.reset().setMode(ResetType.SOFT)
+			Git.wrap(repo).reset().setMode(ResetType.SOFT)
 					.setRef("HEAD~1").call(); //$NON-NLS-1$
 		} finally {
 			// set ORIG_HEAD back to where we started because soft
@@ -807,12 +802,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			if (!line.trim().startsWith("#")) //$NON-NLS-1$
 				result.append(line).append("\n"); //$NON-NLS-1$
 		}
-		if (!commitMessage.endsWith("\n")) { //$NON-NLS-1$
-			int bufferSize = result.length();
-			if (bufferSize > 0 && result.charAt(bufferSize - 1) == '\n') {
-				result.deleteCharAt(bufferSize - 1);
-			}
-		}
+		if (!commitMessage.endsWith("\n")) //$NON-NLS-1$
+			result.deleteCharAt(result.length() - 1);
 		return result.toString();
 	}
 
@@ -1061,8 +1052,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	private void popSteps(int numSteps) throws IOException {
 		if (numSteps == 0)
 			return;
-		List<RebaseTodoLine> todoLines = new LinkedList<>();
-		List<RebaseTodoLine> poppedLines = new LinkedList<>();
+		List<RebaseTodoLine> todoLines = new LinkedList<RebaseTodoLine>();
+		List<RebaseTodoLine> poppedLines = new LinkedList<RebaseTodoLine>();
 
 		for (RebaseTodoLine line : repo.readRebaseTodo(
 				rebaseState.getPath(GIT_REBASE_TODO), true)) {
@@ -1127,7 +1118,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		}
 		rebaseState.createFile(QUIET, ""); //$NON-NLS-1$
 
-		ArrayList<RebaseTodoLine> toDoSteps = new ArrayList<>();
+		ArrayList<RebaseTodoLine> toDoSteps = new ArrayList<RebaseTodoLine>();
 		toDoSteps.add(new RebaseTodoLine("# Created by EGit: rebasing " + headId.name() //$NON-NLS-1$
 						+ " onto " + upstreamCommit.name())); //$NON-NLS-1$
 		// determine the commits to be applied
@@ -1163,7 +1154,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			LogCommand cmd = git.log().addRange(upstreamCommit, headCommit);
 			commitsToUse = cmd.call();
 		}
-		List<RevCommit> cherryPickList = new ArrayList<>();
+		List<RevCommit> cherryPickList = new ArrayList<RevCommit>();
 		for (RevCommit commit : commitsToUse) {
 			if (preserveMerges || commit.getParentCount() == 1)
 				cherryPickList.add(commit);
@@ -1610,7 +1601,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		if (raw.length == 0)
 			return null;
 
-		Map<String, String> keyValueMap = new HashMap<>();
+		Map<String, String> keyValueMap = new HashMap<String, String>();
 		for (int p = 0; p < raw.length;) {
 			int end = RawParseUtils.nextLF(raw, p);
 			if (end == p)

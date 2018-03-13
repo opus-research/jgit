@@ -42,10 +42,7 @@
  */
 package org.eclipse.jgit.pgm;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.CLIRepositoryTestCase;
@@ -69,7 +66,7 @@ public class ResetTest extends CLIRepositoryTestCase {
 	public void testPathOptionHelp() throws Exception {
 		String[] result = execute("git reset -h");
 		assertTrue("Unexpected argument: " + result[1],
-				result[1].endsWith("[-- path ...]"));
+				result[1].endsWith("[-- path ... ...]"));
 	}
 
 	@Test

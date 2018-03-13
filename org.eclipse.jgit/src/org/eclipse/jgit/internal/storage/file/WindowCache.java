@@ -235,9 +235,9 @@ public class WindowCache {
 		if (lockCount < 1)
 			throw new IllegalArgumentException(JGitText.get().lockCountMustBeGreaterOrEqual1);
 
-		queue = new ReferenceQueue<>();
+		queue = new ReferenceQueue<ByteWindow>();
 		clock = new AtomicLong(1);
-		table = new AtomicReferenceArray<>(tableSize);
+		table = new AtomicReferenceArray<Entry>(tableSize);
 		locks = new Lock[lockCount];
 		for (int i = 0; i < locks.length; i++)
 			locks[i] = new Lock();
@@ -496,16 +496,31 @@ public class WindowCache {
 	private void gc() {
 		Ref r;
 		while ((r = (Ref) queue.poll()) != null) {
-			clear(r);
+			// Sun's Java 5 and 6 implementation have a bug where a Reference
+			// can be enqueued and dequeued twice on the same reference queue
+			// due to a race condition within ReferenceQueue.enqueue(Reference).
+			//
+			// http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6837858
+			//
+			// We CANNOT permit a Reference to come through us twice, as it will
+			// skew the resource counters we maintain. Our canClear() check here
+			// provides a way to skip the redundant dequeues, if any.
+			//
+			if (r.canClear()) {
+				clear(r);
 
-			final int s = slot(r.pack, r.position);
-			final Entry e1 = table.get(s);
-			for (Entry n = e1; n != null; n = n.next) {
-				if (n.ref == r) {
-					n.dead = true;
-					table.compareAndSet(s, e1, clean(e1));
-					break;
+				boolean found = false;
+				final int s = slot(r.pack, r.position);
+				final Entry e1 = table.get(s);
+				for (Entry n = e1; n != null; n = n.next) {
+					if (n.ref == r) {
+						n.dead = true;
+						found = true;
+						break;
+					}
 				}
+				if (found)
+					table.compareAndSet(s, e1, clean(e1));
 			}
 		}
 	}
@@ -566,12 +581,21 @@ public class WindowCache {
 
 		long lastAccess;
 
+		private boolean cleared;
+
 		protected Ref(final PackFile pack, final long position,
 				final ByteWindow v, final ReferenceQueue<ByteWindow> queue) {
 			super(v, queue);
 			this.pack = pack;
 			this.position = position;
 			this.size = v.size();
+		}
+
+		final synchronized boolean canClear() {
+			if (cleared)
+				return false;
+			cleared = true;
+			return true;
 		}
 	}
 

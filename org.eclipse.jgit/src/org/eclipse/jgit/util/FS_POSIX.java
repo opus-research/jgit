@@ -99,7 +99,6 @@ public class FS_POSIX extends FS {
 		}
 	}
 
-	@SuppressWarnings("boxing")
 	private void determineAtomicFileCreationSupport() {
 		// @TODO: enhance SystemReader to support this without copying code
 		Boolean ret = getAtomicFileCreationSupportOption(
@@ -224,10 +223,10 @@ public class FS_POSIX extends FS {
 		if (!isFile(f))
 			return false;
 		if (!canExecute)
-			return f.setExecutable(false, false);
+			return f.setExecutable(false);
 
 		try {
-			Path path = FileUtils.toPath(f);
+			Path path = f.toPath();
 			Set<PosixFilePermission> pset = Files.getPosixFilePermissions(path);
 
 			// owner (user) is always allowed to execute.
@@ -261,7 +260,7 @@ public class FS_POSIX extends FS {
 
 	@Override
 	public ProcessBuilder runInShell(String cmd, String[] args) {
-		List<String> argv = new ArrayList<>(4 + args.length);
+		List<String> argv = new ArrayList<String>(4 + args.length);
 		argv.add("sh"); //$NON-NLS-1$
 		argv.add("-c"); //$NON-NLS-1$
 		argv.add(cmd + " \"$@\""); //$NON-NLS-1$
@@ -346,7 +345,6 @@ public class FS_POSIX extends FS {
 		return supportsAtomicCreateNewFile.booleanValue();
 	}
 
-	@Override
 	@SuppressWarnings("boxing")
 	/**
 	 * An implementation of the File#createNewFile() semantics which works also

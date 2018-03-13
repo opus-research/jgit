@@ -52,6 +52,7 @@ import javax.crypto.spec.SecretKeySpec;
 
 import org.eclipse.jgit.internal.storage.dfs.DfsRepository;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.NonceGenerator;
 import org.eclipse.jgit.transport.PushCertificate.NonceStatus;
 
 /**
@@ -82,7 +83,6 @@ public class HMACSHA1NonceGenerator implements NonceGenerator {
 		}
 	}
 
-	@Override
 	public synchronized String createNonce(Repository repo, long timestamp)
 			throws IllegalStateException {
 		String path;

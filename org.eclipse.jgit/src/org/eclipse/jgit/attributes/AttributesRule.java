@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2017 Red Hat Inc.
+ * Copyright (C) 2010, Red Hat Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -71,7 +71,7 @@ public class AttributesRule {
 
 	private static List<Attribute> parseAttributes(String attributesLine) {
 		// the C implementation oddly enough allows \r between attributes too.
-		ArrayList<Attribute> result = new ArrayList<>();
+		ArrayList<Attribute> result = new ArrayList<Attribute>();
 		for (String attribute : attributesLine.split(ATTRIBUTES_SPLIT_REGEX)) {
 			attribute = attribute.trim();
 			if (attribute.length() == 0)
@@ -210,7 +210,7 @@ public class AttributesRule {
 			return false;
 		if (relativeTarget.length() == 0)
 			return false;
-		boolean match = matcher.matches(relativeTarget, isDirectory, true);
+		boolean match = matcher.matches(relativeTarget, isDirectory);
 		return match;
 	}
 

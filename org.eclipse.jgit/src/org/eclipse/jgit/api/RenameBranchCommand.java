@@ -96,7 +96,6 @@ public class RenameBranchCommand extends GitCommand<Ref> {
 	 *             if rename is tried without specifying the old name and HEAD
 	 *             is detached
 	 */
-	@Override
 	public Ref call() throws GitAPIException, RefNotFoundException, InvalidRefNameException,
 			RefAlreadyExistsException, DetachedHeadException {
 		checkCallable();
