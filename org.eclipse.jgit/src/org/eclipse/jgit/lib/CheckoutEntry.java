@@ -2,8 +2,6 @@ package org.eclipse.jgit.lib;
 
 /**
  * Parsed information about a checkout.
- *
- * @since 3.0
  */
 public interface CheckoutEntry {
 
