@@ -444,7 +444,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		Collection<ObjectId> ids = or.resolve(step.getCommit());
 		if (ids.size() != 1)
 			throw new JGitInternalException(
-					JGitText.get().cannotResolveUniquelyAbbrevObjectId);
+					"Could not resolve uniquely the abbreviated object ID");
 		RevCommit commitToPick = walk.parseCommit(ids.iterator().next());
 		if (shouldPick) {
 			if (monitor.isCancelled())
@@ -878,8 +878,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			case NO_CHANGE:
 				break;
 			default:
-				throw new JGitInternalException(
-						JGitText.get().updatingHeadFailed);
+				throw new JGitInternalException("Updating HEAD failed");
 			}
 			rup = repo.updateRef(Constants.HEAD);
 			rup.setRefLogMessage("rebase finished: returning to " + headName, //$NON-NLS-1$
@@ -891,8 +890,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			case NO_CHANGE:
 				break;
 			default:
-				throw new JGitInternalException(
-						JGitText.get().updatingHeadFailed);
+				throw new JGitInternalException("Updating HEAD failed");
 			}
 		}
 	}
@@ -1277,7 +1275,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				if (this.upstreamCommit == null)
 					throw new JGitInternalException(MessageFormat
 							.format(JGitText.get().missingRequiredParameter,
-									"upstream")); //$NON-NLS-1$
+									"upstream"));
 				return;
 			default:
 				throw new WrongRepositoryStateException(MessageFormat.format(
@@ -1384,8 +1382,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			case FORCED:
 				break;
 			default:
-				throw new IOException(
-						JGitText.get().couldNotRewindToUpstreamCommit);
+				throw new IOException("Could not rewind to upstream commit");
 			}
 		} finally {
 			walk.release();
@@ -1455,7 +1452,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	public RebaseCommand setUpstreamName(String upstreamName) {
 		if (upstreamCommit == null) {
 			throw new IllegalStateException(
-					"setUpstreamName must be called after setUpstream."); //$NON-NLS-1$
+					"setUpstreamName must be called after setUpstream.");
 		}
 		this.upstreamCommitName = upstreamName;
 		return this;

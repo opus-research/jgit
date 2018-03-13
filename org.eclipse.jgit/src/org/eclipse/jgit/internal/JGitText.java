@@ -143,7 +143,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotResolveLocalTrackingRefForUpdating;
 	/***/ public String cannotSquashFixupWithoutPreviousCommit;
 	/***/ public String cannotStoreObjects;
-	/***/ public String cannotResolveUniquelyAbbrevObjectId;
 	/***/ public String cannotUnloadAModifiedTree;
 	/***/ public String cannotWorkWithOtherStagesThanZeroRightNow;
 	/***/ public String canOnlyCherryPickCommitsWithOneParent;
@@ -238,7 +237,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String couldNotRenameDeleteOldIndex;
 	/***/ public String couldNotRenameTemporaryFile;
 	/***/ public String couldNotRenameTemporaryIndexFileToIndex;
-	/***/ public String couldNotRewindToUpstreamCommit;
 	/***/ public String couldNotURLEncodeToUTF8;
 	/***/ public String couldNotWriteFile;
 	/***/ public String countingObjects;
@@ -664,7 +662,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unsupportedOperationNotAddAtEnd;
 	/***/ public String unsupportedPackIndexVersion;
 	/***/ public String unsupportedPackVersion;
-	/***/ public String updatingHeadFailed;
 	/***/ public String updatingReferences;
 	/***/ public String updatingRefFailed;
 	/***/ public String uriNotConfigured;
