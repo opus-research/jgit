@@ -211,9 +211,8 @@ public class CommitCommand extends GitCommand<RevCommit> {
 						RevCommit revCommit = revWalk.parseCommit(commitId);
 						RefUpdate ru = repo.updateRef(Constants.HEAD);
 						ru.setNewObjectId(commitId);
-						String prefix = amend ? "commit (amend): " : "commit: ";
-						ru.setRefLogMessage(
-								prefix + revCommit.getShortMessage(), false);
+						ru.setRefLogMessage("commit : "
+								+ revCommit.getShortMessage(), false);
 
 						ru.setExpectedOldObjectId(headId);
 						Result rc = ru.forceUpdate();
@@ -441,7 +440,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				parents = repo.readMergeHeads();
 			} catch (IOException e) {
 				throw new JGitInternalException(MessageFormat.format(
-						JGitText.get().exceptionOccurredDuringReadingOfGIT_DIR,
+						JGitText.get().exceptionOccuredDuringReadingOfGIT_DIR,
 						Constants.MERGE_HEAD, e), e);
 			}
 			if (message == null) {
@@ -449,7 +448,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 					message = repo.readMergeCommitMsg();
 				} catch (IOException e) {
 					throw new JGitInternalException(MessageFormat.format(
-							JGitText.get().exceptionOccurredDuringReadingOfGIT_DIR,
+							JGitText.get().exceptionOccuredDuringReadingOfGIT_DIR,
 							Constants.MERGE_MSG, e), e);
 				}
 			}
