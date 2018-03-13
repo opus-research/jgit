@@ -1,7 +1,6 @@
 /*
  * Copyright (C) 2008-2009, Google Inc.
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
- * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -114,8 +113,6 @@ public class DirCacheEntry {
 	static final int INFO_LEN = 62;
 
 	private static final int ASSUME_VALID = 0x80;
-
-	private static final int UPDATE_NEEDED = 0x40;
 
 	/** (Possibly shared) header information storage. */
 	private final byte[] info;
@@ -295,7 +292,7 @@ public class DirCacheEntry {
 		if (smudge_s < mtime)
 			return true;
 		if (smudge_s == mtime)
-			return smudge_ns <= NB.decodeInt32(info, base + 4);
+			return smudge_ns <= NB.decodeInt32(info, base + 4) / 1000000;
 		return false;
 	}
 
@@ -356,25 +353,6 @@ public class DirCacheEntry {
 			info[infoOffset + P_FLAGS] |= ASSUME_VALID;
 		else
 			info[infoOffset + P_FLAGS] &= ~ASSUME_VALID;
-	}
-
-	/**
-	 * @return true if this entry should be checked for changes
-	 */
-	public boolean isUpdateNeeded() {
-		return (info[infoOffset + P_FLAGS] & UPDATE_NEEDED) != 0;
-	}
-
-	/**
-	 * Set whether this entry must be checked for changes
-	 *
-	 * @param updateNeeded
-	 */
-	public void setUpdateNeeded(boolean updateNeeded) {
-		if (updateNeeded)
-			info[infoOffset + P_FLAGS] |= UPDATE_NEEDED;
-		else
-			info[infoOffset + P_FLAGS] &= ~UPDATE_NEEDED;
 	}
 
 	/**
