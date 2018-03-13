@@ -1,8 +1,6 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
  * Copyright (C) 2009, Robin Rosenberg
  * Copyright (C) 2009, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -51,96 +49,25 @@ import java.io.IOException;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 
 /**
- * A RefUpdate combination for renaming a reference.
- * <p>
- * If the source reference is currently pointed to by {@code HEAD}, then the
- * HEAD symbolic reference is updated to point to the new destination.
+ * A RefUpdate combination for renaming a ref
  */
-public abstract class RefRename {
-	/** Update operation to read and delete the source reference. */
-	protected final RefUpdate source;
+public class RefRename {
+	private RefUpdate newToUpdate;
 
-	/** Update operation to create/overwrite the destination reference. */
-	protected final RefUpdate destination;
+	private RefUpdate oldFromDelete;
 
-	private Result result = Result.NOT_ATTEMPTED;
+	private Result renameResult = Result.NOT_ATTEMPTED;
 
-	/**
-	 * Initialize a new rename operation.
-	 *
-	 * @param src
-	 *            operation to read and delete the source.
-	 * @param dst
-	 *            operation to create (or overwrite) the destination.
-	 */
-	protected RefRename(final RefUpdate src, final RefUpdate dst) {
-		source = src;
-		destination = dst;
-
-		Repository repo = destination.getRepository();
-		String cmd = "";
-		if (source.getName().startsWith(Constants.R_HEADS)
-				&& destination.getName().startsWith(Constants.R_HEADS))
-			cmd = "Branch: ";
-		setRefLogMessage(cmd + "renamed "
-				+ repo.shortenRefName(source.getName()) + " to "
-				+ repo.shortenRefName(destination.getName()));
-	}
-
-	/** @return identity of the user making the change in the reflog. */
-	public PersonIdent getRefLogIdent() {
-		return destination.getRefLogIdent();
-	}
-
-	/**
-	 * Set the identity of the user appearing in the reflog.
-	 * <p>
-	 * The timestamp portion of the identity is ignored. A new identity with the
-	 * current timestamp will be created automatically when the rename occurs
-	 * and the log record is written.
-	 *
-	 * @param pi
-	 *            identity of the user. If null the identity will be
-	 *            automatically determined based on the repository
-	 *            configuration.
-	 */
-	public void setRefLogIdent(final PersonIdent pi) {
-		destination.setRefLogIdent(pi);
-	}
-
-	/**
-	 * Get the message to include in the reflog.
-	 *
-	 * @return message the caller wants to include in the reflog; null if the
-	 *         rename should not be logged.
-	 */
-	public String getRefLogMessage() {
-		return destination.getRefLogMessage();
-	}
-
-	/**
-	 * Set the message to include in the reflog.
-	 *
-	 * @param msg
-	 *            the message to describe this change.
-	 */
-	public void setRefLogMessage(final String msg) {
-		if (msg == null)
-			disableRefLog();
-		else
-			destination.setRefLogMessage(msg, false);
-	}
-
-	/** Don't record this rename in the ref's associated reflog. */
-	public void disableRefLog() {
-		destination.setRefLogMessage("", false);
+	RefRename(final RefUpdate toUpdate, final RefUpdate fromUpdate) {
+		newToUpdate = toUpdate;
+		oldFromDelete = fromUpdate;
 	}
 
 	/**
 	 * @return result of rename operation
 	 */
 	public Result getResult() {
-		return result;
+		return renameResult;
 	}
 
 	/**
@@ -148,33 +75,101 @@ public abstract class RefRename {
 	 * @throws IOException
 	 */
 	public Result rename() throws IOException {
+		Ref oldRef = oldFromDelete.db.readRef(Constants.HEAD);
+		boolean renameHEADtoo = oldRef != null
+				&& oldRef.getName().equals(oldFromDelete.getName());
+		Repository db = oldFromDelete.getRepository();
 		try {
-			result = doRename();
-			return result;
-		} catch (IOException err) {
-			result = Result.IO_FAILURE;
-			throw err;
+			RefLogWriter.renameTo(db, oldFromDelete,
+					newToUpdate);
+			newToUpdate.setRefLogMessage(null, false);
+			String tmpRefName = "RENAMED-REF.." + Thread.currentThread().getId();
+			RefUpdate tmpUpdateRef = db.updateRef(tmpRefName);
+			if (renameHEADtoo) {
+				try {
+					oldFromDelete.db.link(Constants.HEAD, tmpRefName);
+				} catch (IOException e) {
+					RefLogWriter.renameTo(db,
+							newToUpdate, oldFromDelete);
+					return renameResult = Result.LOCK_FAILURE;
+				}
+			}
+			tmpUpdateRef.setNewObjectId(oldFromDelete.getOldObjectId());
+			tmpUpdateRef.setForceUpdate(true);
+			Result update = tmpUpdateRef.update();
+			if (update != Result.FORCED && update != Result.NEW && update != Result.NO_CHANGE) {
+				RefLogWriter.renameTo(db,
+						newToUpdate, oldFromDelete);
+				if (renameHEADtoo) {
+					oldFromDelete.db.link(Constants.HEAD, oldFromDelete.getName());
+				}
+				return renameResult = update;
+			}
+
+			oldFromDelete.setExpectedOldObjectId(oldFromDelete.getOldObjectId());
+			oldFromDelete.setForceUpdate(true);
+			Result delete = oldFromDelete.delete();
+			if (delete != Result.FORCED) {
+				if (db.getRef(
+						oldFromDelete.getName()) != null) {
+					RefLogWriter.renameTo(db,
+							newToUpdate, oldFromDelete);
+					if (renameHEADtoo) {
+						oldFromDelete.db.link(Constants.HEAD, oldFromDelete
+								.getName());
+					}
+				}
+				return renameResult = delete;
+			}
+
+			newToUpdate.setNewObjectId(tmpUpdateRef.getNewObjectId());
+			Result updateResult = newToUpdate.update();
+			if (updateResult != Result.NEW) {
+				RefLogWriter.renameTo(db, newToUpdate, oldFromDelete);
+				if (renameHEADtoo) {
+					oldFromDelete.db.link(Constants.HEAD, oldFromDelete.getName());
+				}
+				oldFromDelete.setExpectedOldObjectId(null);
+				oldFromDelete.setNewObjectId(oldFromDelete.getOldObjectId());
+				oldFromDelete.setForceUpdate(true);
+				oldFromDelete.setRefLogMessage(null, false);
+				Result undelete = oldFromDelete.update();
+				if (undelete != Result.NEW && undelete != Result.LOCK_FAILURE)
+					return renameResult = Result.IO_FAILURE;
+				return renameResult = Result.LOCK_FAILURE;
+			}
+
+			if (renameHEADtoo) {
+				oldFromDelete.db.link(Constants.HEAD, newToUpdate.getName());
+			} else {
+				db.fireRefsMaybeChanged();
+			}
+			RefLogWriter.append(this, newToUpdate.getName(), "Branch: renamed "
+					+ db.shortenRefName(oldFromDelete.getName()) + " to "
+					+ db.shortenRefName(newToUpdate.getName()));
+			if (renameHEADtoo)
+				RefLogWriter.append(this, Constants.HEAD, "Branch: renamed "
+						+ db.shortenRefName(oldFromDelete.getName()) + " to "
+						+ db.shortenRefName(newToUpdate.getName()));
+			return renameResult = Result.RENAMED;
+		} catch (RuntimeException e) {
+			throw e;
 		}
 	}
 
-	/**
-	 * @return the result of the rename operation.
-	 * @throws IOException
-	 */
-	protected abstract Result doRename() throws IOException;
+	ObjectId getObjectId() {
+		return oldFromDelete.getOldObjectId();
+	}
 
-	/**
-	 * @return true if the {@code Constants#HEAD} reference needs to be linked
-	 *         to the new destination name.
-	 * @throws IOException
-	 *             the current value of {@code HEAD} cannot be read.
-	 */
-	protected boolean needToUpdateHEAD() throws IOException {
-		Ref head = source.getRefDatabase().getRef(Constants.HEAD);
-		if (head instanceof SymbolicRef) {
-			head = ((SymbolicRef) head).getTarget();
-			return head.getName().equals(source.getName());
-		}
-		return false;
+	Repository getRepository() {
+		return oldFromDelete.getRepository();
+	}
+
+	PersonIdent getRefLogIdent() {
+		return newToUpdate.getRefLogIdent();
+	}
+
+	String getToName() {
+		return newToUpdate.getName();
 	}
 }

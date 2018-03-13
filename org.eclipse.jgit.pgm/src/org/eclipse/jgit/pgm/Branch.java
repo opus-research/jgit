@@ -143,7 +143,7 @@ class Branch extends TextBuiltin {
 		Ref head = refs.get(Constants.HEAD);
 		// This can happen if HEAD is stillborn
 		if (head != null) {
-			String current = head.getLeaf().getName();
+			String current = head.getName();
 			if (current.equals(Constants.HEAD))
 				addRef("(no branch)", head);
 			addRefs(refs, Constants.R_HEADS, !remote);

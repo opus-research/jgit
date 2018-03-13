@@ -44,6 +44,7 @@
 package org.eclipse.jgit.http.test;
 
 import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_ENCODING;
+import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_LENGTH;
 import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_TYPE;
 
 import java.io.IOException;
@@ -91,8 +92,6 @@ import org.eclipse.jgit.transport.TransportHttp;
 import org.eclipse.jgit.transport.URIish;
 
 public class SmartClientSmartServerTest extends HttpTestCase {
-	private static final String HDR_CONTENT_LENGTH = "Content-Length";
-
 	private static final String HDR_TRANSFER_ENCODING = "Transfer-Encoding";
 
 	private Repository remoteRepository;
