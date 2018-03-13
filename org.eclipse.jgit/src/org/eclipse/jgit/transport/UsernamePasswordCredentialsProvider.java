@@ -41,31 +41,84 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.notes;
+package org.eclipse.jgit.transport;
 
-import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.TreeFormatter;
+import java.util.Arrays;
 
-/** A tree entry found in a note branch that isn't a valid note. */
-class NonNoteEntry extends ObjectId {
-	/** Name of the entry in the tree, in raw format. */
-	private final byte[] name;
+import org.eclipse.jgit.errors.UnsupportedCredentialItem;
 
-	/** Mode of the entry as parsed from the tree. */
-	private final FileMode mode;
+/**
+ * Simple {@link CredentialsProvider} that always uses the same information.
+ */
+public class UsernamePasswordCredentialsProvider extends CredentialsProvider {
+	private String username;
 
-	/** The next non-note entry in the same tree, as defined by tree order. */
-	NonNoteEntry next;
+	private char[] password;
 
-	NonNoteEntry(byte[] name, FileMode mode, AnyObjectId id) {
-		super(id);
-		this.name = name;
-		this.mode = mode;
+	/**
+	 * Initialize the provider with a single username and password.
+	 *
+	 * @param username
+	 * @param password
+	 */
+	public UsernamePasswordCredentialsProvider(String username, String password) {
+		this(username, password.toCharArray());
 	}
 
-	void format(TreeFormatter fmt) {
-		fmt.append(name, mode, this);
+	/**
+	 * Initialize the provider with a single username and password.
+	 *
+	 * @param username
+	 * @param password
+	 */
+	public UsernamePasswordCredentialsProvider(String username, char[] password) {
+		this.username = username;
+		this.password = password;
+	}
+
+	@Override
+	public boolean isInteractive() {
+		return false;
+	}
+
+	@Override
+	public boolean supports(CredentialItem... items) {
+		for (CredentialItem i : items) {
+			if (i instanceof CredentialItem.Username)
+				continue;
+
+			else if (i instanceof CredentialItem.Password)
+				continue;
+
+			else
+				return false;
+		}
+		return true;
+	}
+
+	@Override
+	public boolean get(URIish uri, CredentialItem... items)
+			throws UnsupportedCredentialItem {
+		for (CredentialItem i : items) {
+			if (i instanceof CredentialItem.Username)
+				((CredentialItem.Username) i).setValue(username);
+
+			else if (i instanceof CredentialItem.Password)
+				((CredentialItem.Password) i).setValue(password);
+
+			else
+				throw new UnsupportedCredentialItem(uri, i.getPromptText());
+		}
+		return true;
+	}
+
+	/** Destroy the saved username and password.. */
+	public void clear() {
+		username = null;
+
+		if (password != null) {
+			Arrays.fill(password, (char) 0);
+			password = null;
+		}
 	}
 }

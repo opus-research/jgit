@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>,
+ * Copyright (C) 2010, Stefan Lay <stefan.lay@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,32 +41,29 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.errors;
 
-package org.eclipse.jgit.notes;
+import org.eclipse.jgit.transport.CredentialItem;
+import org.eclipse.jgit.transport.CredentialsProvider;
+import org.eclipse.jgit.transport.URIish;
 
-import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.TreeFormatter;
+/**
+ * An exception thrown when a {@link CredentialItem} is requested from a
+ * {@link CredentialsProvider} which is not supported by this provider.
+ */
+public class UnsupportedCredentialItem extends RuntimeException {
+	private static final long serialVersionUID = 1L;
 
-/** A tree entry found in a note branch that isn't a valid note. */
-class NonNoteEntry extends ObjectId {
-	/** Name of the entry in the tree, in raw format. */
-	private final byte[] name;
-
-	/** Mode of the entry as parsed from the tree. */
-	private final FileMode mode;
-
-	/** The next non-note entry in the same tree, as defined by tree order. */
-	NonNoteEntry next;
-
-	NonNoteEntry(byte[] name, FileMode mode, AnyObjectId id) {
-		super(id);
-		this.name = name;
-		this.mode = mode;
-	}
-
-	void format(TreeFormatter fmt) {
-		fmt.append(name, mode, this);
+	/**
+	 * Constructs an UnsupportedCredentialItem with the specified detail message
+	 * prefixed with provided URI.
+	 *
+	 * @param uri
+	 *            URI used for transport
+	 * @param s
+	 *            message
+	 */
+	public UnsupportedCredentialItem(final URIish uri, final String s) {
+		super(uri.setPass(null) + ": " + s);
 	}
 }
