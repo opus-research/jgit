@@ -87,8 +87,6 @@ public class NameConflictTreeWalk extends TreeWalk {
 
 	private boolean fastMinHasMatch;
 
-	private AbstractTreeIterator dfConflict;
-
 	/**
 	 * Create a new tree walker for a given repository.
 	 *
@@ -143,7 +141,6 @@ public class NameConflictTreeWalk extends TreeWalk {
 		if (minRef.eof())
 			return minRef;
 
-		boolean hasConflict = false;
 		minRef.matches = minRef;
 		while (++i < trees.length) {
 			final AbstractTreeIterator t = trees[i];
@@ -159,7 +156,6 @@ public class NameConflictTreeWalk extends TreeWalk {
 					// tree anyway.
 					//
 					t.matches = minRef;
-					hasConflict = true;
 				} else {
 					fastMinHasMatch = false;
 					t.matches = t;
@@ -186,13 +182,10 @@ public class NameConflictTreeWalk extends TreeWalk {
 				}
 				t.matches = t;
 				minRef = t;
-				hasConflict = true;
 			} else
 				fastMinHasMatch = false;
 		}
 
-		if (hasConflict && fastMinHasMatch && dfConflict == null)
-			dfConflict = minRef;
 		return minRef;
 	}
 
@@ -288,10 +281,6 @@ public class NameConflictTreeWalk extends TreeWalk {
 			for (final AbstractTreeIterator t : trees)
 				if (t.matches == minRef)
 					t.matches = treeMatch;
-
-			if (dfConflict == null)
-				dfConflict = treeMatch;
-
 			return treeMatch;
 		}
 
@@ -313,9 +302,6 @@ public class NameConflictTreeWalk extends TreeWalk {
 				t.matches = null;
 			}
 		}
-
-		if (ch == dfConflict)
-			dfConflict = null;
 	}
 
 	@Override
@@ -333,26 +319,5 @@ public class NameConflictTreeWalk extends TreeWalk {
 				t.matches = null;
 			}
 		}
-
-		if (ch == dfConflict)
-			dfConflict = null;
-	}
-
-	/**
-	 * True if the current entry is covered by a directory/file conflict.
-	 *
-	 * This means that for some prefix of the current entry's path, this walk
-	 * has detected a directory/file conflict. Also true if the current entry
-	 * itself is a directory/file conflict.
-	 *
-	 * Example: If this TreeWalk points to foo/bar/a.txt and this method returns
-	 * true then you know that either for path foo or for path foo/bar files and
-	 * folders were detected.
-	 *
-	 * @return <code>true</code> if the current entry is covered by a
-	 *         directory/file conflict, <code>false</code> otherwise
-	 */
-	public boolean isDirectoryFileConflict() {
-		return dfConflict != null;
 	}
 }

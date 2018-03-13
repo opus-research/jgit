@@ -555,7 +555,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 			// repository and not inherited from other files.
 			//
 			File path = safeFS().resolve(getGitDir(), "config");
-			FileBasedConfig cfg = new FileBasedConfig(path, safeFS());
+			FileBasedConfig cfg = new FileBasedConfig(path);
 			try {
 				cfg.load();
 			} catch (ConfigInvalidException err) {

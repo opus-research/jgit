@@ -59,7 +59,6 @@ import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.StoredConfig;
-import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 
@@ -69,19 +68,15 @@ import org.eclipse.jgit.util.RawParseUtils;
 public class FileBasedConfig extends StoredConfig {
 	private final File configFile;
 	private volatile long lastModified;
-	private final FS fs;
 
 	/**
 	 * Create a configuration with no default fallback.
 	 *
 	 * @param cfgLocation
 	 *            the location of the configuration file on the file system
-	 * @param fs
-	 *            the file system abstraction which will be necessary to perform
-	 *            certain file system operations.
 	 */
-	public FileBasedConfig(File cfgLocation, FS fs) {
-		this(null, cfgLocation, fs);
+	public FileBasedConfig(File cfgLocation) {
+		this(null, cfgLocation);
 	}
 
 	/**
@@ -91,20 +86,10 @@ public class FileBasedConfig extends StoredConfig {
 	 *            the base configuration file
 	 * @param cfgLocation
 	 *            the location of the configuration file on the file system
-	 * @param fs
-	 *            the file system abstraction which will be necessary to perform
-	 *            certain file system operations.
 	 */
-	public FileBasedConfig(Config base, File cfgLocation, FS fs) {
+	public FileBasedConfig(Config base, File cfgLocation) {
 		super(base);
 		configFile = cfgLocation;
-		this.fs = fs;
-	}
-
-	@Override
-	protected boolean notifyUponTransientChanges() {
-		// we will notify listeners upon save()
-		return false;
 	}
 
 	/** @return location of the configuration file on disk */
@@ -153,7 +138,7 @@ public class FileBasedConfig extends StoredConfig {
 	 */
 	public void save() throws IOException {
 		final byte[] out = Constants.encode(toText());
-		final LockFile lf = new LockFile(getFile(), fs);
+		final LockFile lf = new LockFile(getFile());
 		if (!lf.lock())
 			throw new IOException(MessageFormat.format(JGitText.get().cannotLockFile, getFile()));
 		try {
@@ -165,8 +150,6 @@ public class FileBasedConfig extends StoredConfig {
 			lf.unlock();
 		}
 		lastModified = lf.getCommitLastModified();
-		// notify the listeners
-		fireConfigChangedEvent();
 	}
 
 	@Override

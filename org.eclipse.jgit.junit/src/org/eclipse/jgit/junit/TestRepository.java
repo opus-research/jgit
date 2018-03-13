@@ -359,7 +359,7 @@ public class TestRepository<R extends Repository> {
 			final RevCommit... parents) throws Exception {
 		tick(secDelta);
 
-		final Commit c = new Commit();
+		final Commit c = new Commit(db);
 		c.setTreeId(tree);
 		c.setParentIds(parents);
 		c.setAuthor(new PersonIdent(author, new Date(now)));
@@ -397,8 +397,9 @@ public class TestRepository<R extends Repository> {
 	 * @throws Exception
 	 */
 	public RevTag tag(final String name, final RevObject dst) throws Exception {
-		final Tag t = new Tag();
-		t.setObjectId(dst);
+		final Tag t = new Tag(db);
+		t.setType(Constants.typeString(dst.getType()));
+		t.setObjId(dst.toObjectId());
 		t.setTag(name);
 		t.setTagger(new PersonIdent(committer, new Date(now)));
 		t.setMessage("");
@@ -585,7 +586,7 @@ public class TestRepository<R extends Repository> {
 		md.update(Constants.encodeASCII(bin.length));
 		md.update((byte) 0);
 		md.update(bin);
-		Assert.assertEquals(id, ObjectId.fromRaw(md.digest()));
+		Assert.assertEquals(id.copy(), ObjectId.fromRaw(md.digest()));
 	}
 
 	/**
@@ -653,7 +654,7 @@ public class TestRepository<R extends Repository> {
 
 	private void writeFile(final File p, final byte[] bin) throws IOException,
 			ObjectWritingException {
-		final LockFile lck = new LockFile(p, db.getFS());
+		final LockFile lck = new LockFile(p);
 		if (!lck.lock())
 			throw new ObjectWritingException("Can't write " + p);
 		try {
@@ -810,8 +811,8 @@ public class TestRepository<R extends Repository> {
 			if (self == null) {
 				TestRepository.this.tick(tick);
 
-				final Commit c = new Commit();
-				c.setParentIds(parents);
+				final Commit c = new Commit(db);
+				c.setParentIds(parents.toArray(new RevCommit[parents.size()]));
 				c.setAuthor(new PersonIdent(author, new Date(now)));
 				c.setCommitter(new PersonIdent(committer, new Date(now)));
 				c.setMessage(message);

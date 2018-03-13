@@ -115,7 +115,7 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 		assertNotNull(r.getObjectId());
 		assertNotSame(newid, r.getObjectId());
 		assertSame(ObjectId.class, r.getObjectId().getClass());
-		assertEquals(newid, r.getObjectId());
+		assertEquals(newid.copy(), r.getObjectId());
 		List<org.eclipse.jgit.storage.file.ReflogReader.Entry> reverseEntries1 = db.getReflogReader("refs/heads/abc").getReverseEntries();
 		org.eclipse.jgit.storage.file.ReflogReader.Entry entry1 = reverseEntries1.get(0);
 		assertEquals(1, reverseEntries1.size());
@@ -555,15 +555,13 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 		ObjectId pid = db.resolve("refs/heads/master^");
 		RefUpdate updateRef = db.updateRef("refs/heads/master");
 		updateRef.setNewObjectId(pid);
-		LockFile lockFile1 = new LockFile(new File(db.getDirectory(),
-				"refs/heads/master"), db.getFS());
+		LockFile lockFile1 = new LockFile(new File(db.getDirectory(),"refs/heads/master"));
 		try {
 			assertTrue(lockFile1.lock()); // precondition to test
 			Result update = updateRef.update();
 			assertEquals(Result.LOCK_FAILURE, update);
 			assertEquals(opid, db.resolve("refs/heads/master"));
-			LockFile lockFile2 = new LockFile(new File(db.getDirectory(),"refs/heads/master"),
-					db.getFS());
+			LockFile lockFile2 = new LockFile(new File(db.getDirectory(),"refs/heads/master"));
 			assertFalse(lockFile2.lock()); // was locked, still is
 		} finally {
 			lockFile1.unlock();
@@ -701,8 +699,7 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 				"logs/" + fromName).exists());
 
 		// "someone" has branch X locked
-		LockFile lockFile = new LockFile(new File(db.getDirectory(), toLock),
-				db.getFS());
+		LockFile lockFile = new LockFile(new File(db.getDirectory(), toLock));
 		try {
 			assertTrue(lockFile.lock());
 

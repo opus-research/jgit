@@ -69,7 +69,6 @@ import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.storage.file.WindowCache;
 import org.eclipse.jgit.storage.file.WindowCacheConfig;
-import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.SystemReader;
 
@@ -129,7 +128,7 @@ public abstract class LocalDiskRepositoryTestCase extends TestCase {
 
 		mockSystemReader = new MockSystemReader();
 		mockSystemReader.userGitConfig = new FileBasedConfig(new File(trash,
-				"usergitconfig"), FS.DETECTED);
+				"usergitconfig"));
 		ceilTestDirectories(getCeilings());
 		SystemReader.setInstance(mockSystemReader);
 
@@ -409,6 +408,10 @@ public abstract class LocalDiskRepositoryTestCase extends TestCase {
 	}
 
 	protected static void assertEquals(AnyObjectId exp, AnyObjectId act) {
+		if (exp != null)
+			exp = exp.copy();
+		if (act != null)
+			act = act.copy();
 		Assert.assertEquals(exp, act);
 	}
 

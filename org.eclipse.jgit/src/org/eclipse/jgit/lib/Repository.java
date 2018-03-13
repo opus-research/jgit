@@ -46,10 +46,8 @@
 
 package org.eclipse.jgit.lib;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -271,6 +269,84 @@ public abstract class Repository {
 	}
 
 	/**
+	 * Access a Commit object using a symbolic reference. This reference may
+	 * be a SHA-1 or ref in combination with a number of symbols translating
+	 * from one ref or SHA1-1 to another, such as HEAD^ etc.
+	 *
+	 * @param revstr a reference to a git commit object
+	 * @return a Commit named by the specified string
+	 * @throws IOException for I/O error or unexpected object type.
+	 *
+	 * @see #resolve(String)
+	 * @deprecated Use {@link #resolve(String)} and pass its return value to
+	 * {@link org.eclipse.jgit.revwalk.RevWalk#parseCommit(AnyObjectId)}.
+	 */
+	@Deprecated
+	public Commit mapCommit(final String revstr) throws IOException {
+		final ObjectId id = resolve(revstr);
+		return id != null ? mapCommit(id) : null;
+	}
+
+	/**
+	 * Access any type of Git object by id and
+	 *
+	 * @param id
+	 *            SHA-1 of object to read
+	 * @param refName optional, only relevant for simple tags
+	 * @return The Git object if found or null
+	 * @throws IOException
+	 * @deprecated Use {@link org.eclipse.jgit.revwalk.RevWalk#parseCommit(AnyObjectId)},
+	 *  or {@link org.eclipse.jgit.revwalk.RevWalk#parseTag(AnyObjectId)}.
+	 *  To read a tree, use {@link org.eclipse.jgit.treewalk.TreeWalk#addTree(AnyObjectId)}.
+	 *  To read a blob, open it with {@link #open(AnyObjectId)}.
+	 */
+	@Deprecated
+	public Object mapObject(final ObjectId id, final String refName) throws IOException {
+		final ObjectLoader or;
+		try {
+			or = open(id);
+		} catch (MissingObjectException notFound) {
+			return null;
+		}
+		final byte[] raw = or.getCachedBytes();
+		switch (or.getType()) {
+		case Constants.OBJ_TREE:
+			return new Tree(this, id, raw);
+
+		case Constants.OBJ_COMMIT:
+			return new Commit(this, id, raw);
+
+		case Constants.OBJ_TAG:
+			return new Tag(this, id, refName, raw);
+
+		case Constants.OBJ_BLOB:
+			return raw;
+
+		default:
+			throw new IncorrectObjectTypeException(id,
+				JGitText.get().incorrectObjectType_COMMITnorTREEnorBLOBnorTAG);
+		}
+	}
+
+	/**
+	 * Access a Commit by SHA'1 id.
+	 * @param id
+	 * @return Commit or null
+	 * @throws IOException for I/O error or unexpected object type.
+	 * @deprecated Use {@link org.eclipse.jgit.revwalk.RevWalk#parseCommit(AnyObjectId)}.
+	 */
+	@Deprecated
+	public Commit mapCommit(final ObjectId id) throws IOException {
+		final ObjectLoader or;
+		try {
+			or = open(id, Constants.OBJ_COMMIT);
+		} catch (MissingObjectException notFound) {
+			return null;
+		}
+		return new Commit(this, id, or.getCachedBytes());
+	}
+
+	/**
 	 * Access a Tree object using a symbolic reference. This reference may
 	 * be a SHA-1 or ref in combination with a number of symbols translating
 	 * from one ref or SHA1-1 to another, such as HEAD^{tree} etc.
@@ -315,6 +391,42 @@ public abstract class Repository {
 		default:
 			throw new IncorrectObjectTypeException(id, Constants.TYPE_TREE);
 		}
+	}
+
+	/**
+	 * Access a tag by symbolic name.
+	 *
+	 * @param revstr
+	 * @return a Tag or null
+	 * @throws IOException on I/O error or unexpected type
+	 * @deprecated Use {@link #resolve(String)} and feed its return value to
+	 * {@link org.eclipse.jgit.revwalk.RevWalk#parseTag(AnyObjectId)}.
+	 */
+	@Deprecated
+	public Tag mapTag(String revstr) throws IOException {
+		final ObjectId id = resolve(revstr);
+		return id != null ? mapTag(revstr, id) : null;
+	}
+
+	/**
+	 * Access a Tag by SHA'1 id
+	 * @param refName
+	 * @param id
+	 * @return Commit or null
+	 * @throws IOException for I/O error or unexpected object type.
+	 * @deprecated Use {@link org.eclipse.jgit.revwalk.RevWalk#parseTag(AnyObjectId)}.
+	 */
+	@Deprecated
+	public Tag mapTag(final String refName, final ObjectId id) throws IOException {
+		final ObjectLoader or;
+		try {
+			or = open(id);
+		} catch (MissingObjectException notFound) {
+			return null;
+		}
+		if (or.getType() == Constants.OBJ_TAG)
+			return new Tag(this, id, refName, or.getCachedBytes());
+		return new Tag(this, id, refName, null);
 	}
 
 	/**
@@ -818,7 +930,7 @@ public abstract class Repository {
 	 */
 	public DirCache readDirCache() throws NoWorkTreeException,
 			CorruptObjectException, IOException {
-		return DirCache.read(getIndexFile(), getFS());
+		return DirCache.read(getIndexFile());
 	}
 
 	/**
@@ -842,7 +954,7 @@ public abstract class Repository {
 	 */
 	public DirCache lockDirCache() throws NoWorkTreeException,
 			CorruptObjectException, IOException {
-		return DirCache.lock(getIndexFile(), getFS());
+		return DirCache.lock(getIndexFile());
 	}
 
 	static byte[] gitInternalSlash(byte[] bytes) {
@@ -1052,37 +1164,11 @@ public abstract class Repository {
 
 		File mergeMsgFile = new File(getDirectory(), Constants.MERGE_MSG);
 		try {
-			return RawParseUtils.decode(IO.readFully(mergeMsgFile));
+			return new String(IO.readFully(mergeMsgFile));
 		} catch (FileNotFoundException e) {
 			// MERGE_MSG file has disappeared in the meantime
 			// ignore it
 			return null;
-		}
-	}
-
-	/**
-	 * Write new content to the file $GIT_DIR/MERGE_MSG. In this file operations
-	 * triggering a merge will store a template for the commit message of the
-	 * merge commit. If <code>null</code> is specified as message the file will
-	 * be deleted
-	 *
-	 * @param msg
-	 *            the message which should be written or <code>null</code> to
-	 *            delete the file
-	 *
-	 * @throws IOException
-	 */
-	public void writeMergeCommitMsg(String msg) throws IOException {
-		File mergeMsgFile = new File(gitDir, Constants.MERGE_MSG);
-		if (msg != null) {
-			FileOutputStream fos = new FileOutputStream(mergeMsgFile);
-			try {
-				fos.write(msg.getBytes(Constants.CHARACTER_ENCODING));
-			} finally {
-				fos.close();
-			}
-		} else {
-			mergeMsgFile.delete();
 		}
 	}
 
@@ -1108,11 +1194,11 @@ public abstract class Repository {
 		try {
 			raw = IO.readFully(mergeHeadFile);
 		} catch (FileNotFoundException notFound) {
-			return null;
+			return new LinkedList<ObjectId>();
 		}
 
 		if (raw.length == 0)
-			return null;
+			throw new IOException("MERGE_HEAD file empty: " + mergeHeadFile);
 
 		LinkedList<ObjectId> heads = new LinkedList<ObjectId>();
 		for (int p = 0; p < raw.length;) {
@@ -1121,34 +1207,5 @@ public abstract class Repository {
 					.nextLF(raw, p + Constants.OBJECT_ID_STRING_LENGTH);
 		}
 		return heads;
-	}
-
-	/**
-	 * Write new merge-heads into $GIT_DIR/MERGE_HEAD. In this file operations
-	 * triggering a merge will store the IDs of all heads which should be merged
-	 * together with HEAD. If <code>null</code> is specified as list of commits
-	 * the file will be deleted
-	 *
-	 * @param heads
-	 *            a list of {@link Commit}s which IDs should be written to
-	 *            $GIT_DIR/MERGE_HEAD or <code>null</code> to delete the file
-	 * @throws IOException
-	 */
-	public void writeMergeHeads(List<ObjectId> heads) throws IOException {
-		File mergeHeadFile = new File(gitDir, Constants.MERGE_HEAD);
-		if (heads != null) {
-			BufferedOutputStream bos = new BufferedOutputStream(
-					new FileOutputStream(mergeHeadFile));
-			try {
-				for (ObjectId id : heads) {
-					id.copyTo(bos);
-					bos.write('\n');
-				}
-			} finally {
-				bos.close();
-			}
-		} else {
-			mergeHeadFile.delete();
-		}
 	}
 }

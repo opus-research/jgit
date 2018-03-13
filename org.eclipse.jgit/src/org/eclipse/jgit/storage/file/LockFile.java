@@ -59,7 +59,6 @@ import java.text.MessageFormat;
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.util.FS;
 
 /**
  * Git style file locking and replacement.
@@ -95,21 +94,15 @@ public class LockFile {
 
 	private long commitLastModified;
 
-	private final FS fs;
-
 	/**
 	 * Create a new lock for any file.
 	 *
 	 * @param f
 	 *            the file that will be locked.
-	 * @param fs
-	 *            the file system abstraction which will be necessary to perform
-	 *            certain file system operations.
 	 */
-	public LockFile(final File f, FS fs) {
+	public LockFile(final File f) {
 		ref = f;
 		lck = new File(ref.getParentFile(), ref.getName() + SUFFIX);
-		this.fs = fs;
 	}
 
 	/**
@@ -400,29 +393,10 @@ public class LockFile {
 		saveStatInformation();
 		if (lck.renameTo(ref))
 			return true;
-		if (!ref.exists() || deleteRef())
+		if (!ref.exists() || ref.delete())
 			if (lck.renameTo(ref))
 				return true;
 		unlock();
-		return false;
-	}
-
-	private boolean deleteRef() {
-		if (!fs.retryFailedLockFileCommit())
-			return ref.delete();
-
-		// File deletion fails on windows if another thread is
-		// concurrently reading the same file. So try a few times.
-		//
-		for (int attempts = 0; attempts < 10; attempts++) {
-			if (ref.delete())
-				return true;
-			try {
-				Thread.sleep(100);
-			} catch (InterruptedException e) {
-				return false;
-			}
-		}
 		return false;
 	}
 

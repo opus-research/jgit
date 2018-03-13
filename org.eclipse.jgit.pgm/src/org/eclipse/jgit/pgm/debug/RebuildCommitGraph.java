@@ -56,25 +56,26 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.Option;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.ObjectWritingException;
 import org.eclipse.jgit.lib.Commit;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
-import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.ObjectWriter;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefWriter;
 import org.eclipse.jgit.lib.TextProgressMonitor;
+import org.eclipse.jgit.lib.Tree;
 import org.eclipse.jgit.pgm.CLIText;
 import org.eclipse.jgit.pgm.TextBuiltin;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.LockFile;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
 
 /**
  * Recreates a repository from another one's commit graph.
@@ -163,8 +164,8 @@ class RebuildCommitGraph extends TextBuiltin {
 		}
 
 		pm.beginTask("Rewriting commits", queue.size());
-		final ObjectInserter oi = db.newObjectInserter();
-		final ObjectId emptyTree = oi.insert(Constants.OBJ_TREE, new byte[] {});
+		final ObjectWriter ow = new ObjectWriter(db);
+		final ObjectId emptyTree = ow.writeTree(new Tree(db));
 		final PersonIdent me = new PersonIdent("jgit rebuild-commitgraph",
 				"rebuild-commitgraph@localhost");
 		while (!queue.isEmpty()) {
@@ -191,19 +192,17 @@ class RebuildCommitGraph extends TextBuiltin {
 					}
 				}
 
-				final Commit newc = new Commit();
+				final Commit newc = new Commit(db);
 				newc.setTreeId(emptyTree);
 				newc.setAuthor(new PersonIdent(me, new Date(t.commitTime)));
 				newc.setCommitter(newc.getAuthor());
 				newc.setParentIds(newParents);
 				newc.setMessage("ORIGINAL " + t.oldId.name() + "\n");
-				t.newId = oi.insert(Constants.OBJ_COMMIT,oi.format(newc));
+				t.newId = ow.writeCommit(newc);
 				rewrites.put(t.oldId, t.newId);
 				pm.update(1);
 			}
 		}
-		oi.flush();
-		oi.release();
 		pm.endTask();
 	}
 
@@ -228,7 +227,7 @@ class RebuildCommitGraph extends TextBuiltin {
 		final ObjectId id = db.resolve(Constants.HEAD);
 		if (!ObjectId.isId(head) && id != null) {
 			final LockFile lf;
-			lf = new LockFile(new File(db.getDirectory(), Constants.HEAD), db.getFS());
+			lf = new LockFile(new File(db.getDirectory(), Constants.HEAD));
 			if (!lf.lock())
 				throw new IOException(MessageFormat.format(CLIText.get().cannotLock, Constants.HEAD));
 			lf.write(id);
@@ -255,7 +254,7 @@ class RebuildCommitGraph extends TextBuiltin {
 			protected void writeFile(final String name, final byte[] content)
 					throws IOException {
 				final File file = new File(db.getDirectory(), name);
-				final LockFile lck = new LockFile(file, db.getFS());
+				final LockFile lck = new LockFile(file);
 				if (!lck.lock())
 					throw new ObjectWritingException(MessageFormat.format(CLIText.get().cantWrite, file));
 				try {

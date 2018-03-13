@@ -512,8 +512,7 @@ public class RefDirectory extends RefDatabase {
 		// we don't miss an edit made externally.
 		final PackedRefList packed = getPackedRefs();
 		if (packed.contains(name)) {
-			LockFile lck = new LockFile(packedRefsFile,
-					update.getRepository().getFS());
+			LockFile lck = new LockFile(packedRefsFile);
 			if (!lck.lock())
 				throw new IOException(MessageFormat.format(
 					JGitText.get().cannotLockFile, packedRefsFile));
@@ -851,7 +850,7 @@ public class RefDirectory extends RefDatabase {
 	private void fireRefsChanged() {
 		final int last = lastNotifiedModCnt.get();
 		final int curr = modCnt.get();
-		if (last != curr && lastNotifiedModCnt.compareAndSet(last, curr) && last != 0)
+		if (last != curr && lastNotifiedModCnt.compareAndSet(last, curr))
 			parent.fireEvent(new RefsChangedEvent());
 	}
 
