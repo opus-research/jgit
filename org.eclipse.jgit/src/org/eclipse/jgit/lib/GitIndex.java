@@ -244,11 +244,7 @@ public class GitIndex {
 			entries.clear();
 			for (int i = 0; i < header.entries; ++i) {
 				Entry entry = new Entry(buffer);
-				final GitIndex.Entry existing = entries.get(entry.name);
 				entries.put(entry.name, entry);
-				if (existing != null) {
-					entry.stages |= existing.stages;
-				}
 			}
 			lastCacheTime = cacheFile.lastModified();
 		} finally {
@@ -378,8 +374,6 @@ public class GitIndex {
 
 		private byte[] name;
 
-		private int stages;
-
 		Entry(byte[] key, File f, int stage)
 				throws IOException {
 			ctime = f.lastModified() * 1000000L;
@@ -397,7 +391,6 @@ public class GitIndex {
 			sha1 = writer.writeBlob(f);
 			name = key;
 			flags = (short) ((stage << 12) | name.length); // TODO: fix flags
-			stages = (1 >> getStage());
 		}
 
 		Entry(byte[] key, File f, int stage, byte[] newContent)
@@ -417,7 +410,6 @@ public class GitIndex {
 			sha1 = writer.writeBlob(newContent);
 			name = key;
 			flags = (short) ((stage << 12) | name.length); // TODO: fix flags
-			stages = (1 >> getStage());
 		}
 
 		Entry(TreeEntry f, int stage) {
@@ -437,7 +429,6 @@ public class GitIndex {
 			sha1 = f.getId();
 			name = Constants.encode(f.getFullName());
 			flags = (short) ((stage << 12) | name.length); // TODO: fix flags
-			stages = (1 >> getStage());
 		}
 
 		Entry(ByteBuffer b) {
@@ -454,7 +445,6 @@ public class GitIndex {
 			b.get(sha1bytes);
 			sha1 = ObjectId.fromRaw(sha1bytes);
 			flags = b.getShort();
-			stages = (1 << getStage());
 			name = new byte[flags & 0xFFF];
 			b.get(name);
 			b
@@ -653,10 +643,6 @@ public class GitIndex {
 			return false;
 		}
 
-		public int getStages() {
-			return stages;
-		}
-
 		// for testing
 		void forceRecheck() {
 			mtime = -1;
@@ -753,14 +739,6 @@ public class GitIndex {
 		 */
 		public int getModeBits() {
 			return mode;
-		}
-
-		/**
-		 * Return the index modification time of this entry.
-		 * @return index modification time
-		 */
-		public long getMtime() {
-			return mtime;
 		}
 	}
 
