@@ -76,6 +76,7 @@ import java.util.UUID;
 import javax.crypto.Cipher;
 import javax.crypto.SecretKeyFactory;
 
+import org.apache.log4j.Logger;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.test.resources.SampleDataRepositoryTestCase;
@@ -91,8 +92,6 @@ import org.junit.runners.MethodSorters;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 import org.junit.runners.Suite;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.*;
 
@@ -120,7 +119,7 @@ public class WalkEncryptionTest {
 	/**
 	 * Logger setup: ${project_loc}/tst-rsrc/log4j.properties
 	 */
-	static final Logger logger = LoggerFactory.getLogger(WalkEncryptionTest.class);
+	static final Logger logger = Logger.getLogger(WalkEncryptionTest.class);
 
 	/**
 	 * Property names used in test session.
