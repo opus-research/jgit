@@ -715,6 +715,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	}
 
 	private static final Comparator<Entry> ENTRY_CMP = new Comparator<Entry>() {
+		@Override
 		public int compare(Entry a, Entry b) {
 			return Paths.compare(
 					a.encodedName, 0, a.encodedNameLen, a.getMode().getBits(),
@@ -1154,6 +1155,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				b.get(encodedName = new byte[encodedNameLen]);
 		}
 
+		@Override
 		public String toString() {
 			return getMode().toString() + " " + getName(); //$NON-NLS-1$
 		}
@@ -1366,7 +1368,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				cmd = state.walk
 						.getFilterCommand(Constants.ATTR_FILTER_TYPE_CLEAN);
 			}
-			cleanFilterCommandHolder = new Holder<String>(cmd);
+			cleanFilterCommandHolder = new Holder<>(cmd);
 		}
 		return cleanFilterCommandHolder.get();
 	}
@@ -1413,7 +1415,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 					break;
 				}
 			}
-			eolStreamTypeHolder = new Holder<EolStreamType>(type);
+			eolStreamTypeHolder = new Holder<>(type);
 		}
 		return eolStreamTypeHolder.get();
 	}
