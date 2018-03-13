@@ -217,6 +217,10 @@ public abstract class DfsRefDatabase extends RefDatabase {
 		else
 			detachingSymbolicRef = detach && ref.isSymbolic();
 
+		if (detachingSymbolicRef) {
+			ref = new ObjectIdRef.Unpeeled(NEW, refName, ref.getObjectId());
+		}
+
 		DfsRefUpdate update = new DfsRefUpdate(this, ref);
 		if (detachingSymbolicRef)
 			update.setDetachingSymbolicRef();
