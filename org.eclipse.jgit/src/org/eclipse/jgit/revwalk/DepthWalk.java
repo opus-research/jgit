@@ -149,14 +149,6 @@ public interface DepthWalk {
 		public RevFlag getReinterestingFlag() {
 			return REINTERESTING;
 		}
-
-		@Override
-		public ObjectWalk toObjectWalkWithSameObjects() {
-			ObjectWalk ow = new ObjectWalk(reader, depth);
-			ow.objects = objects;
-			ow.freeFlags = freeFlags;
-			return ow;
-		}
 	}
 
 	/** Subclass of ObjectWalk that performs depth filtering. */

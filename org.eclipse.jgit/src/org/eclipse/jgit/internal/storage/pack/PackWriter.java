@@ -752,8 +752,7 @@ public class PackWriter implements AutoCloseable {
 		if (countingMonitor == null)
 			countingMonitor = NullProgressMonitor.INSTANCE;
 		if (shallowPack && !(walk instanceof DepthWalk.ObjectWalk))
-			throw new IllegalArgumentException(
-					JGitText.get().shallowPacksRequireDepthWalk);
+			walk = new DepthWalk.ObjectWalk(reader, depth);
 		findObjectsToPack(countingMonitor, walk, interestingObjects,
 				uninterestingObjects);
 	}
@@ -1655,7 +1654,7 @@ public class PackWriter implements AutoCloseable {
 		List<RevTag> wantTags = new ArrayList<RevTag>(want.size());
 
 		// Retrieve the RevWalk's versions of "want" and "have" objects to
-		// maintain any state previously set in the RevWalk.
+		// maintain any flags previously set in the RevWalk.
 		AsyncRevObjectQueue q = walker.parseAny(all, true);
 		try {
 			for (;;) {
@@ -1709,9 +1708,7 @@ public class PackWriter implements AutoCloseable {
 			for (RevObject obj : haveObjs) {
 				if (obj instanceof RevCommit) {
 					RevTree t = ((RevCommit) obj).getTree();
-					if (t != null) {
-						depthWalk.markUninteresting(t);
-					}
+					depthWalk.markUninteresting(t);
 				}
 			}
 
