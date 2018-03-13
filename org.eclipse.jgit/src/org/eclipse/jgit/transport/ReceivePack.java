@@ -184,11 +184,17 @@ public class ReceivePack extends BaseReceivePack {
 			return;
 		recvCommands();
 		if (hasCommands()) {
+			enableCapabilities();
+
 			Throwable unpackError = null;
 			if (needPack()) {
 				try {
 					receivePackAndCheckConnectivity();
-				} catch (IOException | RuntimeException | Error err) {
+				} catch (IOException err) {
+					unpackError = err;
+				} catch (RuntimeException err) {
+					unpackError = err;
+				} catch (Error err) {
 					unpackError = err;
 				}
 			}
