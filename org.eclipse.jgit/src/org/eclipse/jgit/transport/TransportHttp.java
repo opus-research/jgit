@@ -247,8 +247,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 	private HttpAuthMethod authMethod = HttpAuthMethod.NONE;
 
-	private Map<String, String> headers;
-
 	TransportHttp(final Repository local, final URIish uri)
 			throws NotSupportedException {
 		super(local, uri);
@@ -427,18 +425,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		// No explicit connections are maintained.
 	}
 
-	/**
-	 * Set additional headers on the HTTP connection
-	 * 
-	 * @param headers
-	 *            a map of name:values that are to be set as headers on the HTTP
-	 *            connection
-	 * @since 3.4
-	 */
-	public void setAdditionalHeaders(Map<String, String> headers) {
-		this.headers = headers;
-	}
-
 	private HttpConnection connect(final String service)
 			throws TransportException, NotSupportedException {
 		final URL u;
@@ -485,12 +471,14 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 					if (authMethod == HttpAuthMethod.NONE)
 						throw new TransportException(uri, MessageFormat.format(
 								JGitText.get().authenticationNotSupported, uri));
-					if (1 < authAttempts
-							|| !authMethod.authorize(uri,
-									getCredentialsProvider())) {
+					CredentialsProvider credentialsProvider = getCredentialsProvider();
+					if (3 < authAttempts
+							|| !authMethod.authorize(uri, credentialsProvider)) {
+						credentialsProvider.reset(uri);
 						throw new TransportException(uri,
 								JGitText.get().notAuthorized);
 					}
+					credentialsProvider.reset(uri);
 					authAttempts++;
 					continue;
 
@@ -544,12 +532,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			int effTimeOut = timeOut * 1000;
 			conn.setConnectTimeout(effTimeOut);
 			conn.setReadTimeout(effTimeOut);
-		}
-		// go through additional headers and set them on conn
-		if (this.headers != null && !this.headers.isEmpty()) {
-			for (Map.Entry<String, String> entry : this.headers.entrySet()) {
-				conn.setRequestProperty(entry.getKey(), entry.getValue());
-			}
 		}
 		authMethod.configureRequest(conn);
 		return conn;
