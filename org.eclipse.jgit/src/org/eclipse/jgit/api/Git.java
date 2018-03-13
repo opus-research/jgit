@@ -430,32 +430,6 @@ public class Git {
 	}
 
 	/**
-	 * Returns a command object to execute a {@code ls-remote} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-ls-remote.html"
-	 *      >Git documentation about ls-remote</a>
-	 * @return a {@link LsRemoteCommand} used to collect all optional parameters
-	 *         and to finally execute the {@code status} command
-	 */
-	public LsRemoteCommand lsRemote() {
-		return new LsRemoteCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code clean} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-clean.html"
-	 *      >Git documentation about Clean</a>
-	 * @return a {@link CleanCommand} used to collect all optional parameters
-	 *         and to finally execute the {@code clean} command
-	 */
-	public CleanCommand clean() {
-		return new CleanCommand(repo);
-	}
-
-	/**
 	 * @return the git repository this class is interacting with
 	 */
 	public Repository getRepository() {
