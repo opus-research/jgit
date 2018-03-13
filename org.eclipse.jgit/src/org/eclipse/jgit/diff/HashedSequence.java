@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>,
- * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,21 +40,33 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.merge;
 
-import org.eclipse.jgit.lib.Repository;
+package org.eclipse.jgit.diff;
 
 /**
- * A three-way merge strategy performing a content-merge if necessary
+ * Wraps a {@link Sequence} to assign hash codes to elements.
+ *
+ * This sequence acts as a proxy for the real sequence, caching element hash
+ * codes so they don't need to be recomputed each time. Sequences of this type
+ * must be used with a {@link HashedSequenceComparator}.
+ *
+ * To construct an instance of this type use {@link HashedSequencePair}.
+ *
+ * @param <S>
+ *            the base sequence type.
  */
-public class StrategyResolve extends ThreeWayMergeStrategy {
-	@Override
-	public ThreeWayMerger newMerger(Repository db) {
-		return new ResolveMerger(db);
+public final class HashedSequence<S extends Sequence> extends Sequence {
+	final S base;
+
+	final int[] hashes;
+
+	HashedSequence(S base, int[] hashes) {
+		this.base = base;
+		this.hashes = hashes;
 	}
 
 	@Override
-	public String getName() {
-		return "resolve";
+	public int size() {
+		return base.size();
 	}
 }

@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>,
- * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,21 +40,38 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.merge;
 
-import org.eclipse.jgit.lib.Repository;
+package org.eclipse.jgit.diff;
 
 /**
- * A three-way merge strategy performing a content-merge if necessary
+ * Wrap another comparator for use with {@link HashedSequence}.
+ *
+ * This comparator acts as a proxy for the real comparator, evaluating the
+ * cached hash code before testing the underlying comparator's equality.
+ * Comparators of this type must be used with a {@link HashedSequence}.
+ *
+ * To construct an instance of this type use {@link HashedSequencePair}.
+ *
+ * @param <S>
+ *            the base sequence type.
  */
-public class StrategyResolve extends ThreeWayMergeStrategy {
-	@Override
-	public ThreeWayMerger newMerger(Repository db) {
-		return new ResolveMerger(db);
+public final class HashedSequenceComparator<S extends Sequence> extends
+		SequenceComparator<HashedSequence<S>> {
+	private final SequenceComparator<? super S> cmp;
+
+	HashedSequenceComparator(SequenceComparator<? super S> cmp) {
+		this.cmp = cmp;
 	}
 
 	@Override
-	public String getName() {
-		return "resolve";
+	public boolean equals(HashedSequence<S> a, int ai, //
+			HashedSequence<S> b, int bi) {
+		return a.hashes[ai] == b.hashes[bi]
+				&& cmp.equals(a.base, ai, b.base, bi);
+	}
+
+	@Override
+	public int hash(HashedSequence<S> seq, int ptr) {
+		return seq.hashes[ptr];
 	}
 }

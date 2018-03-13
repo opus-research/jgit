@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>,
- * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,21 +40,40 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.merge;
 
-import org.eclipse.jgit.lib.Repository;
+package org.eclipse.jgit.diff;
 
 /**
- * A three-way merge strategy performing a content-merge if necessary
+ * Wrap another comparator for use with {@link Subsequence}.
+ *
+ * This comparator acts as a proxy for the real comparator, translating element
+ * indexes on the fly by adding the subsequence's begin offset to them.
+ * Comparators of this type must be used with a {@link Subsequence}.
+ *
+ * @param <S>
+ *            the base sequence type.
  */
-public class StrategyResolve extends ThreeWayMergeStrategy {
-	@Override
-	public ThreeWayMerger newMerger(Repository db) {
-		return new ResolveMerger(db);
+public final class SubsequenceComparator<S extends Sequence> extends
+		SequenceComparator<Subsequence<S>> {
+	private final SequenceComparator<? super S> cmp;
+
+	/**
+	 * Construct a comparator wrapping another comparator.
+	 *
+	 * @param cmp
+	 *            the real comparator.
+	 */
+	public SubsequenceComparator(SequenceComparator<? super S> cmp) {
+		this.cmp = cmp;
 	}
 
 	@Override
-	public String getName() {
-		return "resolve";
+	public boolean equals(Subsequence<S> a, int ai, Subsequence<S> b, int bi) {
+		return cmp.equals(a.base, ai + a.begin, b.base, bi + b.begin);
+	}
+
+	@Override
+	public int hash(Subsequence<S> seq, int ptr) {
+		return cmp.hash(seq.base, ptr + seq.begin);
 	}
 }

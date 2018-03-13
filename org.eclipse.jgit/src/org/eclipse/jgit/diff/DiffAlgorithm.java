@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>,
- * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,21 +40,40 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.merge;
 
-import org.eclipse.jgit.lib.Repository;
+package org.eclipse.jgit.diff;
 
 /**
- * A three-way merge strategy performing a content-merge if necessary
+ * Compares two {@link Sequence}s to create an {@link EditList} of changes.
+ *
+ * An algorithm's {@code diff} method must be callable from concurrent threads
+ * without data collisions. This permits some algorithms to use a singleton
+ * pattern, with concurrent invocations using the same singleton. Other
+ * algorithms may support parameterization, in which case the caller can create
+ * a unique instance per thread.
  */
-public class StrategyResolve extends ThreeWayMergeStrategy {
-	@Override
-	public ThreeWayMerger newMerger(Repository db) {
-		return new ResolveMerger(db);
-	}
-
-	@Override
-	public String getName() {
-		return "resolve";
-	}
+public interface DiffAlgorithm {
+	/**
+	 * Compare two sequences and identify a list of edits between them.
+	 * 
+	 * @param <S>
+	 *            type of sequence being compared.
+	 * @param <C>
+	 *            type of comparator to evaluate the sequence elements.
+	 * @param cmp
+	 *            the comparator supplying the element equivalence function.
+	 * @param a
+	 *            the first (also known as old or pre-image) sequence. Edits
+	 *            returned by this algorithm will reference indexes using the
+	 *            'A' side: {@link Edit#getBeginA()}, {@link Edit#getEndA()}.
+	 * @param b
+	 *            the second (also known as new or post-image) sequence. Edits
+	 *            returned by this algorithm will reference indexes using the
+	 *            'B' side: {@link Edit#getBeginB()}, {@link Edit#getEndB()}.
+	 * @return a modifiable edit list comparing the two sequences. If empty, the
+	 *         sequences are identical according to {@code cmp}'s rules. The
+	 *         result list is never null.
+	 */
+	public <S extends Sequence, C extends SequenceComparator<? super S>> EditList diff(
+			C cmp, S a, S b);
 }

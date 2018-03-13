@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2009, Johannes E. Schindelin
- * Copyright (C) 2009, Johannes Schindelin <johannes.schindelin@gmx.de>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -44,74 +43,66 @@
 
 package org.eclipse.jgit.diff;
 
-import junit.framework.TestCase;
+/**
+ * Wraps two {@link Sequence} instances to cache their element hash codes.
+ *
+ * This pair wraps two sequences that contain cached hash codes for the input
+ * sequences.
+ *
+ * @param <S>
+ *            the base sequence type.
+ */
+public class HashedSequencePair<S extends Sequence> {
+	private final SequenceComparator<? super S> cmp;
 
-public class MyersDiffTest extends TestCase {
-	public void testAtEnd() {
-		assertDiff("HELLO", "HELL", " -4,1 +4,0");
+	private final S baseA;
+
+	private final S baseB;
+
+	private HashedSequence<S> cachedA;
+
+	private HashedSequence<S> cachedB;
+
+	/**
+	 * Construct a pair to provide fast hash codes.
+	 *
+	 * @param cmp
+	 *            the base comparator for the sequence elements.
+	 * @param a
+	 *            the A sequence.
+	 * @param b
+	 *            the B sequence.
+	 */
+	public HashedSequencePair(SequenceComparator<? super S> cmp, S a, S b) {
+		this.cmp = cmp;
+		this.baseA = a;
+		this.baseB = b;
 	}
 
-	public void testAtStart() {
-		assertDiff("Git", "JGit", " -0,0 +0,1");
+	/** @return obtain a comparator that uses the cached hash codes. */
+	public HashedSequenceComparator<S> getComparator() {
+		return new HashedSequenceComparator<S>(cmp);
 	}
 
-	public void testSimple() {
-		assertDiff("HELLO WORLD", "LOW",
-			" -0,3 +0,0 -5,1 +2,0 -7,4 +3,0");
-		// is ambiguous, could be this, too:
-		// " -0,2 +0,0 -3,1 +1,0 -5,1 +2,0 -7,4 +3,0"
+	/** @return wrapper around A that includes cached hash codes. */
+	public HashedSequence<S> getA() {
+		if (cachedA == null)
+			cachedA = wrap(baseA);
+		return cachedA;
 	}
 
-	public void assertDiff(String a, String b, String edits) {
-		EditList editList = MyersDiff.INSTANCE.diff(new CharCmp(),
-				toCharArray(a), toCharArray(b));
-		assertEquals(edits, toString(editList));
+	/** @return wrapper around B that includes cached hash codes. */
+	public HashedSequence<S> getB() {
+		if (cachedB == null)
+			cachedB = wrap(baseB);
+		return cachedB;
 	}
 
-	private static String toString(EditList list) {
-		StringBuilder builder = new StringBuilder();
-		for (Edit e : list)
-			builder.append(" -" + e.beginA
-					+ "," + (e.endA - e.beginA)
-				+ " +" + e.beginB + "," + (e.endB - e.beginB));
-		return builder.toString();
-	}
-
-	private static CharArray toCharArray(String s) {
-		return new CharArray(s);
-	}
-
-	protected static String toString(CharArray a, int begin, int end) {
-		return new String(a.array, begin, end - begin);
-	}
-
-	protected static String toString(CharArray a, CharArray b,
-			int x, int k) {
-		return "(" + x + "," + (k + x)
-			+ (x < 0 ? '<' :
-					(x >= a.array.length ?
-					 '>' : a.array[x]))
-			+ (k + x < 0 ? '<' :
-					(k + x >= b.array.length ?
-					 '>' : b.array[k + x]))
-			+ ")";
-	}
-
-	private static class CharArray extends Sequence {
-		char[] array;
-		public CharArray(String s) { array = s.toCharArray(); }
-		public int size() { return array.length; }
-	}
-
-	private static class CharCmp extends SequenceComparator<CharArray> {
-		@Override
-		public boolean equals(CharArray a, int ai, CharArray b, int bi) {
-			return a.array[ai] == b.array[bi];
-		}
-
-		@Override
-		public int hash(CharArray seq, int ptr) {
-			return seq.array[ptr];
-		}
+	private HashedSequence<S> wrap(S base) {
+		final int end = base.size();
+		final int[] hashes = new int[end];
+		for (int ptr = 0; ptr < end; ptr++)
+			hashes[ptr] = cmp.hash(base, ptr);
+		return new HashedSequence<S>(base, hashes);
 	}
 }
