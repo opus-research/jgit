@@ -192,12 +192,6 @@ public class ArchiveCommandTest extends RepositoryTestCase {
 
 		public MockOutputStream createArchiveOutputStream(OutputStream s)
 				throws IOException {
-			return createArchiveOutputStream(s,
-					Collections.<String, Object> emptyMap());
-		}
-
-		public MockOutputStream createArchiveOutputStream(OutputStream s,
-				Map<String, Object> o) throws IOException {
 			return new MockOutputStream();
 		}
 
