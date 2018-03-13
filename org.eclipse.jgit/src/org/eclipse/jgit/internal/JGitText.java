@@ -190,7 +190,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String corruptObjectNotree;
 	/***/ public String corruptObjectNoType;
 	/***/ public String corruptObjectPackfileChecksumIncorrect;
-	/***/ public String corruptPack;
 	/***/ public String couldNotCheckOutBecauseOfConflicts;
 	/***/ public String couldNotDeleteLockFileShouldNotHappen;
 	/***/ public String couldNotDeleteTemporaryIndexFileShouldNotHappen;

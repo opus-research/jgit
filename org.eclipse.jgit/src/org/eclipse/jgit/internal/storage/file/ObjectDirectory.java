@@ -66,8 +66,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.PackInvalidException;
 import org.eclipse.jgit.errors.PackMismatchException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.pack.ObjectToPack;
@@ -331,17 +329,10 @@ public class ObjectDirectory extends FileObjectDatabase {
 			for (PackFile p : pList.packs) {
 				try {
 					p.resolve(matches, id, RESOLVE_ABBREV_LIMIT);
-				} catch (CorruptObjectException e) {
-					// Assume the pack is corrupted.
-					logPackIOException(e, p, true);
-					removePack(p);
-				} catch (PackInvalidException e) {
-					// Assume the pack is corrupted.
-					logPackIOException(e, p, true);
-					removePack(p);
 				} catch (IOException e) {
-					// log that the pack may be corrupted.
-					logPackIOException(e, p, false);
+					// Assume the pack is corrupted.
+					logCorruptPackError(e, p);
+					removePack(p);
 				}
 				if (matches.size() > RESOLVE_ABBREV_LIMIT)
 					return;
@@ -427,17 +418,10 @@ public class ObjectDirectory extends FileObjectDatabase {
 						// Pack was modified; refresh the entire pack list.
 						if (searchPacksAgain(pList))
 							continue SEARCH;
-					} catch (CorruptObjectException e) {
-						// Assume the pack is corrupted.
-						logPackIOException(e, p, true);
-						removePack(p);
-					} catch (PackInvalidException e) {
-						// Assume the pack is corrupted.
-						logPackIOException(e, p, true);
-						removePack(p);
 					} catch (IOException e) {
-						// log that the pack may be corrupted.
-						logPackIOException(e, p, false);
+						// Assume the pack is corrupted.
+						logCorruptPackError(e, p);
+						removePack(p);
 					}
 				}
 				break SEARCH;
@@ -516,17 +500,10 @@ public class ObjectDirectory extends FileObjectDatabase {
 						// Pack was modified; refresh the entire pack list.
 						if (searchPacksAgain(pList))
 							continue SEARCH;
-					} catch (CorruptObjectException e) {
-						// Assume the pack is corrupted.
-						logPackIOException(e, p, true);
-						removePack(p);
-					} catch (PackInvalidException e) {
-						// Assume the pack is corrupted.
-						logPackIOException(e, p, true);
-						removePack(p);
 					} catch (IOException e) {
-						// log that the pack may be corrupted.
-						logPackIOException(e, p, false);
+						// Assume the pack is corrupted.
+						logCorruptPackError(e, p);
+						removePack(p);
 					}
 				}
 				break SEARCH;
@@ -566,17 +543,10 @@ public class ObjectDirectory extends FileObjectDatabase {
 					//
 					pList = scanPacks(pList);
 					continue SEARCH;
-				} catch (CorruptObjectException e) {
-					// Assume the pack is corrupted.
-					logPackIOException(e, p, true);
-					removePack(p);
-				} catch (PackInvalidException e) {
-					// Assume the pack is corrupted.
-					logPackIOException(e, p, true);
-					removePack(p);
 				} catch (IOException e) {
-					// log that the pack may be corrupted.
-					logPackIOException(e, p, false);
+					// Assume the pack is corrupted.
+					logCorruptPackError(e, p);
+					removePack(p);
 				}
 			}
 			break SEARCH;
@@ -586,11 +556,9 @@ public class ObjectDirectory extends FileObjectDatabase {
 			h.db.selectObjectRepresentation(packer, otp, curs);
 	}
 
-	private static void logPackIOException(IOException e, PackFile p,
-			boolean isCorrupt) {
+	private static void logCorruptPackError(IOException e, PackFile p) {
 		StringBuilder buf = new StringBuilder(MessageFormat.format(
-				isCorrupt ? JGitText.get().corruptPack
-						: JGitText.get().exceptionWhileReadingPack,
+				JGitText.get().exceptionWhileReadingPack,
 				p.getPackFile().getAbsolutePath()));
 		StringWriter sw = new StringWriter();
 		e.printStackTrace(new PrintWriter(sw));
