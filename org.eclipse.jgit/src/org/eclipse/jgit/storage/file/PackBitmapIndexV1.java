@@ -90,7 +90,7 @@ class PackBitmapIndexV1 extends BasePackBitmapIndex {
 		// Read the version
 		final byte[] hdr = new byte[25];
 		IO.readFully(fd, hdr, 0, hdr.length);
-		final int v = NB.decodeInt32(hdr, 4);
+		final int v = NB.decodeInt32(hdr, 0);
 		if (v != 1)
 			throw new IOException(MessageFormat.format(
 					JGitText.get().unsupportedPackIndexVersion,
