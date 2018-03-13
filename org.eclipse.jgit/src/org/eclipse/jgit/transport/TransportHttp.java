@@ -426,27 +426,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 	@Override
 	public SubscribeConnection openSubscribe()
 			throws NotSupportedException, TransportException {
-		final String service = SVC_PUBLISH_SUBSCRIBE;
-		try {
-			final HttpURLConnection c = connect(service);
-			final InputStream in = openInputStream(c);
-			try {
-				if (isSmartHttp(c, service)) {
-					readSmartHeaders(in, service);
-					return new SmartHttpSubscribeConnection(in);
-				} else {
-					String msg = JGitText
-							.get().remoteDoesNotSupportSmartHTTPSubscribe;
-					throw new NotSupportedException(MessageFormat.format(
-							msg, baseUrl.toString()));
-				}
-			} finally {
-				in.close();
-			}
-		} catch (IOException err) {
-			throw new TransportException(uri, JGitText
-					.get().errorReadingInfoRefs, err);
-		}
+		return new SmartHttpSubscribeConnection();
 	}
 
 	@Override
@@ -486,37 +466,10 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				} else {
 					conn.setRequestProperty(HDR_ACCEPT, "*/*"); //$NON-NLS-1$
 				}
-				final int status = HttpSupport.response(conn);
-				switch (status) {
-				case HttpURLConnection.HTTP_OK:
-					return conn;
-
-				case HttpURLConnection.HTTP_NOT_FOUND:
-					throw new NoRemoteRepositoryException(uri,
-							MessageFormat.format(JGitText.get().uriNotFound, u));
-
-				case HttpURLConnection.HTTP_UNAUTHORIZED:
-					authMethod = HttpAuthMethod.scanResponse(conn);
-					if (authMethod == HttpAuthMethod.NONE)
-						throw new TransportException(uri, MessageFormat.format(
-								JGitText.get().authenticationNotSupported, uri));
-					if (1 < authAttempts
-							|| !authMethod.authorize(uri,
-									getCredentialsProvider())) {
-						throw new TransportException(uri,
-								JGitText.get().notAuthorized);
-					}
-					authAttempts++;
-					continue;
-
-				case HttpURLConnection.HTTP_FORBIDDEN:
-					throw new TransportException(uri, MessageFormat.format(
-							JGitText.get().serviceNotPermitted, service));
-
-				default:
-					String err = status + " " + conn.getResponseMessage(); //$NON-NLS-1$
-					throw new TransportException(uri, err);
-				}
+				HttpURLConnection newConn = authorizeConnection(conn, service, authAttempts);
+				if (newConn != null)
+					return newConn;
+				authAttempts++;
 			}
 		} catch (NotSupportedException e) {
 			throw e;
@@ -524,6 +477,42 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			throw e;
 		} catch (IOException e) {
 			throw new TransportException(uri, MessageFormat.format(JGitText.get().cannotOpenService, service), e);
+		}
+	}
+
+	private HttpURLConnection authorizeConnection(
+			HttpURLConnection conn, String service, int authAttempts)
+			throws NoRemoteRepositoryException, TransportException,
+			IOException {
+		final int status = HttpSupport.response(conn);
+		switch (status) {
+		case HttpURLConnection.HTTP_OK:
+			return conn;
+
+		case HttpURLConnection.HTTP_NOT_FOUND:
+			throw new NoRemoteRepositoryException(uri, MessageFormat.format(
+					JGitText.get().uriNotFound, conn.getURL()));
+
+		case HttpURLConnection.HTTP_UNAUTHORIZED:
+			authMethod = HttpAuthMethod.scanResponse(conn);
+			if (authMethod == HttpAuthMethod.NONE)
+				throw new TransportException(uri, MessageFormat.format(
+						JGitText.get().authenticationNotSupported, uri));
+			if (1 < authAttempts
+					|| !authMethod.authorize(uri,
+							getCredentialsProvider())) {
+				throw new TransportException(uri,
+						JGitText.get().notAuthorized);
+			}
+			return null;
+
+		case HttpURLConnection.HTTP_FORBIDDEN:
+			throw new TransportException(uri, MessageFormat.format(
+					JGitText.get().serviceNotPermitted, service));
+
+		default:
+			String err = status + " " + conn.getResponseMessage(); //$NON-NLS-1$
+			throw new TransportException(uri, err);
 		}
 	}
 
@@ -799,10 +788,18 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 	}
 
 	class SmartHttpSubscribeConnection extends BasePackSubscribeConnection {
-		SmartHttpSubscribeConnection(InputStream advertisement) {
+		SmartHttpSubscribeConnection() {
 			super(TransportHttp.this);
-			init(advertisement, DisabledOutputStream.INSTANCE);
 			outNeedsEnd = false;
+		}
+
+		@Override
+		public void doSubscribeAdvertisment(Subscriber subscriber)
+				throws IOException {
+			Service svc = new LongPollService(SVC_PUBLISH_SUBSCRIBE);
+			svc.setHandleAuth(true);
+			start(svc.getInputStream(), svc.getOutputStream());
+			super.doSubscribeAdvertisment(subscriber);
 		}
 
 		@Override
@@ -814,7 +811,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			Service svc = new LongPollService(SVC_PUBLISH_SUBSCRIBE);
 			InputStream bufferedInput = new BufferedInputStream(svc
 					.getInputStream(), 8192);
-			init(bufferedInput, svc.getOutputStream());
+			start(bufferedInput, svc.getOutputStream());
 			super.doSubscribe(subscriber, subscribeCommands, monitor);
 		}
 	}
@@ -835,6 +832,8 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		final UnionInputStream in;
 
+		protected boolean handleAuth;
+
 		Service(String serviceName) {
 			this.serviceName = serviceName;
 			this.requestType = "application/x-" + serviceName + "-request"; //$NON-NLS-1$ //$NON-NLS-2$
@@ -843,6 +842,15 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			this.out = new HttpOutputStream();
 			this.execute = new HttpExecuteStream();
 			this.in = new UnionInputStream(execute);
+		}
+
+		/**
+		 * @param handleAuth
+		 *            if true, examine the response's return code to add
+		 *            authorization and retry the request if necessary.
+		 */
+		void setHandleAuth(boolean handleAuth) {
+			this.handleAuth = handleAuth;
 		}
 
 		void openStream() throws IOException {
@@ -881,12 +889,27 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 
 		void openResponse() throws IOException {
-			final int status = HttpSupport.response(conn);
-			if (status != HttpURLConnection.HTTP_OK) {
-				throw new TransportException(uri, status + " " //$NON-NLS-1$
-						+ conn.getResponseMessage());
+			if (handleAuth) {
+				int authAttempts = 0;
+				while (true) {
+					HttpURLConnection newConn = authorizeConnection(
+							conn, serviceName, authAttempts++);
+					if (newConn != null) {
+						conn = newConn;
+						break;
+					}
+					// Try connection again with authorization, reusing the
+					// same output data.
+					openStream();
+					sendRequest();
+				}
+			} else {
+				final int status = HttpSupport.response(conn);
+				if (status != HttpURLConnection.HTTP_OK) {
+					throw new TransportException(uri, status + " " //$NON-NLS-1$
+							+ conn.getResponseMessage());
+				}
 			}
-
 			final String contentType = conn.getContentType();
 			if (!responseType.equals(contentType)) {
 				conn.getInputStream().close();
