@@ -101,38 +101,30 @@ import org.eclipse.jgit.util.LongList;
  *
  * So the overall runtime complexity stays the same with linear space,
  * albeit with a larger constant factor.
- *
- * @param <S>
- *            type of sequence.
  */
-public class MyersDiff<S extends Sequence> {
+public class MyersDiff {
 	/**
 	 * The list of edits found during the last call to {@link #calculateEdits()}
 	 */
 	protected EditList edits;
 
-	/** Comparison function for sequences. */
-	protected SequenceComparator<S> cmp;
-
 	/**
 	 * The first text to be compared. Referred to as "Text A" in the comments
 	 */
-	protected S a;
+	protected Sequence a;
 
 	/**
 	 * The second text to be compared. Referred to as "Text B" in the comments
 	 */
-	protected S b;
+	protected Sequence b;
 
 	/**
 	 * The only constructor
 	 *
-	 * @param cmp comparison method for this execution.
 	 * @param a   the text A which should be compared
 	 * @param b   the text B which should be compared
 	 */
-	public MyersDiff(SequenceComparator<S> cmp, S a, S b) {
-		this.cmp = cmp;
+	public MyersDiff(Sequence a, Sequence b) {
 		this.a = a;
 		this.b = b;
 		calculateEdits();
@@ -444,7 +436,7 @@ if (k < beginK || k > endK)
 		class ForwardEditPaths extends EditPaths {
 			final int snake(int k, int x) {
 				for (; x < endA && k + x < endB; x++)
-					if (!cmp.equals(a, x, b, k + x))
+					if (!a.equals(x, b, k + x))
 						break;
 				return x;
 			}
@@ -486,7 +478,7 @@ if (k < beginK || k > endK)
 		class BackwardEditPaths extends EditPaths {
 			final int snake(int k, int x) {
 				for (; x > beginA && k + x > beginB; x--)
-					if (!cmp.equals(a, x - 1, b, k + x - 1))
+					if (!a.equals(x - 1, b, k + x - 1))
 						break;
 				return x;
 			}
@@ -537,7 +529,7 @@ if (k < beginK || k > endK)
 		try {
 			RawText a = new RawText(new java.io.File(args[0]));
 			RawText b = new RawText(new java.io.File(args[1]));
-			MyersDiff diff = new MyersDiff(RawTextComparator.DEFAULT, a, b);
+			MyersDiff diff = new MyersDiff(a, b);
 			System.out.println(diff.getEdits().toString());
 		} catch (Exception e) {
 			e.printStackTrace();
