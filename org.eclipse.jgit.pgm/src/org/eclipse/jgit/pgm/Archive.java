@@ -43,19 +43,23 @@
 
 package org.eclipse.jgit.pgm;
 
-import org.eclipse.jgit.api.ArchiveCommand;
-import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.archive.TarFormat;
-import org.eclipse.jgit.archive.ZipFormat;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.pgm.TextBuiltin;
+import org.eclipse.jgit.pgm.archive.ArchiveCommand;
+import org.eclipse.jgit.pgm.archive.TarFormat;
+import org.eclipse.jgit.pgm.archive.ZipFormat;
 import org.eclipse.jgit.pgm.internal.CLIText;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 
 @Command(common = true, usage = "usage_archive")
 class Archive extends TextBuiltin {
+	static {
+		ArchiveCommand.registerFormat("tar", new TarFormat());
+		ArchiveCommand.registerFormat("zip", new ZipFormat());
+	}
+
 	@Argument(index = 0, metaVar = "metaVar_treeish")
 	private ObjectId tree;
 
@@ -67,9 +71,7 @@ class Archive extends TextBuiltin {
 		if (tree == null)
 			throw die(CLIText.get().treeIsRequired);
 
-		ArchiveCommand.registerFormat("tar", new TarFormat());
-		ArchiveCommand.registerFormat("zip", new ZipFormat());
-		final ArchiveCommand cmd = new Git(db).archive();
+		final ArchiveCommand cmd = new ArchiveCommand(db);
 		try {
 			cmd.setTree(tree)
 					.setFormat(format)
@@ -78,8 +80,6 @@ class Archive extends TextBuiltin {
 			throw die(e.getMessage());
 		} finally {
 			cmd.release();
-			ArchiveCommand.unregisterFormat("zip");
-			ArchiveCommand.unregisterFormat("tar");
 		}
 	}
 }
