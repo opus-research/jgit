@@ -54,7 +54,7 @@ import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 
-public class RefUpdateTest extends SampleDataRepositoryTestCase {
+public class RefUpdateTest extends RepositoryTestCase {
 
 	private RefUpdate updateRef(final String name) throws IOException {
 		final RefUpdate ref = db.updateRef(name);
@@ -290,64 +290,6 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 		Result update2 = updateRef2.update();
 		assertEquals(Result.FAST_FORWARD, update2);
 		assertEquals(pid, db.resolve("refs/heads/master"));
-	}
-
-	/**
-	 * Update the HEAD ref. Only it should be changed, not what it points to.
-	 *
-	 * @throws Exception
-	 */
-	public void testUpdateRefDetached() throws Exception {
-		ObjectId pid = db.resolve("refs/heads/master");
-		ObjectId ppid = db.resolve("refs/heads/master^");
-		RefUpdate updateRef = db.updateRef("HEAD", true);
-		updateRef.setForceUpdate(true);
-		updateRef.setNewObjectId(ppid);
-		Result update = updateRef.update();
-		assertEquals(Result.FORCED, update);
-		assertEquals(ppid, db.resolve("HEAD"));
-		Ref ref = db.getRef("HEAD");
-		assertEquals("HEAD", ref.getName());
-		assertEquals("HEAD", ref.getOrigName());
-
-		// the branch HEAD referred to is left untouched
-		assertEquals(pid, db.resolve("refs/heads/master"));
-		ReflogReader reflogReader = new  ReflogReader(db, "HEAD");
-		org.eclipse.jgit.lib.ReflogReader.Entry e = reflogReader.getReverseEntries().get(0);
-		assertEquals(pid, e.getOldId());
-		assertEquals(ppid, e.getNewId());
-		assertEquals("GIT_COMMITTER_EMAIL", e.getWho().getEmailAddress());
-		assertEquals("GIT_COMMITTER_NAME", e.getWho().getName());
-		assertEquals(1250379778000L, e.getWho().getWhen().getTime());
-	}
-
-	/**
-	 * Update the HEAD ref when the referenced branch is unborn
-	 *
-	 * @throws Exception
-	 */
-	public void testUpdateRefDetachedUnbornHead() throws Exception {
-		ObjectId ppid = db.resolve("refs/heads/master^");
-		db.writeSymref("HEAD", "refs/heads/unborn");
-		RefUpdate updateRef = db.updateRef("HEAD", true);
-		updateRef.setForceUpdate(true);
-		updateRef.setNewObjectId(ppid);
-		Result update = updateRef.update();
-		assertEquals(Result.NEW, update);
-		assertEquals(ppid, db.resolve("HEAD"));
-		Ref ref = db.getRef("HEAD");
-		assertEquals("HEAD", ref.getName());
-		assertEquals("HEAD", ref.getOrigName());
-
-		// the branch HEAD referred to is left untouched
-		assertNull(db.resolve("refs/heads/unborn"));
-		ReflogReader reflogReader = new  ReflogReader(db, "HEAD");
-		org.eclipse.jgit.lib.ReflogReader.Entry e = reflogReader.getReverseEntries().get(0);
-		assertEquals(ObjectId.zeroId(), e.getOldId());
-		assertEquals(ppid, e.getNewId());
-		assertEquals("GIT_COMMITTER_EMAIL", e.getWho().getEmailAddress());
-		assertEquals("GIT_COMMITTER_NAME", e.getWho().getName());
-		assertEquals(1250379778000L, e.getWho().getWhen().getTime());
 	}
 
 	/**

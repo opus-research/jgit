@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2009, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,12 +43,9 @@
 
 package org.eclipse.jgit.http.server;
 
-import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
-import static org.eclipse.jgit.http.server.ServletUtils.sendPlainText;
-
 import java.io.IOException;
 
-import javax.servlet.http.HttpServlet;
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -57,15 +54,34 @@ import org.eclipse.jgit.lib.ObjectDirectory;
 import org.eclipse.jgit.lib.PackFile;
 
 /** Sends the current list of pack files, sorted most recent first. */
-class InfoPacksServlet extends HttpServlet {
+class InfoPacksServlet extends RepositoryServlet {
 	private static final long serialVersionUID = 1L;
 
+	private static final String ENCODING = "UTF-8";
+
+	@Override
 	public void doGet(final HttpServletRequest req,
 			final HttpServletResponse rsp) throws IOException {
-		sendPlainText(packList(req), req, rsp);
+		serve(req, rsp, true);
 	}
 
-	private static String packList(final HttpServletRequest req) {
+	@Override
+	protected void doHead(final HttpServletRequest req,
+			final HttpServletResponse rsp) throws ServletException, IOException {
+		serve(req, rsp, false);
+	}
+
+	private void serve(final HttpServletRequest req,
+			final HttpServletResponse rsp, final boolean sendBody)
+			throws IOException {
+		final byte[] raw = packList(req);
+		rsp.setContentType("text/plain");
+		rsp.setCharacterEncoding(ENCODING);
+		send(raw, req, rsp, sendBody);
+	}
+
+	private static byte[] packList(final HttpServletRequest req)
+			throws IOException {
 		final StringBuilder out = new StringBuilder();
 		final ObjectDatabase db = getRepository(req).getObjectDatabase();
 		if (db instanceof ObjectDirectory) {
@@ -76,6 +92,6 @@ class InfoPacksServlet extends HttpServlet {
 			}
 		}
 		out.append('\n');
-		return out.toString();
+		return out.toString().getBytes(ENCODING);
 	}
 }

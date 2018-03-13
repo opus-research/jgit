@@ -63,7 +63,7 @@ public class ObjectId extends AnyObjectId {
 
 	/**
 	 * Get the special all-null ObjectId.
-	 *
+	 * 
 	 * @return the all-null ObjectId, often used to stand-in for no object.
 	 */
 	public static final ObjectId zeroId() {
@@ -74,16 +74,16 @@ public class ObjectId extends AnyObjectId {
 	 * Test a string of characters to verify it is a hex format.
 	 * <p>
 	 * If true the string can be parsed with {@link #fromString(String)}.
-	 *
+	 * 
 	 * @param id
 	 *            the string to test.
 	 * @return true if the string can converted into an ObjectId.
 	 */
 	public static final boolean isId(final String id) {
-		if (id.length() != Constants.OBJECT_ID_STRING_LENGTH)
+		if (id.length() != STR_LEN)
 			return false;
 		try {
-			for (int i = 0; i < Constants.OBJECT_ID_STRING_LENGTH; i++) {
+			for (int i = 0; i < STR_LEN; i++) {
 				RawParseUtils.parseHexInt4((byte) id.charAt(i));
 			}
 			return true;
@@ -94,7 +94,7 @@ public class ObjectId extends AnyObjectId {
 
 	/**
 	 * Convert an ObjectId into a hex string representation.
-	 *
+	 * 
 	 * @param i
 	 *            the id to convert. May be null.
 	 * @return the hex string conversion of this id's content.
@@ -105,7 +105,7 @@ public class ObjectId extends AnyObjectId {
 
 	/**
 	 * Compare to object identifier byte sequences for equality.
-	 *
+	 * 
 	 * @param firstBuffer
 	 *            the first buffer to compare against. Must have at least 20
 	 *            bytes from position ai through the end of the buffer.
@@ -144,7 +144,7 @@ public class ObjectId extends AnyObjectId {
 
 	/**
 	 * Convert an ObjectId from raw binary representation.
-	 *
+	 * 
 	 * @param bs
 	 *            the raw byte buffer to read from. At least 20 bytes must be
 	 *            available within this byte array.
@@ -156,7 +156,7 @@ public class ObjectId extends AnyObjectId {
 
 	/**
 	 * Convert an ObjectId from raw binary representation.
-	 *
+	 * 
 	 * @param bs
 	 *            the raw byte buffer to read from. At least 20 bytes after p
 	 *            must be available within this byte array.
@@ -201,7 +201,7 @@ public class ObjectId extends AnyObjectId {
 
 	/**
 	 * Convert an ObjectId from hex characters (US-ASCII).
-	 *
+	 * 
 	 * @param buf
 	 *            the US-ASCII buffer to read from. At least 40 bytes after
 	 *            offset must be available within this byte array.
@@ -215,13 +215,13 @@ public class ObjectId extends AnyObjectId {
 
 	/**
 	 * Convert an ObjectId from hex characters.
-	 *
+	 * 
 	 * @param str
 	 *            the string to read from. Must be 40 characters long.
 	 * @return the converted object id.
 	 */
 	public static final ObjectId fromString(final String str) {
-		if (str.length() != Constants.OBJECT_ID_STRING_LENGTH)
+		if (str.length() != STR_LEN)
 			throw new IllegalArgumentException("Invalid id: " + str);
 		return fromHexString(Constants.encodeASCII(str), 0);
 	}
@@ -235,8 +235,7 @@ public class ObjectId extends AnyObjectId {
 			final int e = RawParseUtils.parseHexInt32(bs, p + 32);
 			return new ObjectId(a, b, c, d, e);
 		} catch (ArrayIndexOutOfBoundsException e1) {
-			throw new InvalidObjectIdException(bs, p,
-					Constants.OBJECT_ID_STRING_LENGTH);
+			throw new InvalidObjectIdException(bs, p, STR_LEN);
 		}
 	}
 
@@ -255,7 +254,7 @@ public class ObjectId extends AnyObjectId {
 	 * This constructor is mostly useful for subclasses who want to extend an
 	 * ObjectId with more properties, but initialize from an existing ObjectId
 	 * instance acquired by other means.
-	 *
+	 * 
 	 * @param src
 	 *            another already parsed ObjectId to copy the value out of.
 	 */
