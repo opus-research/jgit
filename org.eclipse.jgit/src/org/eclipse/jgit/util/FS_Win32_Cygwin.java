@@ -170,47 +170,47 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 
 	@Override
 	public boolean isSymLink(File path) throws IOException {
-		return FileUtils.isSymlink(path);
+		return FileUtil.isSymlink(path);
 	}
 
 	@Override
 	public long lastModified(File path) throws IOException {
-		return FileUtils.lastModified(path);
+		return FileUtil.lastModified(path);
 	}
 
 	@Override
 	public void setLastModified(File path, long time) throws IOException {
-		FileUtils.setLastModified(path, time);
+		FileUtil.setLastModified(path, time);
 	}
 
 	@Override
 	public long length(File f) throws IOException {
-		return FileUtils.getLength(f);
+		return FileUtil.getLength(f);
 	}
 
 	@Override
 	public boolean exists(File path) {
-		return FileUtils.exists(path);
+		return FileUtil.exists(path);
 	}
 
 	@Override
 	public boolean isDirectory(File path) {
-		return FileUtils.isDirectory(path);
+		return FileUtil.isDirectory(path);
 	}
 
 	@Override
 	public boolean isFile(File path) {
-		return FileUtils.isFile(path);
+		return FileUtil.isFile(path);
 	}
 
 	@Override
 	public boolean isHidden(File path) throws IOException {
-		return FileUtils.isHidden(path);
+		return FileUtil.isHidden(path);
 	}
 
 	@Override
 	public void setHidden(File path, boolean hidden) throws IOException {
-		FileUtils.setHidden(path, hidden);
+		FileUtil.setHidden(path, hidden);
 	}
 
 	/**
@@ -218,7 +218,7 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 	 */
 	@Override
 	public Attributes getAttributes(File path) {
-		return FileUtils.getFileAttributesBasic(this, path);
+		return FileUtil.getFileAttributesBasic(this, path);
 	}
 
 	/**
