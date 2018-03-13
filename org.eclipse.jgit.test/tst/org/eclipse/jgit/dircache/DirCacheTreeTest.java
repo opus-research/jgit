@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009, Google Inc.
+ * Copyright (C) 2008, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -46,7 +46,6 @@ package org.eclipse.jgit.dircache;
 import java.io.IOException;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 
 public class DirCacheTreeTest extends RepositoryTestCase {
@@ -82,10 +81,8 @@ public class DirCacheTreeTest extends RepositoryTestCase {
 
 		final String[] paths = { "a.", "a/b", "a/c", "a/d", "a0b" };
 		final DirCacheEntry[] ents = new DirCacheEntry[paths.length];
-		for (int i = 0; i < paths.length; i++) {
+		for (int i = 0; i < paths.length; i++)
 			ents[i] = new DirCacheEntry(paths[i]);
-			ents[i].setFileMode(FileMode.REGULAR_FILE);
-		}
 		final int aFirst = 1;
 		final int aLast = 3;
 
@@ -119,10 +116,8 @@ public class DirCacheTreeTest extends RepositoryTestCase {
 
 		final String[] paths = { "a.", "a/b", "a/c/e", "a/c/f", "a/d", "a0b" };
 		final DirCacheEntry[] ents = new DirCacheEntry[paths.length];
-		for (int i = 0; i < paths.length; i++) {
+		for (int i = 0; i < paths.length; i++)
 			ents[i] = new DirCacheEntry(paths[i]);
-			ents[i].setFileMode(FileMode.REGULAR_FILE);
-		}
 		final int aFirst = 1;
 		final int aLast = 4;
 		final int acFirst = 2;
@@ -178,10 +173,8 @@ public class DirCacheTreeTest extends RepositoryTestCase {
 		final String B = String.format("b%2000s", "b");
 		final String[] paths = { A + ".", A + "." + B, A + "/" + B, A + "0" + B };
 		final DirCacheEntry[] ents = new DirCacheEntry[paths.length];
-		for (int i = 0; i < paths.length; i++) {
+		for (int i = 0; i < paths.length; i++)
 			ents[i] = new DirCacheEntry(paths[i]);
-			ents[i].setFileMode(FileMode.REGULAR_FILE);
-		}
 
 		final DirCacheBuilder b = dc.builder();
 		for (int i = 0; i < ents.length; i++)
