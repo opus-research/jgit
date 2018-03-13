@@ -266,11 +266,14 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			// If there is a matching DirCacheIterator, we can reuse
 			// its idBuffer, but only if we appear to be clean against
 			// the cached index information for the path.
+			//
 			DirCacheIterator i = state.walk.getTree(state.dirCacheTree,
 							DirCacheIterator.class);
 			if (i != null) {
 				DirCacheEntry ent = i.getDirCacheEntry();
-				if (ent != null && compareMetadata(ent) == MetadataDiff.EQUAL) {
+				if (ent != null && compareMetadata(ent) == MetadataDiff.EQUAL
+						&& ((ent.getFileMode().getBits()
+								& FileMode.TYPE_MASK) != FileMode.TYPE_GITLINK)) {
 					contentIdOffset = i.idOffset();
 					contentIdFromPtr = ptr;
 					return contentId = i.idBuffer();
@@ -393,9 +396,15 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 		if (len <= MAXIMUM_FILE_SIZE_TO_READ_FULLY) {
 			ByteBuffer rawbuf = IO.readWholeStream(is, (int) len);
-			rawbuf = filterClean(rawbuf.array(), rawbuf.limit(), opType);
-			canonLen = rawbuf.limit();
-			return new ByteArrayInputStream(rawbuf.array(), 0, (int) canonLen);
+			byte[] raw = rawbuf.array();
+			int n = rawbuf.limit();
+			if (!isBinary(raw, n)) {
+				rawbuf = filterClean(raw, n, opType);
+				raw = rawbuf.array();
+				n = rawbuf.limit();
+			}
+			canonLen = n;
+			return new ByteArrayInputStream(raw, 0, n);
 		}
 
 		if (getCleanFilterCommand() == null && isBinary(e)) {
@@ -421,6 +430,10 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			// stream. We don't care, we should not have any
 			// outstanding data to flush or anything like that.
 		}
+	}
+
+	private static boolean isBinary(byte[] content, int sz) {
+		return RawText.isBinary(content, sz);
 	}
 
 	private static boolean isBinary(Entry entry) throws IOException {
@@ -453,7 +466,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		if (filterCommand != null) {
 			if (Repository.isRegistered(filterCommand)) {
 				LocalFile buffer = new TemporaryBuffer.LocalFile(null);
-
 				FilterCommand command = Repository.getCommand(filterCommand,
 						repository,
 						in, buffer);
@@ -846,10 +858,15 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		if (entry.isUpdateNeeded())
 			return MetadataDiff.DIFFER_BY_METADATA;
 
-		if (!entry.isSmudged() && entry.getLength() != (int) getEntryLength())
+		if (isModeDifferent(entry.getRawMode()))
 			return MetadataDiff.DIFFER_BY_METADATA;
 
-		if (isModeDifferent(entry.getRawMode()))
+		// Don't check for length or lastmodified on folders
+		int type = mode & FileMode.TYPE_MASK;
+		if (type == FileMode.TYPE_TREE || type == FileMode.TYPE_GITLINK)
+			return MetadataDiff.EQUAL;
+
+		if (!entry.isSmudged() && entry.getLength() != (int) getEntryLength())
 			return MetadataDiff.DIFFER_BY_METADATA;
 
 		// Git under windows only stores seconds so we round the timestamp
@@ -918,6 +935,9 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			// Lets do a content check
 			return contentCheck(entry, reader);
 		case EQUAL:
+			if (mode == FileMode.SYMLINK.getBits()) {
+				return contentCheck(entry, reader);
+			}
 			return false;
 		case DIFFER_BY_METADATA:
 			if (mode == FileMode.SYMLINK.getBits())
