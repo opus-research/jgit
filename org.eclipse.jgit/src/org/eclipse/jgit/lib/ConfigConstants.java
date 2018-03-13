@@ -115,7 +115,6 @@ public class ConfigConstants {
 
 	/**
 	 * The "filter" section
-	 *
 	 * @since 4.6
 	 */
 	public static final String CONFIG_FILTER_SECTION = "filter";
