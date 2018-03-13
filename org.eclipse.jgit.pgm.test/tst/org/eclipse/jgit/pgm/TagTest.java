@@ -68,6 +68,6 @@ public class TagTest extends CLIRepositoryTestCase {
 		git.commit().setMessage("commit").call();
 
 		assertEquals("fatal: tag 'test' already exists",
-				executeUnchecked("git tag test")[0]);
+				execute("git tag test")[0]);
 	}
 }

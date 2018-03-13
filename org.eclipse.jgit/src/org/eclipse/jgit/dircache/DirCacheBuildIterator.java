@@ -130,9 +130,4 @@ public class DirCacheBuildIterator extends DirCacheIterator {
 		if (cur < cnt)
 			builder.keep(cur, cnt - cur);
 	}
-
-	@Override
-	protected boolean needsStopWalk() {
-		return ptr < cache.getEntryCount();
-	}
 }
