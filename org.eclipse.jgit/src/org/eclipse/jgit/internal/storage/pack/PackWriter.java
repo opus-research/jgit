@@ -1029,43 +1029,44 @@ public class PackWriter {
 		stats.totalObjects = objCnt;
 		beginPhase(PackingPhase.WRITING, writeMonitor, objCnt);
 		long writeStart = System.currentTimeMillis();
+		try {
+			out.writeFileHeader(PACK_VERSION_GENERATED, objCnt);
+			out.flush();
 
-		out.writeFileHeader(PACK_VERSION_GENERATED, objCnt);
-		out.flush();
+			writeObjects(out);
+			if (!edgeObjects.isEmpty() || !cachedPacks.isEmpty()) {
+				for (Statistics.ObjectType typeStat : stats.objectTypes) {
+					if (typeStat == null)
+						continue;
+					stats.thinPackBytes += typeStat.bytes;
+				}
+			}
 
-		writeObjects(out);
-		if (!edgeObjects.isEmpty() || !cachedPacks.isEmpty()) {
+			stats.reusedPacks = Collections.unmodifiableList(cachedPacks);
+			for (CachedPack pack : cachedPacks) {
+				long deltaCnt = pack.getDeltaCount();
+				stats.reusedObjects += pack.getObjectCount();
+				stats.reusedDeltas += deltaCnt;
+				stats.totalDeltas += deltaCnt;
+				reuseSupport.copyPackAsIs(out, pack, reuseValidate);
+			}
+			writeChecksum(out);
+			out.flush();
+		} finally {
+			stats.timeWriting = System.currentTimeMillis() - writeStart;
+			stats.depth = depth;
+
 			for (Statistics.ObjectType typeStat : stats.objectTypes) {
 				if (typeStat == null)
 					continue;
-				stats.thinPackBytes += typeStat.bytes;
+				typeStat.cntDeltas += typeStat.reusedDeltas;
+				stats.reusedObjects += typeStat.reusedObjects;
+				stats.reusedDeltas += typeStat.reusedDeltas;
+				stats.totalDeltas += typeStat.cntDeltas;
 			}
 		}
 
-		for (CachedPack pack : cachedPacks) {
-			long deltaCnt = pack.getDeltaCount();
-			stats.reusedObjects += pack.getObjectCount();
-			stats.reusedDeltas += deltaCnt;
-			stats.totalDeltas += deltaCnt;
-			reuseSupport.copyPackAsIs(out, pack, reuseValidate);
-		}
-		writeChecksum(out);
-		out.flush();
-		stats.timeWriting = System.currentTimeMillis() - writeStart;
 		stats.totalBytes = out.length();
-		stats.reusedPacks = Collections.unmodifiableList(cachedPacks);
-		stats.depth = depth;
-
-		for (Statistics.ObjectType typeStat : stats.objectTypes) {
-			if (typeStat == null)
-				continue;
-			typeStat.cntDeltas += typeStat.reusedDeltas;
-
-			stats.reusedObjects += typeStat.reusedObjects;
-			stats.reusedDeltas += typeStat.reusedDeltas;
-			stats.totalDeltas += typeStat.cntDeltas;
-		}
-
 		reader.release();
 		endPhase(writeMonitor);
 	}
@@ -1846,10 +1847,9 @@ public class PackWriter {
 			Set<? extends ObjectId> have)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
-		BitmapBuilder haveBitmap = bitmapWalker.findObjects(have, null, true);
+		BitmapBuilder haveBitmap = bitmapWalker.findObjects(have, null);
 		bitmapWalker.reset();
-		BitmapBuilder wantBitmap = bitmapWalker.findObjects(want, haveBitmap,
-				false);
+		BitmapBuilder wantBitmap = bitmapWalker.findObjects(want, haveBitmap);
 		BitmapBuilder needBitmap = wantBitmap.andNot(haveBitmap);
 
 		if (useCachedPacks && reuseSupport != null
@@ -2049,7 +2049,7 @@ public class PackWriter {
 				walker = bitmapPreparer.newBitmapWalker();
 
 			BitmapBuilder bitmap = walker.findObjects(
-					Collections.singleton(cmit), null, false);
+					Collections.singleton(cmit), null);
 
 			if (last != null && cmit.isReuseWalker() && !bitmap.contains(last))
 				throw new IllegalStateException(MessageFormat.format(
