@@ -203,14 +203,9 @@ public class Tag {
 		final RefUpdate ru;
 
 		if (tagger!=null || message!=null || type!=null) {
-			ObjectInserter odi = objdb.newObjectInserter();
-			try {
-				id = odi.insert(Constants.OBJ_TAG, odi.format(this));
-				odi.flush();
-				setTagId(id);
-			} finally {
-				odi.release();
-			}
+			ObjectId tagid = new ObjectWriter(objdb).writeTag(this);
+			setTagId(tagid);
+			id = tagid;
 		} else {
 			id = objId;
 		}
