@@ -70,7 +70,6 @@ public class RepoProject implements Comparable<RepoProject> {
 	private final String remote;
 	private final Set<String> groups;
 	private final List<CopyFile> copyfiles;
-	private String recommendShallow;
 	private String url;
 	private String defaultRevision;
 
@@ -136,13 +135,10 @@ public class RepoProject implements Comparable<RepoProject> {
 	 *            name of the remote definition
 	 * @param groups
 	 *            set of groups
-	 * @param recommendShallow
-	 *            recommendation for shallowness
 	 * @since 4.4
 	 */
 	public RepoProject(String name, String path, String revision,
-			String remote, Set<String> groups,
-			String recommendShallow) {
+			String remote, Set<String> groups) {
 		if (name == null) {
 			throw new NullPointerException();
 		}
@@ -154,7 +150,6 @@ public class RepoProject implements Comparable<RepoProject> {
 		this.revision = revision;
 		this.remote = remote;
 		this.groups = groups;
-		this.recommendShallow = recommendShallow;
 		copyfiles = new ArrayList<CopyFile>();
 	}
 
@@ -172,7 +167,7 @@ public class RepoProject implements Comparable<RepoProject> {
 	 */
 	public RepoProject(String name, String path, String revision,
 			String remote, String groups) {
-		this(name, path, revision, remote, new HashSet<String>(), null);
+		this(name, path, revision, remote, new HashSet<String>());
 		if (groups != null && groups.length() > 0)
 			this.setGroups(groups);
 	}
@@ -191,8 +186,7 @@ public class RepoProject implements Comparable<RepoProject> {
 	/**
 	 * Set the url of the sub repo.
 	 *
-	 * @param groups
-	 *            comma separated group list
+	 * @param url
 	 * @return this for chaining.
 	 * @since 4.4
 	 */
@@ -285,27 +279,6 @@ public class RepoProject implements Comparable<RepoProject> {
 	 */
 	public Set<String> getGroups() {
 		return groups;
-	}
-
-	/**
-	 * Return the recommendation for shallowness.
-	 *
-	 * @return the String of "clone-depth"
-	 * @since 4.4
-	 */
-	public String getRecommendShallow() {
-		return recommendShallow;
-	}
-
-	/**
-	 * Sets the recommendation for shallowness.
-	 *
-	 * @param recommendShallow
-	 *            recommendation for shallowness
-	 * @since 4.4
-	 */
-	public void setRecommendShallow(String recommendShallow) {
-		this.recommendShallow = recommendShallow;
 	}
 
 	/**
