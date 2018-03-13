@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2008, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,43 +40,54 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 package org.eclipse.jgit.pgm;
 
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.treewalk.AbstractTreeIterator;
-import org.eclipse.jgit.treewalk.TreeWalk;
+import static org.junit.Assert.assertEquals;
 
-class LsTree extends TextBuiltin {
-	@Option(name = "--recursive", usage = "usage_recurseIntoSubtrees", aliases = { "-r" })
-	private boolean recursive;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.eclipse.jgit.merge.MergeStrategy;
+import org.junit.Before;
+import org.junit.Test;
 
-	@Argument(index = 0, required = true, metaVar = "metaVar_treeish")
-	private AbstractTreeIterator tree;
-
+public class MergeTest extends CLIRepositoryTestCase {
 	@Override
-	protected void run() throws Exception {
-		final TreeWalk walk = new TreeWalk(db);
-		walk.setRecursive(recursive);
-		walk.addTree(tree);
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		new Git(db).commit().setMessage("initial commit").call();
+	}
 
-		while (walk.next()) {
-			final FileMode mode = walk.getFileMode(0);
-			if (mode == FileMode.TREE)
-				outw.print('0');
-			outw.print(mode);
-			outw.print(' ');
-			outw.print(Constants.typeString(mode.getObjectType()));
+	@Test
+	public void testMergeSelf() throws Exception {
+		assertEquals("Already up-to-date.", execute("git merge master")[0]);
+	}
 
-			outw.print(' ');
-			outw.print(walk.getObjectId(0).name());
+	@Test
+	public void testFastForward() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
+		new Git(db).branchCreate().setName("side").call();
+		writeTrashFile("file", "master");
+		new Git(db).add().addFilepattern("file").call();
+		new Git(db).commit().setMessage("commit").call();
+		new Git(db).checkout().setName("side").call();
 
-			outw.print('\t');
-			outw.print(walk.getPathString());
-			outw.println();
-		}
+		assertEquals("Fast-forward", execute("git merge master")[0]);
+	}
+
+	@Test
+	public void testMerge() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
+		new Git(db).branchCreate().setName("side").call();
+		writeTrashFile("master", "content");
+		new Git(db).add().addFilepattern("master").call();
+		new Git(db).commit().setMessage("master commit").call();
+		new Git(db).checkout().setName("side").call();
+		writeTrashFile("side", "content");
+		new Git(db).add().addFilepattern("side").call();
+		new Git(db).commit().setMessage("side commit").call();
+
+		assertEquals("Merge made by the '" + MergeStrategy.RESOLVE.getName()
+				+ "' strategy.", execute("git merge master")[0]);
 	}
 }
