@@ -477,7 +477,8 @@ public class RefDirectory extends RefDatabase {
 
 	private ObjectIdRef doPeel(final Ref leaf) throws MissingObjectException,
 			IOException {
-		try (RevWalk rw = new RevWalk(getRepository())) {
+		RevWalk rw = new RevWalk(getRepository());
+		try {
 			RevObject obj = rw.parseAny(leaf.getObjectId());
 			if (obj instanceof RevTag) {
 				return new ObjectIdRef.PeeledTag(leaf.getStorage(), leaf
@@ -486,6 +487,8 @@ public class RefDirectory extends RefDatabase {
 				return new ObjectIdRef.PeeledNonTag(leaf.getStorage(), leaf
 						.getName(), leaf.getObjectId());
 			}
+		} finally {
+			rw.release();
 		}
 	}
 
