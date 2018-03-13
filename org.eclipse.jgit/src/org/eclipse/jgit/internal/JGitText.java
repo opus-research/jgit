@@ -1,7 +1,6 @@
 /*
  * Copyright (C) 2010, 2013 Sasa Zivkov <sasa.zivkov@sap.com>
  * Copyright (C) 2012, Research In Motion Limited
- * Copyright (C) 2013, Obeo
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -76,6 +75,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String applyingCommit;
 	/***/ public String archiveFormatAlreadyAbsent;
 	/***/ public String archiveFormatAlreadyRegistered;
+	/***/ public String argumentIsNotAValidCommentString;
 	/***/ public String atLeastOnePathIsRequired;
 	/***/ public String atLeastOnePatternIsRequired;
 	/***/ public String atLeastTwoFiltersNeeded;
@@ -101,6 +101,8 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cachedPacksPreventsListingObjects;
 	/***/ public String cannotBeCombined;
 	/***/ public String cannotBeRecursiveWhenTreesAreIncluded;
+	/***/ public String cannotChangeActionOnComment;
+	/***/ public String cannotChangeToComment;
 	/***/ public String cannotCombineSquashWithNoff;
 	/***/ public String cannotCombineTreeFilterWithRevFilter;
 	/***/ public String cannotCommitOnARepoWithState;
@@ -138,6 +140,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotReadTree;
 	/***/ public String cannotRebaseWithoutCurrentHead;
 	/***/ public String cannotResolveLocalTrackingRefForUpdating;
+	/***/ public String cannotSquashFixupWithoutPreviousCommit;
 	/***/ public String cannotStoreObjects;
 	/***/ public String cannotUnloadAModifiedTree;
 	/***/ public String cannotWorkWithOtherStagesThanZeroRightNow;
@@ -162,8 +165,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String connectionFailed;
 	/***/ public String connectionTimeOut;
 	/***/ public String contextMustBeNonNegative;
-	/***/ public String copyFailureDestinationIsDirectory;
-	/***/ public String copyFailureDestinationIsReadOnly;
 	/***/ public String corruptionDetectedReReadingAt;
 	/***/ public String corruptObjectBadStream;
 	/***/ public String corruptObjectBadStreamCorruptHeader;
@@ -331,6 +332,10 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidOldIdSent;
 	/***/ public String invalidPacketLineHeader;
 	/***/ public String invalidPath;
+	/***/ public String invalidPathContainsSeparator;
+	/***/ public String invalidPathPeriodAtEndWindows;
+	/***/ public String invalidPathSpaceAtEndWindows;
+	/***/ public String invalidPathReservedOnWindows;
 	/***/ public String invalidReflogRevision;
 	/***/ public String invalidRefName;
 	/***/ public String invalidRemote;

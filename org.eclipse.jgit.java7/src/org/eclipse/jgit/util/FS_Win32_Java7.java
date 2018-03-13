@@ -45,13 +45,13 @@ package org.eclipse.jgit.util;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 
 /**
  * FS for Java7 on Windows
  */
 public class FS_Win32_Java7 extends FS_Win32 {
+
+	private volatile Boolean supportSymlinks;
 
 	FS_Win32_Java7(FS src) {
 		super(src);
@@ -67,7 +67,29 @@ public class FS_Win32_Java7 extends FS_Win32 {
 
 	@Override
 	public boolean supportsSymlinks() {
-		return true;
+		if (supportSymlinks == null)
+			detectSymlinkSupport();
+		return Boolean.TRUE.equals(supportSymlinks);
+	}
+
+	private void detectSymlinkSupport() {
+		File tempFile = null;
+		try {
+			tempFile = File.createTempFile("tempsymlinktarget", ""); //$NON-NLS-1$ //$NON-NLS-2$
+			File linkName = new File(tempFile.getParentFile(), "tempsymlink"); //$NON-NLS-1$
+			FileUtil.createSymLink(linkName, tempFile.getPath());
+			supportSymlinks = Boolean.TRUE;
+			linkName.delete();
+		} catch (IOException e) {
+			supportSymlinks = Boolean.FALSE;
+		} finally {
+			if (tempFile != null)
+				try {
+					FileUtils.delete(tempFile);
+				} catch (IOException e) {
+					throw new RuntimeException(e); // panic
+				}
+		}
 	}
 
 	@Override
@@ -83,6 +105,11 @@ public class FS_Win32_Java7 extends FS_Win32 {
 	@Override
 	public void setLastModified(File path, long time) throws IOException {
 		FileUtil.setLastModified(path, time);
+	}
+
+	@Override
+	public void delete(File path) throws IOException {
+		FileUtil.delete(path);
 	}
 
 	@Override
@@ -125,14 +152,11 @@ public class FS_Win32_Java7 extends FS_Win32 {
 		FileUtil.createSymLink(path, target);
 	}
 
+	/**
+	 * @since 3.3
+	 */
 	@Override
-	public PathMatcher getPathMatcher(String globPattern) {
-		return new PathMatcher_Java7(globPattern);
-	}
-
-	@Override
-	public void copyFile(File sourceFile, File destFile) throws IOException {
-		Files.copy(sourceFile.toPath(), destFile.toPath(),
-				StandardCopyOption.REPLACE_EXISTING);
+	public Attributes getAttributes(File path) {
+		return FileUtil.getFileAttributesBasic(this, path);
 	}
 }
