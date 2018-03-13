@@ -138,10 +138,8 @@ public class FileResolver implements RepositoryResolver {
 			Repository db) throws IOException {
 		if (isExportAll())
 			return true;
-		else if (db.getDirectory() != null)
-			return new File(db.getDirectory(), "git-daemon-export-ok").exists();
 		else
-			return false;
+			return new File(db.getDirectory(), "git-daemon-export-ok").exists();
 	}
 
 	private static boolean isUnreasonableName(final String name) {

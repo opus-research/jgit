@@ -52,7 +52,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
-import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
@@ -121,10 +120,7 @@ public class RepositoryCache {
 	 *            repository to register.
 	 */
 	public static void register(final Repository db) {
-		if (db.getDirectory() != null) {
-			FileKey key = FileKey.exact(db.getDirectory(), db.getFS());
-			cache.registerRepository(key, db);
-		}
+		cache.registerRepository(FileKey.exact(db.getDirectory(), db.getFS()), db);
 	}
 
 	/**
@@ -137,10 +133,7 @@ public class RepositoryCache {
 	 *            repository to unregister.
 	 */
 	public static void close(final Repository db) {
-		if (db.getDirectory() != null) {
-			FileKey key = FileKey.exact(db.getDirectory(), db.getFS());
-			cache.unregisterRepository(key);
-		}
+		cache.unregisterRepository(FileKey.exact(db.getDirectory(), db.getFS()));
 	}
 
 	/** Unregister all repositories from the cache. */
@@ -320,7 +313,7 @@ public class RepositoryCache {
 		public Repository open(final boolean mustExist) throws IOException {
 			if (mustExist && !isGitRepository(path, fs))
 				throw new RepositoryNotFoundException(path);
-			return new FileRepository(path);
+			return new Repository(path);
 		}
 
 		@Override

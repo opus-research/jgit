@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.treewalk.filter;
 
-import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
-
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
@@ -54,17 +52,17 @@ import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.ObjectWriter;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.treewalk.TreeWalk;
 
 public class PathSuffixFilterTestCase extends RepositoryTestCase {
 
 	public void testNonRecursiveFiltering() throws IOException {
-		final ObjectInserter odi = db.newObjectInserter();
-		final ObjectId aSth = odi.insert(OBJ_BLOB, "a.sth".getBytes());
-		final ObjectId aTxt = odi.insert(OBJ_BLOB, "a.txt".getBytes());
-		final DirCache dc = db.readDirCache();
+		final ObjectWriter ow = new ObjectWriter(db);
+		final ObjectId aSth = ow.writeBlob("a.sth".getBytes());
+		final ObjectId aTxt = ow.writeBlob("a.txt".getBytes());
+		final DirCache dc = DirCache.read(db);
 		final DirCacheBuilder builder = dc.builder();
 		final DirCacheEntry aSthEntry = new DirCacheEntry("a.sth");
 		aSthEntry.setFileMode(FileMode.REGULAR_FILE);
@@ -75,8 +73,7 @@ public class PathSuffixFilterTestCase extends RepositoryTestCase {
 		builder.add(aSthEntry);
 		builder.add(aTxtEntry);
 		builder.finish();
-		final ObjectId treeId = dc.writeTree(odi);
-		odi.flush();
+		final ObjectId treeId = dc.writeTree(ow);
 
 
 		final TreeWalk tw = new TreeWalk(db);
@@ -95,12 +92,12 @@ public class PathSuffixFilterTestCase extends RepositoryTestCase {
 	}
 
 	public void testRecursiveFiltering() throws IOException {
-		final ObjectInserter odi = db.newObjectInserter();
-		final ObjectId aSth = odi.insert(OBJ_BLOB, "a.sth".getBytes());
-		final ObjectId aTxt = odi.insert(OBJ_BLOB, "a.txt".getBytes());
-		final ObjectId bSth = odi.insert(OBJ_BLOB, "b.sth".getBytes());
-		final ObjectId bTxt = odi.insert(OBJ_BLOB, "b.txt".getBytes());
-		final DirCache dc = db.readDirCache();
+		final ObjectWriter ow = new ObjectWriter(db);
+		final ObjectId aSth = ow.writeBlob("a.sth".getBytes());
+		final ObjectId aTxt = ow.writeBlob("a.txt".getBytes());
+		final ObjectId bSth = ow.writeBlob("b.sth".getBytes());
+		final ObjectId bTxt = ow.writeBlob("b.txt".getBytes());
+		final DirCache dc = DirCache.read(db);
 		final DirCacheBuilder builder = dc.builder();
 		final DirCacheEntry aSthEntry = new DirCacheEntry("a.sth");
 		aSthEntry.setFileMode(FileMode.REGULAR_FILE);
@@ -119,8 +116,7 @@ public class PathSuffixFilterTestCase extends RepositoryTestCase {
 		builder.add(bSthEntry);
 		builder.add(bTxtEntry);
 		builder.finish();
-		final ObjectId treeId = dc.writeTree(odi);
-		odi.flush();
+		final ObjectId treeId = dc.writeTree(ow);
 
 
 		final TreeWalk tw = new TreeWalk(db);
