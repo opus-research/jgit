@@ -45,15 +45,11 @@ package org.eclipse.jgit.internal.storage.file;
 
 import static java.lang.Integer.valueOf;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CyclicBarrier;
@@ -82,17 +78,6 @@ public class GcPackRefsTest extends GcTestCase {
 
 		gc.packRefs();
 		assertSame(repo.exactRef("refs/tags/t").getStorage(), Storage.PACKED);
-	}
-
-	@Test
-	public void emptyRefDirectoryDeleted() throws Exception {
-		String ref = "dir/ref";
-		tr.branch(ref).commit().create();
-		String name = repo.findRef(ref).getName();
-		Path dir = repo.getDirectory().toPath().resolve(name).getParent();
-		assertNotNull(dir);
-		gc.packRefs();
-		assertFalse(Files.exists(dir));
 	}
 
 	@Test

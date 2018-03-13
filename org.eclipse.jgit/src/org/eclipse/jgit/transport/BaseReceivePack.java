@@ -46,7 +46,6 @@ package org.eclipse.jgit.transport;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_ATOMIC;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_DELETE_REFS;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_OFS_DELTA;
-import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_PUSH_OPTIONS;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_QUIET;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_REPORT_STATUS;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_SIDE_BAND_64K;
@@ -69,7 +68,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.InvalidObjectIdException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
@@ -97,7 +95,6 @@ import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.transport.PacketLineIn.InputOverLimitIOException;
 import org.eclipse.jgit.transport.ReceiveCommand.Result;
 import org.eclipse.jgit.util.io.InterruptTimer;
 import org.eclipse.jgit.util.io.LimitedInputStream;
@@ -181,9 +178,6 @@ public abstract class BaseReceivePack {
 	/** Should an incoming transfer permit non-fast-forward requests? */
 	private boolean allowNonFastForwards;
 
-	/** Should an incoming transfer permit push options? **/
-	private boolean allowPushOptions;
-
 	/**
 	 * Should the requested ref updates be performed as a single atomic
 	 * transaction?
@@ -245,8 +239,6 @@ public abstract class BaseReceivePack {
 	String userAgent;
 	private Set<ObjectId> clientShallowCommits;
 	private List<ReceiveCommand> commands;
-	private long maxCommandBytes;
-	private long maxDiscardBytes;
 
 	private StringBuilder advertiseError;
 
@@ -272,7 +264,6 @@ public abstract class BaseReceivePack {
 	private PushCertificateParser pushCertificateParser;
 	private SignedPushConfig signedPushConfig;
 	private PushCertificate pushCert;
-	private ReceivedPackStatistics stats;
 
 	/**
 	 * Get the push certificate used to verify the pusher's identity.
@@ -320,9 +311,6 @@ public abstract class BaseReceivePack {
 		allowBranchDeletes = rc.allowDeletes;
 		allowNonFastForwards = rc.allowNonFastForwards;
 		allowOfsDelta = rc.allowOfsDelta;
-		allowPushOptions = rc.allowPushOptions;
-		maxCommandBytes = rc.maxCommandBytes;
-		maxDiscardBytes = rc.maxDiscardBytes;
 		advertiseRefsHook = AdvertiseRefsHook.DEFAULT;
 		refFilter = RefFilter.DEFAULT;
 		advertisedHaves = new HashSet<ObjectId>();
@@ -342,9 +330,6 @@ public abstract class BaseReceivePack {
 		final boolean allowDeletes;
 		final boolean allowNonFastForwards;
 		final boolean allowOfsDelta;
-		final boolean allowPushOptions;
-		final long maxCommandBytes;
-		final long maxDiscardBytes;
 		final SignedPushConfig signedPush;
 
 		ReceiveConfig(final Config config) {
@@ -354,14 +339,6 @@ public abstract class BaseReceivePack {
 					"denynonfastforwards", false); //$NON-NLS-1$
 			allowOfsDelta = config.getBoolean("repack", "usedeltabaseoffset", //$NON-NLS-1$ //$NON-NLS-2$
 					true);
-			allowPushOptions = config.getBoolean("receive", "pushoptions", //$NON-NLS-1$ //$NON-NLS-2$
-					false);
-			maxCommandBytes = config.getLong("receive", //$NON-NLS-1$
-					"maxCommandBytes", //$NON-NLS-1$
-					3 << 20);
-			maxDiscardBytes = config.getLong("receive", //$NON-NLS-1$
-					"maxCommandDiscardBytes", //$NON-NLS-1$
-					-1);
 			signedPush = SignedPushConfig.KEY.parse(config);
 		}
 	}
@@ -741,38 +718,6 @@ public abstract class BaseReceivePack {
 	}
 
 	/**
-	 * Set the maximum number of command bytes to read from the client.
-	 *
-	 * @param limit
-	 *            command limit in bytes; if 0 there is no limit.
-	 * @since 4.7
-	 */
-	public void setMaxCommandBytes(long limit) {
-		maxCommandBytes = limit;
-	}
-
-	/**
-	 * Set the maximum number of command bytes to discard from the client.
-	 * <p>
-	 * Discarding remaining bytes allows this instance to consume the rest of
-	 * the command block and send a human readable over-limit error via the
-	 * side-band channel. If the client sends an excessive number of bytes this
-	 * limit kicks in and the instance disconnects, resulting in a non-specific
-	 * 'pipe closed', 'end of stream', or similar generic error at the client.
-	 * <p>
-	 * When the limit is set to {@code -1} the implementation will default to
-	 * the larger of {@code 3 * maxCommandBytes} or {@code 3 MiB}.
-	 *
-	 * @param limit
-	 *            discard limit in bytes; if 0 there is no limit; if -1 the
-	 *            implementation tries to set a reasonable default.
-	 * @since 4.7
-	 */
-	public void setMaxCommandDiscardBytes(long limit) {
-		maxDiscardBytes = limit;
-	}
-
-	/**
 	 * Set the maximum allowed Git object size.
 	 * <p>
 	 * If an object is larger than the given size the pack-parsing will throw an
@@ -784,6 +729,7 @@ public abstract class BaseReceivePack {
 	public void setMaxObjectSizeLimit(final long limit) {
 		maxObjectSizeLimit = limit;
 	}
+
 
 	/**
 	 * Set the maximum allowed pack size.
@@ -814,7 +760,8 @@ public abstract class BaseReceivePack {
 	 *             read.
 	 */
 	public boolean isSideBand() throws RequestNotYetReadException {
-		checkRequestWasRead();
+		if (enabledCapabilities == null)
+			throw new RequestNotYetReadException();
 		return enabledCapabilities.contains(CAPABILITY_SIDE_BAND_64K);
 	}
 
@@ -841,25 +788,6 @@ public abstract class BaseReceivePack {
 	}
 
 	/**
-	 * @return true if the server supports receiving push options.
-	 * @since 4.5
-	 */
-	public boolean isAllowPushOptions() {
-		return allowPushOptions;
-	}
-
-	/**
-	 * Configure if the server supports receiving push options.
-	 *
-	 * @param allow
-	 *            true to optionally accept option strings from the client.
-	 * @since 4.5
-	 */
-	public void setAllowPushOptions(boolean allow) {
-		allowPushOptions = allow;
-	}
-
-	/**
 	 * True if the client wants less verbose output.
 	 *
 	 * @return true if the client has requested the server to be less verbose.
@@ -871,7 +799,8 @@ public abstract class BaseReceivePack {
 	 * @since 4.0
 	 */
 	public boolean isQuiet() throws RequestNotYetReadException {
-		checkRequestWasRead();
+		if (enabledCapabilities == null)
+			throw new RequestNotYetReadException();
 		return quiet;
 	}
 
@@ -1147,9 +1076,6 @@ public abstract class BaseReceivePack {
 			adv.advertiseCapability(CAPABILITY_ATOMIC);
 		if (allowOfsDelta)
 			adv.advertiseCapability(CAPABILITY_OFS_DELTA);
-		if (allowPushOptions) {
-			adv.advertiseCapability(CAPABILITY_PUSH_OPTIONS);
-		}
 		adv.advertiseCapability(OPTION_AGENT, UserAgent.get());
 		adv.send(getAdvertisedOrDefaultRefs());
 		for (ObjectId obj : advertisedHaves)
@@ -1160,33 +1086,18 @@ public abstract class BaseReceivePack {
 	}
 
 	/**
-	 * Returns the statistics on the received pack if available. This should be
-	 * called after {@link #receivePack} is called.
-	 *
-	 * @return ReceivedPackStatistics
-	 * @since 4.6
-	 */
-	@Nullable
-	public ReceivedPackStatistics getReceivedPackStatistics() {
-		return stats;
-	}
-
-	/**
 	 * Receive a list of commands from the input.
 	 *
 	 * @throws IOException
 	 */
 	protected void recvCommands() throws IOException {
-		PacketLineIn pck = maxCommandBytes > 0
-				? new PacketLineIn(rawIn, maxCommandBytes)
-				: pckIn;
 		PushCertificateParser certParser = getPushCertificateParser();
 		boolean firstPkt = true;
 		try {
 			for (;;) {
 				String line;
 				try {
-					line = pck.readString();
+					line = pckIn.readString();
 				} catch (EOFException eof) {
 					if (commands.isEmpty())
 						return;
@@ -1209,13 +1120,13 @@ public abstract class BaseReceivePack {
 					enableCapabilities();
 
 					if (line.equals(GitProtocolConstants.OPTION_PUSH_CERT)) {
-						certParser.receiveHeader(pck, !isBiDirectionalPipe());
+						certParser.receiveHeader(pckIn, !isBiDirectionalPipe());
 						continue;
 					}
 				}
 
 				if (line.equals(PushCertificateParser.BEGIN_SIGNATURE)) {
-					certParser.receiveSignature(pck);
+					certParser.receiveSignature(pckIn);
 					continue;
 				}
 
@@ -1231,32 +1142,16 @@ public abstract class BaseReceivePack {
 				}
 			}
 			pushCert = certParser.build();
-			if (hasCommands()) {
-				readPostCommands(pck);
-			}
 		} catch (PackProtocolException e) {
-			discardCommands();
+			if (sideBand) {
+				try {
+					pckIn.discardUntilEnd();
+				} catch (IOException e2) {
+					// Ignore read failures attempting to discard.
+				}
+			}
 			fatalError(e.getMessage());
 			throw e;
-		} catch (InputOverLimitIOException e) {
-			String msg = JGitText.get().tooManyCommands;
-			discardCommands();
-			fatalError(msg);
-			throw new PackProtocolException(msg);
-		}
-	}
-
-	private void discardCommands() {
-		if (sideBand) {
-			long max = maxDiscardBytes;
-			if (max < 0) {
-				max = Math.max(3 * maxCommandBytes, 3L << 20);
-			}
-			try {
-				new PacketLineIn(rawIn, max).discardUntilEnd();
-			} catch (IOException e) {
-				// Ignore read failures attempting to discard.
-			}
 		}
 	}
 
@@ -1293,16 +1188,6 @@ public abstract class BaseReceivePack {
 		return new ReceiveCommand(oldId, newId, name);
 	}
 
-	/**
-	 * @param in
-	 *            request stream.
-	 * @throws IOException
-	 *             request line cannot be read.
-	 */
-	void readPostCommands(PacketLineIn in) throws IOException {
-		// Do nothing by default.
-	}
-
 	/** Enable capabilities based on a previously read capabilities line. */
 	protected void enableCapabilities() {
 		sideBand = isCapabilityEnabled(CAPABILITY_SIDE_BAND_64K);
@@ -1328,11 +1213,6 @@ public abstract class BaseReceivePack {
 	 */
 	protected boolean isCapabilityEnabled(String name) {
 		return enabledCapabilities.contains(name);
-	}
-
-	void checkRequestWasRead() {
-		if (enabledCapabilities == null)
-			throw new RequestNotYetReadException();
 	}
 
 	/** @return true if a pack is expected based on the list of commands. */
@@ -1380,7 +1260,6 @@ public abstract class BaseReceivePack {
 			parser.setMaxObjectSizeLimit(maxObjectSizeLimit);
 			packLock = parser.parse(receiving, resolving);
 			packSize = Long.valueOf(parser.getPackSize());
-			stats = parser.getReceivedPackStatistics();
 			ins.flush();
 		}
 

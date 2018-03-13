@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2015, Matthias Sohn <matthias.sohnk@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -61,11 +61,9 @@ import org.eclipse.jgit.lfs.lib.Constants;
 import org.eclipse.jgit.util.HttpSupport;
 
 /**
- * Handle asynchronous large object download.
- *
- * @since 4.7
+ * Handle asynchronous large object download
  */
-public class ObjectDownloadListener implements WriteListener {
+class ObjectDownloadListener implements WriteListener {
 
 	private static Logger LOG = Logger
 			.getLogger(ObjectDownloadListener.class.getName());

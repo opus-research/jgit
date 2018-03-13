@@ -43,7 +43,6 @@
 package org.eclipse.jgit.lfs.server.fs;
 
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.text.MessageFormat;
 
 import javax.servlet.AsyncContext;
@@ -59,10 +58,6 @@ import org.eclipse.jgit.lfs.lib.AnyLongObjectId;
 import org.eclipse.jgit.lfs.lib.Constants;
 import org.eclipse.jgit.lfs.lib.LongObjectId;
 import org.eclipse.jgit.lfs.server.internal.LfsServerText;
-
-import com.google.gson.FieldNamingPolicy;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 
 /**
  * Servlet supporting upload and download of large objects as defined by the
@@ -80,8 +75,6 @@ public class FileLfsServlet extends HttpServlet {
 	private final FileLfsRepository repository;
 
 	private final long timeout;
-
-	private static Gson gson = createGson();
 
 	/**
 	 * @param repository
@@ -113,8 +106,7 @@ public class FileLfsServlet extends HttpServlet {
 		if (obj != null) {
 			if (repository.getSize(obj) == -1) {
 				sendError(rsp, HttpStatus.SC_NOT_FOUND, MessageFormat
-						.format(LfsServerText.get().objectNotFound,
-								obj.getName()));
+						.format(LfsServerText.get().objectNotFound, obj));
 				return;
 			}
 			AsyncContext context = req.startAsync();
@@ -125,32 +117,18 @@ public class FileLfsServlet extends HttpServlet {
 		}
 	}
 
-	/**
-	 * Retrieve object id from request
-	 *
-	 * @param req
-	 *            servlet request
-	 * @param rsp
-	 *            servlet response
-	 * @return object id, or <code>null</code> if the object id could not be
-	 *         retrieved
-	 * @throws IOException
-	 *             if an I/O error occurs
-         * @since 4.6
-	 */
-	protected AnyLongObjectId getObjectToTransfer(HttpServletRequest req,
+	private AnyLongObjectId getObjectToTransfer(HttpServletRequest req,
 			HttpServletResponse rsp) throws IOException {
 		String info = req.getPathInfo();
-		int length = 1 + Constants.LONG_OBJECT_ID_STRING_LENGTH;
-		if (info.length() != length) {
-			sendError(rsp, HttpStatus.SC_UNPROCESSABLE_ENTITY, MessageFormat
+		if (info.length() != 1 + Constants.LONG_OBJECT_ID_STRING_LENGTH) {
+			sendError(rsp, HttpStatus.SC_BAD_REQUEST, MessageFormat
 					.format(LfsServerText.get().invalidPathInfo, info));
 			return null;
 		}
 		try {
-			return LongObjectId.fromString(info.substring(1, length));
+			return LongObjectId.fromString(info.substring(1, 65));
 		} catch (InvalidLongObjectIdException e) {
-			sendError(rsp, HttpStatus.SC_UNPROCESSABLE_ENTITY, e.getMessage());
+			sendError(rsp, HttpStatus.SC_BAD_REQUEST, e.getMessage());
 			return null;
 		}
 	}
@@ -179,42 +157,11 @@ public class FileLfsServlet extends HttpServlet {
 		}
 	}
 
-	static class Error {
-		String message;
-
-		Error(String m) {
-			this.message = m;
-		}
-	}
-
-	/**
-	 * Send an error response.
-	 *
-	 * @param rsp
-	 *            the servlet response
-	 * @param status
-	 *            HTTP status code
-	 * @param message
-	 *            error message
-	 * @throws IOException
-	 *             on failure to send the response
-	 * @since 4.6
-	 */
-	protected static void sendError(HttpServletResponse rsp, int status, String message)
+	static void sendError(HttpServletResponse rsp, int status, String message)
 			throws IOException {
 		rsp.setStatus(status);
-		PrintWriter writer = rsp.getWriter();
-		gson.toJson(new Error(message), writer);
-		writer.flush();
-		writer.close();
+		// TODO return message in response body in json format as specified in
+		// https://github.com/github/git-lfs/blob/master/docs/api/http-v1-batch.md
 		rsp.flushBuffer();
-	}
-
-	private static Gson createGson() {
-		GsonBuilder gb = new GsonBuilder()
-				.setFieldNamingPolicy(
-						FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
-				.setPrettyPrinting().disableHtmlEscaping();
-		return gb.create();
 	}
 }

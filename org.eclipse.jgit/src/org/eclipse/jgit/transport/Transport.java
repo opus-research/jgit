@@ -80,7 +80,6 @@ import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectChecker;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
@@ -604,16 +603,14 @@ public abstract class Transport implements AutoCloseable {
 	 * Convert push remote refs update specification from {@link RefSpec} form
 	 * to {@link RemoteRefUpdate}. Conversion expands wildcards by matching
 	 * source part to local refs. expectedOldObjectId in RemoteRefUpdate is
-	 * set when specified in leases. Tracking branch is configured if RefSpec
-	 * destination matches source of any fetch ref spec for this transport
-	 * remote configuration.
+	 * always set as null. Tracking branch is configured if RefSpec destination
+	 * matches source of any fetch ref spec for this transport remote
+	 * configuration.
 	 *
 	 * @param db
 	 *            local database.
 	 * @param specs
 	 *            collection of RefSpec to convert.
-	 * @param leases
-	 *            map from ref to lease (containing expected old object id)
 	 * @param fetchSpecs
 	 *            fetch specifications used for finding localtracking refs. May
 	 *            be null or empty collection.
@@ -621,11 +618,9 @@ public abstract class Transport implements AutoCloseable {
 	 * @throws IOException
 	 *             when problem occurred during conversion or specification set
 	 *             up: most probably, missing objects or refs.
-	 * @since 4.7
 	 */
 	public static Collection<RemoteRefUpdate> findRemoteRefUpdatesFor(
 			final Repository db, final Collection<RefSpec> specs,
-			final Map<String, RefLeaseSpec> leases,
 			Collection<RefSpec> fetchSpecs) throws IOException {
 		if (fetchSpecs == null)
 			fetchSpecs = Collections.emptyList();
@@ -657,41 +652,11 @@ public abstract class Transport implements AutoCloseable {
 
 			final boolean forceUpdate = spec.isForceUpdate();
 			final String localName = findTrackingRefName(destSpec, fetchSpecs);
-			final RefLeaseSpec leaseSpec = leases.get(destSpec);
-			final ObjectId expected = leaseSpec == null ? null :
-				db.resolve(leaseSpec.getExpected());
 			final RemoteRefUpdate rru = new RemoteRefUpdate(db, srcSpec,
-					destSpec, forceUpdate, localName, expected);
+					destSpec, forceUpdate, localName, null);
 			result.add(rru);
 		}
 		return result;
-	}
-
-	/**
-	 * Convert push remote refs update specification from {@link RefSpec} form
-	 * to {@link RemoteRefUpdate}. Conversion expands wildcards by matching
-	 * source part to local refs. expectedOldObjectId in RemoteRefUpdate is
-	 * always set as null. Tracking branch is configured if RefSpec destination
-	 * matches source of any fetch ref spec for this transport remote
-	 * configuration.
-	 *
-	 * @param db
-	 *            local database.
-	 * @param specs
-	 *            collection of RefSpec to convert.
-	 * @param fetchSpecs
-	 *            fetch specifications used for finding localtracking refs. May
-	 *            be null or empty collection.
-	 * @return collection of set up {@link RemoteRefUpdate}.
-	 * @throws IOException
-	 *             when problem occurred during conversion or specification set
-	 *             up: most probably, missing objects or refs.
-	 */
-	public static Collection<RemoteRefUpdate> findRemoteRefUpdatesFor(
-			final Repository db, final Collection<RefSpec> specs,
-			Collection<RefSpec> fetchSpecs) throws IOException {
-		return findRemoteRefUpdatesFor(db, specs, Collections.emptyMap(),
-					       fetchSpecs);
 	}
 
 	private static Collection<RefSpec> expandPushWildcardsFor(
@@ -807,9 +772,6 @@ public abstract class Transport implements AutoCloseable {
 
 	/** Assists with authentication the connection. */
 	private CredentialsProvider credentialsProvider;
-
-	/** The option strings associated with the push operation. */
-	private List<String> pushOptions;
 
 	private PrintStream hookOutRedirect;
 
@@ -1159,25 +1121,6 @@ public abstract class Transport implements AutoCloseable {
 	}
 
 	/**
-	 * @return the option strings associated with the push operation
-	 * @since 4.5
-	 */
-	public List<String> getPushOptions() {
-		return pushOptions;
-	}
-
-	/**
-	 * Sets the option strings associated with the push operation.
-	 *
-	 * @param pushOptions
-	 *            null if push options are unsupported
-	 * @since 4.5
-	 */
-	public void setPushOptions(final List<String> pushOptions) {
-		this.pushOptions = pushOptions;
-	}
-
-	/**
 	 * Fetch objects and refs from the remote repository to the local one.
 	 * <p>
 	 * This is a utility function providing standard fetch behavior. Local
@@ -1234,9 +1177,6 @@ public abstract class Transport implements AutoCloseable {
 
 		final FetchResult result = new FetchResult();
 		new FetchProcess(this, toFetch).execute(monitor, result);
-
-		local.autoGC(monitor);
-
 		return result;
 	}
 
@@ -1376,36 +1316,7 @@ public abstract class Transport implements AutoCloseable {
 	 */
 	public Collection<RemoteRefUpdate> findRemoteRefUpdatesFor(
 			final Collection<RefSpec> specs) throws IOException {
-		return findRemoteRefUpdatesFor(local, specs, Collections.emptyMap(),
-					       fetch);
-	}
-
-	/**
-	 * Convert push remote refs update specification from {@link RefSpec} form
-	 * to {@link RemoteRefUpdate}. Conversion expands wildcards by matching
-	 * source part to local refs. expectedOldObjectId in RemoteRefUpdate is
-	 * set according to leases. Tracking branch is configured if RefSpec destination
-	 * matches source of any fetch ref spec for this transport remote
-	 * configuration.
-	 * <p>
-	 * Conversion is performed for context of this transport (database, fetch
-	 * specifications).
-	 *
-	 * @param specs
-	 *            collection of RefSpec to convert.
-	 * @param leases
-	 *            map from ref to lease (containing expected old object id)
-	 * @return collection of set up {@link RemoteRefUpdate}.
-	 * @throws IOException
-	 *             when problem occurred during conversion or specification set
-	 *             up: most probably, missing objects or refs.
-	 * @since 4.7
-	 */
-	public Collection<RemoteRefUpdate> findRemoteRefUpdatesFor(
-			final Collection<RefSpec> specs,
-			final Map<String, RefLeaseSpec> leases) throws IOException {
-		return findRemoteRefUpdatesFor(local, specs, leases,
-					       fetch);
+		return findRemoteRefUpdatesFor(local, specs, fetch);
 	}
 
 	/**

@@ -64,8 +64,8 @@ import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.lfs.server.LargeFileRepository;
 import org.eclipse.jgit.lfs.server.LfsProtocolServlet;
-import org.eclipse.jgit.lfs.server.fs.FileLfsRepository;
 import org.eclipse.jgit.lfs.server.fs.FileLfsServlet;
+import org.eclipse.jgit.lfs.server.fs.FileLfsRepository;
 import org.eclipse.jgit.lfs.server.s3.S3Config;
 import org.eclipse.jgit.lfs.server.s3.S3Repository;
 import org.eclipse.jgit.pgm.Command;
@@ -238,7 +238,7 @@ class LfsStore extends TextBuiltin {
 		case S3:
 			readAWSKeys();
 			checkOptions();
-			S3Config config = new S3Config(region, bucket,
+			S3Config config = new S3Config(region.toString(), bucket,
 					storageClass.toString(), accessKey, secretKey,
 					expirationSeconds, disableSslVerify);
 			repository = new S3Repository(config);
@@ -253,10 +253,10 @@ class LfsStore extends TextBuiltin {
 			private static final long serialVersionUID = 1L;
 
 			@Override
-			protected LargeFileRepository getLargeFileRepository(
-					LfsRequest request, String path) {
+			protected LargeFileRepository getLargeFileRepository() {
 				return repository;
 			}
+
 		};
 		app.addServlet(new ServletHolder(protocol), PROTOCOL_PATH);
 

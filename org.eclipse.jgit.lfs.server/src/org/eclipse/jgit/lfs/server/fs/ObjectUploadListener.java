@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2015, Matthias Sohn <matthias.sohnk@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -59,16 +59,13 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.http.HttpStatus;
 import org.eclipse.jgit.lfs.errors.CorruptLongObjectException;
-import org.eclipse.jgit.lfs.internal.AtomicObjectOutputStream;
 import org.eclipse.jgit.lfs.lib.AnyLongObjectId;
 import org.eclipse.jgit.lfs.lib.Constants;
 
 /**
- * Handle asynchronous object upload.
- *
- * @since 4.6
+ * Handle asynchronous object upload
  */
-public class ObjectUploadListener implements ReadListener {
+class ObjectUploadListener implements ReadListener {
 
 	private static Logger LOG = Logger
 			.getLogger(ObjectUploadListener.class.getName());
@@ -141,9 +138,6 @@ public class ObjectUploadListener implements ReadListener {
 		close();
 	}
 
-	/**
-	 * @throws IOException
-	 */
 	protected void close() throws IOException {
 		try {
 			inChannel.close();

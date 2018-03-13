@@ -164,7 +164,7 @@ public class PackWriter implements AutoCloseable {
 	private static final int PACK_VERSION_GENERATED = 2;
 
 	/** Empty set of objects for {@code preparePack()}. */
-	public static final Set<ObjectId> NONE = Collections.emptySet();
+	public static Set<ObjectId> NONE = Collections.emptySet();
 
 	private static final Map<WeakReference<PackWriter>, Boolean> instances =
 			new ConcurrentHashMap<WeakReference<PackWriter>, Boolean>();
@@ -369,6 +369,7 @@ public class PackWriter implements AutoCloseable {
 	 *            the callback to set
 	 *
 	 * @return this object for chaining.
+	 * @since 4.1
 	 */
 	public PackWriter setObjectCountCallback(ObjectCountCallback callback) {
 		this.callback = callback;
@@ -380,6 +381,7 @@ public class PackWriter implements AutoCloseable {
 	 *
 	 * @param clientShallowCommits
 	 *            the shallow commits in the client
+	 * @since 4.1
 	 */
 	public void setClientShallowCommits(Set<ObjectId> clientShallowCommits) {
 		stats.clientShallowCommits = Collections
@@ -562,8 +564,7 @@ public class PackWriter implements AutoCloseable {
 	 * Configure this pack for a shallow clone.
 	 *
 	 * @param depth
-	 *            maximum depth of history to return. 1 means return only the
-	 *            "wants".
+	 *            maximum depth to traverse the commit graph
 	 * @param unshallow
 	 *            objects which used to be shallow on the client, but are being
 	 *            extended as part of this fetch
@@ -708,52 +709,12 @@ public class PackWriter implements AutoCloseable {
 	public void preparePack(ProgressMonitor countingMonitor,
 			@NonNull Set<? extends ObjectId> want,
 			@NonNull Set<? extends ObjectId> have) throws IOException {
-		preparePack(countingMonitor,
-				want, have, Collections.<ObjectId> emptySet());
-	}
-
-	/**
-	 * Prepare the list of objects to be written to the pack stream.
-	 * <p>
-	 * Like {@link #preparePack(ProgressMonitor, Set, Set)} but also allows
-	 * specifying commits that should not be walked past ("shallow" commits).
-	 * The caller is responsible for filtering out commits that should not
-	 * be shallow any more ("unshallow" commits as in {@link #setShallowPack})
-	 * from the shallow set.
-	 *
-	 * @param countingMonitor
-	 *            progress during object enumeration.
-	 * @param want
-	 *            objects of interest, ancestors of which will be included in
-	 *            the pack. Must not be {@code null}.
-	 * @param have
-	 *            objects whose ancestors (up to and including
-	 *            {@code shallow} commits) do not need to be included in the
-	 *            pack because they are already available from elsewhere.
-	 *            Must not be {@code null}.
-	 * @param shallow
-	 *            commits indicating the boundary of the history marked with
-	 *            {@code have}. Shallow commits have parents but those
-	 *            parents are considered not to be already available.
-	 *            Parents of {@code shallow} commits and earlier generations
-	 *            will be included in the pack if requested by {@code want}.
-	 *            Must not be {@code null}.
-	 * @throws IOException
-	 *            an I/O problem occured while reading objects.
-	 */
-	public void preparePack(ProgressMonitor countingMonitor,
-			@NonNull Set<? extends ObjectId> want,
-			@NonNull Set<? extends ObjectId> have,
-			@NonNull Set<? extends ObjectId> shallow) throws IOException {
-		try (ObjectWalk ow = getObjectWalk()) {
-			ow.assumeShallow(shallow);
-			preparePack(countingMonitor, ow, want, have);
-		}
-	}
-
-	private ObjectWalk getObjectWalk() {
-		return shallowPack ? new DepthWalk.ObjectWalk(reader, depth - 1)
-				: new ObjectWalk(reader);
+		ObjectWalk ow;
+		if (shallowPack)
+			ow = new DepthWalk.ObjectWalk(reader, depth);
+		else
+			ow = new ObjectWalk(reader);
+		preparePack(countingMonitor, ow, want, have);
 	}
 
 	/**
@@ -791,8 +752,7 @@ public class PackWriter implements AutoCloseable {
 		if (countingMonitor == null)
 			countingMonitor = NullProgressMonitor.INSTANCE;
 		if (shallowPack && !(walk instanceof DepthWalk.ObjectWalk))
-			throw new IllegalArgumentException(
-					JGitText.get().shallowPacksRequireDepthWalk);
+			walk = new DepthWalk.ObjectWalk(reader, depth);
 		findObjectsToPack(countingMonitor, walk, interestingObjects,
 				uninterestingObjects);
 	}
@@ -1086,6 +1046,8 @@ public class PackWriter implements AutoCloseable {
 
 	/**
 	 * Release all resources used by this writer.
+	 *
+	 * @since 4.0
 	 */
 	@Override
 	public void close() {
@@ -1592,15 +1554,14 @@ public class PackWriter implements AutoCloseable {
 			}
 		}
 
-		try (TemporaryBuffer.Heap delta = delta(otp)) {
-			out.writeHeader(otp, delta.length());
+		TemporaryBuffer.Heap delta = delta(otp);
+		out.writeHeader(otp, delta.length());
 
-			Deflater deflater = deflater();
-			deflater.reset();
-			DeflaterOutputStream dst = new DeflaterOutputStream(out, deflater);
-			delta.writeTo(dst, null);
-			dst.finish();
-		}
+		Deflater deflater = deflater();
+		deflater.reset();
+		DeflaterOutputStream dst = new DeflaterOutputStream(out, deflater);
+		delta.writeTo(dst, null);
+		dst.finish();
 		typeStats.cntDeltas++;
 		typeStats.deltaBytes += out.length() - otp.getOffset();
 	}
@@ -1692,8 +1653,6 @@ public class PackWriter implements AutoCloseable {
 		List<RevObject> haveObjs = new ArrayList<RevObject>(haveEst);
 		List<RevTag> wantTags = new ArrayList<RevTag>(want.size());
 
-		// Retrieve the RevWalk's versions of "want" and "have" objects to
-		// maintain any state previously set in the RevWalk.
 		AsyncRevObjectQueue q = walker.parseAny(all, true);
 		try {
 			for (;;) {
@@ -1736,25 +1695,11 @@ public class PackWriter implements AutoCloseable {
 
 		if (walker instanceof DepthWalk.ObjectWalk) {
 			DepthWalk.ObjectWalk depthWalk = (DepthWalk.ObjectWalk) walker;
-			for (RevObject obj : wantObjs) {
+			for (RevObject obj : wantObjs)
 				depthWalk.markRoot(obj);
-			}
-			// Mark the tree objects associated with "have" commits as
-			// uninteresting to avoid writing redundant blobs. A normal RevWalk
-			// lazily propagates the "uninteresting" state from a commit to its
-			// tree during the walk, but DepthWalks can terminate early so
-			// preemptively propagate that state here.
-			for (RevObject obj : haveObjs) {
-				if (obj instanceof RevCommit) {
-					RevTree t = ((RevCommit) obj).getTree();
-					depthWalk.markUninteresting(t);
-				}
-			}
-
 			if (unshallowObjects != null) {
-				for (ObjectId id : unshallowObjects) {
+				for (ObjectId id : unshallowObjects)
 					depthWalk.markUnshallow(walker.parseAny(id));
-				}
 			}
 		} else {
 			for (RevObject obj : wantObjs)
@@ -2253,6 +2198,8 @@ public class PackWriter implements AutoCloseable {
 		 * @return the count of objects that needed to be discovered through an
 		 *         object walk because they were not found in bitmap indices.
 		 *         Returns -1 if no bitmap indices were found.
+		 *
+		 * @since 4.0
 		 */
 		public long getBitmapIndexMisses() {
 			return statistics.getBitmapIndexMisses();

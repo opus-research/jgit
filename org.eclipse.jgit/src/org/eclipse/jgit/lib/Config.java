@@ -52,13 +52,11 @@
 package org.eclipse.jgit.lib;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -84,7 +82,7 @@ public class Config {
 	private static final long KiB = 1024;
 	private static final long MiB = 1024 * KiB;
 	private static final long GiB = 1024 * MiB;
-	private static final int MAX_DEPTH = 10;
+	private static final int MAX_DEPTH = 999;
 
 	/** the change listeners */
 	private final ListenerList listeners = new ListenerList();
@@ -836,11 +834,11 @@ public class Config {
 		final String s;
 
 		if (value >= GiB && (value % GiB) == 0)
-			s = String.valueOf(value / GiB) + "g"; //$NON-NLS-1$
+			s = String.valueOf(value / GiB) + " g"; //$NON-NLS-1$
 		else if (value >= MiB && (value % MiB) == 0)
-			s = String.valueOf(value / MiB) + "m"; //$NON-NLS-1$
+			s = String.valueOf(value / MiB) + " m"; //$NON-NLS-1$
 		else if (value >= KiB && (value % KiB) == 0)
-			s = String.valueOf(value / KiB) + "k"; //$NON-NLS-1$
+			s = String.valueOf(value / KiB) + " k"; //$NON-NLS-1$
 		else
 			s = String.valueOf(value);
 
@@ -896,7 +894,7 @@ public class Config {
 		if (value instanceof ConfigEnum)
 			n = ((ConfigEnum) value).toConfigValue();
 		else
-			n = value.name().toLowerCase(Locale.ROOT).replace('_', ' ');
+			n = value.name().toLowerCase().replace('_', ' ');
 		setString(section, subsection, name, n);
 	}
 
@@ -1249,15 +1247,9 @@ public class Config {
 				decoded = RawParseUtils.decode(bytes);
 			}
 			newEntries.addAll(fromTextRecurse(decoded, depth + 1));
-		} catch (FileNotFoundException fnfe) {
-			if (path.exists()) {
-				throw new ConfigInvalidException(MessageFormat
-						.format(JGitText.get().cannotReadFile, path), fnfe);
-			}
 		} catch (IOException ioe) {
-			throw new ConfigInvalidException(
-					MessageFormat.format(JGitText.get().cannotReadFile, path),
-					ioe);
+			throw new ConfigInvalidException(MessageFormat.format(
+					JGitText.get().invalidIncludedPathInConfigFile, path));
 		}
 	}
 
