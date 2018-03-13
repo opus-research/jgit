@@ -304,14 +304,12 @@ public class RefMap extends AbstractMap<String, Ref> {
 			}
 		}
 
-		@Override
 		public boolean hasNext() {
 			if (next == null)
 				next = peek();
 			return next != null;
 		}
 
-		@Override
 		public Entry<String, Ref> next() {
 			if (hasNext()) {
 				Entry<String, Ref> r = next;
@@ -369,7 +367,6 @@ public class RefMap extends AbstractMap<String, Ref> {
 			return null;
 		}
 
-		@Override
 		public void remove() {
 			throw new UnsupportedOperationException();
 		}
@@ -382,17 +379,14 @@ public class RefMap extends AbstractMap<String, Ref> {
 			this.ref = ref;
 		}
 
-		@Override
 		public String getKey() {
 			return toMapKey(ref);
 		}
 
-		@Override
 		public Ref getValue() {
 			return ref;
 		}
 
-		@Override
 		public Ref setValue(Ref value) {
 			Ref prior = put(getKey(), value);
 			ref = value;

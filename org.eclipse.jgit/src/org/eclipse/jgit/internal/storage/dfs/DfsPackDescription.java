@@ -44,13 +44,12 @@
 package org.eclipse.jgit.internal.storage.dfs;
 
 import static org.eclipse.jgit.internal.storage.pack.PackExt.PACK;
-import static org.eclipse.jgit.internal.storage.pack.PackExt.REFTABLE;
 
-import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
-import org.eclipse.jgit.internal.storage.reftable.ReftableWriter;
 import org.eclipse.jgit.storage.pack.PackStatistics;
 
 /**
@@ -63,21 +62,24 @@ import org.eclipse.jgit.storage.pack.PackStatistics;
  */
 public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	private final DfsRepositoryDescription repoDesc;
-	private final String packName;
-	private PackSource packSource;
-	private long lastModified;
-	private long[] sizeMap;
-	private int[] blockSizeMap;
-	private long objectCount;
-	private long deltaCount;
-	private long minUpdateIndex;
-	private long maxUpdateIndex;
 
-	private PackStatistics packStats;
-	private ReftableWriter.Stats refStats;
+	private final String packName;
+
+	private PackSource packSource;
+
+	private long lastModified;
+
+	private final Map<PackExt, Long> sizeMap;
+
+	private long objectCount;
+
+	private long deltaCount;
+
+	private PackStatistics stats;
+
 	private int extensions;
+
 	private int indexVersion;
-	private long estimatedPackSize;
 
 	/**
 	 * Initialize a description by pack name and repository.
@@ -98,10 +100,7 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 		this.repoDesc = repoDesc;
 		int dot = name.lastIndexOf('.');
 		this.packName = (dot < 0) ? name : name.substring(0, dot);
-
-		int extCnt = PackExt.values().length;
-		sizeMap = new long[extCnt];
-		blockSizeMap = new int[extCnt];
+		this.sizeMap = new HashMap<PackExt, Long>(PackExt.values().length * 2);
 	}
 
 	/** @return description of the repository. */
@@ -137,15 +136,6 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 		return packName + '.' + ext.getExtension();
 	}
 
-	/**
-	 * @param ext
-	 *            the file extension.
-	 * @return cache key for use by the block cache.
-	 */
-	public DfsStreamKey getStreamKey(PackExt ext) {
-		return DfsStreamKey.of(getRepositoryDescription(), getFileName(ext));
-	}
-
 	/** @return the source of the pack. */
 	public PackSource getPackSource() {
 		return packSource;
@@ -176,36 +166,6 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 		return this;
 	}
 
-	/** @return minUpdateIndex for the reftable, if present. */
-	public long getMinUpdateIndex() {
-		return minUpdateIndex;
-	}
-
-	/**
-	 * @param min
-	 *            minUpdateIndex for the reftable, or 0.
-	 * @return {@code this}
-	 */
-	public DfsPackDescription setMinUpdateIndex(long min) {
-		minUpdateIndex = min;
-		return this;
-	}
-
-	/** @return maxUpdateIndex for the reftable, if present. */
-	public long getMaxUpdateIndex() {
-		return maxUpdateIndex;
-	}
-
-	/**
-	 * @param max
-	 *            maxUpdateIndex for the reftable, or 0.
-	 * @return {@code this}
-	 */
-	public DfsPackDescription setMaxUpdateIndex(long max) {
-		maxUpdateIndex = max;
-		return this;
-	}
-
 	/**
 	 * @param ext
 	 *            the file extension.
@@ -215,11 +175,7 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	 * @return {@code this}
 	 */
 	public DfsPackDescription setFileSize(PackExt ext, long bytes) {
-		int i = ext.getPosition();
-		if (i >= sizeMap.length) {
-			sizeMap = Arrays.copyOf(sizeMap, i + 1);
-		}
-		sizeMap[i] = Math.max(0, bytes);
+		sizeMap.put(ext, Long.valueOf(Math.max(0, bytes)));
 		return this;
 	}
 
@@ -229,55 +185,8 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	 * @return size of the file, in bytes. If 0 the file size is not yet known.
 	 */
 	public long getFileSize(PackExt ext) {
-		int i = ext.getPosition();
-		return i < sizeMap.length ? sizeMap[i] : 0;
-	}
-
-	/**
-	 * @param ext
-	 *            the file extension.
-	 * @return blockSize of the file, in bytes. If 0 the blockSize size is not
-	 *         yet known and may be discovered when opening the file.
-	 */
-	public int getBlockSize(PackExt ext) {
-		int i = ext.getPosition();
-		return i < blockSizeMap.length ? blockSizeMap[i] : 0;
-	}
-
-	/**
-	 * @param ext
-	 *            the file extension.
-	 * @param blockSize
-	 *            blockSize of the file, in bytes. If 0 the blockSize is not
-	 *            known and will be determined on first read.
-	 * @return {@code this}
-	 */
-	public DfsPackDescription setBlockSize(PackExt ext, int blockSize) {
-		int i = ext.getPosition();
-		if (i >= blockSizeMap.length) {
-			blockSizeMap = Arrays.copyOf(blockSizeMap, i + 1);
-		}
-		blockSizeMap[i] = Math.max(0, blockSize);
-		return this;
-	}
-
-	/**
-	 * @param estimatedPackSize
-	 *            estimated size of the .pack file in bytes. If 0 the pack file
-	 *            size is unknown.
-	 * @return {@code this}
-	 */
-	public DfsPackDescription setEstimatedPackSize(long estimatedPackSize) {
-		this.estimatedPackSize = Math.max(0, estimatedPackSize);
-		return this;
-	}
-
-	/**
-	 * @return estimated size of the .pack file in bytes. If 0 the pack file
-	 *         size is unknown.
-	 */
-	public long getEstimatedPackSize() {
-		return estimatedPackSize;
+		Long size = sizeMap.get(ext);
+		return size == null ? 0 : size.longValue();
 	}
 
 	/** @return number of objects in the pack. */
@@ -317,28 +226,15 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	 *         is being committed to the repository.
 	 */
 	public PackStatistics getPackStats() {
-		return packStats;
+		return stats;
 	}
 
 	DfsPackDescription setPackStats(PackStatistics stats) {
-		this.packStats = stats;
+		this.stats = stats;
 		setFileSize(PACK, stats.getTotalBytes());
 		setObjectCount(stats.getTotalObjects());
 		setDeltaCount(stats.getTotalDeltas());
 		return this;
-	}
-
-	/** @return stats from the sibling reftable, if created. */
-	public ReftableWriter.Stats getReftableStats() {
-		return refStats;
-	}
-
-	void setReftableStats(ReftableWriter.Stats stats) {
-		this.refStats = stats;
-		setMinUpdateIndex(stats.minUpdateIndex());
-		setMaxUpdateIndex(stats.maxUpdateIndex());
-		setFileSize(REFTABLE, stats.totalBytes());
-		setBlockSize(REFTABLE, stats.refBlockSize());
 	}
 
 	/**
@@ -347,8 +243,7 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	 * @return {@code this}
 	 */
 	public DfsPackDescription clearPackStats() {
-		packStats = null;
-		refStats = null;
+		stats = null;
 		return this;
 	}
 
@@ -393,7 +288,6 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	 * @param b
 	 *            the other pack.
 	 */
-	@Override
 	public int compareTo(DfsPackDescription b) {
 		// Cluster by PackSource, pushing UNREACHABLE_GARBAGE to the end.
 		PackSource as = getPackSource();
@@ -402,17 +296,6 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 			int cmp = as.category - bs.category;
 			if (cmp != 0)
 				return cmp;
-		}
-
-		// Tie break GC type packs by smallest first. There should be at most
-		// one of each source, but when multiple exist concurrent GCs may have
-		// run. Preferring the smaller file selects higher quality delta
-		// compression, placing less demand on the DfsBlockCache.
-		if (as != null && as == bs && isGC(as)) {
-			int cmp = Long.signum(getFileSize(PACK) - b.getFileSize(PACK));
-			if (cmp != 0) {
-				return cmp;
-			}
 		}
 
 		// Newer packs should sort first.
@@ -424,17 +307,6 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 		// the object they care about in the smaller index. This also pushes
 		// big historical packs to the end of the list, due to more objects.
 		return Long.signum(getObjectCount() - b.getObjectCount());
-	}
-
-	static boolean isGC(PackSource s) {
-		switch (s) {
-		case GC:
-		case GC_REST:
-		case GC_TXN:
-			return true;
-		default:
-			return false;
-		}
 	}
 
 	@Override

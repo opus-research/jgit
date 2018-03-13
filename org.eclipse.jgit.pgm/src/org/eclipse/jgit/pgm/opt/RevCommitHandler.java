@@ -45,19 +45,20 @@
 package org.eclipse.jgit.pgm.opt;
 
 import java.io.IOException;
+import java.text.MessageFormat;
 
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.pgm.internal.CLIText;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevFlag;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.OptionDef;
 import org.kohsuke.args4j.spi.OptionHandler;
 import org.kohsuke.args4j.spi.Parameters;
 import org.kohsuke.args4j.spi.Setter;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.pgm.internal.CLIText;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevFlag;
 
 /**
  * Custom argument handler {@link RevCommit} from string values.
@@ -96,8 +97,9 @@ public class RevCommitHandler extends OptionHandler<RevCommit> {
 		if (dot2 != -1) {
 			if (!option.isMultiValued())
 				throw new CmdLineException(clp,
-						CLIText.format(CLIText.get().onlyOneMetaVarExpectedIn),
-						option.metaVar(), name);
+						MessageFormat.format(
+								CLIText.get().onlyOneMetaVarExpectedIn,
+								option.metaVar(), name));
 
 			final String left = name.substring(0, dot2);
 			final String right = name.substring(dot2 + 2);
@@ -116,25 +118,20 @@ public class RevCommitHandler extends OptionHandler<RevCommit> {
 		try {
 			id = clp.getRepository().resolve(name);
 		} catch (IOException e) {
-			throw new CmdLineException(clp, CLIText.format(e.getMessage()));
+			throw new CmdLineException(clp, e.getMessage());
 		}
 		if (id == null)
-			throw new CmdLineException(clp,
-					CLIText.format(CLIText.get().notACommit), name);
+			throw new CmdLineException(clp, MessageFormat.format(CLIText.get().notACommit, name));
 
 		final RevCommit c;
 		try {
 			c = clp.getRevWalk().parseCommit(id);
 		} catch (MissingObjectException e) {
-			throw new CmdLineException(clp,
-					CLIText.format(CLIText.get().notACommit), name);
+			throw new CmdLineException(clp, MessageFormat.format(CLIText.get().notACommit, name));
 		} catch (IncorrectObjectTypeException e) {
-			throw new CmdLineException(clp,
-					CLIText.format(CLIText.get().notACommit), name);
+			throw new CmdLineException(clp, MessageFormat.format(CLIText.get().notACommit, name));
 		} catch (IOException e) {
-			throw new CmdLineException(clp,
-					CLIText.format(CLIText.get().cannotReadBecause), name,
-					e.getMessage());
+			throw new CmdLineException(clp, MessageFormat.format(CLIText.get().cannotReadBecause, name, e.getMessage()));
 		}
 
 		if (interesting)

@@ -53,7 +53,6 @@ public abstract class RevQueueTestCase<T extends AbstractRevQueue> extends
 		RevWalkTestCase {
 	protected T q;
 
-	@Override
 	public void setUp() throws Exception {
 		super.setUp();
 		q = create();

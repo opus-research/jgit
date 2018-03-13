@@ -42,11 +42,10 @@
  */
 package org.eclipse.jgit.ignore;
 
-import static org.eclipse.jgit.ignore.internal.IMatcher.NO_MATCH;
-import static org.eclipse.jgit.ignore.internal.Strings.isDirectoryPattern;
 import static org.eclipse.jgit.ignore.internal.Strings.stripTrailing;
 import static org.eclipse.jgit.ignore.internal.Strings.stripTrailingWhitespace;
-
+import static org.eclipse.jgit.ignore.internal.Strings.isDirectoryPattern;
+import static org.eclipse.jgit.ignore.internal.IMatcher.NO_MATCH;
 import org.eclipse.jgit.errors.InvalidPatternException;
 import org.eclipse.jgit.ignore.internal.IMatcher;
 import org.eclipse.jgit.ignore.internal.PathMatcher;
@@ -155,7 +154,7 @@ public class FastIgnoreRule {
 			return false;
 		if (path.length() == 0)
 			return false;
-		boolean match = matcher.matches(path, directory, false);
+		boolean match = matcher.matches(path, directory);
 		return match;
 	}
 

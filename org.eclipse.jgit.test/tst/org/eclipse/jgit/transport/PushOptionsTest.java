@@ -86,7 +86,6 @@ public class PushOptionsTest extends RepositoryTestCase {
 	private ObjectId obj2;
 	private ReceivePack receivePack;
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
@@ -116,7 +115,6 @@ public class PushOptionsTest extends RepositoryTestCase {
 		}
 	}
 
-	@Override
 	@After
 	public void tearDown() {
 		Transport.unregister(testProtocol);

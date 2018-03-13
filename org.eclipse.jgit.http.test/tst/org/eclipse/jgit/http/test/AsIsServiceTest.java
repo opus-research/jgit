@@ -64,7 +64,6 @@ public class AsIsServiceTest extends LocalDiskRepositoryTestCase {
 
 	private AsIsFileService service;
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();

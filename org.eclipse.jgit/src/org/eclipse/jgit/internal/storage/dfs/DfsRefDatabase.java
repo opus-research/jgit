@@ -78,7 +78,7 @@ public abstract class DfsRefDatabase extends RefDatabase {
 	 */
 	protected DfsRefDatabase(DfsRepository repository) {
 		this.repository = repository;
-		this.cache = new AtomicReference<>();
+		this.cache = new AtomicReference<RefCache>();
 	}
 
 	/** @return the repository the database holds the references of. */
@@ -120,7 +120,7 @@ public abstract class DfsRefDatabase extends RefDatabase {
 		RefCache curr = read();
 		RefList<Ref> packed = RefList.emptyList();
 		RefList<Ref> loose = curr.ids;
-		RefList.Builder<Ref> sym = new RefList.Builder<>(curr.sym.size());
+		RefList.Builder<Ref> sym = new RefList.Builder<Ref>(curr.sym.size());
 
 		for (int idx = 0; idx < curr.sym.size(); idx++) {
 			Ref ref = curr.sym.get(idx);
@@ -180,7 +180,7 @@ public abstract class DfsRefDatabase extends RefDatabase {
 		return recreate(ref, newLeaf);
 	}
 
-	Ref doPeel(Ref leaf) throws MissingObjectException,
+	private Ref doPeel(final Ref leaf) throws MissingObjectException,
 			IOException {
 		try (RevWalk rw = new RevWalk(repository)) {
 			RevObject obj = rw.parseAny(leaf.getObjectId());
@@ -199,7 +199,7 @@ public abstract class DfsRefDatabase extends RefDatabase {
 		}
 	}
 
-	static Ref recreate(Ref old, Ref leaf) {
+	private static Ref recreate(Ref old, Ref leaf) {
 		if (old.isSymbolic()) {
 			Ref dst = recreate(old.getTarget(), leaf);
 			return new SymbolicRef(old.getName(), dst);

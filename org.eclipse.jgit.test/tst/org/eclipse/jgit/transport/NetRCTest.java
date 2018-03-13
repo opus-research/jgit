@@ -62,7 +62,6 @@ public class NetRCTest extends RepositoryTestCase {
 
 	private File configFile;
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();

@@ -176,7 +176,6 @@ public final class InterruptTimer {
 			callingThread = Thread.currentThread();
 		}
 
-		@Override
 		public synchronized void run() {
 			while (!terminated && callingThread.isAlive()) {
 				try {

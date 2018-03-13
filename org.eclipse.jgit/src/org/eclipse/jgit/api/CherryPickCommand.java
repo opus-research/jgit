@@ -85,7 +85,7 @@ import org.eclipse.jgit.treewalk.FileTreeIterator;
 public class CherryPickCommand extends GitCommand<CherryPickResult> {
 	private String reflogPrefix = "cherry-pick:"; //$NON-NLS-1$
 
-	private List<Ref> commits = new LinkedList<>();
+	private List<Ref> commits = new LinkedList<Ref>();
 
 	private String ourCommitName = null;
 
@@ -116,12 +116,11 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 	 * @throws NoMessageException
 	 * @throws NoHeadException
 	 */
-	@Override
 	public CherryPickResult call() throws GitAPIException, NoMessageException,
 			UnmergedPathsException, ConcurrentRefUpdateException,
 			WrongRepositoryStateException, NoHeadException {
 		RevCommit newHead = null;
-		List<Ref> cherryPickedRefs = new LinkedList<>();
+		List<Ref> cherryPickedRefs = new LinkedList<Ref>();
 		checkCallable();
 
 		try (RevWalk revWalk = new RevWalk(repo)) {
@@ -331,15 +330,4 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 		String headName = Repository.shortenRefName(targetRefName);
 		return headName;
 	}
-
-	@SuppressWarnings("nls")
-	@Override
-	public String toString() {
-		return "CherryPickCommand [repo=" + repo + ",\ncommits=" + commits
-				+ ",\nmainlineParentNumber=" + mainlineParentNumber
-				+ ", noCommit=" + noCommit + ", ourCommitName=" + ourCommitName
-				+ ", reflogPrefix=" + reflogPrefix + ", strategy=" + strategy
-				+ "]";
-	}
-
 }
