@@ -154,8 +154,7 @@ public class DirCacheEntry {
 			if ((getExtendedFlags() & ~EXTENDED_FLAGS) != 0)
 				throw new IOException(MessageFormat.format(JGitText.get()
 						.DIRCUnrecognizedExtendedFlags, String.valueOf(getExtendedFlags())));
-		}
-		else
+		} else
 			len = INFO_LEN;
 
 		infoAt.value += len;

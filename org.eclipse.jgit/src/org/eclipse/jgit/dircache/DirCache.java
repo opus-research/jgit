@@ -334,9 +334,9 @@ public class DirCache {
 			throw new CorruptObjectException(JGitText.get().notADIRCFile);
 		final int ver = NB.decodeInt32(hdr, 4);
 		boolean extended = false;
-		if (ver == 3) {
+		if (ver == 3)
 			extended = true;
-		} else if (ver != 2)
+		else if (ver != 2)
 			throw new CorruptObjectException(MessageFormat.format(JGitText.get().unknownDIRCVersion, ver));
 		entryCnt = NB.decodeInt32(hdr, 8);
 		if (entryCnt < 0)
@@ -349,9 +349,8 @@ public class DirCache {
 		sortedEntries = new DirCacheEntry[entryCnt];
 
 		final MutableInteger infoAt = new MutableInteger();
-		for (int i = 0; i < entryCnt; i++) {
+		for (int i = 0; i < entryCnt; i++)
 			sortedEntries[i] = new DirCacheEntry(infos, infoAt, in, md);
-		}
 		lastModified = liveFile.lastModified();
 
 		// After the file entries are index extensions, and then a footer.
