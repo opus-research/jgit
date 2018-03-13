@@ -635,16 +635,6 @@ public class DirCacheEntry {
 	}
 
 	/**
-	 * Get the entry's raw path bytes. Callers must not modify the returned
-	 * byte-array!
-	 *
-	 * @return raw path bytes.
-	 */
-	public byte[] getRawPath() {
-		return path;
-	}
-
-	/**
 	 * Use for debugging only !
 	 */
 	@SuppressWarnings("nls")
