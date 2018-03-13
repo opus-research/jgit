@@ -45,6 +45,8 @@ package org.eclipse.jgit.dircache;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -57,6 +59,7 @@ import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.IndexWriteException;
 import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
@@ -833,11 +836,21 @@ public class DirCacheCheckout {
 	public static void checkoutEntry(final Repository repo, File f, DirCacheEntry entry,
 			boolean config_filemode) throws IOException {
 		ObjectLoader ol = repo.open(entry.getObjectId());
+		if (ol == null)
+			throw new MissingObjectException(entry.getObjectId(),
+					Constants.TYPE_BLOB);
+
+		byte[] bytes = ol.getCachedBytes();
+
 		File parentDir = f.getParentFile();
 		File tmpFile = File.createTempFile("._" + f.getName(), null, parentDir);
-		FileOutputStream channel = new FileOutputStream(tmpFile);
+		FileChannel channel = new FileOutputStream(tmpFile).getChannel();
+		ByteBuffer buffer = ByteBuffer.wrap(bytes);
 		try {
-			ol.copyTo(channel);
+			int j = channel.write(buffer);
+			if (j != bytes.length)
+				throw new IOException(MessageFormat.format(
+						JGitText.get().couldNotWriteFile, tmpFile));
 		} finally {
 			channel.close();
 		}

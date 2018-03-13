@@ -140,7 +140,7 @@ public class TagCommand extends GitCommand<RevTag> {
 
 				RevWalk revWalk = new RevWalk(repo);
 				try {
-					RevTag revTag = revWalk.parseTag(tagId);
+					RevTag revTag = revWalk.parseTag(newTag.getTagId());
 					String refName = Constants.R_TAGS + newTag.getTag();
 					RefUpdate tagRef = repo.updateRef(refName);
 					tagRef.setNewObjectId(tagId);
