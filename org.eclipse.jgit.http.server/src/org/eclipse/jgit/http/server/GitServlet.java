@@ -44,24 +44,17 @@
 package org.eclipse.jgit.http.server;
 
 import java.io.File;
-import java.io.IOException;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jgit.http.server.glue.MetaServlet;
 import org.eclipse.jgit.http.server.glue.RegexGroupFilter;
 import org.eclipse.jgit.http.server.glue.ServletBinder;
-import org.eclipse.jgit.http.server.resolver.DefaultReceivePackFactory;
 import org.eclipse.jgit.http.server.resolver.FileResolver;
 import org.eclipse.jgit.http.server.resolver.GetAnyFile;
-import org.eclipse.jgit.http.server.resolver.ReceivePackFactory;
 import org.eclipse.jgit.http.server.resolver.RepositoryResolver;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.transport.ReceivePack;
 
 /**
  * Handles Git repository access over HTTP.
@@ -96,11 +89,11 @@ import org.eclipse.jgit.transport.ReceivePack;
 public class GitServlet extends MetaServlet {
 	private static final long serialVersionUID = 1L;
 
-	private final GetAnyFile getAnyFile;
-
-	private final ReceivePackFactory receivePackFactory;
+	private volatile boolean initialized;
 
 	private RepositoryResolver resolver;
+
+	private GetAnyFile getAnyFile = new GetAnyFile();
 
 	/**
 	 * New servlet that will load its base directory from {@code web.xml}.
@@ -109,7 +102,7 @@ public class GitServlet extends MetaServlet {
 	 * the local filesystem directory where all served Git repositories reside.
 	 */
 	public GitServlet() {
-		this(null, new GetAnyFile(), new DefaultReceivePackFactory());
+		// Initialized above by field declarations.
 	}
 
 	/**
@@ -120,24 +113,26 @@ public class GitServlet extends MetaServlet {
 	 *            null the {@code base-path} parameter will be looked for in the
 	 *            parameter table during init, which usually comes from the
 	 *            {@code web.xml} file of the web application.
-	 * @param getAnyFile
+	 */
+	public void setRepositoryResolver(RepositoryResolver resolver) {
+		assertNotInitialized();
+		this.resolver = resolver;
+	}
+
+	/**
+	 * @param f
 	 *            the filter to validate direct access to repository files
 	 *            through a dumb client. If {@code null} then dumb client
 	 *            support is completely disabled.
-	 * @param receivePackFactory
-	 *            the factory to construct and configure a {@link ReceivePack}
-	 *            session when a push is requested by a client.
 	 */
-	public GitServlet(final RepositoryResolver resolver, GetAnyFile getAnyFile,
-			ReceivePackFactory receivePackFactory) {
-		if (getAnyFile == null)
-			getAnyFile = GetAnyFile.DISABLED;
-		if (receivePackFactory == null)
-			receivePackFactory = ReceivePackFactory.DISABLED;
+	public void setGetAnyFile(GetAnyFile f) {
+		assertNotInitialized();
+		this.getAnyFile = f != null ? f : GetAnyFile.DISABLED;
+	}
 
-		this.resolver = resolver;
-		this.getAnyFile = getAnyFile;
-		this.receivePackFactory = receivePackFactory;
+	private void assertNotInitialized() {
+		if (initialized)
+			throw new IllegalStateException("Already initialized by container");
 	}
 
 	@Override
@@ -148,38 +143,19 @@ public class GitServlet extends MetaServlet {
 			final String basePath = config.getInitParameter("base-path");
 			if (basePath == null || "".equals(basePath))
 				throw new ServletException("Filter parameter base-path not set");
-			resolver = new FileResolver(new File(basePath));
+			setRepositoryResolver(new FileResolver(new File(basePath)));
 		}
 
-		if (receivePackFactory != ReceivePackFactory.DISABLED) {
-			serve("*/git-receive-pack")//
-					.with(new ReceivePackServlet(receivePackFactory));
-		}
-
-		ServletBinder refs = serve("*/" + Constants.INFO_REFS);
-		if (receivePackFactory != ReceivePackFactory.DISABLED) {
-			refs = refs.through(//
-					new ReceivePackServlet.InfoRefs(receivePackFactory));
-		}
-		if (getAnyFile != GetAnyFile.DISABLED) {
-			refs = refs.through(new GetAnyFileFilter(getAnyFile));
-			refs.with(new InfoRefsServlet());
-		} else {
-			refs.with(new HttpServlet() {
-				private static final long serialVersionUID = 1L;
-
-				@Override
-				protected void doGet(HttpServletRequest req,
-						HttpServletResponse rsp) throws ServletException,
-						IOException {
-					rsp.sendError(HttpServletResponse.SC_FORBIDDEN);
-				}
-			});
-		}
+		initialized = true;
 
 		if (getAnyFile != GetAnyFile.DISABLED) {
 			final IsLocalFilter mustBeLocal = new IsLocalFilter();
 			final GetAnyFileFilter enabled = new GetAnyFileFilter(getAnyFile);
+
+			serve("*/" + Constants.INFO_REFS)//
+					.through(mustBeLocal)//
+					.through(enabled)//
+					.with(new InfoRefsServlet());
 
 			serve("*/" + Constants.HEAD)//
 					.through(mustBeLocal)//

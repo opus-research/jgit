@@ -48,12 +48,15 @@ import static org.eclipse.jgit.http.server.ServletUtils.nocache;
 import static org.eclipse.jgit.http.server.ServletUtils.send;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -99,7 +102,10 @@ class InfoRefsServlet extends HttpServlet {
 		};
 		adv.init(walk, ADVERTISED);
 		adv.setDerefTags(true);
-		adv.send(db.getAllRefs().values());
+
+		Map<String, Ref> refs = new HashMap<String, Ref>(db.getAllRefs());
+		refs.remove(Constants.HEAD);
+		adv.send(refs.values());
 		return out.toString().getBytes(ENCODING);
 	}
 }
