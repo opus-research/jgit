@@ -425,7 +425,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 	}
 
 	@Override
-	public SubscribeConnection openSubscribe(Subscriber subscriber)
+	public SubscribeConnection openSubscribe(SubscriptionState subscriber)
 			throws NotSupportedException, TransportException {
 		SubscribeConnection conn = new SmartHttpSubscribeConnection();
 		try {
@@ -800,7 +800,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 
 		@Override
-		public void sendSubscribeAdvertisement(Subscriber subscriber)
+		public void sendSubscribeAdvertisement(SubscriptionState subscriber)
 				throws IOException {
 			Service svc = new LongPollService(SVC_PUBLISH_SUBSCRIBE);
 			svc.setHandleAuth(true);
@@ -809,7 +809,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 
 		@Override
-		public void subscribe(Subscriber subscriber,
+		public void subscribe(SubscriptionState subscriber,
 				Map<String, List<SubscribeCommand>> subscribeCommands,
 				PrintWriter output)
 				throws InterruptedException, TransportException, IOException {

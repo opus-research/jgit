@@ -62,15 +62,15 @@ import org.eclipse.jgit.transport.SubscribeCommand.Command;
 import org.eclipse.jgit.util.RefTranslator;
 
 /**
- * Subscribe implementation over a send-receive connection. The client writes
- * out their current ref state and subscription requests, then receives a
+ * SubscribeConnection implementation over a send-receive connection. The client
+ * writes out their current ref state and subscription requests, then receives a
  * continuous stream of packs. The pubsub protocol is designed to operate over
  * HTTP, so the client does not send any data back to the server after it
  * receives data.
  */
 public class BasePackSubscribeConnection extends BasePackConnection implements
 		SubscribeConnection {
-	private static final int LATENCY_TIMEOUT = 4; // seconds
+	private static final int LATENCY_TIMEOUT = 15; // seconds
 
 	private static class ReceivePublishedPack extends BaseReceivePack {
 		final String remote;
@@ -144,7 +144,7 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 		init(myIn, myOut);
 	}
 
-	public void subscribe(Subscriber subscriber,
+	public void subscribe(SubscriptionState subscriber,
 			Map<String, List<SubscribeCommand>> subscribeCommands,
 			PrintWriter output)
 			throws InterruptedException, TransportException, IOException {
@@ -189,7 +189,7 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 	 * @throws TransportException
 	 * @throws IOException
 	 */
-	private void readUpdate(Subscriber subscriber, PrintWriter output)
+	private void readUpdate(SubscriptionState subscriber, PrintWriter output)
 			throws TransportException, IOException {
 		String line = pckIn.readString();
 		if (line.equals("heartbeat"))
@@ -215,11 +215,11 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 					JGitText.get().repositoryNotFound, repo));
 		receivePublish(db, output);
 		line = pckIn.readString();
-		if (!line.startsWith("pack-number "))
+		if (!line.startsWith("pack-id "))
 			throw new TransportException(MessageFormat.format(
-					JGitText.get().expectedGot, "pack-number", line));
-		subscriber.setLastPackNumber(line.substring(
-				"pack-number ".length()));
+					JGitText.get().expectedGot, "pack-id", line));
+		subscriber.setLastPackId(line.substring(
+				"pack-id ".length()));
 	}
 
 	/**
@@ -237,12 +237,13 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 				repository.getPubSubRefs().entrySet()) {
 			String refName = ref.getKey();
 			for (String spec : subscribeSpecs) {
-				if ((RefSpec.isWildcard(spec) && refName.startsWith(
+				if (RefSpec.isWildcard(spec) && !refName.startsWith(
 						spec.substring(0, spec.length() - 1)))
-						|| refName.equals(spec))
-					write("have "
-							+ ref.getValue().getLeaf().getObjectId().getName()
-							+ " " + refName);
+					continue;
+				else if (!refName.equals(spec))
+					continue;
+				String objId = ref.getValue().getLeaf().getObjectId().getName();
+				write("have " + objId + " " + refName);
 			}
 		}
 	}
@@ -264,25 +265,27 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 			case UNSUBSCRIBE:
 				write("stop " + cmd.getSpec());
 				break;
+			default:
+				throw new IllegalArgumentException();
 			}
 		}
 	}
 
-	private void writeSubscribeHeader(Subscriber subscriber)
+	private void writeSubscribeHeader(SubscriptionState subscriber)
 			throws IOException {
 		write("subscribe");
 		// Send restart
 		String restart = subscriber.getRestartToken();
 		if (restart != null) {
 			write("restart " + restart);
-			String number = subscriber.getLastPackNumber();
-			if (number != null)
-				write("last-pack-number " + number);
+			String id = subscriber.getLastPackId();
+			if (id != null)
+				write("last-pack-id " + id);
 		}
 		pckOut.end();
 	}
 
-	public void sendSubscribeAdvertisement(Subscriber subscriber)
+	public void sendSubscribeAdvertisement(SubscriptionState subscriber)
 			throws IOException, TransportException {
 		try {
 			pckOut.writeString("advertisement");
