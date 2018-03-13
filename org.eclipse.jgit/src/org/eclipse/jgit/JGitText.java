@@ -146,7 +146,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String checkoutConflictWithFile;
 	/***/ public String checkoutConflictWithFiles;
 	/***/ public String classCastNotA;
-	/***/ public String cloneNonEmptyDirectory;
 	/***/ public String collisionOn;
 	/***/ public String commandWasCalledInTheWrongState;
 	/***/ public String commitAlreadyExists;
@@ -201,7 +200,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String daysAgo;
 	/***/ public String deleteBranchUnexpectedResult;
 	/***/ public String deleteFileFailed;
-	/***/ public String deleteTagUnexpectedResult;
 	/***/ public String deletingNotSupported;
 	/***/ public String destinationIsNotAWildcard;
 	/***/ public String detachedHeadDetected;
@@ -553,6 +551,4 @@ public class JGitText extends TranslationBundle {
 	/***/ public String years;
 	/***/ public String yearsAgo;
 	/***/ public String yearsMonthsAgo;
-	/***/ public String treeWalkMustHaveExactlyTwoTrees;
-	/***/ public String cannotBeRecursiveWhenTreesAreIncluded;
 }

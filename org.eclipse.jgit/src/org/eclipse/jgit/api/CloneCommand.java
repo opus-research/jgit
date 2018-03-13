@@ -45,13 +45,11 @@ package org.eclipse.jgit.api;
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.Callable;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.dircache.DirCache;
@@ -133,9 +131,6 @@ public class CloneCommand implements Callable<Git> {
 		command.setBare(bare);
 		if (directory == null)
 			directory = new File(u.getHumanishName(), Constants.DOT_GIT);
-		if (directory.exists() && directory.listFiles().length != 0)
-			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().cloneNonEmptyDirectory, directory.getName()));
 		command.setDirectory(directory);
 		return command.call().getRepository();
 	}
@@ -301,13 +296,8 @@ public class CloneCommand implements Callable<Git> {
 	}
 
 	/**
-	 * The remote name used to keep track of the upstream repository for the
-	 * clone operation. If no remote name is set, the default value of
-	 * <code>Constants.DEFAULT_REMOTE_NAME</code> will be used.
-	 *
-	 * @see Constants#DEFAULT_REMOTE_NAME
 	 * @param remote
-	 *            name that keeps track of the upstream repository
+	 *            the branch to keep track of in the origin repository
 	 * @return this instance
 	 */
 	public CloneCommand setRemote(String remote) {

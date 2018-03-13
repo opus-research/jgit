@@ -52,7 +52,6 @@ done
 
 use_pager=
 case "$cmd" in
-blame)    use_pager=1 ;;
 diff)     use_pager=1 ;;
 log)      use_pager=1 ;;
 esac
