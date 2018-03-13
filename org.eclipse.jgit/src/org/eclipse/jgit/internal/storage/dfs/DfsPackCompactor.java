@@ -72,7 +72,6 @@ import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdSet;
 import org.eclipse.jgit.lib.ProgressMonitor;
-import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -258,12 +257,6 @@ public class DfsPackCompactor {
 			Collection<DfsPackDescription> remove = toPrune();
 			if (!commit.isEmpty() || !remove.isEmpty()) {
 				objdb.commitPack(commit, remove);
-			}
-
-			RefDatabase refdb = repo.getRefDatabase();
-			if (refdb instanceof DfsReftableDatabase) {
-				objdb.clearCache();
-				((DfsReftableDatabase) refdb).clearCache();
 			}
 		} finally {
 			rw = null;
