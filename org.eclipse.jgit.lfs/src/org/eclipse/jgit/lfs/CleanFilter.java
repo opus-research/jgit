@@ -71,7 +71,7 @@ import org.eclipse.jgit.util.FileUtils;
  *
  * @see <a href="https://github.com/github/git-lfs/blob/master/docs/spec.md">Git
  *      LFS Specification</a>
- * @since 4.5
+ * @since 4.6
  */
 public class CleanFilter extends FilterCommand {
 	/**

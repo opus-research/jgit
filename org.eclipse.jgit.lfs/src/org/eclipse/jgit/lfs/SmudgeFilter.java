@@ -65,7 +65,7 @@ import org.eclipse.jgit.lib.Repository;
  * available in the .git/lfs/objects folder. This implementation will not
  * contact any LFS servers in order to get the missing content.
  *
- * @since 4.5
+ * @since 4.6
  */
 public class SmudgeFilter extends FilterCommand {
 	/**
