@@ -129,7 +129,7 @@ public final class DfsBlockCache {
 	private final AtomicReferenceArray<HashEntry> table;
 
 	/** Locks to prevent concurrent loads for same (PackFile,position). */
-	private final ReentrantLock[] loadLocks;
+	private final Lock[] loadLocks;
 
 	/** Maximum number of bytes the cache should hold. */
 	private final long maxBytes;
@@ -180,9 +180,9 @@ public final class DfsBlockCache {
 			throw new IllegalArgumentException(JGitText.get().tSizeMustBeGreaterOrEqual1);
 
 		table = new AtomicReferenceArray<HashEntry>(tableSize);
-		loadLocks = new ReentrantLock[32];
+		loadLocks = new Lock[32];
 		for (int i = 0; i < loadLocks.length; i++)
-			loadLocks[i] = new ReentrantLock(true /* fair */);
+			loadLocks[i] = new Lock();
 
 		int eb = (int) (tableSize * .1);
 		if (64 < eb)
@@ -269,7 +269,7 @@ public final class DfsBlockCache {
 			throw new IllegalArgumentException(JGitText.get().invalidWindowSize);
 		if (limit < wsz)
 			throw new IllegalArgumentException(JGitText.get().windowSizeMustBeLesserThanLimit);
-		return (int) Math.min(5 * (limit / wsz) / 2, Integer.MAX_VALUE);
+		return (int) Math.min(5 * (limit / wsz) / 2, 2000000000);
 	}
 
 	/**
@@ -298,9 +298,7 @@ public final class DfsBlockCache {
 			return v;
 
 		reserveSpace(blockSize);
-		ReentrantLock regionLock = lockFor(key, position);
-		regionLock.lock();
-		try {
+		synchronized (lock(key, position)) {
 			HashEntry e2 = table.get(slot);
 			if (e2 != e1) {
 				v = scan(e2, key, position);
@@ -311,13 +309,17 @@ public final class DfsBlockCache {
 			}
 
 			statMiss.incrementAndGet();
-			boolean credit = true;
 			try {
 				v = pack.readOneBlock(position, ctx);
-				credit = false;
-			} finally {
-				if (credit)
-					creditSpace(blockSize);
+			} catch (IOException err) {
+				creditSpace(blockSize);
+				throw err;
+			} catch (RuntimeException err) {
+				creditSpace(blockSize);
+				throw err;
+			} catch (Error err) {
+				creditSpace(blockSize);
+				throw err;
 			}
 			if (position != v.start) {
 				// The file discovered its blockSize and adjusted.
@@ -335,8 +337,6 @@ public final class DfsBlockCache {
 				e2 = table.get(slot);
 			}
 			addToClock(ref, blockSize - v.size());
-		} finally {
-			regionLock.unlock();
 		}
 
 		// If the block size changed from the default, it is possible the block
@@ -409,9 +409,7 @@ public final class DfsBlockCache {
 			return ref;
 
 		reserveSpace(size);
-		ReentrantLock regionLock = lockFor(key, pos);
-		regionLock.lock();
-		try {
+		synchronized (lock(key, pos)) {
 			HashEntry e2 = table.get(slot);
 			if (e2 != e1) {
 				ref = scanRef(e2, key, pos);
@@ -430,8 +428,6 @@ public final class DfsBlockCache {
 				e2 = table.get(slot);
 			}
 			addToClock(ref, 0);
-		} finally {
-			regionLock.unlock();
 		}
 		return ref;
 	}
@@ -509,7 +505,7 @@ public final class DfsBlockCache {
 		return (hash(pack.hash, position) >>> 1) % tableSize;
 	}
 
-	private ReentrantLock lockFor(DfsPackKey pack, long position) {
+	private Lock lock(DfsPackKey pack, long position) {
 		return loadLocks[(hash(pack.hash, position) >>> 1) % loadLocks.length];
 	}
 
@@ -556,5 +552,9 @@ public final class DfsBlockCache {
 				hot = true;
 			return v;
 		}
+	}
+
+	private static final class Lock {
+		// Used only for its implicit monitor.
 	}
 }
