@@ -71,9 +71,7 @@ import java.util.Map;
 import java.util.Vector;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.AbortedByHookException;
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.hooks.Hooks;
@@ -86,8 +84,6 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.pack.PackConfig;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Connects two Git repositories together and copies objects between them.
@@ -110,8 +106,6 @@ public abstract class Transport implements AutoCloseable {
 		/** Transport is to push objects remotely. */
 		PUSH;
 	}
-
-	private final static Logger LOG = LoggerFactory.getLogger(Transport.class);
 
 	private static final List<WeakReference<TransportProtocol>> protocols =
 		new CopyOnWriteArrayList<WeakReference<TransportProtocol>>();
@@ -635,7 +629,7 @@ public abstract class Transport implements AutoCloseable {
 
 		for (final RefSpec spec : procRefs) {
 			String srcSpec = spec.getSource();
-			final Ref srcRef = db.getRef(srcSpec);
+			final Ref srcRef = db.findRef(srcSpec);
 			if (srcRef != null)
 				srcSpec = srcRef.getName();
 
@@ -778,6 +772,9 @@ public abstract class Transport implements AutoCloseable {
 
 	/** Assists with authentication the connection. */
 	private CredentialsProvider credentialsProvider;
+
+	/** The option strings associated with the push operation. */
+	private List<String> pushOptions;
 
 	private PrintStream hookOutRedirect;
 
@@ -1127,6 +1124,25 @@ public abstract class Transport implements AutoCloseable {
 	}
 
 	/**
+	 * @return the option strings associated with the push operation
+	 * @since 4.5
+	 */
+	public List<String> getPushOptions() {
+		return pushOptions;
+	}
+
+	/**
+	 * Sets the option strings associated with the push operation.
+	 *
+	 * @param pushOptions
+	 *            null if push options are unsupported
+	 * @since 4.5
+	 */
+	public void setPushOptions(final List<String> pushOptions) {
+		this.pushOptions = pushOptions;
+	}
+
+	/**
 	 * Fetch objects and refs from the remote repository to the local one.
 	 * <p>
 	 * This is a utility function providing standard fetch behavior. Local
@@ -1183,18 +1199,7 @@ public abstract class Transport implements AutoCloseable {
 
 		final FetchResult result = new FetchResult();
 		new FetchProcess(this, toFetch).execute(monitor, result);
-
-		autoGc();
-
 		return result;
-	}
-
-	private void autoGc() {
-		try (Git git = Git.wrap(local)) {
-			git.gc().setAuto(true).call();
-		} catch (GitAPIException e) {
-			LOG.error(e.getMessage(), e);
-		}
 	}
 
 	/**

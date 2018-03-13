@@ -50,24 +50,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.errors.UnpackException;
-import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.ReceiveCommand.Result;
 import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Implements the server side of a push connection, receiving objects.
  */
 public class ReceivePack extends BaseReceivePack {
-	private final static Logger LOG = LoggerFactory
-			.getLogger(ReceivePack.class);
-
 	/** Hook to validate the update commands before execution. */
 	private PreReceiveHook preReceive;
 
@@ -182,6 +174,15 @@ public class ReceivePack extends BaseReceivePack {
 		super.enableCapabilities();
 	}
 
+	private void readPushOptions() throws IOException {
+		String pushOption = pckIn.readString();
+
+		while (pushOption != PacketLineIn.END) {
+			pushOptions.add(pushOption);
+			pushOption = pckIn.readString();
+		}
+	}
+
 	private void service() throws IOException {
 		if (isBiDirectionalPipe()) {
 			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
@@ -192,23 +193,23 @@ public class ReceivePack extends BaseReceivePack {
 			return;
 		recvCommands();
 		if (hasCommands()) {
-			enableCapabilities();
+			if (usePushOptions) {
+				readPushOptions();
+			}
 
 			Throwable unpackError = null;
 			if (needPack()) {
 				try {
 					receivePackAndCheckConnectivity();
-				} catch (IOException err) {
-					unpackError = err;
-				} catch (RuntimeException err) {
-					unpackError = err;
-				} catch (Error err) {
+				} catch (IOException | RuntimeException | Error err) {
 					unpackError = err;
 				}
 			}
 
 			if (unpackError == null) {
 				boolean atomic = isCapabilityEnabled(CAPABILITY_ATOMIC);
+				setAtomic(atomic);
+
 				validateCommands();
 				if (atomic && anyRejects())
 					failPendingCommands();
@@ -259,20 +260,6 @@ public class ReceivePack extends BaseReceivePack {
 				throw new UnpackException(unpackError);
 			}
 			postReceive.onPostReceive(this, filterCommands(Result.OK));
-			autoGc();
-		}
-	}
-
-	private void autoGc() {
-		Repository repo = getRepository();
-		if (!repo.getConfig().getBoolean(ConfigConstants.CONFIG_RECEIVE_SECTION,
-				ConfigConstants.CONFIG_KEY_AUTOGC, true)) {
-			return;
-		}
-		try (Git git = Git.wrap(repo)) {
-			git.gc().setAuto(true).call();
-		} catch (GitAPIException e) {
-			LOG.error(e.getMessage(), e);
 		}
 	}
 

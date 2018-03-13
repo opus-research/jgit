@@ -106,8 +106,6 @@ import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * A class used to execute a {@code Rebase} command. It has setters for all
@@ -121,9 +119,6 @@ import org.slf4j.LoggerFactory;
  *      >Git documentation about Rebase</a>
  */
 public class RebaseCommand extends GitCommand<RebaseResult> {
-	private final static Logger LOG = LoggerFactory
-			.getLogger(RebaseCommand.class);
-
 	/**
 	 * The name of the "rebase-merge" folder for interactive rebases.
 	 */
@@ -424,7 +419,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 	private void updateStashRef(ObjectId commitId, PersonIdent refLogIdent,
 			String refLogMessage) throws IOException {
-		Ref currentRef = repo.getRef(Constants.R_STASH);
+		Ref currentRef = repo.exactRef(Constants.R_STASH);
 		RefUpdate refUpdate = repo.updateRef(Constants.R_STASH);
 		refUpdate.setNewObjectId(commitId);
 		refUpdate.setRefLogIdent(refLogIdent);
@@ -698,21 +693,12 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		String headName = rebaseState.readFile(HEAD_NAME);
 		updateHead(headName, finalHead, upstreamCommit);
 		boolean stashConflicts = autoStashApply();
-		autoGc();
 		FileUtils.delete(rebaseState.getDir(), FileUtils.RECURSIVE);
 		if (stashConflicts)
 			return RebaseResult.STASH_APPLY_CONFLICTS_RESULT;
 		if (lastStepIsForward || finalHead == null)
 			return RebaseResult.FAST_FORWARD_RESULT;
 		return RebaseResult.OK_RESULT;
-	}
-
-	private void autoGc() {
-		try (Git git = Git.wrap(getRepository())) {
-			git.gc().setAuto(true).call();
-		} catch (GitAPIException e) {
-			LOG.error(e.getMessage(), e);
-		}
 	}
 
 	private void checkSteps(List<RebaseTodoLine> steps)
@@ -764,7 +750,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 	private void resetSoftToParent() throws IOException,
 			GitAPIException, CheckoutConflictException {
-		Ref ref = repo.getRef(Constants.ORIG_HEAD);
+		Ref ref = repo.exactRef(Constants.ORIG_HEAD);
 		ObjectId orig_head = ref == null ? null : ref.getObjectId();
 		try {
 			// we have already commited the cherry-picked commit.
@@ -1221,7 +1207,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	}
 
 	private Ref getHead() throws IOException, RefNotFoundException {
-		Ref head = repo.getRef(Constants.HEAD);
+		Ref head = repo.exactRef(Constants.HEAD);
 		if (head == null || head.getObjectId() == null)
 			throw new RefNotFoundException(MessageFormat.format(
 					JGitText.get().refNotResolved, Constants.HEAD));

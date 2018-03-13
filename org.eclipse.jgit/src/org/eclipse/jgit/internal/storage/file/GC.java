@@ -52,9 +52,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.text.MessageFormat;
 import java.text.ParseException;
@@ -65,14 +62,12 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.regex.Pattern;
 
 import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.dircache.DirCacheIterator;
@@ -105,8 +100,6 @@ import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.GitDateParser;
 import org.eclipse.jgit.util.SystemReader;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * A garbage collector for git {@link FileRepository}. Instances of this class
@@ -116,15 +109,9 @@ import org.slf4j.LoggerFactory;
  * adapted to FileRepositories.
  */
 public class GC {
-	private final static Logger LOG = LoggerFactory
-			.getLogger(GC.class);
-
 	private static final String PRUNE_EXPIRE_DEFAULT = "2.weeks.ago"; //$NON-NLS-1$
 
 	private static final String PRUNE_PACK_EXPIRE_DEFAULT = "1.hour.ago"; //$NON-NLS-1$
-
-	private static final Pattern PATTERN_LOOSE_OBJECT = Pattern
-			.compile("[0-9a-fA-F]{38}"); //$NON-NLS-1$
 
 	private final FileRepository repo;
 
@@ -156,11 +143,6 @@ public class GC {
 	private long lastRepackTime;
 
 	/**
-	 * Whether gc should do automatic housekeeping
-	 */
-	private boolean automatic;
-
-	/**
 	 * Creates a new garbage collector with default values. An expirationTime of
 	 * two weeks and <code>null</code> as progress monitor will be used.
 	 *
@@ -188,9 +170,6 @@ public class GC {
 	 *             parsed
 	 */
 	public Collection<PackFile> gc() throws IOException, ParseException {
-		if (automatic && !needGc()) {
-			return Collections.emptyList();
-		}
 		pm.start(6 /* tasks */);
 		packRefs();
 		// TODO: implement reflog_expire(pm, repo);
@@ -676,8 +655,12 @@ public class GC {
 	}
 
 	/**
-	 * Returns a collection of all refs and additional refs (e.g. FETCH_HEAD,
-	 * MERGE_HEAD, ...)
+	 * Returns a collection of all refs and additional refs.
+	 *
+	 * Additional refs which don't start with "refs/" are not returned because
+	 * they should not save objects from being garbage collected. Examples for
+	 * such references are ORIG_HEAD, MERGE_HEAD, FETCH_HEAD and
+	 * CHERRY_PICK_HEAD.
 	 *
 	 * @return a collection of refs pointing to live objects.
 	 * @throws IOException
@@ -689,7 +672,12 @@ public class GC {
 		if (!addl.isEmpty()) {
 			List<Ref> all = new ArrayList<>(refs.size() + addl.size());
 			all.addAll(refs);
-			all.addAll(addl);
+			// add additional refs which start with refs/
+			for (Ref r : addl) {
+				if (r.getName().startsWith(Constants.R_REFS)) {
+					all.add(r);
+				}
+			}
 			return all;
 		}
 		return refs;
@@ -1085,96 +1073,5 @@ public class GC {
 	public void setPackExpire(Date packExpire) {
 		this.packExpire = packExpire;
 		packExpireAgeMillis = -1;
-	}
-
-	/**
-	 * Set the {@code gc --auto} option.
-	 *
-	 * With this option, gc checks whether any housekeeping is required; if not,
-	 * it exits without performing any work. Some JGit commands run gc --auto
-	 * after performing operations that could create many loose objects.
-	 *
-	 * Housekeeping is required if there are too many loose objects or too many
-	 * packs in the repository. If the number of loose objects exceeds the value
-	 * of the gc.auto option, then all loose objects are combined into a single
-	 * pack using repack -d -l. Setting the value of gc.auto to 0 disables
-	 * automatic packing of loose objects.
-	 *
-	 * If the number of packs exceeds the value of gc.autoPackLimit, then
-	 * existing packs (except those marked with a .keep file) are consolidated
-	 * into a single pack by using the -A option of repack. Setting
-	 * gc.autoPackLimit to 0 disables automatic consolidation of packs.
-	 *
-	 * @param auto
-	 *            defines whether gc should do automatic housekeeping
-	 * @since 4.4
-	 */
-	public void setAuto(boolean auto) {
-		this.automatic = auto;
-	}
-
-	private boolean needGc() {
-		if (tooManyPacks()) {
-			addRepackAllOption();
-		} else if (!tooManyLooseObjects()) {
-			return false;
-		}
-		// TODO run pre-auto-gc hook, if it fails return false
-		return true;
-	}
-
-	private void addRepackAllOption() {
-		// TODO
-	}
-
-	/**
-	 * @return {@code true} if number of packs > gc.autopacklimit (default 50)
-	 */
-	private boolean tooManyPacks() {
-		int autopacklimit = repo.getConfig().getInt(
-				ConfigConstants.CONFIG_GC_SECTION,
-				ConfigConstants.CONFIG_KEY_AUTOPACKLIMIT, 50);
-		if (autopacklimit <= 0) {
-			return false;
-		}
-		return repo.getObjectDatabase().getPacks().size() > autopacklimit;
-	}
-
-	/**
-	 * Quickly estimate number of loose objects, SHA1 is distributed evenly so
-	 * counting objects in one directory is sufficient
-	 *
-	 * @return {@code true} if number of loose objects > gc.auto (default 6700)
-	 */
-	private boolean tooManyLooseObjects() {
-		int auto = repo.getConfig().getInt(ConfigConstants.CONFIG_GC_SECTION,
-				ConfigConstants.CONFIG_KEY_AUTO, 6700);
-		if (auto <= 0) {
-			return false;
-		}
-		int n = 0;
-		int threshold = (auto + 255) / 256;
-		Path dir = repo.getObjectsDirectory().toPath().resolve("17"); //$NON-NLS-1$
-		DirectoryStream.Filter<? super Path> filter = new DirectoryStream.Filter<Path>() {
-
-			public boolean accept(Path file) throws IOException {
-				return Files.isRegularFile(file)
-						&& PATTERN_LOOSE_OBJECT
-								.matcher(file.getFileName().toString())
-						.matches();
-			}
-		};
-		try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir,
-				filter)) {
-			Iterator<Path> iter = stream.iterator();
-			while (iter.hasNext()) {
-				if (n++ > threshold) {
-					return true;
-				}
-			}
-		} catch (IOException e) {
-			LOG.error(e.getMessage(), e);
-		}
-		return false;
 	}
 }
