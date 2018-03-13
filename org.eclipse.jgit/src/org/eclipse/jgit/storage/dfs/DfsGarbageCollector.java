@@ -335,7 +335,7 @@ public class DfsGarbageCollector {
 			out.close();
 		}
 
-		if (pw.prepareIndexBitmaps(pm)) {
+		if (pw.prepareBitmapIndex(pm)) {
 			out = objdb.writeFile(pack, BITMAP_INDEX);
 			try {
 				CountingOutputStream cnt = new CountingOutputStream(out);

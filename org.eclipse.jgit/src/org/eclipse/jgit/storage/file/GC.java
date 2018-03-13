@@ -711,7 +711,7 @@ public class GC {
 				idxChannel.close();
 			}
 
-			if (pw.prepareIndexBitmaps(pm)) {
+			if (pw.prepareBitmapIndex(pm)) {
 				File tmpBitmapIdx = new File(packdir, tmpBase + ".bitmap_tmp"); //$NON-NLS-1$
 				tmpExts.put(BITMAP_INDEX, tmpBitmapIdx);
 

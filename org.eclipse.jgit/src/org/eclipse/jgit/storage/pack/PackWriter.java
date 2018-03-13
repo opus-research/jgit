@@ -866,7 +866,7 @@ public class PackWriter {
 	 * Create a bitmap index file to match the pack file just written.
 	 * <p>
 	 * This method can only be invoked after
-	 * {@link #prepareIndexBitmaps(ProgressMonitor, Set)} has been invoked and
+	 * {@link #prepareBitmapIndex(ProgressMonitor)} has been invoked and
 	 * completed successfully. Writing a corresponding bitmap index is an
 	 * optional feature that not all pack users may require.
 	 *
@@ -2055,7 +2055,7 @@ public class PackWriter {
 	 * @throws IOException
 	 *             when some I/O problem occur during reading objects.
 	 */
-	public boolean prepareIndexBitmaps(ProgressMonitor pm) throws IOException {
+	public boolean prepareBitmapIndex(ProgressMonitor pm) throws IOException {
 		if (!canBuildBitmaps || getObjectCount() > Integer.MAX_VALUE
 				|| !cachedPacks.isEmpty())
 			return false;
