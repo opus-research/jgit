@@ -74,8 +74,6 @@ import org.eclipse.jgit.util.RawParseUtils;
 public class FileBasedConfig extends StoredConfig {
 	private final File configFile;
 
-	private final FS fs;
-
 	private boolean utf8Bom;
 
 	private volatile FileSnapshot snapshot;
@@ -109,7 +107,6 @@ public class FileBasedConfig extends StoredConfig {
 	public FileBasedConfig(Config base, File cfgLocation, FS fs) {
 		super(base);
 		configFile = cfgLocation;
-		this.fs = fs;
 		this.snapshot = FileSnapshot.DIRTY;
 		this.hash = ObjectId.zeroId();
 	}
@@ -150,8 +147,7 @@ public class FileBasedConfig extends StoredConfig {
 					snapshot = newSnapshot;
 			} else {
 				final String decoded;
-				if (in.length >= 3 && in[0] == (byte) 0xEF
-						&& in[1] == (byte) 0xBB && in[2] == (byte) 0xBF) {
+				if (isUtf8(in)) {
 					decoded = RawParseUtils.decode(RawParseUtils.UTF8_CHARSET,
 							in, 3, in.length);
 					utf8Bom = true;
@@ -163,6 +159,9 @@ public class FileBasedConfig extends StoredConfig {
 				hash = newHash;
 			}
 		} catch (FileNotFoundException noFile) {
+			if (configFile.exists()) {
+				throw noFile;
+			}
 			clear();
 			snapshot = newSnapshot;
 		} catch (IOException e) {
@@ -200,7 +199,7 @@ public class FileBasedConfig extends StoredConfig {
 			out = Constants.encode(text);
 		}
 
-		final LockFile lf = new LockFile(getFile(), fs);
+		final LockFile lf = new LockFile(getFile());
 		if (!lf.lock())
 			throw new LockFailedException(getFile());
 		try {

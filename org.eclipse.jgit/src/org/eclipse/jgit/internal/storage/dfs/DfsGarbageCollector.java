@@ -44,32 +44,36 @@
 package org.eclipse.jgit.internal.storage.dfs;
 
 import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.GC;
+import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.GC_REST;
+import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.GC_TXN;
 import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.UNREACHABLE_GARBAGE;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.BITMAP_INDEX;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.INDEX;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.PACK;
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource;
 import org.eclipse.jgit.internal.storage.file.PackIndex;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.eclipse.jgit.internal.storage.pack.PackWriter;
+import org.eclipse.jgit.internal.storage.reftree.RefTreeNames;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdOwnerMap;
+import org.eclipse.jgit.lib.ObjectIdSet;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.storage.pack.PackStatistics;
@@ -78,31 +82,30 @@ import org.eclipse.jgit.util.io.CountingOutputStream;
 /** Repack and garbage collect a repository. */
 public class DfsGarbageCollector {
 	private final DfsRepository repo;
-
-	private final DfsRefDatabase refdb;
-
+	private final RefDatabase refdb;
 	private final DfsObjDatabase objdb;
 
 	private final List<DfsPackDescription> newPackDesc;
 
 	private final List<PackStatistics> newPackStats;
 
-	private final List<PackWriter.ObjectIdSet> newPackObj;
+	private final List<ObjectIdSet> newPackObj;
 
 	private DfsReader ctx;
 
 	private PackConfig packConfig;
 
+	// See pack(), below, for how these two variables interact.
 	private long coalesceGarbageLimit = 50 << 20;
+	private long garbageTtlMillis = TimeUnit.DAYS.toMillis(1);
 
-	private Map<String, Ref> refsBefore;
-
+	private long startTimeMillis;
 	private List<DfsPackFile> packsBefore;
+	private List<DfsPackFile> expiredGarbagePacks;
 
 	private Set<ObjectId> allHeads;
-
 	private Set<ObjectId> nonHeads;
-
+	private Set<ObjectId> txnHeads;
 	private Set<ObjectId> tagTargets;
 
 	/**
@@ -117,7 +120,7 @@ public class DfsGarbageCollector {
 		objdb = repo.getObjectDatabase();
 		newPackDesc = new ArrayList<DfsPackDescription>(4);
 		newPackStats = new ArrayList<PackStatistics>(4);
-		newPackObj = new ArrayList<PackWriter.ObjectIdSet>(4);
+		newPackObj = new ArrayList<ObjectIdSet>(4);
 
 		packConfig = new PackConfig(repo);
 		packConfig.setIndexVersion(2);
@@ -171,6 +174,34 @@ public class DfsGarbageCollector {
 	}
 
 	/**
+	 * @return garbage packs older than this limit (in milliseconds) will be
+	 *         pruned as part of the garbage collection process if the value is
+	 *         > 0, otherwise garbage packs are retained.
+	 */
+	public long getGarbageTtlMillis() {
+		return garbageTtlMillis;
+	}
+
+	/**
+	 * Set the time to live for garbage objects.
+	 * <p>
+	 * Any UNREACHABLE_GARBAGE older than this limit will be pruned at the end
+	 * of the run.
+	 * <p>
+	 * If timeToLiveMillis is set to 0, UNREACHABLE_GARBAGE purging is disabled.
+	 *
+	 * @param ttl
+	 *            Time to live whatever unit is specified.
+	 * @param unit
+	 *            The specified time unit.
+	 * @return {@code this}
+	 */
+	public DfsGarbageCollector setGarbageTtl(long ttl, TimeUnit unit) {
+		garbageTtlMillis = unit.toMillis(ttl);
+		return this;
+	}
+
+	/**
 	 * Create a single new pack file containing all of the live objects.
 	 * <p>
 	 * This method safely decides which packs can be expired after the new pack
@@ -192,25 +223,40 @@ public class DfsGarbageCollector {
 		if (packConfig.getIndexVersion() != 2)
 			throw new IllegalStateException(
 					JGitText.get().supportOnlyPackIndexVersion2);
+		if (garbageTtlMillis > 0) {
+			// We disable coalescing because the coalescing step will keep
+			// refreshing the UNREACHABLE_GARBAGE pack and we wouldn't
+			// actually prune anything.
+			coalesceGarbageLimit = 0;
+		}
 
+		startTimeMillis = System.currentTimeMillis();
 		ctx = (DfsReader) objdb.newReader();
 		try {
-			refdb.clearCache();
+			refdb.refresh();
 			objdb.clearCache();
 
-			refsBefore = refdb.getRefs(ALL);
-			packsBefore = packsToRebuild();
-			if (packsBefore.isEmpty())
+			Collection<Ref> refsBefore = getAllRefs();
+			readPacksBefore();
+
+			if (packsBefore.isEmpty()) {
+				if (!expiredGarbagePacks.isEmpty()) {
+					objdb.commitPack(noPacks(), toPrune());
+				}
 				return true;
+			}
 
 			allHeads = new HashSet<ObjectId>();
 			nonHeads = new HashSet<ObjectId>();
+			txnHeads = new HashSet<ObjectId>();
 			tagTargets = new HashSet<ObjectId>();
-			for (Ref ref : refsBefore.values()) {
+			for (Ref ref : refsBefore) {
 				if (ref.isSymbolic() || ref.getObjectId() == null)
 					continue;
 				if (isHead(ref))
 					allHeads.add(ref.getObjectId());
+				else if (RefTreeNames.isRefTree(refdb, ref.getName()))
+					txnHeads.add(ref.getObjectId());
 				else
 					nonHeads.add(ref.getObjectId());
 				if (ref.getPeeledObjectId() != null)
@@ -222,6 +268,7 @@ public class DfsGarbageCollector {
 			try {
 				packHeads(pm);
 				packRest(pm);
+				packRefTreeGraph(pm);
 				packGarbage(pm);
 				objdb.commitPack(newPackDesc, toPrune());
 				rollback = false;
@@ -235,17 +282,77 @@ public class DfsGarbageCollector {
 		}
 	}
 
-	private List<DfsPackFile> packsToRebuild() throws IOException {
+	private Collection<Ref> getAllRefs() throws IOException {
+		Collection<Ref> refs = refdb.getRefs(RefDatabase.ALL).values();
+		List<Ref> addl = refdb.getAdditionalRefs();
+		if (!addl.isEmpty()) {
+			List<Ref> all = new ArrayList<>(refs.size() + addl.size());
+			all.addAll(refs);
+			// add additional refs which start with refs/
+			for (Ref r : addl) {
+				if (r.getName().startsWith(Constants.R_REFS)) {
+					all.add(r);
+				}
+			}
+			return all;
+		}
+		return refs;
+	}
+
+	private void readPacksBefore() throws IOException {
 		DfsPackFile[] packs = objdb.getPacks();
-		List<DfsPackFile> out = new ArrayList<DfsPackFile>(packs.length);
+		packsBefore = new ArrayList<DfsPackFile>(packs.length);
+		expiredGarbagePacks = new ArrayList<DfsPackFile>(packs.length);
+
+		long mostRecentGC = mostRecentGC(packs);
+		long now = System.currentTimeMillis();
 		for (DfsPackFile p : packs) {
 			DfsPackDescription d = p.getPackDescription();
-			if (d.getPackSource() != UNREACHABLE_GARBAGE)
-				out.add(p);
-			else if (d.getFileSize(PackExt.PACK) < coalesceGarbageLimit)
-				out.add(p);
+			if (d.getPackSource() != UNREACHABLE_GARBAGE) {
+				packsBefore.add(p);
+			} else if (packIsExpiredGarbage(d, mostRecentGC, now)) {
+				expiredGarbagePacks.add(p);
+			} else if (d.getFileSize(PackExt.PACK) < coalesceGarbageLimit) {
+				packsBefore.add(p);
+			}
 		}
-		return out;
+	}
+
+	private static long mostRecentGC(DfsPackFile[] packs) {
+		long r = 0;
+		for (DfsPackFile p : packs) {
+			DfsPackDescription d = p.getPackDescription();
+			if (d.getPackSource() == GC || d.getPackSource() == GC_REST) {
+				r = Math.max(r, d.getLastModified());
+			}
+		}
+		return r;
+	}
+
+	private boolean packIsExpiredGarbage(DfsPackDescription d,
+			long mostRecentGC, long now) {
+		// It should be safe to remove an UNREACHABLE_GARBAGE pack if it:
+		//
+		// (a) Predates the most recent prior run of this class. This check
+		// ensures the graph traversal algorithm had a chance to consider
+		// all objects in this pack and copied them into a GC or GC_REST
+		// pack if the graph contained live edges to the objects.
+		//
+		// This check is safe because of the ordering of packing; the GC
+		// packs are written first and then the UNREACHABLE_GARBAGE is
+		// constructed. Any UNREACHABLE_GARBAGE dated earlier than the GC
+		// was input to the prior GC's graph traversal.
+		//
+		// (b) Is older than garbagePackTtl. This check gives concurrent
+		// inserter threads sufficient time to identify an object is not
+		// in the graph and should have a new copy written, rather than
+		// relying on something from an UNREACHABLE_GARBAGE pack.
+		//
+		// Both (a) and (b) must be met to safely remove UNREACHABLE_GARBAGE.
+		return d.getPackSource() == UNREACHABLE_GARBAGE
+				&& d.getLastModified() < mostRecentGC
+				&& garbageTtlMillis > 0
+				&& now - d.getLastModified() >= garbageTtlMillis;
 	}
 
 	/** @return all of the source packs that fed into this compaction. */
@@ -266,8 +373,12 @@ public class DfsGarbageCollector {
 	private List<DfsPackDescription> toPrune() {
 		int cnt = packsBefore.size();
 		List<DfsPackDescription> all = new ArrayList<DfsPackDescription>(cnt);
-		for (DfsPackFile pack : packsBefore)
+		for (DfsPackFile pack : packsBefore) {
 			all.add(pack.getPackDescription());
+		}
+		for (DfsPackFile pack : expiredGarbagePacks) {
+			all.add(pack.getPackDescription());
+		}
 		return all;
 	}
 
@@ -277,7 +388,7 @@ public class DfsGarbageCollector {
 
 		try (PackWriter pw = newPackWriter()) {
 			pw.setTagTargets(tagTargets);
-			pw.preparePack(pm, allHeads, Collections.<ObjectId> emptySet());
+			pw.preparePack(pm, allHeads, PackWriter.NONE);
 			if (0 < pw.getObjectCount())
 				writePack(GC, pw, pm);
 		}
@@ -288,16 +399,28 @@ public class DfsGarbageCollector {
 			return;
 
 		try (PackWriter pw = newPackWriter()) {
-			for (PackWriter.ObjectIdSet packedObjs : newPackObj)
+			for (ObjectIdSet packedObjs : newPackObj)
 				pw.excludeObjects(packedObjs);
 			pw.preparePack(pm, nonHeads, allHeads);
 			if (0 < pw.getObjectCount())
-				writePack(GC, pw, pm);
+				writePack(GC_REST, pw, pm);
+		}
+	}
+
+	private void packRefTreeGraph(ProgressMonitor pm) throws IOException {
+		if (txnHeads.isEmpty())
+			return;
+
+		try (PackWriter pw = newPackWriter()) {
+			for (ObjectIdSet packedObjs : newPackObj)
+				pw.excludeObjects(packedObjs);
+			pw.preparePack(pm, txnHeads, PackWriter.NONE);
+			if (0 < pw.getObjectCount())
+				writePack(GC_TXN, pw, pm);
 		}
 	}
 
 	private void packGarbage(ProgressMonitor pm) throws IOException {
-		// TODO(sop) This is ugly. The garbage pack needs to be deleted.
 		PackConfig cfg = new PackConfig(packConfig);
 		cfg.setReuseDeltas(true);
 		cfg.setReuseObjects(true);
@@ -328,7 +451,7 @@ public class DfsGarbageCollector {
 	}
 
 	private boolean anyPackHas(AnyObjectId id) {
-		for (PackWriter.ObjectIdSet packedObjs : newPackObj)
+		for (ObjectIdSet packedObjs : newPackObj)
 			if (packedObjs.contains(id))
 				return true;
 		return false;
@@ -354,54 +477,42 @@ public class DfsGarbageCollector {
 
 	private DfsPackDescription writePack(PackSource source, PackWriter pw,
 			ProgressMonitor pm) throws IOException {
-		DfsOutputStream out;
 		DfsPackDescription pack = repo.getObjectDatabase().newPack(source);
 		newPackDesc.add(pack);
 
-		out = objdb.writeFile(pack, PACK);
-		try {
+		try (DfsOutputStream out = objdb.writeFile(pack, PACK)) {
 			pw.writePack(pm, pm, out);
 			pack.addFileExt(PACK);
-		} finally {
-			out.close();
 		}
 
-		out = objdb.writeFile(pack, INDEX);
-		try {
-			CountingOutputStream cnt = new CountingOutputStream(out);
+		try (CountingOutputStream cnt =
+				new CountingOutputStream(objdb.writeFile(pack, INDEX))) {
 			pw.writeIndex(cnt);
 			pack.addFileExt(INDEX);
 			pack.setFileSize(INDEX, cnt.getCount());
 			pack.setIndexVersion(pw.getIndexVersion());
-		} finally {
-			out.close();
 		}
 
 		if (pw.prepareBitmapIndex(pm)) {
-			out = objdb.writeFile(pack, BITMAP_INDEX);
-			try {
-				CountingOutputStream cnt = new CountingOutputStream(out);
+			try (CountingOutputStream cnt = new CountingOutputStream(
+					objdb.writeFile(pack, BITMAP_INDEX))) {
 				pw.writeBitmapIndex(cnt);
 				pack.addFileExt(BITMAP_INDEX);
 				pack.setFileSize(BITMAP_INDEX, cnt.getCount());
-			} finally {
-				out.close();
 			}
 		}
 
-		final ObjectIdOwnerMap<ObjectIdOwnerMap.Entry> packedObjs = pw
-				.getObjectSet();
-		newPackObj.add(new PackWriter.ObjectIdSet() {
-			public boolean contains(AnyObjectId objectId) {
-				return packedObjs.contains(objectId);
-			}
-		});
-
 		PackStatistics stats = pw.getStatistics();
 		pack.setPackStats(stats);
+		pack.setLastModified(startTimeMillis);
 		newPackStats.add(stats);
+		newPackObj.add(pw.getObjectSet());
 
 		DfsBlockCache.getInstance().getOrCreate(pack, null);
 		return pack;
+	}
+
+	private static List<DfsPackDescription> noPacks() {
+		return Collections.emptyList();
 	}
 }

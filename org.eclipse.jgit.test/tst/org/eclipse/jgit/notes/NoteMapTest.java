@@ -449,13 +449,11 @@ public class NoteMapTest extends RepositoryTestCase {
 		assertEquals("empty tree", empty, n.getTree());
 	}
 
-	@Test
 	public void testIteratorEmptyMap() {
 		Iterator<Note> it = NoteMap.newEmptyMap().iterator();
 		assertFalse(it.hasNext());
 	}
 
-	@Test
 	public void testIteratorFlatTree() throws Exception {
 		RevBlob a = tr.blob("a");
 		RevBlob b = tr.blob("b");
@@ -474,7 +472,6 @@ public class NoteMapTest extends RepositoryTestCase {
 		assertEquals(2, count(it));
 	}
 
-	@Test
 	public void testIteratorFanoutTree2_38() throws Exception {
 		RevBlob a = tr.blob("a");
 		RevBlob b = tr.blob("b");
@@ -493,7 +490,6 @@ public class NoteMapTest extends RepositoryTestCase {
 		assertEquals(2, count(it));
 	}
 
-	@Test
 	public void testIteratorFanoutTree2_2_36() throws Exception {
 		RevBlob a = tr.blob("a");
 		RevBlob b = tr.blob("b");
@@ -512,7 +508,6 @@ public class NoteMapTest extends RepositoryTestCase {
 		assertEquals(2, count(it));
 	}
 
-	@Test
 	public void testIteratorFullyFannedOut() throws Exception {
 		RevBlob a = tr.blob("a");
 		RevBlob b = tr.blob("b");
@@ -531,13 +526,12 @@ public class NoteMapTest extends RepositoryTestCase {
 		assertEquals(2, count(it));
 	}
 
-	@Test
 	public void testShorteningNoteRefName() throws Exception {
 		String expectedShortName = "review";
 		String noteRefName = Constants.R_NOTES + expectedShortName;
 		assertEquals(expectedShortName, NoteMap.shortenRefName(noteRefName));
 		String nonNoteRefName = Constants.R_HEADS + expectedShortName;
-		assertEquals(nonNoteRefName, NoteMap.shortenRefName(nonNoteRefName));
+		assertEquals(nonNoteRefName, NoteMap.shortenRefName(expectedShortName));
 	}
 
 	private RevCommit commitNoteMap(NoteMap map) throws IOException {

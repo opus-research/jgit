@@ -85,6 +85,7 @@ public class GcBasicPackingTest extends GcTestCase {
 		assertEquals(4, stats.numberOfLooseObjects);
 		assertEquals(0, stats.numberOfPackedObjects);
 		assertEquals(0, stats.numberOfPackFiles);
+		assertEquals(0, stats.numberOfBitmaps);
 	}
 
 	@Theory
@@ -102,6 +103,7 @@ public class GcBasicPackingTest extends GcTestCase {
 		assertEquals(0, stats.numberOfLooseObjects);
 		assertEquals(8, stats.numberOfPackedObjects);
 		assertEquals(1, stats.numberOfPackFiles);
+		assertEquals(2, stats.numberOfBitmaps);
 	}
 
 	@Theory
@@ -118,6 +120,7 @@ public class GcBasicPackingTest extends GcTestCase {
 		assertEquals(0, stats.numberOfLooseObjects);
 		assertEquals(4, stats.numberOfPackedObjects);
 		assertEquals(1, stats.numberOfPackFiles);
+		assertEquals(1, stats.numberOfBitmaps);
 
 		// Do the gc again and check that it hasn't changed anything
 		gc.gc();
@@ -125,10 +128,12 @@ public class GcBasicPackingTest extends GcTestCase {
 		assertEquals(0, stats.numberOfLooseObjects);
 		assertEquals(4, stats.numberOfPackedObjects);
 		assertEquals(1, stats.numberOfPackFiles);
+		assertEquals(1, stats.numberOfBitmaps);
 	}
 
 	@Theory
-	public void testPackCommitsAndLooseOne(boolean aggressive) throws Exception {
+	public void testPackCommitsAndLooseOne(boolean aggressive)
+			throws Exception {
 		BranchBuilder bb = tr.branch("refs/heads/master");
 		RevCommit first = bb.commit().add("A", "A").add("B", "B").create();
 		bb.commit().add("A", "A2").add("B", "B2").create();
@@ -143,6 +148,7 @@ public class GcBasicPackingTest extends GcTestCase {
 		assertEquals(0, stats.numberOfLooseObjects);
 		assertEquals(8, stats.numberOfPackedObjects);
 		assertEquals(2, stats.numberOfPackFiles);
+		assertEquals(1, stats.numberOfBitmaps);
 	}
 
 	@Theory
@@ -207,9 +213,20 @@ public class GcBasicPackingTest extends GcTestCase {
 		assertEquals(9, stats.numberOfPackedObjects);
 		assertEquals(2, stats.numberOfPackFiles);
 
+		// repack again but now without a grace period for loose objects. Since
+		// we don't have loose objects anymore this shouldn't change anything
+		gc.setExpireAgeMillis(0);
+		gc.gc();
+		stats = gc.getStatistics();
+		assertEquals(0, stats.numberOfLooseObjects);
+		// if objects exist in multiple packFiles then they are counted multiple
+		// times
+		assertEquals(9, stats.numberOfPackedObjects);
+		assertEquals(2, stats.numberOfPackFiles);
+
 		// repack again but now without a grace period for packfiles. We should
 		// end up with one packfile
-		gc.setExpireAgeMillis(0);
+		gc.setPackExpireAgeMillis(0);
 		gc.gc();
 		stats = gc.getStatistics();
 		assertEquals(0, stats.numberOfLooseObjects);
