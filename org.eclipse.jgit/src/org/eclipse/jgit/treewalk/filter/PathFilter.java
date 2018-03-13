@@ -86,7 +86,6 @@ public class PathFilter extends TreeFilter {
 	final byte[] pathRaw;
 
 	private PathFilter(final String s) {
-		assert s.length() > 0 && s.charAt(0) != '/';
 		pathStr = s;
 		pathRaw = Constants.encode(pathStr);
 	}

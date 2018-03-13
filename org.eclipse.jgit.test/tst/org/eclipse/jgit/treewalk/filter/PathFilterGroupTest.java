@@ -27,6 +27,8 @@ public class PathFilterGroupTest {
 	public void setup() {
 		// @formatter:off
 		String[] paths = new String[] {
+				"/a",
+				"/a/b",
 				"a",
 				"b/c",
 				"c/d/e",
