@@ -92,7 +92,6 @@ import java.util.zip.GZIPOutputStream;
 
 import javax.net.ssl.SSLHandshakeException;
 
-import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.PackProtocolException;
@@ -107,7 +106,6 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.lib.SymbolicRef;
-import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.transport.HttpAuthMethod.Type;
 import org.eclipse.jgit.transport.HttpConfig.HttpRedirectMode;
 import org.eclipse.jgit.transport.http.HttpConnection;
@@ -645,7 +643,9 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 						if (trustNow || trustLocal || trustAlways) {
 							sslVerify = false;
 							if (trustAlways) {
-								updateSslVerifyUser(false);
+								updateSslVerify(SystemReader.getInstance()
+										.openUserConfig(null, FS.DETECTED),
+										false);
 							} else if (trustLocal) {
 								updateSslVerify(local.getConfig(), false);
 							}
@@ -685,7 +685,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 	private void updateSslVerify(StoredConfig config, boolean value) {
 		// Since git uses the original URI for matching, we must also use the
 		// original URI and cannot use the current URI (which might be different
-		// after redirects).
+		// after redirects)
 		String uriPattern = uri.getScheme() + "://" + uri.getHost(); //$NON-NLS-1$
 		int port = uri.getPort();
 		if (port > 0) {
@@ -697,19 +697,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			config.save();
 		} catch (IOException e) {
 			LOG.error(JGitText.get().sslVerifyCannotSave, e);
-		}
-	}
-
-	private void updateSslVerifyUser(boolean value) {
-		FileBasedConfig userConfig = SystemReader.getInstance()
-				.openUserConfig(null, FS.DETECTED);
-		try {
-			userConfig.load();
-			updateSslVerify(userConfig, value);
-		} catch (IOException | ConfigInvalidException e) {
-			// Log it, but otherwise ignore here.
-			LOG.error(MessageFormat.format(JGitText.get().userConfigFileInvalid,
-					userConfig.getFile().getAbsolutePath(), e));
 		}
 	}
 
