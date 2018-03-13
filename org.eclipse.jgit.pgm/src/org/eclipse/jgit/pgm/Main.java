@@ -57,7 +57,6 @@ import java.util.List;
 import org.eclipse.jgit.awtui.AwtAuthenticator;
 import org.eclipse.jgit.awtui.AwtCredentialsProvider;
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.lfs.CleanFilter;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryBuilder;
 import org.eclipse.jgit.pgm.internal.CLIText;
@@ -98,7 +97,6 @@ public class Main {
 	 */
 	public Main() {
 		HttpTransport.setConnectionFactory(new HttpClientConnectionFactory());
-		CleanFilter.register();
 	}
 
 	/**

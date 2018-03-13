@@ -63,9 +63,9 @@ public interface FilterCommandFactory {
 	 *            the {@link InputStream} this command should read from
 	 * @param out
 	 *            the {@link OutputStream} this command should write to
-	 * @return the create {@link FilterCommand}
+	 * @return the created {@link FilterCommand}
 	 * @throws IOException
-	 *             thrown when the command constructor throws a IOException
+	 *             thrown when the command constructor throws an IOException
 	 */
 	public FilterCommand create(Repository db, InputStream in,
 			OutputStream out) throws IOException;
