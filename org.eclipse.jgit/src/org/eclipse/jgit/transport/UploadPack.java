@@ -189,7 +189,7 @@ public class UploadPack {
 		refFilter = RefFilter.DEFAULT;
 	}
 
-	/** @return the repository this receive completes into. */
+	/** @return the repository this upload is reading from. */
 	public final Repository getRepository() {
 		return db;
 	}
@@ -245,9 +245,10 @@ public class UploadPack {
 	/**
 	 * Set the filter used while advertising the refs to the client.
 	 * <p>
-	 * Only refs allowed by this filter will be sent to the client. This
-	 * can be used by the client to verify that the user using this receive
-	 * pack is only shown refs that he has access to.
+	 * Only refs allowed by this filter will be sent to the client. This can
+	 * be used by a server to restrict the list of references the client can
+	 * obtain through clone or fetch, effectively limiting the access to only
+	 * certain refs.
 	 *
 	 * @param refFilter
 	 *            the filter; may be null to show all refs.
@@ -308,7 +309,7 @@ public class UploadPack {
 		if (biDirectionalPipe)
 			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
 		else {
-			refs = getFilteredRefs();
+			refs = refFilter.filter(db.getAllRefs());
 			for (Ref r : refs.values()) {
 				try {
 					walk.parseAny(r.getObjectId()).add(ADVERTISED);
@@ -352,7 +353,7 @@ public class UploadPack {
 		adv.advertiseCapability(OPTION_THIN_PACK);
 		adv.advertiseCapability(OPTION_NO_PROGRESS);
 		adv.setDerefTags(true);
-		refs = getFilteredRefs();
+		refs = refFilter.filter(db.getAllRefs());
 		adv.send(refs);
 		adv.end();
 	}
@@ -593,13 +594,4 @@ public class UploadPack {
 			rawOut.flush();
 		}
 	}
-
-	private Map<String, Ref> getFilteredRefs() {
-		Map<String, Ref> r = db.getAllRefs();
-		for (String name : r.keySet())
-			if (!refFilter.show(r.get(name)))
-				r.remove(name);
-		return r;
-	}
-
 }

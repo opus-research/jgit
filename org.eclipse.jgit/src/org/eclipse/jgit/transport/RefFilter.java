@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010, Google Inc.
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,14 +43,15 @@
 
 package org.eclipse.jgit.transport;
 
+import java.util.Map;
+
 import org.eclipse.jgit.lib.Ref;
 
 /**
  * Filters the list of refs that are advertised to the client.
  * <p>
- * The filter is called by {@link ReceivePack} and {@link UploadPack} for each
- * ref in the repository to make sure that this ref should be advertised to the
- * client.
+ * The filter is called by {@link ReceivePack} and {@link UploadPack} to ensure
+ * that the refs are filtered before they are advertised to the client.
  * <p>
  * This can be used by applications to control visibility of certain refs based
  * on a custom set of rules.
@@ -58,18 +59,18 @@ import org.eclipse.jgit.lib.Ref;
 public interface RefFilter {
 	/** The default filter, allows all refs to be shown. */
 	public static final RefFilter DEFAULT = new RefFilter() {
-		public boolean show(final Ref ref) {
-			return true;
+		public Map<String, Ref> filter (final Map<String, Ref> refs) {
+			return refs;
 		}
 	};
 
 	/**
-	 * Decides whether {@code ref} should be advertised to the client.
+	 * Filters a {@code Map} of refs before it is advertised to the client.
 	 *
-	 * @param ref
-	 *            the ref which this method needs to consider.
-	 * @return {@code true}
-	 *            if the ref passed in argument should be shown.
+	 * @param refs
+	 *            the refs which this method need to consider.
+	 * @return
+	 *            the filtered map of refs.
 	 */
-	public boolean show(final Ref ref);
+	public Map<String, Ref> filter(Map<String, Ref> refs);
 }

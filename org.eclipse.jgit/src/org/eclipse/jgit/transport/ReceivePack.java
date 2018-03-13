@@ -347,9 +347,10 @@ public class ReceivePack {
 	/**
 	 * Set the filter used while advertising the refs to the client.
 	 * <p>
-	 * Only refs allowed by this filter will be sent to the client. This
-	 * can be used by the client to verify that the user using this receive
-	 * pack is only shown refs that he has access to.
+	 * Only refs allowed by this filter will be shown to the client.
+	 * Clients may still attempt to create or update a reference hidden
+	 * by the configured {@link RefFilter}. These attempts should be
+	 * rejected by a matching {@link PreReceiveHook}.
 	 *
 	 * @param refFilter
 	 *            the filter; may be null to show all refs.
@@ -544,7 +545,7 @@ public class ReceivePack {
 		if (biDirectionalPipe)
 			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
 		else
-			refs = getFilteredRefs();
+			refs = refFilter.filter(db.getAllRefs());
 		recvCommands();
 		if (!commands.isEmpty()) {
 			enableCapabilities();
@@ -597,14 +598,6 @@ public class ReceivePack {
 		}
 	}
 
-	private Map<String, Ref> getFilteredRefs() {
-		Map<String, Ref> r = db.getAllRefs();
-		for (String name : r.keySet())
-			if (!refFilter.show(r.get(name)))
-				r.remove(name);
-		return r;
-	}
-
 	/**
 	 * Generate an advertisement of available refs and capabilities.
 	 *
@@ -620,7 +613,7 @@ public class ReceivePack {
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
 		if (allowOfsDelta)
 			adv.advertiseCapability(CAPABILITY_OFS_DELTA);
-		refs = getFilteredRefs();
+		refs = refFilter.filter(db.getAllRefs());
 		final Ref head = refs.remove(Constants.HEAD);
 		adv.send(refs);
 		if (head != null && !head.isSymbolic())
