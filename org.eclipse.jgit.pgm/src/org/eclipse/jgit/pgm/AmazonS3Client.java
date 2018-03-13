@@ -57,7 +57,6 @@ import java.net.URLConnection;
 import java.text.MessageFormat;
 import java.util.Properties;
 
-import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.transport.AmazonS3;
 import org.kohsuke.args4j.Argument;
 
