@@ -718,11 +718,12 @@ public class PackWriter {
 		final PackedObjectLoader reuse = open(otp);
 		if (reuse != null) {
 			try {
-				if (otp.isDeltaRepresentation())
-					writeDeltaObjectHeader(otp, reuse);
-				else
+				if (otp.isDeltaRepresentation()) {
+					writeDeltaObjectReuse(otp, reuse);
+				} else {
 					writeObjectHeader(otp.getType(), reuse.getSize());
-				reuse.copyRawData(out, buf, windowCursor);
+					reuse.copyRawData(out, buf, windowCursor);
+				}
 			} finally {
 				reuse.endCopyRawData();
 			}
@@ -772,7 +773,7 @@ public class PackWriter {
 		} while (!deflater.finished());
 	}
 
-	private void writeDeltaObjectHeader(final ObjectToPack otp,
+	private void writeDeltaObjectReuse(final ObjectToPack otp,
 			final PackedObjectLoader reuse) throws IOException {
 		if (deltaBaseAsOffset && otp.getDeltaBase() != null) {
 			writeObjectHeader(Constants.OBJ_OFS_DELTA, reuse.getRawSize());
@@ -791,6 +792,7 @@ public class PackWriter {
 			otp.getDeltaBaseId().copyRawTo(buf, 0);
 			out.write(buf, 0, Constants.OBJECT_ID_LENGTH);
 		}
+		reuse.copyRawData(out, buf, windowCursor);
 	}
 
 	private void writeObjectHeader(final int objectType, long dataLength)
