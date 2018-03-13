@@ -47,7 +47,7 @@ package org.eclipse.jgit.lib;
 
 import junit.framework.TestCase;
 
-public class T0001_ObjectId extends TestCase {
+public class ObjectIdTest extends TestCase {
 	public void test001_toString() {
 		final String x = "def4c620bc3713bb1bb26b808ec9312548e73946";
 		final ObjectId oid = ObjectId.fromString(x);
@@ -107,5 +107,48 @@ public class T0001_ObjectId extends TestCase {
 		final String x = "0123456789ABCDEFabcdef1234567890abcdefAB";
 		final ObjectId oid = ObjectId.fromString(x);
 		assertEquals(x.toLowerCase(), oid.name());
+	}
+
+	public void testGetByte() {
+		byte[] raw = new byte[20];
+		for (int i = 0; i < 20; i++)
+			raw[i] = (byte) (0xa0 + i);
+		ObjectId id = ObjectId.fromRaw(raw);
+
+		assertEquals(raw[0] & 0xff, id.getFirstByte());
+		assertEquals(raw[0] & 0xff, id.getByte(0));
+		assertEquals(raw[1] & 0xff, id.getByte(1));
+
+		for (int i = 2; i < 20; i++)
+			assertEquals("index " + i, raw[i] & 0xff, id.getByte(i));
+	}
+
+	public void testSetByte() {
+		byte[] exp = new byte[20];
+		for (int i = 0; i < 20; i++)
+			exp[i] = (byte) (0xa0 + i);
+
+		MutableObjectId id = new MutableObjectId();
+		id.fromRaw(exp);
+		assertEquals(ObjectId.fromRaw(exp).name(), id.name());
+
+		id.setByte(0, 0x10);
+		assertEquals(0x10, id.getByte(0));
+		exp[0] = 0x10;
+		assertEquals(ObjectId.fromRaw(exp).name(), id.name());
+
+		for (int p = 1; p < 20; p++) {
+			id.setByte(p, 0x10 + p);
+			assertEquals(0x10 + p, id.getByte(p));
+			exp[p] = (byte) (0x10 + p);
+			assertEquals(ObjectId.fromRaw(exp).name(), id.name());
+		}
+
+		for (int p = 0; p < 20; p++) {
+			id.setByte(p, 0x80 + p);
+			assertEquals(0x80 + p, id.getByte(p));
+			exp[p] = (byte) (0x80 + p);
+			assertEquals(ObjectId.fromRaw(exp).name(), id.name());
+		}
 	}
 }

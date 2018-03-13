@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,65 +40,34 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
 
-import org.eclipse.jgit.revwalk.RevCommit;
+package org.eclipse.jgit.notes;
 
-/**
- * The result of a {@link RebaseCommand} execution
- */
-public class RebaseResult {
+/** A note bucket that has been loaded into the process. */
+abstract class InMemoryNoteBucket extends NoteBucket {
 	/**
-	 * The overall status
+	 * Number of leading digits that leads to this bucket in the note path.
+	 *
+	 * This is counted in terms of hex digits, not raw bytes. Each bucket level
+	 * is typically 2 higher than its parent, placing about 256 items in each
+	 * level of the tree.
 	 */
-	public enum Status {
-		/**
-		 * Rebase was successful, HEAD points to the new commit
-		 */
-		OK,
-		/**
-		 * Aborted; the original HEAD was restored
-		 */
-		ABORTED,
-		/**
-		 * Stopped due to a conflict; must either abort or resolve or skip
-		 */
-		STOPPED,
-		/**
-		 * Already up-to-date
-		 */
-		UP_TO_DATE;
-	}
-
-	static final RebaseResult UP_TO_DATE_RESULT = new RebaseResult(
-			Status.UP_TO_DATE);
-
-	private final Status mySatus;
-
-	private final RevCommit currentCommit;
-
-	RebaseResult(Status status) {
-		this.mySatus = status;
-		currentCommit = null;
-	}
-
-	RebaseResult(RevCommit commit) {
-		this.mySatus = Status.STOPPED;
-		currentCommit = commit;
-	}
+	final int prefixLen;
 
 	/**
-	 * @return the overall status
+	 * Chain of non-note tree entries found at this path in the tree.
+	 *
+	 * During parsing of a note tree into the in-memory representation,
+	 * {@link NoteParser} keeps track of all non-note tree entries and stores
+	 * them here as a sorted linked list. That list can be merged back with the
+	 * note data that is held by the subclass, allowing the tree to be
+	 * recreated.
 	 */
-	public Status getStatus() {
-		return mySatus;
+	NonNoteEntry nonNotes;
+
+	InMemoryNoteBucket(int prefixLen) {
+		this.prefixLen = prefixLen;
 	}
 
-	/**
-	 * @return the current commit if status is {@link Status#STOPPED}, otherwise
-	 *         <code>null</code>
-	 */
-	public RevCommit getCurrentCommit() {
-		return currentCommit;
-	}
+	abstract InMemoryNoteBucket append(Note note);
 }

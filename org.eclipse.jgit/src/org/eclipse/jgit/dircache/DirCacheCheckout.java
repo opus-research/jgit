@@ -144,8 +144,8 @@ public class DirCacheCheckout {
 	}
 
 	/**
-	 * Constructs a DirCacheCeckout for fast-forwarding from one tree to
-	 * another, merging it with the index
+	 * Constructs a DirCacheCeckout for merging and checking out two trees (HEAD
+	 * and mergeCommitTree) and the index.
 	 *
 	 * @param repo
 	 *            the repository in which we do the checkout
@@ -170,9 +170,9 @@ public class DirCacheCheckout {
 	}
 
 	/**
-	 * Constructs a DirCacheCeckout for checking out one tree, merging with the
-	 * index. As iterator over the working tree this constructor creates a
-	 * standard {@link FileTreeIterator}
+	 * Constructs a DirCacheCeckout for merging and checking out two trees (HEAD
+	 * and mergeCommitTree) and the index. As iterator over the working tree
+	 * this constructor creates a standard {@link FileTreeIterator}
 	 *
 	 * @param repo
 	 *            the repository in which we do the checkout
@@ -184,9 +184,49 @@ public class DirCacheCheckout {
 	 *            the id of the tree of the
 	 * @throws IOException
 	 */
-	public DirCacheCheckout(Repository repo, ObjectId headCommitTree, DirCache dc,
-			ObjectId mergeCommitTree) throws IOException {
+	public DirCacheCheckout(Repository repo, ObjectId headCommitTree,
+			DirCache dc, ObjectId mergeCommitTree) throws IOException {
 		this(repo, headCommitTree, dc, mergeCommitTree, new FileTreeIterator(
+				repo.getWorkTree(), repo.getFS(),
+				WorkingTreeOptions.createDefaultInstance()));
+	}
+
+	/**
+	 * Constructs a DirCacheCeckout for checking out one tree, merging with the
+	 * index.
+	 *
+	 * @param repo
+	 *            the repository in which we do the checkout
+	 * @param dc
+	 *            the (already locked) Dircache for this repo
+	 * @param mergeCommitTree
+	 *            the id of the tree we want to fast-forward to
+	 * @param workingTree
+	 *            an iterator over the repositories Working Tree
+	 * @throws IOException
+	 */
+	public DirCacheCheckout(Repository repo, DirCache dc,
+			ObjectId mergeCommitTree, WorkingTreeIterator workingTree)
+			throws IOException {
+		this(repo, null, dc, mergeCommitTree, workingTree);
+	}
+
+	/**
+	 * Constructs a DirCacheCeckout for checking out one tree, merging with the
+	 * index. As iterator over the working tree this constructor creates a
+	 * standard {@link FileTreeIterator}
+	 *
+	 * @param repo
+	 *            the repository in which we do the checkout
+	 * @param dc
+	 *            the (already locked) Dircache for this repo
+	 * @param mergeCommitTree
+	 *            the id of the tree of the
+	 * @throws IOException
+	 */
+	public DirCacheCheckout(Repository repo, DirCache dc,
+			ObjectId mergeCommitTree) throws IOException {
+		this(repo, null, dc, mergeCommitTree, new FileTreeIterator(
 				repo.getWorkTree(), repo.getFS(),
 				WorkingTreeOptions.createDefaultInstance()));
 	}
@@ -335,13 +375,11 @@ public class DirCacheCheckout {
 		// when deleting files process them in the opposite order as they have
 		// been reported. This ensures the files are deleted before we delete
 		// their parent folders
-		for (int i = removed.size(); i > 0; i--) {
-			String r = removed.get(i - 1);
+		for (int i = removed.size() - 1; i >= 0; i--) {
+			String r = removed.get(i);
 			file = new File(repo.getWorkTree(), r);
-			if (!file.delete()) {
-				if (file.exists())
+			if (!file.delete() && file.exists())
 					toBeDeleted.add(r);
-			}
 			else {
 				if (!isSamePrefix(r, last))
 					removeEmptyParents(file);

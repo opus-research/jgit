@@ -157,8 +157,8 @@ public class DirCacheCheckoutTest extends ReadTreeTest {
 		RevWalk walk = new RevWalk(db);
 		RevCommit head = walk.parseCommit(db.resolve(Constants.HEAD));
 		RevCommit branch = walk.parseCommit(db.resolve(branchName));
-		DirCacheCheckout dco = new DirCacheCheckout(db, head.getTree().getId(),
-				db.lockDirCache(), branch.getTree().getId());
+		DirCacheCheckout dco = new DirCacheCheckout(db, head.getTree(),
+				db.lockDirCache(), branch.getTree());
 		dco.setFailOnConflict(true);
 		assertTrue(dco.checkout());
 		walk.release();
