@@ -75,6 +75,7 @@ import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdSet;
 import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.Sets;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.DepthWalk;
 import org.eclipse.jgit.revwalk.ObjectWalk;
@@ -109,26 +110,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	private ObjectInserter inserter;
 
 	private FileRepository dst;
-
-	private RevBlob contentA;
-
-	private RevBlob contentB;
-
-	private RevBlob contentC;
-
-	private RevBlob contentD;
-
-	private RevBlob contentE;
-
-	private RevCommit c1;
-
-	private RevCommit c2;
-
-	private RevCommit c3;
-
-	private RevCommit c4;
-
-	private RevCommit c5;
 
 	@Before
 	public void setUp() throws Exception {
@@ -547,7 +528,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		RevBlob contentB = testRepo.blob("B");
 		RevCommit c2 = bb.commit().add("f", contentB).create();
 		testRepo.getRevWalk().parseHeaders(c2);
-		PackIndex pf2 = writePack(repo, wants(c2), asSet((ObjectIdSet) pf1));
+		PackIndex pf2 = writePack(repo, wants(c2), Sets.of((ObjectIdSet) pf1));
 		assertContent(
 				pf2,
 				Arrays.asList(c2.getId(), c2.getTree().getId(),
@@ -566,7 +547,24 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 
 	@Test
 	public void testShallowIsMinimal() throws Exception {
-		FileRepository repo = setupRepoForShallowFetch();
+		FileRepository repo = createBareRepository();
+		TestRepository<Repository> r = new TestRepository<Repository>(repo);
+		BranchBuilder bb = r.branch("refs/heads/master");
+		RevBlob contentA = r.blob("A");
+		RevBlob contentB = r.blob("B");
+		RevBlob contentC = r.blob("C");
+		RevBlob contentD = r.blob("D");
+		RevBlob contentE = r.blob("E");
+		RevCommit c1 = bb.commit().add("a", contentA).create();
+		RevCommit c2 = bb.commit().add("b", contentB).create();
+		RevCommit c3 = bb.commit().add("c", contentC).create();
+		RevCommit c4 = bb.commit().add("d", contentD).create();
+		RevCommit c5 = bb.commit().add("e", contentE).create();
+		r.getRevWalk().parseHeaders(c1);
+		r.getRevWalk().parseHeaders(c2);
+		r.getRevWalk().parseHeaders(c3);
+		r.getRevWalk().parseHeaders(c4);
+		r.getRevWalk().parseHeaders(c5);
 
 		PackIndex idx = writeShallowPack(repo, 1, wants(c2), NONE, NONE);
 		assertContent(idx,
@@ -580,60 +578,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 				Arrays.asList(c4.getId(), c5.getId(), c4.getTree().getId(),
 						c5.getTree().getId(), contentC.getId(),
 						contentD.getId(), contentE.getId()));
-	}
-
-	@Test
-	public void testShallowFetchShallowParent() throws Exception {
-		FileRepository repo = setupRepoForShallowFetch();
-
-		PackIndex idx = writeShallowPack(repo, 1, wants(c5), NONE, NONE);
-		assertContent(idx,
-				Arrays.asList(c4.getId(), c5.getId(), c4.getTree().getId(),
-						c5.getTree().getId(), contentA.getId(),
-						contentB.getId(), contentC.getId(), contentD.getId(),
-						contentE.getId()));
-
-		idx = writeShallowPack(repo, 1, wants(c3), haves(c4, c5), shallows(c4));
-		assertContent(idx, Arrays.asList(c2.getId(), c3.getId(),
-				c2.getTree().getId(), c3.getTree().getId()));
-	}
-
-	@Test
-	public void testShallowFetchShallowAncestor() throws Exception {
-		FileRepository repo = setupRepoForShallowFetch();
-
-		PackIndex idx = writeShallowPack(repo, 1, wants(c5), NONE, NONE);
-		assertContent(idx,
-				Arrays.asList(c4.getId(), c5.getId(), c4.getTree().getId(),
-						c5.getTree().getId(), contentA.getId(),
-						contentB.getId(), contentC.getId(), contentD.getId(),
-						contentE.getId()));
-
-		idx = writeShallowPack(repo, 1, wants(c2), haves(c4, c5), shallows(c4));
-		assertContent(idx, Arrays.asList(c1.getId(), c2.getId(),
-				c1.getTree().getId(), c2.getTree().getId()));
-	}
-
-	private FileRepository setupRepoForShallowFetch() throws Exception {
-		FileRepository repo = createBareRepository();
-		TestRepository<Repository> r = new TestRepository<Repository>(repo);
-		BranchBuilder bb = r.branch("refs/heads/master");
-		contentA = r.blob("A");
-		contentB = r.blob("B");
-		contentC = r.blob("C");
-		contentD = r.blob("D");
-		contentE = r.blob("E");
-		c1 = bb.commit().add("a", contentA).create();
-		c2 = bb.commit().add("b", contentB).create();
-		c3 = bb.commit().add("c", contentC).create();
-		c4 = bb.commit().add("d", contentD).create();
-		c5 = bb.commit().add("e", contentE).create();
-		r.getRevWalk().parseHeaders(c1);
-		r.getRevWalk().parseHeaders(c2);
-		r.getRevWalk().parseHeaders(c3);
-		r.getRevWalk().parseHeaders(c4);
-		r.getRevWalk().parseHeaders(c5);
-		return repo;
 	}
 
 	private static PackIndex writePack(FileRepository repo,
@@ -849,23 +793,14 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	}
 
 	private static Set<ObjectId> haves(ObjectId... objects) {
-		return asSet(objects);
+		return Sets.of(objects);
 	}
 
 	private static Set<ObjectId> wants(ObjectId... objects) {
-		return asSet(objects);
+		return Sets.of(objects);
 	}
 
 	private static Set<ObjectId> shallows(ObjectId... objects) {
-		return asSet(objects);
-	}
-
-	private static <T> Set<T> asSet(
-			@SuppressWarnings("unchecked") T... objects) {
-		Set<T> set = new HashSet<>();
-		for (T o : objects) {
-			set.add(o);
-		}
-		return set;
+		return Sets.of(objects);
 	}
 }
