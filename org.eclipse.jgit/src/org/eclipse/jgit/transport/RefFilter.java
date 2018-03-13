@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, Google Inc.
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,57 +43,34 @@
 
 package org.eclipse.jgit.transport;
 
-import java.io.IOException;
-import java.io.OutputStream;
+import java.util.Map;
+
+import org.eclipse.jgit.lib.Ref;
 
 /**
- * Multiplexes data and progress messages
+ * Filters the list of refs that are advertised to the client.
  * <p>
- * To correctly use this class you must wrap it in a BufferedOutputStream with a
- * buffer size no larger than either {@link #SMALL_BUF} or {@link #MAX_BUF},
- * minus {@link #HDR_SIZE}.
+ * The filter is called by {@link ReceivePack} and {@link UploadPack} to ensure
+ * that the refs are filtered before they are advertised to the client.
+ * <p>
+ * This can be used by applications to control visibility of certain refs based
+ * on a custom set of rules.
  */
-class SideBandOutputStream extends OutputStream {
-	static final int CH_DATA = SideBandInputStream.CH_DATA;
+public interface RefFilter {
+	/** The default filter, allows all refs to be shown. */
+	public static final RefFilter DEFAULT = new RefFilter() {
+		public Map<String, Ref> filter (final Map<String, Ref> refs) {
+			return refs;
+		}
+	};
 
-	static final int CH_PROGRESS = SideBandInputStream.CH_PROGRESS;
-
-	static final int CH_ERROR = SideBandInputStream.CH_ERROR;
-
-	static final int SMALL_BUF = 1000;
-
-	static final int MAX_BUF = 65520;
-
-	static final int HDR_SIZE = 5;
-
-	private final int channel;
-
-	private final PacketLineOut pckOut;
-
-	private byte[] singleByteBuffer;
-
-	SideBandOutputStream(final int chan, final PacketLineOut out) {
-		channel = chan;
-		pckOut = out;
-	}
-
-	@Override
-	public void flush() throws IOException {
-		if (channel != CH_DATA)
-			pckOut.flush();
-	}
-
-	@Override
-	public void write(final byte[] b, final int off, final int len)
-			throws IOException {
-		pckOut.writeChannelPacket(channel, b, off, len);
-	}
-
-	@Override
-	public void write(final int b) throws IOException {
-		if (singleByteBuffer == null)
-			singleByteBuffer = new byte[1];
-		singleByteBuffer[0] = (byte) b;
-		write(singleByteBuffer);
-	}
+	/**
+	 * Filters a {@code Map} of refs before it is advertised to the client.
+	 *
+	 * @param refs
+	 *            the refs which this method need to consider.
+	 * @return
+	 *            the filtered map of refs.
+	 */
+	public Map<String, Ref> filter(Map<String, Ref> refs);
 }

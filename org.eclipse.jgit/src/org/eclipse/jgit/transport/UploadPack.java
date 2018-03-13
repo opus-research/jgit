@@ -43,6 +43,9 @@
 
 package org.eclipse.jgit.transport;
 
+import static org.eclipse.jgit.transport.BasePackFetchConnection.MultiAck;
+
+import java.io.BufferedOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -67,7 +70,6 @@ import org.eclipse.jgit.revwalk.RevFlagSet;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.transport.BasePackFetchConnection.MultiAck;
 import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 import org.eclipse.jgit.util.io.InterruptTimer;
 import org.eclipse.jgit.util.io.TimeoutInputStream;
@@ -129,6 +131,9 @@ public class UploadPack {
 	/** The refs we advertised as existing at the start of the connection. */
 	private Map<String, Ref> refs;
 
+	/** Filter used while advertising the refs to the client. */
+	private RefFilter refFilter;
+
 	/** Capabilities requested by the client. */
 	private final Set<String> options = new HashSet<String>();
 
@@ -181,9 +186,10 @@ public class UploadPack {
 		SAVE.add(ADVERTISED);
 		SAVE.add(WANT);
 		SAVE.add(PEER_HAS);
+		refFilter = RefFilter.DEFAULT;
 	}
 
-	/** @return the repository this receive completes into. */
+	/** @return the repository this upload is reading from. */
 	public final Repository getRepository() {
 		return db;
 	}
@@ -229,6 +235,26 @@ public class UploadPack {
 	 */
 	public void setBiDirectionalPipe(final boolean twoWay) {
 		biDirectionalPipe = twoWay;
+	}
+
+	/** @return the filter used while advertising the refs to the client */
+	public RefFilter getRefFilter() {
+		return refFilter;
+	}
+
+	/**
+	 * Set the filter used while advertising the refs to the client.
+	 * <p>
+	 * Only refs allowed by this filter will be sent to the client. This can
+	 * be used by a server to restrict the list of references the client can
+	 * obtain through clone or fetch, effectively limiting the access to only
+	 * certain refs.
+	 *
+	 * @param refFilter
+	 *            the filter; may be null to show all refs.
+	 */
+	public void setRefFilter(final RefFilter refFilter) {
+		this.refFilter = refFilter != null ? refFilter : RefFilter.DEFAULT;
 	}
 
 	/**
@@ -283,7 +309,7 @@ public class UploadPack {
 		if (biDirectionalPipe)
 			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
 		else {
-			refs = db.getAllRefs();
+			refs = refFilter.filter(db.getAllRefs());
 			for (Ref r : refs.values()) {
 				try {
 					walk.parseAny(r.getObjectId()).add(ADVERTISED);
@@ -327,7 +353,7 @@ public class UploadPack {
 		adv.advertiseCapability(OPTION_THIN_PACK);
 		adv.advertiseCapability(OPTION_NO_PROGRESS);
 		adv.setDerefTags(true);
-		refs = db.getAllRefs();
+		refs = refFilter.filter(db.getAllRefs());
 		adv.send(refs);
 		adv.end();
 	}
@@ -530,12 +556,13 @@ public class UploadPack {
 			int bufsz = SideBandOutputStream.SMALL_BUF;
 			if (options.contains(OPTION_SIDE_BAND_64K))
 				bufsz = SideBandOutputStream.MAX_BUF;
+			bufsz -= SideBandOutputStream.HDR_SIZE;
 
-			packOut = new SideBandOutputStream(SideBandOutputStream.CH_DATA,
-					bufsz, rawOut);
+			packOut = new BufferedOutputStream(new SideBandOutputStream(
+					SideBandOutputStream.CH_DATA, pckOut), bufsz);
+
 			if (progress)
-				pm = new SideBandProgressMonitor(new SideBandOutputStream(
-						SideBandOutputStream.CH_PROGRESS, bufsz, rawOut));
+				pm = new SideBandProgressMonitor(pckOut);
 		}
 
 		final PackWriter pw;
