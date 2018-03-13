@@ -144,7 +144,7 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 		init(myIn, myOut);
 	}
 
-	public void subscribe(SubscriptionState subscriber,
+	public void subscribe(SubscribeState subscriber,
 			Map<String, List<SubscribeCommand>> subscribeCommands,
 			PrintWriter output)
 			throws InterruptedException, TransportException, IOException {
@@ -189,7 +189,7 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 	 * @throws TransportException
 	 * @throws IOException
 	 */
-	private void readUpdate(SubscriptionState subscriber, PrintWriter output)
+	private void readUpdate(SubscribeState subscriber, PrintWriter output)
 			throws TransportException, IOException {
 		String line = pckIn.readString();
 		if (line.equals("heartbeat"))
@@ -266,12 +266,12 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 				write("stop " + cmd.getSpec());
 				break;
 			default:
-				throw new IllegalArgumentException();
+				throw new IllegalArgumentException(cmd.toString());
 			}
 		}
 	}
 
-	private void writeSubscribeHeader(SubscriptionState subscriber)
+	private void writeSubscribeHeader(SubscribeState subscriber)
 			throws IOException {
 		write("subscribe");
 		// Send restart
@@ -285,7 +285,7 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 		pckOut.end();
 	}
 
-	public void sendSubscribeAdvertisement(SubscriptionState subscriber)
+	public void sendSubscribeAdvertisement(SubscribeState subscriber)
 			throws IOException, TransportException {
 		try {
 			pckOut.writeString("advertisement");

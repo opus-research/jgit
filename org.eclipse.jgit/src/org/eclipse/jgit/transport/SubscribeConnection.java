@@ -68,7 +68,7 @@ public interface SubscribeConnection extends Connection {
 	 *             repository, the remote repository does not exist, or a
 	 *             protocol level error occurred.
 	 */
-	void sendSubscribeAdvertisement(SubscriptionState subscriber)
+	void sendSubscribeAdvertisement(SubscribeState subscriber)
 			throws IOException, TransportException;
 
 	/**
@@ -86,7 +86,7 @@ public interface SubscribeConnection extends Connection {
 	 * @throws IOException
 	 * @throws TransportException
 	 */
-	void subscribe(SubscriptionState subscriber,
+	void subscribe(SubscribeState subscriber,
 			Map<String, List<SubscribeCommand>> subscribeCommands,
 			PrintWriter output)
 			throws InterruptedException, TransportException, IOException;
