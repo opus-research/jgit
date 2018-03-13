@@ -195,9 +195,6 @@ public class ResetCommand extends GitCommand<Ref> {
 				result = repo.getRef(Constants.HEAD);
 			}
 
-			if (mode == null)
-				mode = ResetType.MIXED;
-
 			switch (mode) {
 				case HARD:
 					checkoutIndex(commitTree);
@@ -282,17 +279,16 @@ public class ResetCommand extends GitCommand<Ref> {
 	}
 
 	/**
-	 * @param path
-	 *            repository-relative path of file/directory to reset (with
-	 *            <code>/</code> as separator)
+	 * @param file
+	 *            the file to add
 	 * @return this instance
 	 */
-	public ResetCommand addPath(String path) {
+	public ResetCommand addPath(String file) {
 		if (mode != null)
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().illegalCombinationOfArguments, "<paths>...",
 					"[--mixed | --soft | --hard]")); //$NON-NLS-1$
-		filepaths.add(path);
+		filepaths.add(file);
 		return this;
 	}
 

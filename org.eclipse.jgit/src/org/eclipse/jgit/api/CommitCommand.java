@@ -245,8 +245,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 					case FORCED:
 					case FAST_FORWARD: {
 						setCallable(false);
-						if (state == RepositoryState.MERGING_RESOLVED
-								|| isMergeDuringRebase(state)) {
+						if (state == RepositoryState.MERGING_RESOLVED) {
 							// Commit was successful. Now delete the files
 							// used for merge commits
 							repo.writeMergeCommitMsg(null);
@@ -490,8 +489,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 			author = committer;
 
 		// when doing a merge commit parse MERGE_HEAD and MERGE_MSG files
-		if (state == RepositoryState.MERGING_RESOLVED
-				|| isMergeDuringRebase(state)) {
+		if (state == RepositoryState.MERGING_RESOLVED) {
 			try {
 				parents = repo.readMergeHeads();
 				if (parents != null)
@@ -530,19 +528,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 			// as long as we don't support -C option we have to have
 			// an explicit message
 			throw new NoMessageException(JGitText.get().commitMessageNotSpecified);
-	}
-
-	private boolean isMergeDuringRebase(RepositoryState state) {
-		if (state != RepositoryState.REBASING_INTERACTIVE
-				&& state != RepositoryState.REBASING_MERGE)
-			return false;
-		try {
-			return repo.readMergeHeads() != null;
-		} catch (IOException e) {
-			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().exceptionOccurredDuringReadingOfGIT_DIR,
-					Constants.MERGE_HEAD, e), e);
-		}
 	}
 
 	/**
@@ -682,14 +667,14 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	}
 
 	/**
-	 * Commit dedicated path only.
-	 * <p>
+	 * Commit dedicated path only
+	 *
 	 * This method can be called several times to add multiple paths. Full file
 	 * paths are supported as well as directory paths; in the latter case this
-	 * commits all files/directories below the specified path.
+	 * commits all files/ directories below the specified path.
 	 *
 	 * @param only
-	 *            path to commit (with <code>/</code> as separator)
+	 *            path to commit
 	 * @return {@code this}
 	 */
 	public CommitCommand setOnly(String only) {

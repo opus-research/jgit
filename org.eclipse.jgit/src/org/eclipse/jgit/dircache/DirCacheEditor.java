@@ -274,8 +274,8 @@ public class DirCacheEditor extends BaseDirCacheEditor {
 		 */
 		public DeleteTree(final String entryPath) {
 			super(
-					(entryPath.endsWith("/") || entryPath.length() == 0) ? entryPath //$NON-NLS-1$
-							: entryPath + "/"); //$NON-NLS-1$
+					(entryPath.endsWith("/") || entryPath.length() == 0) ? entryPath
+							: entryPath + "/");
 		}
 
 		public void apply(final DirCacheEntry ent) {

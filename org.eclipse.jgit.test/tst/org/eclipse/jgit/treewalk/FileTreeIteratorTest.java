@@ -56,14 +56,13 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.dircache.DirCacheEditor;
-import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
+import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.junit.RepositoryTestCase;
-import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
@@ -100,19 +99,6 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testGetEntryContentLength() throws Exception {
-		final FileTreeIterator fti = new FileTreeIterator(db);
-		fti.next(1);
-		assertEquals(3, fti.getEntryContentLength());
-		fti.back(1);
-		assertEquals(2, fti.getEntryContentLength());
-		fti.next(1);
-		assertEquals(3, fti.getEntryContentLength());
-		fti.reset();
-		assertEquals(2, fti.getEntryContentLength());
-	}
-
-	@Test
 	public void testEmptyIfRootIsFile() throws Exception {
 		final File r = new File(trash, paths[0]);
 		assertTrue(r.isFile());
@@ -142,43 +128,6 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 				db.getConfig().get(WorkingTreeOptions.KEY));
 		assertTrue(fti.first());
 		assertTrue(fti.eof());
-	}
-
-	@Test
-	public void testEmptyIteratorOnEmptyDirectory() throws Exception {
-		String nonExistingFileName = "not-existing-file";
-		final File r = new File(trash, nonExistingFileName);
-		assertFalse(r.exists());
-		FileUtils.mkdir(r);
-
-		final FileTreeIterator parent = new FileTreeIterator(db);
-
-		while (!parent.getEntryPathString().equals(nonExistingFileName))
-			parent.next(1);
-
-		final FileTreeIterator childIter = new FileTreeIterator(parent, r,
-				db.getFS());
-		assertTrue(childIter.first());
-		assertTrue(childIter.eof());
-
-		String parentPath = parent.getEntryPathString();
-		assertEquals(nonExistingFileName, parentPath);
-
-		// must be "not-existing-file/", but getEntryPathString() was broken by
-		// 445363 too
-		String childPath = childIter.getEntryPathString();
-
-		// in bug 445363 the iterator wrote garbage to the parent "path" field
-		EmptyTreeIterator e = childIter.createEmptyTreeIterator();
-		assertNotNull(e);
-
-		// check if parent path is not overridden by empty iterator (bug 445363)
-		// due bug 445363 this was "/ot-existing-file" instead of
-		// "not-existing-file"
-		assertEquals(parentPath, parent.getEntryPathString());
-		assertEquals(parentPath + "/", childPath);
-		assertEquals(parentPath + "/", childIter.getEntryPathString());
-		assertEquals(childPath + "/", e.getEntryPathString());
 	}
 
 	@Test
@@ -274,32 +223,26 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 		ObjectId fromRaw = ObjectId.fromRaw(fti.idBuffer(), fti.idOffset());
 		assertEquals("6b584e8ece562ebffc15d38808cd6b98fc3d97ea",
 				fromRaw.getName());
-		ObjectReader objectReader = db.newObjectReader();
-		assertFalse(fti.isModified(dce, false, objectReader));
-		objectReader.release();
+		assertFalse(fti.isModified(dce, false));
 	}
 
 	@Test
-	public void testIsModifiedSymlinkAsFile() throws Exception {
-		writeTrashFile("symlink", "content");
+	public void testIsModifiedSymlink() throws Exception {
+		File f = writeTrashFile("symlink", "content");
 		Git git = new Git(db);
-		db.getConfig().setString(ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_SYMLINKS, "false");
 		git.add().addFilepattern("symlink").call();
 		git.commit().setMessage("commit").call();
 
 		// Modify previously committed DirCacheEntry and write it back to disk
 		DirCacheEntry dce = db.readDirCache().getEntry("symlink");
 		dce.setFileMode(FileMode.SYMLINK);
-		ObjectReader objectReader = db.newObjectReader();
-		DirCacheCheckout.checkoutEntry(db, dce, objectReader);
+		DirCacheCheckout.checkoutEntry(db, f, dce);
 
 		FileTreeIterator fti = new FileTreeIterator(trash, db.getFS(), db
 				.getConfig().get(WorkingTreeOptions.KEY));
 		while (!fti.getEntryPathString().equals("symlink"))
 			fti.next(1);
-		assertFalse(fti.isModified(dce, false, objectReader));
-		objectReader.release();
+		assertFalse(fti.isModified(dce, false));
 	}
 
 	@Test
@@ -314,11 +257,6 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 		git.add().addFilepattern("file").call();
 		writeTrashFile("file", "conten2");
 		f.setLastModified(lastModified);
-		// We cannot trust this to go fast enough on
-		// a system with less than one-second lastModified
-		// resolution, so we force the index to have the
-		// same timestamp as the file we look at.
-		db.getIndexFile().setLastModified(lastModified);
 		DirCacheEntry dce = db.readDirCache().getEntry("file");
 		FileTreeIterator fti = new FileTreeIterator(trash, db.getFS(), db
 				.getConfig().get(WorkingTreeOptions.KEY));
@@ -327,9 +265,7 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 		// If the rounding trick does not work we could skip the compareMetaData
 		// test and hope that we are usually testing the intended code path.
 		assertEquals(MetadataDiff.SMUDGED, fti.compareMetadata(dce));
-		ObjectReader objectReader = db.newObjectReader();
-		assertTrue(fti.isModified(dce, false, objectReader));
-		objectReader.release();
+		assertTrue(fti.isModified(dce, false));
 	}
 
 	@Test

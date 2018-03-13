@@ -57,9 +57,10 @@ import org.eclipse.jgit.lib.ObjectLoader;
 /**
  * gzip-compressed tarball (tar.gz) format.
  */
-public final class TgzFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
-	private static final List<String> SUFFIXES = Collections
-			.unmodifiableList(Arrays.asList(".tar.gz", ".tgz")); //$NON-NLS-1$ //$NON-NLS-2$
+public class TgzFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
+	private static final List<String> SUFFIXES =
+			Collections.unmodifiableList(Arrays.asList(
+				".tar.gz", ".tgz"));
 
 	private final ArchiveCommand.Format<ArchiveOutputStream> tarFormat = new TarFormat();
 
@@ -77,15 +78,5 @@ public final class TgzFormat implements ArchiveCommand.Format<ArchiveOutputStrea
 
 	public Iterable<String> suffixes() {
 		return SUFFIXES;
-	}
-
-	@Override
-	public boolean equals(Object other) {
-		return (other instanceof TgzFormat);
-	}
-
-	@Override
-	public int hashCode() {
-		return getClass().hashCode();
 	}
 }

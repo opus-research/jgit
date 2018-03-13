@@ -147,11 +147,7 @@ public class TransportAmazonS3 extends HttpTransport implements WalkTransport {
 			throws NotSupportedException {
 		super(local, uri);
 
-		Properties props = loadProperties();
-		if (!props.contains("tmpdir") && local.getDirectory() != null) //$NON-NLS-1$
-			props.put("tmpdir", local.getDirectory().getPath()); //$NON-NLS-1$
-
-		s3 = new AmazonS3(props);
+		s3 = new AmazonS3(loadProperties());
 		bucket = uri.getHost();
 
 		String p = uri.getPath();
@@ -174,14 +170,8 @@ public class TransportAmazonS3 extends HttpTransport implements WalkTransport {
 			return loadPropertiesFile(propsFile);
 
 		Properties props = new Properties();
-		String user = uri.getUser();
-		String pass = uri.getPass();
-		if (user != null && pass != null) {
-		        props.setProperty("accesskey", user); //$NON-NLS-1$
-		        props.setProperty("secretkey", pass); //$NON-NLS-1$
-		} else
-			throw new NotSupportedException(MessageFormat.format(
-					JGitText.get().cannotReadFile, propsFile));
+		props.setProperty("accesskey", uri.getUser()); //$NON-NLS-1$
+		props.setProperty("secretkey", uri.getPass()); //$NON-NLS-1$
 		return props;
 	}
 

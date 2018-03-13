@@ -61,31 +61,32 @@ import java.util.Set;
 import org.eclipse.jgit.errors.MissingBundlePrerequisiteException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
+import org.eclipse.jgit.junit.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.test.resources.SampleDataRepositoryTestCase;
 import org.junit.Test;
 
 public class BundleWriterTest extends SampleDataRepositoryTestCase {
 
 	@Test
-	public void testWriteSingleRef() throws Exception {
+	public void testWrite0() throws Exception {
 		// Create a tiny bundle, (well one of) the first commits only
 		final byte[] bundle = makeBundle("refs/heads/firstcommit",
 				"42e4e7c5e507e113ebbb7801b16b52cf867b7ce1", null);
 
 		// Then we clone a new repo from that bundle and do a simple test. This
-		// makes sure we could read the bundle we created.
+		// makes sure
+		// we could read the bundle we created.
 		Repository newRepo = createBareRepository();
 		FetchResult fetchResult = fetchFromBundle(newRepo, bundle);
 		Ref advertisedRef = fetchResult
 				.getAdvertisedRef("refs/heads/firstcommit");
 
-		// We expect first commit to appear by id
+		// We expect firstcommit to appear by id
 		assertEquals("42e4e7c5e507e113ebbb7801b16b52cf867b7ce1", advertisedRef
 				.getObjectId().name());
 		// ..and by name as the bundle created a new ref
@@ -93,21 +94,13 @@ public class BundleWriterTest extends SampleDataRepositoryTestCase {
 				.resolve("refs/heads/firstcommit").name());
 	}
 
+	/**
+	 * Incremental bundle test
+	 *
+	 * @throws Exception
+	 */
 	@Test
-	public void testWriteHEAD() throws Exception {
-		byte[] bundle = makeBundle("HEAD",
-				"42e4e7c5e507e113ebbb7801b16b52cf867b7ce1", null);
-
-		Repository newRepo = createBareRepository();
-		FetchResult fetchResult = fetchFromBundle(newRepo, bundle);
-		Ref advertisedRef = fetchResult.getAdvertisedRef("HEAD");
-
-		assertEquals("42e4e7c5e507e113ebbb7801b16b52cf867b7ce1", advertisedRef
-				.getObjectId().name());
-	}
-
-	@Test
-	public void testIncrementalBundle() throws Exception {
+	public void testWrite1() throws Exception {
 		byte[] bundle;
 
 		// Create a small bundle, an early commit

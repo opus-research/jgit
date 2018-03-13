@@ -46,8 +46,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -75,7 +73,6 @@ import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
-import org.eclipse.jgit.lib.ObjectChecker;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
@@ -312,14 +309,10 @@ public abstract class Transport {
 	public static Transport open(final Repository local, final String remote,
 			final Operation op) throws NotSupportedException,
 			URISyntaxException, TransportException {
-		if (local != null) {
-			final RemoteConfig cfg = new RemoteConfig(local.getConfig(), remote);
-			if (doesNotExist(cfg))
-				return open(local, new URIish(remote), null);
-			return open(local, cfg, op);
-		} else
-			return open(new URIish(remote));
-
+		final RemoteConfig cfg = new RemoteConfig(local.getConfig(), remote);
+		if (doesNotExist(cfg))
+			return open(local, new URIish(remote), null);
+		return open(local, cfg, op);
 	}
 
 	/**
@@ -651,9 +644,8 @@ public abstract class Transport {
 	}
 
 	private static Collection<RefSpec> expandPushWildcardsFor(
-			final Repository db, final Collection<RefSpec> specs)
-			throws IOException {
-		final Map<String, Ref> localRefs = db.getRefDatabase().getRefs(ALL);
+			final Repository db, final Collection<RefSpec> specs) {
+		final Map<String, Ref> localRefs = db.getAllRefs();
 		final Collection<RefSpec> procRefs = new HashSet<RefSpec>();
 
 		for (final RefSpec spec : specs) {
@@ -747,7 +739,7 @@ public abstract class Transport {
 	private boolean dryRun;
 
 	/** Should an incoming (fetch) transfer validate objects? */
-	private ObjectChecker objectChecker;
+	private boolean checkFetchedObjects;
 
 	/** Should refs no longer on the source be pruned from the destination? */
 	private boolean removeDeletedRefs;
@@ -776,7 +768,7 @@ public abstract class Transport {
 		final TransferConfig tc = local.getConfig().get(TransferConfig.KEY);
 		this.local = local;
 		this.uri = uri;
-		this.objectChecker = tc.newObjectChecker();
+		this.checkFetchedObjects = tc.isFsckObjects();
 		this.credentialsProvider = CredentialsProvider.getDefault();
 	}
 
@@ -788,7 +780,7 @@ public abstract class Transport {
 	protected Transport(final URIish uri) {
 		this.uri = uri;
 		this.local = null;
-		this.objectChecker = new ObjectChecker();
+		this.checkFetchedObjects = true;
 		this.credentialsProvider = CredentialsProvider.getDefault();
 	}
 
@@ -874,38 +866,16 @@ public abstract class Transport {
 	 *         client side of the connection.
 	 */
 	public boolean isCheckFetchedObjects() {
-		return getObjectChecker() != null;
+		return checkFetchedObjects;
 	}
 
 	/**
 	 * @param check
 	 *            true to enable checking received objects; false to assume all
 	 *            received objects are valid.
-	 * @see #setObjectChecker(ObjectChecker)
 	 */
 	public void setCheckFetchedObjects(final boolean check) {
-		if (check && objectChecker == null)
-			setObjectChecker(new ObjectChecker());
-		else if (!check && objectChecker != null)
-			setObjectChecker(null);
-	}
-
-	/**
-	 * @return configured object checker for received objects, or null.
-	 * @since 3.6
-	 */
-	public ObjectChecker getObjectChecker() {
-		return objectChecker;
-	}
-
-	/**
-	 * @param impl
-	 *            if non-null the object checking instance to verify each
-	 *            received object with; null to disable object checking.
-	 * @since 3.6
-	 */
-	public void setObjectChecker(ObjectChecker impl) {
-		objectChecker = impl;
+		checkFetchedObjects = check;
 	}
 
 	/**

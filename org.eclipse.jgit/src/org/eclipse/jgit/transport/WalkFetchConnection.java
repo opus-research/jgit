@@ -44,8 +44,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
-
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -58,7 +56,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.jgit.errors.CompoundException;
@@ -193,7 +190,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 	WalkFetchConnection(final WalkTransport t, final WalkRemoteObjectDatabase w) {
 		Transport wt = (Transport)t;
 		local = wt.local;
-		objCheck = wt.getObjectChecker();
+		objCheck = wt.isCheckFetchedObjects() ? new ObjectChecker() : null;
 		inserter = local.newObjectInserter();
 		reader = local.newObjectReader();
 
@@ -671,13 +668,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 	}
 
 	private void markLocalRefsComplete(final Set<ObjectId> have) throws TransportException {
-		Map<String, Ref> refs;
-		try {
-			refs = local.getRefDatabase().getRefs(ALL);
-		} catch (IOException e) {
-			throw new TransportException(e.getMessage(), e);
-		}
-		for (final Ref r : refs.values()) {
+		for (final Ref r : local.getAllRefs().values()) {
 			try {
 				markLocalObjComplete(revWalk.parseAny(r.getObjectId()));
 			} catch (IOException readError) {

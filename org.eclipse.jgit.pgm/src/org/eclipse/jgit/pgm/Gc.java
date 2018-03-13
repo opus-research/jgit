@@ -43,19 +43,16 @@
 
 package org.eclipse.jgit.pgm;
 
-import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.internal.storage.file.FileRepository;
+import org.eclipse.jgit.internal.storage.file.GC;
 import org.eclipse.jgit.lib.TextProgressMonitor;
-import org.kohsuke.args4j.Option;
 
 @Command(common = true, usage = "usage_Gc")
 class Gc extends TextBuiltin {
-	@Option(name = "--aggressive", usage = "usage_Aggressive")
-	private boolean aggressive;
-
 	@Override
 	protected void run() throws Exception {
-		Git git = Git.wrap(db);
-		git.gc().setAggressive(aggressive)
-				.setProgressMonitor(new TextProgressMonitor()).call();
+		GC gc = new GC((FileRepository) db);
+		gc.setProgressMonitor(new TextProgressMonitor());
+		gc.gc();
 	}
 }

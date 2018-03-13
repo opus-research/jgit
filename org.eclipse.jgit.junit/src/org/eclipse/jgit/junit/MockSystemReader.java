@@ -90,7 +90,6 @@ public class MockSystemReader extends SystemReader {
 		init(Constants.GIT_AUTHOR_EMAIL_KEY);
 		init(Constants.GIT_COMMITTER_NAME_KEY);
 		init(Constants.GIT_COMMITTER_EMAIL_KEY);
-		setProperty(Constants.OS_USER_DIR, ".");
 		userGitConfig = new MockConfig(null, null);
 		systemGitConfig = new MockConfig(null, null);
 		setCurrentPlatform();
@@ -184,7 +183,6 @@ public class MockSystemReader extends SystemReader {
 		setProperty("file.separator", "\\");
 		setProperty("path.separator", ";");
 		setProperty("line.separator", "\r\n");
-		setPlatformChecker();
 	}
 
 	/**
@@ -195,6 +193,5 @@ public class MockSystemReader extends SystemReader {
 		setProperty("file.separator", "/");
 		setProperty("path.separator", ":");
 		setProperty("line.separator", "\n");
-		setPlatformChecker();
 	}
 }

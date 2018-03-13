@@ -53,16 +53,13 @@ import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
-import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.patch.FileHeader;
 import org.eclipse.jgit.patch.HunkHeader;
-import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
-import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.io.DisabledOutputStream;
 import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
@@ -289,33 +286,10 @@ public class DiffFormatterTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testCreateFileHeaderForRenameModeChange()
-			throws Exception {
-		DiffEntry a = DiffEntry.delete(PATH_A, ObjectId.zeroId());
-		DiffEntry b = DiffEntry.add(PATH_B, ObjectId.zeroId());
-		b.oldMode = FileMode.REGULAR_FILE;
-		b.newMode = FileMode.EXECUTABLE_FILE;
-		DiffEntry m = DiffEntry.pair(ChangeType.RENAME, a, b, 100);
-		m.oldId = null;
-		m.newId = null;
-
-		FileHeader fh = df.toFileHeader(m);
-		//@formatter:off
-		String expected = DIFF + "a/src/a b/src/b\n" +
-				"old mode 100644\n" +
-				"new mode 100755\n" +
-				"similarity index 100%\n" +
-				"rename from src/a\n" +
-				"rename to src/b\n";
-		//@formatter:on
-		assertEquals(expected, fh.getScriptText());
-	}
-
-	@Test
 	public void testDiff() throws Exception {
 		write(new File(db.getDirectory().getParent(), "test.txt"), "test");
 		File folder = new File(db.getDirectory().getParent(), "folder");
-		FileUtils.mkdir(folder);
+		folder.mkdir();
 		write(new File(folder, "folder.txt"), "folder");
 		Git git = new Git(db);
 		git.add().addFilepattern(".").call();
@@ -323,15 +297,15 @@ public class DiffFormatterTest extends RepositoryTestCase {
 		write(new File(folder, "folder.txt"), "folder change");
 
 		ByteArrayOutputStream os = new ByteArrayOutputStream();
-		DiffFormatter dfmt = new DiffFormatter(new SafeBufferedOutputStream(os));
-		dfmt.setRepository(db);
-		dfmt.setPathFilter(PathFilter.create("folder"));
+		DiffFormatter df = new DiffFormatter(new SafeBufferedOutputStream(os));
+		df.setRepository(db);
+		df.setPathFilter(PathFilter.create("folder"));
 		DirCacheIterator oldTree = new DirCacheIterator(db.readDirCache());
 		FileTreeIterator newTree = new FileTreeIterator(db);
-		dfmt.format(oldTree, newTree);
-		dfmt.flush();
+		df.format(oldTree, newTree);
+		df.flush();
 
-		String actual = os.toString("UTF-8");
+		String actual = os.toString();
 		String expected =
  "diff --git a/folder/folder.txt b/folder/folder.txt\n"
 				+ "index 0119635..95c4c65 100644\n"
@@ -340,83 +314,7 @@ public class DiffFormatterTest extends RepositoryTestCase {
 				+ "\\ No newline at end of file\n" + "+folder change\n"
 				+ "\\ No newline at end of file\n";
 
-		assertEquals(expected, actual);
-	}
-
-	@Test
-	public void testDiffRootNullToTree() throws Exception {
-		write(new File(db.getDirectory().getParent(), "test.txt"), "test");
-		File folder = new File(db.getDirectory().getParent(), "folder");
-		FileUtils.mkdir(folder);
-		write(new File(folder, "folder.txt"), "folder");
-		Git git = new Git(db);
-		git.add().addFilepattern(".").call();
-		RevCommit commit = git.commit().setMessage("Initial commit").call();
-		write(new File(folder, "folder.txt"), "folder change");
-
-		ByteArrayOutputStream os = new ByteArrayOutputStream();
-		DiffFormatter dfmt = new DiffFormatter(new SafeBufferedOutputStream(os));
-		dfmt.setRepository(db);
-		dfmt.setPathFilter(PathFilter.create("folder"));
-		dfmt.format(null, commit.getTree().getId());
-		dfmt.flush();
-
-		String actual = os.toString("UTF-8");
-		String expected = "diff --git a/folder/folder.txt b/folder/folder.txt\n"
-				+ "new file mode 100644\n"
-				+ "index 0000000..0119635\n"
-				+ "--- /dev/null\n"
-				+ "+++ b/folder/folder.txt\n"
-				+ "@@ -0,0 +1 @@\n"
-				+ "+folder\n"
-				+ "\\ No newline at end of file\n";
-
-		assertEquals(expected, actual);
-	}
-
-	@Test
-	public void testDiffRootTreeToNull() throws Exception {
-		write(new File(db.getDirectory().getParent(), "test.txt"), "test");
-		File folder = new File(db.getDirectory().getParent(), "folder");
-		FileUtils.mkdir(folder);
-		write(new File(folder, "folder.txt"), "folder");
-		Git git = new Git(db);
-		git.add().addFilepattern(".").call();
-		RevCommit commit = git.commit().setMessage("Initial commit").call();
-		write(new File(folder, "folder.txt"), "folder change");
-
-		ByteArrayOutputStream os = new ByteArrayOutputStream();
-		DiffFormatter dfmt = new DiffFormatter(new SafeBufferedOutputStream(os));
-		dfmt.setRepository(db);
-		dfmt.setPathFilter(PathFilter.create("folder"));
-		dfmt.format(commit.getTree().getId(), null);
-		dfmt.flush();
-
-		String actual = os.toString("UTF-8");
-		String expected = "diff --git a/folder/folder.txt b/folder/folder.txt\n"
-				+ "deleted file mode 100644\n"
-				+ "index 0119635..0000000\n"
-				+ "--- a/folder/folder.txt\n"
-				+ "+++ /dev/null\n"
-				+ "@@ -1 +0,0 @@\n"
-				+ "-folder\n"
-				+ "\\ No newline at end of file\n";
-
-		assertEquals(expected, actual);
-	}
-
-	@Test
-	public void testDiffNullToNull() throws Exception {
-		ByteArrayOutputStream os = new ByteArrayOutputStream();
-		DiffFormatter dfmt = new DiffFormatter(new SafeBufferedOutputStream(os));
-		dfmt.setRepository(db);
-		dfmt.format((AnyObjectId) null, null);
-		dfmt.flush();
-
-		String actual = os.toString("UTF-8");
-		String expected = "";
-
-		assertEquals(expected, actual);
+		assertEquals(expected.toString(), actual);
 	}
 
 	private static String makeDiffHeader(String pathA, String pathB,

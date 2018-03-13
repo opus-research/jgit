@@ -46,9 +46,6 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -63,7 +60,6 @@ import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 
 /**
  * Create an archive of files from a named tree.
@@ -142,13 +138,11 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 		 *            archive object from createArchiveOutputStream
 		 * @param path
 		 *            full filename relative to the root of the archive
-		 *            (with trailing '/' for directories)
 		 * @param mode
 		 *            mode (for example FileMode.REGULAR_FILE or
 		 *            FileMode.SYMLINK)
 		 * @param loader
-		 *            blob object with data for this entry (null for
-		 *            directories)
+		 *            blob object with data for this entry
 		 * @throws IOException
 		 *            thrown by the underlying output stream for I/O errors
 		 */
@@ -193,142 +187,70 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 		}
 	}
 
-	private static class FormatEntry {
-		final Format<?> format;
-		/** Number of times this format has been registered. */
-		final int refcnt;
-
-		public FormatEntry(Format<?> format, int refcnt) {
-			if (format == null)
-				throw new NullPointerException();
-			this.format = format;
-			this.refcnt = refcnt;
-		}
-	}
-
 	/**
 	 * Available archival formats (corresponding to values for
 	 * the --format= option)
 	 */
-	private static final ConcurrentMap<String, FormatEntry> formats =
-			new ConcurrentHashMap<String, FormatEntry>();
-
-	/**
-	 * Replaces the entry for a key only if currently mapped to a given
-	 * value.
-	 *
-	 * @param map a map
-	 * @param key key with which the specified value is associated
-	 * @param oldValue expected value for the key (null if should be absent).
-	 * @param newValue value to be associated with the key (null to remove).
-	 * @return true if the value was replaced
-	 */
-	private static <K, V> boolean replace(ConcurrentMap<K, V> map,
-			K key, V oldValue, V newValue) {
-		if (oldValue == null && newValue == null) // Nothing to do.
-			return true;
-
-		if (oldValue == null)
-			return map.putIfAbsent(key, newValue) == null;
-		else if (newValue == null)
-			return map.remove(key, oldValue);
-		else
-			return map.replace(key, oldValue, newValue);
-	}
+	private static final ConcurrentMap<String, Format<?>> formats =
+			new ConcurrentHashMap<String, Format<?>>();
 
 	/**
 	 * Adds support for an additional archival format.  To avoid
 	 * unnecessary dependencies, ArchiveCommand does not have support
 	 * for any formats built in; use this function to add them.
-	 * <p>
+	 *
 	 * OSGi plugins providing formats should call this function at
 	 * bundle activation time.
-	 * <p>
-	 * It is okay to register the same archive format with the same
-	 * name multiple times, but don't forget to unregister it that
-	 * same number of times, too.
-	 * <p>
-	 * Registering multiple formats with different names and the
-	 * same or overlapping suffixes results in undefined behavior.
-	 * TODO: check that suffixes don't overlap.
 	 *
 	 * @param name name of a format (e.g., "tar" or "zip").
 	 * @param fmt archiver for that format
 	 * @throws JGitInternalException
-	 *              A different archival format with that name was
-	 *              already registered.
+	 *              An archival format with that name was already registered.
 	 */
 	public static void registerFormat(String name, Format<?> fmt) {
-		if (fmt == null)
-			throw new NullPointerException();
+		// TODO(jrn): Check that suffixes don't overlap.
 
-		FormatEntry old, entry;
-		do {
-			old = formats.get(name);
-			if (old == null) {
-				entry = new FormatEntry(fmt, 1);
-				continue;
-			}
-			if (!old.format.equals(fmt))
-				throw new JGitInternalException(MessageFormat.format(
-						JGitText.get().archiveFormatAlreadyRegistered,
-						name));
-			entry = new FormatEntry(old.format, old.refcnt + 1);
-		} while (!replace(formats, name, old, entry));
+		if (formats.putIfAbsent(name, fmt) != null)
+			throw new JGitInternalException(MessageFormat.format(
+					JGitText.get().archiveFormatAlreadyRegistered,
+					name));
 	}
 
 	/**
-	 * Marks support for an archival format as no longer needed so its
-	 * Format can be garbage collected if no one else is using it either.
-	 * <p>
-	 * In other words, this decrements the reference count for an
-	 * archival format.  If the reference count becomes zero, removes
-	 * support for that format.
+	 * Removes support for an archival format so its Format can be
+	 * garbage collected.
 	 *
 	 * @param name name of format (e.g., "tar" or "zip").
 	 * @throws JGitInternalException
 	 *              No such archival format was registered.
 	 */
 	public static void unregisterFormat(String name) {
-		FormatEntry old, entry;
-		do {
-			old = formats.get(name);
-			if (old == null)
-				throw new JGitInternalException(MessageFormat.format(
-						JGitText.get().archiveFormatAlreadyAbsent,
-						name));
-			if (old.refcnt == 1) {
-				entry = null;
-				continue;
-			}
-			entry = new FormatEntry(old.format, old.refcnt - 1);
-		} while (!replace(formats, name, old, entry));
+		if (formats.remove(name) == null)
+			throw new JGitInternalException(MessageFormat.format(
+					JGitText.get().archiveFormatAlreadyAbsent,
+					name));
 	}
 
 	private static Format<?> formatBySuffix(String filenameSuffix)
 			throws UnsupportedFormatException {
 		if (filenameSuffix != null)
-			for (FormatEntry entry : formats.values()) {
-				Format<?> fmt = entry.format;
+			for (Format<?> fmt : formats.values())
 				for (String sfx : fmt.suffixes())
 					if (filenameSuffix.endsWith(sfx))
 						return fmt;
-			}
 		return lookupFormat("tar"); //$NON-NLS-1$
 	}
 
 	private static Format<?> lookupFormat(String formatName) throws UnsupportedFormatException {
-		FormatEntry entry = formats.get(formatName);
-		if (entry == null)
+		Format<?> fmt = formats.get(formatName);
+		if (fmt == null)
 			throw new UnsupportedFormatException(formatName);
-		return entry.format;
+		return fmt;
 	}
 
 	private OutputStream out;
 	private ObjectId tree;
-	private String prefix;
 	private String format;
-	private List<String> paths = new ArrayList<String>();
 
 	/** Filename suffix, for automatically choosing a format. */
 	private String suffix;
@@ -342,7 +264,6 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	}
 
 	private <T extends Closeable> OutputStream writeArchive(Format<T> fmt) {
-		final String pfx = prefix == null ? "" : prefix; //$NON-NLS-1$
 		final TreeWalk walk = new TreeWalk(repo);
 		try {
 			final T outa = fmt.createArchiveOutputStream(out);
@@ -352,25 +273,16 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 				final RevWalk rw = new RevWalk(walk.getObjectReader());
 
 				walk.reset(rw.parseTree(tree));
-				if (!paths.isEmpty())
-					walk.setFilter(PathFilterGroup.createFromStrings(paths));
-
+				walk.setRecursive(true);
 				while (walk.next()) {
-					final String name = pfx + walk.getPathString();
-					FileMode mode = walk.getFileMode(0);
+					final String name = walk.getPathString();
+					final FileMode mode = walk.getFileMode(0);
 
-					if (walk.isSubtree())
-						walk.enterSubtree();
-
-					if (mode == FileMode.GITLINK)
-						// TODO(jrn): Take a callback to recurse
-						// into submodules.
-						mode = FileMode.TREE;
-
-					if (mode == FileMode.TREE) {
-						fmt.putEntry(outa, name + "/", mode, null); //$NON-NLS-1$
+					if (mode == FileMode.TREE)
+						// ZIP entries for directories are optional.
+						// Leave them out, mimicking "git archive".
 						continue;
-					}
+
 					walk.getObjectId(idBuf, 0);
 					fmt.putEntry(outa, name, mode, reader.open(idBuf));
 				}
@@ -418,18 +330,6 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	}
 
 	/**
-	 * @param prefix
-	 *            string prefixed to filenames in archive (e.g., "master/").
-	 *            null means to not use any leading prefix.
-	 * @return this
-	 * @since 3.3
-	 */
-	public ArchiveCommand setPrefix(String prefix) {
-		this.prefix = prefix;
-		return this;
-	}
-
-	/**
 	 * Set the intended filename for the produced archive. Currently the only
 	 * effect is to determine the default archive format when none is specified
 	 * with {@link #setFormat(String)}.
@@ -468,25 +368,6 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	 */
 	public ArchiveCommand setFormat(String fmt) {
 		this.format = fmt;
-		return this;
-	}
-
-	/**
-	 * Set an optional parameter path. without an optional path parameter, all
-	 * files and subdirectories of the current working directory are included in
-	 * the archive. If one or more paths are specified, only these are included.
-	 *
-	 * @param paths
-	 *            file names (e.g <code>file1.c</code>) or directory names (e.g.
-	 *            <code>dir</code> to add <code>dir/file1</code> and
-	 *            <code>dir/file2</code>) can also be given to add all files in
-	 *            the directory, recursively. Fileglobs (e.g. *.c) are not yet
-	 *            supported.
-	 * @return this
-	 * @since 3.4
-	 */
-	public ArchiveCommand setPaths(String... paths) {
-		this.paths = Arrays.asList(paths);
 		return this;
 	}
 }

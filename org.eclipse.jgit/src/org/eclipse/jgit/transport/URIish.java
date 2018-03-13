@@ -65,8 +65,8 @@ import org.eclipse.jgit.util.StringUtils;
 /**
  * This URI like construct used for referencing Git archives over the net, as
  * well as locally stored archives. It is similar to RFC 2396 URI's, but also
- * support SCP and the malformed file://&lt;path&gt; syntax (as opposed to the correct
- * file:&lt;path&gt; syntax.
+ * support SCP and the malformed file://<path> syntax (as opposed to the correct
+ * file:<path> syntax.
  */
 public class URIish implements Serializable {
 	/**
@@ -252,11 +252,6 @@ public class URIish implements Serializable {
 		throw new URISyntaxException(s, JGitText.get().cannotParseGitURIish);
 	}
 
-	private static int parseHexByte(byte c1, byte c2) {
-			return ((RawParseUtils.parseHexInt4(c1) << 4)
-					| RawParseUtils.parseHexInt4(c2));
-	}
-
 	private static String unescape(String s) throws URISyntaxException {
 		if (s == null)
 			return null;
@@ -277,14 +272,8 @@ public class URIish implements Serializable {
 			if (c == '%') {
 				if (i + 2 >= bytes.length)
 					throw new URISyntaxException(s, JGitText.get().cannotParseGitURIish);
-				byte c1 = bytes[i + 1];
-				byte c2 = bytes[i + 2];
-				int val;
-				try {
-					val = parseHexByte(c1, c2);
-				} catch (ArrayIndexOutOfBoundsException e) {
-					throw new URISyntaxException(s, JGitText.get().cannotParseGitURIish);
-				}
+				int val = (RawParseUtils.parseHexInt4(bytes[i + 1]) << 4)
+						| RawParseUtils.parseHexInt4(bytes[i + 2]);
 				os[j++] = (byte) val;
 				i += 2;
 			} else
@@ -671,7 +660,7 @@ public class URIish implements Serializable {
 	/**
 	 * Get the "humanish" part of the path. Some examples of a 'humanish' part
 	 * for a full path:
-	 * <table summary="path vs humanish path" border="1">
+	 * <table>
 	 * <tr>
 	 * <th>Path</th>
 	 * <th>Humanish part</th>

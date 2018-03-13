@@ -57,9 +57,10 @@ import org.eclipse.jgit.lib.ObjectLoader;
 /**
  * bzip2-compressed tarball (tar.bz2) format.
  */
-public final class Tbz2Format implements ArchiveCommand.Format<ArchiveOutputStream> {
-	private static final List<String> SUFFIXES = Collections
-			.unmodifiableList(Arrays.asList(".tar.bz2", ".tbz", ".tbz2")); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+public class Tbz2Format implements ArchiveCommand.Format<ArchiveOutputStream> {
+	private static final List<String> SUFFIXES =
+			Collections.unmodifiableList(Arrays.asList(
+				".tar.bz2", ".tbz", ".tbz2"));
 
 	private final ArchiveCommand.Format<ArchiveOutputStream> tarFormat = new TarFormat();
 
@@ -77,15 +78,5 @@ public final class Tbz2Format implements ArchiveCommand.Format<ArchiveOutputStre
 
 	public Iterable<String> suffixes() {
 		return SUFFIXES;
-	}
-
-	@Override
-	public boolean equals(Object other) {
-		return (other instanceof Tbz2Format);
-	}
-
-	@Override
-	public int hashCode() {
-		return getClass().hashCode();
 	}
 }

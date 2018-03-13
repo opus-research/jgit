@@ -42,7 +42,16 @@
  */
 package org.eclipse.jgit.api;
 
-import static org.eclipse.jgit.lib.Constants.R_TAGS;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.api.errors.RefNotFoundException;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.revwalk.*;
 
 import java.io.IOException;
 import java.text.MessageFormat;
@@ -53,25 +62,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.api.errors.RefNotFoundException;
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevFlag;
-import org.eclipse.jgit.revwalk.RevFlagSet;
-import org.eclipse.jgit.revwalk.RevWalk;
+import static org.eclipse.jgit.lib.Constants.R_TAGS;
 
 /**
  * Given a commit, show the most recent tag that is reachable from a commit.
  *
- * @since 3.2
+ * @since 3.1
  */
 public class DescribeCommand extends GitCommand<String> {
 	private final RevWalk w;
@@ -111,7 +107,7 @@ public class DescribeCommand extends GitCommand<String> {
 	 * @throws IOException
 	 *             a pack file or loose object could not be read.
 	 */
-	public DescribeCommand setTarget(ObjectId target) throws IOException {
+	DescribeCommand setTarget(ObjectId target) throws IOException {
 		this.target = w.parseCommit(target);
 		return this;
 	}
@@ -130,8 +126,7 @@ public class DescribeCommand extends GitCommand<String> {
 	 * @throws IOException
 	 *             a pack file or loose object could not be read.
 	 */
-	public DescribeCommand setTarget(String rev) throws IOException,
-			RefNotFoundException {
+	DescribeCommand setTarget(String rev) throws IOException, RefNotFoundException {
 		ObjectId id = repo.resolve(rev);
 		if (id == null)
 			throw new RefNotFoundException(MessageFormat.format(JGitText.get().refNotResolved, rev));
@@ -139,16 +134,14 @@ public class DescribeCommand extends GitCommand<String> {
 	}
 
 	/**
-	 * Describes the specified commit. Target defaults to HEAD if no commit was
-	 * set explicitly.
+	 * Describes the specified commit.
 	 *
-	 * @return if there's a tag that points to the commit being described, this
-	 *         tag name is returned. Otherwise additional suffix is added to the
-	 *         nearest tag, just like git-describe(1).
-	 *         <p>
-	 *         If none of the ancestors of the commit being described has any
-	 *         tags at all, then this method returns null, indicating that
-	 *         there's no way to describe this tag.
+	 * @return if there's a tag that points to the commit being described, this tag name
+	 *         is returned. Otherwise additional suffix is added to the nearest tag, just
+	 *         like git-describe(1).
+	 *         <p/>
+	 *         If none of the ancestors of the commit being described has any tags at all,
+	 *         then this method returns null, indicating that there's no way to describe this tag.
 	 */
 	@Override
 	public String call() throws GitAPIException {
@@ -156,11 +149,10 @@ public class DescribeCommand extends GitCommand<String> {
 			checkCallable();
 
 			if (target == null)
-				setTarget(Constants.HEAD);
+				throw new IllegalArgumentException(JGitText.get().targetIsNotSet);
 
 			Map<ObjectId, Ref> tags = new HashMap<ObjectId, Ref>();
-
-			for (Ref r : repo.getRefDatabase().getRefs(R_TAGS).values()) {
+			for (Ref r : repo.getTags().values()) {
 				ObjectId key = repo.peel(r).getPeeledObjectId();
 				if (key == null)
 					key = r.getObjectId();

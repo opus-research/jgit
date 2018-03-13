@@ -53,7 +53,6 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.IndexDiff;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.submodule.SubmoduleWalk.IgnoreSubmoduleMode;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
@@ -73,23 +72,11 @@ public class StatusCommand extends GitCommand<Status> {
 	private List<String> paths = null;
 	private ProgressMonitor progressMonitor = null;
 
-	private IgnoreSubmoduleMode ignoreSubmoduleMode = null;
-
 	/**
 	 * @param repo
 	 */
 	protected StatusCommand(Repository repo) {
 		super(repo);
-	}
-
-	/**
-	 * @param mode
-	 * @return {@code this}
-	 * @since 3.6
-	 */
-	public StatusCommand setIgnoreSubmodules(IgnoreSubmoduleMode mode) {
-		ignoreSubmoduleMode = mode;
-		return this;
 	}
 
 	/**
@@ -102,8 +89,7 @@ public class StatusCommand extends GitCommand<Status> {
 	 * supported.
 	 *
 	 * @param path
-	 *            repository-relative path of file/directory to show status for
-	 *            (with <code>/</code> as separator)
+	 *            a path is relative to the top level of the repository
 	 * @return {@code this}
 	 * @since 3.1
 	 */
@@ -140,8 +126,6 @@ public class StatusCommand extends GitCommand<Status> {
 
 		try {
 			IndexDiff diff = new IndexDiff(repo, Constants.HEAD, workingTreeIt);
-			if (ignoreSubmoduleMode != null)
-				diff.setIgnoreSubmoduleMode(ignoreSubmoduleMode);
 			if (paths != null)
 				diff.setFilter(PathFilterGroup.createFromStrings(paths));
 			if (progressMonitor == null)
