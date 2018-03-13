@@ -1356,7 +1356,7 @@ public class DirCacheCheckout {
 		entry.setLastModified(fs.lastModified(f));
 	}
 
-	// Run a external filter command
+	// Run an external filter command
 	private static void runExternalFilterCommand(Repository repo,
 			DirCacheEntry entry,
 			CheckoutMetadata checkoutMetadata, ObjectLoader ol, FS fs,

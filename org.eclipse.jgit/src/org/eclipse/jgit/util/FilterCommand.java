@@ -47,9 +47,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
- * An abstraction for JGits builtin implementations for hooks and filters.
+ * An abstraction for JGit's builtin implementations for hooks and filters.
  * Instead of spawning an external processes to start a filter/hook and to pump
- * data from/to stdin/stdout these builtin coammnds may be used. They are
+ * data from/to stdin/stdout these builtin commmands may be used. They are
  * constructed by {@link FilterCommandFactory}.
  *
  * @since 4.5
@@ -67,7 +67,9 @@ public abstract class FilterCommand {
 
 	/**
 	 * @param in
+	 *            The {@link InputStream} this command should read from
 	 * @param out
+	 *            The {@link OutputStream} this command should write to
 	 */
 	public FilterCommand(InputStream in, OutputStream out) {
 		this.in = in;
