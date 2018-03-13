@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012 Google Inc. and others.
+ * Copyright (C) 2013, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,59 +41,65 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.dfs;
+package org.eclipse.jgit.treewalk.filter;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.ByteBuffer;
-
-import org.eclipse.jgit.storage.pack.PackExt;
+import org.eclipse.jgit.dircache.DirCacheEntry;
+import org.eclipse.jgit.dircache.DirCacheIterator;
+import org.eclipse.jgit.treewalk.TreeWalk;
 
 /**
- * Output stream to create a file on the DFS.
- *
- * @see DfsObjDatabase#writeFile(DfsPackDescription, PackExt)
+ * A filter for extracting changes between two versions of the dircache. In
+ * addition to what {@link TreeFilter#ANY_DIFF} would do, it also detects
+ * changes that will affect decorations and show up in an attempt to commit.
  */
-public abstract class DfsOutputStream extends OutputStream {
+public final class InterIndexDiffFilter extends TreeFilter {
+	private static final int baseTree = 0;
+
 	/**
-	 * Get the recommended alignment for writing.
-	 * <p>
-	 * Starting a write at multiples of the blockSize is more efficient than
-	 * starting a write at any other position. If 0 or -1 the channel does not
-	 * have any specific block size recommendation.
-	 * <p>
-	 * Channels should not recommend large block sizes. Sizes up to 1-4 MiB may
-	 * be reasonable, but sizes above that may be horribly inefficient.
-	 *
-	 * @return recommended alignment size for randomly positioned reads. Does
-	 *         not need to be a power of 2.
+	 * Predefined InterIndexDiffFilter for finding changes between two dircaches
 	 */
-	public int blockSize() {
-		return 0;
+	public static final TreeFilter INSTANCE = new InterIndexDiffFilter();
+
+	@Override
+	public boolean include(final TreeWalk walker) {
+		final int n = walker.getTreeCount();
+		if (n == 1) // Assume they meant difference to empty tree.
+			return true;
+
+		final int m = walker.getRawMode(baseTree);
+		for (int i = 1; i < n; i++) {
+			DirCacheIterator baseDirCache = walker.getTree(baseTree,
+					DirCacheIterator.class);
+			DirCacheIterator newDirCache = walker.getTree(i,
+					DirCacheIterator.class);
+			if (baseDirCache != null && newDirCache != null) {
+				DirCacheEntry baseDci = baseDirCache.getDirCacheEntry();
+				DirCacheEntry newDci = newDirCache.getDirCacheEntry();
+				if (baseDci != null && newDci != null) {
+					if (baseDci.isAssumeValid() != newDci.isAssumeValid())
+						return true;
+					if (baseDci.isAssumeValid()) // && newDci.isAssumeValid()
+						return false;
+				}
+			}
+			if (walker.getRawMode(i) != m || !walker.idEqual(i, baseTree))
+				return true;
+		}
+		return false;
 	}
 
 	@Override
-	public void write(int b) throws IOException {
-		write(new byte[] { (byte) b });
+	public boolean shouldBeRecursive() {
+		return false;
 	}
 
 	@Override
-	public abstract void write(byte[] buf, int off, int len) throws IOException;
+	public TreeFilter clone() {
+		return this;
+	}
 
-	/**
-	 * Read back a portion of already written data.
-	 * <p>
-	 * The writing position of the output stream is not affected by a read.
-	 *
-	 * @param position
-	 *            offset to read from.
-	 * @param buf
-	 *            buffer to populate. Up to {@code buf.remaining()} bytes will
-	 *            be read from {@code position}.
-	 * @return number of bytes actually read.
-	 * @throws IOException
-	 *             reading is not supported, or the read cannot be performed due
-	 *             to DFS errors.
-	 */
-	public abstract int read(long position, ByteBuffer buf) throws IOException;
+	@Override
+	public String toString() {
+		return "INTERINDEX_DIFF"; //$NON-NLS-1$
+	}
 }
