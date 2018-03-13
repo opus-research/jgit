@@ -42,8 +42,11 @@
  */
 package org.eclipse.jgit.api;
 
+import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.CheckoutResult.Status;
@@ -58,8 +61,8 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
-import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 
@@ -125,7 +128,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			String refLogMessage = "checkout: moving from "
 					+ headRef.getTarget().getName();
 			ObjectId branch = repo.resolve(name);
-
+			Ref ref = repo.getRef(name);
 			if (branch == null)
 				throw new RefNotFoundException(MessageFormat.format(JGitText
 						.get().refNotResolved, name));
@@ -138,24 +141,18 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			try {
 				dco.checkout();
 			} catch (CheckoutConflictException e) {
-				status = new CheckoutResult(Status.CONFLICTS, dco
-						.getConflicts());
+				List<File> fileList = new ArrayList<File>();
+				for (String filePath : dco.getConflicts()) {
+					fileList.add(new File(repo.getWorkTree(), filePath));
+				}
+				status = new CheckoutResult(Status.CONFLICTS, fileList);
 				throw e;
 			}
-			Ref ref = repo.getRef(name);
-			if (ref != null && !ref.getName().startsWith(Constants.R_HEADS))
-				ref = null;
-			RefUpdate refUpdate = repo.updateRef(Constants.HEAD, ref == null);
+			RefUpdate refUpdate = repo.updateRef(Constants.HEAD);
 			refUpdate.setForceUpdate(force);
 			refUpdate.setRefLogMessage(refLogMessage + "to "
 					+ newCommit.getName(), false);
-			Result updateResult;
-			if (ref != null)
-				updateResult = refUpdate.link(ref.getName());
-			else {
-				refUpdate.setNewObjectId(newCommit);
-				updateResult = refUpdate.forceUpdate();
-			}
+			Result updateResult = refUpdate.link(ref.getName());
 
 			setCallable(false);
 
@@ -177,12 +174,18 @@ public class CheckoutCommand extends GitCommand<Ref> {
 				throw new JGitInternalException(MessageFormat.format(JGitText
 						.get().checkoutUnexpectedResult, updateResult.name()));
 
-			if (!dco.getToBeDeleted().isEmpty())
-				status = new CheckoutResult(Status.NONDELETED, dco
-						.getToBeDeleted());
+			Ref result = repo.getRef(name);
+
+			if (!repo.isBare() && !dco.getToBeDeleted().isEmpty()) {
+				List<File> fileList = new ArrayList<File>();
+				for (String filePath : dco.getToBeDeleted()) {
+					fileList.add(new File(repo.getWorkTree(), filePath));
+				}
+				status = new CheckoutResult(Status.NONDELETED, fileList);
+			}
 			else
 				status = CheckoutResult.OK_RESULT;
-			return ref;
+			return result;
 		} catch (IOException ioe) {
 			throw new JGitInternalException(ioe.getMessage(), ioe);
 		} finally {
