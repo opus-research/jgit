@@ -46,7 +46,7 @@ package org.eclipse.jgit.transport;
 
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 
 /** Specification of annotated tag behavior during fetch. */
 public enum TagOpt {

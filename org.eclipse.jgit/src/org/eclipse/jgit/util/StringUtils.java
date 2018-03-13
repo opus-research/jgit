@@ -46,7 +46,7 @@ package org.eclipse.jgit.util;
 import java.text.MessageFormat;
 import java.util.Collection;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 
 /** Miscellaneous string comparison utility methods. */
 public final class StringUtils {
