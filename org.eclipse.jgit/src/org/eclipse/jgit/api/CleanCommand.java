@@ -43,8 +43,6 @@
  */
 package org.eclipse.jgit.api;
 
-import static org.eclipse.jgit.lib.Constants.DOT_GIT;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
@@ -55,7 +53,6 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryCache;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 
@@ -75,8 +72,6 @@ public class CleanCommand extends GitCommand<Set<String>> {
 	private boolean directories;
 
 	private boolean ignore = true;
-
-    private boolean force = false;
 
 	/**
 	 * @param repo
@@ -134,26 +129,10 @@ public class CleanCommand extends GitCommand<Set<String>> {
 			if (directories)
 				for (String dir : notIgnoredDirs)
 					if (paths.isEmpty() || paths.contains(dir)) {
-                        File curDir = new File(repo.getWorkTree(), dir);
-                        if (!dryRun) {
-                            if (RepositoryCache.FileKey.isGitRepository(new File(curDir, DOT_GIT), fs)) {
-                                if (force) {
-                                    FileUtils.delete(curDir, FileUtils.RECURSIVE);
-                                    files.add(dir + "/"); //$NON-NLS-1$
-                                }
-                            } else {
-                                FileUtils.delete(curDir, FileUtils.RECURSIVE);
-                                files.add(dir + "/"); //$NON-NLS-1$
-                            }
-                        } else {
-                            if (RepositoryCache.FileKey.isGitRepository(new File(curDir, DOT_GIT), fs)) {
-                                if (force) {
-                                    files.add(dir + "/"); //$NON-NLS-1$
-                                }
-                            } else {
-                                files.add(dir + "/"); //$NON-NLS-1$
-                            }
-                        }
+						if (!dryRun)
+							FileUtils.delete(new File(repo.getWorkTree(), dir),
+									FileUtils.RECURSIVE);
+						files.add(dir + "/"); //$NON-NLS-1$
 					}
 		} catch (IOException e) {
 			throw new JGitInternalException(e.getMessage(), e);
@@ -215,19 +194,6 @@ public class CleanCommand extends GitCommand<Set<String>> {
 		this.dryRun = dryRun;
 		return this;
 	}
-
-	/**
-     * If force is set, directories that are git repositories will also be
-     * deleted.
-     *
-     * @param force
-     *            whether or not to delete git repositories
-     * @return {@code this}
-     */
-    public CleanCommand setForce(boolean force) {
-        this.force = force;
-        return this;
-    }
 
 	/**
 	 * If dirs is set, in addition to files, also clean directories.
