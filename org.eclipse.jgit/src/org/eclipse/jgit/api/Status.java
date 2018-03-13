@@ -43,7 +43,6 @@
 package org.eclipse.jgit.api;
 
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -67,22 +66,19 @@ public class Status {
 
 	private final boolean clean;
 
-	private final boolean hasUncommittedChanges;;
-
 	/**
 	 * @param diff
 	 */
 	public Status(IndexDiff diff) {
 		super();
 		this.diff = diff;
-		hasUncommittedChanges = !diff.getAdded().isEmpty() //
-				|| !diff.getChanged().isEmpty() //
-				|| !diff.getRemoved().isEmpty() //
-				|| !diff.getMissing().isEmpty() //
-				|| !diff.getModified().isEmpty() //
-				|| !diff.getConflicting().isEmpty();
-		clean = !hasUncommittedChanges //
-				&& diff.getUntracked().isEmpty();
+		clean = diff.getAdded().isEmpty() //
+				&& diff.getChanged().isEmpty() //
+				&& diff.getRemoved().isEmpty() //
+				&& diff.getMissing().isEmpty() //
+				&& diff.getModified().isEmpty() //
+				&& diff.getUntracked().isEmpty() //
+				&& diff.getConflicting().isEmpty();
 	}
 
 	/**
@@ -91,15 +87,6 @@ public class Status {
 	 */
 	public boolean isClean() {
 		return clean;
-	}
-
-	/**
-	 * @return true if any tracked file is changed
-	 * 
-	 * @since 3.2
-	 */
-	public boolean hasUncommittedChanges() {
-		return hasUncommittedChanges;
 	}
 
 	/**
@@ -180,22 +167,5 @@ public class Status {
 	 */
 	public Set<String> getIgnoredNotInIndex() {
 		return Collections.unmodifiableSet(diff.getIgnoredNotInIndex());
-	}
-
-	/**
-	 * @return set of files and folders that are known to the repo and changed
-	 *         either in the index or in the working tree.
-	 * 
-	 * @since 3.2
-	 */
-	public Set<String> getUncommittedChanges() {
-		Set<String> uncommittedChanges = new HashSet<String>();
-		uncommittedChanges.addAll(diff.getAdded());
-		uncommittedChanges.addAll(diff.getChanged());
-		uncommittedChanges.addAll(diff.getRemoved());
-		uncommittedChanges.addAll(diff.getMissing());
-		uncommittedChanges.addAll(diff.getModified());
-		uncommittedChanges.addAll(diff.getConflicting());
-		return uncommittedChanges;
 	}
 }
