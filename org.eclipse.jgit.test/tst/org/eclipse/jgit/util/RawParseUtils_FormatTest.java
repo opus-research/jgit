@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, SAP AG
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,23 +40,31 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lib;
+
+package org.eclipse.jgit.util;
+
+import java.io.UnsupportedEncodingException;
 
 import junit.framework.TestCase;
 
-public class ConfigTest extends TestCase {
-	public void testQuotingForSubSectionNames() {
-		Config config = new Config();
-		config.setString("testsection", "testsubsection", "testname",
-				"testvalue");
-		assertTrue(config.toText().contains("\"testsubsection\""));
-		config.clear();
-		config.setString("testsection", "#quotable", "testname", "testvalue");
-		assertTrue(config.toText().contains("\"#quotable\""));
-		assertFalse(config.toText().contains("\"\"#quotable\"\""));
-		config.clear();
-		config.setString("testsection", "with\"quote", "testname", "testvalue");
-		assertTrue(config.toText().contains("\"with\\\"quote\""));
-		assertFalse(config.toText().contains("\"\"with\\\"quote\"\""));
+public class RawParseUtils_FormatTest extends TestCase {
+	public void testFormatBase10() throws UnsupportedEncodingException {
+		byte[] b = new byte[64];
+		int p;
+
+		p = RawParseUtils.formatBase10(b, b.length, 0);
+		assertEquals("0", new String(b, p, b.length - p, "UTF-8"));
+
+		p = RawParseUtils.formatBase10(b, b.length, 42);
+		assertEquals("42", new String(b, p, b.length - p, "UTF-8"));
+
+		p = RawParseUtils.formatBase10(b, b.length, 1234);
+		assertEquals("1234", new String(b, p, b.length - p, "UTF-8"));
+
+		p = RawParseUtils.formatBase10(b, b.length, -9876);
+		assertEquals("-9876", new String(b, p, b.length - p, "UTF-8"));
+
+		p = RawParseUtils.formatBase10(b, b.length, 123456789);
+		assertEquals("123456789", new String(b, p, b.length - p, "UTF-8"));
 	}
 }
