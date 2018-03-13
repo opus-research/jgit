@@ -183,7 +183,7 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 
 	@Test
 	public void testEverythingPackStream() throws Exception {
-		runPackStreamTest(50, 50, 400);
+		runPackStreamTest(25, 25, 200);
 	}
 
 	/**
