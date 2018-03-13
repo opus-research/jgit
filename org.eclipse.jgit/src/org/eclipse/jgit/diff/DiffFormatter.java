@@ -278,7 +278,6 @@ public class DiffFormatter {
 	 * Get the prefix applied in front of old file paths.
 	 *
 	 * @return the prefix
-	 * @since 2.0
 	 */
 	public String getOldPrefix() {
 		return this.oldPrefix;
@@ -299,9 +298,8 @@ public class DiffFormatter {
 
 	/**
 	 * Get the prefix applied in front of new file paths.
-	 * 
+	 *
 	 * @return the prefix
-	 * @since 2.0
 	 */
 	public String getNewPrefix() {
 		return this.newPrefix;
@@ -963,7 +961,7 @@ public class DiffFormatter {
 		if (entry.getMode(side).getObjectType() != Constants.OBJ_BLOB)
 			return EMPTY;
 
-		if (isBinary())
+		if (isBinary(entry.getPath(side)))
 			return BINARY;
 
 		AbbreviatedObjectId id = entry.getId(side);
@@ -1004,7 +1002,7 @@ public class DiffFormatter {
 		}
 	}
 
-	private boolean isBinary() {
+	private boolean isBinary(String path) {
 		return false;
 	}
 

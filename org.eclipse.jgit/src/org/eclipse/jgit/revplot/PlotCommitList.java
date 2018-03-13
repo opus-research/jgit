@@ -225,13 +225,13 @@ public class PlotCommitList<L extends PlotLane> extends
 		if (blockedPositions.get(commit.lane.getPosition())) {
 			int newPos = -1;
 			for (Integer pos : freePositions)
-				if (!blockedPositions.get(pos.intValue())) {
-					newPos = pos.intValue();
+				if (!blockedPositions.get(pos)) {
+					newPos = pos;
 					break;
 				}
 			if (newPos == -1)
 				newPos = positionsAllocated++;
-			freePositions.add(Integer.valueOf(commit.lane.getPosition()));
+			freePositions.add(commit.lane.getPosition());
 			activeLanes.remove(commit.lane);
 			commit.lane.position = newPos;
 			activeLanes.add(commit.lane);

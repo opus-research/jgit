@@ -1,5 +1,7 @@
 /*
- * Copyright (C) 2011-2012, IBM Corporation and others.
+ * Copyright (C) 2009, Jonas Fonseca <fonseca@diku.dk>
+ * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,63 +42,24 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util;
 
-import static org.junit.Assert.assertEquals;
+package org.eclipse.jgit.errors;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.io.IOException;
 
-import org.junit.Before;
-import org.junit.Test;
+/**
+ * An exception thrown when a gitlink entry is found and cannot be
+ * handled.
+ */
+public class GitlinksNotSupportedException extends IOException {
+	private static final long serialVersionUID = 1L;
 
-public class ReadLinesTest {
-	List<String> l = new ArrayList<String>();
-
-	@Before
-	public void clearList() {
-		l.clear();
-	}
-
-	@Test
-	public void testReadLines_singleLine() {
-		l.add("[0]");
-		assertEquals(l, IO.readLines("[0]"));
-	}
-
-	@Test
-	public void testReadLines_LF() {
-		l.add("[0]");
-		l.add("[1]");
-		assertEquals(l, IO.readLines("[0]\n[1]"));
-	}
-
-	@Test
-	public void testReadLines_CRLF() {
-		l.add("[0]");
-		l.add("[1]");
-		assertEquals(l, IO.readLines("[0]\r\n[1]"));
-	}
-
-	@Test
-	public void testReadLines_endLF() {
-		l.add("[0]");
-		l.add("");
-		assertEquals(l, IO.readLines("[0]\n"));
-	}
-
-	@Test
-	public void testReadLines_endCRLF() {
-		l.add("[0]");
-		l.add("");
-		assertEquals(l, IO.readLines("[0]\r\n"));
-	}
-
-	@Test
-	public void testReadLines_mixed() {
-		l.add("[0]");
-		l.add("[1]");
-		l.add("[2]");
-		assertEquals(l, IO.readLines("[0]\r\n[1]\n[2]"));
+	/**
+	 * Construct a GitlinksNotSupportedException for the specified link
+	 *
+	 * @param s name of link in tree or workdir
+	 */
+	public GitlinksNotSupportedException(final String s) {
+		super(s);
 	}
 }

@@ -80,9 +80,7 @@ public class RevObjectList<E extends RevObject> extends AbstractList<E> {
 
 	public void add(final int index, final E element) {
 		if (index != size)
-			throw new UnsupportedOperationException(MessageFormat.format(
-					JGitText.get().unsupportedOperationNotAddAtEnd,
-					Integer.valueOf(index)));
+			throw new UnsupportedOperationException(MessageFormat.format(JGitText.get().unsupportedOperationNotAddAtEnd, index));
 		set(index, element);
 		size++;
 	}

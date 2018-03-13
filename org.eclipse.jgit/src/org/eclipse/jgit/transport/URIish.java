@@ -591,14 +591,15 @@ public class URIish implements Serializable {
 	 * @return the URI, including its password field, if any.
 	 */
 	public String toPrivateString() {
-		return format(true, false);
+		return format(true, false, false);
 	}
 
 	public String toString() {
-		return format(false, false);
+		return format(false, false, false);
 	}
 
-	private String format(final boolean includePassword, boolean escapeNonAscii) {
+	private String format(final boolean includePassword, boolean escape,
+			boolean escapeNonAscii) {
 		final StringBuilder r = new StringBuilder();
 		if (getScheme() != null) {
 			r.append(getScheme());
@@ -645,7 +646,7 @@ public class URIish implements Serializable {
 	 * @return the URI as an ASCII string. Password is not included.
 	 */
 	public String toASCIIString() {
-		return format(false, true);
+		return format(false, true, true);
 	}
 
 	/**
@@ -653,7 +654,7 @@ public class URIish implements Serializable {
 	 *         such that it will be valid for use over the network.
 	 */
 	public String toPrivateASCIIString() {
-		return format(true, true);
+		return format(true, true, true);
 	}
 
 	/**
