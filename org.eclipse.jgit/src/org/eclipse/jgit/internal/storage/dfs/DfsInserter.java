@@ -104,7 +104,7 @@ public class DfsInserter extends ObjectInserter {
 	ObjectIdOwnerMap<PackedObjectInfo> objectMap;
 
 	DfsBlockCache cache;
-	DfsPackKey packKey;
+	DfsStreamKey packKey;
 	DfsPackDescription packDsc;
 	PackStream packOut;
 	private boolean rollback;
@@ -221,7 +221,7 @@ public class DfsInserter extends ObjectInserter {
 		db.commitPack(Collections.singletonList(packDsc), null);
 		rollback = false;
 
-		DfsPackFile p = cache.getOrCreate(packDsc, packKey);
+		DfsPackFile p = new DfsPackFile(cache, packDsc);
 		if (index != null)
 			p.setPackIndex(index);
 		db.addPack(p);
@@ -281,8 +281,10 @@ public class DfsInserter extends ObjectInserter {
 
 		rollback = true;
 		packDsc = db.newPack(DfsObjDatabase.PackSource.INSERT);
-		packOut = new PackStream(db.writeFile(packDsc, PACK));
-		packKey = new DfsPackKey();
+		DfsOutputStream dfsOut = db.writeFile(packDsc, PACK);
+		packDsc.setBlockSize(PACK, dfsOut.blockSize());
+		packOut = new PackStream(dfsOut);
+		packKey = packDsc.getStreamKey(PACK);
 
 		// Write the header as though it were a single object pack.
 		byte[] buf = packOut.hdrBuf;
@@ -312,13 +314,14 @@ public class DfsInserter extends ObjectInserter {
 			packIndex = PackIndex.read(buf.openInputStream());
 		}
 
-		DfsOutputStream os = db.writeFile(pack, INDEX);
-		try (CountingOutputStream cnt = new CountingOutputStream(os)) {
+		try (DfsOutputStream os = db.writeFile(pack, INDEX)) {
+			CountingOutputStream cnt = new CountingOutputStream(os);
 			if (buf != null)
 				buf.writeTo(cnt, null);
 			else
 				index(cnt, packHash, list);
 			pack.addFileExt(INDEX);
+			pack.setBlockSize(INDEX, os.blockSize());
 			pack.setFileSize(INDEX, cnt.getCount());
 		} finally {
 			if (buf != null) {
@@ -497,7 +500,7 @@ public class DfsInserter extends ObjectInserter {
 				inf.setInput(currBuf, s, n);
 				return n;
 			}
-			throw new EOFException(DfsText.get().unexpectedEofInPack);
+			throw new EOFException(JGitText.get().unexpectedEofInPack);
 		}
 
 		private DfsBlock getOrLoadBlock(long pos) throws IOException {
@@ -510,7 +513,7 @@ public class DfsInserter extends ObjectInserter {
 			for (int p = 0; p < blockSize;) {
 				int n = out.read(s + p, ByteBuffer.wrap(d, p, blockSize - p));
 				if (n <= 0)
-					throw new EOFException(DfsText.get().unexpectedEofInPack);
+					throw new EOFException(JGitText.get().unexpectedEofInPack);
 				p += n;
 			}
 			b = new DfsBlock(packKey, s, d);
@@ -566,13 +569,13 @@ public class DfsInserter extends ObjectInserter {
 			byte[] buf = buffer();
 			int cnt = packOut.read(obj.getOffset(), buf, 0, 20);
 			if (cnt <= 0)
-					throw new EOFException(DfsText.get().unexpectedEofInPack);
+					throw new EOFException(JGitText.get().unexpectedEofInPack);
 
 			int c = buf[0] & 0xff;
 			int type = (c >> 4) & 7;
 			if (type == OBJ_OFS_DELTA || type == OBJ_REF_DELTA)
 				throw new IOException(MessageFormat.format(
-						DfsText.get().cannotReadBackDelta, Integer.toString(type)));
+						JGitText.get().cannotReadBackDelta, Integer.toString(type)));
 			if (typeHint != OBJ_ANY && type != typeHint) {
 				throw new IncorrectObjectTypeException(objectId.copy(), typeHint);
 			}
@@ -582,7 +585,7 @@ public class DfsInserter extends ObjectInserter {
 			int shift = 4;
 			while ((c & 0x80) != 0) {
 				if (ptr >= cnt)
-					throw new EOFException(DfsText.get().unexpectedEofInPack);
+					throw new EOFException(JGitText.get().unexpectedEofInPack);
 				c = buf[ptr++] & 0xff;
 				sz += ((long) (c & 0x7f)) << shift;
 				shift += 7;
@@ -633,11 +636,11 @@ public class DfsInserter extends ObjectInserter {
 		private final int type;
 		private final long size;
 
-		private final DfsPackKey srcPack;
+		private final DfsStreamKey srcPack;
 		private final long pos;
 
 		StreamLoader(ObjectId id, int type, long sz,
-				DfsPackKey key, long pos) {
+				DfsStreamKey key, long pos) {
 			this.id = id;
 			this.type = type;
 			this.size = sz;

@@ -168,7 +168,7 @@ public class LockFile {
 	 */
 	public boolean lock() throws IOException {
 		FileUtils.mkdirs(lck.getParentFile(), true);
-		if (FS.DETECTED.createNewFile(lck)) {
+		if (lck.createNewFile()) {
 			haveLck = true;
 			try {
 				os = new FileOutputStream(lck);
@@ -374,7 +374,7 @@ public class LockFile {
 		};
 	}
 
-	private void requireLock() {
+	void requireLock() {
 		if (os == null) {
 			unlock();
 			throw new IllegalStateException(MessageFormat.format(JGitText.get().lockOnNotHeld, ref));

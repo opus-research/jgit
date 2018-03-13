@@ -42,12 +42,16 @@
  */
 package org.eclipse.jgit.api;
 
+import static java.util.stream.Collectors.toList;
+
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidConfigurationException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
@@ -191,6 +195,7 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 							.setThin(thin).setRefSpecs(refSpecs)
 							.setDryRun(dryRun)
 							.setRecurseSubmodules(recurseMode);
+					configure(f);
 					if (callback != null) {
 						callback.fetchingSubmodule(walk.getPath());
 					}
@@ -258,11 +263,19 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 	 * Set the mode to be used for recursing into submodules.
 	 *
 	 * @param recurse
+	 *            corresponds to the
+	 *            --recurse-submodules/--no-recurse-submodules options. If
+	 *            {@code null} use the value of the
+	 *            {@code submodule.name.fetchRecurseSubmodules} option
+	 *            configured per submodule. If not specified there, use the
+	 *            value of the {@code fetch.recurseSubmodules} option configured
+	 *            in git config. If not configured in either, "on-demand" is the
+	 *            built-in default.
 	 * @return {@code this}
 	 * @since 4.7
 	 */
 	public FetchCommand setRecurseSubmodules(
-			FetchRecurseSubmodulesMode recurse) {
+			@Nullable FetchRecurseSubmodulesMode recurse) {
 		checkCallable();
 		submoduleRecurseMode = recurse;
 		return this;
@@ -382,13 +395,21 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 	 *
 	 * @param specs
 	 * @return {@code this}
+	 * @since 4.9
+	 */
+	public FetchCommand setRefSpecs(String... specs) {
+		return setRefSpecs(
+				Arrays.stream(specs).map(RefSpec::new).collect(toList()));
+	}
+
+	/**
+	 * The ref specs to be used in the fetch operation
+	 *
+	 * @param specs
+	 * @return {@code this}
 	 */
 	public FetchCommand setRefSpecs(RefSpec... specs) {
-		checkCallable();
-		this.refSpecs.clear();
-		for (RefSpec spec : specs)
-			refSpecs.add(spec);
-		return this;
+		return setRefSpecs(Arrays.asList(specs));
 	}
 
 	/**

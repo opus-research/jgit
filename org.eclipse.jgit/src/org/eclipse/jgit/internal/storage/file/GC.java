@@ -106,10 +106,10 @@ import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
-import org.eclipse.jgit.lib.internal.WorkQueue;
 import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.ReflogEntry;
 import org.eclipse.jgit.lib.ReflogReader;
+import org.eclipse.jgit.lib.internal.WorkQueue;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -865,6 +865,12 @@ public class GC {
 		tagTargets.addAll(allHeadsAndTags);
 		nonHeads.addAll(indexObjects);
 
+		// Combine the GC_REST objects into the GC pack if requested
+		if (pconfig != null && pconfig.getSinglePack()) {
+			allHeadsAndTags.addAll(nonHeads);
+			nonHeads.clear();
+		}
+
 		List<PackFile> ret = new ArrayList<>(2);
 		PackFile heads = null;
 		if (!allHeadsAndTags.isEmpty()) {
@@ -1167,16 +1173,7 @@ public class GC {
 			// rename the temporary files to real files
 			File realPack = nameFor(id, ".pack"); //$NON-NLS-1$
 
-			// if the packfile already exists (because we are rewriting a
-			// packfile for the same set of objects maybe with different
-			// PackConfig) then make sure we get rid of all handles on the file.
-			// Windows will not allow for rename otherwise.
-			if (realPack.exists())
-				for (PackFile p : repo.getObjectDatabase().getPacks())
-					if (realPack.getPath().equals(p.getPackFile().getPath())) {
-						p.close();
-						break;
-					}
+			repo.getObjectDatabase().closeAllPackHandles(realPack);
 			tmpPack.setReadOnly();
 
 			FileUtils.rename(tmpPack, realPack, StandardCopyOption.ATOMIC_MOVE);
