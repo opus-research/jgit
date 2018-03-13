@@ -46,11 +46,8 @@ package org.eclipse.jgit.internal.storage.dfs;
 
 import static org.eclipse.jgit.internal.storage.pack.PackExt.PACK;
 import static org.eclipse.jgit.lib.Constants.OBJECT_ID_LENGTH;
-import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
-import static org.eclipse.jgit.lib.Constants.OBJ_TREE;
 
 import java.io.IOException;
-import java.io.InterruptedIOException;
 import java.security.MessageDigest;
 import java.text.MessageFormat;
 import java.util.ArrayList;
@@ -60,10 +57,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
@@ -73,6 +68,8 @@ import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.BitmapIndexImpl;
 import org.eclipse.jgit.internal.storage.file.PackBitmapIndex;
+import org.eclipse.jgit.internal.storage.file.PackIndex;
+import org.eclipse.jgit.internal.storage.file.PackReverseIndex;
 import org.eclipse.jgit.internal.storage.pack.CachedPack;
 import org.eclipse.jgit.internal.storage.pack.ObjectReuseAsIs;
 import org.eclipse.jgit.internal.storage.pack.ObjectToPack;
@@ -90,9 +87,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
-import org.eclipse.jgit.revwalk.ObjectWalk;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.util.BlockList;
 
 /**
@@ -116,11 +110,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 
 	private DfsPackFile last;
 
-	private boolean wantReadAhead;
-
 	private boolean avoidUnreachable;
-
-	private List<ReadAheadTask.BlockFuture> pendingReadAhead;
 
 	DfsReader(DfsObjDatabase db) {
 		this.db = db;
@@ -320,8 +310,6 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 	@Override
 	public <T extends ObjectId> AsyncObjectLoaderQueue<T> open(
 			Iterable<T> objectIds, final boolean reportMissing) {
-		wantReadAhead = true;
-
 		Iterable<FoundObject<T>> order;
 		IOException error = null;
 		try {
@@ -343,7 +331,6 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 				} else if (findAllError != null) {
 					throw findAllError;
 				} else {
-					cancelReadAhead();
 					return false;
 				}
 			}
@@ -363,12 +350,11 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 			}
 
 			public boolean cancel(boolean mayInterruptIfRunning) {
-				cancelReadAhead();
 				return true;
 			}
 
 			public void release() {
-				cancelReadAhead();
+				// Nothing to clean up.
 			}
 		};
 	}
@@ -376,8 +362,6 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 	@Override
 	public <T extends ObjectId> AsyncObjectSizeQueue<T> getObjectSize(
 			Iterable<T> objectIds, final boolean reportMissing) {
-		wantReadAhead = true;
-
 		Iterable<FoundObject<T>> order;
 		IOException error = null;
 		try {
@@ -404,7 +388,6 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 				} else if (findAllError != null) {
 					throw findAllError;
 				} else {
-					cancelReadAhead();
 					return false;
 				}
 			}
@@ -422,29 +405,13 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 			}
 
 			public boolean cancel(boolean mayInterruptIfRunning) {
-				cancelReadAhead();
 				return true;
 			}
 
 			public void release() {
-				cancelReadAhead();
+				// Nothing to clean up.
 			}
 		};
-	}
-
-	@Override
-	public void walkAdviceBeginCommits(RevWalk walk, Collection<RevCommit> roots) {
-		wantReadAhead = true;
-	}
-
-	@Override
-	public void walkAdviceBeginTrees(ObjectWalk ow, RevCommit min, RevCommit max) {
-		wantReadAhead = true;
-	}
-
-	@Override
-	public void walkAdviceEnd() {
-		cancelReadAhead();
 	}
 
 	@Override
@@ -476,69 +443,46 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		return new DfsObjectToPack(objectId, type);
 	}
 
-	private static final Comparator<DfsObjectRepresentation> REPRESENTATION_SORT = new Comparator<DfsObjectRepresentation>() {
-		public int compare(DfsObjectRepresentation a, DfsObjectRepresentation b) {
-			int cmp = a.packIndex - b.packIndex;
-			if (cmp == 0)
-				cmp = Long.signum(a.offset - b.offset);
-			return cmp;
+	private static final Comparator<DfsObjectToPack> OFFSET_SORT = new Comparator<DfsObjectToPack>() {
+		public int compare(DfsObjectToPack a, DfsObjectToPack b) {
+			return Long.signum(a.getOffset() - b.getOffset());
 		}
 	};
 
 	public void selectObjectRepresentation(PackWriter packer,
 			ProgressMonitor monitor, Iterable<ObjectToPack> objects)
 			throws IOException, MissingObjectException {
-		DfsPackFile[] packList = db.getPacks();
-		if (packList.length == 0) {
-			Iterator<ObjectToPack> itr = objects.iterator();
-			if (itr.hasNext())
-				throw new MissingObjectException(itr.next(), "unknown");
-			return;
-		}
-
-		int objectCount = 0;
-		int updated = 0;
-		int posted = 0;
-		List<DfsObjectRepresentation> all = new BlockList<DfsObjectRepresentation>();
-		for (ObjectToPack otp : objects) {
-			boolean found = false;
-			for (int packIndex = 0; packIndex < packList.length; packIndex++) {
-				DfsPackFile pack = packList[packIndex];
-				long p = pack.findOffset(this, otp);
-				if (0 < p) {
-					DfsObjectRepresentation r = new DfsObjectRepresentation(otp);
-					r.pack = pack;
-					r.packIndex = packIndex;
-					r.offset = p;
-					all.add(r);
-					found = true;
-				}
-			}
-			if (!found)
-				throw new MissingObjectException(otp, otp.getType());
-			if ((++updated & 1) == 1) {
-				monitor.update(1); // Update by 50%, the other 50% is below.
-				posted++;
-			}
-			objectCount++;
-		}
-		Collections.sort(all, REPRESENTATION_SORT);
-
-		try {
-			wantReadAhead = true;
-			for (DfsObjectRepresentation r : all) {
-				r.pack.representation(this, r);
-				packer.select(r.object, r);
-				if ((++updated & 1) == 1 && posted < objectCount) {
+		for (DfsPackFile pack : db.getPacks()) {
+			List<DfsObjectToPack> tmp = findAllFromPack(pack, objects);
+			if (tmp.isEmpty())
+				continue;
+			Collections.sort(tmp, OFFSET_SORT);
+			PackReverseIndex rev = pack.getReverseIdx(this);
+			DfsObjectRepresentation rep = new DfsObjectRepresentation(pack);
+			for (DfsObjectToPack otp : tmp) {
+				pack.representation(rep, otp.getOffset(), this, rev);
+				otp.setOffset(0);
+				packer.select(otp, rep);
+				if (!otp.isFound()) {
+					otp.setFound();
 					monitor.update(1);
-					posted++;
 				}
 			}
-		} finally {
-			cancelReadAhead();
 		}
-		if (posted < objectCount)
-			monitor.update(objectCount - posted);
+	}
+
+	private List<DfsObjectToPack> findAllFromPack(DfsPackFile pack,
+			Iterable<ObjectToPack> objects) throws IOException {
+		List<DfsObjectToPack> tmp = new BlockList<DfsObjectToPack>();
+		PackIndex idx = pack.getPackIndex(this);
+		for (ObjectToPack otp : objects) {
+			long p = idx.findOffset(otp);
+			if (0 < p) {
+				otp.setOffset(p);
+				tmp.add((DfsObjectToPack) otp);
+			}
+		}
+		return tmp;
 	}
 
 	public void copyObjectAsIs(PackOutputStream out, ObjectToPack otp,
@@ -548,59 +492,15 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		src.pack.copyAsIs(out, src, validate, this);
 	}
 
-	private static final Comparator<ObjectToPack> WRITE_SORT = new Comparator<ObjectToPack>() {
-		public int compare(ObjectToPack o1, ObjectToPack o2) {
-			DfsObjectToPack a = (DfsObjectToPack) o1;
-			DfsObjectToPack b = (DfsObjectToPack) o2;
-			int cmp = a.packIndex - b.packIndex;
-			if (cmp == 0)
-				cmp = Long.signum(a.offset - b.offset);
-			return cmp;
-		}
-	};
-
 	public void writeObjects(PackOutputStream out, List<ObjectToPack> list)
 			throws IOException {
-		if (list.isEmpty())
-			return;
-
-		// Sorting objects by order in the current packs is usually
-		// worthwhile. Most packs are going to be OFS_DELTA style,
-		// where the base must appear before the deltas. If both base
-		// and delta are to be reused, this ensures the base writes in
-		// the output first without the recursive write-base-first logic
-		// used by PackWriter to ensure OFS_DELTA can be used.
-		//
-		// Sorting by pack also ensures newer objects go first, which
-		// typically matches the desired order.
-		//
-		// Only do this sorting for OBJ_TREE and OBJ_BLOB. Commits
-		// are very likely to already be sorted in a good order in the
-		// incoming list, and if they aren't, JGit's PackWriter has fixed
-		// the order to be more optimal for readers, so honor that.
-		switch (list.get(0).getType()) {
-		case OBJ_TREE:
-		case OBJ_BLOB:
-			Collections.sort(list, WRITE_SORT);
-		}
-
-		try {
-			wantReadAhead = true;
-			for (ObjectToPack otp : list)
-				out.writeObject(otp);
-		} finally {
-			cancelReadAhead();
-		}
+		for (ObjectToPack otp : list)
+			out.writeObject(otp);
 	}
 
 	public void copyPackAsIs(PackOutputStream out, CachedPack pack,
 			boolean validate) throws IOException {
-		try {
-			wantReadAhead = true;
-			((DfsCachedPack) pack).copyAsIs(out, validate, this);
-		} finally {
-			cancelReadAhead();
-		}
+		((DfsCachedPack) pack).copyAsIs(out, validate, this);
 	}
 
 	/**
@@ -759,60 +659,14 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 			// be cleaned up by the GC during the get for the next window.
 			// So we always clear it, even though we are just going to set
 			// it again.
-			//
 			block = null;
-
-			if (pendingReadAhead != null)
-				waitForBlock(pack.key, position);
 			block = pack.getOrLoadBlock(position, this);
-		}
-	}
-
-	boolean wantReadAhead() {
-		return wantReadAhead;
-	}
-
-	void startedReadAhead(List<ReadAheadTask.BlockFuture> blocks) {
-		if (pendingReadAhead == null)
-			pendingReadAhead = new LinkedList<ReadAheadTask.BlockFuture>();
-		pendingReadAhead.addAll(blocks);
-	}
-
-	private void cancelReadAhead() {
-		if (pendingReadAhead != null) {
-			for (ReadAheadTask.BlockFuture f : pendingReadAhead)
-				f.cancel(true);
-			pendingReadAhead = null;
-		}
-		wantReadAhead = false;
-	}
-
-	private void waitForBlock(DfsPackKey key, long position)
-			throws InterruptedIOException {
-		Iterator<ReadAheadTask.BlockFuture> itr = pendingReadAhead.iterator();
-		while (itr.hasNext()) {
-			ReadAheadTask.BlockFuture f = itr.next();
-			if (f.contains(key, position)) {
-				try {
-					f.get();
-				} catch (InterruptedException e) {
-					throw new InterruptedIOException();
-				} catch (ExecutionException e) {
-					// Exceptions should never be thrown by get(). Ignore
-					// this and let the normal load paths identify any error.
-				}
-				itr.remove();
-				if (pendingReadAhead.isEmpty())
-					pendingReadAhead = null;
-				break;
-			}
 		}
 	}
 
 	/** Release the current window cursor. */
 	@Override
 	public void release() {
-		cancelReadAhead();
 		last = null;
 		block = null;
 		baseCache = null;
