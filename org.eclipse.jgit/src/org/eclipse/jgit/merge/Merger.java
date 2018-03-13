@@ -72,10 +72,10 @@ public abstract class Merger {
 	protected final Repository db;
 
 	/** Reader to support {@link #walk} and other object loading. */
-	protected ObjectReader reader;
+	protected final ObjectReader reader;
 
 	/** A RevWalk for computing merge bases, or listing incoming commits. */
-	protected RevWalk walk;
+	protected final RevWalk walk;
 
 	private ObjectInserter inserter;
 
@@ -96,8 +96,7 @@ public abstract class Merger {
 	 */
 	protected Merger(final Repository local) {
 		db = local;
-		inserter = db.newObjectInserter();
-		reader = inserter.newReader();
+		reader = db.newObjectReader();
 		walk = new RevWalk(reader);
 	}
 
@@ -108,8 +107,14 @@ public abstract class Merger {
 		return db;
 	}
 
-	/** @return an object writer to create objects in {@link #getRepository()}. */
+	/**
+	 * @return an object writer to create objects in {@link #getRepository()}.
+	 *         If no inserter has been set on this instance, one will be created
+	 *         and returned by all future calls.
+	 */
 	public ObjectInserter getObjectInserter() {
+		if (inserter == null)
+			inserter = getRepository().newObjectInserter();
 		return inserter;
 	}
 
@@ -117,20 +122,17 @@ public abstract class Merger {
 	 * Set the inserter this merger will use to create objects.
 	 * <p>
 	 * If an inserter was already set on this instance (such as by a prior set,
-	 * or a prior call to {@link #getObjectInserter()}), the prior inserter as
-	 * well as the in-progress walk will be released.
+	 * or a prior call to {@link #getObjectInserter()}), the prior inserter will
+	 * be released first.
 	 *
 	 * @param oi
 	 *            the inserter instance to use. Must be associated with the
 	 *            repository instance returned by {@link #getRepository()}.
 	 */
 	public void setObjectInserter(ObjectInserter oi) {
-		walk.release();
-		reader.release();
-		inserter.release();
+		if (inserter != null)
+			inserter.release();
 		inserter = oi;
-		reader = oi.newReader();
-		walk = new RevWalk(reader);
 	}
 
 	/**
@@ -153,35 +155,6 @@ public abstract class Merger {
 	 *             be written to the Repository.
 	 */
 	public boolean merge(final AnyObjectId... tips) throws IOException {
-		return merge(true, tips);
-	}
-
-	/**
-	 * Merge together two or more tree-ish objects.
-	 * <p>
-	 * Any tree-ish may be supplied as inputs. Commits and/or tags pointing at
-	 * trees or commits may be passed as input objects.
-	 *
-	 * @since 3.5
-	 * @param flush
-	 *            whether to flush the underlying object inserter when finished to
-	 *            store any content-merged blobs and virtual merged bases; if
-	 *            false, callers are responsible for flushing.
-	 * @param tips
-	 *            source trees to be combined together. The merge base is not
-	 *            included in this set.
-	 * @return true if the merge was completed without conflicts; false if the
-	 *         merge strategy cannot handle this merge or there were conflicts
-	 *         preventing it from automatically resolving all paths.
-	 * @throws IncorrectObjectTypeException
-	 *             one of the input objects is not a commit, but the strategy
-	 *             requires it to be a commit.
-	 * @throws IOException
-	 *             one or more sources could not be read, or outputs could not
-	 *             be written to the Repository.
-	 */
-	public boolean merge(final boolean flush, final AnyObjectId... tips)
-			throws IOException {
 		sourceObjects = new RevObject[tips.length];
 		for (int i = 0; i < tips.length; i++)
 			sourceObjects[i] = walk.parseAny(tips[i]);
@@ -201,11 +174,11 @@ public abstract class Merger {
 
 		try {
 			boolean ok = mergeImpl();
-			if (ok && flush)
+			if (ok && inserter != null)
 				inserter.flush();
 			return ok;
 		} finally {
-			if (flush)
+			if (inserter != null)
 				inserter.release();
 			reader.release();
 		}
@@ -220,15 +193,11 @@ public abstract class Merger {
 
 	/**
 	 * Return the merge base of two commits.
-	 * <p>
-	 * May only be called after {@link #merge(RevCommit...)}.
 	 *
 	 * @param aIdx
-	 *            index of the first commit in tips passed to
-	 *            {@link #merge(RevCommit...)}.
+	 *            index of the first commit in {@link #sourceObjects}.
 	 * @param bIdx
-	 *            index of the second commit in tips passed to
-	 *            {@link #merge(RevCommit...)}.
+	 *            index of the second commit in {@link #sourceObjects}.
 	 * @return the merge base of two commits
 	 * @throws IncorrectObjectTypeException
 	 *             one of the input objects is not a commit.
