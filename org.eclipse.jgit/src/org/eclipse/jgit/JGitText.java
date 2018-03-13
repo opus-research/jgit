@@ -71,7 +71,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String advertisementOfCameBefore;
 	/***/ public String amazonS3ActionFailed;
 	/***/ public String amazonS3ActionFailedGivingUp;
-	/***/ public String ambiguousObjectAbbreviation;
 	/***/ public String anExceptionOccurredWhileTryingToAddTheIdOfHEAD;
 	/***/ public String anSSHSessionHasBeenAlreadyCreated;
 	/***/ public String atLeastOnePathIsRequired;
@@ -381,14 +380,12 @@ public class JGitText extends TranslationBundle {
 	/***/ public String repositoryState_rebaseWithMerge;
 	/***/ public String requiredHashFunctionNotAvailable;
 	/***/ public String resolvingDeltas;
-	/***/ public String searchForReuse;
 	/***/ public String serviceNotPermitted;
 	/***/ public String shortCompressedStreamAt;
 	/***/ public String shortReadOfBlock;
 	/***/ public String shortReadOfOptionalDIRCExtensionExpectedAnotherBytes;
 	/***/ public String shortSkipOfBlock;
 	/***/ public String similarityScoreMustBeWithinBounds;
-	/***/ public String sizeExceeds2GB;
 	/***/ public String smartHTTPPushDisabled;
 	/***/ public String sourceDestinationMustMatch;
 	/***/ public String sourceIsNotAWildcard;
@@ -414,6 +411,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String truncatedHunkNewLinesMissing;
 	/***/ public String truncatedHunkOldLinesMissing;
 	/***/ public String unableToCheckConnectivity;
+	/***/ public String unableToLockTag;
 	/***/ public String unableToStore;
 	/***/ public String unableToWrite;
 	/***/ public String unencodeableFile;

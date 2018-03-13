@@ -56,7 +56,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
-import java.util.Set;
 import java.util.zip.CRC32;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
@@ -67,7 +66,6 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackInvalidException;
 import org.eclipse.jgit.errors.PackMismatchException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
-import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -211,11 +209,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		return 0 < offset && !isCorrupt(offset) ? load(curs, offset) : null;
 	}
 
-	void resolve(Set<ObjectId> matches, AbbreviatedObjectId id, int matchLimit)
-			throws IOException {
-		idx().resolve(matches, id, matchLimit);
-	}
-
 	/**
 	 * Close the resources utilized by this repository
 	 */
@@ -334,7 +327,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 			readFully(src.offset + headerCnt, buf, 0, 20, curs);
 			crc1.update(buf, 0, 20);
-			crc2.update(buf, 0, 20);
+			crc2.update(buf, 0, headerCnt);
 			headerCnt += 20;
 		} else {
 			crc1.update(buf, 0, headerCnt);
