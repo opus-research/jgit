@@ -156,9 +156,10 @@ class Blame extends TextBuiltin {
 		else
 			dateFmt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss ZZZZ"); //$NON-NLS-1$
 
+		BlameGenerator generator = new BlameGenerator(db, file);
+		RevFlag scanned = generator.newFlag("SCANNED"); //$NON-NLS-1$
 		reader = db.newObjectReader();
-		try (BlameGenerator generator = new BlameGenerator(db, file)) {
-			RevFlag scanned = generator.newFlag("SCANNED"); //$NON-NLS-1$
+		try {
 			generator.setTextComparator(comparator);
 
 			if (!reverseRange.isEmpty()) {
@@ -246,7 +247,8 @@ class Blame extends TextBuiltin {
 				} while (++line < end && blame.getSourceCommit(line) == c);
 			}
 		} finally {
-			reader.close();
+			generator.release();
+			reader.release();
 		}
 	}
 
