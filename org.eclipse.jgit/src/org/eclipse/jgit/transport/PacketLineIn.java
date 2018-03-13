@@ -113,12 +113,7 @@ class PacketLineIn {
 		if (len == 0)
 			return "";
 
-		byte[] raw;
-		if (len <= lineBuffer.length)
-			raw = lineBuffer;
-		else
-			raw = new byte[len];
-
+		final byte[] raw = new byte[len];
 		IO.readFully(in, raw, 0, len);
 		if (raw[len - 1] == '\n')
 			len--;
