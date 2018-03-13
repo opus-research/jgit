@@ -107,14 +107,6 @@ class LeafBucket extends InMemoryNoteBucket {
 		return 0 <= idx ? notes[idx].getData() : null;
 	}
 
-	Note get(int index) {
-		return notes[index];
-	}
-
-	int size() {
-		return cnt;
-	}
-
 	@Override
 	Iterator<Note> iterator(AnyObjectId objId, ObjectReader reader) {
 		return new Iterator<Note>() {
@@ -177,15 +169,6 @@ class LeafBucket extends InMemoryNoteBucket {
 
 	@Override
 	ObjectId writeTree(ObjectInserter inserter) throws IOException {
-		return inserter.insert(build());
-	}
-
-	@Override
-	ObjectId getTreeId() {
-		return new ObjectInserter.Formatter().idFor(build());
-	}
-
-	private TreeFormatter build() {
 		byte[] nameBuf = new byte[OBJECT_ID_STRING_LENGTH];
 		int nameLen = OBJECT_ID_STRING_LENGTH - prefixLen;
 		TreeFormatter fmt = new TreeFormatter(treeSize(nameLen));
@@ -207,7 +190,7 @@ class LeafBucket extends InMemoryNoteBucket {
 
 		for (; e != null; e = e.next)
 			e.format(fmt);
-		return fmt;
+		return inserter.insert(fmt);
 	}
 
 	private int treeSize(final int nameLen) {
@@ -246,7 +229,7 @@ class LeafBucket extends InMemoryNoteBucket {
 		return MAX_SIZE <= cnt && prefixLen + 2 < OBJECT_ID_STRING_LENGTH;
 	}
 
-	FanoutBucket split() {
+	private InMemoryNoteBucket split() {
 		FanoutBucket n = new FanoutBucket(prefixLen);
 		for (int i = 0; i < cnt; i++)
 			n.append(notes[i]);
