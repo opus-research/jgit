@@ -2,6 +2,7 @@
  * Copyright (C) 2007, Dave Watson <dwatson@mimvista.com>
  * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2013, Robin Stocker <robin@nibor.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -46,35 +47,64 @@
 package org.eclipse.jgit.lib;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.TreeSet;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.MergeResult;
 import org.eclipse.jgit.api.MergeResult.MergeStatus;
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.dircache.DirCache;
+import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEditor;
+import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
+import org.eclipse.jgit.junit.RepositoryTestCase;
+import org.eclipse.jgit.lib.IndexDiff.StageState;
 import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
+import org.eclipse.jgit.util.IO;
 import org.junit.Test;
 
+@SuppressWarnings("deprecation")
 public class IndexDiffTest extends RepositoryTestCase {
+
+	static PathEdit add(final Repository db, final File workdir,
+			final String path) throws FileNotFoundException, IOException {
+		ObjectInserter inserter = db.newObjectInserter();
+		final File f = new File(workdir, path);
+		final ObjectId id = inserter.insert(Constants.OBJ_BLOB,
+				IO.readFully(f));
+		return new PathEdit(path) {
+			public void apply(DirCacheEntry ent) {
+				ent.setFileMode(FileMode.REGULAR_FILE);
+				ent.setLength(f.length());
+				ent.setObjectId(id);
+			}
+		};
+	}
+
 	@Test
 	public void testAdded() throws IOException {
-		GitIndex index = new GitIndex(db);
 		writeTrashFile("file1", "file1");
 		writeTrashFile("dir/subfile", "dir/subfile");
 		Tree tree = new Tree(db);
 		tree.setId(insertTree(tree));
 
-		index.add(trash, new File(trash, "file1"));
-		index.add(trash, new File(trash, "dir/subfile"));
-		index.write();
+		DirCache index = db.lockDirCache();
+		DirCacheEditor editor = index.editor();
+		editor.add(add(db, trash, "file1"));
+		editor.add(add(db, trash, "dir/subfile"));
+		editor.commit();
 		FileTreeIterator iterator = new FileTreeIterator(db);
 		IndexDiff diff = new IndexDiff(db, tree.getId(), iterator);
 		diff.diff();
@@ -84,6 +114,7 @@ public class IndexDiffTest extends RepositoryTestCase {
 		assertEquals(0, diff.getChanged().size());
 		assertEquals(0, diff.getModified().size());
 		assertEquals(0, diff.getRemoved().size());
+		assertEquals(Collections.EMPTY_SET, diff.getUntrackedFolders());
 	}
 
 	@Test
@@ -110,16 +141,17 @@ public class IndexDiffTest extends RepositoryTestCase {
 		assertEquals(0, diff.getChanged().size());
 		assertEquals(0, diff.getModified().size());
 		assertEquals(0, diff.getAdded().size());
+		assertEquals(Collections.EMPTY_SET, diff.getUntrackedFolders());
 	}
 
 	@Test
-	public void testModified() throws IOException {
-		GitIndex index = new GitIndex(db);
+	public void testModified() throws IOException, GitAPIException {
 
+		writeTrashFile("file2", "file2");
+		writeTrashFile("dir/file3", "dir/file3");
 
-		index.add(trash, writeTrashFile("file2", "file2"));
-		index.add(trash, writeTrashFile("dir/file3", "dir/file3"));
-		index.write();
+		Git git = new Git(db);
+		git.add().addFilepattern("file2").addFilepattern("dir/file3").call();
 
 		writeTrashFile("dir/file3", "changed");
 
@@ -142,6 +174,7 @@ public class IndexDiffTest extends RepositoryTestCase {
 		assertEquals(0, diff.getAdded().size());
 		assertEquals(0, diff.getRemoved().size());
 		assertEquals(0, diff.getMissing().size());
+		assertEquals(Collections.EMPTY_SET, diff.getUntrackedFolders());
 	}
 
 	@Test
@@ -183,6 +216,9 @@ public class IndexDiffTest extends RepositoryTestCase {
 		assertEquals("[]", diff.getMissing().toString());
 		assertEquals("[]", diff.getModified().toString());
 		assertEquals("[a]", diff.getConflicting().toString());
+		assertEquals(StageState.BOTH_MODIFIED,
+				diff.getConflictingStageStates().get("a"));
+		assertEquals(Collections.EMPTY_SET, diff.getUntrackedFolders());
 	}
 
 	@Test
@@ -221,6 +257,9 @@ public class IndexDiffTest extends RepositoryTestCase {
 		assertEquals("[]", diff.getMissing().toString());
 		assertEquals("[]", diff.getModified().toString());
 		assertEquals("[a]", diff.getConflicting().toString());
+		assertEquals(StageState.DELETED_BY_THEM,
+				diff.getConflictingStageStates().get("a"));
+		assertEquals(Collections.EMPTY_SET, diff.getUntrackedFolders());
 	}
 
 	@Test
@@ -258,17 +297,20 @@ public class IndexDiffTest extends RepositoryTestCase {
 		assertEquals("[]", diff.getMissing().toString());
 		assertEquals("[]", diff.getModified().toString());
 		assertEquals("[b]", diff.getConflicting().toString());
+		assertEquals(Collections.EMPTY_SET, diff.getUntrackedFolders());
 	}
 
 	@Test
-	public void testUnchangedSimple() throws IOException {
-		GitIndex index = new GitIndex(db);
-
-		index.add(trash, writeTrashFile("a.b", "a.b"));
-		index.add(trash, writeTrashFile("a.c", "a.c"));
-		index.add(trash, writeTrashFile("a=c", "a=c"));
-		index.add(trash, writeTrashFile("a=d", "a=d"));
-		index.write();
+	public void testUnchangedSimple() throws IOException, GitAPIException {
+		writeTrashFile("a.b", "a.b");
+		writeTrashFile("a.c", "a.c");
+		writeTrashFile("a=c", "a=c");
+		writeTrashFile("a=d", "a=d");
+		Git git = new Git(db);
+		git.add().addFilepattern("a.b").call();
+		git.add().addFilepattern("a.c").call();
+		git.add().addFilepattern("a=c").call();
+		git.add().addFilepattern("a=d").call();
 
 		Tree tree = new Tree(db);
 		// got the hash id'd from the data using echo -n a.b|git hash-object -t blob --stdin
@@ -287,26 +329,30 @@ public class IndexDiffTest extends RepositoryTestCase {
 		assertEquals(0, diff.getRemoved().size());
 		assertEquals(0, diff.getMissing().size());
 		assertEquals(0, diff.getModified().size());
+		assertEquals(Collections.EMPTY_SET, diff.getUntrackedFolders());
 	}
 
 	/**
-	 * This test has both files and directories that involve
-	 * the tricky ordering used by Git.
+	 * This test has both files and directories that involve the tricky ordering
+	 * used by Git.
 	 *
 	 * @throws IOException
+	 * @throws GitAPIException
 	 */
 	@Test
-	public void testUnchangedComplex() throws IOException {
-		GitIndex index = new GitIndex(db);
-
-		index.add(trash, writeTrashFile("a.b", "a.b"));
-		index.add(trash, writeTrashFile("a.c", "a.c"));
-		index.add(trash, writeTrashFile("a/b.b/b", "a/b.b/b"));
-		index.add(trash, writeTrashFile("a/b", "a/b"));
-		index.add(trash, writeTrashFile("a/c", "a/c"));
-		index.add(trash, writeTrashFile("a=c", "a=c"));
-		index.add(trash, writeTrashFile("a=d", "a=d"));
-		index.write();
+	public void testUnchangedComplex() throws IOException, GitAPIException {
+		Git git = new Git(db);
+		writeTrashFile("a.b", "a.b");
+		writeTrashFile("a.c", "a.c");
+		writeTrashFile("a/b.b/b", "a/b.b/b");
+		writeTrashFile("a/b", "a/b");
+		writeTrashFile("a/c", "a/c");
+		writeTrashFile("a=c", "a=c");
+		writeTrashFile("a=d", "a=d");
+		git.add().addFilepattern("a.b").addFilepattern("a.c")
+				.addFilepattern("a/b.b/b").addFilepattern("a/b")
+				.addFilepattern("a/c").addFilepattern("a=c")
+				.addFilepattern("a=d").call();
 
 		Tree tree = new Tree(db);
 		// got the hash id'd from the data using echo -n a.b|git hash-object -t blob --stdin
@@ -332,6 +378,7 @@ public class IndexDiffTest extends RepositoryTestCase {
 		assertEquals(0, diff.getRemoved().size());
 		assertEquals(0, diff.getMissing().size());
 		assertEquals(0, diff.getModified().size());
+		assertEquals(Collections.EMPTY_SET, diff.getUntrackedFolders());
 	}
 
 	private ObjectId insertTree(Tree tree) throws IOException {
@@ -364,6 +411,60 @@ public class IndexDiffTest extends RepositoryTestCase {
 		diff.diff();
 		assertTrue(diff.getRemoved().contains(path));
 		assertTrue(diff.getUntracked().contains(path));
+		assertEquals(Collections.EMPTY_SET, diff.getUntrackedFolders());
+	}
+
+	/**
+	 *
+	 * @throws Exception
+	 */
+	@Test
+	public void testUntrackedFolders() throws Exception {
+		Git git = new Git(db);
+
+		IndexDiff diff = new IndexDiff(db, Constants.HEAD,
+				new FileTreeIterator(db));
+		diff.diff();
+		assertEquals(Collections.EMPTY_SET, diff.getUntrackedFolders());
+
+		writeTrashFile("readme", "");
+		writeTrashFile("src/com/A.java", "");
+		writeTrashFile("src/com/B.java", "");
+		writeTrashFile("src/org/A.java", "");
+		writeTrashFile("src/org/B.java", "");
+		writeTrashFile("target/com/A.java", "");
+		writeTrashFile("target/com/B.java", "");
+		writeTrashFile("target/org/A.java", "");
+		writeTrashFile("target/org/B.java", "");
+
+		git.add().addFilepattern("src").addFilepattern("readme").call();
+		git.commit().setMessage("initial").call();
+
+		diff = new IndexDiff(db, Constants.HEAD,
+				new FileTreeIterator(db));
+		diff.diff();
+		assertEquals(new HashSet<String>(Arrays.asList("target")),
+				diff.getUntrackedFolders());
+
+		writeTrashFile("src/tst/A.java", "");
+		writeTrashFile("src/tst/B.java", "");
+
+		diff = new IndexDiff(db, Constants.HEAD, new FileTreeIterator(db));
+		diff.diff();
+		assertEquals(new HashSet<String>(Arrays.asList("target", "src/tst")),
+				diff.getUntrackedFolders());
+
+		git.rm().addFilepattern("src/com/B.java").addFilepattern("src/org")
+				.call();
+		git.commit().setMessage("second").call();
+		writeTrashFile("src/org/C.java", "");
+
+		diff = new IndexDiff(db, Constants.HEAD, new FileTreeIterator(db));
+		diff.diff();
+		assertEquals(
+				new HashSet<String>(Arrays.asList("src/org", "src/tst",
+						"target")),
+				diff.getUntrackedFolders());
 	}
 
 	@Test
@@ -374,19 +475,23 @@ public class IndexDiffTest extends RepositoryTestCase {
 		git.add().addFilepattern(path).call();
 		String path2 = "file2";
 		writeTrashFile(path2, "content");
-		git.add().addFilepattern(path2).call();
+		String path3 = "file3";
+		writeTrashFile(path3, "some content");
+		git.add().addFilepattern(path2).addFilepattern(path3).call();
 		git.commit().setMessage("commit").call();
 		assumeUnchanged(path2);
+		assumeUnchanged(path3);
 		writeTrashFile(path, "more content");
-		writeTrashFile(path2, "more content");
+		deleteTrashFile(path3);
 
 		FileTreeIterator iterator = new FileTreeIterator(db);
 		IndexDiff diff = new IndexDiff(db, Constants.HEAD, iterator);
 		diff.diff();
-		assertEquals(1, diff.getAssumeUnchanged().size());
+		assertEquals(2, diff.getAssumeUnchanged().size());
 		assertEquals(1, diff.getModified().size());
 		assertEquals(0, diff.getChanged().size());
 		assertTrue(diff.getAssumeUnchanged().contains("file2"));
+		assertTrue(diff.getAssumeUnchanged().contains("file3"));
 		assertTrue(diff.getModified().contains("file"));
 
 		git.add().addFilepattern(".").call();
@@ -394,11 +499,53 @@ public class IndexDiffTest extends RepositoryTestCase {
 		iterator = new FileTreeIterator(db);
 		diff = new IndexDiff(db, Constants.HEAD, iterator);
 		diff.diff();
-		assertEquals(1, diff.getAssumeUnchanged().size());
+		assertEquals(2, diff.getAssumeUnchanged().size());
 		assertEquals(0, diff.getModified().size());
 		assertEquals(1, diff.getChanged().size());
 		assertTrue(diff.getAssumeUnchanged().contains("file2"));
+		assertTrue(diff.getAssumeUnchanged().contains("file3"));
 		assertTrue(diff.getChanged().contains("file"));
+		assertEquals(Collections.EMPTY_SET, diff.getUntrackedFolders());
+	}
+
+	@Test
+	public void testStageState() throws IOException {
+		final int base = DirCacheEntry.STAGE_1;
+		final int ours = DirCacheEntry.STAGE_2;
+		final int theirs = DirCacheEntry.STAGE_3;
+		verifyStageState(StageState.BOTH_DELETED, base);
+		verifyStageState(StageState.DELETED_BY_THEM, ours, base);
+		verifyStageState(StageState.DELETED_BY_US, base, theirs);
+		verifyStageState(StageState.BOTH_MODIFIED, base, ours, theirs);
+		verifyStageState(StageState.ADDED_BY_US, ours);
+		verifyStageState(StageState.BOTH_ADDED, ours, theirs);
+		verifyStageState(StageState.ADDED_BY_THEM, theirs);
+
+		assertTrue(StageState.BOTH_DELETED.hasBase());
+		assertFalse(StageState.BOTH_DELETED.hasOurs());
+		assertFalse(StageState.BOTH_DELETED.hasTheirs());
+		assertFalse(StageState.BOTH_ADDED.hasBase());
+		assertTrue(StageState.BOTH_ADDED.hasOurs());
+		assertTrue(StageState.BOTH_ADDED.hasTheirs());
+	}
+
+	private void verifyStageState(StageState expected, int... stages)
+			throws IOException {
+		DirCacheBuilder builder = db.lockDirCache().builder();
+		for (int stage : stages) {
+			DirCacheEntry entry = createEntry("a", FileMode.REGULAR_FILE,
+					stage, "content");
+			builder.add(entry);
+		}
+		builder.commit();
+
+		IndexDiff diff = new IndexDiff(db, Constants.HEAD,
+				new FileTreeIterator(db));
+		diff.diff();
+
+		assertEquals(
+				"Conflict for entries in stages " + Arrays.toString(stages),
+				expected, diff.getConflictingStageStates().get("a"));
 	}
 
 	private void removeFromIndex(String path) throws IOException {

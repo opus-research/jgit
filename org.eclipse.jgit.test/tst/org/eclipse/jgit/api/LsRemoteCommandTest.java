@@ -44,15 +44,14 @@ package org.eclipse.jgit.api;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.util.Collection;
 
+import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
-import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.junit.Test;
 
 public class LsRemoteCommandTest extends RepositoryTestCase {
@@ -79,69 +78,54 @@ public class LsRemoteCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testLsRemote() {
-		try {
-			File directory = createTempDirectory("testRepository");
-			CloneCommand command = Git.cloneRepository();
-			command.setDirectory(directory);
-			command.setURI("file://"
-					+ git.getRepository().getWorkTree().getPath());
-			command.setCloneAllBranches(true);
-			Git git2 = command.call();
-			addRepoToClose(git2.getRepository());
+	public void testLsRemote() throws Exception {
+		File directory = createTempDirectory("testRepository");
+		CloneCommand command = Git.cloneRepository();
+		command.setDirectory(directory);
+		command.setURI("file://" + git.getRepository().getWorkTree().getPath());
+		command.setCloneAllBranches(true);
+		Git git2 = command.call();
+		addRepoToClose(git2.getRepository());
 
 
-			LsRemoteCommand lsRemoteCommand = git2.lsRemote();
-			Collection<Ref> refs = lsRemoteCommand.call();
-			assertNotNull(refs);
-			assertEquals(6, refs.size());
-		} catch (Exception e) {
-			fail(e.getMessage());
-		}
+		LsRemoteCommand lsRemoteCommand = git2.lsRemote();
+		Collection<Ref> refs = lsRemoteCommand.call();
+		assertNotNull(refs);
+		assertEquals(6, refs.size());
 	}
 
 	@Test
-	public void testLsRemoteWithTags() {
-		try {
-			File directory = createTempDirectory("testRepository");
-			CloneCommand command = Git.cloneRepository();
-			command.setDirectory(directory);
-			command.setURI("file://"
-					+ git.getRepository().getWorkTree().getPath());
-			command.setCloneAllBranches(true);
-			Git git2 = command.call();
-			addRepoToClose(git2.getRepository());
+	public void testLsRemoteWithTags() throws Exception {
+		File directory = createTempDirectory("testRepository");
+		CloneCommand command = Git.cloneRepository();
+		command.setDirectory(directory);
+		command.setURI("file://" + git.getRepository().getWorkTree().getPath());
+		command.setCloneAllBranches(true);
+		Git git2 = command.call();
+		addRepoToClose(git2.getRepository());
 
-			LsRemoteCommand lsRemoteCommand = git2.lsRemote();
-			lsRemoteCommand.setTags(true);
-			Collection<Ref> refs = lsRemoteCommand.call();
-			assertNotNull(refs);
-			assertEquals(3, refs.size());
-		} catch (Exception e) {
-			fail(e.getMessage());
-		}
+		LsRemoteCommand lsRemoteCommand = git2.lsRemote();
+		lsRemoteCommand.setTags(true);
+		Collection<Ref> refs = lsRemoteCommand.call();
+		assertNotNull(refs);
+		assertEquals(3, refs.size());
 	}
 
 	@Test
-	public void testLsRemoteWithHeads() {
-		try {
-			File directory = createTempDirectory("testRepository");
-			CloneCommand command = Git.cloneRepository();
-			command.setDirectory(directory);
-			command.setURI("file://"
-					+ git.getRepository().getWorkTree().getPath());
-			command.setCloneAllBranches(true);
-			Git git2 = command.call();
-			addRepoToClose(git2.getRepository());
+	public void testLsRemoteWithHeads() throws Exception {
+		File directory = createTempDirectory("testRepository");
+		CloneCommand command = Git.cloneRepository();
+		command.setDirectory(directory);
+		command.setURI("file://" + git.getRepository().getWorkTree().getPath());
+		command.setCloneAllBranches(true);
+		Git git2 = command.call();
+		addRepoToClose(git2.getRepository());
 
-			LsRemoteCommand lsRemoteCommand = git2.lsRemote();
-			lsRemoteCommand.setHeads(true);
-			Collection<Ref> refs = lsRemoteCommand.call();
-			assertNotNull(refs);
-			assertEquals(2, refs.size());
-		} catch (Exception e) {
-			fail(e.getMessage());
-		}
+		LsRemoteCommand lsRemoteCommand = git2.lsRemote();
+		lsRemoteCommand.setHeads(true);
+		Collection<Ref> refs = lsRemoteCommand.call();
+		assertNotNull(refs);
+		assertEquals(2, refs.size());
 	}
 
 }

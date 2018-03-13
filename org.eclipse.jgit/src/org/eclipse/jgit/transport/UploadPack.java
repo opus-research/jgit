@@ -49,16 +49,18 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.text.MessageFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
+import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.internal.storage.pack.PackWriter;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
@@ -76,10 +78,10 @@ import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.revwalk.filter.CommitTimeRevFilter;
 import org.eclipse.jgit.storage.pack.PackConfig;
-import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.transport.BasePackFetchConnection.MultiAck;
 import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 import org.eclipse.jgit.util.io.InterruptTimer;
+import org.eclipse.jgit.util.io.NullOutputStream;
 import org.eclipse.jgit.util.io.TimeoutInputStream;
 import org.eclipse.jgit.util.io.TimeoutOutputStream;
 
@@ -106,6 +108,54 @@ public class UploadPack {
 	static final String OPTION_NO_DONE = BasePackFetchConnection.OPTION_NO_DONE;
 
 	static final String OPTION_SHALLOW = BasePackFetchConnection.OPTION_SHALLOW;
+
+	/** Policy the server uses to validate client requests */
+	public static enum RequestPolicy {
+		/** Client may only ask for objects the server advertised a reference for. */
+		ADVERTISED,
+		/** Client may ask for any commit reachable from a reference. */
+		REACHABLE_COMMIT,
+		/** Client may ask for any SHA-1 in the repository. */
+		ANY;
+	}
+
+	/** Data in the first line of a request, the line itself plus options. */
+	public static class FirstLine {
+		private final String line;
+		private final Set<String> options;
+
+		/**
+		 * Parse the first line of a receive-pack request.
+		 *
+		 * @param line
+		 *            line from the client.
+		 */
+		public FirstLine(String line) {
+			if (line.length() > 45) {
+				final HashSet<String> opts = new HashSet<String>();
+				String opt = line.substring(45);
+				if (opt.startsWith(" ")) //$NON-NLS-1$
+					opt = opt.substring(1);
+				for (String c : opt.split(" ")) //$NON-NLS-1$
+					opts.add(c);
+				this.line = line.substring(0, 45);
+				this.options = Collections.unmodifiableSet(opts);
+			} else {
+				this.line = line;
+				this.options = Collections.emptySet();
+			}
+		}
+
+		/** @return non-capabilities part of the line. */
+		public String getLine() {
+			return line;
+		}
+
+		/** @return options parsed from the line. */
+		public Set<String> getOptions() {
+			return options;
+		}
+	}
 
 	/** Database we read the objects from. */
 	private final Repository db;
@@ -143,17 +193,22 @@ public class UploadPack {
 
 	private PacketLineOut pckOut;
 
+	private OutputStream msgOut = NullOutputStream.INSTANCE;
+
 	/** The refs we advertised as existing at the start of the connection. */
 	private Map<String, Ref> refs;
 
+	/** Hook used while advertising the refs to the client. */
+	private AdvertiseRefsHook advertiseRefsHook = AdvertiseRefsHook.DEFAULT;
+
 	/** Filter used while advertising the refs to the client. */
-	private RefFilter refFilter;
+	private RefFilter refFilter = RefFilter.DEFAULT;
 
 	/** Hook handling the various upload phases. */
 	private PreUploadHook preUploadHook = PreUploadHook.NULL;
 
 	/** Capabilities requested by the client. */
-	private final Set<String> options = new HashSet<String>();
+	private Set<String> options;
 
 	/** Raw ObjectIds the client has asked for, before validating them. */
 	private final Set<ObjectId> wantIds = new HashSet<ObjectId>();
@@ -198,13 +253,15 @@ public class UploadPack {
 
 	private final RevFlagSet SAVE;
 
+	private RequestPolicy requestPolicy = RequestPolicy.ADVERTISED;
+
 	private MultiAck multiAck = MultiAck.OFF;
 
 	private boolean noDone;
 
 	private PackWriter.Statistics statistics;
 
-	private UploadPackLogger logger;
+	private UploadPackLogger logger = UploadPackLogger.NULL;
 
 	/**
 	 * Create a new pack upload for an open repository.
@@ -217,10 +274,10 @@ public class UploadPack {
 		walk = new RevWalk(db);
 		walk.setRetainBody(false);
 
-		WANT = walk.newFlag("WANT");
-		PEER_HAS = walk.newFlag("PEER_HAS");
-		COMMON = walk.newFlag("COMMON");
-		SATISFIED = walk.newFlag("SATISFIED");
+		WANT = walk.newFlag("WANT"); //$NON-NLS-1$
+		PEER_HAS = walk.newFlag("PEER_HAS"); //$NON-NLS-1$
+		COMMON = walk.newFlag("COMMON"); //$NON-NLS-1$
+		SATISFIED = walk.newFlag("SATISFIED"); //$NON-NLS-1$
 		walk.carry(PEER_HAS);
 
 		SAVE = new RevFlagSet();
@@ -228,7 +285,6 @@ public class UploadPack {
 		SAVE.add(PEER_HAS);
 		SAVE.add(COMMON);
 		SAVE.add(SATISFIED);
-		refFilter = RefFilter.DEFAULT;
 	}
 
 	/** @return the repository this upload is reading from. */
@@ -241,12 +297,34 @@ public class UploadPack {
 		return walk;
 	}
 
-	/** @return all refs which were advertised to the client. */
+	/**
+	 * Get refs which were advertised to the client.
+	 *
+	 * @return all refs which were advertised to the client, or null if
+	 *         {@link #setAdvertisedRefs(Map)} has not been called yet.
+	 */
 	public final Map<String, Ref> getAdvertisedRefs() {
-		if (refs == null) {
-			refs = refFilter.filter(db.getAllRefs());
-		}
 		return refs;
+	}
+
+	/**
+	 * Set the refs advertised by this UploadPack.
+	 * <p>
+	 * Intended to be called from a {@link PreUploadHook}.
+	 *
+	 * @param allRefs
+	 *            explicit set of references to claim as advertised by this
+	 *            UploadPack instance. This overrides any references that
+	 *            may exist in the source repository. The map is passed
+	 *            to the configured {@link #getRefFilter()}. If null, assumes
+	 *            all refs were advertised.
+	 */
+	public void setAdvertisedRefs(Map<String, Ref> allRefs) {
+		if (allRefs != null)
+			refs = allRefs;
+		else
+			refs = db.getAllRefs();
+		refs = refFilter.filter(refs);
 	}
 
 	/** @return timeout (in seconds) before aborting an IO operation. */
@@ -285,6 +363,31 @@ public class UploadPack {
 	 */
 	public void setBiDirectionalPipe(final boolean twoWay) {
 		biDirectionalPipe = twoWay;
+		if (!biDirectionalPipe && requestPolicy == RequestPolicy.ADVERTISED)
+			requestPolicy = RequestPolicy.REACHABLE_COMMIT;
+	}
+
+	/** @return policy used by the service to validate client requests. */
+	public RequestPolicy getRequestPolicy() {
+		return requestPolicy;
+	}
+
+	/**
+	 * @param policy
+	 *            the policy used to enforce validation of a client's want list.
+	 *            By default the policy is {@link RequestPolicy#ADVERTISED},
+	 *            which is the Git default requiring clients to only ask for an
+	 *            object that a reference directly points to. This may be relaxed
+	 *            to {@link RequestPolicy#REACHABLE_COMMIT} when callers
+	 *            have {@link #setBiDirectionalPipe(boolean)} set to false.
+	 */
+	public void setRequestPolicy(RequestPolicy policy) {
+		requestPolicy = policy != null ? policy : RequestPolicy.ADVERTISED;
+	}
+
+	/** @return the hook used while advertising the refs to the client */
+	public AdvertiseRefsHook getAdvertiseRefsHook() {
+		return advertiseRefsHook;
 	}
 
 	/** @return the filter used while advertising the refs to the client */
@@ -293,12 +396,28 @@ public class UploadPack {
 	}
 
 	/**
+	 * Set the hook used while advertising the refs to the client.
+	 * <p>
+	 * If the {@link AdvertiseRefsHook} chooses to call
+	 * {@link #setAdvertisedRefs(Map)}, only refs set by this hook <em>and</em>
+	 * selected by the {@link RefFilter} will be shown to the client.
+	 *
+	 * @param advertiseRefsHook
+	 *            the hook; may be null to show all refs.
+	 */
+	public void setAdvertiseRefsHook(final AdvertiseRefsHook advertiseRefsHook) {
+		if (advertiseRefsHook != null)
+			this.advertiseRefsHook = advertiseRefsHook;
+		else
+			this.advertiseRefsHook = AdvertiseRefsHook.DEFAULT;
+	}
+
+	/**
 	 * Set the filter used while advertising the refs to the client.
 	 * <p>
-	 * Only refs allowed by this filter will be sent to the client. This can
-	 * be used by a server to restrict the list of references the client can
-	 * obtain through clone or fetch, effectively limiting the access to only
-	 * certain refs.
+	 * Only refs allowed by this filter will be sent to the client.
+	 * The filter is run against the refs specified by the
+	 * {@link AdvertiseRefsHook} (if applicable).
 	 *
 	 * @param refFilter
 	 *            the filter; may be null to show all refs.
@@ -333,6 +452,11 @@ public class UploadPack {
 		this.packConfig = pc;
 	}
 
+	/** @return the configured logger. */
+	public UploadPackLogger getLogger() {
+		return logger;
+	}
+
 	/**
 	 * Set the logger.
 	 *
@@ -341,6 +465,24 @@ public class UploadPack {
 	 */
 	public void setLogger(UploadPackLogger logger) {
 		this.logger = logger;
+	}
+
+	/**
+	 * Check whether the client expects a side-band stream.
+	 *
+	 * @return true if the client has advertised a side-band capability, false
+	 *     otherwise.
+	 * @throws RequestNotYetReadException
+	 *             if the client's request has not yet been read from the wire, so
+	 *             we do not know if they expect side-band. Note that the client
+	 *             may have already written the request, it just has not been
+	 *             read.
+	 */
+	public boolean isSideBand() throws RequestNotYetReadException {
+		if (options == null)
+			throw new RequestNotYetReadException();
+		return (options.contains(OPTION_SIDE_BAND)
+				|| options.contains(OPTION_SIDE_BAND_64K));
 	}
 
 	/**
@@ -365,10 +507,12 @@ public class UploadPack {
 		try {
 			rawIn = input;
 			rawOut = output;
+			if (messages != null)
+				msgOut = messages;
 
 			if (timeout > 0) {
 				final Thread caller = Thread.currentThread();
-				timer = new InterruptTimer(caller.getName() + "-Timer");
+				timer = new InterruptTimer(caller.getName() + "-Timer"); //$NON-NLS-1$
 				TimeoutInputStream i = new TimeoutInputStream(rawIn, timer);
 				TimeoutOutputStream o = new TimeoutOutputStream(rawOut, timer);
 				i.setTimeout(timeout * 1000);
@@ -381,6 +525,7 @@ public class UploadPack {
 			pckOut = new PacketLineOut(rawOut);
 			service();
 		} finally {
+			msgOut = NullOutputStream.INSTANCE;
 			walk.release();
 			if (timer != null) {
 				try {
@@ -398,17 +543,26 @@ public class UploadPack {
 	 * @return statistics about pack output, if a pack was sent. Null if no pack
 	 *         was sent, such as during the negotation phase of a smart HTTP
 	 *         connection, or if the client was already up-to-date.
+	 * @since 3.0
 	 */
 	public PackWriter.Statistics getPackStatistics() {
 		return statistics;
 	}
 
+	private Map<String, Ref> getAdvertisedOrDefaultRefs() {
+		if (refs == null)
+			setAdvertisedRefs(null);
+		return refs;
+	}
+
 	private void service() throws IOException {
 		if (biDirectionalPipe)
 			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
+		else if (requestPolicy == RequestPolicy.ANY)
+			advertised = Collections.emptySet();
 		else {
 			advertised = new HashSet<ObjectId>();
-			for (Ref ref : getAdvertisedRefs().values()) {
+			for (Ref ref : getAdvertisedOrDefaultRefs().values()) {
 				if (ref.getObjectId() != null)
 					advertised.add(ref.getObjectId());
 			}
@@ -438,10 +592,10 @@ public class UploadPack {
 			reportErrorDuringNegotiate(err.getMessage());
 			throw err;
 
-		} catch (UploadPackMayNotContinueException err) {
+		} catch (ServiceMayNotContinueException err) {
 			if (!err.isOutput() && err.getMessage() != null) {
 				try {
-					pckOut.writeString("ERR " + err.getMessage() + "\n");
+					pckOut.writeString("ERR " + err.getMessage() + "\n"); //$NON-NLS-1$ //$NON-NLS-2$
 					err.setOutput();
 				} catch (Throwable err2) {
 					// Ignore this secondary failure (and not mark output).
@@ -466,7 +620,7 @@ public class UploadPack {
 
 	private void reportErrorDuringNegotiate(String msg) {
 		try {
-			pckOut.writeString("ERR " + msg + "\n");
+			pckOut.writeString("ERR " + msg + "\n"); //$NON-NLS-1$ //$NON-NLS-2$
 		} catch (Throwable err) {
 			// Ignore this secondary failure.
 		}
@@ -492,13 +646,13 @@ public class UploadPack {
 			// Commits at the boundary which aren't already shallow in
 			// the client need to be marked as such
 			if (c.getDepth() == depth && !clientShallowCommits.contains(c))
-				pckOut.writeString("shallow " + o.name());
+				pckOut.writeString("shallow " + o.name()); //$NON-NLS-1$
 
 			// Commits not on the boundary which are shallow in the client
 			// need to become unshallowed
 			if (c.getDepth() < depth && clientShallowCommits.contains(c)) {
 				unshallowCommits.add(c.copy());
-				pckOut.writeString("unshallow " + c.name());
+				pckOut.writeString("unshallow " + c.name()); //$NON-NLS-1$
 			}
 		}
 
@@ -512,16 +666,16 @@ public class UploadPack {
 	 *            the advertisement formatter.
 	 * @throws IOException
 	 *             the formatter failed to write an advertisement.
-	 * @throws UploadPackMayNotContinueException
+	 * @throws ServiceMayNotContinueException
 	 *             the hook denied advertisement.
 	 */
 	public void sendAdvertisedRefs(final RefAdvertiser adv) throws IOException,
-			UploadPackMayNotContinueException {
+			ServiceMayNotContinueException {
 		try {
-			preUploadHook.onPreAdvertiseRefs(this);
-		} catch (UploadPackMayNotContinueException fail) {
+			advertiseRefsHook.advertiseRefs(this);
+		} catch (ServiceMayNotContinueException fail) {
 			if (fail.getMessage() != null) {
-				adv.writeOne("ERR " + fail.getMessage());
+				adv.writeOne("ERR " + fail.getMessage()); //$NON-NLS-1$
 				fail.setOutput();
 			}
 			throw fail;
@@ -540,8 +694,31 @@ public class UploadPack {
 		if (!biDirectionalPipe)
 			adv.advertiseCapability(OPTION_NO_DONE);
 		adv.setDerefTags(true);
-		advertised = adv.send(getAdvertisedRefs());
+		advertised = adv.send(getAdvertisedOrDefaultRefs());
 		adv.end();
+	}
+
+	/**
+	 * Send a message to the client, if it supports receiving them.
+	 * <p>
+	 * If the client doesn't support receiving messages, the message will be
+	 * discarded, with no other indication to the caller or to the client.
+	 *
+	 * @param what
+	 *            string describing the problem identified by the hook. The
+	 *            string must not end with an LF, and must not contain an LF.
+	 */
+	public void sendMessage(String what) {
+		try {
+			msgOut.write(Constants.encode(what + "\n")); //$NON-NLS-1$
+		} catch (IOException e) {
+			// Ignore write failures.
+		}
+	}
+
+	/** @return an underlying stream for sending messages to the client, or null. */
+	public OutputStream getMessageOutputStream() {
+		return msgOut;
 	}
 
 	private void recvWants() throws IOException {
@@ -559,26 +736,23 @@ public class UploadPack {
 			if (line == PacketLineIn.END)
 				break;
 
-			if (line.startsWith("deepen ")) {
+			if (line.startsWith("deepen ")) { //$NON-NLS-1$
 				depth = Integer.parseInt(line.substring(7));
 				continue;
 			}
 
-			if (line.startsWith("shallow ")) {
+			if (line.startsWith("shallow ")) { //$NON-NLS-1$
 				clientShallowCommits.add(ObjectId.fromString(line.substring(8)));
 				continue;
 			}
 
-			if (!line.startsWith("want ") || line.length() < 45)
-				throw new PackProtocolException(MessageFormat.format(JGitText.get().expectedGot, "want", line));
+			if (!line.startsWith("want ") || line.length() < 45) //$NON-NLS-1$
+				throw new PackProtocolException(MessageFormat.format(JGitText.get().expectedGot, "want", line)); //$NON-NLS-1$
 
 			if (isFirst && line.length() > 45) {
-				String opt = line.substring(45);
-				if (opt.startsWith(" "))
-					opt = opt.substring(1);
-				for (String c : opt.split(" "))
-					options.add(c);
-				line = line.substring(0, 45);
+				final FirstLine firstLine = new FirstLine(line);
+				options = firstLine.getOptions();
+				line = firstLine.getLine();
 			}
 
 			wantIds.add(ObjectId.fromString(line.substring(5)));
@@ -609,31 +783,31 @@ public class UploadPack {
 			if (line == PacketLineIn.END) {
 				last = processHaveLines(peerHas, last);
 				if (commonBase.isEmpty() || multiAck != MultiAck.OFF)
-					pckOut.writeString("NAK\n");
+					pckOut.writeString("NAK\n"); //$NON-NLS-1$
 				if (noDone && sentReady) {
-					pckOut.writeString("ACK " + last.name() + "\n");
+					pckOut.writeString("ACK " + last.name() + "\n"); //$NON-NLS-1$ //$NON-NLS-2$
 					return true;
 				}
 				if (!biDirectionalPipe)
 					return false;
 				pckOut.flush();
 
-			} else if (line.startsWith("have ") && line.length() == 45) {
+			} else if (line.startsWith("have ") && line.length() == 45) { //$NON-NLS-1$
 				peerHas.add(ObjectId.fromString(line.substring(5)));
 
-			} else if (line.equals("done")) {
+			} else if (line.equals("done")) { //$NON-NLS-1$
 				last = processHaveLines(peerHas, last);
 
 				if (commonBase.isEmpty())
-					pckOut.writeString("NAK\n");
+					pckOut.writeString("NAK\n"); //$NON-NLS-1$
 
 				else if (multiAck != MultiAck.OFF)
-					pckOut.writeString("ACK " + last.name() + "\n");
+					pckOut.writeString("ACK " + last.name() + "\n"); //$NON-NLS-1$ //$NON-NLS-2$
 
 				return true;
 
 			} else {
-				throw new PackProtocolException(MessageFormat.format(JGitText.get().expectedGot, "have", line));
+				throw new PackProtocolException(MessageFormat.format(JGitText.get().expectedGot, "have", line)); //$NON-NLS-1$
 			}
 		}
 	}
@@ -643,72 +817,23 @@ public class UploadPack {
 		preUploadHook.onBeginNegotiateRound(this, wantIds, peerHas.size());
 		if (peerHas.isEmpty())
 			return last;
+		if (wantAll.isEmpty() && !wantIds.isEmpty())
+			parseWants();
 
-		List<ObjectId> toParse = peerHas;
-		HashSet<ObjectId> peerHasSet = null;
-		boolean needMissing = false;
 		sentReady = false;
-
-		if (wantAll.isEmpty() && !wantIds.isEmpty()) {
-			// We have not yet parsed the want list. Parse it now.
-			peerHasSet = new HashSet<ObjectId>(peerHas);
-			int cnt = wantIds.size() + peerHasSet.size();
-			toParse = new ArrayList<ObjectId>(cnt);
-			toParse.addAll(wantIds);
-			toParse.addAll(peerHasSet);
-			needMissing = true;
-		}
-
 		int haveCnt = 0;
-		AsyncRevObjectQueue q = walk.parseAny(toParse, needMissing);
+		walk.getObjectReader().setAvoidUnreachableObjects(true);
+		AsyncRevObjectQueue q = walk.parseAny(peerHas, false);
 		try {
 			for (;;) {
 				RevObject obj;
 				try {
 					obj = q.next();
 				} catch (MissingObjectException notFound) {
-					ObjectId id = notFound.getObjectId();
-					if (wantIds.contains(id)) {
-						String msg = MessageFormat.format(
-								JGitText.get().wantNotValid, id.name());
-						throw new PackProtocolException(msg, notFound);
-					}
 					continue;
 				}
 				if (obj == null)
 					break;
-
-				// If the object is still found in wantIds, the want
-				// list wasn't parsed earlier, and was done in this batch.
-				//
-				if (wantIds.remove(obj)) {
-					if (!advertised.contains(obj)) {
-						String msg = MessageFormat.format(
-								JGitText.get().wantNotValid, obj.name());
-						throw new PackProtocolException(msg);
-					}
-
-					if (!obj.has(WANT)) {
-						obj.add(WANT);
-						wantAll.add(obj);
-					}
-
-					if (!(obj instanceof RevCommit))
-						obj.add(SATISFIED);
-
-					if (obj instanceof RevTag) {
-						RevObject target = walk.peel(obj);
-						if (target instanceof RevCommit) {
-							if (!target.has(WANT)) {
-								target.add(WANT);
-								wantAll.add(target);
-							}
-						}
-					}
-
-					if (!peerHasSet.contains(obj))
-						continue;
-				}
 
 				last = obj;
 				haveCnt++;
@@ -732,19 +857,21 @@ public class UploadPack {
 				switch (multiAck) {
 				case OFF:
 					if (commonBase.size() == 1)
-						pckOut.writeString("ACK " + obj.name() + "\n");
+						pckOut.writeString("ACK " + obj.name() + "\n"); //$NON-NLS-1$ //$NON-NLS-2$
 					break;
 				case CONTINUE:
-					pckOut.writeString("ACK " + obj.name() + " continue\n");
+					pckOut.writeString("ACK " + obj.name() + " continue\n"); //$NON-NLS-1$ //$NON-NLS-2$
 					break;
 				case DETAILED:
-					pckOut.writeString("ACK " + obj.name() + " common\n");
+					pckOut.writeString("ACK " + obj.name() + " common\n"); //$NON-NLS-1$ //$NON-NLS-2$
 					break;
 				}
 			}
 		} finally {
 			q.release();
+			walk.getObjectReader().setAvoidUnreachableObjects(false);
 		}
+
 		int missCnt = peerHas.size() - haveCnt;
 
 		// If we don't have one of the objects but we're also willing to
@@ -762,10 +889,10 @@ public class UploadPack {
 						case OFF:
 							break;
 						case CONTINUE:
-							pckOut.writeString("ACK " + id.name() + " continue\n");
+							pckOut.writeString("ACK " + id.name() + " continue\n"); //$NON-NLS-1$ //$NON-NLS-2$
 							break;
 						case DETAILED:
-							pckOut.writeString("ACK " + id.name() + " ready\n");
+							pckOut.writeString("ACK " + id.name() + " ready\n"); //$NON-NLS-1$ //$NON-NLS-2$
 							sentReady = true;
 							break;
 						}
@@ -778,13 +905,94 @@ public class UploadPack {
 		if (multiAck == MultiAck.DETAILED && !didOkToGiveUp && okToGiveUp()) {
 			ObjectId id = peerHas.get(peerHas.size() - 1);
 			sentReady = true;
-			pckOut.writeString("ACK " + id.name() + " ready\n");
+			pckOut.writeString("ACK " + id.name() + " ready\n"); //$NON-NLS-1$ //$NON-NLS-2$
 			sentReady = true;
 		}
 
 		preUploadHook.onEndNegotiateRound(this, wantAll, haveCnt, missCnt, sentReady);
 		peerHas.clear();
 		return last;
+	}
+
+	private void parseWants() throws IOException {
+		AsyncRevObjectQueue q = walk.parseAny(wantIds, true);
+		try {
+			List<RevCommit> checkReachable = null;
+			RevObject obj;
+			while ((obj = q.next()) != null) {
+				if (!advertised.contains(obj)) {
+					switch (requestPolicy) {
+					case ADVERTISED:
+					default:
+						throw new PackProtocolException(MessageFormat.format(
+								JGitText.get().wantNotValid, obj));
+					case REACHABLE_COMMIT:
+						if (!(obj instanceof RevCommit)) {
+							throw new PackProtocolException(MessageFormat.format(
+								JGitText.get().wantNotValid, obj));
+						}
+						if (checkReachable == null)
+							checkReachable = new ArrayList<RevCommit>();
+						checkReachable.add((RevCommit) obj);
+						break;
+					case ANY:
+						break;
+					}
+				}
+				want(obj);
+
+				if (!(obj instanceof RevCommit))
+					obj.add(SATISFIED);
+				if (obj instanceof RevTag) {
+					obj = walk.peel(obj);
+					if (obj instanceof RevCommit)
+						want(obj);
+				}
+			}
+			if (checkReachable != null)
+				checkNotAdvertisedWants(checkReachable);
+			wantIds.clear();
+		} catch (MissingObjectException notFound) {
+			ObjectId id = notFound.getObjectId();
+			throw new PackProtocolException(MessageFormat.format(
+					JGitText.get().wantNotValid, id.name()), notFound);
+		} finally {
+			q.release();
+		}
+	}
+
+	private void want(RevObject obj) {
+		if (!obj.has(WANT)) {
+			obj.add(WANT);
+			wantAll.add(obj);
+		}
+	}
+
+	private void checkNotAdvertisedWants(List<RevCommit> notAdvertisedWants)
+			throws MissingObjectException, IncorrectObjectTypeException, IOException {
+		// Walk the requested commits back to the advertised commits.
+		// If any commit exists, a branch was deleted or rewound and
+		// the repository owner no longer exports that requested item.
+		// If the requested commit is merged into an advertised branch
+		// it will be marked UNINTERESTING and no commits return.
+
+		for (RevCommit c : notAdvertisedWants)
+			walk.markStart(c);
+		for (ObjectId id : advertised) {
+			try {
+				walk.markUninteresting(walk.parseCommit(id));
+			} catch (IncorrectObjectTypeException notCommit) {
+				continue;
+			}
+		}
+
+		RevCommit bad = walk.next();
+		if (bad != null) {
+			throw new PackProtocolException(MessageFormat.format(
+					JGitText.get().wantNotValid,
+					bad.name()));
+		}
+		walk.reset();
 	}
 
 	private void addCommonBase(final RevObject o) {
@@ -848,13 +1056,13 @@ public class UploadPack {
 			if (0 <= eof)
 				throw new CorruptObjectException(MessageFormat.format(
 						JGitText.get().expectedEOFReceived,
-						"\\x" + Integer.toHexString(eof)));
+						"\\x" + Integer.toHexString(eof))); //$NON-NLS-1$
 		}
 
 		if (sideband) {
 			try {
 				sendPack(true);
-			} catch (UploadPackMayNotContinueException noPack) {
+			} catch (ServiceMayNotContinueException noPack) {
 				// This was already reported on (below).
 				throw noPack;
 			} catch (IOException err) {
@@ -880,6 +1088,7 @@ public class UploadPack {
 
 	private boolean reportInternalServerErrorOverSideband() {
 		try {
+			@SuppressWarnings("resource" /* java 7 */)
 			SideBandOutputStream err = new SideBandOutputStream(
 					SideBandOutputStream.CH_ERROR,
 					SideBandOutputStream.SMALL_BUF,
@@ -896,7 +1105,6 @@ public class UploadPack {
 	private void sendPack(final boolean sideband) throws IOException {
 		ProgressMonitor pm = NullProgressMonitor.INSTANCE;
 		OutputStream packOut = rawOut;
-		SideBandOutputStream msgOut = null;
 
 		if (sideband) {
 			int bufsz = SideBandOutputStream.SMALL_BUF;
@@ -918,9 +1126,11 @@ public class UploadPack {
 			} else {
 				preUploadHook.onSendPack(this, wantAll, commonBase);
 			}
-		} catch (UploadPackMayNotContinueException noPack) {
+			msgOut.flush();
+		} catch (ServiceMayNotContinueException noPack) {
 			if (sideband && noPack.getMessage() != null) {
 				noPack.setOutput();
+				@SuppressWarnings("resource" /* java 7 */)
 				SideBandOutputStream err = new SideBandOutputStream(
 						SideBandOutputStream.CH_ERROR,
 						SideBandOutputStream.SMALL_BUF, rawOut);
@@ -935,13 +1145,15 @@ public class UploadPack {
 			cfg = new PackConfig(db);
 		final PackWriter pw = new PackWriter(cfg, walk.getObjectReader());
 		try {
+			pw.setIndexDisabled(true);
 			pw.setUseCachedPacks(true);
+			pw.setUseBitmaps(true);
 			pw.setReuseDeltaCommits(true);
 			pw.setDeltaBaseAsOffset(options.contains(OPTION_OFS_DELTA));
 			pw.setThin(options.contains(OPTION_THIN_PACK));
 			pw.setReuseValidatingObjects(false);
 
-			if (commonBase.isEmpty()) {
+			if (commonBase.isEmpty() && refs != null) {
 				Set<ObjectId> tagTargets = new HashSet<ObjectId>();
 				for (Ref ref : refs.values()) {
 					if (ref.getPeeledObjectId() != null)
@@ -968,7 +1180,7 @@ public class UploadPack {
 				rw = ow;
 			}
 
-			if (options.contains(OPTION_INCLUDE_TAG)) {
+			if (options.contains(OPTION_INCLUDE_TAG) && refs != null) {
 				for (Ref ref : refs.values()) {
 					ObjectId objectId = ref.getObjectId();
 
@@ -998,7 +1210,7 @@ public class UploadPack {
 			pw.writePack(pm, NullProgressMonitor.INSTANCE, packOut);
 			statistics = pw.getStatistics();
 
-			if (msgOut != null) {
+			if (msgOut != NullOutputStream.INSTANCE) {
 				String msg = pw.getStatistics().getMessage() + '\n';
 				msgOut.write(Constants.encode(msg));
 				msgOut.flush();
@@ -1011,7 +1223,7 @@ public class UploadPack {
 		if (sideband)
 			pckOut.end();
 
-		if (logger != null && statistics != null)
+		if (statistics != null)
 			logger.onPackStatistics(statistics);
 	}
 }

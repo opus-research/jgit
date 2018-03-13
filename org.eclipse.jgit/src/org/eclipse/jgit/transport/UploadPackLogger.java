@@ -43,7 +43,7 @@
 
 package org.eclipse.jgit.transport;
 
-import org.eclipse.jgit.storage.pack.PackWriter;
+import org.eclipse.jgit.internal.storage.pack.PackWriter;
 
 /**
  * Logs activity that occurred within {@link UploadPack}.
@@ -54,11 +54,19 @@ import org.eclipse.jgit.storage.pack.PackWriter;
  * the connection information before invoking UploadPack.
  */
 public interface UploadPackLogger {
+	/** A simple no-op logger. */
+	public static final UploadPackLogger NULL = new UploadPackLogger() {
+		public void onPackStatistics(PackWriter.Statistics stats) {
+			// Do nothing.
+		}
+	};
+
 	/**
 	 * Notice to the logger after a pack has been sent.
 	 *
 	 * @param stats
 	 *            the statistics after sending a pack to the client.
+	 * @since 3.0
 	 */
 	public void onPackStatistics(PackWriter.Statistics stats);
 }

@@ -43,14 +43,24 @@
 
 package org.eclipse.jgit.pgm;
 
+import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.Map;
 
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.MergeCommand;
 import org.eclipse.jgit.api.MergeResult;
+import org.eclipse.jgit.api.MergeCommand.FastForwardMode;
+import org.eclipse.jgit.api.errors.CheckoutConflictException;
+import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
+import org.eclipse.jgit.pgm.internal.CLIText;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 
@@ -60,41 +70,88 @@ class Merge extends TextBuiltin {
 	@Option(name = "--strategy", aliases = { "-s" }, usage = "usage_mergeStrategy")
 	private String strategyName;
 
-	private MergeStrategy mergeStrategy = MergeStrategy.RESOLVE;
+	@Option(name = "--squash", usage = "usage_squash")
+	private boolean squash;
+
+	@Option(name = "--no-commit", usage = "usage_noCommit")
+	private boolean noCommit = false;
+
+	private MergeStrategy mergeStrategy = MergeStrategy.RECURSIVE;
 
 	@Argument(required = true)
 	private String ref;
 
+	@Option(name = "--ff")
+	private FastForwardMode ff = FastForwardMode.FF;
+
+	@Option(name = "--no-ff")
+	void noff(@SuppressWarnings("unused") final boolean ignored) {
+		ff = FastForwardMode.NO_FF;
+	}
+
+	@Option(name = "--ff-only")
+	void ffonly(@SuppressWarnings("unused") final boolean ignored) {
+		ff = FastForwardMode.FF_ONLY;
+	}
+
 	@Override
 	protected void run() throws Exception {
+		if (squash && ff == FastForwardMode.NO_FF)
+			throw die(CLIText.get().cannotCombineSquashWithNoff);
 		// determine the merge strategy
 		if (strategyName != null) {
 			mergeStrategy = MergeStrategy.get(strategyName);
 			if (mergeStrategy == null)
 				throw die(MessageFormat.format(
-						CLIText.get().unknownMergeStratey, strategyName));
+						CLIText.get().unknownMergeStrategy, strategyName));
 		}
 
 		// determine the other revision we want to merge with HEAD
-		final ObjectId src = db.resolve(ref + "^{commit}");
+		final Ref srcRef = db.getRef(ref);
+		final ObjectId src = db.resolve(ref + "^{commit}"); //$NON-NLS-1$
 		if (src == null)
 			throw die(MessageFormat.format(
 					CLIText.get().refDoesNotExistOrNoCommit, ref));
 
+		Ref oldHead = db.getRef(Constants.HEAD);
 		Git git = new Git(db);
-		MergeResult result = git.merge().setStrategy(mergeStrategy)
-				.include(src).call();
+		MergeCommand mergeCmd = git.merge().setStrategy(mergeStrategy)
+				.setSquash(squash).setFastForward(ff).setCommit(!noCommit);
+		if (srcRef != null)
+			mergeCmd.include(srcRef);
+		else
+			mergeCmd.include(src);
+		MergeResult result;
+		try {
+			result = mergeCmd.call();
+		} catch (CheckoutConflictException e) {
+			result = new MergeResult(e.getConflictingPaths()); // CHECKOUT_CONFLICT
+		}
 
 		switch (result.getMergeStatus()) {
 		case ALREADY_UP_TO_DATE:
+			if (squash)
+				outw.print(CLIText.get().nothingToSquash);
+			outw.println(CLIText.get().alreadyUpToDate);
+			break;
 		case FAST_FORWARD:
-			out.println(result.getMergeStatus().toString());
+			ObjectId oldHeadId = oldHead.getObjectId();
+			outw.println(MessageFormat.format(CLIText.get().updating, oldHeadId
+					.abbreviate(7).name(), result.getNewHead().abbreviate(7)
+					.name()));
+			outw.println(result.getMergeStatus().toString());
+			break;
+		case CHECKOUT_CONFLICT:
+			outw.println(CLIText.get().mergeCheckoutConflict);
+			for (String collidingPath : result.getCheckoutConflicts())
+				outw.println("\t" + collidingPath); //$NON-NLS-1$
+			outw.println(CLIText.get().mergeCheckoutFailed);
 			break;
 		case CONFLICTING:
 			for (String collidingPath : result.getConflicts().keySet())
-				out.println(MessageFormat.format(CLIText.get().mergeConflict,
+				outw.println(MessageFormat.format(CLIText.get().mergeConflict,
 						collidingPath));
-			out.println(CLIText.get().mergeFailed);
+			outw.println(CLIText.get().mergeFailed);
 			break;
 		case FAILED:
 			for (Map.Entry<String, MergeFailureReason> entry : result
@@ -102,22 +159,48 @@ class Merge extends TextBuiltin {
 				switch (entry.getValue()) {
 				case DIRTY_WORKTREE:
 				case DIRTY_INDEX:
-					out.println(CLIText.get().dontOverwriteLocalChanges);
-					out.println("        " + entry.getKey());
+					outw.println(CLIText.get().dontOverwriteLocalChanges);
+					outw.println("        " + entry.getKey()); //$NON-NLS-1$
 					break;
 				case COULD_NOT_DELETE:
-					out.println(CLIText.get().cannotDeleteFile);
-					out.println("        " + entry.getKey());
+					outw.println(CLIText.get().cannotDeleteFile);
+					outw.println("        " + entry.getKey()); //$NON-NLS-1$
 					break;
 				}
 			break;
 		case MERGED:
-			out.println(MessageFormat.format(CLIText.get().mergeMadeBy,
-					mergeStrategy.getName()));
+			String name;
+			if (!isMergedInto(oldHead, src))
+				name = mergeStrategy.getName();
+			else
+				name = "recursive"; //$NON-NLS-1$
+			outw.println(MessageFormat.format(CLIText.get().mergeMadeBy, name));
 			break;
+		case MERGED_NOT_COMMITTED:
+			outw.println(CLIText.get().mergeWentWellStoppedBeforeCommitting);
+			break;
+		case MERGED_SQUASHED:
+		case FAST_FORWARD_SQUASHED:
+		case MERGED_SQUASHED_NOT_COMMITTED:
+			outw.println(CLIText.get().mergedSquashed);
+			outw.println(CLIText.get().mergeWentWellStoppedBeforeCommitting);
+			break;
+		case ABORTED:
+			throw die(CLIText.get().ffNotPossibleAborting);
 		case NOT_SUPPORTED:
-			out.println(MessageFormat.format(
+			outw.println(MessageFormat.format(
 					CLIText.get().unsupportedOperation, result.toString()));
 		}
+	}
+
+	private boolean isMergedInto(Ref oldHead, AnyObjectId src)
+			throws IOException {
+		RevWalk revWalk = new RevWalk(db);
+		ObjectId oldHeadObjectId = oldHead.getPeeledObjectId();
+		if (oldHeadObjectId == null)
+			oldHeadObjectId = oldHead.getObjectId();
+		RevCommit oldHeadCommit = revWalk.lookupCommit(oldHeadObjectId);
+		RevCommit srcCommit = revWalk.lookupCommit(src);
+		return revWalk.isMergedInto(oldHeadCommit, srcCommit);
 	}
 }

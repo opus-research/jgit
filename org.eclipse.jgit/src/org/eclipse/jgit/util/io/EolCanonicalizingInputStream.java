@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
+ * Copyright (C) 2010, 2013 Marc Strapetz <marc.strapetz@syntevo.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -46,10 +46,14 @@ package org.eclipse.jgit.util.io;
 import java.io.IOException;
 import java.io.InputStream;
 
+import org.eclipse.jgit.diff.RawText;
+
 /**
  * An input stream which canonicalizes EOLs bytes on the fly to '\n'.
  *
- * Note: Make sure to apply this InputStream only to text files!
+ * Optionally, a binary check on the first 8000 bytes is performed
+ * and in case of binary files, canonicalization is turned off
+ * (for the complete file).
  */
 public class EolCanonicalizingInputStream extends InputStream {
 	private final byte[] single = new byte[1];
@@ -62,14 +66,22 @@ public class EolCanonicalizingInputStream extends InputStream {
 
 	private int ptr;
 
+	private boolean isBinary;
+
+	private boolean detectBinary;
+
 	/**
 	 * Creates a new InputStream, wrapping the specified stream
 	 *
 	 * @param in
 	 *            raw input stream
+	 * @param detectBinary
+	 *            whether binaries should be detected
+	 * @since 2.0
 	 */
-	public EolCanonicalizingInputStream(InputStream in) {
+	public EolCanonicalizingInputStream(InputStream in, boolean detectBinary) {
 		this.in = in;
+		this.detectBinary = detectBinary;
 	}
 
 	@Override
@@ -79,40 +91,41 @@ public class EolCanonicalizingInputStream extends InputStream {
 	}
 
 	@Override
-	public int read(byte[] bs, int off, int len) throws IOException {
+	public int read(byte[] bs, final int off, final int len) throws IOException {
 		if (len == 0)
 			return 0;
 
 		if (cnt == -1)
 			return -1;
 
-		final int startOff = off;
+		int i = off;
 		final int end = off + len;
 
-		while (off < end) {
+		while (i < end) {
 			if (ptr == cnt && !fillBuffer()) {
 				break;
 			}
 
 			byte b = buf[ptr++];
-			if (b != '\r') {
-				bs[off++] = b;
+			if (isBinary || b != '\r') {
+				// Logic for binary files ends here
+				bs[i++] = b;
 				continue;
 			}
 
 			if (ptr == cnt && !fillBuffer()) {
-				bs[off++] = '\r';
+				bs[i++] = '\r';
 				break;
 			}
 
 			if (buf[ptr] == '\n') {
-				bs[off++] = '\n';
+				bs[i++] = '\n';
 				ptr++;
 			} else
-				bs[off++] = '\r';
+				bs[i++] = '\r';
 		}
 
-		return startOff == off ? -1 : off - startOff;
+		return i == off ? -1 : i - off;
 	}
 
 	@Override
@@ -124,6 +137,10 @@ public class EolCanonicalizingInputStream extends InputStream {
 		cnt = in.read(buf, 0, buf.length);
 		if (cnt < 1)
 			return false;
+		if (detectBinary) {
+			isBinary = RawText.isBinary(buf, cnt);
+			detectBinary = false;
+		}
 		ptr = 0;
 		return true;
 	}

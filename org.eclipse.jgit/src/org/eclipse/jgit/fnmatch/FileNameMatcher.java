@@ -86,7 +86,7 @@ public class FileNameMatcher {
 	static final List<Head> EMPTY_HEAD_LIST = Collections.emptyList();
 
 	private static final Pattern characterClassStartPattern = Pattern
-			.compile("\\[[.:=]");
+			.compile("\\[[.:=]"); //$NON-NLS-1$
 
 	private List<Head> headsStartValue;
 
@@ -185,7 +185,7 @@ public class FileNameMatcher {
 		int firstValidEndBracketIndex = indexOfStartBracket + 2;
 
 		if (indexOfStartBracket + 1 >= pattern.length())
-			throw new NoClosingBracketException(indexOfStartBracket, "[", "]",
+			throw new NoClosingBracketException(indexOfStartBracket, "[", "]", //$NON-NLS-1$ //$NON-NLS-2$
 					pattern);
 
 		if (pattern.charAt(firstValidCharClassIndex) == '!') {
@@ -199,11 +199,11 @@ public class FileNameMatcher {
 		int groupEnd = -1;
 		while (groupEnd == -1) {
 
-			final int possibleGroupEnd = findNotEscapedCharacterPosition(
-					pattern, firstValidEndBracketIndex, ']');
+			final int possibleGroupEnd = pattern.indexOf(']',
+					firstValidEndBracketIndex);
 			if (possibleGroupEnd == -1)
-				throw new NoClosingBracketException(indexOfStartBracket, "[",
-						"]", pattern);
+				throw new NoClosingBracketException(indexOfStartBracket, "[", //$NON-NLS-1$
+						"]", pattern); //$NON-NLS-1$
 
 			final boolean foundCharClass = charClassStartMatcher
 					.find(firstValidCharClassIndex);
@@ -212,7 +212,7 @@ public class FileNameMatcher {
 					&& charClassStartMatcher.start() < possibleGroupEnd) {
 
 				final String classStart = charClassStartMatcher.group(0);
-				final String classEnd = classStart.charAt(1) + "]";
+				final String classEnd = classStart.charAt(1) + "]"; //$NON-NLS-1$
 
 				final int classStartIndex = charClassStartMatcher.start();
 				final int classEndIndex = pattern.indexOf(classEnd,
@@ -238,8 +238,7 @@ public class FileNameMatcher {
 		int currentIndex = 0;
 		List<AbstractHead> heads = new ArrayList<AbstractHead>();
 		while (currentIndex < pattern.length()) {
-			final int groupStart = findGroupStart(pattern, currentIndex,
-					invalidWildgetCharacter);
+			final int groupStart = pattern.indexOf('[', currentIndex);
 			if (groupStart == -1) {
 				final String patternPart = pattern.substring(currentIndex);
 				heads.addAll(createSimpleHeads(patternPart,
@@ -261,98 +260,38 @@ public class FileNameMatcher {
 		return heads;
 	}
 
-	private static int findGroupStart(String pattern, int currentIndex,
-			Character invalidWildgetCharacter) {
-		if (invalidWildgetCharacter != null && invalidWildgetCharacter == '\\') {
-			return pattern.indexOf('[', currentIndex);
-		}
-		return findNotEscapedCharacterPosition(pattern, currentIndex, '[');
-	}
-
-	private static int findNotEscapedCharacterPosition(String pattern,
-			int currentIndex, char characterToFind) {
-		for (int i = currentIndex; i < pattern.length(); i++) {
-			final char c = pattern.charAt(i);
-			if (c != characterToFind) {
-				continue;
-			}
-
-			final boolean isEscaped = i > 0 && pattern.charAt(i - 1) == '\\';
-			if (isEscaped) {
-				continue;
-			}
-
-			return i;
-		}
-		return -1;
-	}
-
 	private static List<AbstractHead> createSimpleHeads(
-			final String patternPart, final Character invalidWildgetCharacter)
-			throws InvalidPatternException {
+			final String patternPart, final Character invalidWildgetCharacter) {
 		final List<AbstractHead> heads = new ArrayList<AbstractHead>(
 				patternPart.length());
-
-		boolean escapeFlag = false;// true if we meet '\\' and it is not
-									// invalidWildgetCharacter
-
 		for (int i = 0; i < patternPart.length(); i++) {
 			final char c = patternPart.charAt(i);
 			switch (c) {
 			case '*': {
-				if (escapeFlag) {
-					addCharacterHead(heads, c);
-					escapeFlag = false;
-				} else {
-					final AbstractHead head = createWildCardHead(
-							invalidWildgetCharacter, true);
-					heads.add(head);
-				}
+				final AbstractHead head = createWildCardHead(
+						invalidWildgetCharacter, true);
+				heads.add(head);
 				break;
 			}
 			case '?': {
-				if (escapeFlag) {
-					addCharacterHead(heads, c);
-					escapeFlag = false;
-				} else {
-					final AbstractHead head = createWildCardHead(
-							invalidWildgetCharacter, false);
-					heads.add(head);
-				}
-				break;
-			}
-			case '\\': {
-				if (escapeFlag
-						|| (invalidWildgetCharacter != null && invalidWildgetCharacter == '\\')) {
-					addCharacterHead(heads, c);
-					escapeFlag = false;
-				} else {
-					escapeFlag = true;
-				}
+				final AbstractHead head = createWildCardHead(
+						invalidWildgetCharacter, false);
+				heads.add(head);
 				break;
 			}
 			default:
-				addCharacterHead(heads, c);
-				escapeFlag = false;
+				final CharacterHead head = new CharacterHead(c);
+				heads.add(head);
 			}
 		}
-		if (escapeFlag) {
-			throw new InvalidPatternException("Pattern ends with '\\'",
-					patternPart);
-		}
 		return heads;
-	}
-
-	private static void addCharacterHead(List<AbstractHead> heads, char c) {
-		final CharacterHead head = new CharacterHead(c);
-		heads.add(head);
 	}
 
 	private static AbstractHead createWildCardHead(
 			final Character invalidWildgetCharacter, final boolean star) {
 		if (invalidWildgetCharacter != null)
-			return new RestrictedWildCardHead(
-					invalidWildgetCharacter.charValue(), star);
+			return new RestrictedWildCardHead(invalidWildgetCharacter
+					.charValue(), star);
 		else
 			return new WildCardHead(star);
 	}
