@@ -768,7 +768,7 @@ public class IgnoreRuleSpecialCasesTest {
 
 	@Test
 	public void testSpecialGroupCase9() throws Exception {
-		assertMatch("][", "][", false);
+		assertMatch("][", "][", true);
 	}
 
 	@Test
@@ -830,29 +830,21 @@ public class IgnoreRuleSpecialCasesTest {
 	}
 
 	@Test
-	public void testIgnoredBackslash() throws Exception {
-		// In Git CLI a\b\c is equal to abc
-		assertMatch("a\\b\\c", "abc", true);
-	}
-
-	@Test
 	public void testEscapedBackslash() throws Exception {
 		// In Git CLI a\\b matches a\b file
 		assertMatch("a\\\\b", "a\\b", true);
-		assertMatch("a\\\\b\\c", "a\\bc", true);
-
 	}
 
 	@Test
 	public void testEscapedExclamationMark() throws Exception {
 		assertMatch("\\!b!.txt", "!b!.txt", true);
-		assertMatch("a\\!b!.txt", "a!b!.txt", true);
+		assertMatch("a\\!b!.txt", "a\\!b!.txt", true);
 	}
 
 	@Test
 	public void testEscapedHash() throws Exception {
 		assertMatch("\\#b", "#b", true);
-		assertMatch("a\\#", "a#", true);
+		assertMatch("a\\#", "a\\#", true);
 	}
 
 	@Test
@@ -863,33 +855,17 @@ public class IgnoreRuleSpecialCasesTest {
 
 	@Test
 	public void testNotEscapingBackslash() throws Exception {
-		assertMatch("\\out", "out", true);
-		assertMatch("\\out", "a/out", true);
-		assertMatch("c:\\/", "c:/", true);
-		assertMatch("c:\\/", "a/c:/", true);
-		assertMatch("c:\\tmp", "c:tmp", true);
-		assertMatch("c:\\tmp", "a/c:tmp", true);
+		assertMatch("\\out", "\\out", true);
+		assertMatch("\\out", "a/\\out", true);
+		assertMatch("c:\\/", "c:\\/", true);
+		assertMatch("c:\\/", "a/c:\\/", true);
+		assertMatch("c:\\tmp", "c:\\tmp", true);
+		assertMatch("c:\\tmp", "a/c:\\tmp", true);
 	}
 
 	@Test
 	public void testMultipleEscapedCharacters1() throws Exception {
 		assertMatch("\\]a?c\\*\\[d\\?\\]", "]abc*[d?]", true);
-	}
-
-	@Test
-	public void testBackslash() throws Exception {
-		assertMatch("a\\", "a", true);
-		assertMatch("\\a", "a", true);
-		assertMatch("a/\\", "a/", true);
-		assertMatch("a/b\\", "a/b", true);
-		assertMatch("\\a/b", "a/b", true);
-		assertMatch("/\\a", "/a", true);
-		assertMatch("\\a\\b\\c\\", "abc", true);
-		assertMatch("/\\a/\\b/\\c\\", "a/b/c", true);
-
-		// empty path segment doesn't match
-		assertMatch("\\/a", "/a", false);
-		assertMatch("\\/a", "a", false);
 	}
 
 	@Test
@@ -968,59 +944,6 @@ public class IgnoreRuleSpecialCasesTest {
 		assertMatch("[a{}()b][a{}()b]?[a{}()b][a{}()b]", "{}x()", true);
 		assertMatch("x*{x}3", "xa{x}3", true);
 		assertMatch("a*{x}3", "axxx", false);
-
-		assertMatch("?", "[", true);
-		assertMatch("*", "[", true);
-
-		// Escaped bracket matches, but see weird things below...
-		assertMatch("\\[", "[", true);
-	}
-
-	/**
-	 * The ignore rules here <b>do not match</b> any paths because single '['
-	 * begins character group and the entire rule cannot be parsed due the
-	 * invalid glob pattern. See
-	 * http://article.gmane.org/gmane.comp.version-control.git/278699.
-	 *
-	 * @throws Exception
-	 */
-	@Test
-	public void testBracketsUnmatched1() throws Exception {
-		assertMatch("[", "[", false);
-		assertMatch("[*", "[", false);
-		assertMatch("*[", "[", false);
-		assertMatch("*[", "a[", false);
-		assertMatch("[a][", "a[", false);
-		assertMatch("*[", "a", false);
-		assertMatch("[a", "a", false);
-		assertMatch("[*", "a", false);
-		assertMatch("[*a", "a", false);
-	}
-
-	/**
-	 * Single ']' is treated here literally, not as an and of a character group
-	 *
-	 * @throws Exception
-	 */
-	@Test
-	public void testBracketsUnmatched2() throws Exception {
-		assertMatch("*]", "a", false);
-		assertMatch("]a", "a", false);
-		assertMatch("]*", "a", false);
-		assertMatch("]*a", "a", false);
-
-		assertMatch("]", "]", true);
-		assertMatch("]*", "]", true);
-		assertMatch("]*", "]a", true);
-		assertMatch("*]", "]", true);
-		assertMatch("*]", "a]", true);
-	}
-
-	@Test
-	public void testBracketsRandom() throws Exception {
-		assertMatch("[\\]", "[$0+//r4a\\d]", false);
-		assertMatch("[:]]sZX]", "[:]]sZX]", false);
-		assertMatch("[:]]:]]]", "[:]]:]]]", false);
 	}
 
 	@Test
