@@ -96,7 +96,10 @@ public class WorkingTreeOptions {
 		return checkStat;
 	}
 
-	/** @return how we handle symbolic links */
+	/**
+	 * @return how we handle symbolic links
+	 * @since 3.3
+	 */
 	public SymLinks getSymLinks() {
 		return symlinks;
 	}
