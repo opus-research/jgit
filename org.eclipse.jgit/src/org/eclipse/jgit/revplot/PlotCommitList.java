@@ -232,9 +232,7 @@ public class PlotCommitList<L extends PlotLane> extends
 			if (newPos == -1)
 				newPos = positionsAllocated++;
 			freePositions.add(commit.lane.getPosition());
-			activeLanes.remove(commit.lane);
 			commit.lane.position = newPos;
-			activeLanes.add(commit.lane);
 		}
 	}
 
