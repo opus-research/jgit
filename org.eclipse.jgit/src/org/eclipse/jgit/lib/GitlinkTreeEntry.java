@@ -83,7 +83,7 @@ public class GitlinkTreeEntry extends TreeEntry {
 
 	@Override
 	public String toString() {
-		final StringBuilder r = new StringBuilder();
+		final StringBuffer r = new StringBuffer();
 		r.append(ObjectId.toString(getId()));
 		r.append(" G ");
 		r.append(getFullName());

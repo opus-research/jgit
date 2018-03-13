@@ -168,7 +168,7 @@ public abstract class OrRevFilter extends RevFilter {
 
 		@Override
 		public String toString() {
-			final StringBuilder r = new StringBuilder();
+			final StringBuffer r = new StringBuffer();
 			r.append("(");
 			for (int i = 0; i < subfilters.length; i++) {
 				if (i > 0)

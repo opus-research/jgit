@@ -232,8 +232,7 @@ public class Main {
 			if (gitDir.isDirectory())
 				return gitDir;
 			current = current.getParentFile();
-			if (current != null
-					&& ceilingDirectories.contains(current.getPath()))
+			if (ceilingDirectories.contains(current.getPath()))
 				break;
 		}
 		return null;
