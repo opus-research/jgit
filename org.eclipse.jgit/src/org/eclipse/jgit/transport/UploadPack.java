@@ -807,7 +807,9 @@ public class UploadPack {
 				|| policy == null)
 			adv.advertiseCapability(OPTION_ALLOW_TIP_SHA1_IN_WANT);
 		adv.setDerefTags(true);
-		advertised = adv.send(getAdvertisedOrDefaultRefs());
+		Map<String, Ref> refs = getAdvertisedOrDefaultRefs();
+		findSymrefs(adv, refs);
+		advertised = adv.send(refs);
 		if (adv.isEmpty())
 			adv.advertiseId(ObjectId.zeroId(), "capabilities^{}"); //$NON-NLS-1$
 		adv.end();
@@ -1413,7 +1415,6 @@ public class UploadPack {
 			}
 
 			pw.writePack(pm, NullProgressMonitor.INSTANCE, packOut);
-			statistics = pw.getStatistics();
 
 			if (msgOut != NullOutputStream.INSTANCE) {
 				String msg = pw.getStatistics().getMessage() + '\n';
@@ -1422,13 +1423,21 @@ public class UploadPack {
 			}
 
 		} finally {
+			statistics = pw.getStatistics();
+			if (statistics != null)
+				logger.onPackStatistics(statistics);
 			pw.release();
 		}
 
 		if (sideband)
 			pckOut.end();
+	}
 
-		if (statistics != null)
-			logger.onPackStatistics(statistics);
+	private void findSymrefs(
+			final RefAdvertiser adv, final Map<String, Ref> refs) {
+		Ref head = refs.get(Constants.HEAD);
+		if (head != null && head.isSymbolic()) {
+			adv.addSymref(Constants.HEAD, head.getLeaf().getName());
+		}
 	}
 }

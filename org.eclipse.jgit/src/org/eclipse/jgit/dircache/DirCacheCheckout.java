@@ -110,6 +110,8 @@ public class DirCacheCheckout {
 
 	private ArrayList<String> toBeDeleted = new ArrayList<String>();
 
+	private boolean emptyDirCache;
+
 	/**
 	 * @return a list of updated paths and objectIds
 	 */
@@ -168,6 +170,7 @@ public class DirCacheCheckout {
 		this.headCommitTree = headCommitTree;
 		this.mergeCommitTree = mergeCommitTree;
 		this.workingTree = workingTree;
+		this.emptyDirCache = (dc == null) || (dc.getEntryCount() == 0);
 	}
 
 	/**
@@ -695,7 +698,7 @@ public class DirCacheCheckout {
 			// Nothing in Index
 			// At least one of Head, Index, Merge is not empty
 			// make sure not to overwrite untracked files
-			if (f != null) {
+			if (f != null && !f.isEntryIgnored()) {
 				// A submodule is not a file. We should ignore it
 				if (!FileMode.GITLINK.equals(mMode)) {
 					// a dirty worktree: the index is empty but we have a
@@ -716,7 +719,8 @@ public class DirCacheCheckout {
 			 * 	        0 nothing    nothing  nothing        (does not happen)
 			 * 	        1 nothing    nothing  exists         use M
 			 * 	        2 nothing    exists   nothing        remove path from index
-			 * 	        3 nothing    exists   exists   yes   keep index
+			 * 	        3 nothing    exists   exists   yes   keep index if not in initial checkout
+			 *                                               , otherwise use M
 			 * 	          nothing    exists   exists   no    fail
 			 * </pre>
 			 */
@@ -743,9 +747,12 @@ public class DirCacheCheckout {
 				// in the index there is nothing (e.g. 'git rm ...' was
 				// called before). Ignore the cached deletion and use what we
 				// find in Merge. Potentially updates the file.
-				if (equalIdAndMode(hId, hMode, mId, mMode))
-					keep(dce);
-				else
+				if (equalIdAndMode(hId, hMode, mId, mMode)) {
+					if (emptyDirCache)
+						update(name, mId, mMode);
+					else
+						keep(dce);
+				} else
 					conflict(name, dce, h, m);
 			}
 		} else {
@@ -1156,7 +1163,9 @@ public class DirCacheCheckout {
 	 * @param entry
 	 *            the entry containing new mode and content
 	 * @throws IOException
+	 * @deprecated Use the overloaded form that accepts {@link ObjectReader}.
 	 */
+	@Deprecated
 	public static void checkoutEntry(final Repository repository, File f,
 			DirCacheEntry entry) throws IOException {
 		ObjectReader or = repository.newObjectReader();
