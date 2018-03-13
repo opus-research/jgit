@@ -41,33 +41,56 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.notes;
+package org.eclipse.jgit.util;
 
-/** A note bucket that has been loaded into the process. */
-abstract class InMemoryNoteBucket extends NoteBucket {
-	/**
-	 * Number of leading digits that leads to this bucket in the note path.
-	 *
-	 * This is counted in terms of hex digits, not raw bytes. Each bucket level
-	 * is typically 2 higher than its parent, placing about 256 items in each
-	 * level of the tree.
-	 */
-	final int prefixLen;
+import static org.eclipse.jgit.util.Base64.decode;
+import static org.eclipse.jgit.util.Base64.encodeBytes;
+import junit.framework.TestCase;
 
-	/**
-	 * Chain of non-note tree entries found at this path in the tree.
-	 *
-	 * During parsing of a note tree into the in-memory representation,
-	 * {@link NoteParser} keeps track of all non-note tree entries and stores
-	 * them here as a sorted linked list. That list can be merged back with the
-	 * note data that is held by the subclass, allowing the tree to be
-	 * recreated.
-	 */
-	NonNoteEntry nonNotes;
+import org.eclipse.jgit.lib.Constants;
 
-	InMemoryNoteBucket(int prefixLen) {
-		this.prefixLen = prefixLen;
+public class Base64Test extends TestCase {
+	public void testEncode() {
+		assertEquals("aGkK", encodeBytes(b("hi\n")));
+		assertEquals("AAECDQoJcQ==", encodeBytes(b("\0\1\2\r\n\tq")));
 	}
 
-	abstract InMemoryNoteBucket append(Note note);
+	public void testDecode() {
+		assertEquals(b("hi\n"), decode("aGkK"));
+		assertEquals(b("\0\1\2\r\n\tq"), decode("AAECDQoJcQ=="));
+		assertEquals(b("\0\1\2\r\n\tq"), decode("A A E\tC D\rQ o\nJ c Q=="));
+		assertEquals(b("\u000EB"), decode("DkL="));
+	}
+
+	public void testDecodeFail_NonBase64Character() {
+		try {
+			decode("! a bad base64 string !");
+			fail("Accepted bad string in decode");
+		} catch (IllegalArgumentException fail) {
+			// Expected
+		}
+	}
+
+	public void testEncodeMatchesDecode() {
+		String[] testStrings = { "", //
+				"cow", //
+				"a", //
+				"a secret string", //
+				"\0\1\2\r\n\t" //
+		};
+		for (String e : testStrings)
+			assertEquals(b(e), decode(encodeBytes(b(e))));
+	}
+
+	private static void assertEquals(byte[] exp, byte[] act) {
+		assertEquals(s(exp), s(act));
+	}
+
+	private static byte[] b(String str) {
+		return Constants.encode(str);
+	}
+
+	private static String s(byte[] raw) {
+		return RawParseUtils.decode(raw);
+	}
 }
