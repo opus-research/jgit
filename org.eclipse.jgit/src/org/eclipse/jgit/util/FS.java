@@ -698,7 +698,7 @@ public abstract class FS {
 	 * @return The {@link File} containing this particular hook if it exists in
 	 *         the given repository, <code>null</code> otherwise.
 	 */
-	protected File tryFindHook(Repository repository, final Hook hook) {
+	public File tryFindHook(Repository repository, final Hook hook) {
 		final File gitDir = repository.getDirectory();
 		final File[] hookDirCandidates = gitDir.listFiles(new FileFilter() {
 			public boolean accept(File pathname) {
