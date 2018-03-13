@@ -52,6 +52,8 @@ import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
@@ -94,14 +96,19 @@ public class PlotWalk extends RevWalk {
 
 	@Override
 	protected RevCommit createCommit(final AnyObjectId id) {
-		return new PlotCommit(id, getTags(id));
+		return new PlotCommit(id);
 	}
 
-	/**
-	 * @param commitId
-	 * @return return the list of knows tags referring to this commit
-	 */
-	protected Ref[] getTags(final AnyObjectId commitId) {
+	@Override
+	public RevCommit next() throws MissingObjectException,
+			IncorrectObjectTypeException, IOException {
+		PlotCommit<?> pc = (PlotCommit) super.next();
+		if (pc != null)
+			pc.refs = getTags(pc);
+		return pc;
+	}
+
+	private Ref[] getTags(final AnyObjectId commitId) {
 		Collection<Ref> list = reverseRefMap.get(commitId);
 		Ref[] tags;
 		if (list == null)

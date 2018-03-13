@@ -172,7 +172,7 @@ public class RevWalk implements Iterable<RevCommit> {
 
 	int carryFlags = UNINTERESTING;
 
-	final ArrayList<RevCommit> roots;
+	private final ArrayList<RevCommit> roots;
 
 	AbstractRevQueue queue;
 
