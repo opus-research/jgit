@@ -97,13 +97,17 @@ public class MyersDiffTest extends TestCase {
 			+ ")";
 	}
 
-	private static class CharArray extends Sequence {
+	private static class CharArray {
 		char[] array;
 		public CharArray(String s) { array = s.toCharArray(); }
-		public int size() { return array.length; }
 	}
 
-	private static class CharCmp extends SequenceComparator<CharArray> {
+	private static class CharCmp extends DiffComparator<CharArray> {
+		@Override
+		public int size(CharArray seq) {
+			return seq.array.length;
+		}
+
 		@Override
 		public boolean equals(CharArray a, int ai, CharArray b, int bi) {
 			return a.array[ai] == b.array[bi];

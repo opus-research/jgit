@@ -121,18 +121,13 @@ public class Edit {
 
 	/** @return the type of this region */
 	public final Type getType() {
-		if (beginA < endA) {
-			if (beginB < endB)
-				return Type.REPLACE;
-			else /* if (beginB == endB) */
-				return Type.DELETE;
-
-		} else /* if (beginA == endA) */{
-			if (beginB < endB)
-				return Type.INSERT;
-			else /* if (beginB == endB) */
-				return Type.EMPTY;
-		}
+		if (beginA == endA && beginB < endB)
+			return Type.INSERT;
+		if (beginA < endA && beginB == endB)
+			return Type.DELETE;
+		if (isEmpty())
+			return Type.EMPTY;
+		return Type.REPLACE;
 	}
 
 	/** @return true if the edit is empty (lengths of both a and b is zero). */
@@ -160,12 +155,12 @@ public class Edit {
 		return endB;
 	}
 
-	/** @return length of the region in A. */
+	/** @return distance between begin and end of A. */
 	public final int getLengthA() {
 		return endA - beginA;
 	}
 
-	/** @return length of the region in B. */
+	/** @return distance between begin and end of B. */
 	public final int getLengthB() {
 		return endB - beginB;
 	}

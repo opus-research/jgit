@@ -43,9 +43,6 @@
 
 package org.eclipse.jgit.diff;
 
-import static org.eclipse.jgit.diff.DiffEntry.Side.NEW;
-import static org.eclipse.jgit.diff.DiffEntry.Side.OLD;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -53,8 +50,11 @@ import java.util.List;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.NullProgressMonitor;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
 
 class SimilarityRenameDetector {
@@ -72,7 +72,7 @@ class SimilarityRenameDetector {
 
 	private static final int SCORE_SHIFT = 2 * BITS_PER_INDEX;
 
-	private ContentSource.Pair reader;
+	private ObjectReader reader;
 
 	/**
 	 * All sources to consider for copies or renames.
@@ -112,7 +112,7 @@ class SimilarityRenameDetector {
 
 	private List<DiffEntry> out;
 
-	SimilarityRenameDetector(ContentSource.Pair reader, List<DiffEntry> srcs,
+	SimilarityRenameDetector(ObjectReader reader, List<DiffEntry> srcs,
 			List<DiffEntry> dsts) {
 		this.reader = reader;
 		this.srcs = srcs;
@@ -226,7 +226,7 @@ class SimilarityRenameDetector {
 				continue;
 			}
 
-			SimilarityIndex s = hash(OLD, srcEnt);
+			SimilarityIndex s = hash(srcEnt.oldId.toObjectId());
 			for (int dstIdx = 0; dstIdx < dsts.size(); dstIdx++) {
 				DiffEntry dstEnt = dsts.get(dstIdx);
 
@@ -242,13 +242,13 @@ class SimilarityRenameDetector {
 
 				long srcSize = srcSizes[srcIdx];
 				if (srcSize < 0) {
-					srcSize = size(OLD, srcEnt);
+					srcSize = size(srcEnt.oldId.toObjectId());
 					srcSizes[srcIdx] = srcSize;
 				}
 
 				long dstSize = dstSizes[dstIdx];
 				if (dstSize < 0) {
-					dstSize = size(NEW, dstEnt);
+					dstSize = size(dstEnt.newId.toObjectId());
 					dstSizes[dstIdx] = dstSize;
 				}
 
@@ -260,7 +260,7 @@ class SimilarityRenameDetector {
 					continue;
 				}
 
-				SimilarityIndex d = hash(NEW, dstEnt);
+				SimilarityIndex d = hash(dstEnt.newId.toObjectId());
 				int contentScore = s.score(d, 10000);
 
 				// nameScore returns a value between 0 and 100, but we want it
@@ -335,16 +335,15 @@ class SimilarityRenameDetector {
 		return (((dirScoreLtr + dirScoreRtl) * 25) + (fileScore * 50)) / 100;
 	}
 
-	private SimilarityIndex hash(DiffEntry.Side side, DiffEntry ent)
-			throws IOException {
+	private SimilarityIndex hash(ObjectId objectId) throws IOException {
 		SimilarityIndex r = new SimilarityIndex();
-		r.hash(reader.open(side, ent));
+		r.hash(reader.open(objectId));
 		r.sort();
 		return r;
 	}
 
-	private long size(DiffEntry.Side side, DiffEntry ent) throws IOException {
-		return reader.size(side, ent);
+	private long size(ObjectId objectId) throws IOException {
+		return reader.getObjectSize(objectId, Constants.OBJ_BLOB);
 	}
 
 	private static int score(long value) {

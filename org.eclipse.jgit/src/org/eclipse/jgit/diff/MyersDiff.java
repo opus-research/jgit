@@ -105,14 +105,14 @@ import org.eclipse.jgit.util.LongList;
  * @param <S>
  *            type of sequence.
  */
-public class MyersDiff<S extends Sequence> {
+public class MyersDiff<S> {
 	/**
 	 * The list of edits found during the last call to {@link #calculateEdits()}
 	 */
 	protected EditList edits;
 
 	/** Comparison function for sequences. */
-	protected SequenceComparator<S> cmp;
+	protected DiffComparator<S> cmp;
 
 	/**
 	 * The first text to be compared. Referred to as "Text A" in the comments
@@ -131,7 +131,7 @@ public class MyersDiff<S extends Sequence> {
 	 * @param a   the text A which should be compared
 	 * @param b   the text B which should be compared
 	 */
-	public MyersDiff(SequenceComparator<S> cmp, S a, S b) {
+	public MyersDiff(DiffComparator<S> cmp, S a, S b) {
 		this.cmp = cmp;
 		this.a = a;
 		this.b = b;
@@ -155,7 +155,7 @@ public class MyersDiff<S extends Sequence> {
 	protected void calculateEdits() {
 		edits = new EditList();
 
-		middle.initialize(0, a.size(), 0, b.size());
+		middle.initialize(0, cmp.size(a), 0, cmp.size(b));
 		if (middle.beginA >= middle.endA &&
 				middle.beginB >= middle.endB)
 			return;

@@ -60,7 +60,6 @@ import java.util.Map;
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.diff.RawTextComparator;
-import org.eclipse.jgit.diff.Sequence;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuildIterator;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
@@ -120,7 +119,7 @@ public class ResolveMerger extends ThreeWayMerger {
 
 	private Map<String, DirCacheEntry> toBeCheckedOut = new HashMap<String, DirCacheEntry>();
 
-	private Map<String, MergeResult<? extends Sequence>> mergeResults = new HashMap<String, MergeResult<? extends Sequence>>();
+	private Map<String, MergeResult<?>> mergeResults = new HashMap<String, MergeResult<?>>();
 
 	private Map<String, MergeFailureReason> failingPathes = new HashMap<String, MergeFailureReason>();
 
@@ -527,7 +526,7 @@ public class ResolveMerger extends ThreeWayMerger {
 	/**
 	 * @return the mergeResults
 	 */
-	public Map<String, MergeResult<? extends Sequence>> getMergeResults() {
+	public Map<String, MergeResult<?>> getMergeResults() {
 		return mergeResults;
 	}
 

@@ -249,29 +249,12 @@ public class DeltaStreamTest extends TestCase {
 		assertEquals(data.length, BinaryDelta.getResultSize(delta));
 		assertTrue(Arrays.equals(data, BinaryDelta.apply(base, delta)));
 
-		// Assert that a single bulk read produces the correct result.
-		//
 		byte[] act = new byte[data.length];
 		DeltaStream in = open();
 		assertEquals(data.length, in.getSize());
 		assertEquals(data.length, in.read(act));
 		assertEquals(-1, in.read());
-		assertTrue("bulk read has same content", Arrays.equals(data, act));
-
-		// Assert that smaller tiny reads have the same result too.
-		//
-		act = new byte[data.length];
-		in = open();
-		int read = 0;
-		while (read < data.length) {
-			int n = in.read(act, read, 128);
-			if (n <= 0)
-				break;
-			read += n;
-		}
-		assertEquals(data.length, read);
-		assertEquals(-1, in.read());
-		assertTrue("small reads have same content", Arrays.equals(data, act));
+		assertTrue(Arrays.equals(data, act));
 	}
 
 	private DeltaStream open() throws IOException {

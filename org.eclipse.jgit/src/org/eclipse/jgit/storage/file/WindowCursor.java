@@ -267,7 +267,9 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 	}
 
 	int getStreamFileThreshold() {
-		return WindowCache.getStreamFileThreshold();
+		if (db == null)
+			return ObjectLoader.STREAM_THRESHOLD;
+		return db.getStreamFileThreshold();
 	}
 
 	/** Release the current window cursor. */

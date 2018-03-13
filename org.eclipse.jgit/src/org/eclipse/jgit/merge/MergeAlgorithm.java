@@ -47,11 +47,10 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import org.eclipse.jgit.diff.DiffComparator;
 import org.eclipse.jgit.diff.Edit;
 import org.eclipse.jgit.diff.EditList;
 import org.eclipse.jgit.diff.MyersDiff;
-import org.eclipse.jgit.diff.Sequence;
-import org.eclipse.jgit.diff.SequenceComparator;
 import org.eclipse.jgit.merge.MergeChunk.ConflictState;
 
 /**
@@ -83,8 +82,8 @@ public final class MergeAlgorithm {
 	 * @param theirs the second sequence to be merged
 	 * @return the resulting content
 	 */
-	public static <S extends Sequence> MergeResult<S> merge(
-			SequenceComparator<S> cmp, S base, S ours, S theirs) {
+	public static <S> MergeResult<S> merge(DiffComparator<S> cmp, S base,
+			S ours, S theirs) {
 		List<S> sequences = new ArrayList<S>(3);
 		sequences.add(base);
 		sequences.add(ours);
@@ -243,8 +242,8 @@ public final class MergeAlgorithm {
 		}
 		// maybe we have a common part behind the last edit: copy it to the
 		// result
-		if (current < base.size()) {
-			result.add(0, current, base.size(), ConflictState.NO_CONFLICT);
+		if (current < cmp.size(base)) {
+			result.add(0, current, cmp.size(base), ConflictState.NO_CONFLICT);
 		}
 		return result;
 	}

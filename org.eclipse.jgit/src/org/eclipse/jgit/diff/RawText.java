@@ -65,7 +65,7 @@ import org.eclipse.jgit.util.RawParseUtils;
  * line number 1. Callers may need to subtract 1 prior to invoking methods if
  * they are converting from "line number" to "element index".
  */
-public class RawText extends Sequence {
+public class RawText {
 	/** Number of bytes to check for heuristics in {@link #isBinary(byte[])} */
 	private static final int FIRST_FEW_BYTES = 8000;
 
@@ -93,14 +93,14 @@ public class RawText extends Sequence {
 
 	/**
 	 * Create a new sequence from an existing content byte array.
-	 *
+	 * <p>
 	 * The entire array (indexes 0 through length-1) is used as the content.
 	 *
-	 * @param cmp
-	 *            comparator that will later be used to compare texts.
 	 * @param input
 	 *            the content array. The array is never modified, so passing
 	 *            through cached arrays is safe.
+	 * @param cmp
+	 *            comparator that will later be used to compare texts.
 	 */
 	public RawText(RawTextComparator cmp, byte[] input) {
 		content = input;
@@ -175,7 +175,7 @@ public class RawText extends Sequence {
 		for (int lno = 1; lno < lines.size() - 1; lno++) {
 			final int ptr = lines.get(lno);
 			final int end = lines.get(lno + 1);
-			r[lno] = cmp.hashRegion(content, ptr, end);
+			r[lno] = cmp.hashLine(content, ptr, end);
 		}
 		return r;
 	}
