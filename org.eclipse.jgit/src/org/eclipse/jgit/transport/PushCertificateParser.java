@@ -40,6 +40,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 package org.eclipse.jgit.transport;
 
 import static org.eclipse.jgit.transport.BaseReceivePack.parseCommand;
@@ -152,7 +153,23 @@ public class PushCertificateParser {
 	 */
 	public static PushCertificate fromReader(Reader r)
 			throws PackProtocolException, IOException {
-		return new PushCertificateParser().parse(r);
+		PushCertificateParser parser = new PushCertificateParser();
+		StreamReader reader = new StreamReader(r);
+		parser.receiveHeader(reader, true);
+		String line;
+		try {
+			while (!(line = reader.read()).isEmpty()) {
+				if (line.equals(BEGIN_SIGNATURE)) {
+					parser.receiveSignature(reader);
+					break;
+				}
+				parser.addCommand(line);
+			}
+		} catch (EOFException e) {
+			// EOF reached, but might have been at a valid state. Let build call below
+			// sort it out.
+		}
+		return parser.build();
 	}
 
 	private boolean received;
@@ -210,40 +227,6 @@ public class PushCertificateParser {
 		nonceSlopLimit = 0;
 		nonceGenerator = null;
 		enabled = true;
-	}
-
-	/**
-	 * Parse a push certificate from a reader.
-	 *
-	 * @see #fromReader(Reader)
-	 * @param r
-	 *            input reader; consumed only up until the end of the next
-	 *            signature in the input.
-	 * @return the parsed certificate, or null if the reader was at EOF.
-	 * @throws PackProtocolException
-	 *             if the certificate is malformed.
-	 * @throws IOException
-	 *             if there was an error reading from the input.
-	 * @since 4.1
-	 */
-	public PushCertificate parse(Reader r)
-			throws PackProtocolException, IOException {
-		StreamReader reader = new StreamReader(r);
-		receiveHeader(reader);
-		String line;
-		try {
-			while (!(line = reader.read()).isEmpty()) {
-				if (line.equals(BEGIN_SIGNATURE)) {
-					receiveSignature(reader);
-					break;
-				}
-				addCommand(line);
-			}
-		} catch (EOFException e) {
-			// EOF reached, but might have been at a valid state. Let build call below
-			// sort it out.
-		}
-		return build();
 	}
 
 	/**
@@ -335,14 +318,11 @@ public class PushCertificateParser {
 	 */
 	public void receiveHeader(PacketLineIn pckIn, boolean stateless)
 			throws IOException {
-		receiveHeader(new PacketLineReader(pckIn));
-		nonceStatus = nonceGenerator != null
-				? nonceGenerator.verify(
-					receivedNonce, sentNonce(), db, stateless, nonceSlopLimit)
-				: NonceStatus.UNSOLICITED;
+		receiveHeader(new PacketLineReader(pckIn), stateless);
 	}
 
-	private void receiveHeader(StringReader reader) throws IOException {
+	private void receiveHeader(StringReader reader, boolean stateless)
+			throws IOException {
 		try {
 			try {
 				version = parseHeader(reader, VERSION);
@@ -368,6 +348,10 @@ public class PushCertificateParser {
 			} else {
 				receivedNonce = parseHeader(next, NONCE);
 			}
+			nonceStatus = nonceGenerator != null
+					? nonceGenerator.verify(
+						receivedNonce, sentNonce(), db, stateless, nonceSlopLimit)
+					: NonceStatus.UNSOLICITED;
 			// An empty line.
 			if (!reader.read().isEmpty()) {
 				throw new PackProtocolException(
