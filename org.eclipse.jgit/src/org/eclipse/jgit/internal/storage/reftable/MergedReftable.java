@@ -100,9 +100,13 @@ public class MergedReftable extends Reftable {
 
 	@Override
 	public RefCursor seek(String name) throws IOException {
+		boolean isPrefix = name.endsWith("/"); //$NON-NLS-1$
 		MergedRefCursor m = new MergedRefCursor();
 		for (int i = 0; i < tables.length; i++) {
 			m.add(new RefQueueEntry(tables[i].seek(name), i));
+			if (!isPrefix && !m.queue.isEmpty()) {
+				return m;
+			}
 		}
 		return m;
 	}
