@@ -304,16 +304,14 @@ public abstract class FS {
 							}
 					} catch (IOException e) {
 						// Just print on stderr for debugging
-						if (debug)
-							e.printStackTrace(System.err);
+						e.printStackTrace(System.err);
 						gooblerFail.set(true);
 					}
 					try {
 						is.close();
 					} catch (IOException e) {
 						// Just print on stderr for debugging
-						if (debug)
-							e.printStackTrace(System.err);
+						e.printStackTrace(System.err);
 						gooblerFail.set(true);
 					}
 				}
