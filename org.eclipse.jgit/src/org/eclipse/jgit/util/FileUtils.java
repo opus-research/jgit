@@ -468,66 +468,10 @@ public class FileUtils {
 		throw new IOException(JGitText.get().cannotCreateTempDir);
 	}
 
-
 	/**
-	 * @deprecated  Use the more-clearly-named {@link FileUtils#relativizeNativePath(String, String)} instead,
-	 * or directly call {@link FileUtils#relativizePath(String, String, String, boolean)}
-	 *
-	 * Expresses <code>other</code> as a relative file path from <code>base</code>.
-	 * File-separator and case sensitivity are based on the current file system.
-	 *
-	 * See also {@link FileUtils#relativizePath(String, String, String, boolean)}.
-	 *
-	 * @param base
-	 *            Base path
-	 * @param other
-	 *             Destination path
-	 * @return Relative path from <code>base</code> to <code>other</code>
-	 * @since 3.7
-	 */
-	public static String relativize(String base, String other) {
-		return relativizeNativePath(base, other);
-	}
-
-	/**
-	 * Expresses <code>other</code> as a relative file path from <code>base</code>.
-	 * File-separator and case sensitivity are based on the current file system.
-	 *
-	 * See also {@link FileUtils#relativizePath(String, String, String, boolean)}.
-	 *
-	 * @param base
-	 *            Base path
-	 * @param other
-	 *             Destination path
-	 * @return Relative path from <code>base</code> to <code>other</code>
-	 * @since 4.7
-	 */
-	public static String relativizeNativePath(String base, String other) {
-		return FS.DETECTED.relativize(base, other);
-	}
-
-	/**
-	 * Expresses <code>other</code> as a relative file path from <code>base</code>.
-	 * File-separator and case sensitivity are based on Git's internal representation of files (which matches Unix).
-	 *
-	 * See also {@link FileUtils#relativizePath(String, String, String, boolean)}.
-	 *
-	 * @param base
-	 *            Base path
-	 * @param other
-	 *             Destination path
-	 * @return Relative path from <code>base</code> to <code>other</code>
-	 * @since 4.7
-	 */
-	public static String relativizeGitPath(String base, String other) {
-		return relativizePath(base, other, "/", false); //$NON-NLS-1$
-	}
-
-
-	/**
-	 * Expresses <code>other</code> as a relative file path from <code>base</code>
+	 * This will try and make a given path relative to another.
 	 * <p>
-	 * For example, if called with the two following paths :
+	 * For example, if this is called with the two following paths :
 	 *
 	 * <pre>
 	 * <code>base = "c:\\Users\\jdoe\\eclipse\\git\\project"</code>
@@ -536,7 +480,9 @@ public class FileUtils {
 	 *
 	 * This will return "..\\another_project\\pom.xml".
 	 * </p>
-	 *
+	 * <p>
+	 * This method uses {@link File#separator} to split the paths into segments.
+	 * </p>
 	 * <p>
 	 * <b>Note</b> that this will return the empty String if <code>base</code>
 	 * and <code>other</code> are equal.
@@ -548,32 +494,29 @@ public class FileUtils {
 	 *            folder and not a file.
 	 * @param other
 	 *            The path that will be made relative to <code>base</code>.
-	 * @param dirSeparator
-	 *            A string that separates components of the path. In practice, this is "/" or "\\".
-	 * @param caseSensitive
-	 *            Whether to consider differently-cased directory names as distinct
 	 * @return A relative path that, when resolved against <code>base</code>,
 	 *         will yield the original <code>other</code>.
-	 * @since 4.7
+	 * @since 3.7
 	 */
-	public static String relativizePath(String base, String other, String dirSeparator, boolean caseSensitive) {
+	public static String relativize(String base, String other) {
 		if (base.equals(other))
 			return ""; //$NON-NLS-1$
 
-		final String[] baseSegments = base.split(Pattern.quote(dirSeparator));
+		final boolean ignoreCase = !FS.DETECTED.isCaseSensitive();
+		final String[] baseSegments = base.split(Pattern.quote(File.separator));
 		final String[] otherSegments = other.split(Pattern
-				.quote(dirSeparator));
+				.quote(File.separator));
 
 		int commonPrefix = 0;
 		while (commonPrefix < baseSegments.length
 				&& commonPrefix < otherSegments.length) {
-			if (caseSensitive
-					&& baseSegments[commonPrefix]
-					.equals(otherSegments[commonPrefix]))
-				commonPrefix++;
-			else if (!caseSensitive
+			if (ignoreCase
 					&& baseSegments[commonPrefix]
 							.equalsIgnoreCase(otherSegments[commonPrefix]))
+				commonPrefix++;
+			else if (!ignoreCase
+					&& baseSegments[commonPrefix]
+							.equals(otherSegments[commonPrefix]))
 				commonPrefix++;
 			else
 				break;
@@ -581,11 +524,11 @@ public class FileUtils {
 
 		final StringBuilder builder = new StringBuilder();
 		for (int i = commonPrefix; i < baseSegments.length; i++)
-			builder.append("..").append(dirSeparator); //$NON-NLS-1$
+			builder.append("..").append(File.separator); //$NON-NLS-1$
 		for (int i = commonPrefix; i < otherSegments.length; i++) {
 			builder.append(otherSegments[i]);
 			if (i < otherSegments.length - 1)
-				builder.append(dirSeparator);
+				builder.append(File.separator);
 		}
 		return builder.toString();
 	}
