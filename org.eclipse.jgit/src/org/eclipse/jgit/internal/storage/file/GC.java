@@ -1120,6 +1120,7 @@ public class GC {
 	 * influence how packs are written and to implement something similar to
 	 * "git gc --aggressive"
 	 *
+	 * @since 3.6
 	 * @param pconfig
 	 *            the {@link PackConfig} used when writing packs
 	 */
@@ -1192,6 +1193,7 @@ public class GC {
 	 *
 	 * @param auto
 	 *            defines whether gc should do automatic housekeeping
+	 * @since 4.5
 	 */
 	public void setAuto(boolean auto) {
 		this.automatic = auto;
