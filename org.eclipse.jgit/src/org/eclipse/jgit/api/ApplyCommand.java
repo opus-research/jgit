@@ -167,6 +167,8 @@ public class ApplyCommand extends GitCommand<ApplyResult> {
 		File f = new File(getRepository().getWorkTree(), path);
 		if (create)
 			try {
+				File parent = f.getParentFile();
+				FileUtils.mkdirs(parent, true);
 				FileUtils.createNewFile(f);
 			} catch (IOException e) {
 				throw new PatchApplyException(MessageFormat.format(
@@ -231,10 +233,13 @@ public class ApplyCommand extends GitCommand<ApplyResult> {
 		if (!isChanged(oldLines, newLines))
 			return; // don't touch the file
 		StringBuilder sb = new StringBuilder();
+		final String eol = rt.size() == 0
+				|| (rt.size() == 1 && rt.isMissingNewlineAtEnd()) ? "\n" : rt
+				.getLineDelimiter();
 		for (String l : newLines) {
-			// don't bother handling line endings - if it was windows, the \r is
-			// still there!
-			sb.append(l).append('\n');
+			sb.append(l);
+			if (eol != null)
+				sb.append(eol);
 		}
 		sb.deleteCharAt(sb.length() - 1);
 		FileWriter fw = new FileWriter(f);
