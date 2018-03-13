@@ -238,7 +238,7 @@ public abstract class RefDatabase {
 	 * @return the reference (if it exists); else {@code null}.
 	 * @throws IOException
 	 *             the reference space cannot be accessed.
-	 * @since 4.3
+	 * @since 4.2
 	 */
 	public Ref findRef(String name) throws IOException {
 		String[] names = new String[SEARCH_PATH.length];
