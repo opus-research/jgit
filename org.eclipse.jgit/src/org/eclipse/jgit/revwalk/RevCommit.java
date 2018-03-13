@@ -80,21 +80,16 @@ public class RevCommit extends RevObject {
 	 *         available to the caller.
 	 */
 	public static RevCommit parse(byte[] raw) {
-		try {
-			return parse(new RevWalk((ObjectReader) null), raw);
-		}
-		catch (IOException ex) {
-			throw new RuntimeException(ex);
-		}
+		return parse(new RevWalk((ObjectReader) null), raw);
 	}
 
 	/**
 	 * Parse a commit from its canonical format.
-	 * 
+	 *
 	 * This method inserts the commit directly into the caller supplied revision
 	 * pool, making it appear as though the commit exists in the repository,
-	 * even if it doesn't. The repository under the pool is not affected.
-	 * 
+	 * even if it doesn't.  The repository under the pool is not affected.
+	 *
 	 * @param rw
 	 *            the revision pool to allocate the commit within. The commit's
 	 *            tree and parent pointers will be obtained from this pool.
@@ -102,10 +97,8 @@ public class RevCommit extends RevObject {
 	 *            the canonical formatted commit to be parsed.
 	 * @return the parsed commit, in an isolated revision pool that is not
 	 *         available to the caller.
-	 * @throws IOException
-	 *             in case of RevWalk initialization fails
 	 */
-	public static RevCommit parse(RevWalk rw, byte[] raw) throws IOException {
+	public static RevCommit parse(RevWalk rw, byte[] raw) {
 		ObjectInserter.Formatter fmt = new ObjectInserter.Formatter();
 		boolean retain = rw.isRetainBody();
 		rw.setRetainBody(true);
@@ -153,11 +146,7 @@ public class RevCommit extends RevObject {
 		}
 	}
 
-	void parseCanonical(final RevWalk walk, final byte[] raw)
-			throws IOException {
-		if (!walk.shallowCommitsInitialized)
-			walk.initializeShallowCommits();
-
+	void parseCanonical(final RevWalk walk, final byte[] raw) {
 		final MutableObjectId idBuffer = walk.idBuffer;
 		idBuffer.fromString(raw, 5);
 		tree = walk.lookupTree(idBuffer);

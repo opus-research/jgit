@@ -48,9 +48,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
-import java.io.*;
 import java.util.List;
 
 import org.eclipse.jgit.lib.Constants;
@@ -365,12 +363,7 @@ public class FooterLineTest extends RepositoryTestCase {
 		final RevWalk walk = new RevWalk(db);
 		walk.setRetainBody(true);
 		final RevCommit c = new RevCommit(ObjectId.zeroId());
-		try {
-			c.parseCanonical(walk, Constants.encode(buf.toString()));
-		}
-		catch (IOException ex) {
-			fail();
-		}
+		c.parseCanonical(walk, Constants.encode(buf.toString()));
 		return c;
 	}
 }
