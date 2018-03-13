@@ -357,11 +357,11 @@ public class CommitCommand extends GitCommand<RevCommit> {
 							// insert object
 							if (inserter == null)
 								inserter = repo.newObjectInserter();
-							long contentLength = fTree.getEntryContentLength();
+
 							InputStream inputStream = fTree.openEntryStream();
 							try {
 								dcEntry.setObjectId(inserter.insert(
-										Constants.OBJ_BLOB, contentLength,
+										Constants.OBJ_BLOB, entryLength,
 										inputStream));
 							} finally {
 								inputStream.close();
