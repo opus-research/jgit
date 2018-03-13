@@ -44,6 +44,7 @@
 package org.eclipse.jgit.internal.storage.reftable;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_HEADER_LEN;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.INDEX_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_CHAINED;
@@ -264,7 +265,7 @@ class BlockWriter {
 
 	private BlockSizeTooSmallException blockSizeTooSmall(Entry entry) {
 		// Compute size required to fit this entry by itself.
-		int min = computeBlockBytes(1, entry.sizeBytes());
+		int min = FILE_HEADER_LEN + computeBlockBytes(1, entry.sizeBytes());
 		return new BlockSizeTooSmallException(min);
 	}
 
