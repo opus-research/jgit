@@ -56,11 +56,23 @@ import org.eclipse.jgit.lib.Config.SectionParser;
  * This class keeps git repository core parameters.
  */
 public class CoreConfig {
-	/** Key for {@link Config#get(SectionParser)}. */
-	public static final Config.SectionParser<CoreConfig> KEY =
+	/**
+	 * Key for {@link Config#get(SectionParser)}.
+	 * <p>
+	 * @deprecated The default for some config values depends on properties of the
+	 *             repository that are not captured in the {@link Config}, such as
+	 *             whether it has a working tree. Use {@link #key(Repository)}
+	 *             instead.
+	 */
+	@Deprecated
+	public static final Config.SectionParser<CoreConfig> KEY = new SectionParser<CoreConfig>() {
+		@Override
+		public CoreConfig parse(Config cfg) {
 			// Assume non-bare for backwards compatibility, so isLogAllRefUpdates
 			// continues to default to true if unset.
-			cfg -> new CoreConfig(cfg, false);
+			return new CoreConfig(cfg, false);
+		}
+	};
 
 	/**
 	 * Key for {@link Config#get(SectionParser)}.
