@@ -158,7 +158,7 @@ public class RevCommit extends RevObject {
 	void parseCanonical(final RevWalk walk, final byte[] raw)
 			throws IOException {
 		if (!walk.shallowCommitsInitialized)
-			walk.initializeShallowCommits(this);
+			walk.initializeShallowCommits();
 
 		final MutableObjectId idBuffer = walk.idBuffer;
 		idBuffer.fromString(raw, 5);
