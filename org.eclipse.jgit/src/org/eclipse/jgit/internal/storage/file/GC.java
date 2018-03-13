@@ -50,11 +50,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -81,7 +78,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.eclipse.jgit.annotations.NonNull;
-import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CancelledException;
 import org.eclipse.jgit.errors.CorruptObjectException;
@@ -180,8 +176,6 @@ public class GC {
 	 * Whether gc should do automatic housekeeping
 	 */
 	private boolean automatic;
-	private GcLog gcLog;
-	private boolean background;
 
 	/**
 	 * Creates a new garbage collector with default values. An expirationTime of
@@ -213,13 +207,11 @@ public class GC {
 	 * @throws ParseException
 	 *             If the configuration parameter "gc.pruneexpire" couldn't be
 	 *             parsed
-	 * @deprecated use collectGarbage() instead.
 	 */
 	public Collection<PackFile> gc() throws IOException, ParseException {
 		if (automatic && !needGc()) {
 			return Collections.emptyList();
 		}
-
 		pm.start(6 /* tasks */);
 		packRefs();
 		// TODO: implement reflog_expire(pm, repo);
@@ -227,75 +219,6 @@ public class GC {
 		prune(Collections.<ObjectId> emptySet());
 		// TODO: implement rerere_gc(pm);
 		return newPacks;
-	}
-
-	/**
-	 * Runs a garbage collector on a {@link FileRepository}. It will
-	 * <ul>
-	 * <li>pack loose references into packed-refs</li>
-	 * <li>repack all reachable objects into new pack files and delete the old
-	 * pack files</li>
-	 * <li>prune all loose objects which are now reachable by packs</li>
-	 * </ul>
-	 *
-	 * If {@link #setAuto(boolean)} was set to {@code true} {@code gc} will
-	 * first check whether any housekeeping is required; if not, it exits
-	 * without performing any work.
-	 *
-	 * If {@link #setBackground(boolean)} was set to {@code true}
-	 * {@code collectGarbage} will start the gc in the background, and then
-	 * return immediately. In this case, errors will not be reported except in
-	 * gc.log.
-	 *
-	 * @throws IOException
-	 * @throws ParseException
-	 *             If the configuration parameter "gc.pruneexpire" couldn't be
-	 *             parsed
-	 * @since 4.8
-	 */
-	public void collectGarbage() throws IOException, ParseException {
-		if (gcLog != null && gcLog.lock(background)) {
-			return;
-		}
-		Runnable gcTask = () -> {
-			try {
-				gc();
-				if (automatic && tooManyLooseObjects() && gcLog != null) {
-					String message = JGitText.get().gcTooManyUnpruned;
-					gcLog.write(message.getBytes(StandardCharsets.UTF_8));
-				}
-			} catch (IOException | ParseException e) {
-				if (background) {
-					if (gcLog == null) {
-						// Lacking a log, there's no way to report this.
-						return;
-					}
-					try {
-						gcLog.write(e.getMessage().getBytes());
-						StringWriter sw = new StringWriter();
-						PrintWriter pw = new PrintWriter(sw);
-						e.printStackTrace(pw);
-						gcLog.write(sw.toString().getBytes(StandardCharsets.UTF_8));
-						gcLog.commit();
-					} catch (IOException e2) {
-						e2.addSuppressed(e);
-						LOG.error(e2.getMessage(), e2);
-					}
-				} else {
-					throw new JGitInternalException(e.getMessage(), e);
-				}
-			} finally {
-				if (gcLog != null) {
-					gcLog.unlock();
-				}
-			}
-		};
-		if (background) {
-			Thread thread = new Thread(gcTask);
-			thread.start();
-		} else {
-			gcTask.run();
-		}
 	}
 
 	/**
@@ -351,8 +274,7 @@ public class GC {
 		ObjectReader reader = repo.newObjectReader();
 		ObjectDirectory dir = repo.getObjectDatabase();
 		ObjectDirectoryInserter inserter = dir.newInserter();
-		boolean shouldLoosen = !"now".equals(getPruneExpireStr()) && //$NON-NLS-1$
-			getExpireDate() < Long.MAX_VALUE;
+		boolean shouldLoosen = getExpireDate() < Long.MAX_VALUE;
 
 		prunePreserved();
 		long packExpireDate = getPackExpireDate();
@@ -375,7 +297,6 @@ public class GC {
 				prunePack(oldName);
 			}
 		}
-
 		// close the complete object database. That's my only chance to force
 		// rescanning and to detect that certain pack files are now deleted.
 		repo.getObjectDatabase().close();
@@ -530,7 +451,7 @@ public class GC {
 
 		// Collect all loose objects which are old enough, not referenced from
 		// the index and not in objectsToKeep
-		Map<ObjectId, File> deletionCandidates = new HashMap<>();
+		Map<ObjectId, File> deletionCandidates = new HashMap<ObjectId, File>();
 		Set<ObjectId> indexObjects = null;
 		File objects = repo.getObjectsDirectory();
 		String[] fanout = objects.list();
@@ -678,7 +599,9 @@ public class GC {
 		long expireDate = Long.MAX_VALUE;
 
 		if (expire == null && expireAgeMillis == -1) {
-			String pruneExpireStr = getPruneExpireStr();
+			String pruneExpireStr = repo.getConfig().getString(
+					ConfigConstants.CONFIG_GC_SECTION, null,
+					ConfigConstants.CONFIG_KEY_PRUNEEXPIRE);
 			if (pruneExpireStr == null)
 				pruneExpireStr = PRUNE_EXPIRE_DEFAULT;
 			expire = GitDateParser.parse(pruneExpireStr, null, SystemReader
@@ -690,12 +613,6 @@ public class GC {
 		if (expireAgeMillis != -1)
 			expireDate = System.currentTimeMillis() - expireAgeMillis;
 		return expireDate;
-	}
-
-	private String getPruneExpireStr() {
-		return repo.getConfig().getString(
-                        ConfigConstants.CONFIG_GC_SECTION, null,
-                        ConfigConstants.CONFIG_KEY_PRUNEEXPIRE);
 	}
 
 	private long getPackExpireDate() throws ParseException {
@@ -771,7 +688,7 @@ public class GC {
 	 */
 	public void packRefs() throws IOException {
 		Collection<Ref> refs = repo.getRefDatabase().getRefs(Constants.R_REFS).values();
-		List<String> refsToBePacked = new ArrayList<>(refs.size());
+		List<String> refsToBePacked = new ArrayList<String>(refs.size());
 		pm.beginTask(JGitText.get().packRefs, refs.size());
 		try {
 			for (Ref ref : refs) {
@@ -806,55 +723,42 @@ public class GC {
 		long time = System.currentTimeMillis();
 		Collection<Ref> refsBefore = getAllRefs();
 
-		Set<ObjectId> allHeadsAndTags = new HashSet<>();
-		Set<ObjectId> allHeads = new HashSet<>();
-		Set<ObjectId> allTags = new HashSet<>();
-		Set<ObjectId> nonHeads = new HashSet<>();
-		Set<ObjectId> txnHeads = new HashSet<>();
-		Set<ObjectId> tagTargets = new HashSet<>();
+		Set<ObjectId> allHeads = new HashSet<ObjectId>();
+		Set<ObjectId> nonHeads = new HashSet<ObjectId>();
+		Set<ObjectId> txnHeads = new HashSet<ObjectId>();
+		Set<ObjectId> tagTargets = new HashSet<ObjectId>();
 		Set<ObjectId> indexObjects = listNonHEADIndexObjects();
 		RefDatabase refdb = repo.getRefDatabase();
 
 		for (Ref ref : refsBefore) {
 			checkCancelled();
 			nonHeads.addAll(listRefLogObjects(ref, 0));
-			if (ref.isSymbolic() || ref.getObjectId() == null) {
+			if (ref.isSymbolic() || ref.getObjectId() == null)
 				continue;
-			}
-			if (isHead(ref)) {
+			if (isHead(ref) || isTag(ref))
 				allHeads.add(ref.getObjectId());
-			} else if (isTag(ref)) {
-				allTags.add(ref.getObjectId());
-			} else if (RefTreeNames.isRefTree(refdb, ref.getName())) {
+			else if (RefTreeNames.isRefTree(refdb, ref.getName()))
 				txnHeads.add(ref.getObjectId());
-			} else {
+			else
 				nonHeads.add(ref.getObjectId());
-			}
-			if (ref.getPeeledObjectId() != null) {
+			if (ref.getPeeledObjectId() != null)
 				tagTargets.add(ref.getPeeledObjectId());
-			}
 		}
 
-		List<ObjectIdSet> excluded = new LinkedList<>();
+		List<ObjectIdSet> excluded = new LinkedList<ObjectIdSet>();
 		for (final PackFile f : repo.getObjectDatabase().getPacks()) {
 			checkCancelled();
 			if (f.shouldBeKept())
 				excluded.add(f.getIndex());
 		}
 
-		// Don't exclude tags that are also branch tips
-		allTags.removeAll(allHeads);
-		allHeadsAndTags.addAll(allHeads);
-		allHeadsAndTags.addAll(allTags);
-
-		// Hoist all branch tips and tags earlier in the pack file
-		tagTargets.addAll(allHeadsAndTags);
+		tagTargets.addAll(allHeads);
 		nonHeads.addAll(indexObjects);
 
-		List<PackFile> ret = new ArrayList<>(2);
+		List<PackFile> ret = new ArrayList<PackFile>(2);
 		PackFile heads = null;
-		if (!allHeadsAndTags.isEmpty()) {
-			heads = writePack(allHeadsAndTags, PackWriter.NONE, allTags,
+		if (!allHeads.isEmpty()) {
+			heads = writePack(allHeads, Collections.<ObjectId> emptySet(),
 					tagTargets, excluded);
 			if (heads != null) {
 				ret.add(heads);
@@ -862,14 +766,12 @@ public class GC {
 			}
 		}
 		if (!nonHeads.isEmpty()) {
-			PackFile rest = writePack(nonHeads, allHeadsAndTags, PackWriter.NONE,
-					tagTargets, excluded);
+			PackFile rest = writePack(nonHeads, allHeads, tagTargets, excluded);
 			if (rest != null)
 				ret.add(rest);
 		}
 		if (!txnHeads.isEmpty()) {
-			PackFile txn = writePack(txnHeads, PackWriter.NONE, PackWriter.NONE,
-					null, excluded);
+			PackFile txn = writePack(txnHeads, PackWriter.NONE, null, excluded);
 			if (txn != null)
 				ret.add(txn);
 		}
@@ -955,7 +857,7 @@ public class GC {
 				.getReverseEntries();
 		if (rlEntries == null || rlEntries.isEmpty())
 			return Collections.<ObjectId> emptySet();
-		Set<ObjectId> ret = new HashSet<>();
+		Set<ObjectId> ret = new HashSet<ObjectId>();
 		for (ReflogEntry e : rlEntries) {
 			if (e.getWho().getWhen().getTime() < minTime)
 				break;
@@ -1024,7 +926,7 @@ public class GC {
 
 			treeWalk.setFilter(TreeFilter.ANY_DIFF);
 			treeWalk.setRecursive(true);
-			Set<ObjectId> ret = new HashSet<>();
+			Set<ObjectId> ret = new HashSet<ObjectId>();
 
 			while (treeWalk.next()) {
 				checkCancelled();
@@ -1053,14 +955,12 @@ public class GC {
 	}
 
 	private PackFile writePack(@NonNull Set<? extends ObjectId> want,
-			@NonNull Set<? extends ObjectId> have, @NonNull Set<ObjectId> tags,
-			Set<ObjectId> tagTargets, List<ObjectIdSet> excludeObjects)
-			throws IOException {
+			@NonNull Set<? extends ObjectId> have, Set<ObjectId> tagTargets,
+			List<ObjectIdSet> excludeObjects) throws IOException {
 		checkCancelled();
 		File tmpPack = null;
-		Map<PackExt, File> tmpExts = new TreeMap<>(
+		Map<PackExt, File> tmpExts = new TreeMap<PackExt, File>(
 				new Comparator<PackExt>() {
-					@Override
 					public int compare(PackExt o1, PackExt o2) {
 						// INDEX entries must be returned last, so the pack
 						// scanner does pick up the new pack until all the
@@ -1081,13 +981,12 @@ public class GC {
 			// prepare the PackWriter
 			pw.setDeltaBaseAsOffset(true);
 			pw.setReuseDeltaCommits(false);
-			if (tagTargets != null) {
+			if (tagTargets != null)
 				pw.setTagTargets(tagTargets);
-			}
 			if (excludeObjects != null)
 				for (ObjectIdSet idx : excludeObjects)
 					pw.excludeObjects(idx);
-			pw.preparePack(pm, want, have, PackWriter.NONE, tags);
+			pw.preparePack(pm, want, have);
 			if (pw.getObjectCount() == 0)
 				return null;
 			checkCancelled();
@@ -1214,25 +1113,6 @@ public class GC {
 	}
 
 	/**
-	 * Set the GcLog object used to store errors during background processing
-	 *
-	 * @param gcLog
-	 * @since 4.8
-	 */
-	public void setLog(GcLog gcLog) {
-		this.gcLog = gcLog;
-	}
-
-	/**
-	 * @param background
-	 *            whether to run the gc in a background thread.
-	 * @since 4.8
-	 */
-	public void setBackground(boolean background) {
-		this.background = background;
-	}
-
-	/**
 	 * A class holding statistical data for a FileRepository regarding how many
 	 * objects are stored as loose or packed objects
 	 */
@@ -1279,7 +1159,6 @@ public class GC {
 		 */
 		public long numberOfBitmaps;
 
-		@Override
 		public String toString() {
 			final StringBuilder b = new StringBuilder();
 			b.append("numberOfPackedObjects=").append(numberOfPackedObjects); //$NON-NLS-1$
@@ -1499,7 +1378,8 @@ public class GC {
 	 * @return {@code true} if number of loose objects > gc.auto (default 6700)
 	 */
 	boolean tooManyLooseObjects() {
-		int auto = getLooseObjectLimit();
+		int auto = repo.getConfig().getInt(ConfigConstants.CONFIG_GC_SECTION,
+				ConfigConstants.CONFIG_KEY_AUTO, DEFAULT_AUTOLIMIT);
 		if (auto <= 0) {
 			return false;
 		}
@@ -1512,7 +1392,6 @@ public class GC {
 		try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir,
 				new DirectoryStream.Filter<Path>() {
 
-					@Override
 					public boolean accept(Path file) throws IOException {
 						Path fileName = file.getFileName();
 						return Files.isRegularFile(file) && fileName != null
@@ -1530,10 +1409,5 @@ public class GC {
 			LOG.error(e.getMessage(), e);
 		}
 		return false;
-	}
-
-	private int getLooseObjectLimit() {
-		return repo.getConfig().getInt(ConfigConstants.CONFIG_GC_SECTION,
-				ConfigConstants.CONFIG_KEY_AUTO, DEFAULT_AUTOLIMIT);
 	}
 }

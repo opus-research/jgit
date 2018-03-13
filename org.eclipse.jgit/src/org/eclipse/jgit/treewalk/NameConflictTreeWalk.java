@@ -45,7 +45,6 @@ package org.eclipse.jgit.treewalk;
 
 import java.io.IOException;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.lib.FileMode;
@@ -111,7 +110,7 @@ public class NameConflictTreeWalk extends TreeWalk {
 	 *            the reader the walker will obtain tree data from.
 	 * @since 4.3
 	 */
-	public NameConflictTreeWalk(@Nullable Repository repo, final ObjectReader or) {
+	public NameConflictTreeWalk(Repository repo, final ObjectReader or) {
 		super(repo, or);
 	}
 
@@ -354,7 +353,6 @@ public class NameConflictTreeWalk extends TreeWalk {
 			dfConflict = null;
 	}
 
-	@Override
 	void stopWalk() throws IOException {
 		if (!needsStopWalk()) {
 			return;

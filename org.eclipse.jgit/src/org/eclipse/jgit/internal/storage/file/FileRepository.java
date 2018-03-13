@@ -76,7 +76,6 @@ import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig.HideDotFiles;
 import org.eclipse.jgit.lib.CoreConfig.SymLinks;
-import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
@@ -491,28 +490,10 @@ public class FileRepository extends Repository {
 	 */
 	@Override
 	public Set<ObjectId> getAdditionalHaves() {
-		return getAdditionalHaves(null);
-	}
-
-	/**
-	 * Objects known to exist but not expressed by {@link #getAllRefs()}.
-	 * <p>
-	 * When a repository borrows objects from another repository, it can
-	 * advertise that it safely has that other repository's references, without
-	 * exposing any other details about the other repository.  This may help
-	 * a client trying to push changes avoid pushing more than it needs to.
-	 *
-	 * @param skips
-	 *            Set of AlternateHandle Ids already seen
-	 *
-	 * @return unmodifiable collection of other known objects.
-	 */
-	private Set<ObjectId> getAdditionalHaves(Set<AlternateHandle.Id> skips) {
-		HashSet<ObjectId> r = new HashSet<>();
-		skips = objectDatabase.addMe(skips);
+		HashSet<ObjectId> r = new HashSet<ObjectId>();
 		for (AlternateHandle d : objectDatabase.myAlternates()) {
-			if (d instanceof AlternateRepository && !skips.contains(d.getId())) {
-				FileRepository repo;
+			if (d instanceof AlternateRepository) {
+				Repository repo;
 
 				repo = ((AlternateRepository) d).repository;
 				for (Ref ref : repo.getAllRefs().values()) {
@@ -521,7 +502,7 @@ public class FileRepository extends Repository {
 					if (ref.getPeeledObjectId() != null)
 						r.add(ref.getPeeledObjectId());
 				}
-				r.addAll(repo.getAdditionalHaves(skips));
+				r.addAll(repo.getAdditionalHaves());
 			}
 		}
 		return r;
@@ -638,29 +619,16 @@ public class FileRepository extends Repository {
 
 	}
 
-	private boolean shouldAutoDetach() {
-		return getConfig().getBoolean(ConfigConstants.CONFIG_GC_SECTION,
-				ConfigConstants.CONFIG_KEY_AUTODETACH, true);
-	}
-
 	@Override
 	public void autoGC(ProgressMonitor monitor) {
-		// Since we don't care about tracking progress, it is OK to run the
-		// gc in the background.
-		GcLog gcLog = new GcLog(this);
 		GC gc = new GC(this);
 		gc.setPackConfig(new PackConfig(this));
 		gc.setProgressMonitor(monitor);
 		gc.setAuto(true);
-		gc.setLog(gcLog);
-		boolean background = monitor instanceof NullProgressMonitor
-				&& shouldAutoDetach();
-		gc.setBackground(background);
 		try {
-			gc.collectGarbage();
+			gc.gc();
 		} catch (ParseException | IOException e) {
 			throw new JGitInternalException(JGitText.get().gcFailed, e);
 		}
-
 	}
 }

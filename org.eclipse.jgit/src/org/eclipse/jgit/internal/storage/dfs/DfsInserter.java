@@ -90,7 +90,6 @@ import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.TemporaryBuffer;
 import org.eclipse.jgit.util.io.CountingOutputStream;
-import org.eclipse.jgit.util.sha1.SHA1;
 
 /** Inserts objects into the DFS. */
 public class DfsInserter extends ObjectInserter {
@@ -169,7 +168,7 @@ public class DfsInserter extends ObjectInserter {
 		}
 
 		long offset = beginObject(type, len);
-		SHA1 md = digest();
+		MessageDigest md = digest();
 		md.update(Constants.encodedTypeString(type));
 		md.update((byte) ' ');
 		md.update(Constants.encodeASCII(len));
@@ -184,7 +183,7 @@ public class DfsInserter extends ObjectInserter {
 			len -= n;
 		}
 		packOut.compress.finish();
-		return endObject(md.toObjectId(), offset);
+		return endObject(ObjectId.fromRaw(md.digest()), offset);
 	}
 
 	private byte[] insertBuffer(long len) {
@@ -275,8 +274,8 @@ public class DfsInserter extends ObjectInserter {
 	}
 
 	private void beginPack() throws IOException {
-		objectList = new BlockList<>();
-		objectMap = new ObjectIdOwnerMap<>();
+		objectList = new BlockList<PackedObjectInfo>();
+		objectMap = new ObjectIdOwnerMap<PackedObjectInfo>();
 		cache = DfsBlockCache.getInstance();
 
 		rollback = true;
@@ -530,7 +529,7 @@ public class DfsInserter extends ObjectInserter {
 	}
 
 	private class Reader extends ObjectReader {
-		private final DfsReader ctx = db.newReader();
+		private final DfsReader ctx = new DfsReader(db);
 
 		@Override
 		public ObjectReader newReader() {
@@ -544,7 +543,7 @@ public class DfsInserter extends ObjectInserter {
 			if (objectList == null)
 				return stored;
 
-			Set<ObjectId> r = new HashSet<>(stored.size() + 2);
+			Set<ObjectId> r = new HashSet<ObjectId>(stored.size() + 2);
 			r.addAll(stored);
 			for (PackedObjectInfo obj : objectList) {
 				if (id.prefixCompare(obj) == 0)
@@ -647,7 +646,7 @@ public class DfsInserter extends ObjectInserter {
 
 		@Override
 		public ObjectStream openStream() throws IOException {
-			final DfsReader ctx = db.newReader();
+			final DfsReader ctx = new DfsReader(db);
 			if (srcPack != packKey) {
 				try {
 					// Post DfsInserter.flush() use the normal code path.

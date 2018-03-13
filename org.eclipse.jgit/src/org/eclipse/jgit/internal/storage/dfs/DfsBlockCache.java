@@ -183,7 +183,7 @@ public final class DfsBlockCache {
 		if (tableSize < 1)
 			throw new IllegalArgumentException(JGitText.get().tSizeMustBeGreaterOrEqual1);
 
-		table = new AtomicReferenceArray<>(tableSize);
+		table = new AtomicReferenceArray<HashEntry>(tableSize);
 		loadLocks = new ReentrantLock[cfg.getConcurrencyLevel()];
 		for (int i = 0; i < loadLocks.length; i++)
 			loadLocks[i] = new ReentrantLock(true /* fair */);
@@ -194,10 +194,10 @@ public final class DfsBlockCache {
 		blockSizeShift = Integer.numberOfTrailingZeros(blockSize);
 
 		clockLock = new ReentrantLock(true /* fair */);
-		clockHand = new Ref<>(new DfsPackKey(), -1, 0, null);
+		clockHand = new Ref<Object>(new DfsPackKey(), -1, 0, null);
 		clockHand.next = clockHand;
 
-		packCache = new ConcurrentHashMap<>(
+		packCache = new ConcurrentHashMap<DfsPackDescription, DfsPackFile>(
 				16, 0.75f, 1);
 		packFiles = Collections.unmodifiableCollection(packCache.values());
 
@@ -322,7 +322,6 @@ public final class DfsBlockCache {
 		HashEntry e1 = table.get(slot);
 		DfsBlock v = scan(e1, key, position);
 		if (v != null) {
-			ctx.stats.blockCacheHit++;
 			statHit.incrementAndGet();
 			return v;
 		}
@@ -335,7 +334,6 @@ public final class DfsBlockCache {
 			if (e2 != e1) {
 				v = scan(e2, key, position);
 				if (v != null) {
-					ctx.stats.blockCacheHit++;
 					statHit.incrementAndGet();
 					creditSpace(blockSize);
 					return v;
@@ -359,7 +357,7 @@ public final class DfsBlockCache {
 			}
 
 			key.cachedSize.addAndGet(v.size());
-			Ref<DfsBlock> ref = new Ref<>(key, position, v.size(), v);
+			Ref<DfsBlock> ref = new Ref<DfsBlock>(key, position, v.size(), v);
 			ref.hot = true;
 			for (;;) {
 				HashEntry n = new HashEntry(clean(e2), ref);
@@ -463,7 +461,7 @@ public final class DfsBlockCache {
 			}
 
 			key.cachedSize.addAndGet(size);
-			ref = new Ref<>(key, pos, size, v);
+			ref = new Ref<T>(key, pos, size, v);
 			ref.hot = true;
 			for (;;) {
 				HashEntry n = new HashEntry(clean(e2), ref);
