@@ -46,18 +46,10 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import java.io.File;
-import java.text.MessageFormat;
 
-import org.eclipse.jgit.api.errors.InvalidRefNameException;
-import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.api.errors.NoHeadException;
-import org.eclipse.jgit.errors.CheckoutConflictException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.util.FileUtils;
@@ -117,7 +109,7 @@ public class StashApplyCommandTest extends RepositoryTestCase {
 		File addedFile = writeTrashFile(addedPath, "content2");
 		git.add().addFilepattern(addedPath).call();
 
-		RevCommit stashed = git.stashCreate().call();
+		RevCommit stashed = Git.wrap(db).stashCreate().call();
 		assertNotNull(stashed);
 		assertFalse(addedFile.exists());
 
@@ -142,7 +134,7 @@ public class StashApplyCommandTest extends RepositoryTestCase {
 	public void indexDelete() throws Exception {
 		git.rm().addFilepattern("file.txt").call();
 
-		RevCommit stashed = git.stashCreate().call();
+		RevCommit stashed = Git.wrap(db).stashCreate().call();
 		assertNotNull(stashed);
 		assertEquals("content", read(committedFile));
 
@@ -166,7 +158,7 @@ public class StashApplyCommandTest extends RepositoryTestCase {
 	public void workingDirectoryModify() throws Exception {
 		writeTrashFile("file.txt", "content2");
 
-		RevCommit stashed = git.stashCreate().call();
+		RevCommit stashed = Git.wrap(db).stashCreate().call();
 		assertNotNull(stashed);
 		assertEquals("content", read(committedFile));
 
@@ -195,7 +187,7 @@ public class StashApplyCommandTest extends RepositoryTestCase {
 
 		writeTrashFile(path, "content2");
 
-		RevCommit stashed = git.stashCreate().call();
+		RevCommit stashed = Git.wrap(db).stashCreate().call();
 		assertNotNull(stashed);
 		assertEquals("content", read(subfolderFile));
 
@@ -221,7 +213,7 @@ public class StashApplyCommandTest extends RepositoryTestCase {
 		git.add().addFilepattern("file.txt").call();
 		writeTrashFile("file.txt", "content3");
 
-		RevCommit stashed = git.stashCreate().call();
+		RevCommit stashed = Git.wrap(db).stashCreate().call();
 		assertNotNull(stashed);
 		assertEquals("content", read(committedFile));
 
@@ -248,7 +240,7 @@ public class StashApplyCommandTest extends RepositoryTestCase {
 		git.add().addFilepattern("file.txt").call();
 		writeTrashFile("file.txt", "content");
 
-		RevCommit stashed = git.stashCreate().call();
+		RevCommit stashed = Git.wrap(db).stashCreate().call();
 		assertNotNull(stashed);
 		assertEquals("content", read(committedFile));
 
@@ -277,7 +269,7 @@ public class StashApplyCommandTest extends RepositoryTestCase {
 		FileUtils.delete(added);
 		assertFalse(added.exists());
 
-		RevCommit stashed = git.stashCreate().call();
+		RevCommit stashed = Git.wrap(db).stashCreate().call();
 		assertNotNull(stashed);
 		assertFalse(added.exists());
 
@@ -304,7 +296,7 @@ public class StashApplyCommandTest extends RepositoryTestCase {
 		FileUtils.delete(committedFile);
 		assertFalse(committedFile.exists());
 
-		RevCommit stashed = git.stashCreate().call();
+		RevCommit stashed = Git.wrap(db).stashCreate().call();
 		assertNotNull(stashed);
 		assertEquals("content", read(committedFile));
 
@@ -331,7 +323,7 @@ public class StashApplyCommandTest extends RepositoryTestCase {
 		File addedFile = writeTrashFile(addedPath, "content2");
 		git.add().addFilepattern(addedPath).call();
 
-		RevCommit stashed = git.stashCreate().call();
+		RevCommit stashed = Git.wrap(db).stashCreate().call();
 		assertNotNull(stashed);
 		assertTrue(committedFile.exists());
 		assertFalse(addedFile.exists());
@@ -350,107 +342,5 @@ public class StashApplyCommandTest extends RepositoryTestCase {
 		assertTrue(status.getRemoved().contains(PATH));
 		assertEquals(1, status.getAdded().size());
 		assertTrue(status.getAdded().contains(addedPath));
-	}
-
-	@Test
-	public void workingDirectoryContentConflict() throws Exception {
-		writeTrashFile(PATH, "content2");
-
-		RevCommit stashed = git.stashCreate().call();
-		assertNotNull(stashed);
-		assertEquals("content", read(committedFile));
-		assertTrue(git.status().call().isClean());
-
-		writeTrashFile(PATH, "content3");
-
-		try {
-			git.stashApply().call();
-			fail("Exception not thrown");
-		} catch (JGitInternalException e) {
-			assertTrue(e.getCause() instanceof CheckoutConflictException);
-		}
-	}
-
-	@Test
-	public void indexContentConflict() throws Exception {
-		writeTrashFile(PATH, "content2");
-
-		RevCommit stashed = git.stashCreate().call();
-		assertNotNull(stashed);
-		assertEquals("content", read(committedFile));
-		assertTrue(git.status().call().isClean());
-
-		writeTrashFile(PATH, "content3");
-		git.add().addFilepattern(PATH).call();
-		writeTrashFile(PATH, "content2");
-
-		try {
-			git.stashApply().call();
-			fail("Exception not thrown");
-		} catch (JGitInternalException e) {
-			assertTrue(e.getCause() instanceof CheckoutConflictException);
-		}
-	}
-
-	@Test
-	public void workingDirectoryEditPreCommit() throws Exception {
-		writeTrashFile(PATH, "content2");
-
-		RevCommit stashed = git.stashCreate().call();
-		assertNotNull(stashed);
-		assertEquals("content", read(committedFile));
-		assertTrue(git.status().call().isClean());
-
-		String path2 = "file2.txt";
-		writeTrashFile(path2, "content3");
-		git.add().addFilepattern(path2).call();
-		assertNotNull(git.commit().setMessage("adding file").call());
-
-		ObjectId unstashed = git.stashApply().call();
-		assertEquals(stashed, unstashed);
-
-		Status status = git.status().call();
-		assertTrue(status.getAdded().isEmpty());
-		assertTrue(status.getChanged().isEmpty());
-		assertTrue(status.getConflicting().isEmpty());
-		assertTrue(status.getMissing().isEmpty());
-		assertTrue(status.getRemoved().isEmpty());
-		assertTrue(status.getUntracked().isEmpty());
-
-		assertEquals(1, status.getModified().size());
-		assertTrue(status.getModified().contains(PATH));
-	}
-
-	@Test
-	public void unstashNonStashCommit() throws Exception {
-		try {
-			git.stashApply().setStashRef(head.name()).call();
-			fail("Exception not thrown");
-		} catch (JGitInternalException e) {
-			assertEquals(MessageFormat.format(
-					JGitText.get().stashCommitMissingTwoParents, head.name()),
-					e.getMessage());
-		}
-	}
-
-	@Test
-	public void unstashNoHead() throws Exception {
-		Repository repo = createWorkRepository();
-		try {
-			Git.wrap(repo).stashApply().call();
-			fail("Exception not thrown");
-		} catch (NoHeadException e) {
-			assertNotNull(e.getMessage());
-		}
-	}
-
-	@Test
-	public void noStashedCommits() throws Exception {
-		try {
-			git.stashApply().call();
-			fail("Exception not thrown");
-		} catch (InvalidRefNameException e) {
-			assertNotNull(e.getMessage());
-		}
 	}
 }

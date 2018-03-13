@@ -62,6 +62,7 @@ import org.eclipse.jgit.api.MergeResult.MergeStatus;
 import org.eclipse.jgit.api.ResetCommand.ResetType;
 import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
@@ -1014,7 +1015,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		try {
 			checkout.call();
 			fail("Checkout exception not thrown");
-		} catch (org.eclipse.jgit.api.errors.CheckoutConflictException e) {
+		} catch (JGitInternalException e) {
 			CheckoutResult result = checkout.getResult();
 			assertNotNull(result);
 			assertNotNull(result.getConflictList());
