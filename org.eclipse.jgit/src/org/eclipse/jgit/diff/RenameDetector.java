@@ -267,7 +267,7 @@ public class RenameDetector {
 			case COPY:
 			case RENAME:
 			default:
-				entries.add(entry);
+				entriesToAdd.add(entry);
 			}
 		}
 	}
