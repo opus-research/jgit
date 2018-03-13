@@ -173,6 +173,7 @@ public class AbbreviationTest extends LocalDiskRepositoryTestCase {
 			dst.close();
 		}
 		new FileOutputStream(packFile).close();
+		db.openPack(packFile, idxFile);
 
 		assertEquals(id.abbreviate(20), reader.abbreviate(id, 2));
 
