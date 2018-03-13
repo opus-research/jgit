@@ -94,7 +94,6 @@ import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.revwalk.filter.CommitTimeRevFilter;
 import org.eclipse.jgit.storage.pack.PackConfig;
-import org.eclipse.jgit.storage.pack.PackStatistics;
 import org.eclipse.jgit.transport.GitProtocolConstants.MultiAck;
 import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 import org.eclipse.jgit.util.io.InterruptTimer;
@@ -254,9 +253,6 @@ public class UploadPack {
 	/** Hook handling the various upload phases. */
 	private PreUploadHook preUploadHook = PreUploadHook.NULL;
 
-	/** Hook for taking post upload actions. */
-	private PostUploadHook postUploadHook = PostUploadHook.NULL;
-
 	/** Capabilities requested by the client. */
 	private Set<String> options;
 	String userAgent;
@@ -310,7 +306,7 @@ public class UploadPack {
 
 	private boolean noDone;
 
-	private PackStatistics statistics;
+	private PackWriter.Statistics statistics;
 
 	private UploadPackLogger logger = UploadPackLogger.NULL;
 
@@ -523,7 +519,7 @@ public class UploadPack {
 		this.refFilter = refFilter != null ? refFilter : RefFilter.DEFAULT;
 	}
 
-	/** @return the configured pre upload hook. */
+	/** @return the configured upload hook. */
 	public PreUploadHook getPreUploadHook() {
 		return preUploadHook;
 	}
@@ -536,25 +532,6 @@ public class UploadPack {
 	 */
 	public void setPreUploadHook(PreUploadHook hook) {
 		preUploadHook = hook != null ? hook : PreUploadHook.NULL;
-	}
-
-	/**
-	 * @return the configured post upload hook.
-	 * @since 4.1
-	 */
-	public PostUploadHook getPostUploadHook() {
-		return postUploadHook;
-	}
-
-	/**
-	 * Set the hook for post upload actions (logging, repacking).
-	 *
-	 * @param hook
-	 *            the hook; if null no special actions are taken.
-	 * @since 4.1
-	 */
-	public void setPostUploadHook(PostUploadHook hook) {
-		postUploadHook = hook != null ? hook : PostUploadHook.NULL;
 	}
 
 	/**
@@ -585,12 +562,7 @@ public class UploadPack {
 		}
 	}
 
-	/**
-	 * @return the configured logger.
-	 *
-	 * @deprecated Use {@link #getPreUploadHook()}.
-	 */
-	@Deprecated
+	/** @return the configured logger. */
 	public UploadPackLogger getLogger() {
 		return logger;
 	}
@@ -598,12 +570,9 @@ public class UploadPack {
 	/**
 	 * Set the logger.
 	 *
-	 * @deprecated Use {@link #setPreUploadHook(PreUploadHook)}.
-	 *
 	 * @param logger
 	 *            the logger instance. If null, no logging occurs.
 	 */
-	@Deprecated
 	public void setLogger(UploadPackLogger logger) {
 		this.logger = logger;
 	}
@@ -681,27 +650,12 @@ public class UploadPack {
 	/**
 	 * Get the PackWriter's statistics if a pack was sent to the client.
 	 *
-	 * @deprecated Use {@link #getStatistics()}.
-	 *
 	 * @return statistics about pack output, if a pack was sent. Null if no pack
 	 *         was sent, such as during the negotation phase of a smart HTTP
 	 *         connection, or if the client was already up-to-date.
 	 * @since 3.0
 	 */
-	@Deprecated
 	public PackWriter.Statistics getPackStatistics() {
-		return new PackWriter.Statistics(statistics);
-	}
-
-	/**
-	 * Get the PackWriter's statistics if a pack was sent to the client.
-	 *
-	 * @return statistics about pack output, if a pack was sent. Null if no pack
-	 *         was sent, such as during the negotation phase of a smart HTTP
-	 *         connection, or if the client was already up-to-date.
-	 * @since 4.1
-	 */
-	public PackStatistics getStatistics() {
 		return statistics;
 	}
 
@@ -1514,10 +1468,8 @@ public class UploadPack {
 
 		} finally {
 			statistics = pw.getStatistics();
-			if (statistics != null) {
-				postUploadHook.onPostUpload(statistics);
-				logger.onPackStatistics(new PackWriter.Statistics(statistics));
-			}
+			if (statistics != null)
+				logger.onPackStatistics(statistics);
 			pw.close();
 		}
 
