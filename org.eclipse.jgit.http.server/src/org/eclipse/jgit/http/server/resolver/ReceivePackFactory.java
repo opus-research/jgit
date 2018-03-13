@@ -68,9 +68,12 @@ public interface ReceivePackFactory {
 	 *            the repository the receive would write into.
 	 * @return the newly configured ReceivePack instance, must not be null.
 	 * @throws ServiceNotEnabledException
+	 *             this factory refuses to create the instance because it is not
+	 *             allowed on the target repository, by any user.
+	 * @throws ServiceNotAuthorizedException
 	 *             this factory refuses to create the instance for this HTTP
 	 *             request and repository, such as due to a permission error.
 	 */
 	ReceivePack create(HttpServletRequest req, Repository db)
-			throws ServiceNotEnabledException;
+			throws ServiceNotEnabledException, ServiceNotAuthorizedException;
 }

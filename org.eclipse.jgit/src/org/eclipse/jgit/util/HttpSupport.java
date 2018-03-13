@@ -89,6 +89,18 @@ public class HttpSupport {
 	/** The {@code Content-Encoding} header. */
 	public static final String HDR_CONTENT_ENCODING = "Content-Encoding";
 
+	/** The {@code Content-Range} header. */
+	public static final String HDR_CONTENT_RANGE = "Content-Range";
+
+	/** The {@code Accept-Ranges} header. */
+	public static final String HDR_ACCEPT_RANGES = "Accept-Ranges";
+
+	/** The {@code If-Range} header. */
+	public static final String HDR_IF_RANGE = "If-Range";
+
+	/** The {@code Range} header. */
+	public static final String HDR_RANGE = "Range";
+
 	/** The {@code Accept-Encoding} header. */
 	public static final String HDR_ACCEPT_ENCODING = "Accept-Encoding";
 

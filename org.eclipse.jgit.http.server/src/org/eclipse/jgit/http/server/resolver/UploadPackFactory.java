@@ -68,9 +68,12 @@ public interface UploadPackFactory {
 	 *            the repository the upload would read from.
 	 * @return the newly configured UploadPack instance, must not be null.
 	 * @throws ServiceNotEnabledException
+	 *             this factory refuses to create the instance because it is not
+	 *             allowed on the target repository, by any user.
+	 * @throws ServiceNotAuthorizedException
 	 *             this factory refuses to create the instance for this HTTP
 	 *             request and repository, such as due to a permission error.
 	 */
 	UploadPack create(HttpServletRequest req, Repository db)
-			throws ServiceNotEnabledException;
+			throws ServiceNotEnabledException, ServiceNotAuthorizedException;
 }

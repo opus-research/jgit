@@ -58,8 +58,8 @@ import org.eclipse.jgit.transport.ReceivePack;
  * <ul>
  * <li>The container has authenticated the user and set
  * {@link HttpServletRequest#getRemoteUser()} to the authenticated name.
- * <li>The repository configuration file has {@code daemon.receivepack}
- * explicitly set to true.
+ * <li>The repository configuration file has {@code http.receivepack} explicitly
+ * set to true.
  * </ul>
  * and explicitly rejected otherwise.
  */
@@ -71,32 +71,33 @@ public class DefaultReceivePackFactory implements ReceivePackFactory {
 	};
 
 	private static class ServiceConfig {
+		final boolean set;
+
 		final boolean enabled;
 
 		ServiceConfig(final Config cfg) {
-			enabled = cfg.getBoolean("daemon", "receivepack", false);
+			set = cfg.getString("http", null, "receivepack") != null;
+			enabled = cfg.getBoolean("http", "receivepack", false);
 		}
 	}
 
 	public ReceivePack create(final HttpServletRequest req, final Repository db)
-			throws ServiceNotEnabledException {
-		final String user = req.getRemoteUser();
-		if (user != null && !"".equals(user)) {
-			// Assume the container performed authentication, and
-			// writing is permitted.
-			//
-			return createFor(req, db, user);
+			throws ServiceNotEnabledException, ServiceNotAuthorizedException {
+		final ServiceConfig cfg = db.getConfig().get(CONFIG);
+		String user = req.getRemoteUser();
 
-		} else if (db.getConfig().get(CONFIG).enabled) {
-			// If daemon.receivepack is enabled then anonymous pushing
-			// over git:// would be acceptable, so assume the same is
-			// true for pushing over http://
-			//
-			return createFor(req, db, "anonymous");
-
-		} else {
+		if (cfg.set) {
+			if (cfg.enabled) {
+				if (user == null || "".equals(user))
+					user = "anonymous";
+				return createFor(req, db, user);
+			}
 			throw new ServiceNotEnabledException();
 		}
+
+		if (user != null && !"".equals(user))
+			return createFor(req, db, user);
+		throw new ServiceNotAuthorizedException();
 	}
 
 	private ReceivePack createFor(final HttpServletRequest req,

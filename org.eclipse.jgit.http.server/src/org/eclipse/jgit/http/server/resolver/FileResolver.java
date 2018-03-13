@@ -68,27 +68,52 @@ public class FileResolver implements RepositoryResolver {
 	}
 
 	public Repository open(final HttpServletRequest req,
-			final String repositoryName) throws RepositoryNotFoundException {
+			final String repositoryName) throws RepositoryNotFoundException,
+			ServiceNotEnabledException {
 		if (isUnreasonableName(repositoryName))
 			throw new RepositoryNotFoundException(repositoryName);
 
+		final Repository db;
 		try {
-			File gitdir = new File(basePath, repositoryName);
-			Repository db = RepositoryCache.open(FileKey.lenient(gitdir), true);
-			if (isExportOk(req, repositoryName, db))
-				return db;
-			db.close();
-			throw new IOException("Repository not available for export");
+			final File gitdir = new File(basePath, repositoryName);
+			db = RepositoryCache.open(FileKey.lenient(gitdir), true);
 		} catch (IOException e) {
 			final RepositoryNotFoundException notFound;
 			notFound = new RepositoryNotFoundException(repositoryName);
 			notFound.initCause(e);
 			throw notFound;
 		}
+
+		try {
+			if (isExportOk(req, repositoryName, db))
+				return db;
+			else
+				throw new ServiceNotEnabledException();
+
+		} catch (RuntimeException e) {
+			db.close();
+			final RepositoryNotFoundException notFound;
+			notFound = new RepositoryNotFoundException(repositoryName);
+			notFound.initCause(e);
+			throw notFound;
+
+		} catch (IOException e) {
+			db.close();
+			final RepositoryNotFoundException notFound;
+			notFound = new RepositoryNotFoundException(repositoryName);
+			notFound.initCause(e);
+			throw notFound;
+
+		} catch (ServiceNotEnabledException e) {
+			db.close();
+			throw e;
+		}
 	}
 
 	/**
 	 * Check if this repository can be served over HTTP.
+	 * <p>
+	 * The default implementation of this method always returns true.
 	 *
 	 * @param req
 	 *            the current HTTP request.
@@ -97,10 +122,13 @@ public class FileResolver implements RepositoryResolver {
 	 * @param db
 	 *            the opened repository instance.
 	 * @return true if the repository is accessible; false if not.
+	 * @throws IOException
+	 *             the repository could not be accessed, the caller will claim
+	 *             the repository does not exist.
 	 */
 	protected boolean isExportOk(HttpServletRequest req, String repositoryName,
-			Repository db) {
-		return new File(db.getDirectory(), "git-daemon-export-ok").exists();
+			Repository db) throws IOException {
+		return true;
 	}
 
 	private static boolean isUnreasonableName(final String name) {

@@ -53,7 +53,7 @@ import org.eclipse.jgit.transport.UploadPack;
 /**
  * Create and configure {@link UploadPack} service instance.
  * <p>
- * Reading by upload-pack is permitted unless {@code daemon.uploadpack} is
+ * Reading by upload-pack is permitted unless {@code http.uploadpack} is
  * explicitly set to false.
  */
 public class DefaultUploadPackFactory implements UploadPackFactory {
@@ -67,12 +67,12 @@ public class DefaultUploadPackFactory implements UploadPackFactory {
 		final boolean enabled;
 
 		ServiceConfig(final Config cfg) {
-			enabled = cfg.getBoolean("daemon", "uploadpack", true);
+			enabled = cfg.getBoolean("http", "uploadpack", true);
 		}
 	}
 
 	public UploadPack create(final HttpServletRequest req, final Repository db)
-			throws ServiceNotEnabledException {
+			throws ServiceNotEnabledException, ServiceNotAuthorizedException {
 		if (db.getConfig().get(CONFIG).enabled)
 			return new UploadPack(db);
 		else

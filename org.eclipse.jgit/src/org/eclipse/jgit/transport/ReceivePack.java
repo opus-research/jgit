@@ -98,10 +98,15 @@ public class ReceivePack {
 	private final RevWalk walk;
 
 	/**
-	 * Should we start by advertising our refs to the client?
+	 * Is the client connection a bi-directional socket or pipe?
 	 * <p>
-	 * If false this class runs in a read everything then output results mode,
-	 * making it suitable for single call RPCs like HTTP.
+	 * If true, this class assumes it can perform multiple read and write cycles
+	 * with the client over the input and output streams. This matches the
+	 * functionality available with a standard TCP/IP connection, or a local
+	 * operating system or in-memory pipe.
+	 * <p>
+	 * If false, this class runs in a read everything then output results mode,
+	 * making it suitable for single round-trip systems RPCs such as HTTP.
 	 */
 	private boolean biDirectionalPipe = true;
 
