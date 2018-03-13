@@ -85,14 +85,7 @@ public class ReflogCommand extends GitCommand<Collection<ReflogEntry>> {
 		return this;
 	}
 
-	/**
-	 * Run the reflog command
-	 *
-	 * @throws GitAPIException
-	 * @throws InvalidRefNameException
-	 */
-	public Collection<ReflogEntry> call() throws GitAPIException,
-			InvalidRefNameException {
+	public Collection<ReflogEntry> call() throws GitAPIException {
 		checkCallable();
 
 		try {

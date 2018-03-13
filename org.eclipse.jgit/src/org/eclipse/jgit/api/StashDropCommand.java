@@ -165,9 +165,8 @@ public class StashDropCommand extends GitCommand<ObjectId> {
 	/**
 	 * Drop the configured entry from the stash reflog and return value of the
 	 * stash reference after the drop occurs
-	 * 
+	 *
 	 * @return commit id of stash reference or null if no more stashed changes
-	 * @throws GitAPIException
 	 */
 	public ObjectId call() throws GitAPIException {
 		checkCallable();
