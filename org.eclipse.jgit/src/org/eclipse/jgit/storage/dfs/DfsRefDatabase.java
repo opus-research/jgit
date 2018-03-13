@@ -316,9 +316,8 @@ public abstract class DfsRefDatabase extends RefDatabase {
 	 *
 	 * @param oldRef
 	 *            old value to compare to. If the reference is expected to not
-	 *            exist the old value has a storage of
-	 *            {@link org.eclipse.jgit.lib.Ref.Storage#NEW} and an ObjectId
-	 *            value of {@code null}.
+	 *            exist the old value has a storage of {@link Ref.Storage#NEW}
+	 *            and an ObjectId value of {@code null}.
 	 * @param newRef
 	 *            new reference to store.
 	 * @return true if the put was successful; false otherwise.
