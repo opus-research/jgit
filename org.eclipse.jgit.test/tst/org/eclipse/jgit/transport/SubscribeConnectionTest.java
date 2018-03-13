@@ -104,7 +104,7 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 			BasePackSubscribeConnection c = new BasePackSubscribeConnection(
 					this) {
 				@Override
-				public void doSubscribeAdvertisment(
+				public void doSubscribeAdvertisement(
 						Subscriber s) throws IOException {
 					// Nothing
 				}
