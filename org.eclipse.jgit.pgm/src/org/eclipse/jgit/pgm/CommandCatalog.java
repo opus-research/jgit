@@ -100,7 +100,7 @@ public class CommandCatalog {
 	 * @return all common commands, sorted by command name.
 	 */
 	public static CommandRef[] common() {
-		final ArrayList<CommandRef> common = new ArrayList<>();
+		final ArrayList<CommandRef> common = new ArrayList<CommandRef>();
 		for (final CommandRef c : INSTANCE.commands.values())
 			if (c.isCommon())
 				common.add(c);
@@ -110,7 +110,6 @@ public class CommandCatalog {
 	private static CommandRef[] toSortedArray(final Collection<CommandRef> c) {
 		final CommandRef[] r = c.toArray(new CommandRef[c.size()]);
 		Arrays.sort(r, new Comparator<CommandRef>() {
-			@Override
 			public int compare(final CommandRef o1, final CommandRef o2) {
 				return o1.getName().compareTo(o2.getName());
 			}
@@ -124,7 +123,7 @@ public class CommandCatalog {
 
 	private CommandCatalog() {
 		ldr = Thread.currentThread().getContextClassLoader();
-		commands = new HashMap<>();
+		commands = new HashMap<String, CommandRef>();
 
 		final Enumeration<URL> catalogs = catalogs();
 		while (catalogs.hasMoreElements())

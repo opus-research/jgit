@@ -55,7 +55,6 @@ import org.eclipse.jgit.util.StringUtils;
 public class DiffConfig {
 	/** Key for {@link Config#get(SectionParser)}. */
 	public static final Config.SectionParser<DiffConfig> KEY = new SectionParser<DiffConfig>() {
-		@Override
 		public DiffConfig parse(final Config cfg) {
 			return new DiffConfig(cfg);
 		}

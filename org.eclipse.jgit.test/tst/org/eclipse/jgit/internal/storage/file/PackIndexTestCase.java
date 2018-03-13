@@ -52,6 +52,7 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.internal.storage.file.PackIndex;
 import org.eclipse.jgit.internal.storage.file.PackIndex.MutableEntry;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.junit.Test;
@@ -62,7 +63,6 @@ public abstract class PackIndexTestCase extends RepositoryTestCase {
 
 	PackIndex denseIdx;
 
-	@Override
 	public void setUp() throws Exception {
 		super.setUp();
 		smallIdx = PackIndex.open(getFileForPack34be9032());

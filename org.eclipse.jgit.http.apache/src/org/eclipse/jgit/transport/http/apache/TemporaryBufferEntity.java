@@ -78,30 +78,25 @@ public class TemporaryBufferEntity extends AbstractHttpEntity
 		return buffer;
 	}
 
-	@Override
 	public boolean isRepeatable() {
 		return true;
 	}
 
-	@Override
 	public long getContentLength() {
 		if (contentLength != null)
 			return contentLength.intValue();
 		return buffer.length();
 	}
 
-	@Override
 	public InputStream getContent() throws IOException, IllegalStateException {
 		return buffer.openInputStream();
 	}
 
-	@Override
 	public void writeTo(OutputStream outstream) throws IOException {
 		// TODO: dont we need a progressmonitor
 		buffer.writeTo(outstream, null);
 	}
 
-	@Override
 	public boolean isStreaming() {
 		return false;
 	}
@@ -110,7 +105,7 @@ public class TemporaryBufferEntity extends AbstractHttpEntity
 	 * @param contentLength
 	 */
 	public void setContentLength(int contentLength) {
-		this.contentLength = Integer.valueOf(contentLength);
+		this.contentLength = new Integer(contentLength);
 	}
 
 	/**

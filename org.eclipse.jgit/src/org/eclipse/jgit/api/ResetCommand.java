@@ -121,7 +121,7 @@ public class ResetCommand extends GitCommand<Ref> {
 
 	private ResetType mode;
 
-	private Collection<String> filepaths = new LinkedList<>();
+	private Collection<String> filepaths = new LinkedList<String>();
 
 	private boolean isReflogDisabled;
 
@@ -141,7 +141,6 @@ public class ResetCommand extends GitCommand<Ref> {
 	 * @return the Ref after reset
 	 * @throws GitAPIException
 	 */
-	@Override
 	public Ref call() throws GitAPIException, CheckoutConflictException {
 		checkCallable();
 
@@ -431,14 +430,6 @@ public class ResetCommand extends GitCommand<Ref> {
 	private void resetRevert() throws IOException {
 		repo.writeRevertHead(null);
 		repo.writeMergeCommitMsg(null);
-	}
-
-	@SuppressWarnings("nls")
-	@Override
-	public String toString() {
-		return "ResetCommand [repo=" + repo + ", ref=" + ref + ", mode=" + mode
-				+ ", isReflogDisabled=" + isReflogDisabled + ", filepaths="
-				+ filepaths + "]";
 	}
 
 }
