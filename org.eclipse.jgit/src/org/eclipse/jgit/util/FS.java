@@ -147,9 +147,12 @@ public abstract class FS {
 				System.out.println("Found Java7");
 				factory = (FSFactory) activatorClass.newInstance();
 			} catch (ClassNotFoundException e) {
-				System.out.println("Java7 not found");
+				System.out.println("Java7 module not found");
 				factory = new FS.FSFactory();
 				// Silently ignore failure find Java7 FS factory
+			} catch (UnsupportedClassVersionError e) {
+				System.out.println("Java7 module not accessible");
+				factory = new FS.FSFactory();
 			} catch (Exception e) {
 				factory = new FS.FSFactory();
 				throw new Error(e);
