@@ -185,7 +185,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String duplicateRef;
 	/***/ public String duplicateRemoteRefUpdateIsIllegal;
 	/***/ public String duplicateStagesNotAllowed;
-	/***/ public String eitherGitDirOrWorkTreeRequired;
+	/***/ public String eitherGIT_DIRorGIT_WORK_TREEmustBePassed;
 	/***/ public String emptyPathNotPermitted;
 	/***/ public String encryptionError;
 	/***/ public String endOfFileInEscape;
@@ -281,7 +281,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String mergeStrategyDoesNotSupportHeads;
 	/***/ public String mergeUsingStrategyResultedInDescription;
 	/***/ public String missingAccesskey;
-	/***/ public String missingDeltaBase;
 	/***/ public String missingForwardImageInGITBinaryPatch;
 	/***/ public String missingObject;
 	/***/ public String missingPrerequisiteCommits;
@@ -357,8 +356,8 @@ public class JGitText extends TranslationBundle {
 	/***/ public String remoteDoesNotSupportSmartHTTPPush;
 	/***/ public String remoteHungUpUnexpectedly;
 	/***/ public String remoteNameCantBeNull;
+	/***/ public String renamesAlreadyFound;
 	/***/ public String repositoryAlreadyExists;
-	/***/ public String repositoryConfigFileInvalid;
 	/***/ public String repositoryNotFound;
 	/***/ public String requiredHashFunctionNotAvailable;
 	/***/ public String resolvingDeltas;
