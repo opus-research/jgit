@@ -48,7 +48,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.jgit.internal.storage.pack.ObjectToPack;
 import org.eclipse.jgit.internal.storage.pack.PackWriter;
@@ -144,11 +143,6 @@ class CachedObjectDirectory extends FileObjectDatabase {
 	@Override
 	FS getFS() {
 		return wrapped.getFS();
-	}
-
-	@Override
-	AtomicReference<WindowCache> getWindowCache() {
-		return wrapped.getWindowCache();
 	}
 
 	@Override

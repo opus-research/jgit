@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2014 Google Inc.
+ * Copyright (C) 2008, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -96,7 +96,6 @@ public class OpenSshConfigTest extends RepositoryTestCase {
 		assertEquals("repo.or.cz", h.getHostName());
 		assertEquals("jex_junit", h.getUser());
 		assertEquals(22, h.getPort());
-		assertEquals(1, h.getConnectionAttempts());
 		assertNull(h.getIdentityFile());
 	}
 
@@ -249,36 +248,5 @@ public class OpenSshConfigTest extends RepositoryTestCase {
 		final Host h = osc.lookup("orcz");
 		assertNotNull(h);
 		assertTrue(h.isBatchMode());
-	}
-
-	@Test
-	public void testAlias_ConnectionAttemptsDefault() throws Exception {
-		final Host h = osc.lookup("orcz");
-		assertNotNull(h);
-		assertEquals(1, h.getConnectionAttempts());
-	}
-
-	@Test
-	public void testAlias_ConnectionAttempts() throws Exception {
-		config("Host orcz\n" + "\tConnectionAttempts 5\n");
-		final Host h = osc.lookup("orcz");
-		assertNotNull(h);
-		assertEquals(5, h.getConnectionAttempts());
-	}
-
-	@Test
-	public void testAlias_invalidConnectionAttempts() throws Exception {
-		config("Host orcz\n" + "\tConnectionAttempts -1\n");
-		final Host h = osc.lookup("orcz");
-		assertNotNull(h);
-		assertEquals(1, h.getConnectionAttempts());
-	}
-
-	@Test
-	public void testAlias_badConnectionAttempts() throws Exception {
-		config("Host orcz\n" + "\tConnectionAttempts xxx\n");
-		final Host h = osc.lookup("orcz");
-		assertNotNull(h);
-		assertEquals(1, h.getConnectionAttempts());
 	}
 }
