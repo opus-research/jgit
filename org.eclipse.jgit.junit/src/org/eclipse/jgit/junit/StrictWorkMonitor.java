@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, Thomas Wolf <thomas.wolf@paranor.ch>
+ * Copyright (C) 2017 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,21 +41,38 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.events;
+package org.eclipse.jgit.junit;
 
-/**
- * Receives {@link WorkingTreeModifiedEvent}s, which are fired whenever a
- * {@link org.eclipse.jgit.dircache.DirCacheCheckout} modifies
- * (adds/deletes/updates) files in the working tree.
- *
- * @since 4.9
- */
-public interface WorkingTreeModifiedListener extends RepositoryListener {
+import static org.junit.Assert.assertEquals;
 
-	/**
-	 * Respond to working tree modifications.
-	 *
-	 * @param event
-	 */
-	void onWorkingTreeModified(WorkingTreeModifiedEvent event);
+import org.eclipse.jgit.lib.ProgressMonitor;
+
+public final class StrictWorkMonitor implements ProgressMonitor {
+	private int lastWork, totalWork;
+
+	@Override
+	public void start(int totalTasks) {
+		// empty
+	}
+
+	@Override
+	public void beginTask(String title, int total) {
+		this.totalWork = total;
+		lastWork = 0;
+	}
+
+	@Override
+	public void update(int completed) {
+		lastWork += completed;
+	}
+
+	@Override
+	public void endTask() {
+		assertEquals("Units of work recorded", totalWork, lastWork);
+	}
+
+	@Override
+	public boolean isCancelled() {
+		return false;
+	}
 }
