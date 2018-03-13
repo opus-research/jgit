@@ -89,7 +89,7 @@ public class RebaseTodoFile {
 		byte[] buf = IO.readFully(new File(repo.getDirectory(), path));
 		int ptr = 0;
 		int tokenBegin = 0;
-		List<RebaseTodoLine> r = new LinkedList<>();
+		List<RebaseTodoLine> r = new LinkedList<RebaseTodoLine>();
 		while (ptr < buf.length) {
 			tokenBegin = ptr;
 			ptr = RawParseUtils.nextLF(buf, ptr);

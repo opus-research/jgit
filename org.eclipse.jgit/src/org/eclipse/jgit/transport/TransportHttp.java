@@ -154,7 +154,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		private final String[] schemeNames = { "http", "https" }; //$NON-NLS-1$ //$NON-NLS-2$
 
 		private final Set<String> schemeSet = Collections
-				.unmodifiableSet(new LinkedHashSet<>(Arrays
+				.unmodifiableSet(new LinkedHashSet<String>(Arrays
 						.asList(schemeNames)));
 
 		@Override
@@ -551,7 +551,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			} catch (IOException e) {
 				if (authMethod.getType() != HttpAuthMethod.Type.NONE) {
 					if (ignoreTypes == null) {
-						ignoreTypes = new HashSet<>();
+						ignoreTypes = new HashSet<Type>();
 					}
 
 					ignoreTypes.add(authMethod.getType());
@@ -726,7 +726,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		@Override
 		Collection<String> getPackNames() throws IOException {
-			final Collection<String> packs = new ArrayList<>();
+			final Collection<String> packs = new ArrayList<String>();
 			try {
 				final BufferedReader br = openReader(INFO_PACKS);
 				try {
@@ -779,7 +779,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		Map<String, Ref> readAdvertisedImpl(final BufferedReader br)
 				throws IOException, PackProtocolException {
-			final TreeMap<String, Ref> avail = new TreeMap<>();
+			final TreeMap<String, Ref> avail = new TreeMap<String, Ref>();
 			for (;;) {
 				String line = br.readLine();
 				if (line == null)
