@@ -50,6 +50,9 @@ import java.io.OutputStream;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.attributes.FilterCommand;
+import org.eclipse.jgit.attributes.FilterCommandFactory;
+import org.eclipse.jgit.attributes.FilterCommandRegistry;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.RefUpdate;
@@ -74,7 +77,7 @@ public class FilterCommandsTest extends RepositoryTestCase {
 		}
 
 		@Override
-		public FilterCommand create(Repository db, InputStream in,
+		public FilterCommand create(Repository repo, InputStream in,
 				final OutputStream out) {
 			FilterCommand cmd = new FilterCommand(in, out) {
 
@@ -118,7 +121,7 @@ public class FilterCommandsTest extends RepositoryTestCase {
 	public void testBuiltinCleanFilter()
 			throws IOException, GitAPIException {
 		String builtinCommandName = "jgit://builtin/test/clean";
-		Repository.registerFilterCommand(builtinCommandName,
+		FilterCommandRegistry.register(builtinCommandName,
 				new TestCommandFactory('c'));
 		StoredConfig config = git.getRepository().getConfig();
 		config.setString("filter", "test", "clean", builtinCommandName);
@@ -155,7 +158,7 @@ public class FilterCommandsTest extends RepositoryTestCase {
 	@Test
 	public void testBuiltinSmudgeFilter() throws IOException, GitAPIException {
 		String builtinCommandName = "jgit://builtin/test/smudge";
-		Repository.registerFilterCommand(builtinCommandName,
+		FilterCommandRegistry.register(builtinCommandName,
 				new TestCommandFactory('s'));
 		StoredConfig config = git.getRepository().getConfig();
 		config.setString("filter", "test", "smudge", builtinCommandName);
@@ -199,9 +202,9 @@ public class FilterCommandsTest extends RepositoryTestCase {
 	@Test
 	public void testBuiltinCleanAndSmudgeFilter() throws IOException, GitAPIException {
 		String builtinCommandPrefix = "jgit://builtin/test/";
-		Repository.registerFilterCommand(builtinCommandPrefix + "smudge",
+		FilterCommandRegistry.register(builtinCommandPrefix + "smudge",
 				new TestCommandFactory('s'));
-		Repository.registerFilterCommand(builtinCommandPrefix + "clean",
+		FilterCommandRegistry.register(builtinCommandPrefix + "clean",
 				new TestCommandFactory('c'));
 		StoredConfig config = git.getRepository().getConfig();
 		config.setString("filter", "test", "smudge", builtinCommandPrefix+"smudge");
