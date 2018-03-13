@@ -1,7 +1,4 @@
 /*
- * Copyright (C) 2009, Constantine Plotnikov <constantine.plotnikov@gmail.com>
- * Copyright (C) 2008, Google Inc.
- * Copyright (C) 2010, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -46,31 +43,29 @@
 
 package org.eclipse.jgit.pgm;
 
-import java.io.File;
-import java.text.MessageFormat;
+import java.util.ArrayList;
+import java.util.List;
 
+import org.eclipse.jgit.api.AddCommand;
+import org.eclipse.jgit.api.Git;
+import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.storage.file.FileRepository;
 
-@Command(common = true, usage = "usage_CreateAnEmptyGitRepository")
-class Init extends TextBuiltin {
-	@Option(name = "--bare", usage = "usage_CreateABareRepository")
-	private boolean bare;
+@Command(common = true, usage = "usage_addFileContentsToTheIndex")
+class Add extends TextBuiltin {
 
-	@Override
-	protected final boolean requiresRepository() {
-		return false;
-	}
+	@Option(name = "--update", aliases = { "-u" }, usage = "usage_onlyMatchAgainstAlreadyTrackedFiles")
+	private boolean update = false;
+
+	@Argument(required = true, metaVar = "metavar_filepattern", usage = "usage_filesToAddContentFrom")
+	private List<String> filepatterns = new ArrayList<String>();
 
 	@Override
 	protected void run() throws Exception {
-		if (gitdir == null)
-			gitdir = new File(bare ? "." : Constants.DOT_GIT);
-		else
-			bare = true;
-		db = new FileRepository(gitdir);
-		db.create(bare);
-		out.println(MessageFormat.format(CLIText.get().initializedEmptyGitRepositoryIn, gitdir.getAbsolutePath()));
+		AddCommand addCmd = new Git(db).add();
+		addCmd.setUpdate(update);
+		for (String p : filepatterns)
+			addCmd.addFilepattern(p);
+		addCmd.call();
 	}
 }

@@ -129,11 +129,6 @@ class LeafBucket extends InMemoryNoteBucket {
 		};
 	}
 
-	@Override
-	int estimateSize(AnyObjectId noteOn, ObjectReader or) throws IOException {
-		return cnt;
-	}
-
 	InMemoryNoteBucket set(AnyObjectId noteOn, AnyObjectId noteData,
 			ObjectReader or) throws IOException {
 		int p = search(noteOn);
