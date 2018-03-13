@@ -119,10 +119,10 @@ public class BitmapIndexImpl implements BitmapIndex {
 		return position;
 	}
 
-	int findOrInsert(AnyObjectId objectId, int type) {
+	int addObjectPosition(AnyObjectId objectId, int type) {
 		int position = findPosition(objectId);
 		if (position < 0) {
-			position = mutableIndex.findOrInsert(objectId, type);
+			position = mutableIndex.addObjectPosition(objectId, type);
 			position += indexObjectCount;
 		}
 		return position;
@@ -215,7 +215,7 @@ public class BitmapIndexImpl implements BitmapIndex {
 
 		@Override
 		public boolean add(AnyObjectId objectId, int type) {
-			int position = findOrInsert(objectId, type);
+			int position = addObjectPosition(objectId, type);
 			if (bitset.contains(position))
 				return false;
 
@@ -237,7 +237,7 @@ public class BitmapIndexImpl implements BitmapIndex {
 
 		@Override
 		public BitmapBuilder addObject(AnyObjectId objectId, int type) {
-			bitset.set(findOrInsert(objectId, type));
+			bitset.set(addObjectPosition(objectId, type));
 			return this;
 		}
 
@@ -453,7 +453,7 @@ public class BitmapIndexImpl implements BitmapIndex {
 			}
 		}
 
-		int findOrInsert(AnyObjectId objectId, int type) {
+		int addObjectPosition(AnyObjectId objectId, int type) {
 			MutableEntry entry = new MutableEntry(
 					objectId, type, revList.size());
 			revList.add(entry);
