@@ -231,10 +231,6 @@ public class FileRepository extends Repository {
 						Long.valueOf(repositoryFormatVersion)));
 		}
 
-		FS.DETECTED.setSupportsAtomicCreateNewFile(getConfig().getBoolean(
-				ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_SUPPORTSATOMICFILECREATION, true));
-
 		if (!isBare())
 			snapshot = FileSnapshot.save(getIndexFile());
 	}
