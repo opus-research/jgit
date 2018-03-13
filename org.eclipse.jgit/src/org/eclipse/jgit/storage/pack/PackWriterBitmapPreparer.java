@@ -106,12 +106,8 @@ class PackWriterBitmapPreparer {
 		this.pm = pm;
 		this.want = want;
 		this.commitBitmapIndex = new BitmapIndexImpl(writeBitmaps);
-		BitmapIndex prevBitmapIndex = reader.getBitmapIndex();
-		if (prevBitmapIndex != null)
-			this.bitmapIndex = new BitmapIndexImpl(
-					new PackBitmapIndexRemapper(prevBitmapIndex, writeBitmaps));
-		else
-			this.bitmapIndex = this.commitBitmapIndex;
+		this.bitmapIndex = new BitmapIndexImpl(PackBitmapIndexRemapper
+				.newPackBitmapIndex(reader.getBitmapIndex(), writeBitmaps));
 	}
 
 	Collection<BitmapCommit> doCommitSelection(int expectedNumCommits)
