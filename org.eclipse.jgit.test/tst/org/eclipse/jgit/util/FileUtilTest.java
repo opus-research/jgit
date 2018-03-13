@@ -43,7 +43,6 @@
 
 package org.eclipse.jgit.util;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -176,7 +175,6 @@ public class FileUtilTest {
 		assertTrue(f.delete());
 	}
 
-	@Test
 	public void testCreateNewFile() throws IOException {
 		File f = new File(trash, "x");
 		FileUtils.createNewFile(f);
@@ -192,13 +190,4 @@ public class FileUtilTest {
 		FileUtils.delete(f);
 	}
 
-	@Test
-	public void testCreateSymlink() throws IOException {
-		FS fs = FS.DETECTED;
-		// if (!fs.supportsSymlinks())
-		// return;
-		fs.createSymLink(new File(trash, "x"), "y");
-		String target = fs.readSymLink(new File(trash, "x"));
-		assertEquals("y", target);
-	}
 }
