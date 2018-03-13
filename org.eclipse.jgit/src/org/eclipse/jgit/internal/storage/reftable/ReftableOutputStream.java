@@ -218,6 +218,11 @@ class ReftableOutputStream extends OutputStream {
 		}
 	}
 
+	int estimatePadBetweenBlocks(int currentBlockSize) {
+		long m = (size() + currentBlockSize) % blockSize;
+		return m > 0 ? blockSize - (int) m : 0;
+	}
+
 	private boolean isIndexBlock() {
 		return (blockType & INDEX_BLOCK_TYPE) == INDEX_BLOCK_TYPE;
 	}
