@@ -175,7 +175,8 @@ public class FileUtils {
 	 * with only directories in it, the whole directory hierarchy will be
 	 * deleted. If the target represents a non-empty directory structure, empty
 	 * subdirectories within that structure may or may not be deleted even if
-	 * the method fails.
+	 * the method fails. Furthermore if the destination exists and is a file
+	 * then the file will be deleted and then the rename is retried.
 	 * <p>
 	 * This operation is <em>not</me> atomic.
 	 *
@@ -195,7 +196,10 @@ public class FileUtils {
 			if (src.renameTo(dst))
 				return;
 			try {
-				delete(dst, EMPTY_DIRECTORIES_ONLY | RECURSIVE);
+				if (dst.isDirectory())
+					delete(dst, EMPTY_DIRECTORIES_ONLY | RECURSIVE);
+				else
+					delete(dst, 0);
 				// On *nix there is no try, you do or do not
 				if (src.renameTo(dst))
 					return;
