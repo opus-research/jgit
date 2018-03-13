@@ -59,6 +59,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -95,6 +96,7 @@ import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevFlagSet;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevSort;
+import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.storage.file.PackIndexWriter;
 import org.eclipse.jgit.util.TemporaryBuffer;
@@ -151,6 +153,8 @@ public class PackWriter {
 	private List<ObjectToPack> edgeObjects = new ArrayList<ObjectToPack>();
 
 	private List<CachedPack> cachedPacks = new ArrayList<CachedPack>(2);
+
+	private Set<ObjectId> tagTargets = Collections.emptySet();
 
 	private Deflater myDeflater;
 
@@ -326,6 +330,22 @@ public class PackWriter {
 	 */
 	public void setIgnoreMissingUninteresting(final boolean ignore) {
 		ignoreMissingUninteresting = ignore;
+	}
+
+	/**
+	 * Set the tag targets that should be hoisted earlier during packing.
+	 * <p>
+	 * Callers may put objects into this set before invoking any of the
+	 * preparePack methods to influence where an annotated tag's target is
+	 * stored within the resulting pack. Typically these will be clustered
+	 * together, and hoisted earlier in the file even if they are ancient
+	 * revisions, allowing readers to find tag targets with better locality.
+	 *
+	 * @param objects
+	 *            objects that annotated tags point at.
+	 */
+	public void setTagTargets(Set<ObjectId> objects) {
+		tagTargets = objects;
 	}
 
 	/**
@@ -587,8 +607,10 @@ public class PackWriter {
 			stats.thinPackBytes = out.length() - (headerEnd - headerStart);
 
 		for (CachedPack pack : cachedPacks) {
+			long deltaCnt = pack.getDeltaCount();
 			stats.reusedObjects += pack.getObjectCount();
-			stats.reusedDeltas += pack.getDeltaCount();
+			stats.reusedDeltas += deltaCnt;
+			stats.totalDeltas += deltaCnt;
 			reuseSupport.copyPackAsIs(out, pack);
 		}
 		writeChecksum(out);
@@ -1106,8 +1128,8 @@ public class PackWriter {
 		if (have == null)
 			have = Collections.emptySet();
 
-		stats.interestingObjects = Collections.unmodifiableSet(new HashSet(want));
-		stats.uninterestingObjects = Collections.unmodifiableSet(new HashSet(have));
+		stats.interestingObjects = Collections.unmodifiableSet(new HashSet<ObjectId>(want));
+		stats.uninterestingObjects = Collections.unmodifiableSet(new HashSet<ObjectId>(have));
 
 		List<ObjectId> all = new ArrayList<ObjectId>(want.size() + have.size());
 		all.addAll(want);
@@ -1116,6 +1138,7 @@ public class PackWriter {
 		final Map<ObjectId, CachedPack> tipToPack = new HashMap<ObjectId, CachedPack>();
 		final RevFlag inCachedPack = walker.newFlag("inCachedPack");
 		final RevFlag include = walker.newFlag("include");
+		final RevFlag added = walker.newFlag("added");
 
 		final RevFlagSet keepOnRestart = new RevFlagSet();
 		keepOnRestart.add(inCachedPack);
@@ -1127,12 +1150,30 @@ public class PackWriter {
 		if (have.isEmpty()) {
 			walker.sort(RevSort.COMMIT_TIME_DESC);
 			if (useCachedPacks && reuseSupport != null) {
+				Set<ObjectId> need = new HashSet<ObjectId>(want);
+				List<CachedPack> shortCircuit = new LinkedList<CachedPack>();
+
 				for (CachedPack pack : reuseSupport.getCachedPacks()) {
+					if (need.containsAll(pack.getTips())) {
+						need.removeAll(pack.getTips());
+						shortCircuit.add(pack);
+					}
+
 					for (ObjectId id : pack.getTips()) {
 						tipToPack.put(id, pack);
 						all.add(id);
 					}
 				}
+
+				if (need.isEmpty() && !shortCircuit.isEmpty()) {
+					cachedPacks.addAll(shortCircuit);
+					for (CachedPack pack : shortCircuit)
+						countingMonitor.update((int) pack.getObjectCount());
+					countingMonitor.endTask();
+					stats.timeCounting = System.currentTimeMillis() - countingStart;
+					return;
+				}
+
 				haveEst += tipToPack.size();
 			}
 		} else {
@@ -1143,6 +1184,7 @@ public class PackWriter {
 
 		List<RevObject> wantObjs = new ArrayList<RevObject>(want.size());
 		List<RevObject> haveObjs = new ArrayList<RevObject>(haveEst);
+		List<RevTag> wantTags = new ArrayList<RevTag>(want.size());
 
 		AsyncRevObjectQueue q = walker.parseAny(all, true);
 		try {
@@ -1157,11 +1199,11 @@ public class PackWriter {
 
 					if (have.contains(o)) {
 						haveObjs.add(o);
-						walker.markUninteresting(o);
 					} else if (want.contains(o)) {
 						o.add(include);
 						wantObjs.add(o);
-						walker.markStart(o);
+						if (o instanceof RevTag)
+							wantTags.add((RevTag) o);
 					}
 				} catch (MissingObjectException e) {
 					if (ignoreMissingUninteresting
@@ -1174,16 +1216,37 @@ public class PackWriter {
 			q.release();
 		}
 
+		if (!wantTags.isEmpty()) {
+			all = new ArrayList<ObjectId>(wantTags.size());
+			for (RevTag tag : wantTags)
+				all.add(tag.getObject());
+			q = walker.parseAny(all, true);
+			try {
+				while (q.next() != null) {
+					// Just need to pop the queue item to parse the object.
+				}
+			} finally {
+				q.release();
+			}
+		}
+
+		for (RevObject obj : wantObjs)
+			walker.markStart(obj);
+		for (RevObject obj : haveObjs)
+			walker.markUninteresting(obj);
+
 		int typesToPrune = 0;
 		final int maxBases = config.getDeltaSearchWindowSize();
 		Set<RevTree> baseTrees = new HashSet<RevTree>();
-		RevObject o;
-		while ((o = walker.next()) != null) {
-			if (o.has(inCachedPack)) {
-				CachedPack pack = tipToPack.get(o);
+		List<RevCommit> commits = new ArrayList<RevCommit>();
+		RevCommit c;
+		while ((c = walker.next()) != null) {
+			if (c.has(inCachedPack)) {
+				CachedPack pack = tipToPack.get(c);
 				if (includesAllTips(pack, include, walker)) {
 					useCachedPack(walker, keepOnRestart, //
 							wantObjs, haveObjs, pack);
+					commits = new ArrayList<RevCommit>();
 
 					countingMonitor.endTask();
 					countingMonitor.beginTask(JGitText.get().countingObjects,
@@ -1192,15 +1255,54 @@ public class PackWriter {
 				}
 			}
 
-			if (o.has(RevFlag.UNINTERESTING)) {
+			if (c.has(RevFlag.UNINTERESTING)) {
 				if (baseTrees.size() <= maxBases)
-					baseTrees.add(((RevCommit) o).getTree());
+					baseTrees.add(c.getTree());
 				continue;
 			}
 
-			addObject(o, 0);
+			commits.add(c);
 			countingMonitor.update(1);
 		}
+
+		if (objectsLists[Constants.OBJ_COMMIT] instanceof ArrayList) {
+			ArrayList<ObjectToPack> list = (ArrayList<ObjectToPack>) objectsLists[Constants.OBJ_COMMIT];
+			list.ensureCapacity(list.size() + commits.size());
+		}
+
+		int commitCnt = 0;
+		boolean putTagTargets = false;
+		for (RevCommit cmit : commits) {
+			if (!cmit.has(added)) {
+				cmit.add(added);
+				addObject(cmit, 0);
+				commitCnt++;
+			}
+
+			for (int i = 0; i < cmit.getParentCount(); i++) {
+				RevCommit p = cmit.getParent(i);
+				if (!p.has(added) && !p.has(RevFlag.UNINTERESTING)) {
+					p.add(added);
+					addObject(p, 0);
+					commitCnt++;
+				}
+			}
+
+			if (!putTagTargets && 4096 < commitCnt) {
+				for (ObjectId id : tagTargets) {
+					RevObject obj = walker.lookupOrNull(id);
+					if (obj instanceof RevCommit
+							&& obj.has(include)
+							&& !obj.has(RevFlag.UNINTERESTING)
+							&& !obj.has(added)) {
+						obj.add(added);
+						addObject(obj, 0);
+					}
+				}
+				putTagTargets = true;
+			}
+		}
+		commits = null;
 
 		for (CachedPack p : cachedPacks) {
 			for (ObjectId d : p.hasObject(objectsLists[Constants.OBJ_COMMIT])) {
@@ -1213,6 +1315,7 @@ public class PackWriter {
 
 		BaseSearch bases = new BaseSearch(countingMonitor, baseTrees, //
 				objectsMap, edgeObjects, reader);
+		RevObject o;
 		while ((o = walker.nextObject()) != null) {
 			if (o.has(RevFlag.UNINTERESTING))
 				continue;
@@ -1283,9 +1386,6 @@ public class PackWriter {
 		cachedPacks.add(pack);
 		for (ObjectId id : pack.getTips())
 			baseObj.add(walker.lookupOrNull(id));
-
-		objectsMap.clear();
-		objectsLists[Constants.OBJ_COMMIT] = new ArrayList<ObjectToPack>();
 
 		setThin(true);
 		walker.resetRetain(keepOnRestart);
