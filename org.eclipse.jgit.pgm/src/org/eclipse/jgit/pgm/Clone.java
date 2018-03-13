@@ -44,11 +44,14 @@
 package org.eclipse.jgit.pgm;
 
 import java.io.File;
+import java.io.IOException;
 import java.text.MessageFormat;
+import java.util.Collection;
 
 import org.eclipse.jgit.api.CloneCommand;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
+import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.pgm.internal.CLIText;
@@ -58,7 +61,7 @@ import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 
 @Command(common = true, usage = "usage_cloneRepositoryIntoNewDir")
-class Clone extends AbstractFetchCommand {
+class Clone extends AbstractFetchCommand implements CloneCommand.Callback {
 	@Option(name = "--origin", aliases = { "-o" }, metaVar = "metaVar_remoteName", usage = "usage_useNameInsteadOfOriginToTrackUpstream")
 	private String remoteName = Constants.DEFAULT_REMOTE_NAME;
 
@@ -119,7 +122,8 @@ class Clone extends AbstractFetchCommand {
 		command.setDirectory(localNameF);
 		boolean msgs = quiet == null || !quiet.booleanValue();
 		if (msgs) {
-			command.setProgressMonitor(new TextProgressMonitor(errw));
+			command.setProgressMonitor(new TextProgressMonitor(errw))
+					.setCallback(this);
 			outw.println(MessageFormat.format(
 					CLIText.get().cloningInto, localName));
 			outw.flush();
@@ -138,6 +142,41 @@ class Clone extends AbstractFetchCommand {
 		if (msgs) {
 			outw.println();
 			outw.flush();
+		}
+	}
+
+	@Override
+	public void initializedSubmodules(Collection<String> submodules) {
+		try {
+			for (String submodule : submodules) {
+				outw.println(MessageFormat
+						.format(CLIText.get().submoduleRegistered, submodule));
+			}
+			outw.flush();
+		} catch (IOException e) {
+			// ignore
+		}
+	}
+
+	@Override
+	public void cloningSubmodule(String path) {
+		try {
+			outw.println(MessageFormat.format(
+					CLIText.get().cloningInto, path));
+			outw.flush();
+		} catch (IOException e) {
+			// ignore
+		}
+	}
+
+	@Override
+	public void checkingOut(AnyObjectId commit, String path) {
+		try {
+			outw.println(MessageFormat.format(CLIText.get().checkingOut,
+					path, commit.getName()));
+			outw.flush();
+		} catch (IOException e) {
+			// ignore
 		}
 	}
 }

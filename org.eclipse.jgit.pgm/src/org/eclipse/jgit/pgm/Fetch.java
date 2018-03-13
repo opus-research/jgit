@@ -50,7 +50,6 @@ import java.util.List;
 import org.eclipse.jgit.api.FetchCommand;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.SubmoduleConfig.FetchRecurseSubmodulesMode;
 import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.transport.FetchResult;
 import org.eclipse.jgit.transport.RefSpec;
@@ -97,21 +96,6 @@ class Fetch extends AbstractFetchCommand {
 		tags = Boolean.FALSE;
 	}
 
-	private FetchRecurseSubmodulesMode recurseSubmodules;
-
-	@Option(name = "--recurse-submodules", usage = "usage_recurseSubmodules")
-	void recurseSubmodules(String mode) {
-		recurseSubmodules = (mode == null || mode.isEmpty())
-				? FetchRecurseSubmodulesMode.YES
-				: FetchRecurseSubmodulesMode.valueOf(mode);
-	}
-
-	@Option(name = "--no-recurse-submodules", usage = "usage_noRecurseSubmodules")
-	void noRecurseSubmodules(@SuppressWarnings("unused")
-	final boolean ignored) {
-		recurseSubmodules = FetchRecurseSubmodulesMode.NO;
-	}
-
 	@Argument(index = 0, metaVar = "metaVar_uriish")
 	private String remote = Constants.DEFAULT_REMOTE_NAME;
 
@@ -140,7 +124,6 @@ class Fetch extends AbstractFetchCommand {
 				fetch.setThin(thin.booleanValue());
 			if (quiet == null || !quiet.booleanValue())
 				fetch.setProgressMonitor(new TextProgressMonitor(errw));
-			fetch.setRecurseSubmodules(recurseSubmodules);
 
 			FetchResult result = fetch.call();
 			if (result.getTrackingRefUpdates().isEmpty())
