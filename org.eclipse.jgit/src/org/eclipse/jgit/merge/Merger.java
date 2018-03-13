@@ -125,9 +125,9 @@ public abstract class Merger {
 	 *            repository instance returned by {@link #getRepository()}.
 	 */
 	public void setObjectInserter(ObjectInserter oi) {
-		walk.close();
-		reader.close();
-		inserter.close();
+		walk.release();
+		reader.release();
+		inserter.release();
 		inserter = oi;
 		reader = oi.newReader();
 		walk = new RevWalk(reader);
@@ -206,8 +206,8 @@ public abstract class Merger {
 			return ok;
 		} finally {
 			if (flush)
-				inserter.close();
-			reader.close();
+				inserter.release();
+			reader.release();
 		}
 	}
 
