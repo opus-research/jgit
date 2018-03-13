@@ -187,4 +187,13 @@ public class RepositoryCacheTest extends RepositoryTestCase {
 		d2.close();
 		assertEquals(0, d2.useCnt.get());
 	}
+
+	@Test
+	public void testRepositoryUsageCountWithRegisteredRepository() {
+		assertEquals(1, ((Repository) db).useCnt.get());
+		RepositoryCache.register(db);
+		assertEquals(1, ((Repository) db).useCnt.get());
+		db.close();
+		assertEquals(0, ((Repository) db).useCnt.get());
+	}
 }
