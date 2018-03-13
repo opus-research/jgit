@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2008, Google Inc.
- * Copyright (C) 2009, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -44,7 +43,7 @@
 
 package org.eclipse.jgit.errors;
 
-import java.util.Map;
+import java.util.Collection;
 
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.transport.URIish;
@@ -55,14 +54,12 @@ import org.eclipse.jgit.transport.URIish;
 public class MissingBundlePrerequisiteException extends TransportException {
 	private static final long serialVersionUID = 1L;
 
-	private static String format(final Map<ObjectId, String> missingCommits) {
+	private static String format(final Collection<ObjectId> ids) {
 		final StringBuilder r = new StringBuilder();
 		r.append("missing prerequisite commits:");
-		for (final Map.Entry<ObjectId, String> e : missingCommits.entrySet()) {
+		for (final ObjectId p : ids) {
 			r.append("\n  ");
-			r.append(e.getKey().name());
-			if (e.getValue() != null)
-				r.append(" ").append(e.getValue());
+			r.append(p.name());
 		}
 		return r.toString();
 	}
@@ -72,12 +69,11 @@ public class MissingBundlePrerequisiteException extends TransportException {
 	 *
 	 * @param uri
 	 *            URI used for transport
-	 * @param missingCommits
-	 *            the Map of the base/common object(s) we don't have. Keys are
-	 *            ids of the missing objects and values are short descriptions.
+	 * @param ids
+	 *            the ids of the base/common object(s) we don't have.
 	 */
 	public MissingBundlePrerequisiteException(final URIish uri,
-			final Map<ObjectId, String> missingCommits) {
-		super(uri, format(missingCommits));
+			final Collection<ObjectId> ids) {
+		super(uri, format(ids));
 	}
 }
