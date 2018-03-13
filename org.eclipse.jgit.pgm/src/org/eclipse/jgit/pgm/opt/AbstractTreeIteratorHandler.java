@@ -59,7 +59,7 @@ import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.WindowCursor;
 import org.eclipse.jgit.pgm.CLIText;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
@@ -103,7 +103,7 @@ public class AbstractTreeIteratorHandler extends
 		if (new File(name).isFile()) {
 			final DirCache dirc;
 			try {
-				dirc = DirCache.read(new File(name), FS.DETECTED);
+				dirc = DirCache.read(new File(name));
 			} catch (IOException e) {
 				throw new CmdLineException(MessageFormat.format(CLIText.get().notAnIndexFile, name), e);
 			}
@@ -121,9 +121,9 @@ public class AbstractTreeIteratorHandler extends
 			throw new CmdLineException(MessageFormat.format(CLIText.get().notATree, name));
 
 		final CanonicalTreeParser p = new CanonicalTreeParser();
-		final ObjectReader curs = clp.getRepository().newObjectReader();
+		final WindowCursor curs = new WindowCursor();
 		try {
-			p.reset(curs, clp.getRevWalk().parseTree(id));
+			p.reset(clp.getRepository(), clp.getRevWalk().parseTree(id), curs);
 		} catch (MissingObjectException e) {
 			throw new CmdLineException(MessageFormat.format(CLIText.get().notATree, name));
 		} catch (IncorrectObjectTypeException e) {
