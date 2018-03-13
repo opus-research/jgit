@@ -376,8 +376,8 @@ public class FileUtils {
 	 */
 	public static File createTempDir(String prefix, String suffix, File dir)
 			throws IOException {
-		final int RETRIES = 1; // When something bad happens, retry once.
-		for (int i = 0; i < RETRIES; i++) {
+		final int RETRY = 1; // When something bad happens, retry once.
+		for (int i = 0; i < RETRY; i++) {
 			File tmp = File.createTempFile(prefix, suffix, dir);
 			if (!tmp.delete())
 				continue;

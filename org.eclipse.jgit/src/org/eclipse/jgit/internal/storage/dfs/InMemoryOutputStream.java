@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014, Andrey Loskutov <loskutov@gmx.de>
+ * Copyright (C) 2013, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,41 +40,46 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.ignore.internal;
 
-/**
- * Generic string matcher
- *
- * @since 3.6
- */
-public interface IMatcher {
+package org.eclipse.jgit.internal.storage.dfs;
 
-	/**
-	 * Matches entire given string
-	 *
-	 * @param path
-	 *            string which is not null, but might be empty
-	 * @param assumeDirectory
-	 *            true to assume this path as directory (even if it doesn't end
-	 *            with a slash)
-	 * @return true if this matcher pattern matches given string
-	 */
-	boolean matches(String path, boolean assumeDirectory);
+import java.io.ByteArrayOutputStream;
+import java.nio.ByteBuffer;
 
-	/**
-	 * Matches only part of given string
-	 *
-	 * @param segment
-	 *            string which is not null, but might be empty
-	 * @param startIncl
-	 *            start index, inclusive
-	 * @param endExcl
-	 *            end index, exclusive
-	 * @param assumeDirectory
-	 *            true to assume this path as directory (even if it doesn't end
-	 *            with a slash)
-	 * @return true if this matcher pattern matches given string
-	 */
-	boolean matches(String segment, int startIncl, int endExcl,
-			boolean assumeDirectory);
+class InMemoryOutputStream extends DfsOutputStream {
+	private final ByteArrayOutputStream dst = new ByteArrayOutputStream();
+
+	private byte[] data;
+
+	@Override
+	public void write(byte[] buf, int off, int len) {
+		data = null;
+		dst.write(buf, off, len);
+	}
+
+	@Override
+	public int read(long position, ByteBuffer buf) {
+		byte[] d = getData();
+		int n = Math.min(buf.remaining(), d.length - (int) position);
+		if (n <= 0)
+			return -1;
+		buf.put(d, (int) position, n);
+		return n;
+	}
+
+	byte[] getData() {
+		if (data == null)
+			data = dst.toByteArray();
+		return data;
+	}
+
+	@Override
+	public void flush() {
+		// Default implementation does nothing;
+	}
+
+	@Override
+	public void close() {
+		flush();
+	}
 }
