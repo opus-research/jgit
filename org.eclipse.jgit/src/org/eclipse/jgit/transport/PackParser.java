@@ -1077,7 +1077,7 @@ public abstract class PackParser {
 	 * Verify the integrity of the object.
 	 *
 	 * @param id
-	 *            identity of the object to be tracked.
+	 *            identity of the object to be checked.
 	 * @param type
 	 *            the type of the object.
 	 * @param data

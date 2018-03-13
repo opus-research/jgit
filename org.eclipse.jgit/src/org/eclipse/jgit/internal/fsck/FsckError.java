@@ -51,7 +51,7 @@ import org.eclipse.jgit.errors.CorruptPackIndexException.ErrorType;
 import org.eclipse.jgit.lib.ObjectChecker;
 import org.eclipse.jgit.lib.ObjectId;
 
-/** Reports all fsck errors of a git repository. */
+/** Holds all fsck errors of a git repository. */
 public class FsckError {
 	/** Represents a corrupt object. */
 	public static class CorruptObject {

@@ -48,22 +48,16 @@ import java.util.List;
 
 import org.eclipse.jgit.errors.CorruptPackIndexException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.internal.fsck.Fsck;
 import org.eclipse.jgit.internal.fsck.FsckError;
 import org.eclipse.jgit.internal.fsck.FsckError.CorruptIndex;
 import org.eclipse.jgit.internal.fsck.FsckPackParser;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.eclipse.jgit.lib.ObjectChecker;
 import org.eclipse.jgit.lib.ProgressMonitor;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.revwalk.ObjectWalk;
-import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.transport.PackedObjectInfo;
 
-/**
- * {@link Fsck} implementation for DFS repository.
- */
-public class DfsFsck implements Fsck {
+/** Verify the validity and connectivity of a DFS repository. */
+public class DfsFsck {
 	private final DfsRepository repo;
 
 	private final DfsObjDatabase objdb;
@@ -73,7 +67,7 @@ public class DfsFsck implements Fsck {
 	private ObjectChecker objChecker = new ObjectChecker();
 
 	/**
-	 * Initialize a Dfs Fsck.
+	 * Initialize DFS fsck.
 	 *
 	 * @param repository
 	 *            the dfs repository to check.
@@ -84,7 +78,17 @@ public class DfsFsck implements Fsck {
 		ctx = objdb.newReader();
 	}
 
-	@Override
+
+	/**
+	 * Verify the integrity and connectivity of all objects in the object
+	 * database.
+	 *
+	 * @param pm
+	 *            callback to provide progress feedback during the check.
+	 * @return all errors about the repository.
+	 * @throws IOException
+	 *             if encounters IO errors during the process.
+	 */
 	public FsckError check(ProgressMonitor pm) throws IOException {
 		FsckError errors = new FsckError();
 		try {
@@ -109,19 +113,6 @@ public class DfsFsck implements Fsck {
 							pack.getPackDescription()
 									.getFileName(PackExt.INDEX),
 							e.getErrorType()));
-				}
-			}
-
-			try (ObjectWalk ow = new ObjectWalk(ctx)) {
-				for (Ref r : repo.getAllRefs().values()) {
-					try {
-						RevObject tip = ow.parseAny(r.getObjectId());
-						ow.markStart(ow.parseAny(r.getObjectId()));
-						ow.checkConnectivity();
-						ow.markUninteresting(tip);
-					} catch (MissingObjectException e) {
-						errors.getMissingObjects().add(e.getObjectId());
-					}
 				}
 			}
 		} finally {
