@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Nadav Cohen <nadavcoh@gmail.com>
+ * Copyright (C) 2016, David Pursehouse <david.pursehouse@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,35 +41,21 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.zlib;
-
-import java.util.zip.Inflater;
+package org.eclipse.jgit.lfs.errors;
 
 /**
- * Utility class to inflate zlib
+ * Thrown when the user has read, but not write access. Only applicable when the
+ * operation in the request is "upload".
+ *
+ * @since 4.5
  */
-public class ZlibSupport {
+public class LfsRepositoryReadOnly extends LfsException {
+	private static final long serialVersionUID = 1L;
 
 	/**
-	 * Inflates a zlib byte array
-	 *
-	 * @param bytes
-	 *            zlib-compressed bytes
-	 * @param expectedSize
-	 *            expected result size
-	 * @return inflated bytes
+	 * @param name
 	 */
-	public static byte[] inflate(byte[] bytes, int expectedSize) {
-		try {
-			Inflater decompressor = new Inflater();
-			decompressor.setInput(bytes, 0, bytes.length);
-			byte[] result = new byte[expectedSize];
-			decompressor.inflate(result);
-			decompressor.end();
-			return result;
-		} catch (Exception e) {
-			throw new RuntimeException("Unable to inflate binary data", e); //$NON-NLS-1$
-		}
+	public LfsRepositoryReadOnly(String name) {
+		super("repository " + name + "is read-only"); //$NON-NLS-1$ //$NON-NLS-2$
 	}
-
 }
