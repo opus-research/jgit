@@ -62,14 +62,14 @@ import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
  * Creates the version 1 pack bitmap index files.
- *
+ * 
  * @see PackBitmapIndexV1
  */
-public class PackBitmapIndexWriterV1 {
+class PackBitmapIndexWriterV1 {
 	private final DigestOutputStream out;
 	private final DataOutput dataOutput;
 
-	public PackBitmapIndexWriterV1(final OutputStream dst) {
+	PackBitmapIndexWriterV1(final OutputStream dst) {
 		out = new DigestOutputStream(dst instanceof BufferedOutputStream ? dst
 				: new SafeBufferedOutputStream(dst),
 				Constants.newMessageDigest());
