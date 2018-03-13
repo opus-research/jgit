@@ -181,6 +181,13 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	 */
 	public static final String OPTION_NO_DONE = "no-done"; //$NON-NLS-1$
 
+	/**
+	 * The client supports fetching objects at the tip of any ref, even if not
+	 * advertised.
+	 * @since 3.1
+	 */
+	public static final String OPTION_ALLOW_TIP_SHA1_IN_WANT = "allow-tip-sha1-in-want"; //$NON-NLS-1$
+
 	static enum MultiAck {
 		OFF, CONTINUE, DETAILED;
 	}
@@ -232,21 +239,33 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	public BasePackFetchConnection(final PackTransport packTransport) {
 		super(packTransport);
 
-		final FetchConfig cfg = local.getConfig().get(FetchConfig.KEY);
+		if (local != null) {
+			final FetchConfig cfg = local.getConfig().get(FetchConfig.KEY);
+			allowOfsDelta = cfg.allowOfsDelta;
+		} else {
+			allowOfsDelta = true;
+		}
 		includeTags = transport.getTagOpt() != TagOpt.NO_TAGS;
 		thinPack = transport.isFetchThin();
-		allowOfsDelta = cfg.allowOfsDelta;
 
-		walk = new RevWalk(local);
-		reachableCommits = new RevCommitList<RevCommit>();
-		REACHABLE = walk.newFlag("REACHABLE"); //$NON-NLS-1$
-		COMMON = walk.newFlag("COMMON"); //$NON-NLS-1$
-		STATE = walk.newFlag("STATE"); //$NON-NLS-1$
-		ADVERTISED = walk.newFlag("ADVERTISED"); //$NON-NLS-1$
+		if (local != null) {
+			walk = new RevWalk(local);
+			reachableCommits = new RevCommitList<RevCommit>();
+			REACHABLE = walk.newFlag("REACHABLE"); //$NON-NLS-1$
+			COMMON = walk.newFlag("COMMON"); //$NON-NLS-1$
+			STATE = walk.newFlag("STATE"); //$NON-NLS-1$
+			ADVERTISED = walk.newFlag("ADVERTISED"); //$NON-NLS-1$
 
-		walk.carry(COMMON);
-		walk.carry(REACHABLE);
-		walk.carry(ADVERTISED);
+			walk.carry(COMMON);
+			walk.carry(REACHABLE);
+			walk.carry(ADVERTISED);
+		} else {
+			walk = null;
+			REACHABLE = null;
+			COMMON = null;
+			STATE = null;
+			ADVERTISED = null;
+		}
 	}
 
 	private static class FetchConfig {
@@ -350,7 +369,8 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 	@Override
 	public void close() {
-		walk.release();
+		if (walk != null)
+			walk.release();
 		super.close();
 	}
 

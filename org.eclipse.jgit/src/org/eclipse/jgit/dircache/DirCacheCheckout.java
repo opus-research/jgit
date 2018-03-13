@@ -418,7 +418,7 @@ public class DirCacheCheckout {
 			builder.finish();
 
 			File file = null;
-			String last = ""; //$NON-NLS-1$
+			String last = null;
 			// when deleting files process them in the opposite order as they have
 			// been reported. This ensures the files are deleted before we delete
 			// their parent folders
@@ -434,7 +434,7 @@ public class DirCacheCheckout {
 					if (!repo.getFS().isDirectory(file))
 						toBeDeleted.add(r);
 				} else {
-					if (!isSamePrefix(r, last))
+					if (last != null && !isSamePrefix(r, last))
 						removeEmptyParents(new File(repo.getWorkTree(), last));
 					last = r;
 				}
@@ -476,7 +476,7 @@ public class DirCacheCheckout {
 	 private void removeEmptyParents(File f) {
 		File parentFile = f.getParentFile();
 
-		while (!parentFile.equals(repo.getWorkTree())) {
+		while (parentFile != null && !parentFile.equals(repo.getWorkTree())) {
 			if (!parentFile.delete())
 				break;
 			parentFile = parentFile.getParentFile();
