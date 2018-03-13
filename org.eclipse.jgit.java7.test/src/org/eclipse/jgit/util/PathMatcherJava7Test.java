@@ -1,5 +1,5 @@
-/*
- * Copyright (C) 2012, Christian Halstrick <christian.halstrick@sap.com>
+/*******************************************************************************
+ * Copyright (C) 2013, Obeo
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -39,40 +39,16 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *******************************************************************************/
+package org.eclipse.jgit.util;
+
+/**
+ * This will launch the exact same tests as PathMatcherTest, we just make sure
+ * that the used matcher is a Java7 one.
  */
-
-package org.eclipse.jgit.internal.storage.file;
-
-import static org.junit.Assert.assertTrue;
-
-import java.util.Collections;
-
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.revwalk.RevBlob;
-import org.eclipse.jgit.revwalk.RevTag;
-import org.junit.Test;
-
-public class GcTagTest extends GcTestCase {
-	@Test
-	public void lightweightTag_objectNotPruned() throws Exception {
-		RevBlob a = tr.blob("a");
-		tr.lightweightTag("t", a);
-		gc.setExpireAgeMillis(0);
-		fsTick();
-		gc.prune(Collections.<ObjectId> emptySet());
-		assertTrue(repo.hasObject(a));
-	}
-
-	@Test
-	public void annotatedTag_objectNotPruned() throws Exception {
-		RevBlob a = tr.blob("a");
-		RevTag t = tr.tag("t", a); // this doesn't create the refs/tags/t ref
-		tr.lightweightTag("t", t);
-
-		gc.setExpireAgeMillis(0);
-		fsTick();
-		gc.prune(Collections.<ObjectId> emptySet());
-		assertTrue(repo.hasObject(t));
-		assertTrue(repo.hasObject(a));
+public class PathMatcherJava7Test extends PathMatcherTest {
+	@Override
+	protected PathMatcher getPathMatcher(String glob) {
+		return new PathMatcher_Java7(glob);
 	}
 }

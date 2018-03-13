@@ -1,5 +1,5 @@
-/*
- * Copyright (C) 2012, Christian Halstrick <christian.halstrick@sap.com>
+/*******************************************************************************
+ * Copyright (C) 2013, Obeo
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -39,47 +39,29 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *******************************************************************************/
+package org.eclipse.jgit.util;
+
+/**
+ * Path matchers will allow JGit to match paths against a glob syntax, much as
+ * would be done by users on the file system.
+ * <p>
+ * For example, <code>*c</code> matches the path "abc", but does not match
+ * "t/abc"; whereas <code>*&#47;*c</code> will match "t/abc" but not "abc".
+ * <code>*.*</code> matches file names containing a dot and <code>a?c</code>
+ * will match any file which names starts with 'a', finishes with 'c' and has
+ * one character (any chararacter) in between : it would match "abc" but not
+ * "ac" or "abbc".
+ * </p>
  */
-
-package org.eclipse.jgit.internal.storage.file;
-
-import static org.junit.Assert.assertEquals;
-
-import org.eclipse.jgit.junit.TestRepository.BranchBuilder;
-import org.junit.Test;
-
-public class GcDirCacheSavesObjectsTest extends GcTestCase {
-	@Test
-	public void testDirCacheSavesObjects() throws Exception {
-		BranchBuilder bb = tr.branch("refs/heads/master");
-		bb.commit().add("A", "A").add("B", "B").create();
-		bb.commit().add("A", "A2").add("B", "B2").create();
-		bb.commit().add("A", "A3"); // this new content in index should survive
-		stats = gc.getStatistics();
-		assertEquals(9, stats.numberOfLooseObjects);
-		assertEquals(0, stats.numberOfPackedObjects);
-		gc.gc();
-		stats = gc.getStatistics();
-		assertEquals(1, stats.numberOfLooseObjects);
-		assertEquals(8, stats.numberOfPackedObjects);
-		assertEquals(1, stats.numberOfPackFiles);
-	}
-
-	@Test
-	public void testDirCacheSavesObjectsWithPruneNow() throws Exception {
-		BranchBuilder bb = tr.branch("refs/heads/master");
-		bb.commit().add("A", "A").add("B", "B").create();
-		bb.commit().add("A", "A2").add("B", "B2").create();
-		bb.commit().add("A", "A3"); // this new content in index should survive
-		stats = gc.getStatistics();
-		assertEquals(9, stats.numberOfLooseObjects);
-		assertEquals(0, stats.numberOfPackedObjects);
-		gc.setExpireAgeMillis(0);
-		fsTick();
-		gc.gc();
-		stats = gc.getStatistics();
-		assertEquals(0, stats.numberOfLooseObjects);
-		assertEquals(8, stats.numberOfPackedObjects);
-		assertEquals(1, stats.numberOfPackFiles);
-	}
+public interface PathMatcher {
+	/**
+	 * Checks whether the given path matches this matcher's pattern.
+	 * 
+	 * @param path
+	 *            The path to match.
+	 * @return <code>true</code> if <code>path</code> matches this matcher's
+	 *         pattern, <code>false</code> otherwise.
+	 */
+	boolean matches(String path);
 }

@@ -1,6 +1,5 @@
-/*
- * Copyright (C) 2011, 2013 Robin Rosenberg
- * Copyright (C) 2013 Robin Stocker
+/*******************************************************************************
+ * Copyright (C) 2013, Obeo
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,16 +39,34 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *******************************************************************************/
+package org.eclipse.jgit.util;
+
+import java.nio.file.FileSystems;
+import java.nio.file.Path;
+
+/**
+ * Java 7 implementation of a Path matcher. This will simply delegate to
+ * java.nio.file.PathMatcher.
  */
+public class PathMatcher_Java7 implements PathMatcher {
+	/** The actual matcher we'll delegate to. */
+	private final java.nio.file.PathMatcher matcher;
 
-package org.eclipse.jgit.util.io;
+	/**
+	 * Instantiates this path matcher given the glob it needs to match.
+	 *
+	 * @param globPattern
+	 *            The pattern this instance should match against.
+	 */
+	public PathMatcher_Java7(String globPattern) {
+		matcher = FileSystems.getDefault()
+				.getPathMatcher("glob:" + globPattern); //$NON-NLS-1$
+	}
 
-class Strings {
-	static String repeat(String input, int size) {
-		StringBuilder sb = new StringBuilder(input.length() * size);
-		for (int i = 0; i < size; i++)
-			sb.append(input);
-		String s = sb.toString();
-		return s;
+	@Override
+	public boolean matches(String pathString) {
+		final Path path = FileSystems.getDefault().getPath(pathString);
+		return matcher.matches(path);
 	}
 }
