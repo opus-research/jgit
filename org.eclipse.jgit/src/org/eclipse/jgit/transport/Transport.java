@@ -542,7 +542,7 @@ public abstract class Transport {
 				continue;
 			}
 
-			if (proto.canHandle(uri))
+			if (proto.canHandle(local, uri, remoteName))
 				return proto.open(local, uri, remoteName);
 		}
 

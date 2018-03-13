@@ -116,7 +116,7 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		}
 
 		@Override
-		public boolean canHandle(URIish uri) {
+		public boolean canHandle(Repository local, URIish uri, String remoteName) {
 			if (uri.getScheme() == null) {
 				// scp-style URI "host:path" does not have scheme.
 				return uri.getHost() != null
@@ -124,7 +124,7 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 					&& uri.getHost().length() != 0
 					&& uri.getPath().length() != 0;
 			}
-			return super.canHandle(uri);
+			return super.canHandle(local, uri, remoteName);
 		}
 
 		public Transport open(Repository local, URIish uri, String remoteName)
