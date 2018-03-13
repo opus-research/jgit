@@ -173,20 +173,17 @@ public class RenameDetectorTest extends RepositoryTestCase {
 
 		DiffEntry c = DiffEntry.add("c.txt", foo);
 		DiffEntry d = DiffEntry.delete("d.txt", foo);
-		DiffEntry e = DiffEntry.add("the_e_file.txt", foo);
 
 		// Add out of order to avoid first-match succeeding
 		rd.add(a);
 		rd.add(d);
-		rd.add(e);
 		rd.add(b);
 		rd.add(c);
 
 		List<DiffEntry> entries = rd.compute();
-		assertEquals(3, entries.size());
+		assertEquals(2, entries.size());
 		assertRename(d, c, 100, entries.get(0));
 		assertRename(b, a, 100, entries.get(1));
-		assertCopy(d, e, 100, entries.get(2));
 	}
 
 	public void testExactRename_OneDeleteManyAdds() throws Exception {
@@ -266,21 +263,6 @@ public class RenameDetectorTest extends RepositoryTestCase {
 	public void testInexactRename_NewlinesOnly() throws Exception {
 		ObjectId aId = blob("\n\n\n");
 		ObjectId bId = blob("\n\n\n\n");
-
-		DiffEntry a = DiffEntry.add(PATH_A, aId);
-		DiffEntry b = DiffEntry.delete(PATH_Q, bId);
-
-		rd.add(a);
-		rd.add(b);
-
-		List<DiffEntry> entries = rd.compute();
-		assertEquals(1, entries.size());
-		assertRename(b, a, 74, entries.get(0));
-	}
-
-	public void testInexactRename_SameContentMultipleTimes() throws Exception {
-		ObjectId aId = blob("a\na\na\na\n");
-		ObjectId bId = blob("a\na\na\n");
 
 		DiffEntry a = DiffEntry.add(PATH_A, aId);
 		DiffEntry b = DiffEntry.delete(PATH_Q, bId);
@@ -501,10 +483,10 @@ public class RenameDetectorTest extends RepositoryTestCase {
 		assertEquals(1, entries.size());
 
 		DiffEntry modify = entries.get(0);
-		assertEquals(m.oldPath, modify.oldPath);
+		assertEquals(m.oldName, modify.oldName);
 		assertEquals(m.oldId, modify.oldId);
 		assertEquals(m.oldMode, modify.oldMode);
-		assertEquals(m.newPath, modify.newPath);
+		assertEquals(m.newName, modify.newName);
 		assertEquals(m.newId, modify.newId);
 		assertEquals(m.newMode, modify.newMode);
 		assertEquals(m.changeType, modify.changeType);
@@ -563,8 +545,8 @@ public class RenameDetectorTest extends RepositoryTestCase {
 			DiffEntry rename) {
 		assertEquals(ChangeType.RENAME, rename.getChangeType());
 
-		assertEquals(o.getOldPath(), rename.getOldPath());
-		assertEquals(n.getNewPath(), rename.getNewPath());
+		assertEquals(o.getOldName(), rename.getOldName());
+		assertEquals(n.getNewName(), rename.getNewName());
 
 		assertEquals(o.getOldMode(), rename.getOldMode());
 		assertEquals(n.getNewMode(), rename.getNewMode());
@@ -579,8 +561,8 @@ public class RenameDetectorTest extends RepositoryTestCase {
 			DiffEntry copy) {
 		assertEquals(ChangeType.COPY, copy.getChangeType());
 
-		assertEquals(o.getOldPath(), copy.getOldPath());
-		assertEquals(n.getNewPath(), copy.getNewPath());
+		assertEquals(o.getOldName(), copy.getOldName());
+		assertEquals(n.getNewName(), copy.getNewName());
 
 		assertEquals(o.getOldMode(), copy.getOldMode());
 		assertEquals(n.getNewMode(), copy.getNewMode());
@@ -593,11 +575,11 @@ public class RenameDetectorTest extends RepositoryTestCase {
 
 	private static void assertAdd(String newName, ObjectId newId,
 			FileMode newMode, DiffEntry add) {
-		assertEquals(DiffEntry.DEV_NULL, add.oldPath);
+		assertEquals(DiffEntry.DEV_NULL, add.oldName);
 		assertEquals(DiffEntry.A_ZERO, add.oldId);
 		assertEquals(FileMode.MISSING, add.oldMode);
 		assertEquals(ChangeType.ADD, add.changeType);
-		assertEquals(newName, add.newPath);
+		assertEquals(newName, add.newName);
 		assertEquals(AbbreviatedObjectId.fromObjectId(newId), add.newId);
 		assertEquals(newMode, add.newMode);
 	}
