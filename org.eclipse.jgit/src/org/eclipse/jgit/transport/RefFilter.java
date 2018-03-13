@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2008, Marek Zawirski <marek.zawirski@gmail.com>
- * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -45,65 +43,34 @@
 
 package org.eclipse.jgit.transport;
 
-import java.util.Collection;
-import java.util.Collections;
 import java.util.Map;
 
-import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Ref;
 
 /**
- * Base helper class for implementing operations connections.
- *
- * @see BasePackConnection
- * @see BaseFetchConnection
+ * Filters the list of refs that are advertised to the client.
+ * <p>
+ * The filter is called by {@link ReceivePack} and {@link UploadPack} to ensure
+ * that the refs are filtered before they are advertised to the client.
+ * <p>
+ * This can be used by applications to control visibility of certain refs based
+ * on a custom set of rules.
  */
-abstract class BaseConnection implements Connection {
-
-	private Map<String, Ref> advertisedRefs = Collections.emptyMap();
-
-	private boolean startedOperation;
-
-	public Map<String, Ref> getRefsMap() {
-		return advertisedRefs;
-	}
-
-	public final Collection<Ref> getRefs() {
-		return advertisedRefs.values();
-	}
-
-	public final Ref getRef(final String name) {
-		return advertisedRefs.get(name);
-	}
-
-	public abstract void close();
+public interface RefFilter {
+	/** The default filter, allows all refs to be shown. */
+	public static final RefFilter DEFAULT = new RefFilter() {
+		public Map<String, Ref> filter (final Map<String, Ref> refs) {
+			return refs;
+		}
+	};
 
 	/**
-	 * Denote the list of refs available on the remote repository.
-	 * <p>
-	 * Implementors should invoke this method once they have obtained the refs
-	 * that are available from the remote repository.
+	 * Filters a {@code Map} of refs before it is advertised to the client.
 	 *
-	 * @param all
-	 *            the complete list of refs the remote has to offer. This map
-	 *            will be wrapped in an unmodifiable way to protect it, but it
-	 *            does not get copied.
+	 * @param refs
+	 *            the refs which this method need to consider.
+	 * @return
+	 *            the filtered map of refs.
 	 */
-	protected void available(final Map<String, Ref> all) {
-		advertisedRefs = Collections.unmodifiableMap(all);
-	}
-
-	/**
-	 * Helper method for ensuring one-operation per connection. Check whether
-	 * operation was already marked as started, and mark it as started.
-	 *
-	 * @throws TransportException
-	 *             if operation was already marked as started.
-	 */
-	protected void markStartedOperation() throws TransportException {
-		if (startedOperation)
-			throw new TransportException(
-					"Only one operation call per connection is supported.");
-		startedOperation = true;
-	}
+	public Map<String, Ref> filter(Map<String, Ref> refs);
 }

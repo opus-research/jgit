@@ -46,22 +46,17 @@
 
 package org.eclipse.jgit.transport;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
-import java.io.Writer;
 
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.QuotedString;
-import org.eclipse.jgit.util.RawParseUtils;
 
 import com.jcraft.jsch.ChannelExec;
 import com.jcraft.jsch.JSchException;
@@ -92,6 +87,8 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 			return true;
 		return false;
 	}
+
+	OutputStream errStream;
 
 	TransportGitSsh(final Repository local, final URIish uri) {
 		super(local, uri);
@@ -148,15 +145,15 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		return cmd.toString();
 	}
 
-	ChannelExec exec(final String exe, final OutputStream err)
-			throws TransportException {
+	ChannelExec exec(final String exe) throws TransportException {
 		initSession();
 
 		final int tms = getTimeout() > 0 ? getTimeout() * 1000 : 0;
 		try {
 			final ChannelExec channel = (ChannelExec) sock.openChannel("exec");
 			channel.setCommand(commandFor(exe));
-			channel.setErrStream(err);
+			errStream = createErrorStream();
+			channel.setErrStream(errStream, true);
 			channel.connect(tms);
 			return channel;
 		} catch (JSchException je) {
@@ -164,9 +161,9 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		}
 	}
 
-	void checkExecFailure(int status, String exe, String why)
-			throws TransportException {
+	void checkExecFailure(int status, String exe) throws TransportException {
 		if (status == 127) {
+			String why = errStream.toString();
 			IOException cause = null;
 			if (why != null && why.length() > 0)
 				cause = new IOException(why);
@@ -175,8 +172,41 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		}
 	}
 
-	NoRemoteRepositoryException cleanNotFound(NoRemoteRepositoryException nf,
-			String why) {
+	/**
+	 * @return the error stream for the channel, the stream is used to detect
+	 *         specific error reasons for exceptions.
+	 */
+	private static OutputStream createErrorStream() {
+		return new OutputStream() {
+			private StringBuilder all = new StringBuilder();
+
+			private StringBuilder sb = new StringBuilder();
+
+			public String toString() {
+				String r = all.toString();
+				while (r.endsWith("\n"))
+					r = r.substring(0, r.length() - 1);
+				return r;
+			}
+
+			@Override
+			public void write(final int b) throws IOException {
+				if (b == '\r') {
+					return;
+				}
+
+				sb.append((char) b);
+
+				if (b == '\n') {
+					all.append(sb);
+					sb.setLength(0);
+				}
+			}
+		};
+	}
+
+	NoRemoteRepositoryException cleanNotFound(NoRemoteRepositoryException nf) {
+		String why = errStream.toString();
 		if (why == null || why.length() == 0)
 			return nf;
 
@@ -294,14 +324,12 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		SshFetchConnection() throws TransportException {
 			super(TransportGitSsh.this);
 			try {
-				final MessageWriter msg = new MessageWriter();
-				setMessageWriter(msg);
-				channel = exec(getOptionUploadPack(), msg.getRawStream());
+				channel = exec(getOptionUploadPack());
 
 				if (channel.isConnected())
 					init(channel.getInputStream(), outputStream(channel));
 				else
-					throw new TransportException(uri, getMessages());
+					throw new TransportException(uri, errStream.toString());
 
 			} catch (TransportException err) {
 				close();
@@ -316,9 +344,8 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 				readAdvertisedRefs();
 			} catch (NoRemoteRepositoryException notFound) {
 				close();
-				checkExecFailure(exitStatus, getOptionUploadPack(),
-						getMessages());
-				throw cleanNotFound(notFound, getMessages());
+				checkExecFailure(exitStatus, getOptionUploadPack());
+				throw cleanNotFound(notFound);
 			}
 		}
 
@@ -346,14 +373,12 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		SshPushConnection() throws TransportException {
 			super(TransportGitSsh.this);
 			try {
-				final MessageWriter msg = new MessageWriter();
-				setMessageWriter(msg);
-				channel = exec(getOptionReceivePack(), msg.getRawStream());
+				channel = exec(getOptionReceivePack());
 
 				if (channel.isConnected())
 					init(channel.getInputStream(), outputStream(channel));
 				else
-					throw new TransportException(uri, getMessages());
+					throw new TransportException(uri, errStream.toString());
 
 			} catch (TransportException err) {
 				close();
@@ -368,9 +393,8 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 				readAdvertisedRefs();
 			} catch (NoRemoteRepositoryException notFound) {
 				close();
-				checkExecFailure(exitStatus, getOptionReceivePack(),
-						getMessages());
-				throw cleanNotFound(notFound, getMessages());
+				checkExecFailure(exitStatus, getOptionReceivePack());
+				throw cleanNotFound(notFound);
 			}
 		}
 
@@ -387,44 +411,6 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 					channel = null;
 				}
 			}
-		}
-	}
-
-	private static class MessageWriter extends Writer {
-		private final ByteArrayOutputStream buf;
-
-		private final OutputStreamWriter enc;
-
-		MessageWriter() {
-			buf = new ByteArrayOutputStream();
-			enc = new OutputStreamWriter(buf, Constants.CHARSET);
-		}
-
-		@Override
-		public void write(char[] cbuf, int off, int len) throws IOException {
-			synchronized (buf) {
-				enc.write(cbuf, off, len);
-				enc.flush();
-			}
-		}
-
-		OutputStream getRawStream() {
-			return buf;
-		}
-
-		@Override
-		public void close() throws IOException {
-			// Do nothing, we are buffered with no resources.
-		}
-
-		@Override
-		public void flush() throws IOException {
-			// Do nothing, we are buffered with no resources.
-		}
-
-		@Override
-		public String toString() {
-			return RawParseUtils.decode(buf.toByteArray());
 		}
 	}
 }
