@@ -665,7 +665,6 @@ public class UploadPack {
 			pw.setDeltaBaseAsOffset(options.contains(OPTION_OFS_DELTA));
 			pw.setThin(options.contains(OPTION_THIN_PACK));
 
-			RevWalk rw = walk;
 			if (wantAll.isEmpty()) {
 				pw.preparePack(pm, wantIds, commonBase);
 			} else {
@@ -673,33 +672,21 @@ public class UploadPack {
 
 				ObjectWalk ow = walk.toObjectWalkWithSameObjects();
 				pw.preparePack(pm, ow, wantAll, commonBase);
-				rw = ow;
 			}
 
 			if (options.contains(OPTION_INCLUDE_TAG)) {
-				for (Ref ref : refs.values()) {
-					ObjectId objectId = ref.getObjectId();
-
-					// If the object was already requested, skip it.
-					if (wantAll.isEmpty()) {
-						if (wantIds.contains(objectId))
-							continue;
-					} else {
-						RevObject obj = rw.lookupOrNull(objectId);
-						if (obj != null && obj.has(WANT))
-							continue;
-					}
-
-					if (!ref.isPeeled())
-						ref = db.peel(ref);
-
-					ObjectId peeledId = ref.getPeeledObjectId();
-					if (peeledId == null)
+				for (final Ref r : refs.values()) {
+					final RevObject o;
+					try {
+						o = walk.parseAny(r.getObjectId());
+					} catch (IOException e) {
 						continue;
-
-					objectId = ref.getObjectId();
-					if (pw.willInclude(peeledId) && !pw.willInclude(objectId))
-						pw.addObject(rw.parseAny(objectId));
+					}
+					if (o.has(WANT) || !(o instanceof RevTag))
+						continue;
+					final RevTag t = (RevTag) o;
+					if (!pw.willInclude(t) && pw.willInclude(t.getObject()))
+						pw.addObject(t);
 				}
 			}
 
