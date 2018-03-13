@@ -75,7 +75,6 @@ import org.eclipse.jgit.lib.RepositoryCache.FileKey;
 import org.eclipse.jgit.storage.pack.ObjectToPack;
 import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FileUtils;
 
 /**
  * Traditional file system based {@link ObjectDatabase}.
@@ -455,15 +454,15 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	@Override
 	InsertLooseObjectResult insertUnpackedObject(File tmp, ObjectId id,
-			boolean createDuplicate) throws IOException {
+			boolean createDuplicate) {
 		// If the object is already in the repository, remove temporary file.
 		//
 		if (unpackedObjectCache.isUnpacked(id)) {
-			FileUtils.delete(tmp);
+			tmp.delete();
 			return InsertLooseObjectResult.EXISTS_LOOSE;
 		}
 		if (!createDuplicate && has(id)) {
-			FileUtils.delete(tmp);
+			tmp.delete();
 			return InsertLooseObjectResult.EXISTS_PACKED;
 		}
 
@@ -475,7 +474,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 			// that already exists. We can't be sure renameTo() would
 			// fail on all platforms if dst exists, so we check first.
 			//
-			FileUtils.delete(tmp);
+			tmp.delete();
 			return InsertLooseObjectResult.EXISTS_LOOSE;
 		}
 		if (tmp.renameTo(dst)) {
@@ -494,7 +493,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 		}
 
 		if (!createDuplicate && has(id)) {
-			FileUtils.delete(tmp);
+			tmp.delete();
 			return InsertLooseObjectResult.EXISTS_PACKED;
 		}
 
@@ -503,7 +502,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 		// either. We really don't know what went wrong, so
 		// fail.
 		//
-		FileUtils.delete(tmp);
+		tmp.delete();
 		return InsertLooseObjectResult.FAILURE;
 	}
 

@@ -61,6 +61,9 @@ public class FileUtils {
 	 *             if file deletion failed
 	 */
 	public static void delete(final File f) throws IOException {
+		if (!f.exists())
+			return;
+
 		if (!f.delete())
 			throw new IOException(MessageFormat.format(
 					JGitText.get().deleteFileFailed, f.getAbsolutePath()));
