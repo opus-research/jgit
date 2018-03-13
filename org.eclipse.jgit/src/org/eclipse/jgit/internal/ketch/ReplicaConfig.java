@@ -43,9 +43,7 @@
 
 package org.eclipse.jgit.internal.ketch;
 
-import static java.util.concurrent.TimeUnit.DAYS;
-import static java.util.concurrent.TimeUnit.HOURS;
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.*;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.eclipse.jgit.internal.ketch.KetchConstants.CONFIG_KEY_COMMIT;
@@ -62,33 +60,20 @@ import java.util.regex.Pattern;
 
 import org.eclipse.jgit.internal.ketch.KetchReplica.CommitMethod;
 import org.eclipse.jgit.internal.ketch.KetchReplica.CommitSpeed;
-import org.eclipse.jgit.internal.ketch.KetchReplica.Participation;
+import org.eclipse.jgit.internal.ketch.KetchReplica.Type;
 import org.eclipse.jgit.lib.Config;
 
 /** Configures a {@link KetchReplica}. */
 public class ReplicaConfig {
-	/**
-	 * Read a configuration from a config block.
-	 *
-	 * @param cfg
-	 *            configuration to read.
-	 * @param name
-	 *            of the replica being configured.
-	 * @return replica configuration for {@code name}.
-	 */
-	public static ReplicaConfig newFromConfig(Config cfg, String name) {
-		return new ReplicaConfig().fromConfig(cfg, name);
-	}
-
-	private Participation participation = Participation.FULL;
+	private Type type = Type.NONE;
 	private CommitMethod commitMethod = CommitMethod.ALL_REFS;
 	private CommitSpeed commitSpeed = CommitSpeed.BATCHED;
 	private long minRetry = SECONDS.toMillis(5);
 	private long maxRetry = MINUTES.toMillis(1);
 
-	/** @return participation of the replica in the system. */
-	public Participation getParticipation() {
-		return participation;
+	/** @return type of the replica. */
+	public Type getType() {
+		return type;
 	}
 
 	/** @return how Ketch should apply committed changes. */
@@ -102,8 +87,6 @@ public class ReplicaConfig {
 	}
 
 	/**
-	 * Returns the minimum wait delay before retrying a failure.
-	 *
 	 * @param unit
 	 *            to get retry delay in.
 	 * @return minimum delay before retrying a failure.
@@ -113,11 +96,9 @@ public class ReplicaConfig {
 	}
 
 	/**
-	 * Returns the maximum wait delay before retrying a failure.
-	 *
 	 * @param unit
 	 *            to get retry delay in.
-	 * @return maximum delay before retrying a failure.
+	 * @return minimum delay before retrying a failure.
 	 */
 	public long getMaxRetry(TimeUnit unit) {
 		return unit.convert(maxRetry, MILLISECONDS);
@@ -133,9 +114,7 @@ public class ReplicaConfig {
 	 * @return {@code this}
 	 */
 	public ReplicaConfig fromConfig(Config cfg, String name) {
-		participation = cfg.getEnum(
-				CONFIG_KEY_REMOTE, name, CONFIG_KEY_TYPE,
-				participation);
+		type = cfg.getEnum(CONFIG_KEY_REMOTE, name, CONFIG_KEY_TYPE, type);
 		commitMethod = cfg.getEnum(
 				CONFIG_KEY_REMOTE, name, CONFIG_KEY_COMMIT,
 				commitMethod);
@@ -159,7 +138,7 @@ public class ReplicaConfig {
 			return defaultValue;
 		}
 
-		Matcher m = UnitMap.PATTERN.matcher(valStr);
+		Matcher m = matcher("^([1-9][0-9]*(?:\\.[0-9]*)?)\\s*(.*)$", valStr); //$NON-NLS-1$
 		if (!m.matches()) {
 			return defaultValue;
 		}
@@ -183,10 +162,11 @@ public class ReplicaConfig {
 		}
 	}
 
-	static class UnitMap {
-		static final Pattern PATTERN = Pattern
-				.compile("^([1-9][0-9]*(?:\\.[0-9]*)?)\\s*(.*)$"); //$NON-NLS-1$
+	private static Matcher matcher(String pattern, String valStr) {
+		return Pattern.compile(pattern).matcher(valStr);
+	}
 
+	static class UnitMap {
 		static final Map<String, TimeUnit> UNITS;
 
 		static {
@@ -201,21 +181,18 @@ public class ReplicaConfig {
 			u = SECONDS;
 			m.put("s", u); //$NON-NLS-1$
 			m.put("sec", u); //$NON-NLS-1$
-			m.put("secs", u); //$NON-NLS-1$
 			m.put("second", u); //$NON-NLS-1$
 			m.put("seconds", u); //$NON-NLS-1$
 
 			u = MINUTES;
 			m.put("m", u); //$NON-NLS-1$
 			m.put("min", u); //$NON-NLS-1$
-			m.put("mins", u); //$NON-NLS-1$
 			m.put("minute", u); //$NON-NLS-1$
 			m.put("minutes", u); //$NON-NLS-1$
 
 			u = HOURS;
 			m.put("h", u); //$NON-NLS-1$
 			m.put("hr", u); //$NON-NLS-1$
-			m.put("hrs", u); //$NON-NLS-1$
 			m.put("hour", u); //$NON-NLS-1$
 			m.put("hours", u); //$NON-NLS-1$
 

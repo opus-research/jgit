@@ -52,7 +52,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.ReceiveCommand;
 
 /**
- * A push request sending objects to a replica, and its result.
+ * Request made to a replica, and its result.
  * <p>
  * Implementors of {@link KetchReplica} must populate the command result fields,
  * {@link #setRefs(Map)}, and call one of
@@ -60,11 +60,12 @@ import org.eclipse.jgit.transport.ReceiveCommand;
  * finish processing.
  */
 public class ReplicaPushRequest {
+	private final Object lock = new Object();
 	private final KetchReplica replica;
 	private final Collection<ReceiveCommand> commands;
 	private Map<String, Ref> refs;
 	private Throwable exception;
-	private boolean notified;
+	private boolean done;
 
 	/**
 	 * Construct a new push request for a replica.
@@ -82,13 +83,17 @@ public class ReplicaPushRequest {
 
 	/** @return commands to be executed, and their results. */
 	public Collection<ReceiveCommand> getCommands() {
-		return commands;
+		synchronized (lock) {
+			return commands;
+		}
 	}
 
 	/** @return remote references, usually from the advertisement. */
 	@Nullable
 	public Map<String, Ref> getRefs() {
-		return refs;
+		synchronized (lock) {
+			return refs;
+		}
 	}
 
 	/**
@@ -96,13 +101,17 @@ public class ReplicaPushRequest {
 	 *            references observed from the replica.
 	 */
 	public void setRefs(Map<String, Ref> refs) {
-		this.refs = refs;
+		synchronized (lock) {
+			this.refs = refs;
+		}
 	}
 
 	/** @return exception thrown, if any. */
 	@Nullable
 	public Throwable getException() {
-		return exception;
+		synchronized (lock) {
+			return exception;
+		}
 	}
 
 	/**
@@ -118,11 +127,29 @@ public class ReplicaPushRequest {
 	 */
 	public void setException(@Nullable Repository repo, Throwable err) {
 		if (KetchReplica.log.isErrorEnabled()) {
-			KetchReplica.log.error(describe("failed"), err); //$NON-NLS-1$
+			StringBuilder m = new StringBuilder();
+			m.append("pushAsync to "); //$NON-NLS-1$
+			m.append(replica.describeForLog());
+			m.append(" failed for:\n"); //$NON-NLS-1$
+			for (ReceiveCommand cmd : commands) {
+				m.append("  "); //$NON-NLS-1$
+				m.append(cmd.getOldId().abbreviate(8).name());
+				m.append(' ');
+				m.append(cmd.getNewId().abbreviate(8).name());
+				m.append(' ');
+				m.append(cmd.getRefName());
+				m.append('\n');
+			}
+			KetchReplica.log.error(m.toString(), err);
 		}
-		if (!notified) {
-			notified = true;
-			exception = err;
+
+		boolean invoke;
+		synchronized (lock) {
+			invoke = !done;
+			this.exception = err;
+			this.done = true;
+		}
+		if (invoke) {
 			replica.afterPush(repo, this);
 		}
 	}
@@ -138,31 +165,34 @@ public class ReplicaPushRequest {
 	 */
 	public void done(Repository repo) {
 		if (KetchReplica.log.isDebugEnabled()) {
-			KetchReplica.log.debug(describe("completed")); //$NON-NLS-1$
+			StringBuilder m = new StringBuilder();
+			m.append("pushAsync to "); //$NON-NLS-1$
+			m.append(replica.describeForLog());
+			m.append(":\n"); //$NON-NLS-1$
+			for (ReceiveCommand cmd : commands) {
+				m.append("  "); //$NON-NLS-1$
+				m.append(cmd.getOldId().abbreviate(8).name());
+				m.append(' ');
+				m.append(cmd.getNewId().abbreviate(8).name());
+				m.append(' ');
+				m.append(cmd.getRefName());
+				m.append(' ');
+				m.append(cmd.getResult());
+				if (cmd.getMessage() != null) {
+					m.append(' ').append(cmd.getMessage());
+				}
+				m.append('\n');
+			}
+			KetchReplica.log.debug(m.toString());
 		}
-		if (!notified) {
-			notified = true;
+
+		boolean invoke;
+		synchronized (lock) {
+			invoke = !done;
+			done = true;
+		}
+		if (invoke) {
 			replica.afterPush(repo, this);
 		}
-	}
-
-	private String describe(String heading) {
-		StringBuilder b = new StringBuilder();
-		b.append("push to "); //$NON-NLS-1$
-		b.append(replica.describeForLog());
-		b.append(' ').append(heading).append(":\n"); //$NON-NLS-1$
-		for (ReceiveCommand cmd : commands) {
-			b.append(String.format(
-					"  %-12s %-12s %s %s", //$NON-NLS-1$
-					LeaderSnapshot.str(cmd.getOldId()),
-					LeaderSnapshot.str(cmd.getNewId()),
-					cmd.getRefName(),
-					cmd.getResult()));
-			if (cmd.getMessage() != null) {
-				b.append(' ').append(cmd.getMessage());
-			}
-			b.append('\n');
-		}
-		return b.toString();
 	}
 }

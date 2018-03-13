@@ -47,13 +47,7 @@ import org.eclipse.jgit.revwalk.FooterKey;
 
 /** Frequently used constants in a Ketch system. */
 public class KetchConstants {
-	/**
-	 * Default reference namespace holding {@link #ACCEPTED} and
-	 * {@link #COMMITTED} references and the {@link #STAGE} sub-namespace.
-	 */
-	public static final String DEFAULT_TXN_NAMESPACE = "refs/txn/"; //$NON-NLS-1$
-
-	/** Reference name holding the RefTree accepted by a follower. */
+	/** Reference name holding the RefTree accepted by this follower. */
 	public static final String ACCEPTED = "accepted"; //$NON-NLS-1$
 
 	/** Reference name holding the RefTree known to be committed. */
