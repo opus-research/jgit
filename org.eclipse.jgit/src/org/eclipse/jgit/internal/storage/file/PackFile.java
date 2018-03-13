@@ -47,6 +47,7 @@ package org.eclipse.jgit.internal.storage.file;
 
 import static org.eclipse.jgit.internal.storage.pack.PackExt.BITMAP_INDEX;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.INDEX;
+import static org.eclipse.jgit.internal.storage.pack.PackExt.KEEP;
 
 import java.io.EOFException;
 import java.io.File;
@@ -101,6 +102,7 @@ import org.eclipse.jgit.util.RawParseUtils;
 public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	/** Sorts PackFiles to be most recently created to least recently created. */
 	public static final Comparator<PackFile> SORT = new Comparator<PackFile>() {
+		@Override
 		public int compare(final PackFile a, final PackFile b) {
 			return b.packLastModified - a.packLastModified;
 		}
@@ -251,7 +253,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	 */
 	public boolean shouldBeKept() {
 		if (keepFile == null)
-			keepFile = new File(packFile.getPath() + ".keep"); //$NON-NLS-1$
+			keepFile = extFile(KEEP);
 		return keepFile.exists();
 	}
 
@@ -301,6 +303,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	 *
 	 * @see PackIndex#iterator()
 	 */
+	@Override
 	public Iterator<PackIndex.MutableEntry> iterator() {
 		try {
 			return idx().iterator();
@@ -1105,17 +1108,8 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		if (invalid || invalidBitmap)
 			return null;
 		if (bitmapIdx == null && hasExt(BITMAP_INDEX)) {
-			final PackBitmapIndex idx;
-			try {
-				idx = PackBitmapIndex.open(extFile(BITMAP_INDEX), idx(),
-						getReverseIdx());
-			} catch (FileNotFoundException e) {
-				// Once upon a time this bitmap file existed. Now it
-				// has been removed. Most likely an external gc  has
-				// removed this packfile and the bitmap
-				 invalidBitmap = true;
-				 return null;
-			}
+			final PackBitmapIndex idx = PackBitmapIndex.open(
+					extFile(BITMAP_INDEX), idx(), getReverseIdx());
 
 			// At this point, idx() will have set packChecksum.
 			if (Arrays.equals(packChecksum, idx.packChecksum))

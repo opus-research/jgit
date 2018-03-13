@@ -71,7 +71,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.transport.GitProtocolConstants.MultiAck;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevCommitList;
 import org.eclipse.jgit.revwalk.RevFlag;
@@ -80,6 +79,7 @@ import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.revwalk.filter.CommitTimeRevFilter;
 import org.eclipse.jgit.revwalk.filter.RevFilter;
+import org.eclipse.jgit.transport.GitProtocolConstants.MultiAck;
 import org.eclipse.jgit.transport.PacketLineIn.AckNackResult;
 import org.eclipse.jgit.util.TemporaryBuffer;
 
@@ -260,7 +260,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 		if (local != null) {
 			walk = new RevWalk(local);
-			reachableCommits = new RevCommitList<RevCommit>();
+			reachableCommits = new RevCommitList<>();
 			REACHABLE = walk.newFlag("REACHABLE"); //$NON-NLS-1$
 			COMMON = walk.newFlag("COMMON"); //$NON-NLS-1$
 			STATE = walk.newFlag("STATE"); //$NON-NLS-1$
@@ -280,6 +280,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 	private static class FetchConfig {
 		static final SectionParser<FetchConfig> KEY = new SectionParser<FetchConfig>() {
+			@Override
 			public FetchConfig parse(final Config cfg) {
 				return new FetchConfig(cfg);
 			}
@@ -292,6 +293,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		}
 	}
 
+	@Override
 	public final void fetch(final ProgressMonitor monitor,
 			final Collection<Ref> want, final Set<ObjectId> have)
 			throws TransportException {
@@ -301,6 +303,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	/**
 	 * @since 3.0
 	 */
+	@Override
 	public final void fetch(final ProgressMonitor monitor,
 			final Collection<Ref> want, final Set<ObjectId> have,
 			OutputStream outputStream) throws TransportException {
@@ -308,18 +311,22 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		doFetch(monitor, want, have, outputStream);
 	}
 
+	@Override
 	public boolean didFetchIncludeTags() {
 		return false;
 	}
 
+	@Override
 	public boolean didFetchTestConnectivity() {
 		return false;
 	}
 
+	@Override
 	public void setPackLockMessage(final String message) {
 		lockMessage = message;
 	}
 
+	@Override
 	public Collection<PackLock> getPackLocks() {
 		if (packLock != null)
 			return Collections.singleton(packLock);
