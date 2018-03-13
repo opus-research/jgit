@@ -71,10 +71,10 @@ public class CoreConfig {
 	}
 
 	/**
-	 * @param defaultStreamFileThreshold
+	 * @param threshold
 	 */
-	public static void setDefaultStreamFileThreshold(int defaultStreamFileThreshold) {
-		CoreConfig.defaultStreamFileThreshold = defaultStreamFileThreshold;
+	public static void setDefaultStreamFileThreshold(int threshold) {
+		defaultStreamFileThreshold = threshold;
 	}
 
 	/** Key for {@link Config#get(SectionParser)}. */

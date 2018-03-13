@@ -47,7 +47,6 @@ package org.eclipse.jgit.storage.pack;
 import java.util.concurrent.Executor;
 import java.util.zip.Deflater;
 
-import org.eclipse.jgit.lib.CoreConfig;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.PackIndexWriter;
@@ -104,7 +103,9 @@ public class PackConfig {
 	public static final int DEFAULT_DELTA_SEARCH_WINDOW_SIZE = 10;
 
 	/**
-	 * @deprecated
+	 * Default big file threshold: {@value}
+	 *
+	 * @see #setBigFileThreshold(int)
 	 */
 	public static final int DEFAULT_BIG_FILE_THRESHOLD = 50 * 1024 * 1024;
 
@@ -150,7 +151,7 @@ public class PackConfig {
 
 	private int deltaCacheLimit = DEFAULT_DELTA_CACHE_LIMIT;
 
-	private int bigFileThreshold = CoreConfig.getDefaultStreamFileThreshold();
+	private int bigFileThreshold = DEFAULT_BIG_FILE_THRESHOLD;
 
 	private int threads;
 
@@ -488,7 +489,7 @@ public class PackConfig {
 	 * more than likely already highly compressed binary data files that do not
 	 * delta compress well, such as MPEG videos.
 	 *
-	 * Default setting: {@link org.eclipse.jgit.lib.CoreConfig#getDefaultStreamFileThreshold()}
+	 * Default setting: {@value #DEFAULT_BIG_FILE_THRESHOLD}
 	 *
 	 * @return the configured big file threshold.
 	 */
@@ -499,7 +500,7 @@ public class PackConfig {
 	/**
 	 * Set the maximum file size that should be considered for deltas.
 	 *
-	 * Default setting: {@link org.eclipse.jgit.lib.CoreConfig#getDefaultStreamFileThreshold()}
+	 * Default setting: {@value #DEFAULT_BIG_FILE_THRESHOLD}
 	 *
 	 * @param bigFileThreshold
 	 *            the limit, in bytes.
