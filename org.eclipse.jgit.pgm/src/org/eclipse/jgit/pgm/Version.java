@@ -45,8 +45,6 @@ package org.eclipse.jgit.pgm;
 
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.pgm.internal.CLIText;
-
 @Command(common = true, usage = "usage_DisplayTheVersionOfJgit")
 class Version extends TextBuiltin {
 	@Override
