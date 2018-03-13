@@ -178,7 +178,7 @@ public class FS_POSIX_Java7 extends FS_POSIX {
 	}
 
 	@Override
-	protected File tryFindHook(Repository repository, Hook hook) {
+	public File tryFindHook(Repository repository, Hook hook) {
 		final File gitdir = repository.getDirectory();
 		final Path hookPath = gitdir.toPath().resolve("hooks") //$NON-NLS-1$
 				.resolve(hook.getName());
