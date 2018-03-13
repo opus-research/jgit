@@ -110,6 +110,8 @@ public class ResolveMerger extends ThreeWayMerger {
 
 	/**
 	 * string versions of a list of commit SHA1s
+	 *
+	 * @since 3.0
 	 */
 	protected String commitNames[];
 
@@ -127,6 +129,8 @@ public class ResolveMerger extends ThreeWayMerger {
 
 	/**
 	 * merge result as tree
+	 *
+	 * @since 3.0
 	 */
 	protected ObjectId resultTree;
 
@@ -150,6 +154,7 @@ public class ResolveMerger extends ThreeWayMerger {
 	 * created as temporary files and a new empty, in-memory dircache will be
 	 * used instead the repo's one. Often used for bare repos where the repo
 	 * doesn't even have a workingtree and dircache.
+	 * @since 3.0
 	 */
 	protected boolean inCore;
 
@@ -158,22 +163,26 @@ public class ResolveMerger extends ThreeWayMerger {
 	 * repository and should handle locking and unlocking of the dircache. If
 	 * this merger should work in-core or if an explicit dircache was specified
 	 * during construction then this field is set to false.
+	 * @since 3.0
 	 */
 	protected boolean implicitDirCache;
 
 	/**
 	 * Directory cache
+	 * @since 3.0
 	 */
 	protected DirCache dircache;
 
 	/**
 	 * The iterator to access the working tree. If set to <code>null</code> this
 	 * merger will not touch the working tree.
+	 * @since 3.0
 	 */
 	protected WorkingTreeIterator workingTreeIterator;
 
 	/**
 	 * our merge algorithm
+	 * @since 3.0
 	 */
 	protected MergeAlgorithm mergeAlgorithm;
 
@@ -480,7 +489,11 @@ public class ResolveMerger extends ThreeWayMerger {
 				return true;
 			} else if (modeT == 0 && modeB != 0) {
 				// we want THEIRS ... but THEIRS contains the deletion of the
-				// file
+				// file. Also, do not complain if the file is already deleted
+				// locally. This complements the test in isWorktreeDirty() for
+				// the same case.
+				if (tw.getTreeCount() > T_FILE && tw.getRawMode(T_FILE) == 0)
+					return true;
 				toBeDeleted.add(tw.getPathString());
 				return true;
 			}
@@ -622,7 +635,10 @@ public class ResolveMerger extends ThreeWayMerger {
 		boolean isDirty = work.isModeDifferent(modeO);
 		if (!isDirty && nonTree(modeF))
 			isDirty = !tw.idEqual(T_FILE, T_OURS);
-
+		// Ignore existing empty directories
+		if (isDirty && modeF == FileMode.TYPE_TREE
+				&& modeO == FileMode.TYPE_MISSING)
+			isDirty = false;
 		if (isDirty)
 			failingPaths.put(tw.getPathString(),
 					MergeFailureReason.DIRTY_WORKTREE);
@@ -892,6 +908,7 @@ public class ResolveMerger extends ThreeWayMerger {
 	 * @param mergeTree
 	 * @return whether the trees merged cleanly
 	 * @throws IOException
+	 * @since 3.0
 	 */
 	protected boolean mergeTrees(AbstractTreeIterator baseTree,
 			RevTree headTree, RevTree mergeTree) throws IOException {
