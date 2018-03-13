@@ -50,7 +50,6 @@ import org.apache.tools.ant.Task;
 import org.eclipse.jgit.api.CloneCommand;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.transport.URIish;
 
@@ -112,7 +111,7 @@ public class GitCloneTask extends Task {
 		try {
 			clone.setURI(uri).setDirectory(destination).setBranch(branch).setBare(bare);
 			clone.call().getRepository().close();
-		} catch (GitAPIException | JGitInternalException e) {
+		} catch (IllegalStateException | GitAPIException e) {
 			log("Could not clone repository: " + e, e, Project.MSG_ERR);
 			throw new BuildException("Could not clone repository: " + e.getMessage(), e);
 		}
