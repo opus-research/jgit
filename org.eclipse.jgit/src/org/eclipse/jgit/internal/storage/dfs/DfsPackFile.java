@@ -88,7 +88,7 @@ import org.eclipse.jgit.util.LongList;
  * delta packed format yielding high compression of lots of object where some
  * objects are similar.
  */
-public final class DfsPackFile {
+public final class DfsPackFile implements AutoCloseable {
 	/**
 	 * File offset used to cache {@link #index} in {@link DfsBlockCache}.
 	 * <p>
@@ -199,7 +199,7 @@ public final class DfsPackFile {
 		return key.cachedSize.get();
 	}
 
-	private String getPackName() {
+	String getPackName() {
 		return packDesc.getFileName(PACK);
 	}
 
@@ -214,7 +214,17 @@ public final class DfsPackFile {
 		index = cache.put(key, POS_INDEX, sz, idx);
 	}
 
-	PackIndex getPackIndex(DfsReader ctx) throws IOException {
+	/**
+	 * Get the PackIndex for this PackFile.
+	 *
+	 * @param ctx
+	 *            reader context to support reading from the backing store if
+	 *            the index is not already loaded in memory.
+	 * @return the PackIndex.
+	 * @throws IOException
+	 *             the pack index is not available, or is corrupt.
+	 */
+	public PackIndex getPackIndex(DfsReader ctx) throws IOException {
 		return idx(ctx);
 	}
 

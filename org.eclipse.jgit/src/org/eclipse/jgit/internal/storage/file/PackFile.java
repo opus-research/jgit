@@ -89,7 +89,8 @@ import org.eclipse.jgit.util.RawParseUtils;
  * delta packed format yielding high compression of lots of object where some
  * objects are similar.
  */
-public class PackFile implements Iterable<PackIndex.MutableEntry> {
+public class PackFile implements Iterable<PackIndex.MutableEntry>,
+		AutoCloseable {
 	/** Sorts PackFiles to be most recently created to least recently created. */
 	public static final Comparator<PackFile> SORT = new Comparator<PackFile>() {
 		public int compare(final PackFile a, final PackFile b) {
@@ -169,11 +170,13 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			try {
 				final PackIndex idx = PackIndex.open(extFile(INDEX));
 
-				if (packChecksum == null)
+				if (packChecksum == null) {
 					packChecksum = idx.packChecksum;
-				else if (!Arrays.equals(packChecksum, idx.packChecksum))
-					throw new PackMismatchException(JGitText.get().packChecksumMismatch);
-
+				} else if (!Arrays.equals(packChecksum, idx.packChecksum)) {
+					throw new PackMismatchException(MessageFormat.format(
+							JGitText.get().packChecksumMismatch,
+							packFile.getPath()));
+				}
 				loadedIdx = idx;
 			} catch (IOException e) {
 				invalid = true;
