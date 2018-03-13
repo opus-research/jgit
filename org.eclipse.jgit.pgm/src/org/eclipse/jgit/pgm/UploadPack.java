@@ -48,6 +48,7 @@ import java.io.File;
 
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
 
 @Command(common = false, usage = "Server side backend for 'jgit fetch'")
