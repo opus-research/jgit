@@ -70,9 +70,6 @@ public enum RepositoryState {
 		public boolean canAmend() { return false; }
 
 		@Override
-		public boolean isRebasing() { return false; }
-
-		@Override
 		public String getDescription() { return "Bare"; }
 	},
 
@@ -93,9 +90,6 @@ public enum RepositoryState {
 		public boolean canAmend() { return true; }
 
 		@Override
-		public boolean isRebasing() { return false; }
-
-		@Override
 		public String getDescription() { return JGitText.get().repositoryState_normal; }
 	},
 
@@ -113,9 +107,6 @@ public enum RepositoryState {
 
 		@Override
 		public boolean canAmend() { return false; }
-
-		@Override
-		public boolean isRebasing() { return false; }
 
 		@Override
 		public String getDescription() { return JGitText.get().repositoryState_conflicts; }
@@ -139,9 +130,6 @@ public enum RepositoryState {
 		public boolean canAmend() { return false; }
 
 		@Override
-		public boolean isRebasing() { return false; }
-
-		@Override
 		public String getDescription() { return JGitText.get().repositoryState_merged; }
 	},
 
@@ -159,9 +147,6 @@ public enum RepositoryState {
 
 		@Override
 		public boolean canAmend() { return false; }
-
-		@Override
-		public boolean isRebasing() { return false; }
 
 		@Override
 		public String getDescription() { return JGitText.get().repositoryState_conflicts; }
@@ -185,9 +170,6 @@ public enum RepositoryState {
 		public boolean canAmend() { return false; }
 
 		@Override
-		public boolean isRebasing() { return false; }
-
-		@Override
 		public String getDescription() { return JGitText.get().repositoryState_merged; }
 	},
 
@@ -205,9 +187,6 @@ public enum RepositoryState {
 
 		@Override
 		public boolean canAmend() { return false; }
-
-		@Override
-		public boolean isRebasing() { return false; }
 
 		@Override
 		public String getDescription() { return JGitText.get().repositoryState_conflicts; }
@@ -231,9 +210,6 @@ public enum RepositoryState {
 		public boolean canAmend() { return false; }
 
 		@Override
-		public boolean isRebasing() { return false; }
-
-		@Override
 		public String getDescription() { return JGitText.get().repositoryState_merged; }
 	},
 
@@ -252,9 +228,6 @@ public enum RepositoryState {
 
 		@Override
 		public boolean canAmend() { return true; }
-
-		@Override
-		public boolean isRebasing() { return true; }
 
 		@Override
 		public String getDescription() { return JGitText.get().repositoryState_rebaseOrApplyMailbox; }
@@ -277,9 +250,6 @@ public enum RepositoryState {
 		public boolean canAmend() { return true; }
 
 		@Override
-		public boolean isRebasing() { return true; }
-
-		@Override
 		public String getDescription() { return JGitText.get().repositoryState_rebase; }
 	},
 
@@ -298,9 +268,6 @@ public enum RepositoryState {
 
 		@Override
 		public boolean canAmend() { return true; }
-
-		@Override
-		public boolean isRebasing() { return false; }
 
 		@Override
 		public String getDescription() { return JGitText.get().repositoryState_applyMailbox; }
@@ -323,9 +290,6 @@ public enum RepositoryState {
 		public boolean canAmend() { return true; }
 
 		@Override
-		public boolean isRebasing() { return true; }
-
-		@Override
 		public String getDescription() { return JGitText.get().repositoryState_rebaseWithMerge; }
 	},
 
@@ -344,9 +308,6 @@ public enum RepositoryState {
 
 		@Override
 		public boolean canAmend() { return true; }
-
-		@Override
-		public boolean isRebasing() { return true; }
 
 		@Override
 		public String getDescription() { return JGitText.get().repositoryState_rebaseInteractive; }
@@ -372,9 +333,6 @@ public enum RepositoryState {
 		public boolean canAmend() { return false; }
 
 		@Override
-		public boolean isRebasing() { return false; }
-
-		@Override
 		public String getDescription() { return JGitText.get().repositoryState_bisecting; }
 	};
 
@@ -397,12 +355,6 @@ public enum RepositoryState {
 	 * @return true if amending is considered SAFE
 	 */
 	public abstract boolean canAmend();
-
-	/**
-	 * @return true if the repository is currently in a rebase
-	 * @since 2.4
-	 */
-	public abstract boolean isRebasing();
 
 	/**
 	 * @return a human readable description of the state.
