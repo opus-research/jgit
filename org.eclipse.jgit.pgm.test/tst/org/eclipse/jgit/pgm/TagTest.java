@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Google Inc.
+ * Copyright (C) 2012, Tomasz Zarna <tomasz.zarna@tasktop.com> and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,65 +40,34 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 package org.eclipse.jgit.pgm;
 
-import java.lang.String;
-import java.lang.System;
-import java.text.MessageFormat;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
+import static org.junit.Assert.assertEquals;
 
-import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.MutableObjectId;
-import org.eclipse.jgit.lib.ObjectLoader;
-import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.pgm.CLIText;
-import org.eclipse.jgit.pgm.TextBuiltin;
-import org.eclipse.jgit.treewalk.AbstractTreeIterator;
-import org.eclipse.jgit.treewalk.TreeWalk;
-import org.kohsuke.args4j.Argument;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.junit.Before;
+import org.junit.Test;
 
-@Command(common = true, usage = "usage_archive")
-class Archive extends TextBuiltin {
-	@Argument(index = 0, metaVar = "metaVar_treeish")
-	private AbstractTreeIterator tree;
+public class TagTest extends CLIRepositoryTestCase {
+	private Git git;
 
 	@Override
-	protected void run() throws Exception {
-		final TreeWalk walk = new TreeWalk(db);
-		final ObjectReader reader = walk.getObjectReader();
-		final MutableObjectId idBuf = new MutableObjectId();
-		final ZipOutputStream out = new ZipOutputStream(outs);
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		git = new Git(db);
+		git.commit().setMessage("initial commit").call();
+	}
 
-		if (tree == null)
-			throw die(CLIText.get().treeIsRequired);
+	@Test
+	public void testTagTwice() throws Exception {
+		git.tag().setName("test").call();
+		writeTrashFile("file", "content");
+		git.add().addFilepattern("file").call();
+		git.commit().setMessage("commit").call();
 
-		walk.reset();
-		walk.addTree(tree);
-		walk.setRecursive(true);
-		while (walk.next()) {
-			final String name = walk.getPathString();
-			final FileMode mode = walk.getFileMode(0);
-			walk.getObjectId(idBuf, 0);
-
-			if (mode == FileMode.TREE)
-				// ZIP entries for directories are optional.
-				// Leave them out, mimicking "git archive".
-				continue;
-
-			final ZipEntry entry = new ZipEntry(name);
-			final ObjectLoader loader = reader.open(idBuf);
-			entry.setSize(loader.getSize());
-			out.putNextEntry(entry);
-			loader.copyTo(out);
-
-			if (mode != FileMode.REGULAR_FILE)
-				System.err.println(MessageFormat.format( //
-						CLIText.get().archiveEntryModeIgnored, //
-						name));
-		}
-
-		out.close();
+		assertEquals("fatal: tag 'test' already exists",
+				execute("git tag test")[0]);
 	}
 }

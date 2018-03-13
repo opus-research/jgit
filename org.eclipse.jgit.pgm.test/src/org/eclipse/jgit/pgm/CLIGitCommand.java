@@ -43,6 +43,7 @@
 package org.eclipse.jgit.pgm;
 
 import java.io.ByteArrayOutputStream;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -72,7 +73,8 @@ public class CLIGitCommand {
 		try {
 			return IO.readLines(new String(rawExecute(str, db)));
 		} catch (Die e) {
-			return IO.readLines(e.getMessage());
+			return IO.readLines(MessageFormat.format(CLIText.get().fatalError,
+					e.getMessage()));
 		}
 	}
 
