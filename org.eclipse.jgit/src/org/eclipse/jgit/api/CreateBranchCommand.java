@@ -131,7 +131,7 @@ public class CreateBranchCommand extends GitCommand<Ref> {
 					&& refToCheck.getName().startsWith(Constants.R_HEADS);
 			if (!force && exists)
 				throw new RefAlreadyExistsException(MessageFormat.format(
-						JGitText.get().refAlreadyExists1, name));
+						JGitText.get().refAlreadyExists, name));
 
 			ObjectId startAt = getStartPoint();
 			String startPointFullName = null;

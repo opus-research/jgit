@@ -58,7 +58,6 @@ public class JGitText extends TranslationBundle {
 		return NLS.getBundleFor(JGitText.class);
 	}
 
-	// @formatter:off
 	/***/ public String abbreviationLengthMustBeNonNegative;
 	/***/ public String abortingRebase;
 	/***/ public String abortingRebaseFailed;
@@ -92,7 +91,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cachedPacksPreventsIndexCreation;
 	/***/ public String cannotBeCombined;
 	/***/ public String cannotBeRecursiveWhenTreesAreIncluded;
-	/***/ public String cannotCombineSquashWithNoff;
 	/***/ public String cannotCombineTreeFilterWithRevFilter;
 	/***/ public String cannotCommitOnARepoWithState;
 	/***/ public String cannotCommitWriteTo;
@@ -148,7 +146,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String commitAlreadyExists;
 	/***/ public String commitMessageNotSpecified;
 	/***/ public String commitOnRepoWithoutHEADCurrentlyNotSupported;
-	/***/ public String commitAmendOnInitialNotPossible;
 	/***/ public String compressingObjects;
 	/***/ public String connectionFailed;
 	/***/ public String connectionTimeOut;
@@ -270,7 +267,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String flagNotFromThis;
 	/***/ public String flagsAlreadyCreated;
 	/***/ public String funnyRefname;
-	/***/ public String gcFailed;
 	/***/ public String gitmodulesNotFound;
 	/***/ public String headRequiredToStash;
 	/***/ public String hoursAgo;
@@ -441,7 +437,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String receivePackObjectTooLarge2;
 	/***/ public String receivingObjects;
 	/***/ public String refAlreadyExists;
-	/***/ public String refAlreadyExists1;
 	/***/ public String reflogEntryNotFound;
 	/***/ public String refNotResolved;
 	/***/ public String refUpdateReturnCodeWas;
@@ -484,7 +479,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String serviceNotEnabledNoName;
 	/***/ public String serviceNotPermitted;
 	/***/ public String serviceNotPermittedNoName;
-	/***/ public String shallowCommitsAlreadyInitialized;
 	/***/ public String shortCompressedStreamAt;
 	/***/ public String shortReadOfBlock;
 	/***/ public String shortReadOfOptionalDIRCExtensionExpectedAnotherBytes;
@@ -515,7 +509,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String submoduleParentRemoteUrlInvalid;
 	/***/ public String symlinkCannotBeWrittenAsTheLinkTarget;
 	/***/ public String systemConfigFileInvalid;
-	/***/ public String tagAlreadyExists;
 	/***/ public String tagNameInvalid;
 	/***/ public String tagOnRepoWithoutHEADCurrentlyNotSupported;
 	/***/ public String theFactoryMustNotBeNull;
@@ -570,7 +563,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unsupportedCommand0;
 	/***/ public String unsupportedEncryptionAlgorithm;
 	/***/ public String unsupportedEncryptionVersion;
-	/***/ public String unsupportedGC;
 	/***/ public String unsupportedOperationNotAddAtEnd;
 	/***/ public String unsupportedPackIndexVersion;
 	/***/ public String unsupportedPackVersion;

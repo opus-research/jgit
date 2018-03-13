@@ -353,7 +353,6 @@ public class TemporaryBufferTest {
 
 	@Test
 	public void testDestroyWhileOpen() throws IOException {
-		@SuppressWarnings("resource" /* java 7 */)
 		final TemporaryBuffer b = new TemporaryBuffer.LocalFile();
 		try {
 			b.write(new TestRng(getName())
@@ -412,7 +411,6 @@ public class TemporaryBufferTest {
 
 	@Test
 	public void testHeap() throws IOException {
-		@SuppressWarnings("resource" /* java 7 */)
 		final TemporaryBuffer b = new TemporaryBuffer.Heap(2 * 8 * 1024);
 		final byte[] r = new byte[8 * 1024];
 		b.write(r);

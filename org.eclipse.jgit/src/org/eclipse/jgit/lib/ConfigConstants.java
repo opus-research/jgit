@@ -187,7 +187,4 @@ public class ConfigConstants {
 
 	/** The "pruneexpire" key */
 	public static final String CONFIG_KEY_PRUNEEXPIRE = "pruneexpire";
-
-	/** The "mergeoptions" key */
-	public static final String CONFIG_KEY_MERGEOPTIONS = "mergeoptions";
 }
