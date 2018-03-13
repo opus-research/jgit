@@ -446,9 +446,8 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 				// add, as the pack was already committed via commitPack().
 				// If this is the case return without changing the list.
 				for (DfsPackFile p : o.packs) {
-					if (p.key.equals(newPack.key)) {
+					if (p == newPack)
 						return;
-					}
 				}
 			}
 
