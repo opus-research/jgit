@@ -714,7 +714,7 @@ public class UploadPack {
 			else
 				advertised = refIdSet(getAdvertisedOrDefaultRefs().values());
 
-			request = UploadPackRequest.parseWants(pckIn, biDirectionalPipe);
+			request = UploadPackRequest.parse(pckIn, biDirectionalPipe);
 			if (request.wantIds.isEmpty()) {
 				preUploadHook.onBeginNegotiateRound(this, request.wantIds, 0);
 				preUploadHook.onEndNegotiateRound(
@@ -969,7 +969,7 @@ public class UploadPack {
 		List<ObjectId> peerHas = new ArrayList<>(64);
 		for (;;) {
 			switch (request.parseNegotiateRequest(peerHas)) {
-			case NO_NEGOTIATION:
+			case CLIENT_GONE:
 				return false;
 
 			case RECEIVE_END:

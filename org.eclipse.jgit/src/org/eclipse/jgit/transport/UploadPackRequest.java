@@ -85,7 +85,7 @@ class UploadPackRequest {
 		this.depth = depth;
 	}
 
-	static UploadPackRequest parseWants(
+	static UploadPackRequest parse(
 			PacketLineIn pckIn, boolean biDirectionalPipe) throws IOException {
 		Set<String> options = Collections.emptySet();
 		Set<ObjectId> wantIds = new HashSet<>();
@@ -144,26 +144,11 @@ class UploadPackRequest {
 	}
 
 	enum NegotiateState {
-		/** The negotiate request ends with a packet flush. */
 		RECEIVE_END,
-		/** The negotiate request ends with "done" */
 		RECEIVE_DONE,
-		/**
-		 * There is no negotiate request. No pack file is requested.
-		 * <p>
-		 * If a client wants to know shallow/unshallow data in a non-bidi RPC
-		 * (e.g. smart HTTP), it won't send any "have"s.
-		 */
-		NO_NEGOTIATION,
+		CLIENT_GONE,
 	}
 
-	/**
-	 * Parses which object the peer has.
-	 *
-	 * @param peerHas output the parsed {@link ObjectId}s.
-	 * @return how the request ends
-	 * @throws IOException
-	 */
 	NegotiateState parseNegotiateRequest(List<ObjectId> peerHas)
 			throws IOException {
 		for (;;) {
@@ -171,8 +156,14 @@ class UploadPackRequest {
 			try {
 				line = pckIn.readString();
 			} catch (EOFException e) {
+				// EOF on stateless RPC (aka smart HTTP) and non-shallow request
+				// means the client asked for the updated shallow/unshallow
+				// data, disconnected, and will try another request with actual
+				// want/have. Don't report the EOF here, its a bug in the
+				// protocol that the client just disconnects without sending an
+				// END.
 				if (!biDirectionalPipe && depth > 0)
-					return NegotiateState.NO_NEGOTIATION;
+					return NegotiateState.CLIENT_GONE;
 				throw e;
 			}
 
