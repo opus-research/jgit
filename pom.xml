@@ -51,7 +51,7 @@
   <groupId>org.eclipse.jgit</groupId>
   <artifactId>org.eclipse.jgit-parent</artifactId>
   <packaging>pom</packaging>
-  <version>3.0.0-SNAPSHOT</version>
+  <version>2.4.0-SNAPSHOT</version>
 
   <name>JGit - Parent</name>
   <url>${jgit-url}</url>
@@ -185,6 +185,7 @@
     <servlet-api-version>2.5</servlet-api-version>
     <jetty-version>7.6.0.v20120127</jetty-version>
     <clirr-version>2.4</clirr-version>
+    <jni_package>so</jni_package>
   </properties>
 
   <repositories>
@@ -264,6 +265,12 @@
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>build-helper-maven-plugin</artifactId>
           <version>1.7</version>
+        </plugin>
+
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>native-maven-plugin</artifactId>
+          <version>1.0-alpha-7</version>
         </plugin>
 
         <plugin>
@@ -459,26 +466,19 @@
   </distributionManagement>
 
   <profiles>
+    <!-- Set -Djgit.java6.skip=true to compile with only Java 5 -->
     <profile>
       <id>jgit.java6</id>
-	  <activation>
-	    <jdk>1.6</jdk>
-	  </activation>
+      <activation>
+        <property>
+          <name>!jgit.java6.skip</name>
+        </property>
+      </activation>
       <modules>
         <module>org.eclipse.jgit.console</module>
       </modules>
     </profile>
-    <profile>
-      <id>jgit.java7</id>
-	  <activation>
-	    <jdk>1.7</jdk>
-	  </activation>
-      <modules>
-	<module>org.eclipse.jgit.console</module>
-	<module>org.eclipse.jgit.java7</module>
-	<module>org.eclipse.jgit.java7.test</module>
-      </modules>
-    </profile>
+
     <profile>
       <id>static-checks</id>
       <build>
@@ -493,6 +493,43 @@
           </plugin>
         </plugins>
       </build>
+    </profile>
+
+    <!-- Set -Djgit.native.skip=true to use pure Java -->
+    <profile>
+      <id>jgit.native</id>
+      <activation>
+        <property>
+          <name>!jgit.native.skip</name>
+        </property>
+      </activation>
+      <modules>
+        <module>libjgit_native</module>
+      </modules>
+    </profile>
+
+    <profile>
+      <id>jni_package.macosx</id>
+      <activation>
+        <os>
+          <family>mac</family>
+        </os>
+      </activation>
+      <properties>
+        <jni_package>jnilib</jni_package>
+      </properties>
+    </profile>
+
+    <profile>
+      <id>jni_package.win32</id>
+      <activation>
+        <os>
+          <family>windows</family>
+        </os>
+      </activation>
+      <properties>
+        <jni_package>dll</jni_package>
+      </properties>
     </profile>
   </profiles>
 

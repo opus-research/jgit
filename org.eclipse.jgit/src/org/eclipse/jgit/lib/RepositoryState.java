@@ -400,7 +400,7 @@ public enum RepositoryState {
 
 	/**
 	 * @return true if the repository is currently in a rebase
-	 * @since 3.0
+	 * @since 2.4
 	 */
 	public abstract boolean isRebasing();
 

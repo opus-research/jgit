@@ -52,10 +52,10 @@ import java.util.Set;
 
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.internal.storage.pack.ObjectReuseAsIs;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.storage.pack.ObjectReuseAsIs;
 
 /**
  * Reads an {@link ObjectDatabase} for a single thread.
@@ -444,7 +444,6 @@ public abstract class ObjectReader {
 	 *
 	 * @param avoid
 	 *            true to avoid unreachable objects.
-	 * @since 3.0
 	 */
 	public void setAvoidUnreachableObjects(boolean avoid) {
 		// Do nothing by default.
@@ -456,7 +455,6 @@ public abstract class ObjectReader {
 	 * @return the index or null if one does not exist.
 	 * @throws IOException
 	 *             when the index fails to load
-	 * @since 3.0
 	 */
 	public BitmapIndex getBitmapIndex() throws IOException {
 		return null;

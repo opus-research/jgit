@@ -81,6 +81,9 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.storage.file.CheckoutEntry;
+import org.eclipse.jgit.storage.file.ReflogEntry;
+import org.eclipse.jgit.storage.file.ReflogReader;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -754,7 +757,7 @@ public abstract class Repository {
 
 	private String resolveReflogCheckout(int checkoutNo)
 			throws IOException {
-		List<ReflogEntry> reflogEntries = getReflogReader(Constants.HEAD)
+		List<ReflogEntry> reflogEntries = new ReflogReader(this, Constants.HEAD)
 				.getReverseEntries();
 		for (ReflogEntry entry : reflogEntries) {
 			CheckoutEntry checkout = entry.parseCheckout();
@@ -775,7 +778,7 @@ public abstract class Repository {
 					JGitText.get().invalidReflogRevision, time));
 		}
 		assert number >= 0;
-		ReflogReader reader = getReflogReader(ref.getName());
+		ReflogReader reader = new ReflogReader(this, ref.getName());
 		ReflogEntry entry = reader.getReverseEntry(number);
 		if (entry == null)
 			throw new RevisionSyntaxException(MessageFormat.format(
@@ -1266,9 +1269,7 @@ public abstract class Repository {
 	 * @param refName
 	 * @return a {@link ReflogReader} for the supplied refname, or null if the
 	 *         named ref does not exist.
-	 * @throws IOException
-	 *             the ref could not be accessed.
-	 * @since 3.0
+	 * @throws IOException the ref could not be accessed.
 	 */
 	public abstract ReflogReader getReflogReader(String refName)
 			throws IOException;

@@ -70,6 +70,7 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.transport.FetchConnection;
 import org.eclipse.jgit.transport.HttpTransport;
 import org.eclipse.jgit.transport.Transport;
@@ -91,7 +92,7 @@ public class DumbClientDumbServerTest extends HttpTestCase {
 	public void setUp() throws Exception {
 		super.setUp();
 
-		final TestRepository<Repository> src = createTestRepository();
+		final TestRepository<FileRepository> src = createTestRepository();
 		final File srcGit = src.getRepository().getDirectory();
 		final URI base = srcGit.getParentFile().toURI();
 
