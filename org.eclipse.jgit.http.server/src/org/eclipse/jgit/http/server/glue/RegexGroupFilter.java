@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.http.server.glue;
 
-import static java.lang.Integer.valueOf;
-
 import java.io.IOException;
 import java.text.MessageFormat;
 
@@ -54,6 +52,8 @@ import javax.servlet.FilterConfig;
 import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
+
+import static java.lang.Integer.valueOf;
 
 import org.eclipse.jgit.http.server.HttpServerText;
 

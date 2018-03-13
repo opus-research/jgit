@@ -53,11 +53,10 @@ import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.attributes.Attribute;
 import org.eclipse.jgit.attributes.Attributes;
-import org.eclipse.jgit.attributes.AttributesHandler;
 import org.eclipse.jgit.attributes.AttributesNodeProvider;
 import org.eclipse.jgit.attributes.AttributesProvider;
-import org.eclipse.jgit.attributes.FilterCommandRegistry;
 import org.eclipse.jgit.dircache.DirCacheBuildIterator;
+import org.eclipse.jgit.attributes.AttributesHandler;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -65,7 +64,6 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StopWalkException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig.EolStreamType;
 import org.eclipse.jgit.lib.FileMode;
@@ -315,8 +313,6 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 
 	private Config config;
 
-	private Set<String> filterCommands;
-
 	/**
 	 * Create a new tree walker for a given repository.
 	 *
@@ -361,8 +357,6 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 		if (repo != null) {
 			config = repo.getConfig();
 			attributesNodeProvider = repo.createAttributesNodeProvider();
-			filterCommands = FilterCommandRegistry
-					.getRegisteredFilterCommands();
 		} else {
 			config = null;
 			attributesNodeProvider = null;
@@ -1373,22 +1367,10 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 		String filterCommand = filterCommandsByNameDotType.get(key);
 		if (filterCommand != null)
 			return filterCommand;
-		filterCommand = config.getString(ConfigConstants.CONFIG_FILTER_SECTION,
+		filterCommand = config.getString(Constants.ATTR_FILTER,
 				filterDriverName, filterCommandType);
-		boolean useBuiltin = config.getBoolean(
-				ConfigConstants.CONFIG_FILTER_SECTION,
-				filterDriverName, ConfigConstants.CONFIG_KEY_USEJGITBUILTIN, false);
-		if (useBuiltin) {
-			String builtinFilterCommand = Constants.BUILTIN_FILTER_PREFIX
-					+ filterDriverName + '/' + filterCommandType;
-			if (filterCommands != null
-					&& filterCommands.contains(builtinFilterCommand)) {
-				filterCommand = builtinFilterCommand;
-			}
-		}
-		if (filterCommand != null) {
+		if (filterCommand != null)
 			filterCommandsByNameDotType.put(key, filterCommand);
-		}
 		return filterCommand;
 	}
 }
