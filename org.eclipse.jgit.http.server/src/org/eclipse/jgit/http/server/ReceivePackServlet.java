@@ -104,6 +104,7 @@ class ReceivePackServlet extends RepositoryServlet {
 		final OutputStream os = rsp.getOutputStream();
 		try {
 			os.write(result);
+			os.flush();
 		} finally {
 			os.close();
 		}

@@ -106,6 +106,7 @@ abstract class Sender {
 				int n;
 				while ((n = source.read(buf)) > 0)
 					out.write(buf, 0, n);
+				out.flush();
 			} finally {
 				out.close();
 			}

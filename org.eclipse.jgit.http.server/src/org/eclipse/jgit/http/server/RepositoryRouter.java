@@ -95,7 +95,7 @@ public class RepositoryRouter implements Filter {
 
 	/**
 	 * New router configured with a specific resolver.
-	 * 
+	 *
 	 * @param resolver
 	 *            the resolver to use when matching URL to Git repository.
 	 * @param receivePackFactory
@@ -109,12 +109,7 @@ public class RepositoryRouter implements Filter {
 			throw new NullPointerException("RepositoryResolver not supplied");
 
 		if (receivePackFactory == null)
-			receivePackFactory = new ReceivePackFactory() {
-				public ReceivePack create(HttpServletRequest req, Repository db)
-						throws ServiceNotEnabledException {
-					throw new ServiceNotEnabledException();
-				}
-			};
+			receivePackFactory = ReceivePackFactory.DISABLED;
 
 		this.resolver = resolver;
 		this.receivePackFactory = receivePackFactory;
@@ -131,6 +126,10 @@ public class RepositoryRouter implements Filter {
 		context = filterConfig.getServletContext();
 		servlets = new ArrayList<ServletDefinition>();
 
+		// Each binding is evaluated in the order declared here, when
+		// adding a new binding please be careful to ensure it doesn't
+		// cause a collision with another existing binding.
+		//
 		bind("^/(.*)/(HEAD|refs/.*)$", new GetRefServlet());
 		bind("^/(.*)/info/refs$", new InfoRefsServlet(receivePackFactory));
 		bind("^/(.*)/objects/info/packs$", new InfoPacksServlet());
