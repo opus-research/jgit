@@ -64,7 +64,6 @@ import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
-import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.ignore.IgnoreNode;
 import org.eclipse.jgit.ignore.IgnoreRule;
@@ -182,24 +181,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		ignoreNode = new RootIgnoreNode(entry, repo);
 	}
 
-	/**
-	 * Define the matching {@link DirCacheIterator}, to optimize ObjectIds.
-	 *
-	 * Once the DirCacheIterator has been set this iterator must only be
-	 * advanced by the TreeWalk that is supplied, as it assumes that itself and
-	 * the corresponding DirCacheIterator are positioned on the same file path
-	 * whenever {@link #idBuffer()} is invoked.
-	 *
-	 * @param walk
-	 *            the walk that will be advancing this iterator.
-	 * @param treeId
-	 *            index of the matching {@link DirCacheIterator}.
-	 */
-	public void setDirCacheIterator(TreeWalk walk, int treeId) {
-		state.walk = walk;
-		state.dirCacheTree = treeId;
-	}
-
 	@Override
 	public boolean hasId() {
 		if (contentIdFromPtr == ptr)
@@ -211,21 +192,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	public byte[] idBuffer() {
 		if (contentIdFromPtr == ptr)
 			return contentId;
-
-		if (state.walk != null) {
-			// If there is a matching DirCacheIterator, we can reuse
-			// its idBuffer, but only if we appear to be clean against
-			// the cached index information for the path.
-			//
-			DirCacheIterator i = state.walk.getTree(state.dirCacheTree,
-					DirCacheIterator.class);
-			if (i != null) {
-				DirCacheEntry ent = i.getDirCacheEntry();
-				if (ent != null && !isModified(ent, false /* no content check */))
-					return i.idBuffer();
-			}
-		}
-
 		switch (mode & FileMode.TYPE_MASK) {
 		case FileMode.TYPE_FILE:
 			contentIdFromPtr = ptr;
@@ -562,6 +528,89 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	}
 
 	/**
+	 * The result of a metadata-comparison between the current entry and a
+	 * {@link DirCacheEntry}
+	 */
+	public enum MetadataDiff {
+		/**
+		 * The entries are equal by metaData (mode, length,
+		 * modification-timestamp) or the <code>assumeValid</code> attribute of
+		 * the index entry is set
+		 */
+		EQUAL,
+
+		/**
+		 * The entries are not equal by metaData (mode, length,
+		 * modification-timestamp) or the <code>isUpdateNeeded</code> attribute
+		 * of the index entry is set
+		 */
+		NOT_EQUAL,
+
+		/** index entry is smudged - can't use that entry for comparison */
+		SMUDGED,
+
+		/**
+		 * The entries are equal by metaData (mode, length) but differ by
+		 * modification-timestamp.
+		 */
+		DIFFER_BY_TIMESTAMP
+	}
+
+	/**
+	 * Compare the metadata (mode, length, modification-timestamp) of the
+	 * current entry and a {@link DirCacheEntry}
+	 *
+	 * @param entry
+	 *            the {@link DirCacheEntry} to compare with
+	 * @return a {@link MetadataDiff} which tells whether and how the entries
+	 *         metadata differ
+	 */
+	public MetadataDiff compareMetadata(DirCacheEntry entry) {
+		if (entry.isAssumeValid())
+			return MetadataDiff.EQUAL;
+
+		if (entry.isUpdateNeeded())
+			return MetadataDiff.NOT_EQUAL;
+
+		if (!entry.isSmudged() && (getEntryLength() != entry.getLength()))
+			return MetadataDiff.NOT_EQUAL;
+
+		// Determine difference in mode-bits of file and index-entry. In the
+		// bitwise presentation of modeDiff we'll have a '1' when the two modes
+		// differ at this position.
+		int modeDiff = getEntryRawMode() ^ entry.getRawMode();
+
+		// Do not rely on filemode differences in case of symbolic links
+		if (modeDiff != 0 && !FileMode.SYMLINK.equals(entry.getRawMode())) {
+			// Ignore the executable file bits if WorkingTreeOptions tell me to
+			// do so. Ignoring is done by setting the bits representing a
+			// EXECUTABLE_FILE to '0' in modeDiff
+			if (!state.options.isFileMode())
+				modeDiff &= ~FileMode.EXECUTABLE_FILE.getBits();
+			if (modeDiff != 0)
+				// Report a modification if the modes still (after potentially
+				// ignoring EXECUTABLE_FILE bits) differ
+				return MetadataDiff.NOT_EQUAL;
+		}
+
+		// Git under windows only stores seconds so we round the timestamp
+		// Java gives us if it looks like the timestamp in index is seconds
+		// only. Otherwise we compare the timestamp at millisecond precision.
+		long cacheLastModified = entry.getLastModified();
+		long fileLastModified = getEntryLastModified();
+		if (cacheLastModified % 1000 == 0)
+			fileLastModified = fileLastModified - fileLastModified % 1000;
+
+		if (fileLastModified != cacheLastModified)
+			return MetadataDiff.DIFFER_BY_TIMESTAMP;
+		else if (!entry.isSmudged())
+			// The file is clean when you look at timestamps.
+			return MetadataDiff.EQUAL;
+		else
+			return MetadataDiff.SMUDGED;
+	}
+
+	/**
 	 * Checks whether this entry differs from a given entry from the
 	 * {@link DirCache}.
 	 *
@@ -577,58 +626,25 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 * @return true if content is most likely different.
 	 */
 	public boolean isModified(DirCacheEntry entry, boolean forceContentCheck) {
-		if (entry.isAssumeValid())
-			return false;
-
-		if (entry.isUpdateNeeded())
-			return true;
-
-		if (!entry.isSmudged() && (getEntryLength() != entry.getLength()))
-			return true;
-
-		// Determine difference in mode-bits of file and index-entry. In the
-		// bitwise presentation of modeDiff we'll have a '1' when the two modes
-		// differ at this position.
-		int modeDiff = getEntryRawMode() ^ entry.getRawMode();
-		// Ignore the executable file bits if checkFilemode tells me to do so.
-		// Ignoring is done by setting the bits representing a EXECUTABLE_FILE
-		// to '0' in modeDiff
-		if (!state.options.isFileMode())
-			modeDiff &= ~FileMode.EXECUTABLE_FILE.getBits();
-		if (modeDiff != 0)
-			// Report a modification if the modes still (after potentially
-			// ignoring EXECUTABLE_FILE bits) differ
-			return true;
-
-		// Git under windows only stores seconds so we round the timestamp
-		// Java gives us if it looks like the timestamp in index is seconds
-		// only. Otherwise we compare the timestamp at millisecond precision.
-		long cacheLastModified = entry.getLastModified();
-		long fileLastModified = getEntryLastModified();
-		if (cacheLastModified % 1000 == 0)
-			fileLastModified = fileLastModified - fileLastModified % 1000;
-
-		if (fileLastModified != cacheLastModified) {
-			// The file is dirty by timestamps
-			if (forceContentCheck) {
+		switch (compareMetadata(entry)) {
+		case DIFFER_BY_TIMESTAMP:
+			if (forceContentCheck)
 				// But we are told to look at content even though timestamps
 				// tell us about modification
 				return contentCheck(entry);
-			} else {
+			else
 				// We are told to assume a modification if timestamps differs
 				return true;
-			}
-		} else {
-			// The file is clean when you look at timestamps.
-			if (entry.isSmudged()) {
-				// The file is clean by timestamps but the entry was smudged.
-				// Lets do a content check
-				return contentCheck(entry);
-			} else {
-				// The file is clean by timestamps and the entry is not
-				// smudged: Can't get any cleaner!
-				return false;
-			}
+		case SMUDGED:
+			// The file is clean by timestamps but the entry was smudged.
+			// Lets do a content check
+			return contentCheck(entry);
+		case EQUAL:
+			return false;
+		case NOT_EQUAL:
+			return true;
+		default:
+			return true;
 		}
 	}
 
@@ -872,12 +888,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 		/** Buffer used to perform {@link #contentId} computations. */
 		byte[] contentReadBuffer;
-
-		/** TreeWalk with a (supposedly) matching DirCacheIterator. */
-		TreeWalk walk;
-
-		/** Position of the matching {@link DirCacheIterator}. */
-		int dirCacheTree;
 
 		IteratorState(WorkingTreeOptions options) {
 			this.options = options;
