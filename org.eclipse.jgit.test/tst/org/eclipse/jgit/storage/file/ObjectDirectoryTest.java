@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2012, Google Inc.
- * and other copyright owners as documented in the project's IP log.
+ * Copyright (C) 2012, Roberto Tyley <roberto.tyley@gmail.com>
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -43,64 +42,36 @@
 
 package org.eclipse.jgit.storage.file;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import javaewah.EWAHCompressedBitmap;
-
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.junit.Test;
 
-public class InflatingBitSetTest {
+import java.util.*;
+import java.util.concurrent.*;
+
+public class ObjectDirectoryTest extends RepositoryTestCase {
 
 	@Test
-	public void testMaybeContains() {
-		EWAHCompressedBitmap ecb = new EWAHCompressedBitmap();
-		ecb.set(63);
-		ecb.set(64);
-		ecb.set(128);
-
-		InflatingBitSet ibs = new InflatingBitSet(ecb);
-		assertTrue(ibs.maybeContains(0));
-		assertFalse(ibs.contains(0)); // Advance
-		assertFalse(ibs.maybeContains(0));
-		assertTrue(ibs.maybeContains(63));
-		assertTrue(ibs.maybeContains(64));
-		assertTrue(ibs.maybeContains(65));
-		assertFalse(ibs.maybeContains(129));
+	public void testConcurrentInsertionOfBlobsToTheSameNewFanOutDirectory()
+			throws Exception {
+		ExecutorService e = Executors.newCachedThreadPool();
+		for (int i=0; i < 100; ++i) {
+			ObjectDirectory db = createBareRepository().getObjectDatabase();
+			for (Future f : e.invokeAll(blobInsertersForTheSameFanOutDir(db))) {
+				f.get();
+			}
+		}
 	}
 
-	@Test
-	public void testContainsMany() {
-		EWAHCompressedBitmap ecb = new EWAHCompressedBitmap();
-		ecb.set(64);
-		ecb.set(65);
-		ecb.set(1024);
-
-		InflatingBitSet ibs = new InflatingBitSet(ecb);
-		assertFalse(ibs.contains(0));
-		assertTrue(ibs.contains(64));
-		assertTrue(ibs.contains(65));
-		assertFalse(ibs.contains(66));
-		assertTrue(ibs.contains(1024));
-		assertFalse(ibs.contains(1025));
+	private Collection<Callable<ObjectId>> blobInsertersForTheSameFanOutDir(
+			final ObjectDirectory db) {
+		Callable<ObjectId> callable = new Callable<ObjectId>() {
+			public ObjectId call() throws Exception {
+				return db.newInserter().insert(Constants.OBJ_BLOB, new byte[0]);
+			}
+		};
+		return Collections.nCopies(4, callable);
 	}
 
-	@Test
-	public void testContainsOne() {
-		EWAHCompressedBitmap ecb = new EWAHCompressedBitmap();
-		ecb.set(64);
-
-		InflatingBitSet ibs = new InflatingBitSet(ecb);
-		assertTrue(ibs.contains(64));
-		assertTrue(ibs.contains(64));
-		assertFalse(ibs.contains(65));
-		assertFalse(ibs.contains(63));
-	}
-
-	@Test
-	public void testContainsEmpty() {
-		InflatingBitSet ibs = new InflatingBitSet(new EWAHCompressedBitmap());
-		assertFalse(ibs.maybeContains(0));
-		assertFalse(ibs.contains(0));
-	}
 }

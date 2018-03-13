@@ -252,19 +252,14 @@ class CachedObjectDirectory extends FileObjectDatabase {
 	}
 
 	@Override
-	PackFile openPack(File pack, File idx) throws IOException {
-		return wrapped.openPack(pack, idx);
+	PackFile openPack(File pack) throws IOException {
+		return wrapped.openPack(pack);
 	}
 
 	@Override
 	void selectObjectRepresentation(PackWriter packer, ObjectToPack otp,
 			WindowCursor curs) throws IOException {
 		wrapped.selectObjectRepresentation(packer, otp, curs);
-	}
-
-	@Override
-	Collection<PackFile> getPacks() {
-		return wrapped.getPacks();
 	}
 
 	private static class UnpackedObjectId extends ObjectIdOwnerMap.Entry {

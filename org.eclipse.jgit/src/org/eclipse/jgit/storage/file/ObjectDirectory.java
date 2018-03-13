@@ -43,6 +43,9 @@
 
 package org.eclipse.jgit.storage.file;
 
+import static org.eclipse.jgit.storage.pack.PackExt.INDEX;
+import static org.eclipse.jgit.storage.pack.PackExt.PACK;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -74,6 +77,7 @@ import org.eclipse.jgit.lib.RepositoryCache;
 import org.eclipse.jgit.lib.RepositoryCache.FileKey;
 import org.eclipse.jgit.storage.pack.CachedPack;
 import org.eclipse.jgit.storage.pack.ObjectToPack;
+import org.eclipse.jgit.storage.pack.PackExt;
 import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
@@ -155,10 +159,10 @@ public class ObjectDirectory extends FileObjectDatabase {
 			File[] alternatePaths, FS fs, File shallowFile) throws IOException {
 		config = cfg;
 		objects = dir;
-		infoDirectory = new File(objects, "info");
-		packDirectory = new File(objects, "pack");
-		alternatesFile = new File(infoDirectory, "alternates");
-		cachedPacksFile = new File(infoDirectory, "cached-packs");
+		infoDirectory = new File(objects, "info"); //$NON-NLS-1$
+		packDirectory = new File(objects, "pack"); //$NON-NLS-1$
+		alternatesFile = new File(infoDirectory, "alternates"); //$NON-NLS-1$
+		cachedPacksFile = new File(infoDirectory, "cached-packs"); //$NON-NLS-1$
 		packList = new AtomicReference<PackList>(NO_PACKS);
 		cachedPacks = new AtomicReference<CachedPackList>();
 		unpackedObjectCache = new UnpackedObjectCache();
@@ -237,7 +241,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 	 *         containing objects referenced by commits further back in the
 	 *         history of the repository.
 	 */
-	@Override
 	public Collection<PackFile> getPacks() {
 		PackList list = packList.get();
 		if (list == NO_PACKS)
@@ -328,35 +331,42 @@ public class ObjectDirectory extends FileObjectDatabase {
 	 *
 	 * @param pack
 	 *            path of the pack file to open.
-	 * @param idx
-	 *            path of the corresponding index file.
 	 * @return the pack that was opened and added to the database.
 	 * @throws IOException
 	 *             index file could not be opened, read, or is not recognized as
 	 *             a Git pack file index.
 	 */
-	public PackFile openPack(final File pack, final File idx)
+	public PackFile openPack(final File pack)
 			throws IOException {
 		final String p = pack.getName();
-		final String i = idx.getName();
-
-		if (p.length() != 50 || !p.startsWith("pack-") || !p.endsWith(".pack"))
+		if (p.length() != 50 || !p.startsWith("pack-") || !p.endsWith(".pack")) //$NON-NLS-1$ //$NON-NLS-2$
 			throw new IOException(MessageFormat.format(JGitText.get().notAValidPack, pack));
 
-		if (i.length() != 49 || !i.startsWith("pack-") || !i.endsWith(".idx"))
-			throw new IOException(MessageFormat.format(JGitText.get().notAValidPack, idx));
+		// The pack and index are assumed to exist. The existence of other
+		// extensions needs to be explicitly checked.
+		//
+		final List<PackExt> extensions = new ArrayList<PackExt>(
+				PackExt.values().length);
+		extensions.add(PACK);
+		extensions.add(INDEX);
 
-		if (!p.substring(0, 45).equals(i.substring(0, 45)))
-			throw new IOException(MessageFormat.format(JGitText.get().packDoesNotMatchIndex, pack));
+		final String base = p.substring(0, p.length() - 4);
+		for (PackExt ext : PackExt.values()) {
+			if (ext != PACK && ext != INDEX) {
+				final String name = base + ext.getExtension();
+				if (new File(name).exists())
+					extensions.add(ext);
+			}
+		}
 
-		PackFile res = new PackFile(idx, pack);
+		PackFile res = new PackFile(pack, extensions);
 		insertPack(res);
 		return res;
 	}
 
 	@Override
 	public String toString() {
-		return "ObjectDirectory[" + getDirectory() + "]";
+		return "ObjectDirectory[" + getDirectory() + "]"; //$NON-NLS-1$
 	}
 
 	boolean hasObject1(final AnyObjectId objectId) {
@@ -588,7 +598,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 		// directories are always lazily created. Note that we
 		// try the rename first as the directory likely does exist.
 		//
-		FileUtils.mkdir(dst.getParentFile());
+		FileUtils.mkdir(dst.getParentFile(), true);
 		if (tmp.renameTo(dst)) {
 			dst.setReadOnly();
 			unpackedObjectCache.add(id);
@@ -728,12 +738,19 @@ public class ObjectDirectory extends FileObjectDatabase {
 		for (final String indexName : names) {
 			// Must match "pack-[0-9a-f]{40}.idx" to be an index.
 			//
-			if (indexName.length() != 49 || !indexName.endsWith(".idx"))
+			if (indexName.length() != 49 || !indexName.endsWith(".idx")) //$NON-NLS-1$
 				continue;
 
-			final String base = indexName.substring(0, indexName.length() - 4);
-			final String packName = base + ".pack";
-			if (!names.contains(packName)) {
+			final String base = indexName.substring(0, indexName.length() - 3);
+			final List<PackExt> extensions = new ArrayList<PackExt>(
+					PackExt.values().length);
+			for (PackExt ext : PackExt.values()) {
+				final String name = base + ext.getExtension();
+				if (names.contains(name))
+					extensions.add(ext);
+			}
+
+			if (!extensions.contains(PACK)) {
 				// Sometimes C Git's HTTP fetch transport leaves a
 				// .idx file behind and does not download the .pack.
 				// We have to skip over such useless indexes.
@@ -741,6 +758,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 				continue;
 			}
 
+			final String packName = base + PACK.getExtension();
 			final PackFile oldPack = forReuse.remove(packName);
 			if (oldPack != null) {
 				list.add(oldPack);
@@ -748,8 +766,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 			}
 
 			final File packFile = new File(packDirectory, packName);
-			final File idxFile = new File(packDirectory, indexName);
-			list.add(new PackFile(idxFile, packFile));
+			list.add(new PackFile(packFile, extensions));
 			foundNew = true;
 		}
 
@@ -807,7 +824,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 			return Collections.emptySet();
 		final Set<String> nameSet = new HashSet<String>(nameList.length << 1);
 		for (final String name : nameList) {
-			if (name.startsWith("pack-"))
+			if (name.startsWith("pack-")) //$NON-NLS-1$
 				nameSet.add(name);
 		}
 		return nameSet;

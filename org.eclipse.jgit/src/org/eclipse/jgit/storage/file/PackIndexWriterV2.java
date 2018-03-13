@@ -66,16 +66,12 @@ class PackIndexWriterV2 extends PackIndexWriter {
 	@Override
 	protected void writeImpl() throws IOException {
 		writeTOC(2);
-		writeV2Body();
-		writeChecksumFooter();
-	}
-
-	protected void writeV2Body() throws IOException {
 		writeFanOutTable();
 		writeObjectNames();
 		writeCRCs();
 		writeOffset32();
 		writeOffset64();
+		writeChecksumFooter();
 	}
 
 	private void writeObjectNames() throws IOException {
