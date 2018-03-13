@@ -1275,12 +1275,14 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 				attributesNode = workingTreeIterator.getEntryAttributesNode();
 			}
 			if (attributesNode == null && dirCacheIterator != null) {
-				attributesNode = dirCacheIterator
-						.getEntryAttributesNode(getObjectReader());
+				attributesNode = getAttributesNode(dirCacheIterator
+						.getEntryAttributesNode(getObjectReader()),
+						attributesNode);
 			}
 			if (attributesNode == null && other != null) {
-				attributesNode = other
-						.getEntryAttributesNode(getObjectReader());
+				attributesNode = getAttributesNode(
+						other.getEntryAttributesNode(getObjectReader()),
+						attributesNode);
 			}
 			break;
 		case CHECKOUT_OP:
@@ -1289,11 +1291,14 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 						.getEntryAttributesNode(getObjectReader());
 			}
 			if (dirCacheIterator != null) {
-				attributesNode = dirCacheIterator
-						.getEntryAttributesNode(getObjectReader());
+				attributesNode = getAttributesNode(dirCacheIterator
+						.getEntryAttributesNode(getObjectReader()),
+						attributesNode);
 			}
 			if (attributesNode == null && workingTreeIterator != null) {
-				attributesNode = workingTreeIterator.getEntryAttributesNode();
+				attributesNode = getAttributesNode(
+						workingTreeIterator.getEntryAttributesNode(),
+						attributesNode);
 			}
 			break;
 		default:
@@ -1304,6 +1309,11 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 		}
 
 		return attributesNode;
+	}
+
+	private static AttributesNode getAttributesNode(AttributesNode value,
+			AttributesNode defaultValue) {
+		return (value == null) ? defaultValue : value;
 	}
 
 	/**
