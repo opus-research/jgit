@@ -99,7 +99,9 @@ public class HMACSHA1NonceGenerator implements NonceGenerator {
 		} catch (UnsupportedEncodingException e) {
 			throw new IllegalStateException(e);
 		}
-		return String.format("%d-%s", Long.valueOf(timestamp), toHex(rawHmac)); //$NON-NLS-1$
+		String sentNonce = String.format(
+				"%d-%20X", new Long(timestamp), rawHmac); //$NON-NLS-1$
+		return sentNonce;
 	}
 
 	@Override
@@ -143,16 +145,5 @@ public class HMACSHA1NonceGenerator implements NonceGenerator {
 		} else {
 			return NonceStatus.SLOP;
 		}
-	}
-
-	private static final String HEX = "0123456789ABCDEF"; //$NON-NLS-1$
-
-	private static String toHex(byte[] bytes) {
-		StringBuilder builder = new StringBuilder();
-		for (byte b : bytes) {
-			builder.append(HEX.charAt((b & 0xF0) >> 4));
-			builder.append(HEX.charAt(b & 0xF));
-		}
-		return builder.toString();
 	}
 }
