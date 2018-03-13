@@ -132,10 +132,6 @@ final class DeltaBaseCache {
 				return;
 			}
 		}
-
-		throw new IllegalStateException(String.format(
-				"entry for %s:%d not in table", //$NON-NLS-1$
-				e.pack, Long.valueOf(e.offset)));
 	}
 
 	private void moveToHead(final Slot e) {
@@ -149,17 +145,15 @@ final class DeltaBaseCache {
 		Slot p = e.lruPrev;
 		Slot n = e.lruNext;
 
-		if (p != null) {
+		if (p != null)
 			p.lruNext = n;
-		} else {
+		else
 			lruHead = n;
-		}
 
-		if (n != null) {
+		if (n != null)
 			n.lruPrev = p;
-		} else {
+		else
 			lruTail = p;
-		}
 	}
 
 	private void lruPushHead(final Slot e) {

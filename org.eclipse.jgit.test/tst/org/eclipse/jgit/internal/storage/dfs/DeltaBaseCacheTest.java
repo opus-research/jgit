@@ -77,7 +77,7 @@ public class DeltaBaseCacheTest {
 	}
 
 	@Test
-	public void testCacheLruExpires1() {
+	public void testCacheLruExpires() {
 		byte[] obj1 = put(1, SZ / 4);
 		put(2, SZ / 4);
 		byte[] obj3 = put(3, SZ / 4);
@@ -90,41 +90,15 @@ public class DeltaBaseCacheTest {
 		assertEquals(SZ, cache.getMemoryUsed());
 		assertEquals(SZ, cache.getMemoryUsedByTableForTest());
 		assertEquals(SZ, cache.getMemoryUsedByLruChainForTest());
-		assertNull(cache.get(key, 4));
-		assertNull(cache.get(key, 2));
 
 		get(obj1, 1);
 		get(obj3, 3);
+		assertNull(cache.get(key, 4));
+		assertNull(cache.get(key, 2));
 	}
 
 	@Test
-	public void testCacheLruExpires2() {
-		int pos0 = (0 << 10) | 2;
-		int pos1 = (1 << 10) | 2;
-		int pos2 = (2 << 10) | 2;
-		int pos5 = (5 << 10) | 2;
-		int pos6 = (6 << 10) | 2;
-
-		put(pos0, SZ / 4);
-		put(pos5, SZ / 4);
-		byte[] obj1 = put(pos1, SZ / 4);
-		byte[] obj2 = put(pos2, SZ / 4);
-		assertEquals(SZ, cache.getMemoryUsed());
-
-		byte[] obj6 = put(pos6, SZ / 2);
-		assertEquals(SZ, cache.getMemoryUsed());
-		assertEquals(SZ, cache.getMemoryUsedByTableForTest());
-		assertEquals(SZ, cache.getMemoryUsedByLruChainForTest());
-		assertNull(cache.get(key, pos0));
-		assertNull(cache.get(key, pos5));
-
-		get(obj1, pos1);
-		get(obj2, pos2);
-		get(obj6, pos6);
-	}
-
-	@Test
-	public void testCacheMemoryUsedConsistentWithExpectations() {
+	public void testCacheDataConsistentWithExpectations() {
 		put(1, 32);
 		put(2, 32);
 		put(3, 32);
