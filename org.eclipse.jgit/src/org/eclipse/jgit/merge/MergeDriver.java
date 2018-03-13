@@ -40,20 +40,56 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *******************************************************************************/
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.merge;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
+import org.eclipse.jgit.lib.Config;
 
 /**
- * Interface that can be implemented to perform matching operations against
- * paths.
+ * This interface describes the general contract expected out of a merge driver
+ * as can be registered against JGit.
  */
-public interface PathMatcher {
+public interface MergeDriver {
 	/**
-	 * Checks whether the given path matches this matcher's pattern.
-	 *
-	 * @param path
-	 *            The path to match.
-	 * @return <code>true</code> if <code>path</code> matches this matcher's
-	 *         pattern, <code>false</code> otherwise.
+	 * This will be called by the merge strategy on every file it processes that
+	 * needs a non-trivial merge (both ours and theirs have changed since their
+	 * common ancestor).
+	 * <p>
+	 * Merge drivers are not expected to close the streams they are passed.
+	 * </p>
+	 * 
+	 * @param configuration
+	 *            Configuration of the repository in which we're merging files.
+	 * @param ours
+	 *            An input stream providing access to "ours" version of the file
+	 *            to merge.
+	 * @param theirs
+	 *            An input stream providing access to "theirs" version of the
+	 *            file to merge.
+	 * @param base
+	 *            An input stream providing access to the base (common ancestor
+	 *            of ours and theirs) version of the file to merge.
+	 * @param output
+	 *            Stream in which this is expected to output the result of the
+	 *            merge operation.
+	 * @param commitNames
+	 *            Names of the commits we're currently merging.
+	 * @return <code>true</code> if the merge ended successfully,
+	 *         <code>false</code> in case of conflicts or merge errors.
+	 * @throws IOException
 	 */
-	boolean matches(String path);
+	boolean merge(Config configuration, InputStream ours, InputStream theirs,
+			InputStream base, OutputStream output, String[] commitNames)
+			throws IOException;
+
+	/**
+	 * @return The human-readable name of this merge driver. Note that this will
+	 *         be used as an identifier by the
+	 *         {@link org.eclipse.jgit.merge.MergeDriverRegistry merge driver
+	 *         registry}
+	 */
+	String getName();
 }

@@ -174,9 +174,6 @@ public class FS_POSIX_Java7 extends FS_POSIX {
 		return FileUtil.normalize(name);
 	}
 
-	/**
-	 * @since 3.4
-	 */
 	@Override
 	public PathMatcher getPathMatcher(String globPattern) {
 		return new PathMatcher_Java7(globPattern);

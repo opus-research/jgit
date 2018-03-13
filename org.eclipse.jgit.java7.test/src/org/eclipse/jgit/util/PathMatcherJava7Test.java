@@ -1,5 +1,5 @@
-/*
- * Copyright (C) 2014, Sasa Zivkov <sasa.zivkov@sap.com>, SAP AG
+/*******************************************************************************
+ * Copyright (C) 2014, Obeo
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -39,31 +39,16 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-
-package org.eclipse.jgit.errors;
-
-import java.io.IOException;
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.internal.JGitText;
+ *******************************************************************************/
+package org.eclipse.jgit.util;
 
 /**
- * Thrown when a pack exceeds a given size limit
- *
- * @since 3.3
+ * This will launch the exact same tests as PathMatcherTest, we just make sure
+ * that the used matcher is a Java7 one.
  */
-public class TooLargePackException extends IOException {
-	private static final long serialVersionUID = 1L;
-
-	/**
-	 * Construct a too large pack exception.
-	 *
-	 * @param packSizeLimit
-	 *            the pack size limit (in bytes) that was exceeded
-	 */
-	public TooLargePackException(long packSizeLimit) {
-		super(MessageFormat.format(JGitText.get().receivePackTooLarge,
-				Long.valueOf(packSizeLimit)));
+public class PathMatcherJava7Test extends PathMatcherTest {
+	@Override
+	protected PathMatcher getPathMatcher(String glob) {
+		return new PathMatcher_Java7(glob);
 	}
 }

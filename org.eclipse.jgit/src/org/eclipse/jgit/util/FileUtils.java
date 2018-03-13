@@ -369,12 +369,12 @@ public class FileUtils {
 	 * This will try and make a given path relative to another.
 	 * <p>
 	 * For example, if this is called with the two following paths :
-	 *
+	 * 
 	 * <pre>
 	 * <code>base = "c:\\Users\\jdoe\\eclipse\\git\\project"</code>
 	 * <code>other = "c:\\Users\\jdoe\\eclipse\\git\\another_project\\pom.xml"</code>
 	 * </pre>
-	 * 
+	 *
 	 * This will return "..\\another_project\\pom.xml".
 	 * </p>
 	 * <p>
@@ -384,7 +384,7 @@ public class FileUtils {
 	 * <b>Note</b> that this will return the empty String if <code>base</code>
 	 * and <code>other</code> are equal.
 	 * </p>
-	 * 
+	 *
 	 * @param base
 	 *            The path against which <code>other</code> should be
 	 *            relativized.
@@ -392,7 +392,6 @@ public class FileUtils {
 	 *            The path that will be made relative to <code>base</code>.
 	 * @return A relative path that, when resolved against <code>base</code>,
 	 *         will yield the original <code>other</code>.
-	 * @since 3.4
 	 */
 	public static String relativize(String base, String other) {
 		if (base.equals(other))
