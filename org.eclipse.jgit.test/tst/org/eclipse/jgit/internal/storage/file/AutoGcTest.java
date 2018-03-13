@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2016, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,60 +40,48 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.internal.storage.file;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
-
-import org.junit.After;
-import org.junit.Before;
+import org.eclipse.jgit.lib.ConfigConstants;
+import org.eclipse.jgit.storage.file.FileBasedConfig;
+import org.eclipse.jgit.test.resources.SampleDataRepositoryTestCase;
 import org.junit.Test;
 
-public class FileUtils7Test {
+public class AutoGcTest extends GcTestCase {
 
-	private final File trash = new File(new File("target"), "trash");
-
-	@Before
-	public void setUp() throws Exception {
-		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY | FileUtils.SKIP_MISSING);
-		assertTrue(trash.mkdirs());
-	}
-
-	@After
-	public void tearDown() throws Exception {
-		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY);
+	@Test
+	public void testNotTooManyLooseObjects() {
+		assertFalse("should not find too many loose objects",
+				gc.tooManyLooseObjects());
 	}
 
 	@Test
-	public void testDeleteSymlinkToDirectoryDoesNotDeleteTarget()
-			throws IOException {
-		org.junit.Assume.assumeTrue(FS.DETECTED.supportsSymlinks());
-		FS fs = FS.DETECTED;
-		File dir = new File(trash, "dir");
-		File file = new File(dir, "file");
-		File link = new File(trash, "link");
-		FileUtils.mkdirs(dir);
-		FileUtils.createNewFile(file);
-		fs.createSymLink(link, "dir");
-		FileUtils.delete(link, FileUtils.RECURSIVE);
-		assertFalse(link.exists());
-		assertTrue(dir.exists());
-		assertTrue(file.exists());
+	public void testTooManyLooseObjects() throws Exception {
+		FileBasedConfig c = repo.getConfig();
+		c.setInt(ConfigConstants.CONFIG_GC_SECTION, null,
+				ConfigConstants.CONFIG_KEY_AUTO, 255);
+		c.save();
+		commitChain(10, 50);
+		assertTrue("should find too many loose objects",
+				gc.tooManyLooseObjects());
 	}
 
 	@Test
-	public void testAtomicMove() throws IOException {
-		File src = new File(trash, "src");
-		Files.createFile(src.toPath());
-		File dst = new File(trash, "dst");
-		FileUtils.rename(src, dst, StandardCopyOption.ATOMIC_MOVE);
-		assertFalse(Files.exists(src.toPath()));
-		assertTrue(Files.exists(dst.toPath()));
+	public void testNotTooManyPacks() {
+		assertFalse("should not find too many packs", gc.tooManyPacks());
+	}
+
+	@Test
+	public void testTooManyPacks() throws Exception {
+		FileBasedConfig c = repo.getConfig();
+		c.setInt(ConfigConstants.CONFIG_GC_SECTION, null,
+				ConfigConstants.CONFIG_KEY_AUTOPACKLIMIT, 1);
+		c.save();
+		SampleDataRepositoryTestCase.copyCGitTestPacks(repo);
+
+		assertTrue("should find too many packs", gc.tooManyPacks());
 	}
 }

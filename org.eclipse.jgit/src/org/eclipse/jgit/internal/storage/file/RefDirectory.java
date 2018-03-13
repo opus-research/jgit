@@ -798,7 +798,8 @@ public class RefDirectory extends RefDatabase {
 				return new PackedRefList(parsePackedRefs(br), snapshot,
 						ObjectId.fromRaw(digest.digest()));
 			} catch (IOException e) {
-				if (FileUtils.isStaleFileHandle(e) && retries < maxStaleRetries) {
+				if (FileUtils.isStaleFileHandleInCausalChain(e)
+						&& retries < maxStaleRetries) {
 					if (LOG.isDebugEnabled()) {
 						LOG.debug(MessageFormat.format(
 								JGitText.get().packedRefsHandleIsStale,
@@ -843,6 +844,11 @@ public class RefDirectory extends RefDatabase {
 			}
 
 			int sp = p.indexOf(' ');
+			if (sp < 0) {
+				throw new IOException(MessageFormat.format(
+						JGitText.get().packedRefsCorruptionDetected,
+						packedRefsFile.getAbsolutePath()));
+			}
 			ObjectId id = ObjectId.fromString(p.substring(0, sp));
 			String name = copy(p, sp + 1, p.length());
 			ObjectIdRef cur;

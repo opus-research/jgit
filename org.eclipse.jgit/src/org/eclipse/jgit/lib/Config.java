@@ -58,6 +58,7 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -835,11 +836,11 @@ public class Config {
 		final String s;
 
 		if (value >= GiB && (value % GiB) == 0)
-			s = String.valueOf(value / GiB) + " g"; //$NON-NLS-1$
+			s = String.valueOf(value / GiB) + "g"; //$NON-NLS-1$
 		else if (value >= MiB && (value % MiB) == 0)
-			s = String.valueOf(value / MiB) + " m"; //$NON-NLS-1$
+			s = String.valueOf(value / MiB) + "m"; //$NON-NLS-1$
 		else if (value >= KiB && (value % KiB) == 0)
-			s = String.valueOf(value / KiB) + " k"; //$NON-NLS-1$
+			s = String.valueOf(value / KiB) + "k"; //$NON-NLS-1$
 		else
 			s = String.valueOf(value);
 
@@ -895,7 +896,7 @@ public class Config {
 		if (value instanceof ConfigEnum)
 			n = ((ConfigEnum) value).toConfigValue();
 		else
-			n = value.name().toLowerCase().replace('_', ' ');
+			n = value.name().toLowerCase(Locale.ROOT).replace('_', ' ');
 		setString(section, subsection, name, n);
 	}
 

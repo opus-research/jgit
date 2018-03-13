@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, David Pursehouse <david.pursehouse@gmail.com>
+ * Copyright (C) 2016, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,46 +41,31 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.lfs.lib;
 
-/**
- * Submodule section of a Git configuration file.
- *
- * @since 4.6
+import static org.junit.Assert.assertEquals;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+
+import org.eclipse.jgit.lfs.LfsPointer;
+import org.junit.Test;
+
+/*
+ * Test LfsPointer file abstraction
  */
-public class SubmoduleConfig {
-
-	/**
-	 * Config values for submodule.[name].fetchRecurseSubmodules.
-	 */
-	public enum SubmoduleRecurseMode implements Config.ConfigEnum {
-		/** Unconditionally recurse into all populated submodules. */
-		YES("yes"), //$NON-NLS-1$
-
-		/**
-		 * Only recurse into a populated submodule when the superproject
-		 * retrieves a commit that updates the submodule's reference to a commit
-		 * that isn't already in the local submodule clone.
-		 */
-		ON_DEMAND("on-demand"), //$NON-NLS-1$
-
-		/** Completely disable recursion. */
-		NO("no"); //$NON-NLS-1$
-
-		private final String configValue;
-
-		private SubmoduleRecurseMode(String configValue) {
-			this.configValue = configValue;
-		}
-
-		@Override
-		public String toConfigValue() {
-			return configValue;
-		}
-
-		@Override
-		public boolean matchConfigValue(String s) {
-			return configValue.equals(s);
-		}
+public class LFSPointerTest {
+	@Test
+	public void testEncoding() throws IOException {
+		final String s = "27e15b72937fc8f558da24ac3d50ec20302a4cf21e33b87ae8e4ce90e89c4b10";
+		AnyLongObjectId id = LongObjectId.fromString(s);
+		LfsPointer ptr = new LfsPointer(id, 4);
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		ptr.encode(baos);
+		baos.close();
+		assertEquals("version https://git-lfs.github.com/spec/v1\noid sha256:"
+				+ s + "\nsize 4\n",
+				baos.toString(StandardCharsets.UTF_8.name()));
 	}
 }

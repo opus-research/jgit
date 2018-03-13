@@ -90,6 +90,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String badObjectType;
 	/***/ public String badRef;
 	/***/ public String badSectionEntry;
+	/***/ public String badShallowLine;
 	/***/ public String bareRepositoryNoWorkdirAndIndex;
 	/***/ public String base64InputNotProperlyPadded;
 	/***/ public String baseLengthIncorrect;
@@ -98,6 +99,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String blameNotCommittedYet;
 	/***/ public String blobNotFound;
 	/***/ public String blobNotFoundForPath;
+	/***/ public String blockSizeNotPowerOf2;
 	/***/ public String branchNameInvalid;
 	/***/ public String buildingBitmaps;
 	/***/ public String cachedPacksPreventsIndexCreation;
@@ -174,6 +176,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String checkoutUnexpectedResult;
 	/***/ public String classCastNotA;
 	/***/ public String cloneNonEmptyDirectory;
+	/***/ public String closed;
 	/***/ public String collisionOn;
 	/***/ public String commandRejectedByHook;
 	/***/ public String commandWasCalledInTheWrongState;
@@ -425,6 +428,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidTimeout;
 	/***/ public String invalidTimeUnitValue2;
 	/***/ public String invalidTimeUnitValue3;
+	/***/ public String invalidTreeZeroLengthName;
 	/***/ public String invalidURL;
 	/***/ public String invalidWildcards;
 	/***/ public String invalidRefSpec;
@@ -523,6 +527,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String packedRefsHandleIsStale;
 	/***/ public String packetSizeMustBeAtLeast;
 	/***/ public String packetSizeMustBeAtMost;
+	/***/ public String packedRefsCorruptionDetected;
 	/***/ public String packfileCorruptionDetected;
 	/***/ public String packFileInvalid;
 	/***/ public String packfileIsTruncated;
@@ -662,7 +667,9 @@ public class JGitText extends TranslationBundle {
 	/***/ public String tagOnRepoWithoutHEADCurrentlyNotSupported;
 	/***/ public String transactionAborted;
 	/***/ public String theFactoryMustNotBeNull;
+	/***/ public String timeIsUncertain;
 	/***/ public String timerAlreadyTerminated;
+	/***/ public String tooManyCommands;
 	/***/ public String tooManyIncludeRecursions;
 	/***/ public String topologicalSortRequired;
 	/***/ public String transportExceptionBadRef;
@@ -730,6 +737,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unsupportedOperationNotAddAtEnd;
 	/***/ public String unsupportedPackIndexVersion;
 	/***/ public String unsupportedPackVersion;
+	/***/ public String unsupportedRepositoryDescription;
 	/***/ public String updatingHeadFailed;
 	/***/ public String updatingReferences;
 	/***/ public String updatingRefFailed;
