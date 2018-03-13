@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2013, Mathias Kinzler <mathias.kinzler@sap.com>
+ * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -85,15 +85,6 @@ public class RebaseResult {
 			}
 		},
 		/**
-		 * Stopped for editing in the context of an interactive rebase
-		 */
-		EDIT {
-			@Override
-			public boolean isSuccessful() {
-				return false;
-			}
-		},
-		/**
 		 * Failed; the original HEAD was restored
 		 */
 		FAILED {
@@ -140,16 +131,6 @@ public class RebaseResult {
 			public boolean isSuccessful() {
 				return false;
 			}
-		},
-
-		/**
-		 * Interactive rebase has been prepared
-		 */
-		INTERACTIVE_PREPARED {
-			@Override
-			public boolean isSuccessful() {
-				return false;
-			}
 		};
 
 		/**
@@ -171,9 +152,6 @@ public class RebaseResult {
 	static final RebaseResult NOTHING_TO_COMMIT_RESULT = new RebaseResult(
 			Status.NOTHING_TO_COMMIT);
 
-	static final RebaseResult INTERACTIVE_PREPARED_RESULT =  new RebaseResult(
-			Status.INTERACTIVE_PREPARED);
-
 	private final Status status;
 
 	private final RevCommit currentCommit;
@@ -192,10 +170,9 @@ public class RebaseResult {
 	 *
 	 * @param commit
 	 *            current commit
-	 * @param status
 	 */
-	RebaseResult(RevCommit commit, RebaseResult.Status status) {
-		this.status = status;
+	RebaseResult(RevCommit commit) {
+		status = Status.STOPPED;
 		currentCommit = commit;
 	}
 
