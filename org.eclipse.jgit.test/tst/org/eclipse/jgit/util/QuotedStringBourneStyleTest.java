@@ -44,14 +44,11 @@
 package org.eclipse.jgit.util;
 
 import static org.eclipse.jgit.util.QuotedString.BOURNE;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotSame;
+import junit.framework.TestCase;
 
 import org.eclipse.jgit.lib.Constants;
-import org.junit.Test;
 
-public class QuotedStringBourneStyleTest {
+public class QuotedStringBourneStyleTest extends TestCase {
 	private static void assertQuote(final String in, final String exp) {
 		final String r = BOURNE.quote(in);
 		assertNotSame(in, r);
@@ -65,39 +62,32 @@ public class QuotedStringBourneStyleTest {
 		assertEquals(exp, r);
 	}
 
-	@Test
 	public void testQuote_Empty() {
 		assertEquals("''", BOURNE.quote(""));
 	}
 
-	@Test
 	public void testDequote_Empty1() {
 		assertEquals("", BOURNE.dequote(new byte[0], 0, 0));
 	}
 
-	@Test
 	public void testDequote_Empty2() {
 		assertEquals("", BOURNE.dequote(new byte[] { '\'', '\'' }, 0, 2));
 	}
 
-	@Test
 	public void testDequote_SoleSq() {
 		assertEquals("", BOURNE.dequote(new byte[] { '\'' }, 0, 1));
 	}
 
-	@Test
 	public void testQuote_BareA() {
 		assertQuote("a", "a");
 	}
 
-	@Test
 	public void testDequote_BareA() {
 		final String in = "a";
 		final byte[] b = Constants.encode(in);
 		assertEquals(in, BOURNE.dequote(b, 0, b.length));
 	}
 
-	@Test
 	public void testDequote_BareABCZ_OnlyBC() {
 		final String in = "abcz";
 		final byte[] b = Constants.encode(in);
@@ -105,12 +95,10 @@ public class QuotedStringBourneStyleTest {
 		assertEquals("bc", BOURNE.dequote(b, p, p + 2));
 	}
 
-	@Test
 	public void testDequote_LoneBackslash() {
 		assertDequote("\\", "\\");
 	}
 
-	@Test
 	public void testQuote_NamedEscapes() {
 		assertQuote("'", "'\\''");
 		assertQuote("!", "'\\!'");
@@ -119,7 +107,6 @@ public class QuotedStringBourneStyleTest {
 		assertQuote("a!b", "a'\\!'b");
 	}
 
-	@Test
 	public void testDequote_NamedEscapes() {
 		assertDequote("'", "'\\''");
 		assertDequote("!", "'\\!'");

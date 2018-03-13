@@ -44,11 +44,6 @@
 
 package org.eclipse.jgit.storage.file;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.File;
 import java.io.IOException;
 
@@ -60,21 +55,18 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
-import org.junit.Test;
 
 /**
  * Tests for setting up the working directory when creating a Repository
  */
 public class RepositorySetupWorkDirTest extends LocalDiskRepositoryTestCase {
 
-	@Test
 	public void testIsBare_CreateRepositoryFromArbitraryGitDir()
 			throws Exception {
 		File gitDir = getFile("workdir");
 		assertTrue(new FileRepository(gitDir).isBare());
 	}
 
-	@Test
 	public void testNotBare_CreateRepositoryFromDotGitGitDir() throws Exception {
 		File gitDir = getFile("workdir", Constants.DOT_GIT);
 		Repository repo = new FileRepository(gitDir);
@@ -83,7 +75,6 @@ public class RepositorySetupWorkDirTest extends LocalDiskRepositoryTestCase {
 		assertGitdirPath(repo, "workdir", Constants.DOT_GIT);
 	}
 
-	@Test
 	public void testWorkdirIsParentDir_CreateRepositoryFromDotGitGitDir()
 			throws Exception {
 		File gitDir = getFile("workdir", Constants.DOT_GIT);
@@ -92,7 +83,6 @@ public class RepositorySetupWorkDirTest extends LocalDiskRepositoryTestCase {
 		assertEquals(workdir, "workdir");
 	}
 
-	@Test
 	public void testNotBare_CreateRepositoryFromWorkDirOnly() throws Exception {
 		File workdir = getFile("workdir", "repo");
 		FileRepository repo = new FileRepositoryBuilder().setWorkTree(workdir).build();
@@ -101,7 +91,6 @@ public class RepositorySetupWorkDirTest extends LocalDiskRepositoryTestCase {
 		assertGitdirPath(repo, "workdir", "repo", Constants.DOT_GIT);
 	}
 
-	@Test
 	public void testWorkdirIsDotGit_CreateRepositoryFromWorkDirOnly()
 			throws Exception {
 		File workdir = getFile("workdir", "repo");
@@ -109,7 +98,6 @@ public class RepositorySetupWorkDirTest extends LocalDiskRepositoryTestCase {
 		assertGitdirPath(repo, "workdir", "repo", Constants.DOT_GIT);
 	}
 
-	@Test
 	public void testNotBare_CreateRepositoryFromGitDirOnlyWithWorktreeConfig()
 			throws Exception {
 		File gitDir = getFile("workdir", "repoWithConfig");
@@ -121,7 +109,6 @@ public class RepositorySetupWorkDirTest extends LocalDiskRepositoryTestCase {
 		assertGitdirPath(repo, "workdir", "repoWithConfig");
 	}
 
-	@Test
 	public void testBare_CreateRepositoryFromGitDirOnlyWithBareConfigTrue()
 			throws Exception {
 		File gitDir = getFile("workdir", "repoWithConfig");
@@ -130,7 +117,6 @@ public class RepositorySetupWorkDirTest extends LocalDiskRepositoryTestCase {
 		assertTrue(repo.isBare());
 	}
 
-	@Test
 	public void testWorkdirIsParent_CreateRepositoryFromGitDirOnlyWithBareConfigFalse()
 			throws Exception {
 		File gitDir = getFile("workdir", "repoWithBareConfigTrue", "child");
@@ -139,7 +125,6 @@ public class RepositorySetupWorkDirTest extends LocalDiskRepositoryTestCase {
 		assertWorkdirPath(repo, "workdir", "repoWithBareConfigTrue");
 	}
 
-	@Test
 	public void testNotBare_CreateRepositoryFromGitDirOnlyWithBareConfigFalse()
 			throws Exception {
 		File gitDir = getFile("workdir", "repoWithBareConfigFalse", "child");
@@ -150,7 +135,6 @@ public class RepositorySetupWorkDirTest extends LocalDiskRepositoryTestCase {
 		assertGitdirPath(repo, "workdir", "repoWithBareConfigFalse", "child");
 	}
 
-	@Test
 	public void testExceptionThrown_BareRepoGetWorkDir() throws Exception {
 		File gitDir = getFile("workdir");
 		try {
@@ -161,7 +145,6 @@ public class RepositorySetupWorkDirTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testExceptionThrown_BareRepoGetIndex() throws Exception {
 		File gitDir = getFile("workdir");
 		try {
@@ -172,7 +155,6 @@ public class RepositorySetupWorkDirTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testExceptionThrown_BareRepoGetIndexFile() throws Exception {
 		File gitDir = getFile("workdir");
 		try {

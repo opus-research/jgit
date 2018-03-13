@@ -1,5 +1,8 @@
 /*
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2008-2009, Google Inc.
+ * Copyright (C) 2008, Imran M Yousuf <imyousuf@smartitengineering.com>
+ * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2006-2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,50 +44,44 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.nls;
+package org.eclipse.jgit.storage.file;
 
-import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.awtui.UIText;
-import org.eclipse.jgit.console.ConsoleText;
-import org.eclipse.jgit.http.server.HttpServerText;
-import org.eclipse.jgit.iplog.IpLogText;
-import org.eclipse.jgit.pgm.CLIText;
-import org.junit.Before;
-import org.junit.Test;
+import java.io.File;
+import java.io.IOException;
 
-public class RootLocaleTest {
-	@Before
-	public void setUp() {
-		NLS.setLocale(NLS.ROOT_LOCALE);
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectLoader;
+import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
+import org.eclipse.jgit.util.JGitTestUtil;
+
+public class T0004_PackReader extends SampleDataRepositoryTestCase {
+	private static final String PACK_NAME = "pack-34be9032ac282b11fa9babdc2b2a93ca996c9c2f";
+	private static final File TEST_PACK = JGitTestUtil.getTestResourceFile(PACK_NAME + ".pack");
+	private static final File TEST_IDX = JGitTestUtil.getTestResourceFile(PACK_NAME + ".idx");
+
+	public void test003_lookupCompressedObject() throws IOException {
+		final PackFile pr;
+		final ObjectId id;
+		final ObjectLoader or;
+
+		id = ObjectId.fromString("902d5476fa249b7abc9d84c611577a81381f0327");
+		pr = new PackFile(TEST_IDX, TEST_PACK);
+		or = pr.get(new WindowCursor(null), id);
+		assertNotNull(or);
+		assertEquals(Constants.OBJ_TREE, or.getType());
+		assertEquals(35, or.getSize());
+		pr.close();
 	}
 
-	@Test
-	public void testJGitText() {
-		NLS.getBundleFor(JGitText.class);
-	}
+	public void test004_lookupDeltifiedObject() throws IOException {
+		final ObjectId id;
+		final ObjectLoader or;
 
-	@Test
-	public void testHttpServerText() {
-		NLS.getBundleFor(HttpServerText.class);
-	}
-
-	@Test
-	public void testConsoleText() {
-		NLS.getBundleFor(ConsoleText.class);
-	}
-
-	@Test
-	public void testCLIText() {
-		NLS.getBundleFor(CLIText.class);
-	}
-
-	@Test
-	public void testUIText() {
-		NLS.getBundleFor(UIText.class);
-	}
-
-	@Test
-	public void testIpLogText() {
-		NLS.getBundleFor(IpLogText.class);
+		id = ObjectId.fromString("5b6e7c66c276e7610d4a73c70ec1a1f7c1003259");
+		or = db.open(id);
+		assertNotNull(or);
+		assertEquals(Constants.OBJ_BLOB, or.getType());
+		assertEquals(18009, or.getSize());
 	}
 }

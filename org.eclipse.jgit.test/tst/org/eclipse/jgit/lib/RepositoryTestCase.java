@@ -46,8 +46,6 @@
 
 package org.eclipse.jgit.lib;
 
-import static org.junit.Assert.assertEquals;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -65,7 +63,6 @@ import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.util.FileUtils;
-import org.junit.Before;
 
 /**
  * Base class for most JGit unit tests.
@@ -125,8 +122,7 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 	protected File trash;
 
 	@Override
-	@Before
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
 		super.setUp();
 		db = createWorkRepository();
 		trash = db.getWorkTree();

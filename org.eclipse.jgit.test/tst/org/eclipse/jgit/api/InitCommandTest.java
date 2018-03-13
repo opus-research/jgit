@@ -42,28 +42,20 @@
  */
 package org.eclipse.jgit.api;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.File;
 import java.io.IOException;
 
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.util.FileUtils;
-import org.junit.Before;
-import org.junit.Test;
 
 public class InitCommandTest extends RepositoryTestCase {
 
 	@Override
-	@Before
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
 		super.setUp();
 	}
 
-	@Test
 	public void testInitRepository() {
 		try {
 			File directory = createTempDirectory("testInitRepository");
@@ -76,7 +68,6 @@ public class InitCommandTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testInitBareRepository() {
 		try {
 			File directory = createTempDirectory("testInitBareRepository");
