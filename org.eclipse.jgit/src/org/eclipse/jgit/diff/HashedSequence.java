@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008-2009, Google Inc.
- * Copyright (C) 2009, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,69 +41,32 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.merge;
-
-import java.io.IOException;
-
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Repository;
+package org.eclipse.jgit.diff;
 
 /**
- * Trivial merge strategy to make the resulting tree exactly match an input.
- * <p>
- * This strategy can be used to cauterize an entire side branch of history, by
- * setting the output tree to one of the inputs, and ignoring any of the paths
- * of the other inputs.
+ * Wraps a {@link Sequence} to assign hash codes to elements.
+ *
+ * This sequence acts as a proxy for the real sequence, caching element hash
+ * codes so they don't need to be recomputed each time. Sequences of this type
+ * must be used with a {@link HashedSequenceComparator}.
+ *
+ * To construct an instance of this type use {@link HashedSequencePair}.
+ *
+ * @param <S>
+ *            the base sequence type.
  */
-public class StrategyOneSided extends MergeStrategy {
-	private final String strategyName;
+public final class HashedSequence<S extends Sequence> extends Sequence {
+	final S base;
 
-	private final int treeIndex;
+	final int[] hashes;
 
-	/**
-	 * Create a new merge strategy to select a specific input tree.
-	 *
-	 * @param name
-	 *            name of this strategy.
-	 * @param index
-	 *            the position of the input tree to accept as the result.
-	 */
-	protected StrategyOneSided(final String name, final int index) {
-		strategyName = name;
-		treeIndex = index;
+	HashedSequence(S base, int[] hashes) {
+		this.base = base;
+		this.hashes = hashes;
 	}
 
 	@Override
-	public String getName() {
-		return strategyName;
-	}
-
-	@Override
-	public Merger newMerger(final Repository db) {
-		return new OneSide(db, treeIndex);
-	}
-
-	@Override
-	public Merger newMerger(final Repository db, boolean inCore) {
-		return new OneSide(db, treeIndex);
-	}
-
-	static class OneSide extends Merger {
-		private final int treeIndex;
-
-		protected OneSide(final Repository local, final int index) {
-			super(local);
-			treeIndex = index;
-		}
-
-		@Override
-		protected boolean mergeImpl() throws IOException {
-			return treeIndex < sourceTrees.length;
-		}
-
-		@Override
-		public ObjectId getResultTreeId() {
-			return sourceTrees[treeIndex];
-		}
+	public int size() {
+		return base.size();
 	}
 }

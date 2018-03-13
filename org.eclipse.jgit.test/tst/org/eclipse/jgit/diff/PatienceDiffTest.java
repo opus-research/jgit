@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008-2009, Google Inc.
- * Copyright (C) 2009, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,69 +41,37 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.merge;
+package org.eclipse.jgit.diff;
 
-import java.io.IOException;
+import org.eclipse.jgit.diff.DiffPerformanceTest.CharArray;
+import org.eclipse.jgit.diff.DiffPerformanceTest.CharCmp;
 
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Repository;
-
-/**
- * Trivial merge strategy to make the resulting tree exactly match an input.
- * <p>
- * This strategy can be used to cauterize an entire side branch of history, by
- * setting the output tree to one of the inputs, and ignoring any of the paths
- * of the other inputs.
- */
-public class StrategyOneSided extends MergeStrategy {
-	private final String strategyName;
-
-	private final int treeIndex;
-
-	/**
-	 * Create a new merge strategy to select a specific input tree.
-	 *
-	 * @param name
-	 *            name of this strategy.
-	 * @param index
-	 *            the position of the input tree to accept as the result.
-	 */
-	protected StrategyOneSided(final String name, final int index) {
-		strategyName = name;
-		treeIndex = index;
-	}
-
+public class PatienceDiffTest extends AbstractDiffTestCase {
 	@Override
-	public String getName() {
-		return strategyName;
+	protected DiffAlgorithm algorithm() {
+		PatienceDiff pd = new PatienceDiff();
+		pd.setFallbackAlgorithm(null);
+		return pd;
 	}
 
-	@Override
-	public Merger newMerger(final Repository db) {
-		return new OneSide(db, treeIndex);
+	public void testEdit_NoUniqueMiddleSideA() {
+		EditList r = diff(t("aRRSSz"), t("aSSRRz"));
+		assertEquals(1, r.size());
+		assertEquals(new Edit(1, 5, 1, 5), r.get(0));
 	}
 
-	@Override
-	public Merger newMerger(final Repository db, boolean inCore) {
-		return new OneSide(db, treeIndex);
+	public void testEdit_NoUniqueMiddleSideB() {
+		EditList r = diff(t("aRSz"), t("aSSRRz"));
+		assertEquals(1, r.size());
+		assertEquals(new Edit(1, 3, 1, 5), r.get(0));
 	}
 
-	static class OneSide extends Merger {
-		private final int treeIndex;
-
-		protected OneSide(final Repository local, final int index) {
-			super(local);
-			treeIndex = index;
-		}
-
-		@Override
-		protected boolean mergeImpl() throws IOException {
-			return treeIndex < sourceTrees.length;
-		}
-
-		@Override
-		public ObjectId getResultTreeId() {
-			return sourceTrees[treeIndex];
-		}
+	public void testPerformanceTestDeltaLength() {
+		String a = DiffTestDataGenerator.generateSequence(40000, 971, 3);
+		String b = DiffTestDataGenerator.generateSequence(40000, 1621, 5);
+		CharArray ac = new CharArray(a);
+		CharArray bc = new CharArray(b);
+		EditList r = algorithm().diff(new CharCmp(), ac, bc);
+		assertEquals(25, r.size());
 	}
 }

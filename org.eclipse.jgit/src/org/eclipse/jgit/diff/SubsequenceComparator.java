@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008-2009, Google Inc.
- * Copyright (C) 2009, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,69 +41,39 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.merge;
-
-import java.io.IOException;
-
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Repository;
+package org.eclipse.jgit.diff;
 
 /**
- * Trivial merge strategy to make the resulting tree exactly match an input.
- * <p>
- * This strategy can be used to cauterize an entire side branch of history, by
- * setting the output tree to one of the inputs, and ignoring any of the paths
- * of the other inputs.
+ * Wrap another comparator for use with {@link Subsequence}.
+ *
+ * This comparator acts as a proxy for the real comparator, translating element
+ * indexes on the fly by adding the subsequence's begin offset to them.
+ * Comparators of this type must be used with a {@link Subsequence}.
+ *
+ * @param <S>
+ *            the base sequence type.
  */
-public class StrategyOneSided extends MergeStrategy {
-	private final String strategyName;
-
-	private final int treeIndex;
+public final class SubsequenceComparator<S extends Sequence> extends
+		SequenceComparator<Subsequence<S>> {
+	private final SequenceComparator<? super S> cmp;
 
 	/**
-	 * Create a new merge strategy to select a specific input tree.
+	 * Construct a comparator wrapping another comparator.
 	 *
-	 * @param name
-	 *            name of this strategy.
-	 * @param index
-	 *            the position of the input tree to accept as the result.
+	 * @param cmp
+	 *            the real comparator.
 	 */
-	protected StrategyOneSided(final String name, final int index) {
-		strategyName = name;
-		treeIndex = index;
+	public SubsequenceComparator(SequenceComparator<? super S> cmp) {
+		this.cmp = cmp;
 	}
 
 	@Override
-	public String getName() {
-		return strategyName;
+	public boolean equals(Subsequence<S> a, int ai, Subsequence<S> b, int bi) {
+		return cmp.equals(a.base, ai + a.begin, b.base, bi + b.begin);
 	}
 
 	@Override
-	public Merger newMerger(final Repository db) {
-		return new OneSide(db, treeIndex);
-	}
-
-	@Override
-	public Merger newMerger(final Repository db, boolean inCore) {
-		return new OneSide(db, treeIndex);
-	}
-
-	static class OneSide extends Merger {
-		private final int treeIndex;
-
-		protected OneSide(final Repository local, final int index) {
-			super(local);
-			treeIndex = index;
-		}
-
-		@Override
-		protected boolean mergeImpl() throws IOException {
-			return treeIndex < sourceTrees.length;
-		}
-
-		@Override
-		public ObjectId getResultTreeId() {
-			return sourceTrees[treeIndex];
-		}
+	public int hash(Subsequence<S> seq, int ptr) {
+		return cmp.hash(seq.base, ptr + seq.begin);
 	}
 }

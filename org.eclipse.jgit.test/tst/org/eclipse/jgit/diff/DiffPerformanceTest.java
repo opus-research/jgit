@@ -62,7 +62,7 @@ import org.eclipse.jgit.util.CPUTimeStopWatch;
  * diffs between chunks of different length, measure the needed time and check
  * that time/(N*D) does not differ more than a certain factor.
  */
-public class MyersDiffPerformanceTest extends TestCase {
+public class DiffPerformanceTest extends TestCase {
 	private static final long longTaskBoundary = 5000000000L;
 
 	private static final int minCPUTimerTicks = 10;
@@ -164,14 +164,14 @@ public class MyersDiffPerformanceTest extends TestCase {
 		CharArray ac = new CharArray(a);
 		CharArray bc = new CharArray(b);
 		CharCmp cmp = new CharCmp();
-		MyersDiff<CharArray> myersDiff = null;
+		int D = 0;
 		int cpuTimeChanges = 0;
 		long lastReadout = 0;
 		long interimTime = 0;
 		int repetitions = 0;
 		stopwatch.start();
 		while (cpuTimeChanges < minCPUTimerTicks && interimTime < longTaskBoundary) {
-			myersDiff = new MyersDiff<CharArray>(cmp, ac, bc);
+			D = MyersDiff.INSTANCE.diff(cmp, ac, bc).size();
 			repetitions++;
 			interimTime = stopwatch.readout();
 			if (interimTime != lastReadout) {
@@ -181,12 +181,12 @@ public class MyersDiffPerformanceTest extends TestCase {
 		}
 		ret.runningTime = stopwatch.stop() / repetitions;
 		ret.N = ac.size() + bc.size();
-		ret.D = myersDiff.getEdits().size();
+		ret.D = D;
 
 		return ret;
 	}
 
-	private static class CharArray extends Sequence {
+	static class CharArray extends Sequence {
 		final char[] array;
 
 		public CharArray(String s) {
@@ -199,7 +199,7 @@ public class MyersDiffPerformanceTest extends TestCase {
 		}
 	}
 
-	private static class CharCmp extends SequenceComparator<CharArray> {
+	static class CharCmp extends SequenceComparator<CharArray> {
 		@Override
 		public boolean equals(CharArray a, int ai, CharArray b, int bi) {
 			return a.array[ai] == b.array[bi];

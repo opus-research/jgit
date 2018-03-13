@@ -106,43 +106,41 @@ import org.eclipse.jgit.util.LongList;
  *            type of sequence.
  */
 public class MyersDiff<S extends Sequence> {
+	/** Singleton instance of MyersDiff. */
+	public static final DiffAlgorithm INSTANCE = new DiffAlgorithm() {
+		public <S extends Sequence> EditList diffNonCommon(
+				SequenceComparator<? super S> cmp, S a, S b) {
+			return new MyersDiff<S>(cmp, a, b).edits;
+		}
+	};
+
 	/**
 	 * The list of edits found during the last call to {@link #calculateEdits()}
 	 */
 	protected EditList edits;
 
 	/** Comparison function for sequences. */
-	protected SequenceComparator<S> cmp;
+	protected HashedSequenceComparator<S> cmp;
 
 	/**
 	 * The first text to be compared. Referred to as "Text A" in the comments
 	 */
-	protected S a;
+	protected HashedSequence<S> a;
 
 	/**
 	 * The second text to be compared. Referred to as "Text B" in the comments
 	 */
-	protected S b;
+	protected HashedSequence<S> b;
 
-	/**
-	 * The only constructor
-	 *
-	 * @param cmp comparison method for this execution.
-	 * @param a   the text A which should be compared
-	 * @param b   the text B which should be compared
-	 */
-	public MyersDiff(SequenceComparator<S> cmp, S a, S b) {
-		this.cmp = cmp;
-		this.a = a;
-		this.b = b;
+	private MyersDiff(SequenceComparator<? super S> cmp, S a, S b) {
+		HashedSequencePair<S> pair;
+
+		pair = new HashedSequencePair<S>(cmp, a, b);
+		this.cmp = pair.getComparator();
+		this.a = pair.getA();
+		this.b = pair.getB();
+
 		calculateEdits();
-	}
-
-	/**
-	 * @return the list of edits found during the last call to {@link #calculateEdits()}
-	 */
-	public EditList getEdits() {
-		return edits;
 	}
 
 	// TODO: use ThreadLocal for future multi-threaded operations
@@ -537,8 +535,8 @@ if (k < beginK || k > endK)
 		try {
 			RawText a = new RawText(new java.io.File(args[0]));
 			RawText b = new RawText(new java.io.File(args[1]));
-			MyersDiff diff = new MyersDiff(RawTextComparator.DEFAULT, a, b);
-			System.out.println(diff.getEdits().toString());
+			EditList r = INSTANCE.diff(RawTextComparator.DEFAULT, a, b);
+			System.out.println(r.toString());
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008-2009, Google Inc.
- * Copyright (C) 2009, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,70 +40,52 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-package org.eclipse.jgit.merge;
+package org.eclipse.jgit.api;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
 
-import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevTag;
+import org.eclipse.jgit.transport.RefSpec;
+import org.eclipse.jgit.transport.RemoteConfig;
+import org.eclipse.jgit.transport.URIish;
 
-/**
- * Trivial merge strategy to make the resulting tree exactly match an input.
- * <p>
- * This strategy can be used to cauterize an entire side branch of history, by
- * setting the output tree to one of the inputs, and ignoring any of the paths
- * of the other inputs.
- */
-public class StrategyOneSided extends MergeStrategy {
-	private final String strategyName;
+public class FetchCommandTest extends RepositoryTestCase {
 
-	private final int treeIndex;
+	public void testFetch() throws JGitInternalException, IOException,
+			GitAPIException, URISyntaxException {
 
-	/**
-	 * Create a new merge strategy to select a specific input tree.
-	 *
-	 * @param name
-	 *            name of this strategy.
-	 * @param index
-	 *            the position of the input tree to accept as the result.
-	 */
-	protected StrategyOneSided(final String name, final int index) {
-		strategyName = name;
-		treeIndex = index;
+		// create other repository
+		Repository db2 = createWorkRepository();
+		Git git2 = new Git(db2);
+
+		// setup the first repository to fetch from the second repository
+		final Config config = db.getConfig();
+		RemoteConfig remoteConfig = new RemoteConfig(config, "test");
+		URIish uri = new URIish(db2.getDirectory().toURI().toURL());
+		remoteConfig.addURI(uri);
+		remoteConfig.update(config);
+
+		// create some refs via commits and tag
+		RevCommit commit = git2.commit().setMessage("initial commit").call();
+		RevTag tag = git2.tag().setName("tag").call();
+
+		Git git1 = new Git(db);
+
+		RefSpec spec = new RefSpec("refs/heads/master:refs/heads/x");
+		git1.fetch().setRemote("test").setRefSpecs(spec)
+				.call();
+
+		assertEquals(commit.getId(),
+				db.resolve(commit.getId().getName() + "^{commit}"));
+		assertEquals(tag.getId(), db.resolve(tag.getId().getName()));
+
 	}
 
-	@Override
-	public String getName() {
-		return strategyName;
-	}
-
-	@Override
-	public Merger newMerger(final Repository db) {
-		return new OneSide(db, treeIndex);
-	}
-
-	@Override
-	public Merger newMerger(final Repository db, boolean inCore) {
-		return new OneSide(db, treeIndex);
-	}
-
-	static class OneSide extends Merger {
-		private final int treeIndex;
-
-		protected OneSide(final Repository local, final int index) {
-			super(local);
-			treeIndex = index;
-		}
-
-		@Override
-		protected boolean mergeImpl() throws IOException {
-			return treeIndex < sourceTrees.length;
-		}
-
-		@Override
-		public ObjectId getResultTreeId() {
-			return sourceTrees[treeIndex];
-		}
-	}
 }

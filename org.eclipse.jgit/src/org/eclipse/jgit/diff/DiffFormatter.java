@@ -118,6 +118,8 @@ public class DiffFormatter {
 
 	private int abbreviationLength = 7;
 
+	private DiffAlgorithm diffAlgorithm = MyersDiff.INSTANCE;
+
 	private RawTextComparator comparator = RawTextComparator.DEFAULT;
 
 	private int binaryFileThreshold = DEFAULT_BINARY_FILE_THRESHOLD;
@@ -204,6 +206,17 @@ public class DiffFormatter {
 			throw new IllegalArgumentException(
 					JGitText.get().abbreviationLengthMustBeNonNegative);
 		abbreviationLength = count;
+	}
+
+	/**
+	 * Set the algorithm that constructs difference output.
+	 *
+	 * @param alg
+	 *            the algorithm to produce text file differences.
+	 * @see MyersDiff#INSTANCE
+	 */
+	public void setDiffAlgorithm(DiffAlgorithm alg) {
+		diffAlgorithm = alg;
 	}
 
 	/**
@@ -869,8 +882,8 @@ public class DiffFormatter {
 				type = PatchType.BINARY;
 
 			} else {
-				res.a = new RawText(comparator, aRaw);
-				res.b = new RawText(comparator, bRaw);
+				res.a = new RawText(aRaw);
+				res.b = new RawText(bRaw);
 				editList = diff(res.a, res.b);
 				type = PatchType.UNIFIED;
 
@@ -893,7 +906,7 @@ public class DiffFormatter {
 	}
 
 	private EditList diff(RawText a, RawText b) {
-		return new MyersDiff<RawText>(comparator, a, b).getEdits();
+		return diffAlgorithm.diff(comparator, a, b);
 	}
 
 	private void assertHaveRepository() {

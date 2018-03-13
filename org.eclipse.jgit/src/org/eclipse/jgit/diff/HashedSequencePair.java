@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008-2009, Google Inc.
- * Copyright (C) 2009, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,69 +41,68 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.merge;
-
-import java.io.IOException;
-
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Repository;
+package org.eclipse.jgit.diff;
 
 /**
- * Trivial merge strategy to make the resulting tree exactly match an input.
- * <p>
- * This strategy can be used to cauterize an entire side branch of history, by
- * setting the output tree to one of the inputs, and ignoring any of the paths
- * of the other inputs.
+ * Wraps two {@link Sequence} instances to cache their element hash codes.
+ *
+ * This pair wraps two sequences that contain cached hash codes for the input
+ * sequences.
+ *
+ * @param <S>
+ *            the base sequence type.
  */
-public class StrategyOneSided extends MergeStrategy {
-	private final String strategyName;
+public class HashedSequencePair<S extends Sequence> {
+	private final SequenceComparator<? super S> cmp;
 
-	private final int treeIndex;
+	private final S baseA;
+
+	private final S baseB;
+
+	private HashedSequence<S> cachedA;
+
+	private HashedSequence<S> cachedB;
 
 	/**
-	 * Create a new merge strategy to select a specific input tree.
+	 * Construct a pair to provide fast hash codes.
 	 *
-	 * @param name
-	 *            name of this strategy.
-	 * @param index
-	 *            the position of the input tree to accept as the result.
+	 * @param cmp
+	 *            the base comparator for the sequence elements.
+	 * @param a
+	 *            the A sequence.
+	 * @param b
+	 *            the B sequence.
 	 */
-	protected StrategyOneSided(final String name, final int index) {
-		strategyName = name;
-		treeIndex = index;
+	public HashedSequencePair(SequenceComparator<? super S> cmp, S a, S b) {
+		this.cmp = cmp;
+		this.baseA = a;
+		this.baseB = b;
 	}
 
-	@Override
-	public String getName() {
-		return strategyName;
+	/** @return obtain a comparator that uses the cached hash codes. */
+	public HashedSequenceComparator<S> getComparator() {
+		return new HashedSequenceComparator<S>(cmp);
 	}
 
-	@Override
-	public Merger newMerger(final Repository db) {
-		return new OneSide(db, treeIndex);
+	/** @return wrapper around A that includes cached hash codes. */
+	public HashedSequence<S> getA() {
+		if (cachedA == null)
+			cachedA = wrap(baseA);
+		return cachedA;
 	}
 
-	@Override
-	public Merger newMerger(final Repository db, boolean inCore) {
-		return new OneSide(db, treeIndex);
+	/** @return wrapper around B that includes cached hash codes. */
+	public HashedSequence<S> getB() {
+		if (cachedB == null)
+			cachedB = wrap(baseB);
+		return cachedB;
 	}
 
-	static class OneSide extends Merger {
-		private final int treeIndex;
-
-		protected OneSide(final Repository local, final int index) {
-			super(local);
-			treeIndex = index;
-		}
-
-		@Override
-		protected boolean mergeImpl() throws IOException {
-			return treeIndex < sourceTrees.length;
-		}
-
-		@Override
-		public ObjectId getResultTreeId() {
-			return sourceTrees[treeIndex];
-		}
+	private HashedSequence<S> wrap(S base) {
+		final int end = base.size();
+		final int[] hashes = new int[end];
+		for (int ptr = 0; ptr < end; ptr++)
+			hashes[ptr] = cmp.hash(base, ptr);
+		return new HashedSequence<S>(base, hashes);
 	}
 }
