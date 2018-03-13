@@ -810,7 +810,7 @@ public class UploadPack {
 		Map<String, Ref> refs = getAdvertisedOrDefaultRefs();
 		findSymrefs(adv, refs);
 		advertised = adv.send(refs);
-		if (adv.isEmpty() && db.resolve(Constants.HEAD) != null)
+		if (adv.isEmpty())
 			adv.advertiseId(ObjectId.zeroId(), "capabilities^{}"); //$NON-NLS-1$
 		adv.end();
 	}
