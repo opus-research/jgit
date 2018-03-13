@@ -219,8 +219,7 @@ abstract class HttpAuthMethod {
 			if (credentialsProvider.supports(u, p)
 					&& credentialsProvider.get(uri, u, p)) {
 				username = u.getValue();
-				char[] v = p.getValue();
-				password = (v == null) ? null : new String(p.getValue());
+				password = new String(p.getValue());
 				p.clear();
 			} else
 				return false;

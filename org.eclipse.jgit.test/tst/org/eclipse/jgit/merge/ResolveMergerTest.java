@@ -88,36 +88,35 @@ public class ResolveMergerTest extends RepositoryTestCase {
 		file = new File(folder1, "file2.txt");
 		write(file, "folder1--file2.txt");
 
-		try (Git git = new Git(db)) {
-			git.add().addFilepattern(folder1.getName()).call();
-			RevCommit base = git.commit().setMessage("adding folder").call();
+		Git git = new Git(db);
+		git.add().addFilepattern(folder1.getName()).call();
+		RevCommit base = git.commit().setMessage("adding folder").call();
 
-			recursiveDelete(folder1);
-			git.rm().addFilepattern("folder1/file1.txt")
-					.addFilepattern("folder1/file2.txt").call();
-			RevCommit other = git.commit()
-					.setMessage("removing folders on 'other'").call();
+		recursiveDelete(folder1);
+		git.rm().addFilepattern("folder1/file1.txt")
+				.addFilepattern("folder1/file2.txt").call();
+		RevCommit other = git.commit()
+				.setMessage("removing folders on 'other'").call();
 
-			git.checkout().setName(base.name()).call();
+		git.checkout().setName(base.name()).call();
 
-			file = new File(db.getWorkTree(), "unrelated.txt");
-			write(file, "unrelated");
+		file = new File(db.getWorkTree(), "unrelated.txt");
+		write(file, "unrelated");
 
-			git.add().addFilepattern("unrelated.txt").call();
-			RevCommit head = git.commit().setMessage("Adding another file").call();
+		git.add().addFilepattern("unrelated.txt").call();
+		RevCommit head = git.commit().setMessage("Adding another file").call();
 
-			// Untracked file to cause failing path for delete() of folder1
-			// but that's ok.
-			file = new File(folder1, "file3.txt");
-			write(file, "folder1--file3.txt");
+		// Untracked file to cause failing path for delete() of folder1
+		// but that's ok.
+		file = new File(folder1, "file3.txt");
+		write(file, "folder1--file3.txt");
 
-			ResolveMerger merger = (ResolveMerger) strategy.newMerger(db, false);
-			merger.setCommitNames(new String[] { "BASE", "HEAD", "other" });
-			merger.setWorkingTreeIterator(new FileTreeIterator(db));
-			boolean ok = merger.merge(head.getId(), other.getId());
-			assertTrue(ok);
-			assertTrue(file.exists());
-		}
+		ResolveMerger merger = (ResolveMerger) strategy.newMerger(db, false);
+		merger.setCommitNames(new String[] { "BASE", "HEAD", "other" });
+		merger.setWorkingTreeIterator(new FileTreeIterator(db));
+		boolean ok = merger.merge(head.getId(), other.getId());
+		assertTrue(ok);
+		assertTrue(file.exists());
 	}
 
 	/**
@@ -631,7 +630,7 @@ public class ResolveMergerTest extends RepositoryTestCase {
 		// ResolveMerge
 		try {
 			MergeResult mergeResult = git.merge().setStrategy(strategy)
-					.include(git.getRepository().exactRef("refs/heads/side"))
+					.include(git.getRepository().getRef("refs/heads/side"))
 					.call();
 			assertEquals(MergeStrategy.RECURSIVE, strategy);
 			assertEquals(MergeResult.MergeStatus.MERGED,

@@ -119,20 +119,13 @@ public abstract class RefWriter {
 				continue;
 			}
 
-			ObjectId objectId = r.getObjectId();
-			if (objectId == null) {
-				// Symrefs to unborn branches aren't advertised in the info/refs
-				// file.
-				continue;
-			}
-			objectId.copyTo(tmp, w);
+			r.getObjectId().copyTo(tmp, w);
 			w.write('\t');
 			w.write(r.getName());
 			w.write('\n');
 
-			ObjectId peeledObjectId = r.getPeeledObjectId();
-			if (peeledObjectId != null) {
-				peeledObjectId.copyTo(tmp, w);
+			if (r.getPeeledObjectId() != null) {
+				r.getPeeledObjectId().copyTo(tmp, w);
 				w.write('\t');
 				w.write(r.getName());
 				w.write("^{}\n"); //$NON-NLS-1$
@@ -174,21 +167,14 @@ public abstract class RefWriter {
 			if (r.getStorage() != Ref.Storage.PACKED)
 				continue;
 
-			ObjectId objectId = r.getObjectId();
-			if (objectId == null) {
-				// A packed ref cannot be a symref, let alone a symref
-				// to an unborn branch.
-				throw new NullPointerException();
-			}
-			objectId.copyTo(tmp, w);
+			r.getObjectId().copyTo(tmp, w);
 			w.write(' ');
 			w.write(r.getName());
 			w.write('\n');
 
-			ObjectId peeledObjectId = r.getPeeledObjectId();
-			if (peeledObjectId != null) {
+			if (r.getPeeledObjectId() != null) {
 				w.write('^');
-				peeledObjectId.copyTo(tmp, w);
+				r.getPeeledObjectId().copyTo(tmp, w);
 				w.write('\n');
 			}
 		}

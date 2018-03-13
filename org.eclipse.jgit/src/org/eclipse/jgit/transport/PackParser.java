@@ -122,14 +122,14 @@ public abstract class PackParser {
 
 	private InputStream in;
 
-	byte[] buf;
+	private byte[] buf;
 
 	/** Position in the input stream of {@code buf[0]}. */
 	private long bBase;
 
 	private int bOffset;
 
-	int bAvail;
+	private int bAvail;
 
 	private ObjectChecker objCheck;
 
@@ -1049,11 +1049,8 @@ public abstract class PackParser {
 			final byte[] data) throws IOException {
 		if (objCheck != null) {
 			try {
-				objCheck.check(id, type, data);
+				objCheck.check(type, data);
 			} catch (CorruptObjectException e) {
-				if (e.getErrorType() != null) {
-					throw e;
-				}
 				throw new CorruptObjectException(MessageFormat.format(
 						JGitText.get().invalidObject,
 						Constants.typeString(type),
@@ -1144,13 +1141,13 @@ public abstract class PackParser {
 	}
 
 	// Consume cnt bytes from the buffer.
-	void use(final int cnt) {
+	private void use(final int cnt) {
 		bOffset += cnt;
 		bAvail -= cnt;
 	}
 
 	// Ensure at least need bytes are available in in {@link #buf}.
-	int fill(final Source src, final int need) throws IOException {
+	private int fill(final Source src, final int need) throws IOException {
 		while (bAvail < need) {
 			int next = bOffset + bAvail;
 			int free = buf.length - next;

@@ -81,14 +81,15 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 	public void setUp() throws Exception {
 		WindowCacheConfig windowCacheConfig = new WindowCacheConfig();
 		windowCacheConfig.setPackedGitOpenFiles(1);
-		windowCacheConfig.install();
+		WindowCache.reconfigure(windowCacheConfig);
 		super.setUp();
 	}
 
 	@After
 	public void tearDown() throws Exception {
 		super.tearDown();
-		new WindowCacheConfig().install();
+		WindowCacheConfig windowCacheConfig = new WindowCacheConfig();
+		WindowCache.reconfigure(windowCacheConfig);
 	}
 
 	@Test
@@ -205,14 +206,12 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 	private static void whackCache() {
 		final WindowCacheConfig config = new WindowCacheConfig();
 		config.setPackedGitOpenFiles(1);
-		config.install();
+		WindowCache.reconfigure(config);
 	}
 
 	private RevObject parse(final AnyObjectId id)
 			throws MissingObjectException, IOException {
-		try (RevWalk rw = new RevWalk(db)) {
-			return rw.parseAny(id);
-		}
+		return new RevWalk(db).parseAny(id);
 	}
 
 	private File[] pack(final Repository src, final RevObject... list)
@@ -281,6 +280,7 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 
 	private RevObject writeBlob(final Repository repo, final String data)
 			throws IOException {
+		final RevWalk revWalk = new RevWalk(repo);
 		final byte[] bytes = Constants.encode(data);
 		final ObjectId id;
 		try (ObjectInserter inserter = repo.newObjectInserter()) {
@@ -293,8 +293,6 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 		} catch (MissingObjectException e) {
 			// Ok
 		}
-		try (RevWalk revWalk = new RevWalk(repo)) {
-			return revWalk.lookupBlob(id);
-		}
+		return revWalk.lookupBlob(id);
 	}
 }

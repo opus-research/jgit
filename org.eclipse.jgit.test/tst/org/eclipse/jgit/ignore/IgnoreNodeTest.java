@@ -55,6 +55,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.ignore.IgnoreNode.MatchResult;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.FileMode;
@@ -62,7 +63,6 @@ import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.util.FileUtils;
-import org.eclipse.jgit.util.SystemReader;
 import org.junit.Test;
 
 /**
@@ -468,9 +468,6 @@ public class IgnoreNodeTest extends RepositoryTestCase {
 
 	@Test
 	public void testTrailingSpaces() throws IOException {
-		// Windows can't create files with trailing spaces
-		// If this assumption fails the test is halted and ignored.
-		org.junit.Assume.assumeFalse(SystemReader.getInstance().isWindows());
 		writeTrashFile("a  /a", "");
 		writeTrashFile("a  /a ", "");
 		writeTrashFile("a  /a  ", "");
@@ -508,7 +505,7 @@ public class IgnoreNodeTest extends RepositoryTestCase {
 						.toString());
 	}
 
-	private void beginWalk() {
+	private void beginWalk() throws CorruptObjectException {
 		walk = new TreeWalk(db);
 		walk.addTree(new FileTreeIterator(db));
 	}
