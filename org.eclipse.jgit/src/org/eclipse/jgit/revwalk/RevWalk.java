@@ -192,8 +192,6 @@ public class RevWalk implements Iterable<RevCommit> {
 
 	private boolean retainBody;
 
-	boolean shallowCommitsInitialized;
-
 	/**
 	 * Create a new revision walker for a given repository.
 	 *
@@ -622,9 +620,6 @@ public class RevWalk implements Iterable<RevCommit> {
 	 * <p>
 	 * The commit may or may not exist in the repository. It is impossible to
 	 * tell from this method's return value.
-	 * <p>
-	 * See {@link #parseHeaders(RevObject)} and {@link #parseBody(RevObject)}
-	 * for loading contents.
 	 *
 	 * @param id
 	 *            name of the commit object.
@@ -1211,7 +1206,6 @@ public class RevWalk implements Iterable<RevCommit> {
 		roots.clear();
 		queue = new DateRevQueue();
 		pending = new StartGenerator(this);
-		shallowCommitsInitialized = false;
 	}
 
 	/**
@@ -1314,19 +1308,5 @@ public class RevWalk implements Iterable<RevCommit> {
 		final int carry = c.flags & carryFlags;
 		if (carry != 0)
 			RevCommit.carryFlags(c, carry);
-	}
-
-	void initializeShallowCommits() throws IOException {
-		if (shallowCommitsInitialized)
-			throw new IllegalStateException(
-					JGitText.get().shallowCommitsAlreadyInitialized);
-
-		shallowCommitsInitialized = true;
-
-		if (reader == null)
-			return;
-
-		for (ObjectId id : reader.getShallowCommits())
-			lookupCommit(id).parents = RevCommit.NO_PARENTS;
 	}
 }

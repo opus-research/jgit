@@ -85,7 +85,6 @@ public abstract class RepositoryEvent<T extends RepositoryListener> {
 	 */
 	public abstract void dispatch(T listener);
 
-	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
 		String type = getClass().getSimpleName();

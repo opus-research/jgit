@@ -51,8 +51,6 @@ import org.eclipse.jgit.util.SystemReader;
 
 /**
  * An alternative PrintWriter that doesn't catch exceptions.
- *
- * @since 2.2
  */
 public class ThrowingPrintWriter extends Writer {
 
@@ -70,7 +68,7 @@ public class ThrowingPrintWriter extends Writer {
 		this.out = out;
 		LF = AccessController.doPrivileged(new PrivilegedAction<String>() {
 			public String run() {
-				return SystemReader.getInstance().getProperty("line.separator"); //$NON-NLS-1$
+				return SystemReader.getInstance().getProperty("line.separator");
 			}
 		});
 	}

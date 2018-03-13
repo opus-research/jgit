@@ -192,7 +192,7 @@ public class FileBasedConfig extends StoredConfig {
 			bos.write(0xEF);
 			bos.write(0xBB);
 			bos.write(0xBF);
-			bos.write(text.getBytes(RawParseUtils.UTF8_CHARSET.name()));
+			bos.write(text.getBytes(RawParseUtils.UTF8_CHARSET));
 			out = bos.toByteArray();
 		} else {
 			out = Constants.encode(text);
@@ -225,7 +225,6 @@ public class FileBasedConfig extends StoredConfig {
 		return ObjectId.fromRaw(Constants.newMessageDigest().digest(rawText));
 	}
 
-	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
 		return getClass().getSimpleName() + "[" + getFile().getPath() + "]";

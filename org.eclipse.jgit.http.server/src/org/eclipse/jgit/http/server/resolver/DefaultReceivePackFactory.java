@@ -104,7 +104,7 @@ public class DefaultReceivePackFactory implements
 		throw new ServiceNotAuthorizedException();
 	}
 
-	private static ReceivePack createFor(final HttpServletRequest req,
+	private ReceivePack createFor(final HttpServletRequest req,
 			final Repository db, final String user) {
 		final ReceivePack rp = new ReceivePack(db);
 		rp.setRefLogIdent(toPersonIdent(req, user));

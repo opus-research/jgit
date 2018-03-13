@@ -42,8 +42,7 @@
  */
 package org.eclipse.jgit.storage.file;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.*;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -55,6 +54,7 @@ import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.IO;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 public class FileBasedConfigTest {

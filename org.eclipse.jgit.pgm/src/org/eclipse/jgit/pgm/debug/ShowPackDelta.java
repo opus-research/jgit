@@ -90,11 +90,11 @@ class ShowPackDelta extends TextBuiltin {
 		outw.println(BinaryDelta.format(delta));
 	}
 
-	private static byte[] getDelta(ObjectReader reader, RevObject obj)
+	private byte[] getDelta(ObjectReader reader, RevObject obj)
 			throws IOException, MissingObjectException,
 			StoredObjectRepresentationNotAvailableException {
 		ObjectReuseAsIs asis = (ObjectReuseAsIs) reader;
-		ObjectToPack target = asis.newObjectToPack(obj, obj.getType());
+		ObjectToPack target = asis.newObjectToPack(obj);
 
 		PackWriter pw = new PackWriter(reader) {
 			@Override
@@ -119,7 +119,6 @@ class ShowPackDelta extends TextBuiltin {
 			ptr++;
 		ptr++;
 
-		@SuppressWarnings("resource" /* java 7 */)
 		TemporaryBuffer.Heap raw = new TemporaryBuffer.Heap(bufArray.length);
 		InflaterInputStream inf = new InflaterInputStream(
 				new ByteArrayInputStream(bufArray, ptr, bufArray.length));

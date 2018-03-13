@@ -142,11 +142,6 @@ class CachedObjectDirectory extends FileObjectDatabase {
 	}
 
 	@Override
-	Set<ObjectId> getShallowCommits() throws IOException {
-		return wrapped.getShallowCommits();
-	}
-
-	@Override
 	Collection<? extends CachedPack> getCachedPacks() throws IOException {
 		return wrapped.getCachedPacks();
 	}
@@ -252,19 +247,14 @@ class CachedObjectDirectory extends FileObjectDatabase {
 	}
 
 	@Override
-	PackFile openPack(File pack) throws IOException {
-		return wrapped.openPack(pack);
+	PackFile openPack(File pack, File idx) throws IOException {
+		return wrapped.openPack(pack, idx);
 	}
 
 	@Override
 	void selectObjectRepresentation(PackWriter packer, ObjectToPack otp,
 			WindowCursor curs) throws IOException {
 		wrapped.selectObjectRepresentation(packer, otp, curs);
-	}
-
-	@Override
-	Collection<PackFile> getPacks() {
-		return wrapped.getPacks();
 	}
 
 	private static class UnpackedObjectId extends ObjectIdOwnerMap.Entry {
