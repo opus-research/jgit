@@ -53,6 +53,7 @@ import java.io.InputStream;
 
 import org.eclipse.jgit.api.errors.PatchApplyException;
 import org.eclipse.jgit.api.errors.PatchFormatException;
+import org.eclipse.jgit.diff.DiffFormatterReflowTest;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.junit.Test;
@@ -85,7 +86,9 @@ public class ApplyCommandTest extends RepositoryTestCase {
 
 		return git
 				.apply()
-				.setPatch(getTestResource(name + ".patch")).call();
+				.setPatch(
+						DiffFormatterReflowTest.class.getResourceAsStream(name
+								+ ".patch")).call();
 	}
 
 	@Test
@@ -186,7 +189,8 @@ public class ApplyCommandTest extends RepositoryTestCase {
 	}
 
 	private static byte[] readFile(final String patchFile) throws IOException {
-		final InputStream in = getTestResource(patchFile);
+		final InputStream in = DiffFormatterReflowTest.class
+				.getResourceAsStream(patchFile);
 		if (in == null) {
 			fail("No " + patchFile + " test vector");
 			return null; // Never happens
@@ -201,10 +205,5 @@ public class ApplyCommandTest extends RepositoryTestCase {
 		} finally {
 			in.close();
 		}
-	}
-
-	private static InputStream getTestResource(final String patchFile) {
-		return ApplyCommandTest.class.getClassLoader()
-				.getResourceAsStream("org/eclipse/jgit/diff/" + patchFile);
 	}
 }
