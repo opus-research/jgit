@@ -61,13 +61,4 @@ public class UnmergedPathsException extends GitAPIException {
 	public UnmergedPathsException(Throwable cause) {
 		super(JGitText.get().unmergedPaths, cause);
 	}
-
-	/**
-	 * @param message
-	 * @param cause
-	 * @since 4.1
-	 */
-	public UnmergedPathsException(String message, Throwable cause) {
-		super(message, cause);
-	}
 }

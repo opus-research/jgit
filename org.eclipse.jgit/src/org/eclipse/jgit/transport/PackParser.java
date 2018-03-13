@@ -122,20 +122,18 @@ public abstract class PackParser {
 
 	private InputStream in;
 
-	byte[] buf;
+	private byte[] buf;
 
 	/** Position in the input stream of {@code buf[0]}. */
 	private long bBase;
 
 	private int bOffset;
 
-	int bAvail;
+	private int bAvail;
 
 	private ObjectChecker objCheck;
 
 	private boolean allowThin;
-
-	private boolean checkObjectCollisions;
 
 	private boolean needBaseObjectIds;
 
@@ -206,7 +204,6 @@ public abstract class PackParser {
 		objectDigest = Constants.newMessageDigest();
 		tempObjectId = new MutableObjectId();
 		packDigest = Constants.newMessageDigest();
-		checkObjectCollisions = true;
 	}
 
 	/** @return true if a thin pack (missing base objects) is permitted. */
@@ -225,39 +222,6 @@ public abstract class PackParser {
 	 */
 	public void setAllowThin(final boolean allow) {
 		allowThin = allow;
-	}
-
-	/**
-	 * @return if true received objects are verified to prevent collisions.
-	 * @since 4.1
-	 */
-	protected boolean isCheckObjectCollisions() {
-		return checkObjectCollisions;
-	}
-
-	/**
-	 * Enable checking for collisions with existing objects.
-	 * <p>
-	 * By default PackParser looks for each received object in the repository.
-	 * If the object already exists, the existing object is compared
-	 * byte-for-byte with the newly received copy to ensure they are identical.
-	 * The receive is aborted with an exception if any byte differs. This check
-	 * is necessary to prevent an evil attacker from supplying a replacement
-	 * object into this repository in the event that a discovery enabling SHA-1
-	 * collisions is made.
-	 * <p>
-	 * This check may be very costly to perform, and some repositories may have
-	 * other ways to segregate newly received object data. The check is enabled
-	 * by default, but can be explicitly disabled if the implementation can
-	 * provide the same guarantee, or is willing to accept the risks associated
-	 * with bypassing the check.
-	 *
-	 * @param check
-	 *            true to enable collision checking (strongly encouraged).
-	 * @since 4.1
-	 */
-	protected void setCheckObjectCollisions(boolean check) {
-		checkObjectCollisions = check;
 	}
 
 	/**
@@ -565,7 +529,7 @@ public abstract class PackParser {
 		} finally {
 			try {
 				if (readCurs != null)
-					readCurs.close();
+					readCurs.release();
 			} finally {
 				readCurs = null;
 			}
@@ -848,7 +812,7 @@ public abstract class PackParser {
 
 		for (final DeltaChain base : missing) {
 			if (base.head != null)
-				throw new MissingObjectException(base, "delta base"); //$NON-NLS-1$
+				throw new MissingObjectException(base, "delta base");
 		}
 
 		onEndThinPack();
@@ -1024,8 +988,7 @@ public abstract class PackParser {
 			}
 			inf.close();
 			tempObjectId.fromRaw(objectDigest.digest(), 0);
-			checkContentLater = isCheckObjectCollisions()
-					&& readCurs.has(tempObjectId);
+			checkContentLater = readCurs.has(tempObjectId);
 			data = null;
 
 		} else {
@@ -1059,19 +1022,17 @@ public abstract class PackParser {
 			}
 		}
 
-		if (isCheckObjectCollisions()) {
-			try {
-				final ObjectLoader ldr = readCurs.open(id, type);
-				final byte[] existingData = ldr.getCachedBytes(data.length);
-				if (!Arrays.equals(data, existingData)) {
-					throw new IOException(MessageFormat.format(
-							JGitText.get().collisionOn, id.name()));
-				}
-			} catch (MissingObjectException notLocal) {
-				// This is OK, we don't have a copy of the object locally
-				// but the API throws when we try to read it as usually its
-				// an error to read something that doesn't exist.
+		try {
+			final ObjectLoader ldr = readCurs.open(id, type);
+			final byte[] existingData = ldr.getCachedBytes(data.length);
+			if (!Arrays.equals(data, existingData)) {
+				throw new IOException(MessageFormat.format(
+						JGitText.get().collisionOn, id.name()));
 			}
+		} catch (MissingObjectException notLocal) {
+			// This is OK, we don't have a copy of the object locally
+			// but the API throws when we try to read it as usually its
+			// an error to read something that doesn't exist.
 		}
 	}
 
@@ -1141,13 +1102,13 @@ public abstract class PackParser {
 	}
 
 	// Consume cnt bytes from the buffer.
-	void use(final int cnt) {
+	private void use(final int cnt) {
 		bOffset += cnt;
 		bAvail -= cnt;
 	}
 
 	// Ensure at least need bytes are available in in {@link #buf}.
-	int fill(final Source src, final int need) throws IOException {
+	private int fill(final Source src, final int need) throws IOException {
 		while (bAvail < need) {
 			int next = bOffset + bAvail;
 			int free = buf.length - next;
@@ -1174,8 +1135,7 @@ public abstract class PackParser {
 				break;
 			}
 			if (next <= 0)
-				throw new EOFException(
-						JGitText.get().packfileIsTruncatedNoParam);
+				throw new EOFException(JGitText.get().packfileIsTruncated);
 			bAvail += next;
 		}
 		return bOffset;

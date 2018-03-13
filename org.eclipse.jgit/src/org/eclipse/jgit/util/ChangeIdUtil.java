@@ -115,10 +115,8 @@ public class ChangeIdUtil {
 		b.append(committer.toExternalString());
 		b.append("\n\n"); //$NON-NLS-1$
 		b.append(cleanMessage);
-		try (ObjectInserter f = new ObjectInserter.Formatter()) {
-			return f.idFor(Constants.OBJ_COMMIT, //
-					b.toString().getBytes(Constants.CHARACTER_ENCODING));
-		}
+		return new ObjectInserter.Formatter().idFor(Constants.OBJ_COMMIT, //
+				b.toString().getBytes(Constants.CHARACTER_ENCODING));
 	}
 
 	private static final Pattern issuePattern = Pattern
@@ -231,8 +229,6 @@ public class ChangeIdUtil {
 	 */
 	public static int indexOfChangeId(String message, String delimiter) {
 		String[] lines = message.split(delimiter);
-		if (lines.length == 0)
-			return -1;
 		int indexOfChangeIdLine = 0;
 		boolean inFooter = false;
 		for (int i = lines.length - 1; i >= 0; --i) {

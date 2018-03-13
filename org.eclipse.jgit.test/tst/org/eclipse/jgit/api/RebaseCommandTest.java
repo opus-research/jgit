@@ -114,14 +114,13 @@ public class RebaseCommandTest extends RepositoryTestCase {
 
 	private void checkoutCommit(RevCommit commit) throws IllegalStateException,
 			IOException {
-		RevCommit head;
-		try (RevWalk walk = new RevWalk(db)) {
-			head = walk.parseCommit(db.resolve(Constants.HEAD));
-			DirCacheCheckout dco = new DirCacheCheckout(db, head.getTree(),
-					db.lockDirCache(), commit.getTree());
-			dco.setFailOnConflict(true);
-			dco.checkout();
-		}
+		RevWalk walk = new RevWalk(db);
+		RevCommit head = walk.parseCommit(db.resolve(Constants.HEAD));
+		DirCacheCheckout dco = new DirCacheCheckout(db, head.getTree(), db
+				.lockDirCache(), commit.getTree());
+		dco.setFailOnConflict(true);
+		dco.checkout();
+		walk.release();
 		// update the HEAD
 		RefUpdate refUpdate = db.updateRef(Constants.HEAD, true);
 		refUpdate.setNewObjectId(commit);
@@ -473,12 +472,11 @@ public class RebaseCommandTest extends RepositoryTestCase {
 	}
 
 	private String readFile(String path, RevCommit commit) throws IOException {
-		try (TreeWalk walk = TreeWalk.forPath(db, path, commit.getTree())) {
-			ObjectLoader loader = db.open(walk.getObjectId(0),
-					Constants.OBJ_BLOB);
-			String result = RawParseUtils.decode(loader.getCachedBytes());
-			return result;
-		}
+		TreeWalk walk = TreeWalk.forPath(db, path, commit.getTree());
+		ObjectLoader loader = db.open(walk.getObjectId(0), Constants.OBJ_BLOB);
+		String result = RawParseUtils.decode(loader.getCachedBytes());
+		walk.release();
+		return result;
 	}
 
 	@Test
@@ -826,7 +824,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 				"<<<<<<< Upstream, based on master\n1master\n=======\n1topic",
 				">>>>>>> e0d1dea change file1 in topic\n2\n3\ntopic4");
 
-		assertEquals(RepositoryState.REBASING_MERGE, db
+		assertEquals(RepositoryState.REBASING_INTERACTIVE, db
 				.getRepositoryState());
 		assertTrue(new File(db.getDirectory(), "rebase-merge").exists());
 		// the first one should be included, so we should have left two picks in
@@ -889,7 +887,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 				"<<<<<<< Upstream, based on master\n1master\n=======\n1topic",
 				">>>>>>> e0d1dea change file1 in topic\n2\n3\ntopic4");
 
-		assertEquals(RepositoryState.REBASING_MERGE,
+		assertEquals(RepositoryState.REBASING_INTERACTIVE,
 				db.getRepositoryState());
 		assertTrue(new File(db.getDirectory(), "rebase-merge").exists());
 		// the first one should be included, so we should have left two picks in
@@ -1011,7 +1009,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		res = git.rebase().setOperation(Operation.CONTINUE).call();
 		assertNotNull(res);
 		assertEquals(Status.NOTHING_TO_COMMIT, res.getStatus());
-		assertEquals(RepositoryState.REBASING_MERGE,
+		assertEquals(RepositoryState.REBASING_INTERACTIVE,
 				db.getRepositoryState());
 
 		git.rebase().setOperation(Operation.SKIP).call();
@@ -1302,7 +1300,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		// user can decide what to do. if he accidentally committed, reset soft,
 		// and continue, if he really has nothing to commit, skip.
 		assertEquals(Status.NOTHING_TO_COMMIT, res.getStatus());
-		assertEquals(RepositoryState.REBASING_MERGE,
+		assertEquals(RepositoryState.REBASING_INTERACTIVE,
 				db.getRepositoryState());
 
 		git.rebase().setOperation(Operation.SKIP).call();
@@ -1403,7 +1401,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		assertEquals(Status.STOPPED, res.getStatus());
 		assertEquals(conflicting, res.getCurrentCommit());
 
-		assertEquals(RepositoryState.REBASING_MERGE, db
+		assertEquals(RepositoryState.REBASING_INTERACTIVE, db
 				.getRepositoryState());
 		assertTrue(new File(db.getDirectory(), "rebase-merge").exists());
 		// the first one should be included, so we should have left two picks in
@@ -2075,11 +2073,14 @@ public class RebaseCommandTest extends RepositoryTestCase {
 	private List<DiffEntry> diffWorkingAgainstHead(final RevCommit commit,
 			RevWalk revWalk)
 			throws IOException {
+		TreeWalk walk = createTreeWalk();
 		RevCommit parentCommit = revWalk.parseCommit(commit.getParent(0));
-		try (TreeWalk walk = createTreeWalk()) {
+		try {
 			walk.addTree(parentCommit.getTree());
 			walk.addTree(commit.getTree());
 			return DiffEntry.scan(walk);
+		} finally {
+			walk.release();
 		}
 	}
 

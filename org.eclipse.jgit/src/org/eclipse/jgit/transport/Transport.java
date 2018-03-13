@@ -53,7 +53,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.PrintStream;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -71,15 +70,11 @@ import java.util.Map;
 import java.util.Vector;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import org.eclipse.jgit.api.errors.AbortedByHookException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.hooks.Hooks;
-import org.eclipse.jgit.hooks.PrePushHook;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
-import org.eclipse.jgit.lib.ObjectChecker;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
@@ -561,13 +556,8 @@ public abstract class Transport {
 				continue;
 			}
 
-			if (proto.canHandle(uri, local, remoteName)) {
-				Transport tn = proto.open(uri, local, remoteName);
-				tn.prePush = Hooks.prePush(local, tn.hookOutRedirect);
-				tn.prePush.setRemoteLocation(uri.toString());
-				tn.prePush.setRemoteName(remoteName);
-				return tn;
-			}
+			if (proto.canHandle(uri, local, remoteName))
+				return proto.open(uri, local, remoteName);
 		}
 
 		throw new NotSupportedException(MessageFormat.format(JGitText.get().URINotSupported, uri));
@@ -756,7 +746,7 @@ public abstract class Transport {
 	private boolean dryRun;
 
 	/** Should an incoming (fetch) transfer validate objects? */
-	private ObjectChecker objectChecker;
+	private boolean checkFetchedObjects;
 
 	/** Should refs no longer on the source be pruned from the destination? */
 	private boolean removeDeletedRefs;
@@ -770,9 +760,6 @@ public abstract class Transport {
 	/** Assists with authentication the connection. */
 	private CredentialsProvider credentialsProvider;
 
-	private PrintStream hookOutRedirect;
-
-	private PrePushHook prePush;
 	/**
 	 * Create a new transport instance.
 	 *
@@ -788,9 +775,8 @@ public abstract class Transport {
 		final TransferConfig tc = local.getConfig().get(TransferConfig.KEY);
 		this.local = local;
 		this.uri = uri;
-		this.objectChecker = tc.newObjectChecker();
+		this.checkFetchedObjects = tc.isFsckObjects();
 		this.credentialsProvider = CredentialsProvider.getDefault();
-		prePush = Hooks.prePush(local, hookOutRedirect);
 	}
 
 	/**
@@ -801,7 +787,7 @@ public abstract class Transport {
 	protected Transport(final URIish uri) {
 		this.uri = uri;
 		this.local = null;
-		this.objectChecker = new ObjectChecker();
+		this.checkFetchedObjects = true;
 		this.credentialsProvider = CredentialsProvider.getDefault();
 	}
 
@@ -887,38 +873,16 @@ public abstract class Transport {
 	 *         client side of the connection.
 	 */
 	public boolean isCheckFetchedObjects() {
-		return getObjectChecker() != null;
+		return checkFetchedObjects;
 	}
 
 	/**
 	 * @param check
 	 *            true to enable checking received objects; false to assume all
 	 *            received objects are valid.
-	 * @see #setObjectChecker(ObjectChecker)
 	 */
 	public void setCheckFetchedObjects(final boolean check) {
-		if (check && objectChecker == null)
-			setObjectChecker(new ObjectChecker());
-		else if (!check && objectChecker != null)
-			setObjectChecker(null);
-	}
-
-	/**
-	 * @return configured object checker for received objects, or null.
-	 * @since 3.6
-	 */
-	public ObjectChecker getObjectChecker() {
-		return objectChecker;
-	}
-
-	/**
-	 * @param impl
-	 *            if non-null the object checking instance to verify each
-	 *            received object with; null to disable object checking.
-	 * @since 3.6
-	 */
-	public void setObjectChecker(ObjectChecker impl) {
-		objectChecker = impl;
+		checkFetchedObjects = check;
 	}
 
 	/**
@@ -1209,15 +1173,6 @@ public abstract class Transport {
 			if (toPush.isEmpty())
 				throw new TransportException(JGitText.get().nothingToPush);
 		}
-		if (prePush != null) {
-			try {
-				prePush.setRefs(toPush);
-				prePush.call();
-			} catch (AbortedByHookException | IOException e) {
-				throw new TransportException(e.getMessage(), e);
-			}
-		}
-
 		final PushProcess pushProcess = new PushProcess(this, toPush, out);
 		return pushProcess.execute(monitor);
 	}

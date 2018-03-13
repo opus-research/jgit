@@ -63,7 +63,6 @@ import java.util.Comparator;
 import java.util.List;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.IndexReadException;
 import org.eclipse.jgit.errors.LockFailedException;
 import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.events.IndexChangedEvent;
@@ -77,7 +76,6 @@ import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.treewalk.TreeWalk.OperationType;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
@@ -419,12 +417,6 @@ public class DirCache {
 					}
 				}
 			} catch (FileNotFoundException fnfe) {
-				if (liveFile.exists()) {
-					// Panic: the index file exists but we can't read it
-					throw new IndexReadException(
-							MessageFormat.format(JGitText.get().cannotReadIndex,
-									liveFile.getAbsolutePath(), fnfe));
-				}
 				// Someone must have deleted it between our exists test
 				// and actually opening the path. That's fine, its empty.
 				//
@@ -615,8 +607,7 @@ public class DirCache {
 		final LockFile tmp = myLock;
 		requireLocked(tmp);
 		try {
-			writeTo(liveFile.getParentFile(),
-					new SafeBufferedOutputStream(tmp.getOutputStream()));
+			writeTo(new SafeBufferedOutputStream(tmp.getOutputStream()));
 		} catch (IOException err) {
 			tmp.unlock();
 			throw err;
@@ -629,7 +620,7 @@ public class DirCache {
 		}
 	}
 
-	void writeTo(File dir, final OutputStream os) throws IOException {
+	void writeTo(final OutputStream os) throws IOException {
 		final MessageDigest foot = Constants.newMessageDigest();
 		final DigestOutputStream dos = new DigestOutputStream(os, foot);
 
@@ -679,18 +670,14 @@ public class DirCache {
 		}
 
 		if (writeTree) {
-			TemporaryBuffer bb = new TemporaryBuffer.LocalFile(dir, 5 << 20);
-			try {
-				tree.write(tmp, bb);
-				bb.close();
+			final TemporaryBuffer bb = new TemporaryBuffer.LocalFile();
+			tree.write(tmp, bb);
+			bb.close();
 
-				NB.encodeInt32(tmp, 0, EXT_TREE);
-				NB.encodeInt32(tmp, 4, (int) bb.length());
-				dos.write(tmp, 0, 8);
-				bb.writeTo(dos, null);
-			} finally {
-				bb.destroy();
-			}
+			NB.encodeInt32(tmp, 0, EXT_TREE);
+			NB.encodeInt32(tmp, 4, (int) bb.length());
+			dos.write(tmp, 0, 8);
+			bb.writeTo(dos, null);
 		}
 		writeIndexChecksum = foot.digest();
 		os.write(writeIndexChecksum);
@@ -969,9 +956,9 @@ public class DirCache {
 	 * @throws IOException
 	 */
 	private void updateSmudgedEntries() throws IOException {
+		TreeWalk walk = new TreeWalk(repository);
 		List<String> paths = new ArrayList<String>(128);
-		try (TreeWalk walk = new TreeWalk(repository)) {
-			walk.setOperationType(OperationType.CHECKIN_OP);
+		try {
 			for (int i = 0; i < entryCnt; i++)
 				if (sortedEntries[i].isSmudged())
 					paths.add(sortedEntries[i].getPathString());
@@ -997,6 +984,8 @@ public class DirCache {
 					entry.setLastModified(fIter.getEntryLastModified());
 				}
 			}
+		} finally {
+			walk.release();
 		}
 	}
 }

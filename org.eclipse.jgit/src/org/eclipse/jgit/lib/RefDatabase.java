@@ -47,7 +47,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -212,9 +211,6 @@ public abstract class RefDatabase {
 	 * Aside from taking advantage of {@link #SEARCH_PATH}, this method may be
 	 * able to more quickly resolve a single reference name than obtaining the
 	 * complete namespace by {@code getRefs(ALL).get(name)}.
-	 * <p>
-	 * To read a specific reference without using @{link #SEARCH_PATH}, see
-	 * {@link #exactRef(String)}.
 	 *
 	 * @param name
 	 *            the name of the reference. May be a short name which must be
@@ -224,76 +220,6 @@ public abstract class RefDatabase {
 	 *             the reference space cannot be accessed.
 	 */
 	public abstract Ref getRef(String name) throws IOException;
-
-	/**
-	 * Read a single reference.
-	 * <p>
-	 * Unlike {@link #getRef}, this method expects an unshortened reference
-	 * name and does not search using the standard {@link #SEARCH_PATH}.
-	 *
-	 * @param name
-	 *             the unabbreviated name of the reference.
-	 * @return the reference (if it exists); else {@code null}.
-	 * @throws IOException
-	 *             the reference space cannot be accessed.
-	 * @since 4.1
-	 */
-	public Ref exactRef(String name) throws IOException {
-		Ref ref = getRef(name);
-		if (ref == null || !name.equals(ref.getName())) {
-			return null;
-		}
-		return ref;
-	}
-
-	/**
-	 * Read the specified references.
-	 * <p>
-	 * This method expects a list of unshortened reference names and returns
-	 * a map from reference names to refs.  Any named references that do not
-	 * exist will not be included in the returned map.
-	 *
-	 * @param refs
-	 *             the unabbreviated names of references to look up.
-	 * @return modifiable map describing any refs that exist among the ref
-	 *         ref names supplied. The map can be an unsorted map.
-	 * @throws IOException
-	 *             the reference space cannot be accessed.
-	 * @since 4.1
-	 */
-	public Map<String, Ref> exactRef(String... refs) throws IOException {
-		Map<String, Ref> result = new HashMap<>(refs.length);
-		for (String name : refs) {
-			Ref ref = exactRef(name);
-			if (ref != null) {
-				result.put(name, ref);
-			}
-		}
-		return result;
-	}
-
-	/**
-	 * Find the first named reference.
-	 * <p>
-	 * This method expects a list of unshortened reference names and returns
-	 * the first that exists.
-	 *
-	 * @param refs
-	 *             the unabbreviated names of references to look up.
-	 * @return the first named reference that exists (if any); else {@code null}.
-	 * @throws IOException
-	 *             the reference space cannot be accessed.
-	 * @since 4.1
-	 */
-	public Ref firstExactRef(String... refs) throws IOException {
-		for (String name : refs) {
-			Ref ref = exactRef(name);
-			if (ref != null) {
-				return ref;
-			}
-		}
-		return null;
-	}
 
 	/**
 	 * Get a section of the reference namespace.
@@ -316,7 +242,6 @@ public abstract class RefDatabase {
 	 * The result list includes non-ref items such as MERGE_HEAD and
 	 * FETCH_RESULT cast to be refs. The names of these refs are not returned by
 	 * <code>getRefs(ALL)</code> but are accepted by {@link #getRef(String)}
-	 * and {@link #exactRef(String)}.
 	 *
 	 * @return a list of additional refs
 	 * @throws IOException

@@ -184,8 +184,11 @@ class Diff extends TextBuiltin {
 					if (head == null)
 						die(MessageFormat.format(CLIText.get().notATree, HEAD));
 					CanonicalTreeParser p = new CanonicalTreeParser();
-					try (ObjectReader reader = db.newObjectReader()) {
+					ObjectReader reader = db.newObjectReader();
+					try {
 						p.reset(reader, head);
+					} finally {
+						reader.release();
 					}
 					oldTree = p;
 				}
@@ -196,7 +199,7 @@ class Diff extends TextBuiltin {
 			} else if (newTree == null)
 				newTree = new FileTreeIterator(db);
 
-			TextProgressMonitor pm = new TextProgressMonitor(errw);
+			TextProgressMonitor pm = new TextProgressMonitor();
 			pm.setDelayStart(2, TimeUnit.SECONDS);
 			diffFmt.setProgressMonitor(pm);
 			diffFmt.setPathFilter(pathFilter);
@@ -216,7 +219,7 @@ class Diff extends TextBuiltin {
 				diffFmt.flush();
 			}
 		} finally {
-			diffFmt.close();
+			diffFmt.release();
 		}
 	}
 

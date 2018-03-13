@@ -95,16 +95,16 @@ public class DfsInserter extends ObjectInserter {
 	/** Always produce version 2 indexes, to get CRC data. */
 	private static final int INDEX_VERSION = 2;
 
-	final DfsObjDatabase db;
-	int compression = Deflater.BEST_COMPRESSION;
+	private final DfsObjDatabase db;
+	private int compression = Deflater.BEST_COMPRESSION;
 
-	List<PackedObjectInfo> objectList;
-	ObjectIdOwnerMap<PackedObjectInfo> objectMap;
+	private List<PackedObjectInfo> objectList;
+	private ObjectIdOwnerMap<PackedObjectInfo> objectMap;
 
-	DfsBlockCache cache;
-	DfsPackKey packKey;
-	DfsPackDescription packDsc;
-	PackStream packOut;
+	private DfsBlockCache cache;
+	private DfsPackKey packKey;
+	private DfsPackDescription packDsc;
+	private PackStream packOut;
 	private boolean rollback;
 
 	/**
@@ -137,8 +137,7 @@ public class DfsInserter extends ObjectInserter {
 		ObjectId id = idFor(type, data, off, len);
 		if (objectMap != null && objectMap.contains(id))
 			return id;
-		// Ignore unreachable (garbage) objects here.
-		if (db.has(id, true))
+		if (db.has(id))
 			return id;
 
 		long offset = beginObject(type, len);
@@ -217,7 +216,7 @@ public class DfsInserter extends ObjectInserter {
 	}
 
 	@Override
-	public void close() {
+	public void release() {
 		if (packOut != null) {
 			try {
 				packOut.close();
@@ -323,7 +322,7 @@ public class DfsInserter extends ObjectInserter {
 	private class PackStream extends OutputStream {
 		private final DfsOutputStream out;
 		private final MessageDigest md;
-		final byte[] hdrBuf;
+		private final byte[] hdrBuf;
 		private final Deflater deflater;
 		private final int blockSize;
 
@@ -601,8 +600,8 @@ public class DfsInserter extends ObjectInserter {
 		}
 
 		@Override
-		public void close() {
-			ctx.close();
+		public void release() {
+			ctx.release();
 		}
 	}
 
@@ -632,7 +631,7 @@ public class DfsInserter extends ObjectInserter {
 					// The newly created pack is registered in the cache.
 					return ctx.open(id, type).openStream();
 				} finally {
-					ctx.close();
+					ctx.release();
 				}
 			}
 
@@ -643,7 +642,7 @@ public class DfsInserter extends ObjectInserter {
 							new ReadBackStream(pos), inf, bufsz), bufsz)) {
 				@Override
 				public void close() throws IOException {
-					ctx.close();
+					ctx.release();
 					super.close();
 				}
 			};
