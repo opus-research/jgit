@@ -795,7 +795,6 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	public boolean next() throws MissingObjectException,
 			IncorrectObjectTypeException, CorruptObjectException, IOException {
 		try {
-			attrs = null;
 			if (advance) {
 				advance = false;
 				postChildren = false;
@@ -803,6 +802,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 			}
 
 			for (;;) {
+				attrs = null;
 				final AbstractTreeIterator t = min();
 				if (t.eof()) {
 					if (depth > 0) {
@@ -1367,15 +1367,8 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 		String filterCommand = filterCommandsByNameDotType.get(key);
 		if (filterCommand != null)
 			return filterCommand;
-		boolean useBuiltin = config.getBoolean(Constants.ATTR_FILTER,
-				filterDriverName, Constants.ATTR_FILTER_USE_BUILTIN, false);
-		if (useBuiltin) {
-			filterCommand = Constants.BUILTIN_FILTER_PREFIX + filterDriverName
-					+ "/" + filterCommandType;
-		} else {
-			filterCommand = config.getString(Constants.ATTR_FILTER,
+		filterCommand = config.getString(Constants.ATTR_FILTER,
 				filterDriverName, filterCommandType);
-		}
 		if (filterCommand != null)
 			filterCommandsByNameDotType.put(key, filterCommand);
 		return filterCommand;
