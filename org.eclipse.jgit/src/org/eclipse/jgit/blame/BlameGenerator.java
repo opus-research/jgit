@@ -179,6 +179,7 @@ public class BlameGenerator implements AutoCloseable {
 		else
 			revPool = new RevWalk(getRepository());
 
+		revPool.setRetainBody(true);
 		SEEN = revPool.newFlag("SEEN"); //$NON-NLS-1$
 		reader = revPool.getObjectReader();
 		treeWalk = new TreeWalk(reader);
@@ -934,6 +935,14 @@ public class BlameGenerator implements AutoCloseable {
 	 */
 	public RawText getResultContents() throws IOException {
 		return queue != null ? queue.sourceText : null;
+	}
+
+	/**
+	 * Release the current blame session. Use {@link #close()} instead.
+	 */
+	@Deprecated
+	public void release() {
+		close();
 	}
 
 	/**

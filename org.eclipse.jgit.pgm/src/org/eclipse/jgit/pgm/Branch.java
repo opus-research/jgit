@@ -186,32 +186,33 @@ class Branch extends TextBuiltin {
 		// This can happen if HEAD is stillborn
 		if (head != null) {
 			String current = head.getLeaf().getName();
-			try (Git git = new Git(db)) {
-				ListBranchCommand command = git.branchList();
-				if (all)
-					command.setListMode(ListMode.ALL);
-				else if (remote)
-					command.setListMode(ListMode.REMOTE);
+			ListBranchCommand command = new Git(db).branchList();
+			if (all)
+				command.setListMode(ListMode.ALL);
+			else if (remote)
+				command.setListMode(ListMode.REMOTE);
 
-				if (containsCommitish != null)
-					command.setContains(containsCommitish);
+			if (containsCommitish != null)
+				command.setContains(containsCommitish);
 
-				List<Ref> refs = command.call();
-				for (Ref ref : refs) {
-					if (ref.getName().equals(Constants.HEAD))
-						addRef("(no branch)", head); //$NON-NLS-1$
+			List<Ref> refs = command.call();
+			for (Ref ref : refs) {
+				if (ref.getName().equals(Constants.HEAD))
+					addRef("(no branch)", head); //$NON-NLS-1$
+			}
+
+			addRefs(refs, Constants.R_HEADS);
+			addRefs(refs, Constants.R_REMOTES);
+
+			ObjectReader reader = db.newObjectReader();
+			try {
+				for (final Entry<String, Ref> e : printRefs.entrySet()) {
+					final Ref ref = e.getValue();
+					printHead(reader, e.getKey(),
+							current.equals(ref.getName()), ref);
 				}
-
-				addRefs(refs, Constants.R_HEADS);
-				addRefs(refs, Constants.R_REMOTES);
-
-				try (ObjectReader reader = db.newObjectReader()) {
-					for (final Entry<String, Ref> e : printRefs.entrySet()) {
-						final Ref ref = e.getValue();
-						printHead(reader, e.getKey(),
-								current.equals(ref.getName()), ref);
-					}
-				}
+			} finally {
+				reader.release();
 			}
 		}
 	}

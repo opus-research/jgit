@@ -447,7 +447,7 @@ public class DirCacheCheckout {
 			for (String path : updated.keySet()) {
 				DirCacheEntry entry = dc.getEntry(path);
 				if (!FileMode.GITLINK.equals(entry.getRawMode()))
-					checkoutEntry(repo, entry, objectReader, false);
+					checkoutEntry(repo, entry, objectReader);
 			}
 
 			// commit the index builder - a new index is persisted
@@ -1124,14 +1124,74 @@ public class DirCacheCheckout {
 	 * Updates the file in the working tree with content and mode from an entry
 	 * in the index. The new content is first written to a new temporary file in
 	 * the same directory as the real file. Then that new file is renamed to the
+	 * final filename. Use this method only for checkout of a single entry.
+	 * Otherwise use
+	 * {@code checkoutEntry(Repository, File f, DirCacheEntry, ObjectReader)}
+	 * instead which allows to reuse one {@code ObjectReader} for multiple
+	 * entries.
+	 *
+	 * <p>
+	 * TODO: this method works directly on File IO, we may need another
+	 * abstraction (like WorkingTreeIterator). This way we could tell e.g.
+	 * Eclipse that Files in the workspace got changed
+	 * </p>
+	 *
+	 * @param repository
+	 * @param f
+	 *            this parameter is ignored.
+	 * @param entry
+	 *            the entry containing new mode and content
+	 * @throws IOException
+	 * @deprecated Use the overloaded form that accepts {@link ObjectReader}.
+	 */
+	@Deprecated
+	public static void checkoutEntry(final Repository repository, File f,
+			DirCacheEntry entry) throws IOException {
+		ObjectReader or = repository.newObjectReader();
+		try {
+			checkoutEntry(repository, f, entry, or);
+		} finally {
+			or.close();
+		}
+	}
+
+	/**
+	 * Updates the file in the working tree with content and mode from an entry
+	 * in the index. The new content is first written to a new temporary file in
+	 * the same directory as the real file. Then that new file is renamed to the
 	 * final filename.
 	 *
 	 * <p>
-	 * <b>Note:</b> if the entry path on local file system exists as a non-empty
-	 * directory, and the target entry type is a link or file, the checkout will
-	 * fail with {@link IOException} since existing non-empty directory cannot
-	 * be renamed to file or link without deleting it recursively.
+	 * TODO: this method works directly on File IO, we may need another
+	 * abstraction (like WorkingTreeIterator). This way we could tell e.g.
+	 * Eclipse that Files in the workspace got changed
 	 * </p>
+	 *
+	 * @param repo
+	 * @param f
+	 *            this parameter is ignored.
+	 * @param entry
+	 *            the entry containing new mode and content
+	 * @param or
+	 *            object reader to use for checkout
+	 * @throws IOException
+	 * @deprecated Do not pass File object.
+	 */
+	@Deprecated
+	public static void checkoutEntry(final Repository repo, File f,
+			DirCacheEntry entry, ObjectReader or) throws IOException {
+		if (f == null || repo.getWorkTree() == null)
+			throw new IllegalArgumentException();
+		if (!f.equals(new File(repo.getWorkTree(), entry.getPathString())))
+			throw new IllegalArgumentException();
+		checkoutEntry(repo, entry, or);
+	}
+
+	/**
+	 * Updates the file in the working tree with content and mode from an entry
+	 * in the index. The new content is first written to a new temporary file in
+	 * the same directory as the real file. Then that new file is renamed to the
+	 * final filename.
 	 *
 	 * <p>
 	 * TODO: this method works directly on File IO, we may need another
@@ -1150,42 +1210,6 @@ public class DirCacheCheckout {
 	 */
 	public static void checkoutEntry(Repository repo, DirCacheEntry entry,
 			ObjectReader or) throws IOException {
-		checkoutEntry(repo, entry, or, false);
-	}
-
-	/**
-	 * Updates the file in the working tree with content and mode from an entry
-	 * in the index. The new content is first written to a new temporary file in
-	 * the same directory as the real file. Then that new file is renamed to the
-	 * final filename.
-	 *
-	 * <p>
-	 * <b>Note:</b> if the entry path on local file system exists as a file, it
-	 * will be deleted and if it exists as a directory, it will be deleted
-	 * recursively, independently if has any content.
-	 * </p>
-	 *
-	 * <p>
-	 * TODO: this method works directly on File IO, we may need another
-	 * abstraction (like WorkingTreeIterator). This way we could tell e.g.
-	 * Eclipse that Files in the workspace got changed
-	 * </p>
-	 *
-	 * @param repo
-	 *            repository managing the destination work tree.
-	 * @param entry
-	 *            the entry containing new mode and content
-	 * @param or
-	 *            object reader to use for checkout
-	 * @param deleteRecursive
-	 *            true to recursively delete final path if it exists on the file
-	 *            system
-	 *
-	 * @throws IOException
-	 * @since 4.2
-	 */
-	public static void checkoutEntry(Repository repo, DirCacheEntry entry,
-			ObjectReader or, boolean deleteRecursive) throws IOException {
 		ObjectLoader ol = or.open(entry.getObjectId());
 		File f = new File(repo.getWorkTree(), entry.getPathString());
 		File parentDir = f.getParentFile();
@@ -1196,9 +1220,6 @@ public class DirCacheCheckout {
 				&& opt.getSymLinks() == SymLinks.TRUE) {
 			byte[] bytes = ol.getBytes();
 			String target = RawParseUtils.decode(bytes);
-			if (deleteRecursive && f.isDirectory()) {
-				FileUtils.delete(f, FileUtils.RECURSIVE);
-			}
 			fs.createSymLink(f, target);
 			entry.setLength(bytes.length);
 			entry.setLastModified(fs.lastModified(f));
@@ -1229,18 +1250,11 @@ public class DirCacheCheckout {
 			}
 		}
 		try {
-			if (deleteRecursive && f.isDirectory()) {
-				FileUtils.delete(f, FileUtils.RECURSIVE);
-			}
 			FileUtils.rename(tmpFile, f);
 		} catch (IOException e) {
 			throw new IOException(MessageFormat.format(
 					JGitText.get().renameFileFailed, tmpFile.getPath(),
 					f.getPath()));
-		} finally {
-			if (tmpFile.exists()) {
-				FileUtils.delete(tmpFile);
-			}
 		}
 		entry.setLastModified(f.lastModified());
 	}

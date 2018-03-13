@@ -1243,7 +1243,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				RefUpdate rup = repo.updateRef(headName);
 				rup.setExpectedOldObjectId(oldCommit);
 				rup.setNewObjectId(newCommit);
-				rup.setRefLogMessage("Fast-forward from " + oldCommit.name() //$NON-NLS-1$
+				rup.setRefLogMessage("Fast-foward from " + oldCommit.name() //$NON-NLS-1$
 						+ " to " + newCommit.name(), false); //$NON-NLS-1$
 				Result res = rup.update(walk);
 				switch (res) {
@@ -1493,9 +1493,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	 * @return this instance
 	 */
 	public RebaseCommand setProgressMonitor(ProgressMonitor monitor) {
-		if (monitor == null) {
-			monitor = NullProgressMonitor.INSTANCE;
-		}
 		this.monitor = monitor;
 		return this;
 	}

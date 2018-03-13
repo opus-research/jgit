@@ -227,9 +227,9 @@ public class ResetCommand extends GitCommand<Ref> {
 			setCallable(false);
 			return result;
 		} catch (IOException e) {
-			throw new JGitInternalException(MessageFormat.format(
+			throw new JGitInternalException(
 					JGitText.get().exceptionCaughtDuringExecutionOfResetCommand,
-					e.getMessage()), e);
+					e);
 		}
 	}
 

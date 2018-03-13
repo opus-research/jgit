@@ -108,7 +108,7 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 	@After
 	public void tearDown() throws Exception {
 		if (wc != null)
-			wc.close();
+			wc.release();
 		new WindowCacheConfig().install();
 		super.tearDown();
 	}

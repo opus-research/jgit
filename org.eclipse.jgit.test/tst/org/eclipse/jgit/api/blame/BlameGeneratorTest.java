@@ -70,7 +70,8 @@ public class BlameGeneratorTest extends RepositoryTestCase {
 		git.add().addFilepattern("file.txt").call();
 		RevCommit c2 = git.commit().setMessage("create file").call();
 
-		try (BlameGenerator generator = new BlameGenerator(db, "file.txt")) {
+		BlameGenerator generator = new BlameGenerator(db, "file.txt");
+		try {
 			generator.push(null, db.resolve(Constants.HEAD));
 			assertEquals(3, generator.getResultContents().size());
 
@@ -93,6 +94,8 @@ public class BlameGeneratorTest extends RepositoryTestCase {
 			assertEquals("file.txt", generator.getSourcePath());
 
 			assertFalse(generator.next());
+		} finally {
+			generator.release();
 		}
 	}
 
@@ -120,7 +123,8 @@ public class BlameGeneratorTest extends RepositoryTestCase {
 		git.add().addFilepattern(FILENAME_2).call();
 		RevCommit c2 = git.commit().setMessage("change file2").call();
 
-		try (BlameGenerator generator = new BlameGenerator(db, FILENAME_2)) {
+		BlameGenerator generator = new BlameGenerator(db, FILENAME_2);
+		try {
 			generator.push(null, db.resolve(Constants.HEAD));
 			assertEquals(3, generator.getResultContents().size());
 
@@ -143,10 +147,13 @@ public class BlameGeneratorTest extends RepositoryTestCase {
 			assertEquals(FILENAME_1, generator.getSourcePath());
 
 			assertFalse(generator.next());
+		} finally {
+			generator.release();
 		}
 
 		// and test again with other BlameGenerator API:
-		try (BlameGenerator generator = new BlameGenerator(db, FILENAME_2)) {
+		generator = new BlameGenerator(db, FILENAME_2);
+		try {
 			generator.push(null, db.resolve(Constants.HEAD));
 			BlameResult result = generator.computeBlameResult();
 
@@ -160,6 +167,9 @@ public class BlameGeneratorTest extends RepositoryTestCase {
 
 			assertEquals(c1, result.getSourceCommit(2));
 			assertEquals(FILENAME_1, result.getSourcePath(2));
+
+		} finally {
+			generator.release();
 		}
 	}
 
@@ -183,7 +193,8 @@ public class BlameGeneratorTest extends RepositoryTestCase {
 		git.add().addFilepattern("file.txt").call();
 		RevCommit c3 = git.commit().setMessage("create file").call();
 
-		try (BlameGenerator generator = new BlameGenerator(db, "file.txt")) {
+		BlameGenerator generator = new BlameGenerator(db, "file.txt");
+		try {
 			generator.push(null, db.resolve(Constants.HEAD));
 			assertEquals(3, generator.getResultContents().size());
 
@@ -193,6 +204,8 @@ public class BlameGeneratorTest extends RepositoryTestCase {
 			assertEquals(3, generator.getResultEnd());
 
 			assertFalse(generator.next());
+		} finally {
+			generator.release();
 		}
 	}
 

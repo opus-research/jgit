@@ -44,9 +44,7 @@
 package org.eclipse.jgit.transport;
 
 import static org.eclipse.jgit.lib.RefDatabase.ALL;
-import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_AGENT;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_ALLOW_TIP_SHA1_IN_WANT;
-import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_ALLOW_REACHABLE_SHA1_IN_WANT;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_INCLUDE_TAG;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_MULTI_ACK;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_MULTI_ACK_DETAILED;
@@ -94,7 +92,6 @@ import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.revwalk.filter.CommitTimeRevFilter;
 import org.eclipse.jgit.storage.pack.PackConfig;
-import org.eclipse.jgit.storage.pack.PackStatistics;
 import org.eclipse.jgit.transport.GitProtocolConstants.MultiAck;
 import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 import org.eclipse.jgit.util.io.InterruptTimer;
@@ -254,12 +251,8 @@ public class UploadPack {
 	/** Hook handling the various upload phases. */
 	private PreUploadHook preUploadHook = PreUploadHook.NULL;
 
-	/** Hook for taking post upload actions. */
-	private PostUploadHook postUploadHook = PostUploadHook.NULL;
-
 	/** Capabilities requested by the client. */
 	private Set<String> options;
-	String userAgent;
 
 	/** Raw ObjectIds the client has asked for, before validating them. */
 	private final Set<ObjectId> wantIds = new HashSet<ObjectId>();
@@ -310,7 +303,7 @@ public class UploadPack {
 
 	private boolean noDone;
 
-	private PackStatistics statistics;
+	private PackWriter.Statistics statistics;
 
 	private UploadPackLogger logger = UploadPackLogger.NULL;
 
@@ -523,7 +516,7 @@ public class UploadPack {
 		this.refFilter = refFilter != null ? refFilter : RefFilter.DEFAULT;
 	}
 
-	/** @return the configured pre upload hook. */
+	/** @return the configured upload hook. */
 	public PreUploadHook getPreUploadHook() {
 		return preUploadHook;
 	}
@@ -536,25 +529,6 @@ public class UploadPack {
 	 */
 	public void setPreUploadHook(PreUploadHook hook) {
 		preUploadHook = hook != null ? hook : PreUploadHook.NULL;
-	}
-
-	/**
-	 * @return the configured post upload hook.
-	 * @since 4.1
-	 */
-	public PostUploadHook getPostUploadHook() {
-		return postUploadHook;
-	}
-
-	/**
-	 * Set the hook for post upload actions (logging, repacking).
-	 *
-	 * @param hook
-	 *            the hook; if null no special actions are taken.
-	 * @since 4.1
-	 */
-	public void setPostUploadHook(PostUploadHook hook) {
-		postUploadHook = hook != null ? hook : PostUploadHook.NULL;
 	}
 
 	/**
@@ -576,21 +550,11 @@ public class UploadPack {
 	 */
 	public void setTransferConfig(TransferConfig tc) {
 		this.transferConfig = tc != null ? tc : new TransferConfig(db);
-		if (transferConfig.isAllowTipSha1InWant()) {
-			setRequestPolicy(transferConfig.isAllowReachableSha1InWant()
-				? RequestPolicy.REACHABLE_COMMIT_TIP : RequestPolicy.TIP);
-		} else {
-			setRequestPolicy(transferConfig.isAllowReachableSha1InWant()
-				? RequestPolicy.REACHABLE_COMMIT : RequestPolicy.ADVERTISED);
-		}
+		setRequestPolicy(transferConfig.isAllowTipSha1InWant()
+				? RequestPolicy.TIP : RequestPolicy.ADVERTISED);
 	}
 
-	/**
-	 * @return the configured logger.
-	 *
-	 * @deprecated Use {@link #getPreUploadHook()}.
-	 */
-	@Deprecated
+	/** @return the configured logger. */
 	public UploadPackLogger getLogger() {
 		return logger;
 	}
@@ -600,9 +564,7 @@ public class UploadPack {
 	 *
 	 * @param logger
 	 *            the logger instance. If null, no logging occurs.
-	 * @deprecated Use {@link #setPreUploadHook(PreUploadHook)}.
 	 */
-	@Deprecated
 	public void setLogger(UploadPackLogger logger) {
 		this.logger = logger;
 	}
@@ -684,23 +646,8 @@ public class UploadPack {
 	 *         was sent, such as during the negotation phase of a smart HTTP
 	 *         connection, or if the client was already up-to-date.
 	 * @since 3.0
-	 * @deprecated Use {@link #getStatistics()}.
 	 */
-	@Deprecated
 	public PackWriter.Statistics getPackStatistics() {
-		return statistics == null ? null
-				: new PackWriter.Statistics(statistics);
-	}
-
-	/**
-	 * Get the PackWriter's statistics if a pack was sent to the client.
-	 *
-	 * @return statistics about pack output, if a pack was sent. Null if no pack
-	 *         was sent, such as during the negotation phase of a smart HTTP
-	 *         connection, or if the client was already up-to-date.
-	 * @since 4.1
-	 */
-	public PackStatistics getStatistics() {
 		return statistics;
 	}
 
@@ -735,8 +682,6 @@ public class UploadPack {
 			else
 				multiAck = MultiAck.OFF;
 
-			if (!clientShallowCommits.isEmpty())
-				verifyClientShallow();
 			if (depth != 0)
 				processShallow();
 			if (!clientShallowCommits.isEmpty())
@@ -822,35 +767,6 @@ public class UploadPack {
 		pckOut.end();
 	}
 
-	private void verifyClientShallow()
-			throws IOException, PackProtocolException {
-		AsyncRevObjectQueue q = walk.parseAny(clientShallowCommits, true);
-		try {
-			for (;;) {
-				try {
-					// Shallow objects named by the client must be commits.
-					RevObject o = q.next();
-					if (o == null) {
-						break;
-					}
-					if (!(o instanceof RevCommit)) {
-						throw new PackProtocolException(
-							MessageFormat.format(
-								JGitText.get().invalidShallowObject,
-								o.name()));
-					}
-				} catch (MissingObjectException notCommit) {
-					// shallow objects not known at the server are ignored
-					// by git-core upload-pack, match that behavior.
-					clientShallowCommits.remove(notCommit.getObjectId());
-					continue;
-				}
-			}
-		} finally {
-			q.release();
-		}
-	}
-
 	/**
 	 * Generate an advertisement of available refs and capabilities.
 	 *
@@ -890,11 +806,6 @@ public class UploadPack {
 				|| policy == RequestPolicy.REACHABLE_COMMIT_TIP
 				|| policy == null)
 			adv.advertiseCapability(OPTION_ALLOW_TIP_SHA1_IN_WANT);
-		if (policy == RequestPolicy.REACHABLE_COMMIT
-				|| policy == RequestPolicy.REACHABLE_COMMIT_TIP
-				|| policy == null)
-			adv.advertiseCapability(OPTION_ALLOW_REACHABLE_SHA1_IN_WANT);
-		adv.advertiseCapability(OPTION_AGENT, UserAgent.get());
 		adv.setDerefTags(true);
 		Map<String, Ref> advertisedOrDefaultRefs = getAdvertisedOrDefaultRefs();
 		findSymrefs(adv, advertisedOrDefaultRefs);
@@ -971,37 +882,6 @@ public class UploadPack {
 			wantIds.add(ObjectId.fromString(line.substring(5)));
 			isFirst = false;
 		}
-	}
-
-	/**
-	 * Returns the clone/fetch depth. Valid only after calling recvWants().
-	 *
-	 * @return the depth requested by the client, or 0 if unbounded.
-	 * @since 4.0
-	 */
-	public int getDepth() {
-		if (options == null)
-			throw new RequestNotYetReadException();
-		return depth;
-	}
-
-	/**
-	 * Get the user agent of the client.
-	 * <p>
-	 * If the client is new enough to use {@code agent=} capability that value
-	 * will be returned. Older HTTP clients may also supply their version using
-	 * the HTTP {@code User-Agent} header. The capability overrides the HTTP
-	 * header if both are available.
-	 * <p>
-	 * When an HTTP request has been received this method returns the HTTP
-	 * {@code User-Agent} header value until capabilities have been parsed.
-	 *
-	 * @return user agent supplied by the client. Available only if the client
-	 *         is new enough to advertise its user agent.
-	 * @since 4.0
-	 */
-	public String getPeerUserAgent() {
-		return UserAgent.getAgent(options, userAgent);
 	}
 
 	private boolean negotiate() throws IOException {
@@ -1475,7 +1355,6 @@ public class UploadPack {
 			pw.setIndexDisabled(true);
 			pw.setUseCachedPacks(true);
 			pw.setUseBitmaps(depth == 0 && clientShallowCommits.isEmpty());
-			pw.setClientShallowCommits(clientShallowCommits);
 			pw.setReuseDeltaCommits(true);
 			pw.setDeltaBaseAsOffset(options.contains(OPTION_OFS_DELTA));
 			pw.setThin(options.contains(OPTION_THIN_PACK));
@@ -1545,10 +1424,8 @@ public class UploadPack {
 
 		} finally {
 			statistics = pw.getStatistics();
-			if (statistics != null) {
-				postUploadHook.onPostUpload(statistics);
-				logger.onPackStatistics(new PackWriter.Statistics(statistics));
-			}
+			if (statistics != null)
+				logger.onPackStatistics(statistics);
 			pw.close();
 		}
 

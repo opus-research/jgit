@@ -223,7 +223,7 @@ class Log extends RevWalkTextBuiltin {
 
 			super.run();
 		} finally {
-			diffFmt.close();
+			diffFmt.release();
 		}
 	}
 
@@ -267,7 +267,6 @@ class Log extends RevWalkTextBuiltin {
 			outw.print(s);
 			outw.println();
 		}
-		c.disposeBody();
 
 		outw.println();
 		if (showNotes(c))
