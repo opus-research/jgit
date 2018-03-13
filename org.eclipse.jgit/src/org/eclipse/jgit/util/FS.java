@@ -44,15 +44,13 @@
 package org.eclipse.jgit.util;
 
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.io.PrintStream;
-import java.io.PrintWriter;
 import java.nio.charset.Charset;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
@@ -60,12 +58,14 @@ import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
@@ -110,7 +110,7 @@ public abstract class FS {
 		}
 	}
 
-	private final static Logger LOG = LoggerFactory.getLogger(FS.class);
+	final static Logger LOG = LoggerFactory.getLogger(FS.class);
 
 	/** The auto-detected implementation selected for this operating system and JRE. */
 	public static final FS DETECTED = detect();
@@ -404,8 +404,10 @@ public abstract class FS {
 	 *            as component array
 	 * @param encoding
 	 *            to be used to parse the command's output
-	 * @return the one-line output of the command
+	 * @return the one-line output of the command or {@code null} if there is
+	 *         none
 	 */
+	@Nullable
 	protected static String readPipe(File dir, String[] command, String encoding) {
 		return readPipe(dir, command, encoding, null);
 	}
@@ -422,9 +424,11 @@ public abstract class FS {
 	 * @param env
 	 *            Map of environment variables to be merged with those of the
 	 *            current process
-	 * @return the one-line output of the command
+	 * @return the one-line output of the command or {@code null} if there is
+	 *         none
 	 * @since 4.0
 	 */
+	@Nullable
 	protected static String readPipe(File dir, String[] command, String encoding, Map<String, String> env) {
 		final boolean debug = LOG.isDebugEnabled();
 		try {
@@ -438,36 +442,30 @@ public abstract class FS {
 				pb.environment().putAll(env);
 			}
 			Process p = pb.start();
-			BufferedReader lineRead = new BufferedReader(
-					new InputStreamReader(p.getInputStream(), encoding));
 			p.getOutputStream().close();
 			GobblerThread gobbler = new GobblerThread(p, command, dir);
 			gobbler.start();
 			String r = null;
-			try {
+			try (BufferedReader lineRead = new BufferedReader(
+					new InputStreamReader(p.getInputStream(), encoding))) {
 				r = lineRead.readLine();
 				if (debug) {
 					LOG.debug("readpipe may return '" + r + "'"); //$NON-NLS-1$ //$NON-NLS-2$
-					LOG.debug("(ignoring remaing output:"); //$NON-NLS-1$
-				}
-				String l;
-				while ((l = lineRead.readLine()) != null) {
-					if (debug) {
+					LOG.debug("remaining output:\n"); //$NON-NLS-1$
+					String l;
+					while ((l = lineRead.readLine()) != null) {
 						LOG.debug(l);
 					}
 				}
-			} finally {
-				p.getErrorStream().close();
-				lineRead.close();
 			}
 
 			for (;;) {
 				try {
 					int rc = p.waitFor();
 					gobbler.join();
-					if (rc == 0 && r != null && r.length() > 0
-							&& !gobbler.fail.get())
+					if (rc == 0 && !gobbler.fail.get()) {
 						return r;
+					}
 					if (debug) {
 						LOG.debug("readpipe rc=" + rc); //$NON-NLS-1$
 					}
@@ -477,7 +475,7 @@ public abstract class FS {
 				}
 			}
 		} catch (IOException e) {
-			LOG.debug("Caught exception in FS.readPipe()", e); //$NON-NLS-1$
+			LOG.error("Caught exception in FS.readPipe()", e); //$NON-NLS-1$
 		}
 		if (debug) {
 			LOG.debug("readpipe returns null"); //$NON-NLS-1$
@@ -489,52 +487,39 @@ public abstract class FS {
 		private final Process p;
 		private final String desc;
 		private final String dir;
-		private final boolean debug = LOG.isDebugEnabled();
-		private final AtomicBoolean fail = new AtomicBoolean();
+		final AtomicBoolean fail = new AtomicBoolean();
 
-		private GobblerThread(Process p, String[] command, File dir) {
+		GobblerThread(Process p, String[] command, File dir) {
 			this.p = p;
-			if (debug) {
-				this.desc = Arrays.asList(command).toString();
-				this.dir = dir.toString();
-			} else {
-				this.desc = null;
-				this.dir = null;
-			}
+			this.desc = Arrays.toString(command);
+			this.dir = Objects.toString(dir);
 		}
 
 		public void run() {
-			InputStream is = p.getErrorStream();
-			try {
+			StringBuilder err = new StringBuilder();
+			try (InputStream is = p.getErrorStream()) {
 				int ch;
-				if (debug) {
-					while ((ch = is.read()) != -1) {
-						System.err.print((char) ch);
-					}
-				} else {
-					while (is.read() != -1) {
-						// ignore
-					}
+				while ((ch = is.read()) != -1) {
+					err.append((char) ch);
 				}
 			} catch (IOException e) {
-				logError(e);
-				fail.set(true);
-			}
-			try {
-				is.close();
-			} catch (IOException e) {
-				logError(e);
-				fail.set(true);
+				if (p.exitValue() != 0) {
+					logError(e);
+					fail.set(true);
+				} else {
+					// ignore. git terminated faster and stream was just closed
+				}
+			} finally {
+				if (err.length() > 0) {
+					LOG.error(err.toString());
+				}
 			}
 		}
 
 		private void logError(Throwable t) {
-			if (!debug) {
-				return;
-			}
 			String msg = MessageFormat.format(
 					JGitText.get().exceptionCaughtDuringExcecutionOfCommand, desc, dir);
-			LOG.debug(msg, t);
+			LOG.error(msg, t);
 		}
 	}
 
@@ -553,6 +538,14 @@ public abstract class FS {
 	protected File discoverGitSystemConfig() {
 		File gitExe = discoverGitExe();
 		if (gitExe == null) {
+			return null;
+		}
+
+		// Bug 480782: Check if the discovered git executable is JGit CLI
+		String v = readPipe(gitExe.getParentFile(),
+				new String[] { "git", "--version" }, //$NON-NLS-1$ //$NON-NLS-2$
+				Charset.defaultCharset().name());
+		if (v != null && v.startsWith("jgit")) { //$NON-NLS-1$
 			return null;
 		}
 
@@ -871,52 +864,88 @@ public abstract class FS {
 	 * Runs the given process until termination, clearing its stdout and stderr
 	 * streams on-the-fly.
 	 *
-	 * @param hookProcessBuilder
-	 *            The process builder configured for this hook.
+	 * @param processBuilder
+	 *            The process builder configured for this process.
 	 * @param outRedirect
-	 *            A print stream on which to redirect the hook's stdout. Can be
-	 *            <code>null</code>, in which case the hook's standard output
-	 *            will be lost.
+	 *            A OutputStream on which to redirect the processes stdout. Can
+	 *            be <code>null</code>, in which case the processes standard
+	 *            output will be lost.
 	 * @param errRedirect
-	 *            A print stream on which to redirect the hook's stderr. Can be
-	 *            <code>null</code>, in which case the hook's standard error
-	 *            will be lost.
+	 *            A OutputStream on which to redirect the processes stderr. Can
+	 *            be <code>null</code>, in which case the processes standard
+	 *            error will be lost.
 	 * @param stdinArgs
 	 *            A string to pass on to the standard input of the hook. Can be
 	 *            <code>null</code>.
-	 * @return the exit value of this hook.
+	 * @return the exit value of this process.
 	 * @throws IOException
-	 *             if an I/O error occurs while executing this hook.
+	 *             if an I/O error occurs while executing this process.
 	 * @throws InterruptedException
 	 *             if the current thread is interrupted while waiting for the
 	 *             process to end.
-	 * @since 3.7
+	 * @since 4.2
 	 */
-	protected int runProcess(ProcessBuilder hookProcessBuilder,
+	public int runProcess(ProcessBuilder processBuilder,
 			OutputStream outRedirect, OutputStream errRedirect, String stdinArgs)
 			throws IOException, InterruptedException {
+		InputStream in = (stdinArgs == null) ? null : new ByteArrayInputStream(
+				stdinArgs.getBytes(Constants.CHARACTER_ENCODING));
+		return runProcess(processBuilder, outRedirect, errRedirect, in);
+	}
+
+	/**
+	 * Runs the given process until termination, clearing its stdout and stderr
+	 * streams on-the-fly.
+	 *
+	 * @param processBuilder
+	 *            The process builder configured for this process.
+	 * @param outRedirect
+	 *            An OutputStream on which to redirect the processes stdout. Can
+	 *            be <code>null</code>, in which case the processes standard
+	 *            output will be lost. If binary is set to <code>false</code>
+	 *            then it is expected that the process emits text data which
+	 *            should be processed line by line.
+	 * @param errRedirect
+	 *            An OutputStream on which to redirect the processes stderr. Can
+	 *            be <code>null</code>, in which case the processes standard
+	 *            error will be lost.
+	 * @param inRedirect
+	 *            An InputStream from which to redirect the processes stdin. Can
+	 *            be <code>null</code>, in which case the process doesn't get
+	 *            any data over stdin. If binary is set to
+	 *            <code>false</code> then it is expected that the process
+	 *            expects text data which should be processed line by line.
+	 * @return the return code of this process.
+	 * @throws IOException
+	 *             if an I/O error occurs while executing this process.
+	 * @throws InterruptedException
+	 *             if the current thread is interrupted while waiting for the
+	 *             process to end.
+	 * @since 4.2
+	 */
+	public int runProcess(ProcessBuilder processBuilder,
+			OutputStream outRedirect, OutputStream errRedirect,
+			InputStream inRedirect) throws IOException,
+			InterruptedException {
 		final ExecutorService executor = Executors.newFixedThreadPool(2);
 		Process process = null;
 		// We'll record the first I/O exception that occurs, but keep on trying
 		// to dispose of our open streams and file handles
 		IOException ioException = null;
 		try {
-			process = hookProcessBuilder.start();
+			process = processBuilder.start();
 			final Callable<Void> errorGobbler = new StreamGobbler(
 					process.getErrorStream(), errRedirect);
 			final Callable<Void> outputGobbler = new StreamGobbler(
 					process.getInputStream(), outRedirect);
 			executor.submit(errorGobbler);
 			executor.submit(outputGobbler);
-			if (stdinArgs != null) {
-				final PrintWriter stdinWriter = new PrintWriter(
-						process.getOutputStream());
-				stdinWriter.print(stdinArgs);
-				stdinWriter.flush();
-				// We are done with this hook's input. Explicitly close its
-				// stdin now to kick off any blocking read the hook might have.
-				stdinWriter.close();
+			OutputStream outputStream = process.getOutputStream();
+			if (inRedirect != null) {
+				new StreamGobbler(inRedirect, outputStream)
+						.call();
 			}
+			outputStream.close();
 			return process.waitFor();
 		} catch (IOException e) {
 			ioException = e;
@@ -1194,30 +1223,27 @@ public abstract class FS {
 	 * </p>
 	 */
 	private static class StreamGobbler implements Callable<Void> {
-		private final BufferedReader reader;
+		private InputStream in;
 
-		private final BufferedWriter writer;
+		private OutputStream out;
 
 		public StreamGobbler(InputStream stream, OutputStream output) {
-			this.reader = new BufferedReader(new InputStreamReader(stream));
-			if (output == null)
-				this.writer = null;
-			else
-				this.writer = new BufferedWriter(new OutputStreamWriter(output));
+			this.in = stream;
+			this.out = output;
 		}
 
 		public Void call() throws IOException {
 			boolean writeFailure = false;
-
-			String line = null;
-			while ((line = reader.readLine()) != null) {
-				// Do not try to write again after a failure, but keep reading
-				// as long as possible to prevent the input stream from choking.
-				if (!writeFailure && writer != null) {
+			byte buffer[] = new byte[4096];
+			int readBytes;
+			while ((readBytes = in.read(buffer)) != -1) {
+				// Do not try to write again after a failure, but keep
+				// reading as long as possible to prevent the input stream
+				// from choking.
+				if (!writeFailure && out != null) {
 					try {
-						writer.write(line);
-						writer.newLine();
-						writer.flush();
+						out.write(buffer, 0, readBytes);
+						out.flush();
 					} catch (IOException e) {
 						writeFailure = true;
 					}
