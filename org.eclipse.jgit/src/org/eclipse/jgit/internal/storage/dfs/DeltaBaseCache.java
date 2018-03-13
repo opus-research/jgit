@@ -70,11 +70,8 @@ final class DeltaBaseCache {
 	private int curByteCount;
 
 	DeltaBaseCache(DfsReader reader) {
-		this(reader.getOptions().getDeltaBaseCacheLimit());
-	}
-
-	DeltaBaseCache(int maxBytes) {
-		maxByteCount = maxBytes;
+		DfsReaderOptions options = reader.getOptions();
+		maxByteCount = options.getDeltaBaseCacheLimit();
 		table = new Slot[1 << TABLE_BITS];
 	}
 
@@ -87,7 +84,6 @@ final class DeltaBaseCache {
 					moveToHead(e);
 					return buf;
 				}
-				return null;
 			}
 		}
 		return null;
@@ -105,15 +101,23 @@ final class DeltaBaseCache {
 		e.data = new SoftReference<Entry>(new Entry(data, objectType));
 		e.tableNext = table[tableIdx];
 		table[tableIdx] = e;
-		lruPushHead(e);
+		moveToHead(e);
 	}
 
 	private void releaseMemory() {
 		while (curByteCount > maxByteCount && lruTail != null) {
-			Slot e = lruTail;
-			curByteCount -= e.size;
-			lruRemove(e);
-			removeFromTable(e);
+			Slot currOldest = lruTail;
+			Slot nextOldest = currOldest.lruPrev;
+
+			curByteCount -= currOldest.size;
+			unlink(currOldest);
+			removeFromTable(currOldest);
+
+			if (nextOldest == null)
+				lruHead = null;
+			else
+				nextOldest.lruNext = null;
+			lruTail = nextOldest;
 		}
 	}
 
@@ -135,59 +139,24 @@ final class DeltaBaseCache {
 	}
 
 	private void moveToHead(final Slot e) {
-		if (e != lruHead) {
-			lruRemove(e);
-			lruPushHead(e);
-		}
-	}
-
-	private void lruRemove(final Slot e) {
-		Slot p = e.lruPrev;
-		Slot n = e.lruNext;
-
-		if (p != null)
-			p.lruNext = n;
-		else
-			lruHead = n;
-
-		if (n != null)
-			n.lruPrev = p;
-		else
-			lruTail = p;
-	}
-
-	private void lruPushHead(final Slot e) {
-		Slot n = lruHead;
-		e.lruNext = n;
-		if (n != null)
-			n.lruPrev = e;
+		unlink(e);
+		e.lruPrev = null;
+		e.lruNext = lruHead;
+		if (lruHead != null)
+			lruHead.lruPrev = e;
 		else
 			lruTail = e;
-
-		e.lruPrev = null;
 		lruHead = e;
 	}
 
-	int getMemoryUsed() {
-		return curByteCount;
-	}
+	private void unlink(final Slot e) {
+		Slot prev = e.lruPrev;
+		Slot next = e.lruNext;
 
-	int getMemoryUsedByLruChainForTest() {
-		int r = 0;
-		for (Slot e = lruHead; e != null; e = e.lruNext) {
-			r += e.size;
-		}
-		return r;
-	}
-
-	int getMemoryUsedByTableForTest() {
-		int r = 0;
-		for (int i = 0; i < table.length; i++) {
-			for (Slot e = table[i]; e != null; e = e.tableNext) {
-				r += e.size;
-			}
-		}
-		return r;
+		if (prev != null)
+			prev.lruNext = next;
+		if (next != null)
+			next.lruPrev = prev;
 	}
 
 	static class Entry {
