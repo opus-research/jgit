@@ -202,6 +202,7 @@ public class CLIText extends TranslationBundle {
 	/***/ public String notARevision;
 	/***/ public String notATree;
 	/***/ public String notAValidRefName;
+	/***/ public String notAValidCommitName;
 	/***/ public String notAnIndexFile;
 	/***/ public String notAnObject;
 	/***/ public String notFound;
@@ -246,6 +247,7 @@ public class CLIText extends TranslationBundle {
 	/***/ public String treeIsRequired;
 	/***/ public char[] unknownIoErrorStdout;
 	/***/ public String unknownMergeStrategy;
+	/***/ public String unknownSubcommand;
 	/***/ public String unmergedPaths;
 	/***/ public String unsupportedOperation;
 	/***/ public String untrackedFiles;
