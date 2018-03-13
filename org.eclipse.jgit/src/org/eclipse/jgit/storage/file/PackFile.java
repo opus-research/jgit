@@ -45,7 +45,6 @@
 
 package org.eclipse.jgit.storage.file;
 
-import static org.eclipse.jgit.storage.pack.PackExt.BITMAP_INDEX;
 import static org.eclipse.jgit.storage.pack.PackExt.INDEX;
 
 import java.io.EOFException;
@@ -126,8 +125,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	private PackIndex loadedIdx;
 
 	private PackReverseIndex reverseIdx;
-
-	private PackBitmapIndex bitmapIdx;
 
 	/**
 	 * Objects we have tried to read, and discovered to be corrupt.
@@ -1056,22 +1053,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		return getReverseIdx().findNextOffset(startOffset, maxOffset);
 	}
 
-	synchronized PackBitmapIndex getBitmapIndex() throws IOException {
-		if (bitmapIdx == null && hasExt(BITMAP_INDEX)) {
-			final PackBitmapIndex idx = PackBitmapIndex.open(
-					extFile(BITMAP_INDEX), idx(), getReverseIdx());
-
-			if (packChecksum == null)
-				packChecksum = idx.packChecksum;
-			else if (!Arrays.equals(packChecksum, idx.packChecksum))
-				throw new PackMismatchException(
-						JGitText.get().packChecksumMismatch);
-
-			bitmapIdx = idx;
-		}
-		return bitmapIdx;
-	}
-
 	private synchronized PackReverseIndex getReverseIdx() throws IOException {
 		if (reverseIdx == null)
 			reverseIdx = new PackReverseIndex(idx());
@@ -1111,6 +1092,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	}
 
 	private boolean hasExt(PackExt ext) {
-		return (extensions & ext.getBit()) == ext.getBit();
+		return (extensions & ext.getBit()) != 0;
 	}
 }
