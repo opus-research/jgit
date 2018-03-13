@@ -102,7 +102,7 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 	 * collected by the setter methods of this class. Each instance of this
 	 * class should only be used for one invocation of the command (means: one
 	 * call to {@link #call()})
-	 *
+	 * 
 	 * @return a {@link FetchResult} object representing the successful fetch
 	 *         result
 	 * @throws InvalidRemoteException
@@ -135,7 +135,8 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 					JGitText.get().invalidRemote, remote), e);
 		} catch (TransportException e) {
 			throw new org.eclipse.jgit.api.errors.TransportException(
-					e.getMessage(), e);
+					JGitText.get().exceptionCaughtDuringExecutionOfFetchCommand,
+					e);
 		} catch (URISyntaxException e) {
 			throw new InvalidRemoteException(MessageFormat.format(
 					JGitText.get().invalidRemote, remote));

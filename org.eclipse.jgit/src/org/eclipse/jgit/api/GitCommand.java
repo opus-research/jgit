@@ -120,7 +120,7 @@ public abstract class GitCommand<T> implements Callable<T> {
 
 	/**
 	 * Executes the command
-	 *
+	 * 
 	 * @return T a result. Each command has its own return type
 	 * @throws GitAPIException
 	 *             or subclass thereof when an error occurs

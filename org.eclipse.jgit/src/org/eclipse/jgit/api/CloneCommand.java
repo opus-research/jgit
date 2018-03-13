@@ -113,12 +113,8 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	 * Executes the {@code Clone} command.
 	 *
 	 * @return the newly created {@code Git} object with associated repository
-	 * @throws InvalidRemoteException
-	 * @throws org.eclipse.jgit.api.errors.TransportException
-	 * @throws GitAPIException
 	 */
-	public Git call() throws GitAPIException, InvalidRemoteException,
-			org.eclipse.jgit.api.errors.TransportException {
+	public Git call() throws GitAPIException {
 		try {
 			URIish u = new URIish(uri);
 			Repository repository = init(u);
@@ -128,13 +124,15 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 			return new Git(repository);
 		} catch (IOException ioe) {
 			throw new JGitInternalException(ioe.getMessage(), ioe);
+		} catch (InvalidRemoteException e) {
+			throw new JGitInternalException(e.getMessage(), e);
 		} catch (URISyntaxException e) {
-			throw new InvalidRemoteException(MessageFormat.format(
-					JGitText.get().invalidRemote, remote));
+			throw new JGitInternalException(e.getMessage(), e);
 		}
 	}
 
-	private Repository init(URIish u) throws GitAPIException {
+	private Repository init(URIish u) throws JGitInternalException,
+			GitAPIException {
 		InitCommand command = Git.init();
 		command.setBare(bare);
 		if (directory == null)
@@ -147,8 +145,7 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	}
 
 	private FetchResult fetch(Repository clonedRepo, URIish u)
-			throws URISyntaxException,
-			org.eclipse.jgit.api.errors.TransportException, IOException,
+			throws URISyntaxException, JGitInternalException, IOException,
 			GitAPIException {
 		// create the remote config and save it
 		RemoteConfig config = new RemoteConfig(clonedRepo.getConfig(), remote);
@@ -195,8 +192,8 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	}
 
 	private void checkout(Repository clonedRepo, FetchResult result)
-			throws MissingObjectException, IncorrectObjectTypeException,
-			IOException, GitAPIException {
+			throws JGitInternalException, MissingObjectException,
+			IncorrectObjectTypeException, IOException, GitAPIException {
 
 		Ref head = result.getAdvertisedRef(branch);
 		if (branch.equals(Constants.HEAD)) {
@@ -233,7 +230,7 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	}
 
 	private void cloneSubmodules(Repository clonedRepo) throws IOException,
-			GitAPIException {
+			JGitInternalException, GitAPIException {
 		SubmoduleInitCommand init = new SubmoduleInitCommand(clonedRepo);
 		if (init.call().isEmpty())
 			return;
