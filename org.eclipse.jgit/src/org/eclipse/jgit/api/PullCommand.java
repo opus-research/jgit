@@ -166,31 +166,22 @@ public class PullCommand extends GitCommand<PullResult> {
 		// get the configured remote for the currently checked out branch
 		// stored in configuration key branch.<branch name>.remote
 		Config repoConfig = repo.getConfig();
-		final String remote = repoConfig.getString(
+		String remote = repoConfig.getString(
 				ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
 				ConfigConstants.CONFIG_KEY_REMOTE);
-		if (remote == null) {
-			String missingKey = ConfigConstants.CONFIG_BRANCH_SECTION + DOT
-					+ branchName + DOT + ConfigConstants.CONFIG_KEY_REMOTE;
-			throw new InvalidConfigurationException(MessageFormat.format(
-					JGitText.get().missingConfigurationForKey, missingKey));
-		}
+		if (remote == null)
+			// fall back to default remote
+			remote = Constants.DEFAULT_REMOTE_NAME;
 
 		// get the name of the branch in the remote repository
 		// stored in configuration key branch.<branch name>.merge
 		String remoteBranchName = repoConfig.getString(
 				ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
 				ConfigConstants.CONFIG_KEY_MERGE);
-		boolean doRebase = false;
-		if (remoteBranchName == null) {
-			// check if the branch is configured for pull-rebase
-			remoteBranchName = repoConfig.getString(
-					ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
-					ConfigConstants.CONFIG_KEY_REBASE);
-			if (remoteBranchName != null) {
-				doRebase = true;
-			}
-		}
+		// check if the branch is configured for pull-rebase
+		boolean doRebase = repoConfig.getBoolean(
+				ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
+				ConfigConstants.CONFIG_KEY_REBASE, false);
 
 		if (remoteBranchName == null) {
 			String missingKey = ConfigConstants.CONFIG_BRANCH_SECTION + DOT
@@ -237,11 +228,38 @@ public class PullCommand extends GitCommand<PullResult> {
 					JGitText.get().operationCanceled,
 					JGitText.get().pullTaskName));
 
+		// we check the updates to see which of the updated branches
+		// corresponds
+		// to the remote branch name
+		AnyObjectId commitToMerge;
+		if (isRemote) {
+			Ref r = null;
+			if (fetchRes != null) {
+				r = fetchRes.getAdvertisedRef(remoteBranchName);
+				if (r == null)
+					r = fetchRes.getAdvertisedRef(Constants.R_HEADS
+							+ remoteBranchName);
+			}
+			if (r == null)
+				throw new JGitInternalException(MessageFormat.format(JGitText
+						.get().couldNotGetAdvertisedRef, remoteBranchName));
+			else
+				commitToMerge = r.getObjectId();
+		} else {
+			try {
+				commitToMerge = repo.resolve(remoteBranchName);
+			} catch (IOException e) {
+				throw new JGitInternalException(
+						JGitText.get().exceptionCaughtDuringExecutionOfPullCommand,
+						e);
+			}
+		}
+
 		PullResult result;
 		if (doRebase) {
 			RebaseCommand rebase = new RebaseCommand(repo);
 			try {
-				RebaseResult rebaseRes = rebase.setUpstream(remoteBranchName)
+				RebaseResult rebaseRes = rebase.setUpstream(commitToMerge)
 						.setProgressMonitor(monitor).setOperation(
 								Operation.BEGIN).call();
 				result = new PullResult(fetchRes, remote, rebaseRes);
@@ -255,34 +273,6 @@ public class PullCommand extends GitCommand<PullResult> {
 				throw new JGitInternalException(e.getMessage(), e);
 			}
 		} else {
-			// we check the updates to see which of the updated branches
-			// corresponds
-			// to the remote branch name
-			AnyObjectId commitToMerge;
-
-			if (isRemote) {
-				Ref r = null;
-				if (fetchRes != null) {
-					r = fetchRes.getAdvertisedRef(remoteBranchName);
-					if (r == null)
-						r = fetchRes.getAdvertisedRef(Constants.R_HEADS
-								+ remoteBranchName);
-				}
-				if (r == null)
-					throw new JGitInternalException(MessageFormat.format(
-							JGitText.get().couldNotGetAdvertisedRef,
-							remoteBranchName));
-				else
-					commitToMerge = r.getObjectId();
-			} else {
-				try {
-					commitToMerge = repo.resolve(remoteBranchName);
-				} catch (IOException e) {
-					throw new JGitInternalException(
-							JGitText.get().exceptionCaughtDuringExecutionOfPullCommand,
-							e);
-				}
-			}
 			MergeCommand merge = new MergeCommand(repo);
 			merge.include(
 					"branch \'" + remoteBranchName + "\' of " + remoteUri,
