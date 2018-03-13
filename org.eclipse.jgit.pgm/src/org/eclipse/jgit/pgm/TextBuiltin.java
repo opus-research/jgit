@@ -103,7 +103,6 @@ public abstract class TextBuiltin {
 	 *
 	 * @deprecated Use outw instead
 	 */
-	@Deprecated
 	protected PrintWriter out;
 
 	/** Git repository the command was invoked within. */

@@ -684,8 +684,6 @@ public class UploadPack {
 
 			if (depth != 0)
 				processShallow();
-			if (!clientShallowCommits.isEmpty())
-				walk.assumeShallow(clientShallowCommits);
 			sendPack = negotiate();
 		} catch (PackProtocolException err) {
 			reportErrorDuringNegotiate(err.getMessage());
@@ -758,7 +756,7 @@ public class UploadPack {
 
 			// Commits not on the boundary which are shallow in the client
 			// need to become unshallowed
-			if (c.getDepth() < depth && clientShallowCommits.remove(c)) {
+			if (c.getDepth() < depth && clientShallowCommits.contains(c)) {
 				unshallowCommits.add(c.copy());
 				pckOut.writeString("unshallow " + c.name()); //$NON-NLS-1$
 			}
@@ -1352,7 +1350,7 @@ public class UploadPack {
 		try {
 			pw.setIndexDisabled(true);
 			pw.setUseCachedPacks(true);
-			pw.setUseBitmaps(depth == 0 && clientShallowCommits.isEmpty());
+			pw.setUseBitmaps(true);
 			pw.setReuseDeltaCommits(true);
 			pw.setDeltaBaseAsOffset(options.contains(OPTION_OFS_DELTA));
 			pw.setThin(options.contains(OPTION_THIN_PACK));
