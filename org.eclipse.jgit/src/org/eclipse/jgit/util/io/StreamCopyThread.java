@@ -47,7 +47,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /** Thread to copy from an input stream to an output stream. */
 public class StreamCopyThread extends Thread {
@@ -58,8 +57,6 @@ public class StreamCopyThread extends Thread {
 	private final OutputStream dst;
 
 	private volatile boolean done;
-
-	private final AtomicInteger flushCount = new AtomicInteger(0);
 
 	/**
 	 * Create a thread to copy data from an input stream to an output stream.
@@ -85,7 +82,6 @@ public class StreamCopyThread extends Thread {
 	 * the request.
 	 */
 	public void flush() {
-		flushCount.incrementAndGet();
 		interrupt();
 	}
 
@@ -113,11 +109,12 @@ public class StreamCopyThread extends Thread {
 	public void run() {
 		try {
 			final byte[] buf = new byte[BUFFER_SIZE];
+			int interruptCounter = 0;
 			for (;;) {
 				try {
-					if (flushCount.get() > 0) {
+					if (interruptCounter > 0) {
 						dst.flush();
-						flushCount.decrementAndGet();
+						interruptCounter--;
 					}
 
 					if (done)
@@ -127,6 +124,7 @@ public class StreamCopyThread extends Thread {
 					try {
 						n = src.read(buf);
 					} catch (InterruptedIOException wakey) {
+						interruptCounter++;
 						continue;
 					}
 					if (n < 0)
