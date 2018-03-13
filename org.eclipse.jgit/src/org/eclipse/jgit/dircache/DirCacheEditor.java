@@ -162,10 +162,10 @@ public class DirCacheEditor extends BaseDirCacheEditor {
 							JGitText.get().fileModeNotSetForPath,
 							ent.getPathString()));
 				}
-				fastAdd(ent);
 				lastIdx = e.replace
 					? deleteOverlappingSubtree(ent, eIdx)
 					: eIdx;
+				fastAdd(ent);
 			} else {
 				// Apply to all entries of the current path (different stages)
 				lastIdx = cache.nextEntry(eIdx);
@@ -204,7 +204,7 @@ public class DirCacheEditor extends BaseDirCacheEditor {
 			// If at least one other entry already exists in this parent
 			// directory there is no need to continue searching up the tree.
 			i = -(i + 1);
-			if (i < entryCnt - 1 && inDir(entries[i], entPath, p)) {
+			if (i < entryCnt && inDir(entries[i], entPath, p)) {
 				break;
 			}
 		}
