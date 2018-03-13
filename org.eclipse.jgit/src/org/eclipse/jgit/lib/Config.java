@@ -1200,8 +1200,6 @@ public class Config {
 		for (;;) {
 			int c = in.read();
 			if (c < 0) {
-				if (value.length() == 0)
-					throw new ConfigInvalidException(JGitText.get().unexpectedEndOfConfigFile);
 				break;
 			}
 
@@ -1268,7 +1266,7 @@ public class Config {
 
 			value.append((char) c);
 		}
-		return value.length() > 0 ? value.toString() : null;
+		return value.toString();
 	}
 
 	/**
