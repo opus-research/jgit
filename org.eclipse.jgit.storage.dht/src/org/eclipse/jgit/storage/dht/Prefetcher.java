@@ -59,7 +59,6 @@ import java.util.Set;
 import java.util.concurrent.TimeoutException;
 
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.generated.storage.dht.proto.GitStore.ChunkMeta;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
@@ -92,6 +91,8 @@ class Prefetcher implements StreamingCallback<Collection<PackChunk.Members>> {
 
 	private final int lowWaterMark;
 
+	private boolean cacheLoadedChunks;
+
 	private boolean first = true;
 
 	private boolean automaticallyPushHints = true;
@@ -104,7 +105,7 @@ class Prefetcher implements StreamingCallback<Collection<PackChunk.Members>> {
 
 	private DhtException error;
 
-	Prefetcher(DhtReader reader, int objectType, int prefetchLimitInBytes) {
+	Prefetcher(DhtReader reader, int objectType) {
 		this.db = reader.getDatabase();
 		this.stats = reader.getStatistics();
 		this.objectType = objectType;
@@ -113,19 +114,25 @@ class Prefetcher implements StreamingCallback<Collection<PackChunk.Members>> {
 		this.queue = new LinkedList<ChunkKey>();
 		this.followEdgeHints = reader.getOptions().isPrefetchFollowEdgeHints();
 		this.averageChunkSize = reader.getInserterOptions().getChunkSize();
-		this.highWaterMark = prefetchLimitInBytes;
+		this.highWaterMark = reader.getOptions().getPrefetchLimit();
 
 		int lwm = (highWaterMark / averageChunkSize) - 4;
 		if (lwm <= 0)
 			lwm = (highWaterMark / averageChunkSize) / 2;
 		lowWaterMark = lwm * averageChunkSize;
+		cacheLoadedChunks = true;
 	}
 
 	boolean isType(int type) {
 		return objectType == type;
 	}
 
-	void push(DhtReader ctx, Collection<RevCommit> roots) {
+	synchronized void setCacheLoadedChunks(boolean cacheLoadedChunks) {
+		this.cacheLoadedChunks = cacheLoadedChunks;
+	}
+
+	void push(DhtReader ctx, Collection<RevCommit> roots) throws DhtException,
+			MissingObjectException {
 		// Approximate walk by using hints from the most recent commit.
 		// Since the commits were recently parsed by the reader, we can
 		// ask the reader for their chunk locations and most likely get
@@ -136,7 +143,7 @@ class Prefetcher implements StreamingCallback<Collection<PackChunk.Members>> {
 
 		for (RevCommit cmit : roots) {
 			if (time < cmit.getCommitTime()) {
-				ChunkAndOffset p = ctx.getChunkGently(cmit);
+				ChunkAndOffset p = ctx.getChunkGently(cmit, cmit.getType());
 				if (p != null && p.chunk.getMeta() != null) {
 					time = cmit.getCommitTime();
 					chunk = p.chunk;
@@ -219,19 +226,12 @@ class Prefetcher implements StreamingCallback<Collection<PackChunk.Members>> {
 
 		if (hint != null) {
 			synchronized (this) {
-				if (followEdgeHints && 0 < hint.getEdgeCount())
-					push(hint.getEdgeList());
+				if (followEdgeHints && !hint.getEdge().isEmpty())
+					push(hint.getEdge());
 				else
-					push(hint.getSequentialList());
+					push(hint.getSequential());
 			}
 		}
-	}
-
-	private void push(List<String> list) {
-		List<ChunkKey> keys = new ArrayList<ChunkKey>(list.size());
-		for (String keyString : list)
-			keys.add(ChunkKey.fromString(keyString));
-		push(keys);
 	}
 
 	void push(Iterable<ChunkKey> list) {
@@ -254,7 +254,8 @@ class Prefetcher implements StreamingCallback<Collection<PackChunk.Members>> {
 		}
 	}
 
-	synchronized ChunkAndOffset find(RepositoryKey repo, AnyObjectId objId) {
+	synchronized ChunkAndOffset find(
+			@SuppressWarnings("hiding") RepositoryKey repo, AnyObjectId objId) {
 		for (PackChunk c : ready.values()) {
 			int p = c.findOffset(repo, objId);
 			if (0 <= p)
@@ -340,6 +341,9 @@ class Prefetcher implements StreamingCallback<Collection<PackChunk.Members>> {
 	private PackChunk useReadyChunk(ChunkKey key) {
 		PackChunk chunk = ready.remove(key);
 
+		if (cacheLoadedChunks)
+			chunk = ChunkCache.get().put(chunk);
+
 		status.put(chunk.getChunkKey(), Status.DONE);
 		bytesReady -= chunk.getTotalSize();
 
@@ -362,19 +366,26 @@ class Prefetcher implements StreamingCallback<Collection<PackChunk.Members>> {
 		// set's iterator order to load in the order we want data.
 		//
 		LinkedHashSet<ChunkKey> toLoad = new LinkedHashSet<ChunkKey>();
+		ChunkCache cache = ChunkCache.get();
 
 		while (bytesReady + bytesLoading < highWaterMark && !queue.isEmpty()) {
 			ChunkKey key = queue.removeFirst();
+			PackChunk chunk = cache.get(key);
 
-			stats.access(key).cntPrefetcher_Load++;
-			toLoad.add(key);
-			status.put(key, Status.LOADING);
-			bytesLoading += averageChunkSize;
+			if (chunk != null) {
+				stats.access(key).cntPrefetcher_ChunkCacheHit++;
+				chunkIsReady(chunk);
+			} else {
+				stats.access(key).cntPrefetcher_Load++;
+				toLoad.add(key);
+				status.put(key, Status.LOADING);
+				bytesLoading += averageChunkSize;
 
-			// For the first chunk, start immediately to reduce the
-			// startup latency associated with additional chunks.
-			if (first)
-				break;
+				// For the first chunk, start immediately to reduce the
+				// startup latency associated with additional chunks.
+				if (first)
+					break;
+			}
 		}
 
 		if (!toLoad.isEmpty() && error == null)

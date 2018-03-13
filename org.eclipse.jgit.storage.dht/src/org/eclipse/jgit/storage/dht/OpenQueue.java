@@ -59,7 +59,8 @@ import org.eclipse.jgit.lib.ObjectReader;
 /**
  * Locates objects in large batches, then opens them clustered by chunk.
  * <p>
- * To simplify the implementation this method performs lookups for the
+ * To simplify the implementation this method does not consult the local
+ * {@link ChunkCache} for objects. Instead it performs lookups for the
  * {@link ObjectInfo} in large batches, clusters those by ChunkKey, and loads
  * the chunks with a {@link Prefetcher}.
  * <p>
@@ -159,7 +160,6 @@ final class OpenQueue<T extends ObjectId> extends QueueObjectLookup<T>
 
 	@Override
 	public void release() {
-		reader.getRecentChunks().setMaxBytes(reader.getOptions().getChunkLimit());
 		prefetcher = null;
 		currChunk = null;
 	}
@@ -174,13 +174,8 @@ final class OpenQueue<T extends ObjectId> extends QueueObjectLookup<T>
 				list = new ArrayList<ObjectWithInfo<T>>();
 				byChunk.put(chunkKey, list);
 
-				if (prefetcher == null) {
-					int limit = reader.getOptions().getChunkLimit();
-					int ratio = reader.getOptions().getOpenQueuePrefetchRatio();
-					int prefetchLimit = (int) (limit * (ratio / 100.0));
-					reader.getRecentChunks().setMaxBytes(limit - prefetchLimit);
-					prefetcher = new Prefetcher(reader, 0, prefetchLimit);
-				}
+				if (prefetcher == null)
+					prefetcher = new Prefetcher(reader, 0);
 				prefetcher.push(chunkKey);
 			}
 			list.add(c);

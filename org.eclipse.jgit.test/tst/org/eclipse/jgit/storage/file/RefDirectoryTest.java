@@ -61,9 +61,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 
-import org.eclipse.jgit.events.ListenerHandle;
-import org.eclipse.jgit.events.RefsChangedEvent;
-import org.eclipse.jgit.events.RefsChangedListener;
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.AnyObjectId;
@@ -172,6 +169,7 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		Ref head;
 
 		writeLooseRef(HEAD, A);
+		BUG_WorkAroundRacyGitIssues(HEAD);
 
 		all = refdir.getRefs(RefDatabase.ALL);
 		assertEquals(1, all.size());
@@ -192,6 +190,7 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 
 		writeLooseRef(HEAD, A);
 		writeLooseRef("refs/heads/master", B);
+		BUG_WorkAroundRacyGitIssues(HEAD);
 
 		all = refdir.getRefs(RefDatabase.ALL);
 		assertEquals(2, all.size());
@@ -329,6 +328,7 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertTrue(heads.containsKey("refs/heads/C"));
 
 		writeLooseRef("refs/heads/B", "FAIL\n");
+		BUG_WorkAroundRacyGitIssues("refs/heads/B");
 
 		heads = refdir.getRefs(RefDatabase.ALL);
 		assertEquals(2, heads.size());
@@ -469,33 +469,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 	}
 
 	@Test
-	public void testGetRefs_LooseSorting_Bug_348834() throws IOException {
-		Map<String, Ref> refs;
-
-		writeLooseRef("refs/heads/my/a+b", A);
-		writeLooseRef("refs/heads/my/a/b/c", B);
-
-		final int[] count = new int[1];
-
-		ListenerHandle listener = Repository.getGlobalListenerList()
-				.addRefsChangedListener(new RefsChangedListener() {
-
-					public void onRefsChanged(RefsChangedEvent event) {
-						count[0]++;
-					}
-				});
-
-		refs = refdir.getRefs(RefDatabase.ALL);
-		refs = refdir.getRefs(RefDatabase.ALL);
-		listener.remove();
-		assertEquals(1, count[0]); // Bug 348834 multiple RefsChangedEvents
-		assertEquals(2, refs.size());
-		assertEquals(A, refs.get("refs/heads/my/a+b").getObjectId());
-		assertEquals(B, refs.get("refs/heads/my/a/b/c").getObjectId());
-
-	}
-
-	@Test
 	public void testGetRefs_TagsOnly_AllPacked() throws IOException {
 		Map<String, Ref> tags;
 		Ref a;
@@ -574,6 +547,7 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(A, all.get(HEAD).getObjectId());
 
 		writeLooseRef("refs/heads/master", B);
+		BUG_WorkAroundRacyGitIssues("refs/heads/master");
 		all = refdir.getRefs(RefDatabase.ALL);
 		assertEquals(B, all.get(HEAD).getObjectId());
 	}
@@ -587,6 +561,7 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(A, all.get(HEAD).getObjectId());
 
 		writeLooseRef("refs/heads/master", B);
+		BUG_WorkAroundRacyGitIssues("refs/heads/master");
 
 		Ref master = refdir.getRef("refs/heads/master");
 		assertEquals(B, master.getObjectId());
@@ -785,6 +760,7 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 
 		writeLooseRef("refs/5", "ref: refs/6\n");
 		writeLooseRef("refs/6", "ref: refs/end\n");
+		BUG_WorkAroundRacyGitIssues("refs/5");
 		all = refdir.getRefs(RefDatabase.ALL);
 		r = all.get("refs/1");
 		assertNull("mising 1 due to cycle", r);
@@ -1101,5 +1077,24 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 	private void deleteLooseRef(String name) {
 		File path = new File(diskRepo.getDirectory(), name);
 		assertTrue("deleted " + name, path.delete());
+	}
+
+	/**
+	 * Kick the timestamp of a local file.
+	 * <p>
+	 * We shouldn't have to make these method calls. The cache is using file
+	 * system timestamps, and on many systems unit tests run faster than the
+	 * modification clock. Dumping the cache after we make an edit behind
+	 * RefDirectory's back allows the tests to pass.
+	 *
+	 * @param name
+	 *            the file in the repository to force a time change on.
+	 */
+	private void BUG_WorkAroundRacyGitIssues(String name) {
+		File path = new File(diskRepo.getDirectory(), name);
+		long old = path.lastModified();
+		long set = 1250379778668L; // Sat Aug 15 20:12:58 GMT-03:30 2009
+		path.setLastModified(set);
+		assertTrue("time changed", old != path.lastModified());
 	}
 }

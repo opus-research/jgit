@@ -54,7 +54,7 @@ import org.eclipse.jgit.lib.ObjectId;
 
 /** Unique identifier of a {@link PackChunk} in the DHT. */
 public final class ChunkKey implements RowKey {
-	static final int KEYLEN = 49;
+	static final int KEYLEN = 52;
 
 	/**
 	 * @param repo
@@ -74,6 +74,18 @@ public final class ChunkKey implements RowKey {
 	}
 
 	/**
+	 * @param d
+	 *            decoder to read key from current field from.
+	 * @return the key
+	 */
+	public static ChunkKey fromBytes(TinyProtobuf.Decoder d) {
+		int len = d.bytesLength();
+		int ptr = d.bytesOffset();
+		byte[] buf = d.bytesArray();
+		return fromBytes(buf, ptr, len);
+	}
+
+	/**
 	 * @param key
 	 * @param ptr
 	 * @param len
@@ -84,8 +96,8 @@ public final class ChunkKey implements RowKey {
 			throw new IllegalArgumentException(MessageFormat.format(
 					DhtText.get().invalidChunkKey, decode(key, ptr, ptr + len)));
 
-		int repo = parse32(key, ptr);
-		ObjectId chunk = ObjectId.fromString(key, ptr + 9);
+		int repo = parse32(key, ptr + 3);
+		ObjectId chunk = ObjectId.fromString(key, ptr + 12);
 		return new ChunkKey(repo, chunk);
 	}
 
@@ -122,9 +134,13 @@ public final class ChunkKey implements RowKey {
 
 	public byte[] asBytes() {
 		byte[] r = new byte[KEYLEN];
-		format32(r, 0, repo);
-		r[8] = '.';
-		chunk.copyTo(r, 9);
+		chunk.copyTo(r, 12);
+		format32(r, 3, repo);
+		// bucket is the leading 2 digits of the SHA-1.
+		r[11] = '.';
+		r[2] = '.';
+		r[1] = r[12 + 1];
+		r[0] = r[12 + 0];
 		return r;
 	}
 

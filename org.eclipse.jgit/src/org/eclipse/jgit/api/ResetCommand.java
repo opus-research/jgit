@@ -44,19 +44,13 @@ package org.eclipse.jgit.api;
 
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.Collection;
-import java.util.LinkedList;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
-import org.eclipse.jgit.dircache.DirCacheEditor;
-import org.eclipse.jgit.dircache.DirCacheEntry;
-import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
@@ -64,9 +58,6 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryState;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.treewalk.CanonicalTreeParser;
-import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 
 /**
  * A class used to execute a {@code Reset} command. It has setters for all
@@ -112,11 +103,9 @@ public class ResetCommand extends GitCommand<Ref> {
 		KEEP // TODO not implemented yet
 	}
 
-	private String ref = Constants.HEAD;
+	private String ref;
 
 	private ResetType mode;
-
-	private Collection<String> filepaths = new LinkedList<String>();
 
 	/**
 	 *
@@ -151,12 +140,6 @@ public class ResetCommand extends GitCommand<Ref> {
 			final ObjectId commitId;
 			try {
 				commitId = repo.resolve(ref);
-				if (commitId == null) {
-					// @TODO throw an InvalidRefNameException. We can't do that
-					// now because this would break the API
-					throw new JGitInternalException("Invalid ref " + ref
-							+ " specified");
-				}
 			} catch (IOException e) {
 				throw new JGitInternalException(
 						MessageFormat.format(JGitText.get().cannotRead, ref),
@@ -172,13 +155,6 @@ public class ResetCommand extends GitCommand<Ref> {
 						e);
 			} finally {
 				rw.release();
-			}
-
-			if (!filepaths.isEmpty()) {
-				// reset [commit] -- paths
-				resetIndexForPaths(commit);
-				setCallable(false);
-				return repo.getRef(Constants.HEAD);
 			}
 
 			// write the ref
@@ -241,74 +217,8 @@ public class ResetCommand extends GitCommand<Ref> {
 	 * @return this instance
 	 */
 	public ResetCommand setMode(ResetType mode) {
-		if (!filepaths.isEmpty())
-			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().illegalCombinationOfArguments,
-					"[--mixed | --soft | --hard]", "<paths>..."));
 		this.mode = mode;
 		return this;
-	}
-
-	/**
-	 * @param file
-	 *            the file to add
-	 * @return this instance
-	 */
-	public ResetCommand addPath(String file) {
-		if (mode != null)
-			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().illegalCombinationOfArguments, "<paths>...",
-					"[--mixed | --soft | --hard]"));
-		filepaths.add(file);
-		return this;
-	}
-
-	private void resetIndexForPaths(RevCommit commit) {
-		DirCache dc = null;
-		final DirCacheEditor edit;
-		try {
-			dc = repo.lockDirCache();
-			edit = dc.editor();
-
-			final TreeWalk tw = new TreeWalk(repo);
-			tw.addTree(new DirCacheIterator(dc));
-			tw.addTree(commit.getTree());
-			tw.setFilter(PathFilterGroup.createFromStrings(filepaths));
-			tw.setRecursive(true);
-
-			while (tw.next()) {
-				final String path = tw.getPathString();
-				// DirCacheIterator dci = tw.getTree(0, DirCacheIterator.class);
-				final CanonicalTreeParser tree = tw.getTree(1,
-						CanonicalTreeParser.class);
-				if (tree == null)
-					// file is not in the commit, remove from index
-					edit.add(new DirCacheEditor.DeletePath(path));
-				else { // revert index to commit
-					// it seams that there is concurrent access to tree
-					// variable, therefore we need to keep references to
-					// entryFileMode and entryObjectId in local
-					// variables
-					final FileMode entryFileMode = tree.getEntryFileMode();
-					final ObjectId entryObjectId = tree.getEntryObjectId();
-					edit.add(new DirCacheEditor.PathEdit(path) {
-						@Override
-						public void apply(DirCacheEntry ent) {
-							ent.setFileMode(entryFileMode);
-							ent.setObjectId(entryObjectId);
-							ent.setLastModified(0);
-						}
-					});
-				}
-			}
-
-			edit.commit();
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		} finally {
-			if (dc != null)
-				dc.unlock();
-		}
 	}
 
 	private void resetIndex(RevCommit commit) throws IOException {

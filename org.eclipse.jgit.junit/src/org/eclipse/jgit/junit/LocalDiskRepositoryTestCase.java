@@ -58,7 +58,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jgit.lib.Constants;
@@ -217,23 +216,29 @@ public abstract class LocalDiskRepositoryTestCase {
 	private static boolean recursiveDelete(final String testName,
 			final File dir, boolean silent, boolean failOnError) {
 		assert !(silent && failOnError);
-		if (!dir.exists())
+		if (!dir.exists()) {
 			return silent;
+		}
 		final File[] ls = dir.listFiles();
-		if (ls != null)
+		if (ls != null) {
 			for (int k = 0; k < ls.length; k++) {
 				final File e = ls[k];
-				if (e.isDirectory())
+				if (e.isDirectory()) {
 					silent = recursiveDelete(testName, e, silent, failOnError);
-				else if (!e.delete()) {
-					if (!silent)
-						reportDeleteFailure(testName, failOnError, e);
-					silent = !failOnError;
+				} else {
+					if (!e.delete()) {
+						if (!silent) {
+							reportDeleteFailure(testName, failOnError, e);
+						}
+						silent = !failOnError;
+					}
 				}
 			}
+		}
 		if (!dir.delete()) {
-			if (!silent)
+			if (!silent) {
 				reportDeleteFailure(testName, failOnError, dir);
+			}
 			silent = !failOnError;
 		}
 		return silent;
@@ -297,37 +302,6 @@ public abstract class LocalDiskRepositoryTestCase {
 	}
 
 	/**
-	 * Adds a repository to the list of repositories which is closed at the end
-	 * of the tests
-	 *
-	 * @param r
-	 *            the repository to be closed
-	 */
-	public void addRepoToClose(Repository r) {
-		toClose.add(r);
-	}
-
-	private String createUniqueTestFolderPrefix() {
-		return "test" + (System.currentTimeMillis() + "_" + (testCount++));
-	}
-
-	/**
-	 * Creates a unique directory for a test
-	 *
-	 * @param name
-	 *            a subdirectory
-	 * @return a unique directory for a test
-	 * @throws IOException
-	 */
-	protected File createTempDirectory(String name) throws IOException {
-		String gitdirName = createUniqueTestFolderPrefix();
-		File parent = new File(trash, gitdirName);
-		File directory = new File(parent, name);
-		FileUtils.mkdirs(directory);
-		return directory.getCanonicalFile();
-	}
-
-	/**
 	 * Creates a new unique directory for a test repository
 	 *
 	 * @param bare
@@ -337,16 +311,11 @@ public abstract class LocalDiskRepositoryTestCase {
 	 * @throws IOException
 	 */
 	protected File createUniqueTestGitDir(boolean bare) throws IOException {
-		String gitdirName = createUniqueTestFolderPrefix();
-		if (!bare)
-			gitdirName += "/";
-		gitdirName += Constants.DOT_GIT;
-		File gitdir = new File(trash, gitdirName);
-		return gitdir.getCanonicalFile();
-	}
-
-	protected File createTempFile() throws IOException {
-		return new File(trash, "tmp-" + UUID.randomUUID()).getCanonicalFile();
+		String uniqueId = System.currentTimeMillis() + "_" + (testCount++);
+		String gitdirName = "test" + uniqueId + (bare ? "" : "/")
+				+ Constants.DOT_GIT;
+		File gitdir = new File(trash, gitdirName).getCanonicalFile();
+		return gitdir;
 	}
 
 	/**
@@ -462,8 +431,9 @@ public abstract class LocalDiskRepositoryTestCase {
 	private static String[] toEnvArray(final Map<String, String> env) {
 		final String[] envp = new String[env.size()];
 		int i = 0;
-		for (Map.Entry<String, String> e : env.entrySet())
+		for (Map.Entry<String, String> e : env.entrySet()) {
 			envp[i++] = e.getKey() + "=" + e.getValue();
+		}
 		return envp;
 	}
 
@@ -474,5 +444,4 @@ public abstract class LocalDiskRepositoryTestCase {
 	private String testId() {
 		return getClass().getName() + "." + testCount;
 	}
-
 }

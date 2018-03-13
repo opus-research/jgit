@@ -238,23 +238,19 @@ public class ResolveMerger extends ThreeWayMerger {
 	}
 
 	private void checkout() throws NoWorkTreeException, IOException {
-		ObjectReader r = db.getObjectDatabase().newReader();
-		try {
-			for (Map.Entry<String, DirCacheEntry> entry : toBeCheckedOut
-					.entrySet()) {
-				File f = new File(db.getWorkTree(), entry.getKey());
-				if (entry.getValue() != null) {
-					createDir(f.getParentFile());
-					DirCacheCheckout.checkoutEntry(db, f, entry.getValue(), r);
-				} else {
-					if (!f.delete())
-						failingPaths.put(entry.getKey(),
-								MergeFailureReason.COULD_NOT_DELETE);
-				}
-				modifiedFiles.add(entry.getKey());
+		for (Map.Entry<String, DirCacheEntry> entry : toBeCheckedOut.entrySet()) {
+			File f = new File(db.getWorkTree(), entry.getKey());
+			if (entry.getValue() != null) {
+				createDir(f.getParentFile());
+				DirCacheCheckout.checkoutEntry(db,
+						f,
+						entry.getValue());
+			} else {
+				if (!f.delete())
+					failingPaths.put(entry.getKey(),
+							MergeFailureReason.COULD_NOT_DELETE);
 			}
-		} finally {
-			r.release();
+			modifiedFiles.add(entry.getKey());
 		}
 	}
 
@@ -478,18 +474,6 @@ public class ResolveMerger extends ThreeWayMerger {
 				}
 
 				unmergedPaths.add(tw.getPathString());
-
-				// generate a MergeResult for the deleted file
-				RawText baseText = base == null ? RawText.EMPTY_TEXT
-						: getRawText(base.getEntryObjectId(), db);
-				RawText ourText = ours == null ? RawText.EMPTY_TEXT
-						: getRawText(ours.getEntryObjectId(), db);
-				RawText theirsText = theirs == null ? RawText.EMPTY_TEXT
-						: getRawText(theirs.getEntryObjectId(), db);
-				MergeResult<RawText> result = mergeAlgorithm.merge(
-						RawTextComparator.DEFAULT, baseText, ourText,
-						theirsText);
-				mergeResults.put(tw.getPathString(), result);
 			}
 		}
 		return true;
