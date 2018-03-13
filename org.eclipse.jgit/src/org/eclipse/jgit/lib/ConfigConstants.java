@@ -66,9 +66,6 @@ public class ConfigConstants {
 	/** The "gerrit" section */
 	public static final String CONFIG_GERRIT_SECTION = "gerrit";
 
-	/** The "submodule" section */
-	public static final String CONFIG_SUBMODULE_SECTION = "submodule";
-
 	/** The "algorithm" key */
 	public static final String CONFIG_KEY_ALGORITHM = "algorithm";
 
@@ -136,10 +133,4 @@ public class ConfigConstants {
 
 	/** The "createchangeid" key */
 	public static final String CONFIG_KEY_CREATECHANGEID = "createchangeid";
-
-	/** The "path" key */
-	public static final String CONFIG_KEY_PATH = "path";
-
-	/** The "update" key */
-	public static final String CONFIG_KEY_UPDATE = "update";
 }
