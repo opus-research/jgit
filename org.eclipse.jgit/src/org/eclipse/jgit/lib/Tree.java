@@ -56,7 +56,14 @@ import org.eclipse.jgit.util.RawParseUtils;
 
 /**
  * A representation of a Git tree entry. A Tree is a directory in Git.
+ *
+ * @deprecated To look up information about a single path, use
+ * {@link org.eclipse.jgit.treewalk.TreeWalk#forPath(Repository, String, org.eclipse.jgit.revwalk.RevTree)}.
+ * To lookup information about multiple paths at once, use a
+ * {@link org.eclipse.jgit.treewalk.TreeWalk} and obtain the current entry's
+ * information from its getter methods.
  */
+@Deprecated
 public class Tree extends TreeEntry implements Treeish {
 	private static final TreeEntry[] EMPTY_TREE = {};
 
@@ -530,8 +537,10 @@ public class Tree extends TreeEntry implements Treeish {
 
 	private void ensureLoaded() throws IOException, MissingObjectException {
 		if (!isLoaded()) {
-			ObjectLoader ldr = db.open(getId(), Constants.OBJ_TREE);
-			readTree(ldr.getCachedBytes());
+			final ObjectLoader or = db.openTree(getId());
+			if (or == null)
+				throw new MissingObjectException(getId(), Constants.TYPE_TREE);
+			readTree(or.getBytes());
 		}
 	}
 
