@@ -183,8 +183,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 		}
 		Repository repository = null;
 		FetchResult fetchResult = null;
-		Thread cleanupHook = new Thread(() -> cleanup());
-		Runtime.getRuntime().addShutdownHook(cleanupHook);
 		try {
 			repository = init();
 			fetchResult = fetch(repository, u);
@@ -207,8 +205,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 			}
 			cleanup();
 			throw e;
-		} finally {
-			Runtime.getRuntime().removeShutdownHook(cleanupHook);
 		}
 		if (!noCheckout) {
 			try {
