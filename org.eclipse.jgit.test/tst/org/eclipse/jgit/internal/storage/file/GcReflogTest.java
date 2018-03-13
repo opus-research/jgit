@@ -92,7 +92,7 @@ public class GcReflogTest extends GcTestCase {
 				.create();
 		// make sure HEAD exists
 		Git.wrap(repo).checkout().setName("refs/heads/master").call();
-		gc.collectGarbage();
+		gc.gc();
 	}
 
 	@Test
@@ -111,7 +111,7 @@ public class GcReflogTest extends GcTestCase {
 		FileUtils.delete(
 				new File(repo.getDirectory(), "logs/refs/heads/master"),
 				FileUtils.RETRY | FileUtils.SKIP_MISSING);
-		gc.collectGarbage();
+		gc.gc();
 
 		stats = gc.getStatistics();
 		assertEquals(4, stats.numberOfLooseObjects);
@@ -137,7 +137,7 @@ public class GcReflogTest extends GcTestCase {
 				new File(repo.getDirectory(), "logs/refs/heads/master"),
 				FileUtils.RETRY | FileUtils.SKIP_MISSING);
 		gc.setExpireAgeMillis(0);
-		gc.collectGarbage();
+		gc.gc();
 
 		stats = gc.getStatistics();
 		assertEquals(0, stats.numberOfLooseObjects);

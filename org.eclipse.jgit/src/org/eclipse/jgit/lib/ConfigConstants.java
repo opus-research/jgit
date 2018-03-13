@@ -292,14 +292,14 @@ public class ConfigConstants {
 
 	/**
 	 * The "logexpiry" key
-	 * 
+	 *
 	 * @since 4.8
 	 */
 	public static final String CONFIG_KEY_LOGEXPIRY = "logExpiry";
 
 	/**
 	 * The "autodetach" key
-	 * 
+	 *
 	 * @since 4.8
 	 */
 	public static final String CONFIG_KEY_AUTODETACH = "autoDetach";
