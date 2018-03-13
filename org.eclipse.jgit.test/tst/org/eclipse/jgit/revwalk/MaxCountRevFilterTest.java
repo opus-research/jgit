@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Robin Rosenberg
+ * Copyright (C) 2011, Tomasz Zarna <Tomasz.Zarna@pl.ibm.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,84 +40,45 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.revwalk;
 
-package org.eclipse.jgit.util.io;
+import static org.junit.Assert.assertNull;
 
-import java.io.IOException;
-import java.io.OutputStream;
+import org.eclipse.jgit.revwalk.filter.MaxCountRevFilter;
+import org.junit.Test;
 
-/**
- * An OutputStream that expands LF to CRLF.
- * <p>
- * Existing CRLF are not expanded to CRCRLF, but retained as it.
- */
-public class AutoCRLFOutputStream extends OutputStream {
+public class MaxCountRevFilterTest extends RevWalkTestCase {
+	@Test
+	public void testMaxCountRevFilter() throws Exception {
+		final RevCommit a = commit();
+		final RevCommit b = commit(a);
+		final RevCommit c1 = commit(b);
+		final RevCommit c2 = commit(b);
+		final RevCommit d = commit(c1, c2);
+		final RevCommit e = commit(d);
 
-	private final OutputStream out;
+		rw.reset();
+		rw.setRevFilter(MaxCountRevFilter.create(3));
+		markStart(e);
+		assertCommit(e, rw.next());
+		assertCommit(d, rw.next());
+		assertCommit(c2, rw.next());
+		assertNull(rw.next());
 
-	private int buf = -1;
-
-	/**
-	 * @param out
-	 */
-	public AutoCRLFOutputStream(OutputStream out) {
-		this.out = out;
+		rw.reset();
+		rw.setRevFilter(MaxCountRevFilter.create(0));
+		markStart(e);
+		assertNull(rw.next());
 	}
 
-	@Override
-	public void write(int b) throws IOException {
-		if (b == '\n') {
-			if (buf == '\r') {
-				out.write('\n');
-				buf = -1;
-			} else if (buf == -1) {
-				out.write('\r');
-				out.write('\n');
-				buf = -1;
-			}
-		} else if (b == '\r') {
-			out.write(b);
-			buf = '\r';
-		} else {
-			out.write(b);
-			buf = -1;
-		}
-	}
+	@Test
+	public void testMaxCountRevFilter0() throws Exception {
+		final RevCommit a = commit();
+		final RevCommit b = commit(a);
 
-	@Override
-	public void write(byte[] b) throws IOException {
-		write(b, 0, b.length);
-	}
-
-	@Override
-	public void write(byte[] b, int off, int len) throws IOException {
-		int lastw = off;
-		for (int i = off; i < off + len; ++i) {
-			byte c = b[i];
-			if (c == '\r') {
-				buf = '\r';
-			} else if (c == '\n') {
-				if (buf != '\r') {
-					if (lastw < i) {
-						out.write(b, lastw, i - lastw);
-					}
-					out.write('\r');
-					lastw = i;
-				}
-				buf = -1;
-			} else {
-				buf = -1;
-			}
-		}
-		if (lastw < off + len) {
-			out.write(b, lastw, off + len - lastw);
-		}
-		if (b[off + len - 1] == '\r')
-			buf = '\r';
-	}
-
-	@Override
-	public void flush() throws IOException {
-		buf = -1;
+		rw.reset();
+		rw.setRevFilter(MaxCountRevFilter.create(0));
+		markStart(b);
+		assertNull(rw.next());
 	}
 }

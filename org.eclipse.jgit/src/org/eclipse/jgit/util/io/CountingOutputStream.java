@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Robin Rosenberg
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,81 +43,48 @@
 
 package org.eclipse.jgit.util.io;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 
-import org.junit.Assert;
-import org.junit.Test;
+/** Counts the number of bytes written. */
+public class CountingOutputStream extends OutputStream {
+	private final OutputStream out;
+	private long cnt;
 
-public class AutoCRLFOutputStreamTest {
-
-	@Test
-	public void test() throws IOException {
-		assertNoCrLf("", "");
-		assertNoCrLf("\r", "\r");
-		assertNoCrLf("\r\n", "\n");
-		assertNoCrLf("\r\n", "\r\n");
-		assertNoCrLf("\r\r", "\r\r");
-		assertNoCrLf("\r\n\r", "\n\r");
-		assertNoCrLf("\r\n\r\r", "\r\n\r\r");
-		assertNoCrLf("\r\n\r\n", "\r\n\r\n");
-		assertNoCrLf("\r\n\r\n\r", "\n\r\n\r");
+	/**
+	 * Initialize a new counting stream.
+	 *
+	 * @param out
+	 *            stream to output all writes to.
+	 */
+	public CountingOutputStream(OutputStream out) {
+		this.out = out;
 	}
 
-	private void assertNoCrLf(String string, String string2) throws IOException {
-		assertNoCrLfHelper(string, string2);
-		// \u00e5 = LATIN SMALL LETTER A WITH RING ABOVE
-		// the byte value is negative
-		assertNoCrLfHelper("\u00e5" + string, "\u00e5" + string2);
-		assertNoCrLfHelper("\u00e5" + string + "\u00e5", "\u00e5" + string2
-				+ "\u00e5");
-		assertNoCrLfHelper(string + "\u00e5", string2 + "\u00e5");
+	/** @return current number of bytes written. */
+	public long getCount() {
+		return cnt;
 	}
 
-	private void assertNoCrLfHelper(String expect, String input)
-			throws IOException {
-		byte[] inbytes = input.getBytes();
-		byte[] expectBytes = expect.getBytes();
-		for (int i = 0; i < 5; ++i) {
-			byte[] buf = new byte[i];
-			InputStream in = new ByteArrayInputStream(inbytes);
-			ByteArrayOutputStream bos = new ByteArrayOutputStream();
-			OutputStream out = new AutoCRLFOutputStream(bos);
-			if (i > 0) {
-				int n;
-				while ((n = in.read(buf)) >= 0) {
-					out.write(buf, 0, n);
-				}
-			} else {
-				int c;
-				while ((c = in.read()) != -1)
-					out.write(c);
-			}
-			out.flush();
-			in.close();
-			out.close();
-			byte[] actualBytes = bos.toByteArray();
-			Assert.assertEquals("bufsize=" + i, encode(expectBytes),
-					encode(actualBytes));
-		}
+	@Override
+	public void write(int val) throws IOException {
+		out.write(val);
+		cnt++;
 	}
 
-	String encode(byte[] in) {
-		StringBuilder str = new StringBuilder();
-		for (byte b : in) {
-			if (b < 32)
-				str.append(0xFF & b);
-			else {
-				str.append("'");
-				str.append((char) b);
-				str.append("'");
-			}
-			str.append(' ');
-		}
-		return str.toString();
+	@Override
+	public void write(byte[] buf, int off, int len) throws IOException {
+		out.write(buf, off, len);
+		cnt += len;
 	}
 
+	@Override
+	public void flush() throws IOException {
+		out.flush();
+	}
+
+	@Override
+	public void close() throws IOException {
+		out.close();
+	}
 }

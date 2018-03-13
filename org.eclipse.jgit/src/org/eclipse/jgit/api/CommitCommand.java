@@ -228,7 +228,10 @@ public class CommitCommand extends GitCommand<RevCommit> {
 							ru.setRefLogMessage(
 									prefix + revCommit.getShortMessage(), false);
 						}
-						ru.setExpectedOldObjectId(headId);
+						if (headId != null)
+							ru.setExpectedOldObjectId(headId);
+						else
+							ru.setExpectedOldObjectId(ObjectId.zeroId());
 						Result rc = ru.forceUpdate();
 						switch (rc) {
 						case NEW:
@@ -340,7 +343,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 					long entryLength = fTree.getEntryLength();
 					dcEntry.setLength(entryLength);
 					dcEntry.setLastModified(fTree.getEntryLastModified());
-					dcEntry.setFileMode(fTree.getEntryFileMode());
+					dcEntry.setFileMode(fTree.getIndexFileMode(dcTree));
 
 					boolean objectExists = (dcTree != null && fTree
 							.idEqual(dcTree))
