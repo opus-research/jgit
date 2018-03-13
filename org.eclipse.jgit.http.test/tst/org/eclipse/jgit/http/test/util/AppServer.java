@@ -64,6 +64,7 @@ import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.UserIdentity;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
+import org.eclipse.jetty.server.handler.RequestLogHandler;
 import org.eclipse.jetty.server.nio.SelectChannelConnector;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
@@ -125,12 +126,15 @@ public class AppServer {
 		contexts = new ContextHandlerCollection();
 
 		log = new TestRequestLog();
-		log.setHandler(contexts);
+
+		final RequestLogHandler logHandler = new RequestLogHandler();
+		logHandler.setHandler(contexts);
+		logHandler.setRequestLog(log);
 
 		server = new Server();
 		server.setConnectors(new Connector[] { connector });
 		server.setThreadPool(pool);
-		server.setHandler(log);
+		server.setHandler(logHandler);
 
 		server.setStopAtShutdown(false);
 		server.setGracefulShutdown(0);
