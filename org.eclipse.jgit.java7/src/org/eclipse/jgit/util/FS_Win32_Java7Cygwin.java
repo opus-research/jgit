@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Google Inc.
+ * Copyright (C) 2012, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,46 +40,86 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm.archive;
 
+package org.eclipse.jgit.util;
+
+import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
 
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.archivers.tar.TarConstants;
-import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectLoader;
+/**
+ * FS for Java7 on Windows with Cygwin
+ */
+public class FS_Win32_Java7Cygwin extends FS_Win32_Cygwin {
 
-class TarFormat implements ArchiveCommand.Format {
-	public ArchiveOutputStream createArchiveOutputStream(OutputStream s) {
-		return new TarArchiveOutputStream(s);
+	FS_Win32_Java7Cygwin(FS src) {
+		super(src);
 	}
 
-	public void putEntry(String path, FileMode mode, ObjectLoader loader,
-				ArchiveOutputStream out) throws IOException {
-		if (mode == FileMode.SYMLINK) {
-			final TarArchiveEntry entry = new TarArchiveEntry(
-					path, TarConstants.LF_SYMLINK);
-			entry.setLinkName(new String(
-					loader.getCachedBytes(100), "UTF-8")); //$NON-NLS-1$
-			out.putArchiveEntry(entry);
-			out.closeArchiveEntry();
-			return;
-		}
+	FS_Win32_Java7Cygwin() {
+	}
 
-		final TarArchiveEntry entry = new TarArchiveEntry(path);
-		if (mode == FileMode.REGULAR_FILE ||
-		    mode == FileMode.EXECUTABLE_FILE) {
-			entry.setMode(mode.getBits());
-		} else {
-			// TODO(jrn): Let the caller know the tree contained
-			// an entry with unsupported mode (e.g., a submodule).
-		}
-		entry.setSize(loader.getSize());
-		out.putArchiveEntry(entry);
-		loader.copyTo(out);
-		out.closeArchiveEntry();
+	@Override
+	public FS newInstance() {
+		return new FS_Win32_Java7Cygwin(this);
+	}
+
+	@Override
+	public boolean supportsSymlinks() {
+		return true;
+	}
+
+	@Override
+	public boolean isSymLink(File path) throws IOException {
+		return FileUtil.isSymlink(path);
+	}
+
+	@Override
+	public long lastModified(File path) throws IOException {
+		return FileUtil.lastModified(path);
+	}
+
+	@Override
+	public void setLastModified(File path, long time) throws IOException {
+		FileUtil.setLastModified(path, time);
+	}
+
+	@Override
+	public long length(File f) throws IOException {
+		return FileUtil.getLength(f);
+	}
+
+	@Override
+	public boolean exists(File path) {
+		return FileUtil.exists(path);
+	}
+
+	@Override
+	public boolean isDirectory(File path) {
+		return FileUtil.isDirectory(path);
+	}
+
+	@Override
+	public boolean isFile(File path) {
+		return FileUtil.isFile(path);
+	}
+
+	@Override
+	public boolean isHidden(File path) throws IOException {
+		return FileUtil.isHidden(path);
+	}
+
+	@Override
+	public void setHidden(File path, boolean hidden) throws IOException {
+		FileUtil.setHidden(path, hidden);
+	}
+
+	@Override
+	public String readSymLink(File path) throws IOException {
+		return FileUtil.readSymlink(path);
+	}
+
+	@Override
+	public void createSymLink(File path, String target) throws IOException {
+		FileUtil.createSymLink(path, target);
 	}
 }

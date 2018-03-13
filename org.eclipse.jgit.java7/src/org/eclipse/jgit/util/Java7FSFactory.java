@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Google Inc.
+ * Copyright (C) 2012, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,38 +40,27 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm.archive;
 
-import java.io.IOException;
-import java.io.OutputStream;
+package org.eclipse.jgit.util;
 
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
-import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream;
-import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectLoader;
+import org.eclipse.jgit.util.FS;
+import org.eclipse.jgit.util.FS.FSFactory;
+import org.eclipse.jgit.util.SystemReader;
 
-class ZipFormat implements ArchiveCommand.Format {
-	public ArchiveOutputStream createArchiveOutputStream(OutputStream s) {
-		return new ZipArchiveOutputStream(s);
-	}
-
-	public void putEntry(String path, FileMode mode, ObjectLoader loader,
-				ArchiveOutputStream out) throws IOException {
-		final ZipArchiveEntry entry = new ZipArchiveEntry(path);
-
-		if (mode == FileMode.REGULAR_FILE) {
-			// ok
-		} else if (mode == FileMode.EXECUTABLE_FILE
-				|| mode == FileMode.SYMLINK) {
-			entry.setUnixMode(mode.getBits());
-		} else {
-			// TODO(jrn): Let the caller know the tree contained
-			// an entry with unsupported mode (e.g., a submodule).
-		}
-		entry.setSize(loader.getSize());
-		out.putArchiveEntry(entry);
-		loader.copyTo(out);
-		out.closeArchiveEntry();
+/**
+ * A factory for creating FS instances on Java7
+ */
+public class Java7FSFactory extends FSFactory {
+	@Override
+	public FS detect(Boolean cygwinUsed) {
+		if (SystemReader.getInstance().isWindows()) {
+			if (cygwinUsed == null)
+				cygwinUsed = Boolean.valueOf(FS_Win32_Cygwin.isCygwin());
+			if (cygwinUsed.booleanValue())
+				return new FS_Win32_Java7Cygwin();
+			else
+				return new FS_Win32_Java7();
+		} else
+			return new FS_POSIX_Java7();
 	}
 }
