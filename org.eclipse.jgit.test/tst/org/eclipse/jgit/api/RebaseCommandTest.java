@@ -293,8 +293,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		// change third line in topic branch
 		writeTrashFile(FILE1, "1\n2\n3\ntopic\n");
 		git.add().addFilepattern(FILE1).call();
-		RevCommit origHead = git.commit().setMessage("change file1 in topic")
-				.call();
+		git.commit().setMessage("change file1 in topic").call();
 
 		RebaseResult res = git.rebase().setUpstream("refs/heads/master").call();
 		assertEquals(Status.OK, res.getStatus());
@@ -303,7 +302,6 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		assertEquals("refs/heads/topic", db.getFullBranch());
 		assertEquals(lastMasterChange, new RevWalk(db).parseCommit(
 				db.resolve(Constants.HEAD)).getParent(0));
-		assertEquals(origHead, db.readOrigHead());
 	}
 
 	@Test
