@@ -56,5 +56,6 @@
   </parent>
 
   <artifactId>org.eclipse.jgit-feature</artifactId>
-  <name>JGit - Eclipse Feature</name>
+  <packaging>eclipse-feature</packaging>
+
 </project>
