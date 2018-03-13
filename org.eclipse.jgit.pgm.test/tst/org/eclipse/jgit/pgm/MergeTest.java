@@ -55,8 +55,7 @@ public class MergeTest extends CLIRepositoryTestCase {
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		new Git(db).commit().setMessage("initial commit").setAllowEmpty(true)
-				.call();
+		new Git(db).commit().setMessage("initial commit").call();
 	}
 
 	@Test
@@ -66,8 +65,7 @@ public class MergeTest extends CLIRepositoryTestCase {
 
 	@Test
 	public void testFastForward() throws Exception {
-		new Git(db).commit().setMessage("initial commit").setAllowEmpty(true)
-				.call();
+		new Git(db).commit().setMessage("initial commit").call();
 		new Git(db).branchCreate().setName("side").call();
 		writeTrashFile("file", "master");
 		new Git(db).add().addFilepattern("file").call();
@@ -79,8 +77,7 @@ public class MergeTest extends CLIRepositoryTestCase {
 
 	@Test
 	public void testMerge() throws Exception {
-		new Git(db).commit().setMessage("initial commit").setAllowEmpty(true)
-				.call();
+		new Git(db).commit().setMessage("initial commit").call();
 		new Git(db).branchCreate().setName("side").call();
 		writeTrashFile("master", "content");
 		new Git(db).add().addFilepattern("master").call();

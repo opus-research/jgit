@@ -50,10 +50,8 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.util.List;
 
-import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -323,7 +321,7 @@ public class CommitCommandTest extends RepositoryTestCase {
 		db.getIndexFile().setLastModified(indexTime - 5000);
 
 		write(file1, "content4");
-		assertTrue(file1.setLastModified(file1.lastModified() + 2500));
+		assertTrue(file1.setLastModified(file1.lastModified() + 1000));
 		assertNotNull(git.commit().setMessage("edit file").setOnly("file1.txt")
 				.call());
 
@@ -421,48 +419,5 @@ public class CommitCommandTest extends RepositoryTestCase {
 				.getReflogReader(Constants.HEAD).getLastEntry().getComment());
 		assertEquals("commit: Squashed commit of the following:", db
 				.getReflogReader(db.getBranch()).getLastEntry().getComment());
-	}
-
-	@Test
-	public void shouldNotBePossibleToCreateEmptyCommitByDefault()
-			throws Exception {
-		boolean exceptionThrown = false;
-		Git git = new Git(db);
-		try {
-			git.commit().setMessage("This is an empty commit!").call();
-		} catch(JGitInternalException e) {
-			// Check for the expected exception message
-			assertEquals(JGitText.get().emptyCommit, e.getMessage());
-			exceptionThrown = true;
-		}
-		assertTrue(exceptionThrown);
-	}
-
-	@Test
-	public void shouldNotBePossibleToCreateEmptyCommitIfAllowEmptyIsSetToFalse()
-			throws Exception {
-		boolean exceptionThrown = false;
-		Git git = new Git(db);
-		try {
-			git.commit().setMessage("This is an empty commit!")
-				.setAllowEmpty(false).call();
-		} catch(JGitInternalException e) {
-			// Check for the expected exception message
-			assertEquals(JGitText.get().emptyCommit, e.getMessage());
-			exceptionThrown = true;
-		}
-		assertTrue(exceptionThrown);
-	}
-
-	@Test
-	public void shouldBePossibleToCreateEmptyCommitIfAllowEmptyIsSetToTrue()
-			throws Exception {
-		final String COMMIT_MESSAGE = "This is an empty commit!";
-		Git git = new Git(db);
-		assertTrue(git.status().call().isClean());
-		RevCommit emptyCommit = git.commit().setMessage(COMMIT_MESSAGE)
-				.setAllowEmpty(true).call();
-
-		assertEquals(COMMIT_MESSAGE, emptyCommit.getFullMessage());
 	}
 }

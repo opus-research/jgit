@@ -54,7 +54,6 @@ import java.lang.reflect.Method;
 import java.net.URISyntaxException;
 import java.net.URL;
 
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.IO;
@@ -136,7 +135,7 @@ public abstract class JGitTestUtil {
 		return JGitTestUtil.class.getClassLoader();
 	}
 
-	public static File writeTrashFile(final Repository db,
+	public static File writeTrashFile(final FileRepository db,
 			final String name, final String data) throws IOException {
 		File path = new File(db.getWorkTree(), name);
 		write(path, data);
