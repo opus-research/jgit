@@ -69,7 +69,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String aNewObjectIdIsRequired;
 	/***/ public String anExceptionOccurredWhileTryingToAddTheIdOfHEAD;
 	/***/ public String anSSHSessionHasBeenAlreadyCreated;
-        /***/ public String aSymbolicRefRequired;
 	/***/ public String applyingCommit;
 	/***/ public String atLeastOnePathIsRequired;
 	/***/ public String atLeastOnePatternIsRequired;
