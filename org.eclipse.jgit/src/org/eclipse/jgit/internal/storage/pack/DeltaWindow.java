@@ -64,7 +64,6 @@ final class DeltaWindow {
 	private final DeltaCache deltaCache;
 	private final ObjectReader reader;
 	private final ProgressMonitor monitor;
-	private final boolean reuseDeltas;
 
 	/** Maximum number of bytes to admit to the window at once. */
 	private final long maxMemory;
@@ -105,7 +104,6 @@ final class DeltaWindow {
 
 		maxMemory = Math.max(0, config.getDeltaSearchMemoryLimit());
 		maxDepth = config.getMaxDeltaDepth();
-		reuseDeltas = config.isReuseDeltas();
 		res = DeltaWindowEntry.createWindow(config.getDeltaSearchWindowSize());
 	}
 
@@ -115,12 +113,22 @@ final class DeltaWindow {
 		if (0 == halfRemaining)
 			return null;
 
-		// Split on the next path after the 50% split point.
-		int p = e - halfRemaining;
-		int h = toSearch[p].getPathHash();
-		for (int n = p + 1; n < e; n++) {
+		int split = e - halfRemaining;
+		int h = toSearch[split].getPathHash();
+
+		// Attempt to split on the next path after the 50% split point.
+		for (int n = split + 1; n < e; n++) {
 			if (h != toSearch[n].getPathHash())
 				return new DeltaTask.Slice(n, e);
+		}
+
+		if (h != toSearch[cur].getPathHash()) {
+			// Try to split on the path before the 50% split point.
+			// Do not split the path currently being processed.
+			for (int p = split - 1; cur < p; p--) {
+				if (h != toSearch[p].getPathHash())
+					return new DeltaTask.Slice(p + 1, e);
+			}
 		}
 		return null;
 	}
@@ -150,16 +158,15 @@ final class DeltaWindow {
 				}
 				res.set(next);
 
-				if (res.object.isEdge()) {
-					// Edges are not packed and do not need to make a delta.
-					// They may be a base, retain the edge in the window
-					keepInWindow();
-				} else if (res.object.doNotAttemptDelta() && reuseDeltas) {
-					// Object may be a base for another object, but should
-					// not be converted into a delta on its own.
+				if (res.object.isEdge() || res.object.doNotAttemptDelta()) {
+					// We don't actually want to make a delta for
+					// them, just need to push them into the window
+					// so they can be read by other objects.
+					//
 					keepInWindow();
 				} else {
 					// Search for a delta for the current window slot.
+					//
 					monitor.update(1);
 					searchInWindow();
 				}
@@ -252,8 +259,8 @@ final class DeltaWindow {
 			return NEXT_RES;
 		}
 
-		// Do not use a base that is 32x larger than desired result.
-		if (res.size() < src.size() >>> 5)
+		// If the sizes are radically different, this is a bad pairing.
+		if (res.size() < src.size() >>> 4)
 			return NEXT_SRC;
 
 		int msz = deltaSizeLimit(src);
