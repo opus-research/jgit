@@ -47,7 +47,6 @@ import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.LinkedList;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
@@ -134,7 +133,7 @@ public class ResetCommand extends GitCommand<Ref> {
 	 *
 	 * @return the Ref after reset
 	 */
-	public Ref call() throws GitAPIException, IOException {
+	public Ref call() throws IOException {
 		checkCallable();
 
 		Ref r;
@@ -313,35 +312,27 @@ public class ResetCommand extends GitCommand<Ref> {
 	}
 
 	private void resetIndex(RevCommit commit) throws IOException {
-		DirCache dc = null;
+		DirCache dc = repo.lockDirCache();
 		try {
-			dc = repo.lockDirCache();
 			dc.clear();
 			DirCacheBuilder dcb = dc.builder();
 			dcb.addTree(new byte[0], 0, repo.newObjectReader(),
 					commit.getTree());
 			dcb.commit();
-		} catch (IOException e) {
-			throw e;
 		} finally {
-			if (dc != null)
-				dc.unlock();
+			dc.unlock();
 		}
 	}
 
 	private void checkoutIndex(RevCommit commit) throws IOException {
-		DirCache dc = null;
+		DirCache dc = repo.lockDirCache();
 		try {
-			dc = repo.lockDirCache();
 			DirCacheCheckout checkout = new DirCacheCheckout(repo, dc,
 					commit.getTree());
 			checkout.setFailOnConflict(false);
 			checkout.checkout();
-		} catch (IOException e) {
-			throw e;
 		} finally {
-			if (dc != null)
-				dc.unlock();
+			dc.unlock();
 		}
 	}
 

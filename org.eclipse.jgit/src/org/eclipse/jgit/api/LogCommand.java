@@ -47,7 +47,6 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -110,7 +109,7 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	 *
 	 * @return an iteration over RevCommits
 	 */
-	public Iterable<RevCommit> call() throws GitAPIException, NoHeadException,
+	public Iterable<RevCommit> call() throws NoHeadException,
 			JGitInternalException {
 		checkCallable();
 		if (pathFilters.size() > 0)
