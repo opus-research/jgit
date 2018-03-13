@@ -701,7 +701,7 @@ public abstract class PackParser {
 
 	private final void checkIfTooLarge(int typeCode, long size)
 			throws IOException {
-		if (0 < maxObjectSizeLimit && maxObjectSizeLimit < size) {
+		if (0 < maxObjectSizeLimit && maxObjectSizeLimit < size)
 			switch (typeCode) {
 			case Constants.OBJ_COMMIT:
 			case Constants.OBJ_TREE:
@@ -711,17 +711,13 @@ public abstract class PackParser {
 
 			case Constants.OBJ_OFS_DELTA:
 			case Constants.OBJ_REF_DELTA:
-				throw new TooLargeObjectInPackException(size, maxObjectSizeLimit);
+				throw new TooLargeObjectInPackException(maxObjectSizeLimit);
 
 			default:
 				throw new IOException(MessageFormat.format(
 						JGitText.get().unknownObjectType,
 						Integer.valueOf(typeCode)));
 			}
-		}
-		if (size > Integer.MAX_VALUE - 8) {
-			throw new TooLargeObjectInPackException(size, Integer.MAX_VALUE - 8);
-		}
 	}
 
 	/**
