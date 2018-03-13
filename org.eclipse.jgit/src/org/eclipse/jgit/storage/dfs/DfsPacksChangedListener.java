@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Robin Rosenberg
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,23 +41,17 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.dircache;
+package org.eclipse.jgit.storage.dfs;
 
-import java.text.MessageFormat;
+import org.eclipse.jgit.events.RepositoryListener;
 
-import org.eclipse.jgit.JGitText;
-
-/**
- * Thrown when JGit detects and refuses to use an invalid path
- */
-public class InvalidPathException extends IllegalArgumentException {
-
-	private static final long serialVersionUID = 1L;
-
+/** Receives {@link DfsPacksChangedEvent}s. */
+public interface DfsPacksChangedListener extends RepositoryListener {
 	/**
-	 * @param path
+	 * Invoked when all packs in a repository are listed.
+	 *
+	 * @param event
+	 *            information about the packs.
 	 */
-	public InvalidPathException(String path) {
-		super(MessageFormat.format(JGitText.get().invalidPath, path));
-	}
+	void onPacksChanged(DfsPacksChangedEvent event);
 }

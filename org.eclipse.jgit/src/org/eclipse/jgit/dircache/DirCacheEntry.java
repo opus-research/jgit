@@ -64,7 +64,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.MutableInteger;
 import org.eclipse.jgit.util.NB;
-import org.eclipse.jgit.util.SystemReader;
 
 /**
  * A single file (or stage of a file) in a {@link DirCache}.
@@ -87,7 +86,7 @@ public class DirCacheEntry {
 	/** The second tree revision (usually called "theirs"). */
 	public static final int STAGE_3 = 3;
 
-	// private static final int P_CTIME = 0;
+	private static final int P_CTIME = 0;
 
 	// private static final int P_CTIME_NSEC = 4;
 
@@ -261,7 +260,8 @@ public class DirCacheEntry {
 	 */
 	public DirCacheEntry(final byte[] newPath, final int stage) {
 		if (!isValidPath(newPath))
-			throw new InvalidPathException(toString(newPath));
+			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidPath
+					, toString(newPath)));
 		if (stage < 0 || 3 < stage)
 			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidStageForPath
 					, stage, toString(newPath)));
@@ -480,6 +480,26 @@ public class DirCacheEntry {
 	}
 
 	/**
+	 * Get the cached creation time of this file, in milliseconds.
+	 *
+	 * @return cached creation time of this file, in milliseconds since the
+	 *         Java epoch (midnight Jan 1, 1970 UTC).
+	 */
+	public long getCreationTime() {
+		return decodeTS(P_CTIME);
+	}
+
+	/**
+	 * Set the cached creation time of this file, using milliseconds.
+	 *
+	 * @param when
+	 *            new cached creation time of the file, in milliseconds.
+	 */
+	public void setCreationTime(final long when) {
+		encodeTS(P_CTIME, when);
+	}
+
+	/**
 	 * Get the cached last modification date of this file, in milliseconds.
 	 * <p>
 	 * One of the indicators that the file has been modified by an application
@@ -600,6 +620,16 @@ public class DirCacheEntry {
 	}
 
 	/**
+	 * Use for debugging only !
+	 */
+	@Override
+	public String toString() {
+		return getFileMode() + " " + getLength() + " " + getLastModified()
+				+ " " + getObjectId() + " " + getStage() + " "
+				+ getPathString() + "\n";
+	}
+
+	/**
 	 * Copy the ObjectId and other meta fields from an existing entry.
 	 * <p>
 	 * This method copies everything except the path from one entry to another,
@@ -662,14 +692,7 @@ public class DirCacheEntry {
 				else
 					return false;
 				break;
-			case '\\':
-			case ':':
-				// Tree's never have a backslash in them, not even on Windows
-				// but even there we regard it as an invalid path
-				if (SystemReader.getInstance().getProperty("os.name")
-						.equals("Windows"))
-					return false;
-				//$FALL-THROUGH$
+
 			default:
 				componentHasChars = true;
 			}
