@@ -132,7 +132,7 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	@Override
 	public AbstractTreeIterator createSubtreeIterator(final ObjectReader reader)
 			throws IncorrectObjectTypeException, IOException {
-		return new FileTreeIterator(this, ((FileEntry) current()).getFile(), fs);
+		return new FileTreeIterator(this, ((FileEntry) current()).file, fs);
 	}
 
 	private Entry[] entries() {
@@ -149,9 +149,13 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 * Wrapper for a standard Java IO file
 	 */
 	static public class FileEntry extends Entry {
+		final File file;
+
 		private final FileMode mode;
 
-		private FS.Attributes attributes;
+		private long length = -1;
+
+		private long lastModified;
 
 		private FS fs;
 
@@ -163,21 +167,28 @@ public class FileTreeIterator extends WorkingTreeIterator {
 		 * @param fs
 		 *            file system
 		 */
-		public FileEntry(File f, FS fs) {
+		public FileEntry(final File f, FS fs) {
+			file = f;
 			this.fs = fs;
-			f = fs.normalize(f);
-			attributes = fs.getAttributes(f);
-			if (attributes.isSymbolicLink())
-				mode = FileMode.SYMLINK;
-			else if (attributes.isDirectory()) {
-				if (new File(f, Constants.DOT_GIT).exists())
-					mode = FileMode.GITLINK;
+
+			@SuppressWarnings("hiding")
+			FileMode mode = null;
+			try {
+				if (fs.isSymLink(f)) {
+					mode = FileMode.SYMLINK;
+				} else if (fs.isDirectory(f)) {
+					if (fs.exists(new File(f, Constants.DOT_GIT)))
+						mode = FileMode.GITLINK;
+					else
+						mode = FileMode.TREE;
+				} else if (fs.canExecute(file))
+					mode = FileMode.EXECUTABLE_FILE;
 				else
-					mode = FileMode.TREE;
-			} else if (attributes.isExecutable())
-				mode = FileMode.EXECUTABLE_FILE;
-			else
-				mode = FileMode.REGULAR_FILE;
+					mode = FileMode.REGULAR_FILE;
+			} catch (IOException e) {
+				mode = FileMode.MISSING;
+			}
+			this.mode = mode;
 		}
 
 		@Override
@@ -187,27 +198,40 @@ public class FileTreeIterator extends WorkingTreeIterator {
 
 		@Override
 		public String getName() {
-			return attributes.getName();
+			return file.getName();
 		}
 
 		@Override
 		public long getLength() {
-			return attributes.getLength();
+			if (length < 0) {
+				try {
+					length = fs.length(file);
+				} catch (IOException e) {
+					length = 0;
+				}
+			}
+			return length;
 		}
 
 		@Override
 		public long getLastModified() {
-			return attributes.getLastModifiedTime();
+			if (lastModified == 0) {
+				try {
+					lastModified = fs.lastModified(file);
+				} catch (IOException e) {
+					lastModified = 0;
+				}
+			}
+			return lastModified;
 		}
 
 		@Override
 		public InputStream openInputStream() throws IOException {
-			if (fs.isSymLink(getFile()))
-				return new ByteArrayInputStream(fs.readSymLink(getFile())
-						.getBytes(
+			if (fs.isSymLink(file))
+				return new ByteArrayInputStream(fs.readSymLink(file).getBytes(
 						Constants.CHARACTER_ENCODING));
 			else
-				return new FileInputStream(getFile());
+				return new FileInputStream(file);
 		}
 
 		/**
@@ -216,7 +240,7 @@ public class FileTreeIterator extends WorkingTreeIterator {
 		 * @return the underlying file of this entry
 		 */
 		public File getFile() {
-			return attributes.getFile();
+			return file;
 		}
 	}
 

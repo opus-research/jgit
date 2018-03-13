@@ -54,7 +54,6 @@ import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.Tree;
 import org.junit.Test;
 
-@SuppressWarnings("deprecation")
 public class ObjectWalkTest extends RevWalkTestCase {
 	protected ObjectWalk objw;
 
@@ -211,21 +210,6 @@ public class ObjectWalkTest extends RevWalkTestCase {
 		assertSame(tb, objw.nextObject());
 		assertSame(get(tb, "a"), objw.nextObject());
 		assertSame(f2, objw.nextObject());
-		assertNull(objw.nextObject());
-	}
-
-	@Test
-	public void testMarkUninterestingPropagation() throws Exception {
-		final RevBlob f = blob("1");
-		final RevTree t = tree(file("f", f));
-		final RevCommit c1 = commit(t);
-		final RevCommit c2 = commit(t);
-
-		markUninteresting(c1);
-		markStart(c2);
-
-		assertSame(c2, objw.next());
-		assertNull(objw.next());
 		assertNull(objw.nextObject());
 	}
 

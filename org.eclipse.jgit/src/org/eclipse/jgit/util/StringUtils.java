@@ -208,15 +208,15 @@ public final class StringUtils {
 		if (stringValue == null)
 			return null;
 
-		if (equalsIgnoreCase("yes", stringValue) //$NON-NLS-1$
-				|| equalsIgnoreCase("true", stringValue) //$NON-NLS-1$
-				|| equalsIgnoreCase("1", stringValue) //$NON-NLS-1$
-				|| equalsIgnoreCase("on", stringValue)) //$NON-NLS-1$
+		if (equalsIgnoreCase("yes", stringValue)
+				|| equalsIgnoreCase("true", stringValue)
+				|| equalsIgnoreCase("1", stringValue)
+				|| equalsIgnoreCase("on", stringValue))
 			return Boolean.TRUE;
-		else if (equalsIgnoreCase("no", stringValue) //$NON-NLS-1$
-				|| equalsIgnoreCase("false", stringValue) //$NON-NLS-1$
-				|| equalsIgnoreCase("0", stringValue) //$NON-NLS-1$
-				|| equalsIgnoreCase("off", stringValue)) //$NON-NLS-1$
+		else if (equalsIgnoreCase("no", stringValue)
+				|| equalsIgnoreCase("false", stringValue)
+				|| equalsIgnoreCase("0", stringValue)
+				|| equalsIgnoreCase("off", stringValue))
 			return Boolean.FALSE;
 		else
 			return null;
@@ -278,32 +278,5 @@ public final class StringUtils {
 	 */
 	public static boolean isEmptyOrNull(String stringValue) {
 		return stringValue == null || stringValue.length() == 0;
-	}
-
-	/**
-	 * Replace CRLF, CR or LF with a single space.
-	 *
-	 * @param in
-	 *            A string with line breaks
-	 * @return in without line breaks
-	 * @since 3.1
-	 */
-	public static String replaceLineBreaksWithSpace(String in) {
-		char[] buf = new char[in.length()];
-		int o = 0;
-		for (int i = 0; i < buf.length; ++i) {
-			char ch = in.charAt(i);
-			if (ch == '\r') {
-				if (i + 1 < buf.length && in.charAt(i + 1) == '\n') {
-					buf[o++] = ' ';
-					++i;
-				} else
-					buf[o++] = ' ';
-			} else if (ch == '\n')
-				buf[o++] = ' ';
-			else
-				buf[o++] = ch;
-		}
-		return new String(buf, 0, o);
 	}
 }

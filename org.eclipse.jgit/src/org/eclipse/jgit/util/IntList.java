@@ -44,7 +44,7 @@
 
 package org.eclipse.jgit.util;
 
-/** A more efficient List&lt;Integer&gt; using a primitive integer array. */
+/** A more efficient List<Integer> using a primitive integer array. */
 public class IntList {
 	private int[] entries;
 
@@ -143,7 +143,7 @@ public class IntList {
 		r.append('[');
 		for (int i = 0; i < count; i++) {
 			if (i > 0)
-				r.append(", "); //$NON-NLS-1$
+				r.append(", ");
 			r.append(entries[i]);
 		}
 		r.append(']');

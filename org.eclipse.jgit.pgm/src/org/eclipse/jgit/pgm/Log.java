@@ -68,7 +68,6 @@ import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.notes.NoteMap;
-import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.util.GitDateFormatter;
@@ -172,8 +171,8 @@ class Log extends RevWalkTextBuiltin {
 
 	@Option(name = "--no-prefix", usage = "usage_noPrefix")
 	void noPrefix(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setOldPrefix(""); //$NON-NLS-1$
-		diffFmt.setNewPrefix(""); //$NON-NLS-1$
+		diffFmt.setOldPrefix("");
+		diffFmt.setNewPrefix("");
 	}
 
 	// END -- Options shared with Diff
@@ -239,18 +238,18 @@ class Log extends RevWalkTextBuiltin {
 	@Override
 	protected void show(final RevCommit c) throws Exception {
 		outw.print(CLIText.get().commitLabel);
-		outw.print(" "); //$NON-NLS-1$
+		outw.print(" ");
 		c.getId().copyTo(outbuffer, outw);
 		if (decorate) {
 			Collection<Ref> list = allRefsByPeeledObjectId.get(c);
 			if (list != null) {
-				outw.print(" ("); //$NON-NLS-1$
+				outw.print(" (");
 				for (Iterator<Ref> i = list.iterator(); i.hasNext(); ) {
 					outw.print(i.next().getName());
 					if (i.hasNext())
-						outw.print(" "); //$NON-NLS-1$
+						outw.print(" ");
 				}
-				outw.print(")"); //$NON-NLS-1$
+				outw.print(")");
 			}
 		}
 		outw.println();
@@ -261,9 +260,9 @@ class Log extends RevWalkTextBuiltin {
 				dateFormatter.formatDate(author)));
 
 		outw.println();
-		final String[] lines = c.getFullMessage().split("\n"); //$NON-NLS-1$
+		final String[] lines = c.getFullMessage().split("\n");
 		for (final String s : lines) {
-			outw.print("    "); //$NON-NLS-1$
+			outw.print("    ");
 			outw.print(s);
 			outw.println();
 		}
@@ -272,7 +271,7 @@ class Log extends RevWalkTextBuiltin {
 		if (showNotes(c))
 			outw.println();
 
-		if (c.getParentCount() <= 1 && (showNameAndStatusOnly || showPatch))
+		if (c.getParentCount() == 1 && (showNameAndStatusOnly || showPatch))
 			showDiff(c);
 		outw.flush();
 	}
@@ -325,16 +324,16 @@ class Log extends RevWalkTextBuiltin {
 			outw.println();
 		outw.print("Notes");
 		if (label != null) {
-			outw.print(" ("); //$NON-NLS-1$
+			outw.print(" (");
 			outw.print(label);
-			outw.print(")"); //$NON-NLS-1$
+			outw.print(")");
 		}
-		outw.println(":"); //$NON-NLS-1$
+		outw.println(":");
 		try {
 			RawText rawText = new RawText(argWalk.getObjectReader()
 					.open(blobId).getCachedBytes(Integer.MAX_VALUE));
 			for (int i = 0; i < rawText.size(); i++) {
-				outw.print("    "); //$NON-NLS-1$
+				outw.print("    ");
 				outw.println(rawText.getString(i));
 			}
 		} catch (LargeObjectException e) {
@@ -345,8 +344,7 @@ class Log extends RevWalkTextBuiltin {
 	}
 
 	private void showDiff(RevCommit c) throws IOException {
-		final RevTree a = c.getParentCount() > 0 ? c.getParent(0).getTree()
-				: null;
+		final RevTree a = c.getParent(0).getTree();
 		final RevTree b = c.getTree();
 
 		if (showNameAndStatusOnly)

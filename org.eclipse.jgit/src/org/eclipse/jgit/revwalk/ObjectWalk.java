@@ -232,7 +232,7 @@ public class ObjectWalk extends RevWalk {
 		}
 
 		if (o instanceof RevCommit)
-			markUninteresting((RevCommit) o);
+			super.markUninteresting((RevCommit) o);
 		else if (o instanceof RevTree)
 			markTreeUninteresting((RevTree) o);
 		else
@@ -240,13 +240,6 @@ public class ObjectWalk extends RevWalk {
 
 		if (o.getType() != OBJ_COMMIT && boundary)
 			addObject(o);
-	}
-
-	@Override
-	public void markUninteresting(RevCommit c) throws MissingObjectException,
-			IncorrectObjectTypeException, IOException {
-		super.markUninteresting(c);
-		markTreeUninteresting(c.getTree());
 	}
 
 	@Override
@@ -358,7 +351,7 @@ public class ObjectWalk extends RevWalk {
 				default:
 					throw new CorruptObjectException(MessageFormat.format(
 							JGitText.get().corruptObjectInvalidMode3,
-							String.format("%o", Integer.valueOf(mode)), //$NON-NLS-1$
+							String.format("%o", Integer.valueOf(mode)),
 							idBuffer.name(),
 							RawParseUtils.decode(buf, tv.namePtr, tv.nameEnd),
 							tv.obj));
@@ -712,8 +705,8 @@ public class ObjectWalk extends RevWalk {
 				idBuffer.fromRaw(raw, ptr);
 				throw new CorruptObjectException(MessageFormat.format(
 						JGitText.get().corruptObjectInvalidMode3,
-						String.format("%o", Integer.valueOf(mode)), //$NON-NLS-1$
-						idBuffer.name(), "", tree)); //$NON-NLS-1$
+						String.format("%o", Integer.valueOf(mode)),
+						idBuffer.name(), "", tree));
 			}
 			ptr += ID_SZ;
 		}

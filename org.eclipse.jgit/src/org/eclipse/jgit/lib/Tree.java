@@ -81,7 +81,7 @@ public class Tree extends TreeEntry {
 	 * @param lasta '/' if a is a tree, else NUL
 	 * @param lastb '/' if b is a tree, else NUL
 	 *
-	 * @return &lt; 0 if a is sorted before b, 0 if they are the same, else b
+	 * @return < 0 if a is sorted before b, 0 if they are the same, else b
 	 */
 	public static final int compareNames(final byte[] a, final byte[] b, final int lasta,final int lastb) {
 		return compareNames(a, b, 0, b.length, lasta, lastb);
@@ -593,7 +593,7 @@ public class Tree extends TreeEntry {
 	public String toString() {
 		final StringBuilder r = new StringBuilder();
 		r.append(ObjectId.toString(getId()));
-		r.append(" T "); //$NON-NLS-1$
+		r.append(" T ");
 		r.append(getFullName());
 		return r.toString();
 	}

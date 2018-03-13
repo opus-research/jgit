@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2013 Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -51,9 +51,9 @@ import java.util.List;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidTagNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.junit.Test;
@@ -78,18 +78,6 @@ public class TagCommandTest extends RepositoryTestCase {
 		git.commit().setMessage("third commit").call();
 		Ref tagRef = git.tag().setObjectId(commit).setName("tag").call();
 		assertEquals(commit.getId(), db.peel(tagRef).getPeeledObjectId());
-	}
-
-	@Test
-	public void testUnannotatedTagging() throws GitAPIException,
-			JGitInternalException {
-		Git git = new Git(db);
-		git.commit().setMessage("initial commit").call();
-		RevCommit commit = git.commit().setMessage("second commit").call();
-		git.commit().setMessage("third commit").call();
-		Ref tagRef = git.tag().setObjectId(commit).setName("tag")
-				.setAnnotated(false).call();
-		assertEquals(commit.getId(), tagRef.getObjectId());
 	}
 
 	@Test

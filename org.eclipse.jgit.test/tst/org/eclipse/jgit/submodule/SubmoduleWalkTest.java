@@ -61,15 +61,16 @@ import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.errors.ConfigInvalidException;
-import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
@@ -80,12 +81,12 @@ import org.junit.Test;
  * Unit tests of {@link SubmoduleWalk}
  */
 public class SubmoduleWalkTest extends RepositoryTestCase {
-	private TestRepository<Repository> testDb;
+	private TestRepository<FileRepository> testDb;
 
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		testDb = new TestRepository<Repository>(db);
+		testDb = new TestRepository<FileRepository>(db);
 	}
 
 	@Test
@@ -171,10 +172,8 @@ public class SubmoduleWalkTest extends RepositoryTestCase {
 		Repository subRepo = gen.getRepository();
 		addRepoToClose(subRepo);
 		assertNotNull(subRepo);
-		assertEquals(modulesGitDir.getAbsolutePath(),
-				subRepo.getDirectory().getAbsolutePath());
-		assertEquals(new File(db.getWorkTree(), path).getAbsolutePath(),
-				subRepo.getWorkTree().getAbsolutePath());
+		assertEquals(modulesGitDir, subRepo.getDirectory());
+		assertEquals(new File(db.getWorkTree(), path), subRepo.getWorkTree());
 		assertFalse(gen.next());
 	}
 
@@ -223,9 +222,8 @@ public class SubmoduleWalkTest extends RepositoryTestCase {
 		Repository subRepo = gen.getRepository();
 		addRepoToClose(subRepo);
 		assertNotNull(subRepo);
-		assertEqualsFile(modulesGitDir, subRepo.getDirectory());
-		assertEqualsFile(new File(db.getWorkTree(), path),
-				subRepo.getWorkTree());
+		assertEquals(modulesGitDir, subRepo.getDirectory());
+		assertEquals(new File(db.getWorkTree(), path), subRepo.getWorkTree());
 		assertFalse(gen.next());
 	}
 

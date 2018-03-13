@@ -48,7 +48,6 @@ import java.text.MessageFormat;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Config.SectionParser;
-import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.util.StringUtils;
 
 /** Keeps track of diff related configuration options. */
@@ -79,12 +78,10 @@ public class DiffConfig {
 	private final int renameLimit;
 
 	private DiffConfig(final Config rc) {
-		noPrefix = rc.getBoolean(ConfigConstants.CONFIG_DIFF_SECTION,
-				ConfigConstants.CONFIG_KEY_NOPREFIX, false);
-		renameDetectionType = parseRenameDetectionType(rc.getString(
-				ConfigConstants.CONFIG_DIFF_SECTION, null, ConfigConstants.CONFIG_KEY_RENAMES));
-		renameLimit = rc.getInt(ConfigConstants.CONFIG_DIFF_SECTION,
-				ConfigConstants.CONFIG_KEY_RENAMELIMIT, 200);
+		noPrefix = rc.getBoolean("diff", "noprefix", false);
+		renameDetectionType = parseRenameDetectionType(rc.getString("diff",
+				null, "renames"));
+		renameLimit = rc.getInt("diff", "renamelimit", 200);
 	}
 
 	/** @return true if the prefix "a/" and "b/" should be suppressed. */
@@ -111,21 +108,16 @@ public class DiffConfig {
 			final String renameString) {
 		if (renameString == null)
 			return RenameDetectionType.FALSE;
-		else if (StringUtils.equalsIgnoreCase(
-				ConfigConstants.CONFIG_RENAMELIMIT_COPY, renameString)
-				|| StringUtils
-						.equalsIgnoreCase(
-								ConfigConstants.CONFIG_RENAMELIMIT_COPIES,
-								renameString))
+		else if (StringUtils.equalsIgnoreCase("copy", renameString)
+				|| StringUtils.equalsIgnoreCase("copies", renameString))
 			return RenameDetectionType.COPY;
 		else {
 			final Boolean renameBoolean = StringUtils
 					.toBooleanOrNull(renameString);
 			if (renameBoolean == null)
 				throw new IllegalArgumentException(MessageFormat.format(
-						JGitText.get().enumValueNotSupported2,
-						ConfigConstants.CONFIG_DIFF_SECTION,
-						ConfigConstants.CONFIG_KEY_RENAMES, renameString));
+						JGitText.get().enumValueNotSupported2, "diff",
+						"renames", renameString));
 			else if (renameBoolean.booleanValue())
 				return RenameDetectionType.TRUE;
 			else

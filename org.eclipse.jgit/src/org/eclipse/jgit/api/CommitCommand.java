@@ -46,7 +46,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -77,8 +76,6 @@ import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryState;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevObject;
-import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
@@ -150,23 +147,19 @@ public class CommitCommand extends GitCommand<RevCommit> {
 			ConcurrentRefUpdateException,
 			WrongRepositoryStateException {
 		checkCallable();
-		Collections.sort(only);
 
-		RevWalk rw = new RevWalk(repo);
+		RepositoryState state = repo.getRepositoryState();
+		if (!state.canCommit())
+			throw new WrongRepositoryStateException(MessageFormat.format(
+					JGitText.get().cannotCommitOnARepoWithState, state.name()));
+		processOptions(state);
 
 		try {
-			RepositoryState state = repo.getRepositoryState();
-			if (!state.canCommit())
-				throw new WrongRepositoryStateException(MessageFormat.format(
-						JGitText.get().cannotCommitOnARepoWithState,
-						state.name()));
-			processOptions(state, rw);
-
 			if (all && !repo.isBare() && repo.getWorkTree() != null) {
 				Git git = new Git(repo);
 				try {
 					git.add()
-							.addFilepattern(".") //$NON-NLS-1$
+							.addFilepattern(".")
 							.setUpdate(true).call();
 				} catch (NoFilepatternException e) {
 					// should really not happen
@@ -180,16 +173,18 @@ public class CommitCommand extends GitCommand<RevCommit> {
 						JGitText.get().commitOnRepoWithoutHEADCurrentlyNotSupported);
 
 			// determine the current HEAD and the commit it is referring to
-			ObjectId headId = repo.resolve(Constants.HEAD + "^{commit}"); //$NON-NLS-1$
+			ObjectId headId = repo.resolve(Constants.HEAD + "^{commit}");
 			if (headId == null && amend)
 				throw new WrongRepositoryStateException(
 						JGitText.get().commitAmendOnInitialNotPossible);
 
 			if (headId != null)
 				if (amend) {
-					RevCommit previousCommit = rw.parseCommit(headId);
-					for (RevCommit p : previousCommit.getParents())
-						parents.add(p.getId());
+					RevCommit previousCommit = new RevWalk(repo)
+							.parseCommit(headId);
+					RevCommit[] p = previousCommit.getParents();
+					for (int i = 0; i < p.length; i++)
+						parents.add(0, p[i].getId());
 					if (author == null)
 						author = previousCommit.getAuthorIdent();
 				} else {
@@ -200,7 +195,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 			DirCache index = repo.lockDirCache();
 			try {
 				if (!only.isEmpty())
-					index = createTemporaryIndex(headId, index, rw);
+					index = createTemporaryIndex(headId, index);
 
 				ObjectInserter odi = repo.newObjectInserter();
 				try {
@@ -223,52 +218,52 @@ public class CommitCommand extends GitCommand<RevCommit> {
 					ObjectId commitId = odi.insert(commit);
 					odi.flush();
 
-					RevCommit revCommit = rw.parseCommit(commitId);
-					RefUpdate ru = repo.updateRef(Constants.HEAD);
-					ru.setNewObjectId(commitId);
-					if (reflogComment != null) {
-						ru.setRefLogMessage(reflogComment, false);
-					} else {
-						String prefix = amend ? "commit (amend): " //$NON-NLS-1$
-								: parents.size() == 0 ? "commit (initial): " //$NON-NLS-1$
-										: "commit: "; //$NON-NLS-1$
-						ru.setRefLogMessage(
-								prefix + revCommit.getShortMessage(), false);
-					}
-					if (headId != null)
-						ru.setExpectedOldObjectId(headId);
-					else
-						ru.setExpectedOldObjectId(ObjectId.zeroId());
-					Result rc = ru.forceUpdate();
-					switch (rc) {
-					case NEW:
-					case FORCED:
-					case FAST_FORWARD: {
-						setCallable(false);
-						if (state == RepositoryState.MERGING_RESOLVED
-								|| isMergeDuringRebase(state)) {
-							// Commit was successful. Now delete the files
-							// used for merge commits
-							repo.writeMergeCommitMsg(null);
-							repo.writeMergeHeads(null);
-						} else if (state == RepositoryState.CHERRY_PICKING_RESOLVED) {
-							repo.writeMergeCommitMsg(null);
-							repo.writeCherryPickHead(null);
-						} else if (state == RepositoryState.REVERTING_RESOLVED) {
-							repo.writeMergeCommitMsg(null);
-							repo.writeRevertHead(null);
+					RevWalk revWalk = new RevWalk(repo);
+					try {
+						RevCommit revCommit = revWalk.parseCommit(commitId);
+						RefUpdate ru = repo.updateRef(Constants.HEAD);
+						ru.setNewObjectId(commitId);
+						if (reflogComment != null) {
+							ru.setRefLogMessage(reflogComment, false);
+						} else {
+							String prefix = amend ? "commit (amend): "
+									: "commit: ";
+							ru.setRefLogMessage(
+									prefix + revCommit.getShortMessage(), false);
 						}
-						return revCommit;
-					}
-					case REJECTED:
-					case LOCK_FAILURE:
-						throw new ConcurrentRefUpdateException(
-								JGitText.get().couldNotLockHEAD, ru.getRef(),
-								rc);
-					default:
-						throw new JGitInternalException(MessageFormat.format(
-								JGitText.get().updatingRefFailed,
-								Constants.HEAD, commitId.toString(), rc));
+						if (headId != null)
+							ru.setExpectedOldObjectId(headId);
+						else
+							ru.setExpectedOldObjectId(ObjectId.zeroId());
+						Result rc = ru.forceUpdate();
+						switch (rc) {
+						case NEW:
+						case FORCED:
+						case FAST_FORWARD: {
+							setCallable(false);
+							if (state == RepositoryState.MERGING_RESOLVED) {
+								// Commit was successful. Now delete the files
+								// used for merge commits
+								repo.writeMergeCommitMsg(null);
+								repo.writeMergeHeads(null);
+							} else if (state == RepositoryState.CHERRY_PICKING_RESOLVED) {
+								repo.writeMergeCommitMsg(null);
+								repo.writeCherryPickHead(null);
+							}
+							return revCommit;
+						}
+						case REJECTED:
+						case LOCK_FAILURE:
+							throw new ConcurrentRefUpdateException(JGitText
+									.get().couldNotLockHEAD, ru.getRef(), rc);
+						default:
+							throw new JGitInternalException(MessageFormat
+									.format(JGitText.get().updatingRefFailed,
+											Constants.HEAD,
+											commitId.toString(), rc));
+						}
+					} finally {
+						revWalk.release();
 					}
 				} finally {
 					odi.release();
@@ -281,8 +276,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 		} catch (IOException e) {
 			throw new JGitInternalException(
 					JGitText.get().exceptionCaughtDuringExecutionOfCommitCommand, e);
-		} finally {
-			rw.dispose();
 		}
 	}
 
@@ -294,13 +287,12 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				author, committer, message);
 		message = ChangeIdUtil.insertId(message, changeId);
 		if (changeId != null)
-			message = message.replaceAll("\nChange-Id: I" //$NON-NLS-1$
-					+ ObjectId.zeroId().getName() + "\n", "\nChange-Id: I" //$NON-NLS-1$ //$NON-NLS-2$
-					+ changeId.getName() + "\n"); //$NON-NLS-1$
+			message = message.replaceAll("\nChange-Id: I"
+					+ ObjectId.zeroId().getName() + "\n", "\nChange-Id: I"
+					+ changeId.getName() + "\n");
 	}
 
-	private DirCache createTemporaryIndex(ObjectId headId, DirCache index,
-			RevWalk rw)
+	private DirCache createTemporaryIndex(ObjectId headId, DirCache index)
 			throws IOException {
 		ObjectInserter inserter = null;
 
@@ -320,7 +312,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 		int fIdx = treeWalk.addTree(new FileTreeIterator(repo));
 		int hIdx = -1;
 		if (headId != null)
-			hIdx = treeWalk.addTree(rw.parseTree(headId));
+			hIdx = treeWalk.addTree(new RevWalk(repo).parseTree(headId));
 		treeWalk.setRecursive(true);
 
 		String lastAddedFile = null;
@@ -457,15 +449,18 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 * @return the item's index in <code>only</code>; -1 if no item matches
 	 */
 	private int lookupOnly(String pathString) {
-		String p = pathString;
-		while (true) {
-			int position = Collections.binarySearch(only, p);
-			if (position >= 0)
-				return position;
-			int l = p.lastIndexOf("/"); //$NON-NLS-1$
-			if (l < 1)
-				break;
-			p = p.substring(0, l);
+		int i = 0;
+		for (String o : only) {
+			String p = pathString;
+			while (true) {
+				if (p.equals(o))
+					return i;
+				int l = p.lastIndexOf("/");
+				if (l < 1)
+					break;
+				p = p.substring(0, l);
+			}
+			i++;
 		}
 		return -1;
 	}
@@ -476,30 +471,20 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 *
 	 * @param state
 	 *            the state of the repository we are working on
-	 * @param rw
-	 *            the RevWalk to use
 	 *
 	 * @throws NoMessageException
 	 *             if the commit message has not been specified
 	 */
-	private void processOptions(RepositoryState state, RevWalk rw)
-			throws NoMessageException {
+	private void processOptions(RepositoryState state) throws NoMessageException {
 		if (committer == null)
 			committer = new PersonIdent(repo);
 		if (author == null && !amend)
 			author = committer;
 
 		// when doing a merge commit parse MERGE_HEAD and MERGE_MSG files
-		if (state == RepositoryState.MERGING_RESOLVED
-				|| isMergeDuringRebase(state)) {
+		if (state == RepositoryState.MERGING_RESOLVED) {
 			try {
 				parents = repo.readMergeHeads();
-				if (parents != null)
-					for (int i = 0; i < parents.size(); i++) {
-						RevObject ro = rw.parseAny(parents.get(i));
-						if (ro instanceof RevTag)
-							parents.set(i, rw.peel(ro));
-					}
 			} catch (IOException e) {
 				throw new JGitInternalException(MessageFormat.format(
 						JGitText.get().exceptionOccurredDuringReadingOfGIT_DIR,
@@ -530,19 +515,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 			// as long as we don't support -C option we have to have
 			// an explicit message
 			throw new NoMessageException(JGitText.get().commitMessageNotSpecified);
-	}
-
-	private boolean isMergeDuringRebase(RepositoryState state) {
-		if (state != RepositoryState.REBASING_INTERACTIVE
-				&& state != RepositoryState.REBASING_MERGE)
-			return false;
-		try {
-			return repo.readMergeHeads() != null;
-		} catch (IOException e) {
-			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().exceptionOccurredDuringReadingOfGIT_DIR,
-					Constants.MERGE_HEAD, e), e);
-		}
 	}
 
 	/**
@@ -661,8 +633,8 @@ public class CommitCommand extends GitCommand<RevCommit> {
 		checkCallable();
 		if (!only.isEmpty())
 			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().illegalCombinationOfArguments, "--all", //$NON-NLS-1$
-					"--only")); //$NON-NLS-1$
+					JGitText.get().illegalCombinationOfArguments, "--all",
+					"--only"));
 		this.all = all;
 		return this;
 	}
@@ -682,23 +654,23 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	}
 
 	/**
-	 * Commit dedicated path only.
-	 * <p>
+	 * Commit dedicated path only
+	 *
 	 * This method can be called several times to add multiple paths. Full file
 	 * paths are supported as well as directory paths; in the latter case this
-	 * commits all files/directories below the specified path.
+	 * commits all files/ directories below the specified path.
 	 *
 	 * @param only
-	 *            path to commit (with <code>/</code> as separator)
+	 *            path to commit
 	 * @return {@code this}
 	 */
 	public CommitCommand setOnly(String only) {
 		checkCallable();
 		if (all)
 			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().illegalCombinationOfArguments, "--only", //$NON-NLS-1$
-					"--all")); //$NON-NLS-1$
-		String o = only.endsWith("/") ? only.substring(0, only.length() - 1) //$NON-NLS-1$
+					JGitText.get().illegalCombinationOfArguments, "--only",
+					"--all"));
+		String o = only.endsWith("/") ? only.substring(0, only.length() - 1)
 				: only;
 		// ignore duplicates
 		if (!this.only.contains(o))

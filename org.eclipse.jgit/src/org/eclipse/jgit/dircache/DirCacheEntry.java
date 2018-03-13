@@ -548,7 +548,7 @@ public class DirCacheEntry {
 	 * <p>
 	 * Note that this is the length of the file in the working directory, which
 	 * may differ from the size of the decompressed blob if work tree filters
-	 * are being used, such as LF&lt;-&gt;CRLF conversion.
+	 * are being used, such as LF<->CRLF conversion.
 	 * <p>
 	 * Note also that for very large files, this is the size of the on-disk file
 	 * truncated to 32 bits, i.e. modulo 4294967296. If that value is larger
@@ -635,19 +635,8 @@ public class DirCacheEntry {
 	}
 
 	/**
-	 * Get a copy of the entry's raw path bytes.
-	 *
-	 * @return raw path bytes.
-	 * @since 3.4
-	 */
-	public byte[] getRawPath() {
-		return path.clone();
-	}
-
-	/**
 	 * Use for debugging only !
 	 */
-	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
 		return getFileMode() + " " + getLength() + " " + getLastModified()

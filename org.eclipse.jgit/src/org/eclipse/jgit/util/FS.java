@@ -50,20 +50,20 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
-import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.eclipse.jgit.errors.SymlinksNotSupportedException;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.util.internal.FS_POSIX_Java5;
+import org.eclipse.jgit.util.internal.FS_POSIX_Java6;
+import org.eclipse.jgit.util.internal.FS_Win32;
+import org.eclipse.jgit.util.internal.FS_Win32_Cygwin;
 
 /** Abstraction to support various file system operations not in Java. */
 public abstract class FS {
 	/**
-	 * This class creates FS instances. It will be overridden by a Java7 variant
-	 * if such can be detected in {@link #detect(Boolean)}.
-	 *
-	 * @since 3.0
+	 * Thie class creates FS instances. It may be overr
 	 */
 	public static class FSFactory {
 		/**
@@ -100,6 +100,20 @@ public abstract class FS {
 	private static FSFactory factory;
 
 	/**
+	 * Set the factory class to use
+	 *
+	 * @param factory
+	 */
+	@SuppressWarnings("nls")
+	public static void setFactory(FSFactory factory) {
+		if (FS.factory != null)
+			throw new IllegalStateException("FSFactory alread set to "
+					+ FS.factory.getClass() + ", cannot change to "
+					+ factory.getClass());
+		FS.factory = factory;
+	}
+
+	/**
 	 * Auto-detect the appropriate file system abstraction.
 	 *
 	 * @return detected file system abstraction
@@ -133,19 +147,16 @@ public abstract class FS {
 		if (factory == null) {
 			try {
 				Class<?> activatorClass = Class
-						.forName("org.eclipse.jgit.util.Java7FSFactory"); //$NON-NLS-1$
-				// found Java7
+						.forName("org.eclipse.jgit.java7.Java7FSFactory"); //$NON-NLS-1$
+				System.out.println("Found Java7");
 				factory = (FSFactory) activatorClass.newInstance();
 			} catch (ClassNotFoundException e) {
-				// Java7 module not found
-				// Silently ignore failure to find Java7 FS factory
+				System.out.println("Java7 not found");
 				factory = new FS.FSFactory();
-			} catch (UnsupportedClassVersionError e) {
+				// Silently ignore failure find Java7 FS factory
+			} catch (Exception e) {
 				factory = new FS.FSFactory();
-			} catch (InstantiationException e) {
-				factory = new FS.FSFactory();
-			} catch (IllegalAccessException e) {
-				factory = new FS.FSFactory();
+				throw new Error(e);
 			}
 		}
 		return factory.detect(cygwinUsed);
@@ -159,7 +170,6 @@ public abstract class FS {
 	 * Constructs a file system abstraction.
 	 */
 	protected FS() {
-		// Do nothing by default.
 	}
 
 	/**
@@ -169,6 +179,7 @@ public abstract class FS {
 	 *            the source FS to copy from.
 	 */
 	protected FS(FS src) {
+		this();
 		userHome = src.userHome;
 		gitPrefix = src.gitPrefix;
 	}
@@ -189,7 +200,6 @@ public abstract class FS {
 	 * capability to handle symbolic links is detected at runtime.
 	 *
 	 * @return true if symbolic links may be used
-	 * @since 3.0
 	 */
 	public boolean supportsSymlinks() {
 		return false;
@@ -207,10 +217,6 @@ public abstract class FS {
 	 * <p>
 	 * Not all platforms and JREs support executable flags on files. If the
 	 * feature is unsupported this method will always return false.
-	 * <p>
-	 * <em>If the platform supports symbolic links and <code>f</code> is a symbolic link
-	 * this method returns false, rather than the state of the executable flags
-	 * on the target file.</em>
 	 *
 	 * @param f
 	 *            abstract path to test.
@@ -234,27 +240,25 @@ public abstract class FS {
 	public abstract boolean setExecute(File f, boolean canExec);
 
 	/**
-	 * Get the last modified time of a file system object. If the OS/JRE support
-	 * symbolic links, the modification time of the link is returned, rather
-	 * than that of the link target.
+	 * Get the last modified time of an file system object. If the OS/JRE
+	 * support symbolic links, the modification time of the link is returned,
+	 * rather than that of the link target.
 	 *
 	 * @param f
 	 * @return last modified time of f
 	 * @throws IOException
-	 * @since 3.0
 	 */
 	public long lastModified(File f) throws IOException {
 		return f.lastModified();
 	}
 
 	/**
-	 * Set the last modified time of a file system object. If the OS/JRE support
-	 * symbolic links, the link is modified, not the target,
+	 * Get the last modified time of an file system object. If the OS/JRE
+	 * support symbolic links, the link is modified, not the target,
 	 *
 	 * @param f
 	 * @param time
 	 * @throws IOException
-	 * @since 3.0
 	 */
 	public void setLastModified(File f, long time) throws IOException {
 		f.setLastModified(time);
@@ -267,24 +271,9 @@ public abstract class FS {
 	 * @param path
 	 * @return length of a file
 	 * @throws IOException
-	 * @since 3.0
 	 */
 	public long length(File path) throws IOException {
 		return path.length();
-	}
-
-	/**
-	 * Delete a file. Throws an exception if delete fails.
-	 *
-	 * @param f
-	 * @throws IOException
-	 *             this may be a Java7 subclass with detailed information
-	 * @since 3.3
-	 */
-	public void delete(File f) throws IOException {
-		if (!f.delete())
-			throw new IOException(MessageFormat.format(
-					JGitText.get().deleteFileFailed, f.getAbsolutePath()));
 	}
 
 	/**
@@ -361,7 +350,7 @@ public abstract class FS {
 		final String home = AccessController
 				.doPrivileged(new PrivilegedAction<String>() {
 					public String run() {
-						return System.getProperty("user.home"); //$NON-NLS-1$
+						return System.getProperty("user.home");
 					}
 				});
 		if (home == null || home.length() == 0)
@@ -378,7 +367,6 @@ public abstract class FS {
 	 * @param lookFor
 	 *            Files to search for in the given path
 	 * @return the first match found, or null
-	 * @since 3.0
 	 **/
 	protected static File searchPath(final String path, final String... lookFor) {
 		if (path == null)
@@ -406,10 +394,10 @@ public abstract class FS {
 	 */
 	protected static String readPipe(File dir, String[] command, String encoding) {
 		final boolean debug = Boolean.parseBoolean(SystemReader.getInstance()
-				.getProperty("jgit.fs.debug")); //$NON-NLS-1$
+				.getProperty("jgit.fs.debug"));
 		try {
 			if (debug)
-				System.err.println("readpipe " + Arrays.asList(command) + "," //$NON-NLS-1$ //$NON-NLS-2$
+				System.err.println("readpipe " + Arrays.asList(command) + ","
 						+ dir);
 			final Process p = Runtime.getRuntime().exec(command, null, dir);
 			final BufferedReader lineRead = new BufferedReader(
@@ -449,8 +437,8 @@ public abstract class FS {
 			try {
 				r = lineRead.readLine();
 				if (debug) {
-					System.err.println("readpipe may return '" + r + "'"); //$NON-NLS-1$ //$NON-NLS-2$
-					System.err.println("(ignoring remaing output:"); //$NON-NLS-1$
+					System.err.println("readpipe may return '" + r + "'");
+					System.err.println("(ignoring remaing output:");
 				}
 				String l;
 				while ((l = lineRead.readLine()) != null) {
@@ -470,7 +458,7 @@ public abstract class FS {
 							&& !gooblerFail.get())
 						return r;
 					if (debug)
-						System.err.println("readpipe rc=" + rc); //$NON-NLS-1$
+						System.err.println("readpipe rc=" + rc);
 					break;
 				} catch (InterruptedException ie) {
 					// Stop bothering me, I have a zombie to reap.
@@ -482,7 +470,7 @@ public abstract class FS {
 			// Ignore error (but report)
 		}
 		if (debug)
-			System.err.println("readpipe returns null"); //$NON-NLS-1$
+			System.err.println("readpipe returns null");
 		return null;
 	}
 
@@ -491,7 +479,7 @@ public abstract class FS {
 		Holder<File> p = gitPrefix;
 		if (p == null) {
 			String overrideGitPrefix = SystemReader.getInstance().getProperty(
-					"jgit.gitprefix"); //$NON-NLS-1$
+					"jgit.gitprefix");
 			if (overrideGitPrefix != null)
 				p = new Holder<File>(new File(overrideGitPrefix));
 			else
@@ -522,7 +510,6 @@ public abstract class FS {
 	 * @param path
 	 * @return target of link or null
 	 * @throws IOException
-	 * @since 3.0
 	 */
 	public String readSymLink(File path) throws IOException {
 		throw new SymlinksNotSupportedException(
@@ -531,21 +518,20 @@ public abstract class FS {
 
 	/**
 	 * @param path
-	 * @return true if the path is a symbolic link (and we support these)
+	 * @return true if the path is a symlink, or we do not support symbolic
+	 *         links
 	 * @throws IOException
-	 * @since 3.0
 	 */
 	public boolean isSymLink(File path) throws IOException {
 		return false;
 	}
 
 	/**
-	 * Tests if the path exists, in case of a symbolic link, true even if the
-	 * target does not exist
+	 * Tests if the path exists, in case of a symlink, true even if the target
+	 * does not exist
 	 *
 	 * @param path
 	 * @return true if path exists
-	 * @since 3.0
 	 */
 	public boolean exists(File path) {
 		return path.exists();
@@ -553,11 +539,10 @@ public abstract class FS {
 
 	/**
 	 * Check if path is a directory. If the OS/JRE supports symbolic links and
-	 * path is a symbolic link to a directory, this method returns false.
+	 * path is a symbolic link to a directory, this method return false.
 	 *
 	 * @param path
 	 * @return true if file is a directory,
-	 * @since 3.0
 	 */
 	public boolean isDirectory(File path) {
 		return path.isDirectory();
@@ -569,7 +554,6 @@ public abstract class FS {
 	 *
 	 * @param path
 	 * @return true if path represents a regular file
-	 * @since 3.0
 	 */
 	public boolean isFile(File path) {
 		return path.isFile();
@@ -580,7 +564,6 @@ public abstract class FS {
 	 * @return true if path is hidden, either starts with . on unix or has the
 	 *         hidden attribute in windows
 	 * @throws IOException
-	 * @since 3.0
 	 */
 	public boolean isHidden(File path) throws IOException {
 		return path.isHidden();
@@ -592,7 +575,6 @@ public abstract class FS {
 	 * @param path
 	 * @param hidden
 	 * @throws IOException
-	 * @since 3.0
 	 */
 	public void setHidden(File path, boolean hidden) throws IOException {
 		if (!path.getName().startsWith(".")) //$NON-NLS-1$
@@ -606,7 +588,6 @@ public abstract class FS {
 	 * @param path
 	 * @param target
 	 * @throws IOException
-	 * @since 3.0
 	 */
 	public void createSymLink(File path, String target) throws IOException {
 		throw new SymlinksNotSupportedException(
@@ -633,173 +614,5 @@ public abstract class FS {
 		Holder(V value) {
 			this.value = value;
 		}
-	}
-
-	/**
-	 * File attributes we typically care for.
-	 *
-	 * @since 3.3
-	 */
-	public static class Attributes {
-
-		/**
-		 * @return true if this are the attributes of a directory
-		 */
-		public boolean isDirectory() {
-			return isDirectory;
-		}
-
-		/**
-		 * @return true if this are the attributes of an executable file
-		 */
-		public boolean isExecutable() {
-			return isExecutable;
-		}
-
-		/**
-		 * @return true if this are the attributes of a symbolic link
-		 */
-		public boolean isSymbolicLink() {
-			return isSymbolicLink;
-		}
-
-		/**
-		 * @return true if this are the attributes of a regular file
-		 */
-		public boolean isRegularFile() {
-			return isRegularFile;
-		}
-
-		/**
-		 * @return the time when the file was created
-		 */
-		public long getCreationTime() {
-			return creationTime;
-		}
-
-		/**
-		 * @return the time (milliseconds since 1970-01-01) when this object was
-		 *         last modified
-		 */
-		public long getLastModifiedTime() {
-			return lastModifiedTime;
-		}
-
-		private boolean isDirectory;
-
-		private boolean isSymbolicLink;
-
-		private boolean isRegularFile;
-
-		private long creationTime;
-
-		private long lastModifiedTime;
-
-		private boolean isExecutable;
-
-		private File file;
-
-		private boolean exists;
-
-		/**
-		 * file length
-		 */
-		protected long length = -1;
-
-		FS fs;
-
-		Attributes(FS fs, File file, boolean exists, boolean isDirectory,
-				boolean isExecutable, boolean isSymbolicLink,
-				boolean isRegularFile, long creationTime,
-				long lastModifiedTime, long length) {
-			this.fs = fs;
-			this.file = file;
-			this.exists = exists;
-			this.isDirectory = isDirectory;
-			this.isExecutable = isExecutable;
-			this.isSymbolicLink = isSymbolicLink;
-			this.isRegularFile = isRegularFile;
-			this.creationTime = creationTime;
-			this.lastModifiedTime = lastModifiedTime;
-			this.length = length;
-		}
-
-		/**
-		 * Constructor when there are issues with reading
-		 *
-		 * @param fs
-		 * @param path
-		 */
-		public Attributes(File path, FS fs) {
-			this.file = path;
-			this.fs = fs;
-		}
-
-		/**
-		 * @return length of this file object
-		 */
-		public long getLength() {
-			if (length == -1)
-				return length = file.length();
-			return length;
-		}
-
-		/**
-		 * @return the filename
-		 */
-		public String getName() {
-			return file.getName();
-		}
-
-		/**
-		 * @return the file the attributes apply to
-		 */
-		public File getFile() {
-			return file;
-		}
-
-		boolean exists() {
-			return exists;
-		}
-	}
-
-	/**
-	 * @param path
-	 * @return the file attributes we care for
-	 * @since 3.3
-	 */
-	public Attributes getAttributes(File path) {
-		boolean isDirectory = isDirectory(path);
-		boolean isFile = !isDirectory && path.isFile();
-		assert path.exists() == isDirectory || isFile;
-		boolean exists = isDirectory || isFile;
-		boolean canExecute = exists && !isDirectory && canExecute(path);
-		boolean isSymlink = false;
-		long lastModified = exists ? path.lastModified() : 0L;
-		long createTime = 0L;
-		return new Attributes(this, path, exists, isDirectory, canExecute,
-				isSymlink, isFile, createTime, lastModified, -1);
-	}
-
-	/**
-	 * Normalize the unicode path to composed form.
-	 *
-	 * @param file
-	 * @return NFC-format File
-	 * @since 3.3
-	 */
-	public File normalize(File file) {
-		return file;
-	}
-
-	/**
-	 * Normalize the unicode path to composed form.
-	 *
-	 * @param name
-	 * @return NFC-format string
-	 * @since 3.3
-	 */
-	public String normalize(String name) {
-		return name;
 	}
 }

@@ -51,8 +51,8 @@ import java.io.File;
 import java.io.IOException;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.FileMode;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
@@ -164,17 +164,6 @@ public class IgnoreNodeTest extends RepositoryTestCase {
 		assertEntry(D, tracked, "src/a");
 		assertEntry(F, tracked, "src/a/a");
 		assertEntry(F, tracked, "src/a/b");
-	}
-
-	@Test
-	public void testNoPatterns() throws IOException {
-		writeIgnoreFile(".gitignore", "", " ", "# comment", "/");
-		writeTrashFile("a/a", "");
-
-		beginWalk();
-		assertEntry(F, tracked, ".gitignore");
-		assertEntry(D, tracked, "a");
-		assertEntry(F, tracked, "a/a");
 	}
 
 	private void beginWalk() throws CorruptObjectException {

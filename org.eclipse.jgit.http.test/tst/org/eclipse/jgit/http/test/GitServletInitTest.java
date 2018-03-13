@@ -101,8 +101,6 @@ public class GitServletInitTest {
 		ServletHolder s = app.addServlet(GitServlet.class, "/git");
 		s.setInitOrder(1);
 		s.getServletHandler().setStartWithUnavailable(false);
-		// The tmp directory is symlinked on OS X
-		s.setInitParameter("aliases", "true");
 
 		try {
 			server.setUp();
@@ -135,8 +133,6 @@ public class GitServletInitTest {
 		s.setInitOrder(1);
 		s.setInitParameter("base-path", ".");
 		s.setInitParameter("export-all", "true");
-		// The tmp directory is symlinked on OS X
-		s.setInitParameter("aliases", "true");
 
 		server.setUp();
 		assertTrue("no warnings", RecordingLogger.getWarnings().isEmpty());

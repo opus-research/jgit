@@ -54,7 +54,6 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.transport.FetchConnection;
 import org.eclipse.jgit.transport.Transport;
 
-@Command(common = true, usage = "usage_LsRemote")
 class LsRemote extends TextBuiltin {
 	@Option(name = "--timeout", metaVar = "metaVar_service", usage = "usage_abortConnectionIfNoActivity")
 	int timeout = -1;
@@ -72,7 +71,7 @@ class LsRemote extends TextBuiltin {
 			for (final Ref r : c.getRefs()) {
 				show(r.getObjectId(), r.getName());
 				if (r.getPeeledObjectId() != null)
-					show(r.getPeeledObjectId(), r.getName() + "^{}"); //$NON-NLS-1$
+					show(r.getPeeledObjectId(), r.getName() + "^{}");
 			}
 		} finally {
 			c.close();

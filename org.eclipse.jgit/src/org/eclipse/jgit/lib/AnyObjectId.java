@@ -57,7 +57,7 @@ import org.eclipse.jgit.util.NB;
  * with this instance can alter at any time, if this instance is modified to
  * represent a different object name.
  */
-public abstract class AnyObjectId implements Comparable<AnyObjectId> {
+public abstract class AnyObjectId implements Comparable<Object> {
 
 	/**
 	 * Compare to object identifier byte sequences for equality.
@@ -156,8 +156,8 @@ public abstract class AnyObjectId implements Comparable<AnyObjectId> {
 	 *
 	 * @param other
 	 *            the other id to compare to. Must not be null.
-	 * @return &lt; 0 if this id comes before other; 0 if this id is equal to
-	 *         other; &gt; 0 if this id comes after other.
+	 * @return < 0 if this id comes before other; 0 if this id is equal to
+	 *         other; > 0 if this id comes after other.
 	 */
 	public final int compareTo(final AnyObjectId other) {
 		if (this == other)
@@ -182,6 +182,10 @@ public abstract class AnyObjectId implements Comparable<AnyObjectId> {
 			return cmp;
 
 		return NB.compareUInt32(w5, other.w5);
+	}
+
+	public final int compareTo(final Object other) {
+		return compareTo(((AnyObjectId) other));
 	}
 
 	/**
@@ -485,7 +489,6 @@ public abstract class AnyObjectId implements Comparable<AnyObjectId> {
 			dst[o--] = '0';
 	}
 
-	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
 		return "AnyObjectId[" + name() + "]";

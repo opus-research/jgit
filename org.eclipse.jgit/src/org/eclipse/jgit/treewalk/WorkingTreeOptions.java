@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
- * Copyright (C) 2012-2013, Robin Rosenberg
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -47,7 +46,6 @@ import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
-import org.eclipse.jgit.lib.CoreConfig.CheckStat;
 import org.eclipse.jgit.lib.CoreConfig.HideDotFiles;
 import org.eclipse.jgit.lib.CoreConfig.SymLinks;
 
@@ -64,8 +62,6 @@ public class WorkingTreeOptions {
 
 	private final AutoCRLF autoCRLF;
 
-	private final CheckStat checkStat;
-
 	private final SymLinks symlinks;
 
 	private final HideDotFiles hideDotFiles;
@@ -75,8 +71,6 @@ public class WorkingTreeOptions {
 				ConfigConstants.CONFIG_KEY_FILEMODE, true);
 		autoCRLF = rc.getEnum(ConfigConstants.CONFIG_CORE_SECTION, null,
 				ConfigConstants.CONFIG_KEY_AUTOCRLF, AutoCRLF.FALSE);
-		checkStat = rc.getEnum(ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_CHECKSTAT, CheckStat.DEFAULT);
 		symlinks = rc.getEnum(ConfigConstants.CONFIG_CORE_SECTION, null,
 				ConfigConstants.CONFIG_KEY_SYMLINKS, SymLinks.TRUE);
 		hideDotFiles = rc.getEnum(ConfigConstants.CONFIG_CORE_SECTION, null,
@@ -94,26 +88,12 @@ public class WorkingTreeOptions {
 		return autoCRLF;
 	}
 
-	/**
-	 * @return how stat data is compared
-	 * @since 3.0
-	 */
-	public CheckStat getCheckStat() {
-		return checkStat;
-	}
-
-	/**
-	 * @return how we handle symbolic links
-	 * @since 3.3
-	 */
+	/** @return how we handle symbolic links */
 	public SymLinks getSymLinks() {
 		return symlinks;
 	}
 
-	/**
-	 * @return how we create '.'-files (on Windows)
-	 * @since 3.5
-	 */
+	/** @return how we create '.'-files */
 	public HideDotFiles getHideDotFiles() {
 		return hideDotFiles;
 	}
