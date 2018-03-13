@@ -43,11 +43,9 @@
 package org.eclipse.jgit.gitrepo;
 
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.channels.FileChannel;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -57,7 +55,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.eclipse.jgit.api.AddCommand;
 import org.eclipse.jgit.api.GitCommand;
 import org.eclipse.jgit.api.SubmoduleAddCommand;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -78,6 +75,9 @@ import org.xml.sax.helpers.XMLReaderFactory;
  *
  * This will parse a repo XML manifest, convert it into .gitmodules file and the
  * repository config file.
+ *
+ * @see <a href="https://code.google.com/p/git-repo/">git-repo project page</a>
+ * @since 3.4
  */
 public class RepoCommand extends GitCommand<Void> {
 
@@ -87,43 +87,17 @@ public class RepoCommand extends GitCommand<Void> {
 
 	private ProgressMonitor monitor;
 
-	private static class CopyFile {
-		final String src;
-		final String dest;
-
-		CopyFile(String path, String src, String dest) {
-			this.src = path + "/" + src;
-			this.dest = dest;
-		}
-
-		void copy() throws IOException {
-			FileInputStream input = new FileInputStream(src);
-			FileOutputStream output = new FileOutputStream(dest);
-			FileChannel channel = input.getChannel();
-			output.getChannel().transferFrom(channel, 0, channel.size());
-			input.close();
-			output.close();
-		}
-	}
-
 	private static class Project {
 		final String name;
 		final String path;
 		final Set<String> groups;
-		final List<CopyFile> copyfiles;
 
 		Project(String name, String path, String groups) {
 			this.name = name;
 			this.path = path;
 			this.groups = new HashSet<String>();
-			if (groups != null && groups.length() > 0) {
-				this.groups.addAll(Arrays.asList(groups.split(",")));
-			}
-			copyfiles = new ArrayList<CopyFile>();
-		}
-
-		void addCopyFile(CopyFile copyfile) {
-			copyfiles.add(copyfile);
+			if (groups != null && groups.length() > 0)
+				this.groups.addAll(Arrays.asList(groups.split(","))); //$NON-NLS-1$
 		}
 	}
 
@@ -136,7 +110,6 @@ public class RepoCommand extends GitCommand<Void> {
 		private final Set<String> plusGroups;
 		private final Set<String> minusGroups;
 		private String defaultRemote;
-		private Project currentProject;
 
 		XmlManifest(RepoCommand command, String filename, String baseUrl, String groups) {
 			this.command = command;
@@ -146,12 +119,12 @@ public class RepoCommand extends GitCommand<Void> {
 			projects = new ArrayList<Project>();
 			plusGroups = new HashSet<String>();
 			minusGroups = new HashSet<String>();
-			if (groups == null || groups.length() == 0 || groups.equals("default")) {
+			if (groups == null || groups.length() == 0 || groups.equals("default")) { //$NON-NLS-1$
 				// default means "all,-notdefault"
-				minusGroups.add("notdefault");
+				minusGroups.add("notdefault"); //$NON-NLS-1$
 			} else {
-				for (String group : groups.split(",")) {
-					if (group.startsWith("-"))
+				for (String group : groups.split(",")) { //$NON-NLS-1$
+					if (group.startsWith("-")) //$NON-NLS-1$
 						minusGroups.add(group.substring(1));
 					else
 						plusGroups.add(group);
@@ -171,8 +144,10 @@ public class RepoCommand extends GitCommand<Void> {
 			try {
 				xr.parse(new InputSource(in));
 			} catch (SAXException e) {
-				throw new IOException(MessageFormat.format(
-							RepoText.get().errorParsingFromFile, filename), e);
+				IOException error = new IOException(MessageFormat.format(
+							RepoText.get().errorParsingManifestFile, filename));
+				error.initCause(e);
+				throw error;
 			} finally {
 				in.close();
 			}
@@ -184,34 +159,18 @@ public class RepoCommand extends GitCommand<Void> {
 				String localName,
 				String qName,
 				Attributes attributes) throws SAXException {
-			if ("project".equals(qName)) {
-				currentProject = new Project(
-						attributes.getValue("name"),
-						attributes.getValue("path"),
-						attributes.getValue("groups"));
-			} else if ("remote".equals(qName)) {
-				remotes.put(attributes.getValue("name"),
-						attributes.getValue("fetch"));
-			} else if ("default".equals(qName)) {
-				defaultRemote = attributes.getValue("remote");
-			} else if ("copyfile".equals(qName)) {
-				if (currentProject == null)
-					throw new SAXException(RepoText.get().invalidManifest);
-				currentProject.addCopyFile(new CopyFile(
-							currentProject.path,
-							attributes.getValue("src"),
-							attributes.getValue("dest")));
-			}
-		}
-
-		@Override
-		public void endElement(
-				String uri,
-				String localName,
-				String qName) throws SAXException {
-			if ("project".equals(qName)) {
-				projects.add(currentProject);
-				currentProject = null;
+			if ("project".equals(qName)) { //$NON-NLS-1$
+				projects.add(new Project( //$NON-NLS-1$
+							attributes.getValue("name"), //$NON-NLS-1$
+							attributes.getValue("path"), //$NON-NLS-1$
+							attributes.getValue("groups"))); //$NON-NLS-1$
+			} else if ("remote".equals(qName)) { //$NON-NLS-1$
+				remotes.put(attributes.getValue("name"), //$NON-NLS-1$
+						attributes.getValue("fetch")); //$NON-NLS-1$
+			} else if ("default".equals(qName)) { //$NON-NLS-1$
+				defaultRemote = attributes.getValue("remote"); //$NON-NLS-1$
+			} else if ("copyfile".equals(qName)) { //$NON-NLS-1$
+				// TODO(fishywang): Handle copyfile. Do nothing for now.
 			}
 		}
 
@@ -223,7 +182,7 @@ public class RepoCommand extends GitCommand<Void> {
 			}
 			final String remoteUrl;
 			try {
-				URI uri = new URI(String.format("%s/%s/", baseUrl, remotes.get(defaultRemote)));
+				URI uri = new URI(String.format("%s/%s/", baseUrl, remotes.get(defaultRemote))); //$NON-NLS-1$
 				remoteUrl = uri.normalize().toString();
 			} catch (URISyntaxException e) {
 				throw new SAXException(e);
@@ -232,21 +191,6 @@ public class RepoCommand extends GitCommand<Void> {
 				if (inGroups(proj)) {
 					String url = remoteUrl + proj.name;
 					command.addSubmodule(url, proj.path);
-					for (CopyFile copyfile : proj.copyfiles) {
-						try {
-							copyfile.copy();
-						} catch (IOException e) {
-							throw new SAXException(
-									RepoText.get().copyFileFailed, e);
-						}
-						AddCommand add = new AddCommand(command.repo)
-							.addFilepattern(copyfile.dest);
-						try {
-							add.call();
-						} catch (GitAPIException e) {
-							throw new SAXException(e);
-						}
-					}
 				}
 			}
 		}
@@ -258,7 +202,7 @@ public class RepoCommand extends GitCommand<Void> {
 					return false;
 				}
 			}
-			if (plusGroups.isEmpty() || plusGroups.contains("all")) {
+			if (plusGroups.isEmpty() || plusGroups.contains("all")) { //$NON-NLS-1$
 				// empty plus groups means "all"
 				return true;
 			}
@@ -321,7 +265,7 @@ public class RepoCommand extends GitCommand<Void> {
 	 * The progress monitor associated with the clone operation. By default,
 	 * this is set to <code>NullProgressMonitor</code>
 	 *
-	 * @see NullProgressMonitor
+	 * @see org.eclipse.jgit.lib.NullProgressMonitor
 	 * @param monitor
 	 * @return this command
 	 */
@@ -330,6 +274,7 @@ public class RepoCommand extends GitCommand<Void> {
 		return this;
 	}
 
+	@Override
 	public Void call() throws GitAPIException {
 		checkCallable();
 		if (path == null || path.length() == 0)
@@ -354,7 +299,7 @@ public class RepoCommand extends GitCommand<Void> {
 		if (monitor != null)
 			add.setProgressMonitor(monitor);
 		try {
-			Repository sub = add.call();
+			add.call();
 		} catch (GitAPIException e) {
 			throw new SAXException(e);
 		}
