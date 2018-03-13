@@ -61,6 +61,7 @@ import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.EmptyTreeIterator;
@@ -183,7 +184,9 @@ public class DirCacheCheckout {
 	 */
 	public DirCacheCheckout(Repository repo, ObjectId headCommitTree,
 			DirCache dc, ObjectId mergeCommitTree) throws IOException {
-		this(repo, headCommitTree, dc, mergeCommitTree, new FileTreeIterator(repo));
+		this(repo, headCommitTree, dc, mergeCommitTree, new FileTreeIterator(
+				repo.getWorkTree(), repo.getFS(),
+				WorkingTreeOptions.createDefaultInstance()));
 	}
 
 	/**
@@ -221,7 +224,9 @@ public class DirCacheCheckout {
 	 */
 	public DirCacheCheckout(Repository repo, DirCache dc,
 			ObjectId mergeCommitTree) throws IOException {
-		this(repo, null, dc, mergeCommitTree, new FileTreeIterator(repo));
+		this(repo, null, dc, mergeCommitTree, new FileTreeIterator(
+				repo.getWorkTree(), repo.getFS(),
+				WorkingTreeOptions.createDefaultInstance()));
 	}
 
 	/**
@@ -306,8 +311,8 @@ public class DirCacheCheckout {
 		if (m != null) {
 			if (i == null || f == null || !m.idEqual(i)
 					|| (i.getDirCacheEntry() != null && (f.isModified(
-							i.getDirCacheEntry(), true) ||
-							i.getDirCacheEntry().getStage() != 0))) {
+							i.getDirCacheEntry(), true, config_filemode(),
+							repo.getFS()) || i.getDirCacheEntry().getStage() != 0))) {
 				update(m.getEntryPathString(), m.getEntryObjectId(),
 						m.getEntryFileMode());
 			} else
@@ -386,7 +391,7 @@ public class DirCacheCheckout {
 			file.getParentFile().mkdirs();
 			file.createNewFile();
 			DirCacheEntry entry = dc.getEntry(path);
-			checkoutEntry(repo, file, entry);
+			checkoutEntry(repo, file, entry, config_filemode());
 		}
 
 
@@ -570,7 +575,9 @@ public class DirCacheCheckout {
 			case 0xFFD: // 12 13 14
 				if (hId.equals(iId)) {
 					dce = i.getDirCacheEntry();
-					if (f == null || f.isModified(dce, true))
+					if (f == null
+							|| f.isModified(dce, true, config_filemode(),
+									repo.getFS()))
 						conflict(name, i.getDirCacheEntry(), h, m);
 					else
 						remove(name);
@@ -636,7 +643,8 @@ public class DirCacheCheckout {
 				if (m == null || mId.equals(iId)) {
 					if (m==null && walk.isDirectoryFileConflict()) {
 						if (dce != null
-								&& (f == null || f.isModified(dce, true)))
+								&& (f == null || f.isModified(dce, true,
+										config_filemode(), repo.getFS())))
 							conflict(name, i.getDirCacheEntry(), h, m);
 						else
 							remove(name);
@@ -658,7 +666,9 @@ public class DirCacheCheckout {
 				 */
 
 				if (hId.equals(iId)) {
-					if (f == null || f.isModified(dce, true))
+					if (f == null
+							|| f.isModified(dce, true, config_filemode(),
+									repo.getFS()))
 						conflict(name, i.getDirCacheEntry(), h, m);
 					else
 						remove(name);
@@ -668,7 +678,9 @@ public class DirCacheCheckout {
 				if (!hId.equals(mId) && !hId.equals(iId) && !mId.equals(iId))
 					conflict(name, i.getDirCacheEntry(), h, m);
 				else if (hId.equals(iId) && !mId.equals(iId)) {
-					if (dce != null && (f == null || f.isModified(dce, true)))
+					if (dce != null
+							&& (f == null || f.isModified(dce, true,
+									config_filemode(), repo.getFS())))
 						conflict(name, i.getDirCacheEntry(), h, m);
 					else
 						update(name, mId, m.getEntryFileMode());
@@ -730,6 +742,19 @@ public class DirCacheCheckout {
 		}
 	}
 
+	private Boolean filemode;
+
+	private boolean config_filemode() {
+		// TODO: temporary till we can actually set parameters. We need to be
+		// able to change this for testing.
+		if (filemode == null) {
+			StoredConfig config = repo.getConfig();
+			filemode = Boolean.valueOf(config.getBoolean("core", null,
+					"filemode", true));
+		}
+		return filemode.booleanValue();
+	}
+
 	/**
 	 * If <code>true</code>, will scan first to see if it's possible to check
 	 * out, otherwise throw {@link CheckoutConflictException}. If
@@ -769,7 +794,8 @@ public class DirCacheCheckout {
 	private boolean isModified(String path) throws CorruptObjectException, IOException {
 		NameConflictTreeWalk tw = new NameConflictTreeWalk(repo);
 		tw.addTree(new DirCacheIterator(dc));
-		tw.addTree(new FileTreeIterator(repo));
+		tw.addTree(new FileTreeIterator(repo.getWorkTree(), repo.getFS(),
+				WorkingTreeOptions.createDefaultInstance()));
 		tw.setRecursive(true);
 		tw.setFilter(PathFilter.create(path));
 		DirCacheIterator dcIt;
@@ -779,7 +805,7 @@ public class DirCacheCheckout {
 			wtIt = tw.getTree(1, WorkingTreeIterator.class);
 			if (dcIt == null || wtIt == null)
 				return true;
-			if (wtIt.isModified(dcIt.getDirCacheEntry(), true)) {
+			if (wtIt.isModified(dcIt.getDirCacheEntry(), true, config_filemode(), repo.getFS())) {
 				return true;
 			}
 		}
@@ -801,10 +827,12 @@ public class DirCacheCheckout {
 	 *            has to exist already
 	 * @param entry
 	 *            the entry containing new mode and content
+	 * @param config_filemode
+	 *            whether the mode bits should be handled at all.
 	 * @throws IOException
 	 */
-	public static void checkoutEntry(final Repository repo, File f,
-			DirCacheEntry entry) throws IOException {
+	public static void checkoutEntry(final Repository repo, File f, DirCacheEntry entry,
+			boolean config_filemode) throws IOException {
 		ObjectLoader ol = repo.open(entry.getObjectId());
 		File parentDir = f.getParentFile();
 		File tmpFile = File.createTempFile("._" + f.getName(), null, parentDir);
@@ -815,8 +843,7 @@ public class DirCacheCheckout {
 			channel.close();
 		}
 		FS fs = repo.getFS();
-		WorkingTreeOptions opt = repo.getConfig().get(WorkingTreeOptions.KEY);
-		if (opt.isFileMode() && fs.supportsExecute()) {
+		if (config_filemode && fs.supportsExecute()) {
 			if (FileMode.EXECUTABLE_FILE.equals(entry.getRawMode())) {
 				if (!fs.canExecute(tmpFile))
 					fs.setExecute(tmpFile, true);
