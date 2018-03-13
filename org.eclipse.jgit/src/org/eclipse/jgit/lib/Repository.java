@@ -922,7 +922,7 @@ public abstract class Repository {
 			return RepositoryState.REBASING_MERGE;
 
 		// Both versions
-		if (new File(getDirectory(), "MERGE_HEAD").exists()) {
+		if (new File(getDirectory(), Constants.MERGE_HEAD).exists()) {
 			// we are merging - now check whether we have unmerged paths
 			try {
 				if (!readDirCache().hasUnmergedPaths()) {
@@ -940,6 +940,20 @@ public abstract class Repository {
 
 		if (new File(getDirectory(), "BISECT_LOG").exists())
 			return RepositoryState.BISECTING;
+
+		if (new File(getDirectory(), Constants.CHERRY_PICK_HEAD).exists()) {
+			try {
+				if (!readDirCache().hasUnmergedPaths()) {
+					// no unmerged paths
+					return RepositoryState.CHERRY_PICKING_RESOLVED;
+				}
+			} catch (IOException e) {
+				// fall through to CHERRY_PICKING
+				e.printStackTrace();
+			}
+
+			return RepositoryState.CHERRY_PICKING;
+		}
 
 		return RepositoryState.SAFE;
 	}
@@ -1144,15 +1158,8 @@ public abstract class Repository {
 		if (isBare() || getDirectory() == null)
 			throw new NoWorkTreeException();
 
-		File mergeHeadFile = new File(getDirectory(), Constants.MERGE_HEAD);
-		byte[] raw;
-		try {
-			raw = IO.readFully(mergeHeadFile);
-		} catch (FileNotFoundException notFound) {
-			return null;
-		}
-
-		if (raw.length == 0)
+		byte[] raw = readGitDirectoryFile(Constants.MERGE_HEAD);
+		if (raw == null)
 			return null;
 
 		LinkedList<ObjectId> heads = new LinkedList<ObjectId>();
@@ -1176,10 +1183,80 @@ public abstract class Repository {
 	 * @throws IOException
 	 */
 	public void writeMergeHeads(List<ObjectId> heads) throws IOException {
-		File mergeHeadFile = new File(gitDir, Constants.MERGE_HEAD);
+		writeHeadsFile(heads, Constants.MERGE_HEAD);
+	}
+
+	/**
+	 * Return the information stored in the file $GIT_DIR/CHERRY_PICK_HEAD.
+	 *
+	 * @return object id from CHERRY_PICK_HEAD file or {@code null} if this file
+	 *         doesn't exist. Also if the file exists but is empty {@code null}
+	 *         will be returned
+	 * @throws IOException
+	 * @throws NoWorkTreeException
+	 *             if this is bare, which implies it has no working directory.
+	 *             See {@link #isBare()}.
+	 */
+	public ObjectId readCherryPickHead() throws IOException,
+			NoWorkTreeException {
+		if (isBare() || getDirectory() == null)
+			throw new NoWorkTreeException();
+
+		byte[] raw = readGitDirectoryFile(Constants.CHERRY_PICK_HEAD);
+		if (raw == null)
+			return null;
+
+		return ObjectId.fromString(raw, 0);
+	}
+
+	/**
+	 * Write cherry pick commit into $GIT_DIR/CHERRY_PICK_HEAD. This is used in
+	 * case of conflicts to store the cherry which was tried to be picked.
+	 *
+	 * @param head
+	 *            an object id of the cherry commit or <code>null</code> to
+	 *            delete the file
+	 * @throws IOException
+	 */
+	public void writeCherryPickHead(ObjectId head) throws IOException {
+		List<ObjectId> heads = (head != null) ? Collections.singletonList(head)
+				: null;
+		writeHeadsFile(heads, Constants.CHERRY_PICK_HEAD);
+	}
+
+	/**
+	 * Read a file from the git directory.
+	 *
+	 * @param filename
+	 * @return the raw contents or null if the file doesn't exist or is empty
+	 * @throws IOException
+	 */
+	private byte[] readGitDirectoryFile(String filename) throws IOException {
+		File file = new File(getDirectory(), filename);
+		try {
+			byte[] raw = IO.readFully(file);
+			return raw.length > 0 ? raw : null;
+		} catch (FileNotFoundException notFound) {
+			return null;
+		}
+	}
+
+	/**
+	 * Write the given heads to a file in the git directory.
+	 *
+	 * @param heads
+	 *            a list of object ids to write or null if the file should be
+	 *            deleted.
+	 * @param filename
+	 * @throws FileNotFoundException
+	 * @throws IOException
+	 */
+	private void writeHeadsFile(List<ObjectId> heads, String filename)
+			throws FileNotFoundException, IOException {
+		File headsFile = new File(getDirectory(), filename);
 		if (heads != null) {
 			BufferedOutputStream bos = new BufferedOutputStream(
-					new FileOutputStream(mergeHeadFile));
+					new FileOutputStream(headsFile));
 			try {
 				for (ObjectId id : heads) {
 					id.copyTo(bos);
@@ -1189,7 +1266,7 @@ public abstract class Repository {
 				bos.close();
 			}
 		} else {
-			FileUtils.delete(mergeHeadFile);
+			FileUtils.delete(headsFile, FileUtils.SKIP_MISSING);
 		}
 	}
 }
