@@ -540,7 +540,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 		 * @since 4.0
 		 */
 		public Heap(final int estimatedSize, final int limit) {
-			super(estimatedSize, limit);
+			super(limit, estimatedSize);
 		}
 
 		@Override

@@ -430,7 +430,7 @@ public class TemporaryBufferTest {
 	@Test
 	public void testHeapWithEstimatedSize() throws IOException {
 		int sz = 2 * Block.SZ;
-		try (TemporaryBuffer b = new TemporaryBuffer.Heap(sz / 2, sz)) {
+		try (TemporaryBuffer b = new TemporaryBuffer.Heap(sz, sz / 2)) {
 			for (int i = 0; i < sz; i++) {
 				b.write('x');
 			}
