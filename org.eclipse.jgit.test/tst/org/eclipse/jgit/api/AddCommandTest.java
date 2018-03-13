@@ -45,7 +45,6 @@ package org.eclipse.jgit.api;
 
 import static org.eclipse.jgit.util.FileUtils.RECURSIVE;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -71,16 +70,8 @@ import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 import org.junit.Test;
-import org.junit.experimental.theories.DataPoints;
-import org.junit.experimental.theories.Theories;
-import org.junit.experimental.theories.Theory;
-import org.junit.runner.RunWith;
 
-@RunWith(Theories.class)
 public class AddCommandTest extends RepositoryTestCase {
-	@DataPoints
-	public static boolean[] smudge = { true, false };
-
 
 	@Test
 	public void testAddNothing() throws GitAPIException {
@@ -118,62 +109,28 @@ public class AddCommandTest extends RepositoryTestCase {
 		}
 	}
 
-	@Theory
-	public void testBuiltinFilter(boolean doSmudge)
-			throws IOException,
-			GitAPIException, InterruptedException {
-		writeTrashFile(".gitattributes", "*.txt filter=lfs");
+	@Test
+	public void testCleanFilter() throws IOException,
+			GitAPIException {
+		writeTrashFile(".gitattributes", "*.txt filter=tstFilter");
 		writeTrashFile("src/a.tmp", "foo");
 		// Caution: we need a trailing '\n' since sed on mac always appends
 		// linefeeds if missing
+		writeTrashFile("src/a.txt", "foo\n");
 		File script = writeTempFile("sed s/o/e/g");
-		File f = writeTrashFile("src/a.txt", "foo\n");
 
 		try (Git git = new Git(db)) {
-			if (!doSmudge) {
-				fsTick(f);
-			}
-			git.add().addFilepattern(".gitattributes").call();
 			StoredConfig config = git.getRepository().getConfig();
-			config.setString("filter", "lfs", "clean",
+			config.setString("filter", "tstFilter", "clean",
 					"sh " + slashify(script.getPath()));
-			config.setString("filter", "lfs", "smudge",
-					"sh " + slashify(script.getPath()));
-			config.setBoolean("filter", "lfs", "useJGitBuiltin", true);
 			config.save();
 
-			if (!doSmudge) {
-				fsTick(f);
-			}
 			git.add().addFilepattern("src/a.txt").addFilepattern("src/a.tmp")
-					.addFilepattern(".gitattributes").call();
+					.call();
 
 			assertEquals(
-					"[.gitattributes, mode:100644, content:*.txt filter=lfs][src/a.tmp, mode:100644, content:foo][src/a.txt, mode:100644, content:version https://git-lfs.github.com/spec/v1\noid b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c\nsize 4\n]", //TODO: doublecheck with native git
+					"[src/a.tmp, mode:100644, content:foo][src/a.txt, mode:100644, content:fee\n]",
 					indexState(CONTENT));
-
-			RevCommit c1 = git.commit().setMessage("c1").call();
-			assertTrue(git.status().call().isClean());
-			f = writeTrashFile("src/a.txt", "foobar\n");
-			if (!doSmudge) {
-				fsTick(f);
-			}
-			git.add().addFilepattern("src/a.txt").call();
-			git.commit().setMessage("c2").call();
-			assertTrue(git.status().call().isClean());
-			assertEquals(
-					"[.gitattributes, mode:100644, content:*.txt filter=lfs][src/a.tmp, mode:100644, content:foo][src/a.txt, mode:100644, content:version https://git-lfs.github.com/spec/v1\noid aec070645fe53ee3b3763059376134f058cc337247c978add178b6ccdfb0019f\nsize 7\n]",
-					indexState(CONTENT));
-			assertEquals("foobar\n", read("src/a.txt"));
-			git.checkout().setName(c1.getName()).call();
-			assertEquals(
-					"[.gitattributes, mode:100644, content:*.txt filter=lfs][src/a.tmp, mode:100644, content:foo][src/a.txt, mode:100644, content:version https://git-lfs.github.com/spec/v1\noid b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c\nsize 4\n]",
-					indexState(CONTENT));
-			// due to lfs clean filter but dummy smudge filter we expect strange
-			// content
-			assertEquals(
-					"versien https://git-lfs.github.cem/spec/v1\neid b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c\nsize 4\n",
-					read("src/a.txt"));
 		}
 	}
 
@@ -997,7 +954,11 @@ public class AddCommandTest extends RepositoryTestCase {
 			}
 
 			public boolean canExecute(File f) {
-				return true;
+				try {
+					return read(f).startsWith("binary:");
+				} catch (IOException e) {
+					return false;
+				}
 			}
 
 			@Override
@@ -1008,61 +969,40 @@ public class AddCommandTest extends RepositoryTestCase {
 
 		Git git = Git.open(db.getDirectory(), executableFs);
 		String path = "a.txt";
+		String path2 = "a.sh";
 		writeTrashFile(path, "content");
-		git.add().addFilepattern(path).call();
+		writeTrashFile(path2, "binary: content");
+		git.add().addFilepattern(path).addFilepattern(path2).call();
 		RevCommit commit1 = git.commit().setMessage("commit").call();
-		TreeWalk walk = TreeWalk.forPath(db, path, commit1.getTree());
-		assertNotNull(walk);
-		assertEquals(FileMode.EXECUTABLE_FILE, walk.getFileMode(0));
-
-		FS nonExecutableFs = new FS() {
-
-			public boolean supportsExecute() {
-				return false;
-			}
-
-			public boolean setExecute(File f, boolean canExec) {
-				return false;
-			}
-
-			public ProcessBuilder runInShell(String cmd, String[] args) {
-				return null;
-			}
-
-			public boolean retryFailedLockFileCommit() {
-				return false;
-			}
-
-			public FS newInstance() {
-				return this;
-			}
-
-			protected File discoverGitExe() {
-				return null;
-			}
-
-			public boolean canExecute(File f) {
-				return false;
-			}
-
-			@Override
-			public boolean isCaseSensitive() {
-				return false;
-			}
-		};
+		try (TreeWalk walk = new TreeWalk(db)) {
+			walk.addTree(commit1.getTree());
+			walk.next();
+			assertEquals(path2, walk.getPathString());
+			assertEquals(FileMode.EXECUTABLE_FILE, walk.getFileMode(0));
+			walk.next();
+			assertEquals(path, walk.getPathString());
+			assertEquals(FileMode.REGULAR_FILE, walk.getFileMode(0));
+		}
 
 		config = db.getConfig();
 		config.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
 				ConfigConstants.CONFIG_KEY_FILEMODE, false);
 		config.save();
 
-		Git git2 = Git.open(db.getDirectory(), nonExecutableFs);
-		writeTrashFile(path, "content2");
-		git2.add().addFilepattern(path).call();
+		Git git2 = Git.open(db.getDirectory(), executableFs);
+		writeTrashFile(path2, "content2");
+		writeTrashFile(path, "binary: content2");
+		git2.add().addFilepattern(path).addFilepattern(path2).call();
 		RevCommit commit2 = git2.commit().setMessage("commit2").call();
-		walk = TreeWalk.forPath(db, path, commit2.getTree());
-		assertNotNull(walk);
-		assertEquals(FileMode.EXECUTABLE_FILE, walk.getFileMode(0));
+		try (TreeWalk walk = new TreeWalk(db)) {
+			walk.addTree(commit2.getTree());
+			walk.next();
+			assertEquals(path2, walk.getPathString());
+			assertEquals(FileMode.EXECUTABLE_FILE, walk.getFileMode(0));
+			walk.next();
+			assertEquals(path, walk.getPathString());
+			assertEquals(FileMode.REGULAR_FILE, walk.getFileMode(0));
+		}
 	}
 
 	@Test

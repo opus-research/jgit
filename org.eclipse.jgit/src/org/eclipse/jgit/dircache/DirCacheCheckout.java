@@ -1307,9 +1307,9 @@ public class DirCacheCheckout {
 		try (OutputStream channel = EolStreamTypeUtil.wrapOutputStream(
 				new FileOutputStream(tmpFile), nonNullEolStreamType)) {
 			if (checkoutMetadata.smudgeFilterCommand != null) {
-				if (repo
+				if (Repository
 						.isRegistered(checkoutMetadata.smudgeFilterCommand)) {
-					BuiltinCommand command = repo.getCommand(
+					BuiltinCommand command = Repository.getCommand(
 							checkoutMetadata.smudgeFilterCommand, repo,
 							ol.openStream(), channel);
 					while (command.run() != -1)
