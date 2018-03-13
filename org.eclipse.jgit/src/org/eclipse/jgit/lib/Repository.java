@@ -1276,8 +1276,10 @@ public abstract class Repository {
 
 	/**
 	 * @param refName
-	 * @return the remote branch name without the
-	 *         <code>refs/remotes/&lt;remote&gt;</code> prefix
+	 * @return the remote branch name part of <code>refName</code>, i.e. without
+	 *         the <code>refs/remotes/&lt;remote&gt;</code> prefix, if
+	 *         <code>refName</code> represents a remote tracking branch;
+	 *         otherwise null.
 	 * @since 3.4
 	 */
 	public String shortenRemoteBranchName(String refName) {
@@ -1291,8 +1293,10 @@ public abstract class Repository {
 
 	/**
 	 * @param refName
-	 * @return the remote branch name without the
-	 *         <code>refs/remotes/&lt;remote&gt;</code> prefix
+	 * @return the remote name part of <code>refName</code>, i.e. without the
+	 *         <code>refs/remotes/&lt;remote&gt;</code> prefix, if
+	 *         <code>refName</code> represents a remote tracking branch;
+	 *         otherwise null.
 	 * @since 3.4
 	 */
 	public String getRemoteName(String refName) {
@@ -1645,7 +1649,7 @@ public abstract class Repository {
 	}
 
 	/**
-	 * @return the names of all knows remotes
+	 * @return the names of all known remotes
 	 * @since 3.4
 	 */
 	public Set<String> getRemoteNames() {
