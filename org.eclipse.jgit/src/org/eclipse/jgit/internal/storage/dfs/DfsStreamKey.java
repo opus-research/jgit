@@ -47,9 +47,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 import java.util.Arrays;
 
-import org.eclipse.jgit.annotations.Nullable;
-import org.eclipse.jgit.internal.storage.pack.PackExt;
-
 /** Key used by {@link DfsBlockCache} to disambiguate streams. */
 public abstract class DfsStreamKey {
 	/**
@@ -57,30 +54,22 @@ public abstract class DfsStreamKey {
 	 *            description of the containing repository.
 	 * @param name
 	 *            compute the key from a string name.
-	 * @param ext
-	 *            pack file extension, or {@code null}.
 	 * @return key for {@code name}
 	 */
-	public static DfsStreamKey of(DfsRepositoryDescription repo, String name,
-			@Nullable PackExt ext) {
-		return new ByteArrayDfsStreamKey(repo, name.getBytes(UTF_8), ext);
+	public static DfsStreamKey of(DfsRepositoryDescription repo, String name) {
+		return new ByteArrayDfsStreamKey(repo, name.getBytes(UTF_8));
 	}
 
 	final int hash;
 
-	final int packExtPos;
-
 	/**
 	 * @param hash
 	 *            hash of the other identifying components of the key.
-	 * @param ext
-	 *            pack file extension, or {@code null}.
 	 */
-	protected DfsStreamKey(int hash, @Nullable PackExt ext) {
+	protected DfsStreamKey(int hash) {
 		// Multiply by 31 here so we can more directly combine with another
 		// value without doing the multiply there.
 		this.hash = hash * 31;
-		this.packExtPos = ext == null ? 0 : ext.getPosition();
 	}
 
 	@Override
@@ -99,12 +88,10 @@ public abstract class DfsStreamKey {
 
 	private static final class ByteArrayDfsStreamKey extends DfsStreamKey {
 		private final DfsRepositoryDescription repo;
-
 		private final byte[] name;
 
-		ByteArrayDfsStreamKey(DfsRepositoryDescription repo, byte[] name,
-				@Nullable PackExt ext) {
-			super(repo.hashCode() * 31 + Arrays.hashCode(name), ext);
+		ByteArrayDfsStreamKey(DfsRepositoryDescription repo, byte[] name) {
+			super(repo.hashCode() * 31 + Arrays.hashCode(name));
 			this.repo = repo;
 			this.name = name;
 		}
@@ -113,7 +100,8 @@ public abstract class DfsStreamKey {
 		public boolean equals(Object o) {
 			if (o instanceof ByteArrayDfsStreamKey) {
 				ByteArrayDfsStreamKey k = (ByteArrayDfsStreamKey) o;
-				return hash == k.hash && repo.equals(k.repo)
+				return hash == k.hash
+						&& repo.equals(k.repo)
 						&& Arrays.equals(name, k.name);
 			}
 			return false;
@@ -124,7 +112,7 @@ public abstract class DfsStreamKey {
 		private final DfsStreamKey idxKey;
 
 		ForReverseIndex(DfsStreamKey idxKey) {
-			super(idxKey.hash + 1, null);
+			super(idxKey.hash + 1);
 			this.idxKey = idxKey;
 		}
 
