@@ -64,7 +64,6 @@ public class FormatActivator implements BundleActivator {
 	 * @param context
 	 *            unused
 	 */
-	@Override
 	public void start(BundleContext context) {
 		ArchiveFormats.registerAll();
 	}
@@ -76,7 +75,6 @@ public class FormatActivator implements BundleActivator {
 	 * @param context
 	 *            unused
 	 */
-	@Override
 	public void stop(BundleContext context) {
 		ArchiveFormats.unregisterAll();
 	}

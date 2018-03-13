@@ -133,9 +133,7 @@ public class SubmoduleAddCommand extends
 	 */
 	protected boolean submoduleExists() throws IOException {
 		TreeFilter filter = PathFilter.create(path);
-		try (SubmoduleWalk w = SubmoduleWalk.forIndex(repo)) {
-			return w.setFilter(filter).next();
-		}
+		return SubmoduleWalk.forIndex(repo).setFilter(filter).next();
 	}
 
 	/**
@@ -149,7 +147,6 @@ public class SubmoduleAddCommand extends
 	 * @return the newly created {@link Repository}
 	 * @throws GitAPIException
 	 */
-	@Override
 	public Repository call() throws GitAPIException {
 		checkCallable();
 		if (path == null || path.length() == 0)
@@ -176,16 +173,10 @@ public class SubmoduleAddCommand extends
 		CloneCommand clone = Git.cloneRepository();
 		configure(clone);
 		clone.setDirectory(moduleDirectory);
-		clone.setGitDir(new File(new File(repo.getDirectory(),
-				Constants.MODULES), path));
 		clone.setURI(resolvedUri);
 		if (monitor != null)
 			clone.setProgressMonitor(monitor);
-		Repository subRepo = null;
-		try (Git git = clone.call()) {
-			subRepo = git.getRepository();
-			subRepo.incrementOpen();
-		}
+		Repository subRepo = clone.call().getRepository();
 
 		// Save submodule URL to parent repository's config
 		StoredConfig config = repo.getConfig();

@@ -51,6 +51,9 @@ import static org.junit.Assert.assertTrue;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
+import org.eclipse.jgit.internal.storage.pack.BinaryDelta;
+import org.eclipse.jgit.internal.storage.pack.DeltaEncoder;
+import org.eclipse.jgit.internal.storage.pack.DeltaIndex;
 import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.junit.TestRng;
 import org.eclipse.jgit.lib.Constants;

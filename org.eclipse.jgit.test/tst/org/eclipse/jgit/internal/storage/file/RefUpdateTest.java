@@ -104,14 +104,9 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 
 	private void delete(final RefUpdate ref, final Result expected,
 			final boolean exists, final boolean removed) throws IOException {
-		delete(db, ref, expected, exists, removed);
-	}
-
-	private void delete(Repository repo, final RefUpdate ref, final Result expected,
-			final boolean exists, final boolean removed) throws IOException {
-		assertEquals(exists, repo.getAllRefs().containsKey(ref.getName()));
+		assertEquals(exists, db.getAllRefs().containsKey(ref.getName()));
 		assertEquals(expected, ref.delete());
-		assertEquals(!removed, repo.getAllRefs().containsKey(ref.getName()));
+		assertEquals(!removed, db.getAllRefs().containsKey(ref.getName()));
 	}
 
 	@Test
@@ -237,17 +232,6 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 		assertEquals(0, db.getReflogReader("HEAD").getReverseEntries().size());
 	}
 
-	@Test
-	public void testDeleteHeadInBareRepo() throws IOException {
-		Repository bareRepo = createBareRepository();
-		RefUpdate ref = bareRepo.updateRef(Constants.HEAD);
-		ref.setNewObjectId(ObjectId
-				.fromString("0123456789012345678901234567890123456789"));
-		// Create the HEAD ref so we can delete it.
-		assertEquals(Result.NEW, ref.update());
-		ref = bareRepo.updateRef(Constants.HEAD);
-		delete(bareRepo, ref, Result.NO_CHANGE, true, true);
-	}
 	/**
 	 * Delete a loose ref and make sure the directory in refs is deleted too,
 	 * and the reflog dir too
@@ -363,7 +347,7 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 		Result update = updateRef.update();
 		assertEquals(Result.FORCED, update);
 		assertEquals(ppid, db.resolve("HEAD"));
-		Ref ref = db.exactRef("HEAD");
+		Ref ref = db.getRef("HEAD");
 		assertEquals("HEAD", ref.getName());
 		assertTrue("is detached", !ref.isSymbolic());
 
@@ -393,7 +377,7 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 		Result update = updateRef.update();
 		assertEquals(Result.NEW, update);
 		assertEquals(ppid, db.resolve("HEAD"));
-		Ref ref = db.exactRef("HEAD");
+		Ref ref = db.getRef("HEAD");
 		assertEquals("HEAD", ref.getName());
 		assertTrue("is detached", !ref.isSymbolic());
 
@@ -574,15 +558,13 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 		assertEquals(ppid, db.resolve("refs/heads/master"));
 
 		// real test
-		try (RevWalk rw = new RevWalk(db)) {
-			RevCommit old = rw.parseCommit(ppid);
-			RefUpdate updateRef2 = db.updateRef("refs/heads/master");
-			updateRef2.setExpectedOldObjectId(old);
-			updateRef2.setNewObjectId(pid);
-			Result update2 = updateRef2.update();
-			assertEquals(Result.FAST_FORWARD, update2);
-			assertEquals(pid, db.resolve("refs/heads/master"));
-		}
+		RevCommit old = new RevWalk(db).parseCommit(ppid);
+		RefUpdate updateRef2 = db.updateRef("refs/heads/master");
+		updateRef2.setExpectedOldObjectId(old);
+		updateRef2.setNewObjectId(pid);
+		Result update2 = updateRef2.update();
+		assertEquals(Result.FAST_FORWARD, update2);
+		assertEquals(pid, db.resolve("refs/heads/master"));
 	}
 
 	/**
@@ -597,13 +579,14 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 		RefUpdate updateRef = db.updateRef("refs/heads/master");
 		updateRef.setNewObjectId(pid);
 		LockFile lockFile1 = new LockFile(new File(db.getDirectory(),
-				"refs/heads/master"));
+				"refs/heads/master"), db.getFS());
 		try {
 			assertTrue(lockFile1.lock()); // precondition to test
 			Result update = updateRef.update();
 			assertEquals(Result.LOCK_FAILURE, update);
 			assertEquals(opid, db.resolve("refs/heads/master"));
-			LockFile lockFile2 = new LockFile(new File(db.getDirectory(),"refs/heads/master"));
+			LockFile lockFile2 = new LockFile(new File(db.getDirectory(),"refs/heads/master"),
+					db.getFS());
 			assertFalse(lockFile2.lock()); // was locked, still is
 		} finally {
 			lockFile1.unlock();
@@ -698,13 +681,13 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 	public void testRenameBranchAlsoInPack() throws IOException {
 		ObjectId rb = db.resolve("refs/heads/b");
 		ObjectId rb2 = db.resolve("refs/heads/b~1");
-		assertEquals(Ref.Storage.PACKED, db.exactRef("refs/heads/b").getStorage());
+		assertEquals(Ref.Storage.PACKED, db.getRef("refs/heads/b").getStorage());
 		RefUpdate updateRef = db.updateRef("refs/heads/b");
 		updateRef.setNewObjectId(rb2);
 		updateRef.setForceUpdate(true);
 		Result update = updateRef.update();
 		assertEquals("internal check new ref is loose", Result.FORCED, update);
-		assertEquals(Ref.Storage.LOOSE, db.exactRef("refs/heads/b").getStorage());
+		assertEquals(Ref.Storage.LOOSE, db.getRef("refs/heads/b").getStorage());
 		writeReflog(db, rb, "Just a message", "refs/heads/b");
 		assertTrue("log on old branch", new File(db.getDirectory(),
 				"logs/refs/heads/b").exists());
@@ -724,10 +707,9 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 
 		// Create new Repository instance, to reread caches and make sure our
 		// assumptions are persistent.
-		try (Repository ndb = new FileRepository(db.getDirectory())) {
-			assertEquals(rb2, ndb.resolve("refs/heads/new/name"));
-			assertNull(ndb.resolve("refs/heads/b"));
-		}
+		Repository ndb = new FileRepository(db.getDirectory());
+		assertEquals(rb2, ndb.resolve("refs/heads/new/name"));
+		assertNull(ndb.resolve("refs/heads/b"));
 	}
 
 	public void tryRenameWhenLocked(String toLock, String fromName,
@@ -746,7 +728,8 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 				"logs/" + fromName).exists());
 
 		// "someone" has branch X locked
-		LockFile lockFile = new LockFile(new File(db.getDirectory(), toLock));
+		LockFile lockFile = new LockFile(new File(db.getDirectory(), toLock),
+				db.getFS());
 		try {
 			assertTrue(lockFile.lock());
 
@@ -768,7 +751,7 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 			assertNull(db.resolve(toName));
 			assertEquals(oldFromLog.toString(), db.getReflogReader(fromName)
 					.getReverseEntries().toString());
-			if (oldHeadId != null && oldHeadLog != null)
+			if (oldHeadId != null)
 				assertEquals(oldHeadLog.toString(), db.getReflogReader(
 						Constants.HEAD).getReverseEntries().toString());
 		} finally {

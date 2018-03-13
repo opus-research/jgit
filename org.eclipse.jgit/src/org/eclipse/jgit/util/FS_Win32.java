@@ -51,10 +51,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.eclipse.jgit.errors.CommandFailedException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 
 /**
  * FS implementation for Windows
@@ -62,7 +58,6 @@ import org.slf4j.LoggerFactory;
  * @since 3.0
  */
 public class FS_Win32 extends FS {
-	private final static Logger LOG = LoggerFactory.getLogger(FS_Win32.class);
 
 	private volatile Boolean supportSymlinks;
 
@@ -83,22 +78,18 @@ public class FS_Win32 extends FS {
 		super(src);
 	}
 
-	@Override
 	public FS newInstance() {
 		return new FS_Win32(this);
 	}
 
-	@Override
 	public boolean supportsExecute() {
 		return false;
 	}
 
-	@Override
 	public boolean canExecute(final File f) {
 		return false;
 	}
 
-	@Override
 	public boolean setExecute(final File f, final boolean canExec) {
 		return false;
 	}
@@ -122,19 +113,12 @@ public class FS_Win32 extends FS {
 			if (searchPath(path, "bash.exe") != null) { //$NON-NLS-1$
 				// This isn't likely to work, but its worth trying:
 				// If bash is in $PATH, git should also be in $PATH.
-				String w;
-				try {
-					w = readPipe(userHome(),
+				String w = readPipe(userHome(),
 						new String[]{"bash", "--login", "-c", "which git"}, // //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
 						Charset.defaultCharset().name());
-				} catch (CommandFailedException e) {
-					LOG.warn(e.getMessage());
-					return null;
-				}
-				if (!StringUtils.isEmptyOrNull(w)) {
+				if (!StringUtils.isEmptyOrNull(w))
 					// The path may be in cygwin/msys notation so resolve it right away
 					gitExe = resolve(null, w);
-				}
 			}
 		}
 
@@ -162,7 +146,7 @@ public class FS_Win32 extends FS {
 
 	@Override
 	public ProcessBuilder runInShell(String cmd, String[] args) {
-		List<String> argv = new ArrayList<>(3 + args.length);
+		List<String> argv = new ArrayList<String>(3 + args.length);
 		argv.add("cmd.exe"); //$NON-NLS-1$
 		argv.add("/c"); //$NON-NLS-1$
 		argv.add(cmd);
@@ -184,11 +168,10 @@ public class FS_Win32 extends FS {
 		try {
 			tempFile = File.createTempFile("tempsymlinktarget", ""); //$NON-NLS-1$ //$NON-NLS-2$
 			File linkName = new File(tempFile.getParentFile(), "tempsymlink"); //$NON-NLS-1$
-			createSymLink(linkName, tempFile.getPath());
+			FileUtil.createSymLink(linkName, tempFile.getPath());
 			supportSymlinks = Boolean.TRUE;
 			linkName.delete();
-		} catch (IOException | UnsupportedOperationException
-				| InternalError e) {
+		} catch (IOException | UnsupportedOperationException e) {
 			supportSymlinks = Boolean.FALSE;
 		} finally {
 			if (tempFile != null)
@@ -200,11 +183,71 @@ public class FS_Win32 extends FS {
 		}
 	}
 
+	@Override
+	public boolean isSymLink(File path) throws IOException {
+		return FileUtil.isSymlink(path);
+	}
+
+	@Override
+	public long lastModified(File path) throws IOException {
+		return FileUtil.lastModified(path);
+	}
+
+	@Override
+	public void setLastModified(File path, long time) throws IOException {
+		FileUtil.setLastModified(path, time);
+	}
+
+	@Override
+	public void delete(File path) throws IOException {
+		FileUtil.delete(path);
+	}
+
+	@Override
+	public long length(File f) throws IOException {
+		return FileUtil.getLength(f);
+	}
+
+	@Override
+	public boolean exists(File path) {
+		return FileUtil.exists(path);
+	}
+
+	@Override
+	public boolean isDirectory(File path) {
+		return FileUtil.isDirectory(path);
+	}
+
+	@Override
+	public boolean isFile(File path) {
+		return FileUtil.isFile(path);
+	}
+
+	@Override
+	public boolean isHidden(File path) throws IOException {
+		return FileUtil.isHidden(path);
+	}
+
+	@Override
+	public void setHidden(File path, boolean hidden) throws IOException {
+		FileUtil.setHidden(path, hidden);
+	}
+
+	@Override
+	public String readSymLink(File path) throws IOException {
+		return FileUtil.readSymlink(path);
+	}
+
+	@Override
+	public void createSymLink(File path, String target) throws IOException {
+		FileUtil.createSymLink(path, target);
+	}
+
 	/**
 	 * @since 3.3
 	 */
 	@Override
 	public Attributes getAttributes(File path) {
-		return FileUtils.getFileAttributesBasic(this, path);
+		return FileUtil.getFileAttributesBasic(this, path);
 	}
 }

@@ -60,9 +60,7 @@ public class ConfigTest extends CLIRepositoryTestCase {
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		try (Git git = new Git(db)) {
-			git.commit().setMessage("initial commit").call();
-		}
+		new Git(db).commit().setMessage("initial commit").call();
 	}
 
 	@Test
@@ -73,7 +71,7 @@ public class ConfigTest extends CLIRepositoryTestCase {
 				.equals("Mac OS X");
 
 		String[] output = execute("git config --list");
-		List<String> expect = new ArrayList<>();
+		List<String> expect = new ArrayList<String>();
 		expect.add("core.filemode=" + !isWindows);
 		expect.add("core.logallrefupdates=true");
 		if (isMac)

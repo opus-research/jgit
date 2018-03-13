@@ -59,6 +59,8 @@ import org.eclipse.jgit.ignore.internal.Strings.PatternState;
  * Matcher built by patterns consists of multiple path segments.
  * <p>
  * This class is immutable and thread safe.
+ *
+ * @since 3.6
  */
 public class PathMatcher extends AbstractMatcher {
 
@@ -83,14 +85,13 @@ public class PathMatcher extends AbstractMatcher {
 	}
 
 	private boolean isSimplePathWithSegments(String path) {
-		return !isWildCard(path) && path.indexOf('\\') < 0
-				&& count(path, slash, true) > 0;
+		return !isWildCard(path) && count(path, slash, true) > 0;
 	}
 
 	static private List<IMatcher> createMatchers(List<String> segments,
 			Character pathSeparator, boolean dirOnly)
 			throws InvalidPatternException {
-		List<IMatcher> matchers = new ArrayList<>(segments.size());
+		List<IMatcher> matchers = new ArrayList<IMatcher>(segments.size());
 		for (int i = 0; i < segments.size(); i++) {
 			String segment = segments.get(i);
 			IMatcher matcher = createNameMatcher0(segment, pathSeparator,
@@ -117,36 +118,13 @@ public class PathMatcher extends AbstractMatcher {
 	public static IMatcher createPathMatcher(String pattern,
 			Character pathSeparator, boolean dirOnly)
 			throws InvalidPatternException {
-		pattern = trim(pattern);
+		pattern = pattern.trim();
 		char slash = Strings.getPathSeparator(pathSeparator);
 		// ignore possible leading and trailing slash
 		int slashIdx = pattern.indexOf(slash, 1);
 		if (slashIdx > 0 && slashIdx < pattern.length() - 1)
 			return new PathMatcher(pattern, pathSeparator, dirOnly);
 		return createNameMatcher0(pattern, pathSeparator, dirOnly);
-	}
-
-	/**
-	 * Trim trailing spaces, unless they are escaped with backslash, see
-	 * https://www.kernel.org/pub/software/scm/git/docs/gitignore.html
-	 *
-	 * @param pattern
-	 *            non null
-	 * @return trimmed pattern
-	 */
-	private static String trim(String pattern) {
-		while (pattern.length() > 0
-				&& pattern.charAt(pattern.length() - 1) == ' ') {
-			if (pattern.length() > 1
-					&& pattern.charAt(pattern.length() - 2) == '\\') {
-				// last space was escaped by backslash: remove backslash and
-				// keep space
-				pattern = pattern.substring(0, pattern.length() - 2) + " "; //$NON-NLS-1$
-				return pattern;
-			}
-			pattern = pattern.substring(0, pattern.length() - 1);
-		}
-		return pattern;
 	}
 
 	private static IMatcher createNameMatcher0(String segment,
@@ -166,11 +144,10 @@ public class PathMatcher extends AbstractMatcher {
 		case COMPLEX:
 			return new WildCardMatcher(segment, pathSeparator, dirOnly);
 		default:
-			return new NameMatcher(segment, pathSeparator, dirOnly, true);
+			return new NameMatcher(segment, pathSeparator, dirOnly);
 		}
 	}
 
-	@Override
 	public boolean matches(String path, boolean assumeDirectory) {
 		if (matchers == null)
 			return simpleMatch(path, assumeDirectory);
@@ -210,7 +187,6 @@ public class PathMatcher extends AbstractMatcher {
 		return false;
 	}
 
-	@Override
 	public boolean matches(String segment, int startIncl, int endExcl,
 			boolean assumeDirectory) {
 		throw new UnsupportedOperationException(

@@ -51,7 +51,6 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.blame.Candidate.BlobCandidate;
 import org.eclipse.jgit.blame.Candidate.ReverseCandidate;
 import org.eclipse.jgit.blame.ReverseWalk.ReverseCommit;
@@ -239,13 +238,11 @@ public class BlameGenerator implements AutoCloseable {
 	}
 
 	/**
-	 * Obtain the RenameDetector, allowing the application to configure its
-	 * settings for rename score and breaking behavior.
+	 * Obtain the RenameDetector if {@code setFollowFileRenames(true)}.
 	 *
-	 * @return the rename detector, or {@code null} if
-	 *         {@code setFollowFileRenames(false)}.
+	 * @return the rename detector, allowing the application to configure its
+	 *         settings for rename score and breaking behavior.
 	 */
-	@Nullable
 	public RenameDetector getRenameDetector() {
 		return renameDetector;
 	}

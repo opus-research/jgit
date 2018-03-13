@@ -76,7 +76,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.UnpackException;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.InternalHttpServerGlue;
@@ -130,7 +129,6 @@ class ReceivePackServlet extends HttpServlet {
 			this.receivePackFactory = receivePackFactory;
 		}
 
-		@Override
 		public void doFilter(ServletRequest request, ServletResponse response,
 				FilterChain chain) throws IOException, ServletException {
 			HttpServletRequest req = (HttpServletRequest) request;
@@ -139,10 +137,11 @@ class ReceivePackServlet extends HttpServlet {
 			try {
 				rp = receivePackFactory.create(req, getRepository(req));
 			} catch (ServiceNotAuthorizedException e) {
-				rsp.sendError(SC_UNAUTHORIZED, e.getMessage());
+				rsp.sendError(SC_UNAUTHORIZED);
 				return;
+
 			} catch (ServiceNotEnabledException e) {
-				sendError(req, rsp, SC_FORBIDDEN, e.getMessage());
+				sendError(req, rsp, SC_FORBIDDEN);
 				return;
 			}
 
@@ -154,12 +153,10 @@ class ReceivePackServlet extends HttpServlet {
 			}
 		}
 
-		@Override
 		public void init(FilterConfig filterConfig) throws ServletException {
 			// Nothing.
 		}
 
-		@Override
 		public void destroy() {
 			// Nothing.
 		}
@@ -204,7 +201,7 @@ class ReceivePackServlet extends HttpServlet {
 			consumeRequestBody(req);
 			out.close();
 
-		} catch (UnpackException | PackProtocolException e) {
+		} catch (UnpackException e) {
 			// This should be already reported to the client.
 			log(rp.getRepository(), e.getCause());
 			consumeRequestBody(req);

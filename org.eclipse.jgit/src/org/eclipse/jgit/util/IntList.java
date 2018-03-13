@@ -138,7 +138,6 @@ public class IntList {
 		entries = n;
 	}
 
-	@Override
 	public String toString() {
 		final StringBuilder r = new StringBuilder();
 		r.append('[');

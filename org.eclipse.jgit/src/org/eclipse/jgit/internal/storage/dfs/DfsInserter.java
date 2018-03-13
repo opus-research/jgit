@@ -69,7 +69,6 @@ import java.util.zip.Inflater;
 import java.util.zip.InflaterInputStream;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.PackIndex;
@@ -90,25 +89,23 @@ import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.TemporaryBuffer;
 import org.eclipse.jgit.util.io.CountingOutputStream;
-import org.eclipse.jgit.util.sha1.SHA1;
 
 /** Inserts objects into the DFS. */
 public class DfsInserter extends ObjectInserter {
 	/** Always produce version 2 indexes, to get CRC data. */
 	private static final int INDEX_VERSION = 2;
 
-	final DfsObjDatabase db;
-	int compression = Deflater.BEST_COMPRESSION;
+	private final DfsObjDatabase db;
+	private int compression = Deflater.BEST_COMPRESSION;
 
-	List<PackedObjectInfo> objectList;
-	ObjectIdOwnerMap<PackedObjectInfo> objectMap;
+	private List<PackedObjectInfo> objectList;
+	private ObjectIdOwnerMap<PackedObjectInfo> objectMap;
 
-	DfsBlockCache cache;
-	DfsPackKey packKey;
-	DfsPackDescription packDsc;
-	PackStream packOut;
+	private DfsBlockCache cache;
+	private DfsPackKey packKey;
+	private DfsPackDescription packDsc;
+	private PackStream packOut;
 	private boolean rollback;
-	private boolean checkExisting = true;
 
 	/**
 	 * Initialize a new inserter.
@@ -118,15 +115,6 @@ public class DfsInserter extends ObjectInserter {
 	 */
 	protected DfsInserter(DfsObjDatabase db) {
 		this.db = db;
-	}
-
-	/**
-	 * @param check
-	 *            if false, will write out possibly-duplicate objects without
-	 *            first checking whether they exist in the repo; default is true.
-	 */
-	public void checkExisting(boolean check) {
-		checkExisting = check;
 	}
 
 	void setCompressionLevel(int compression) {
@@ -149,8 +137,7 @@ public class DfsInserter extends ObjectInserter {
 		ObjectId id = idFor(type, data, off, len);
 		if (objectMap != null && objectMap.contains(id))
 			return id;
-		// Ignore unreachable (garbage) objects here.
-		if (checkExisting && db.has(id, true))
+		if (db.has(id))
 			return id;
 
 		long offset = beginObject(type, len);
@@ -169,7 +156,7 @@ public class DfsInserter extends ObjectInserter {
 		}
 
 		long offset = beginObject(type, len);
-		SHA1 md = digest();
+		MessageDigest md = digest();
 		md.update(Constants.encodedTypeString(type));
 		md.update((byte) ' ');
 		md.update(Constants.encodeASCII(len));
@@ -184,7 +171,7 @@ public class DfsInserter extends ObjectInserter {
 			len -= n;
 		}
 		packOut.compress.finish();
-		return endObject(md.toObjectId(), offset);
+		return endObject(ObjectId.fromRaw(md.digest()), offset);
 	}
 
 	private byte[] insertBuffer(long len) {
@@ -275,8 +262,8 @@ public class DfsInserter extends ObjectInserter {
 	}
 
 	private void beginPack() throws IOException {
-		objectList = new BlockList<>();
-		objectMap = new ObjectIdOwnerMap<>();
+		objectList = new BlockList<PackedObjectInfo>();
+		objectMap = new ObjectIdOwnerMap<PackedObjectInfo>();
 		cache = DfsBlockCache.getInstance();
 
 		rollback = true;
@@ -313,7 +300,8 @@ public class DfsInserter extends ObjectInserter {
 		}
 
 		DfsOutputStream os = db.writeFile(pack, INDEX);
-		try (CountingOutputStream cnt = new CountingOutputStream(os)) {
+		try {
+			CountingOutputStream cnt = new CountingOutputStream(os);
 			if (buf != null)
 				buf.writeTo(cnt, null);
 			else
@@ -321,9 +309,7 @@ public class DfsInserter extends ObjectInserter {
 			pack.addFileExt(INDEX);
 			pack.setFileSize(INDEX, cnt.getCount());
 		} finally {
-			if (buf != null) {
-				buf.close();
-			}
+			os.close();
 		}
 		return packIndex;
 	}
@@ -336,7 +322,7 @@ public class DfsInserter extends ObjectInserter {
 	private class PackStream extends OutputStream {
 		private final DfsOutputStream out;
 		private final MessageDigest md;
-		final byte[] hdrBuf;
+		private final byte[] hdrBuf;
 		private final Deflater deflater;
 		private final int blockSize;
 
@@ -487,8 +473,7 @@ public class DfsInserter extends ObjectInserter {
 			}
 		}
 
-		private int setInput(long pos, Inflater inf)
-				throws IOException, DataFormatException {
+		private int setInput(long pos, Inflater inf) throws IOException {
 			if (pos < currPos)
 				return getOrLoadBlock(pos).setInput(pos, inf);
 			if (pos < currPos + currPtr) {
@@ -544,7 +529,7 @@ public class DfsInserter extends ObjectInserter {
 			if (objectList == null)
 				return stored;
 
-			Set<ObjectId> r = new HashSet<>(stored.size() + 2);
+			Set<ObjectId> r = new HashSet<ObjectId>(stored.size() + 2);
 			r.addAll(stored);
 			for (PackedObjectInfo obj : objectList) {
 				if (id.prefixCompare(obj) == 0)
@@ -573,9 +558,6 @@ public class DfsInserter extends ObjectInserter {
 			if (type == OBJ_OFS_DELTA || type == OBJ_REF_DELTA)
 				throw new IOException(MessageFormat.format(
 						DfsText.get().cannotReadBackDelta, Integer.toString(type)));
-			if (typeHint != OBJ_ANY && type != typeHint) {
-				throw new IncorrectObjectTypeException(objectId.copy(), typeHint);
-			}
 
 			long sz = c & 0x0f;
 			int ptr = 1;
@@ -615,11 +597,6 @@ public class DfsInserter extends ObjectInserter {
 		@Override
 		public Set<ObjectId> getShallowCommits() throws IOException {
 			return ctx.getShallowCommits();
-		}
-
-		@Override
-		public ObjectInserter getCreatedFromInserter() {
-			return DfsInserter.this;
 		}
 
 		@Override

@@ -206,7 +206,7 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 			String refLogMessage) throws IOException {
 		if (ref == null)
 			return;
-		Ref currentRef = repo.findRef(ref);
+		Ref currentRef = repo.getRef(ref);
 		RefUpdate refUpdate = repo.updateRef(ref);
 		refUpdate.setNewObjectId(commitId);
 		refUpdate.setRefLogIdent(refLogIdent);
@@ -220,7 +220,7 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 
 	private Ref getHead() throws GitAPIException {
 		try {
-			Ref head = repo.exactRef(Constants.HEAD);
+			Ref head = repo.getRef(Constants.HEAD);
 			if (head == null || head.getObjectId() == null)
 				throw new NoHeadException(JGitText.get().headRequiredToStash);
 			return head;
@@ -236,7 +236,6 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 	 * @return stashed commit or null if no changes to stash
 	 * @throws GitAPIException
 	 */
-	@Override
 	public RevCommit call() throws GitAPIException {
 		checkCallable();
 
@@ -246,14 +245,12 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 			DirCache cache = repo.lockDirCache();
 			ObjectId commitId;
 			try (ObjectInserter inserter = repo.newObjectInserter();
-					TreeWalk treeWalk = new TreeWalk(repo, reader)) {
+					TreeWalk treeWalk = new TreeWalk(reader)) {
 
 				treeWalk.setRecursive(true);
 				treeWalk.addTree(headCommit.getTree());
 				treeWalk.addTree(new DirCacheIterator(cache));
 				treeWalk.addTree(new FileTreeIterator(repo));
-				treeWalk.getTree(2, FileTreeIterator.class)
-						.setDirCacheIterator(treeWalk, 1);
 				treeWalk.setFilter(AndTreeFilter.create(new SkipWorkTreeFilter(
 						1), new IndexDiffFilter(1, 2)));
 
@@ -262,9 +259,9 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 					return null;
 
 				MutableObjectId id = new MutableObjectId();
-				List<PathEdit> wtEdits = new ArrayList<>();
-				List<String> wtDeletes = new ArrayList<>();
-				List<DirCacheEntry> untracked = new ArrayList<>();
+				List<PathEdit> wtEdits = new ArrayList<PathEdit>();
+				List<String> wtDeletes = new ArrayList<String>();
+				List<DirCacheEntry> untracked = new ArrayList<DirCacheEntry>();
 				boolean hasChanges = false;
 				do {
 					AbstractTreeIterator headIter = treeWalk.getTree(0,
@@ -306,7 +303,6 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 							untracked.add(entry);
 						else
 							wtEdits.add(new PathEdit(entry) {
-								@Override
 								public void apply(DirCacheEntry ent) {
 									ent.copyMetaData(entry);
 								}

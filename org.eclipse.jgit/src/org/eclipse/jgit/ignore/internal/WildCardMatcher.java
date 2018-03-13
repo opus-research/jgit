@@ -53,6 +53,8 @@ import org.eclipse.jgit.errors.InvalidPatternException;
  * glob wildcards to Java {@link Pattern}'s.
  * <p>
  * This class is immutable and thread safe.
+ *
+ * @since 3.6
  */
 public class WildCardMatcher extends NameMatcher {
 
@@ -60,7 +62,7 @@ public class WildCardMatcher extends NameMatcher {
 
 	WildCardMatcher(String pattern, Character pathSeparator, boolean dirOnly)
 			throws InvalidPatternException {
-		super(pattern, pathSeparator, dirOnly, false);
+		super(pattern, pathSeparator, dirOnly);
 		p = convertGlob(subPattern);
 	}
 

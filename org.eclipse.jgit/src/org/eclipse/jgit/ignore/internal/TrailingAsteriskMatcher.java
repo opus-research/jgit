@@ -44,18 +44,19 @@ package org.eclipse.jgit.ignore.internal;
 
 /**
  * Matcher for simple patterns ending with an asterisk, e.g. "Makefile.*"
+ *
+ * @since 3.6
  */
 public class TrailingAsteriskMatcher extends NameMatcher {
 
 	TrailingAsteriskMatcher(String pattern, Character pathSeparator, boolean dirOnly) {
-		super(pattern, pathSeparator, dirOnly, true);
+		super(pattern, pathSeparator, dirOnly);
 
 		if (subPattern.charAt(subPattern.length() - 1) != '*')
 			throw new IllegalArgumentException(
 					"Pattern must have trailing asterisk: " + pattern); //$NON-NLS-1$
 	}
 
-	@Override
 	public boolean matches(String segment, int startIncl, int endExcl,
 			boolean assumeDirectory) {
 		// faster local access, same as in string.indexOf()

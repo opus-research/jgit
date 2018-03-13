@@ -109,8 +109,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 
 		int pathStart = 8;
 		int lineEnd = RawParseUtils.nextLF(content, pathStart);
-		while (content[lineEnd - 1] == '\n' ||
-		       (content[lineEnd - 1] == '\r' && SystemReader.getInstance().isWindows()))
+		if (content[lineEnd - 1] == '\n')
 			lineEnd--;
 		if (lineEnd == pathStart)
 			throw new IOException(MessageFormat.format(
@@ -218,7 +217,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 	public B addAlternateObjectDirectory(File other) {
 		if (other != null) {
 			if (alternateObjectDirectories == null)
-				alternateObjectDirectories = new LinkedList<>();
+				alternateObjectDirectories = new LinkedList<File>();
 			alternateObjectDirectories.add(other);
 		}
 		return self();
@@ -429,7 +428,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 	public B addCeilingDirectory(File root) {
 		if (root != null) {
 			if (ceilingDirectories == null)
-				ceilingDirectories = new LinkedList<>();
+				ceilingDirectories = new LinkedList<File>();
 			ceilingDirectories.add(root);
 		}
 		return self();

@@ -46,7 +46,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.ChangeIdUtil;
@@ -71,31 +70,31 @@ public class MergeMessageFormatter {
 		StringBuilder sb = new StringBuilder();
 		sb.append("Merge "); //$NON-NLS-1$
 
-		List<String> branches = new ArrayList<>();
-		List<String> remoteBranches = new ArrayList<>();
-		List<String> tags = new ArrayList<>();
-		List<String> commits = new ArrayList<>();
-		List<String> others = new ArrayList<>();
+		List<String> branches = new ArrayList<String>();
+		List<String> remoteBranches = new ArrayList<String>();
+		List<String> tags = new ArrayList<String>();
+		List<String> commits = new ArrayList<String>();
+		List<String> others = new ArrayList<String>();
 		for (Ref ref : refsToMerge) {
-			if (ref.getName().startsWith(Constants.R_HEADS)) {
+			if (ref.getName().startsWith(Constants.R_HEADS))
 				branches.add("'" + Repository.shortenRefName(ref.getName()) //$NON-NLS-1$
 						+ "'"); //$NON-NLS-1$
-			} else if (ref.getName().startsWith(Constants.R_REMOTES)) {
+
+			else if (ref.getName().startsWith(Constants.R_REMOTES))
 				remoteBranches.add("'" //$NON-NLS-1$
 						+ Repository.shortenRefName(ref.getName()) + "'"); //$NON-NLS-1$
-			} else if (ref.getName().startsWith(Constants.R_TAGS)) {
+
+			else if (ref.getName().startsWith(Constants.R_TAGS))
 				tags.add("'" + Repository.shortenRefName(ref.getName()) + "'"); //$NON-NLS-1$ //$NON-NLS-2$
-			} else {
-				ObjectId objectId = ref.getObjectId();
-				if (objectId != null && ref.getName().equals(objectId.getName())) {
-					commits.add("'" + ref.getName() + "'"); //$NON-NLS-1$ //$NON-NLS-2$
-				} else {
-					others.add(ref.getName());
-				}
-			}
+
+			else if (ref.getName().equals(ref.getObjectId().getName()))
+				commits.add("'" + ref.getName() + "'"); //$NON-NLS-1$ //$NON-NLS-2$
+
+			else
+				others.add(ref.getName());
 		}
 
-		List<String> listings = new ArrayList<>();
+		List<String> listings = new ArrayList<String>();
 
 		if (!branches.isEmpty())
 			listings.add(joinNames(branches, "branch", "branches")); //$NON-NLS-1$//$NON-NLS-2$

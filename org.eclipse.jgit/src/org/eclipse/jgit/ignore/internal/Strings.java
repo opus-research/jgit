@@ -44,20 +44,19 @@ package org.eclipse.jgit.ignore.internal;
 
 import static java.lang.Character.isLetter;
 
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
 
 import org.eclipse.jgit.errors.InvalidPatternException;
 import org.eclipse.jgit.ignore.FastIgnoreRule;
-import org.eclipse.jgit.internal.JGitText;
 
 /**
  * Various {@link String} related utility methods, written mostly to avoid
  * generation of new String objects (e.g. via splitting Strings etc).
+ *
+ * @since 3.6
  */
 public class Strings {
 
@@ -74,50 +73,10 @@ public class Strings {
 	 * @return new string with all trailing characters removed
 	 */
 	public static String stripTrailing(String pattern, char c) {
-		for (int i = pattern.length() - 1; i >= 0; i--) {
-			char charAt = pattern.charAt(i);
-			if (charAt != c) {
-				if (i == pattern.length() - 1) {
-					return pattern;
-				}
-				return pattern.substring(0, i + 1);
-			}
-		}
-		return ""; //$NON-NLS-1$
-	}
-
-	/**
-	 * @param pattern
-	 *            non null
-	 * @return new string with all trailing whitespace removed
-	 */
-	public static String stripTrailingWhitespace(String pattern) {
-		for (int i = pattern.length() - 1; i >= 0; i--) {
-			char charAt = pattern.charAt(i);
-			if (!Character.isWhitespace(charAt)) {
-				if (i == pattern.length() - 1) {
-					return pattern;
-				}
-				return pattern.substring(0, i + 1);
-			}
-		}
-		return ""; //$NON-NLS-1$
-	}
-
-	/**
-	 * @param pattern
-	 *            non null
-	 * @return true if the last character, which is not whitespace, is a path
-	 *         separator
-	 */
-	public static boolean isDirectoryPattern(String pattern) {
-		for (int i = pattern.length() - 1; i >= 0; i--) {
-			char charAt = pattern.charAt(i);
-			if (!Character.isWhitespace(charAt)) {
-				return charAt == FastIgnoreRule.PATH_SEPARATOR;
-			}
-		}
-		return false;
+		while (pattern.length() > 0
+				&& pattern.charAt(pattern.length() - 1) == c)
+			pattern = pattern.substring(0, pattern.length() - 1);
+		return pattern;
 	}
 
 	static int count(String s, char c, boolean ignoreFirstLast) {
@@ -148,7 +107,7 @@ public class Strings {
 		if (count < 1)
 			throw new IllegalStateException(
 					"Pattern must have at least two segments: " + pattern); //$NON-NLS-1$
-		List<String> segments = new ArrayList<>(count);
+		List<String> segments = new ArrayList<String>(count);
 		int right = 0;
 		while (true) {
 			int left = right;
@@ -179,32 +138,14 @@ public class Strings {
 	private static boolean isComplexWildcard(String pattern) {
 		int idx1 = pattern.indexOf('[');
 		if (idx1 != -1) {
-			return true;
+			int idx2 = pattern.indexOf(']');
+			if (idx2 > idx1)
+				return true;
 		}
-		if (pattern.indexOf('?') != -1) {
+		// required to match escaped backslashes '\\\\'
+		if (pattern.indexOf('?') != -1 || pattern.indexOf('\\') != -1)
 			return true;
-		} else {
-			// check if the backslash escapes one of the glob special characters
-			// if not, backslash is not part of a regex and treated literally
-			int backSlash = pattern.indexOf('\\');
-			if (backSlash >= 0) {
-				int nextIdx = backSlash + 1;
-				if (pattern.length() == nextIdx) {
-					return false;
-				}
-				char nextChar = pattern.charAt(nextIdx);
-				if (escapedByBackslash(nextChar)) {
-					return true;
-				} else {
-					return false;
-				}
-			}
-		}
 		return false;
-	}
-
-	private static boolean escapedByBackslash(char nextChar) {
-		return nextChar == '?' || nextChar == '*' || nextChar == '[';
 	}
 
 	static PatternState checkWildCards(String pattern) {
@@ -285,7 +226,7 @@ public class Strings {
 		char[] charClass = new char[6];
 
 		for (int i = 0; i < pattern.length(); i++) {
-			final char c = pattern.charAt(i);
+			char c = pattern.charAt(i);
 			switch (c) {
 
 			case '*':
@@ -293,20 +234,6 @@ public class Strings {
 					sb.append(c);
 				else
 					sb.append('.').append(c);
-				break;
-
-			case '(': // fall-through
-			case ')': // fall-through
-			case '{': // fall-through
-			case '}': // fall-through
-			case '+': // fall-through
-			case '$': // fall-through
-			case '^': // fall-through
-			case '|':
-				if (seenEscape || in_brackets > 0)
-					sb.append(c);
-				else
-					sb.append('\\').append(c);
 				break;
 
 			case '.':
@@ -346,14 +273,6 @@ public class Strings {
 					char lookAhead = lookAhead(pattern, i);
 					if (lookAhead == ']' || lookAhead == '[')
 						ignoreLastBracket = true;
-				} else {
-					//
-					char lookAhead = lookAhead(pattern, i);
-					if (lookAhead != '\\' && lookAhead != '['
-							&& lookAhead != '?' && lookAhead != '*'
-							&& lookAhead != ' ' && lookBehind(sb) != '\\') {
-						break;
-					}
 				}
 				sb.append(c);
 				break;
@@ -430,16 +349,7 @@ public class Strings {
 
 		if (in_brackets > 0)
 			throw new InvalidPatternException("Not closed bracket?", pattern); //$NON-NLS-1$
-		try {
-			return Pattern.compile(sb.toString());
-		} catch (PatternSyntaxException e) {
-			InvalidPatternException patternException = new InvalidPatternException(
-					MessageFormat.format(JGitText.get().invalidIgnoreRule,
-							pattern),
-					pattern);
-			patternException.initCause(e);
-			throw patternException;
-		}
+		return Pattern.compile(sb.toString());
 	}
 
 	/**
@@ -489,32 +399,6 @@ public class Strings {
 				return JAVA_CHAR_CLASSES.get(i);
 		}
 		return null;
-	}
-
-	static String deleteBackslash(String s) {
-		if (s.indexOf('\\') < 0) {
-			return s;
-		}
-		StringBuilder sb = new StringBuilder(s.length());
-		for (int i = 0; i < s.length(); i++) {
-			char ch = s.charAt(i);
-			if (ch == '\\') {
-				if (i + 1 == s.length()) {
-					continue;
-				}
-				char next = s.charAt(i + 1);
-				if (next == '\\') {
-					sb.append(ch);
-					i++;
-					continue;
-				}
-				if (!escapedByBackslash(next)) {
-					continue;
-				}
-			}
-			sb.append(ch);
-		}
-		return sb.toString();
 	}
 
 }

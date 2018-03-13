@@ -99,7 +99,7 @@ public class RmCommand extends GitCommand<DirCache> {
 	 */
 	public RmCommand(Repository repo) {
 		super(repo);
-		filepatterns = new LinkedList<>();
+		filepatterns = new LinkedList<String>();
 	}
 
 	/**
@@ -136,7 +136,6 @@ public class RmCommand extends GitCommand<DirCache> {
 	 *
 	 * @return the DirCache after Rm
 	 */
-	@Override
 	public DirCache call() throws GitAPIException,
 			NoFilepatternException {
 

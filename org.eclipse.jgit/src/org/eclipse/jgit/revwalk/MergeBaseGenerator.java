@@ -45,7 +45,6 @@ package org.eclipse.jgit.revwalk;
 
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.LinkedList;
 
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -86,15 +85,12 @@ class MergeBaseGenerator extends Generator {
 
 	private int recarryMask;
 
-	private int mergeBaseAncestor = -1;
-	private LinkedList<RevCommit> ret = new LinkedList<>();
-
 	MergeBaseGenerator(final RevWalk w) {
 		walker = w;
 		pending = new DateRevQueue();
 	}
 
-	void init(final AbstractRevQueue p) throws IOException {
+	void init(final AbstractRevQueue p) {
 		try {
 			for (;;) {
 				final RevCommit c = p.next();
@@ -102,25 +98,17 @@ class MergeBaseGenerator extends Generator {
 					break;
 				add(c);
 			}
+		} finally {
+			// Always free the flags immediately. This ensures the flags
+			// will be available for reuse when the walk resets.
+			//
+			walker.freeFlag(branchMask);
+
 			// Setup the condition used by carryOntoOne to detect a late
 			// merge base and produce it on the next round.
 			//
 			recarryTest = branchMask | POPPED;
 			recarryMask = branchMask | POPPED | MERGE_BASE;
-			mergeBaseAncestor = walker.allocFlag();
-
-			for (;;) {
-				RevCommit c = _next();
-				if (c == null) {
-					break;
-				}
-				ret.add(c);
-			}
-		} finally {
-			// Always free the flags immediately. This ensures the flags
-			// will be available for reuse when the walk resets.
-			//
-			walker.freeFlag(branchMask | mergeBaseAncestor);
 		}
 	}
 
@@ -143,7 +131,8 @@ class MergeBaseGenerator extends Generator {
 		return 0;
 	}
 
-	private RevCommit _next() throws MissingObjectException,
+	@Override
+	RevCommit next() throws MissingObjectException,
 			IncorrectObjectTypeException, IOException {
 		for (;;) {
 			final RevCommit c = pending.next();
@@ -167,7 +156,7 @@ class MergeBaseGenerator extends Generator {
 				// also flagged as being popped, so that they do not
 				// generate to the caller.
 				//
-				carry |= MERGE_BASE | mergeBaseAncestor;
+				carry |= MERGE_BASE;
 			}
 			carryOntoHistory(c, carry);
 
@@ -188,18 +177,6 @@ class MergeBaseGenerator extends Generator {
 				return c;
 			}
 		}
-	}
-
-	@Override
-	RevCommit next() throws MissingObjectException,
-			IncorrectObjectTypeException, IOException {
-		while (!ret.isEmpty()) {
-			RevCommit commit = ret.remove();
-			if ((commit.flags & mergeBaseAncestor) == 0) {
-				return commit;
-			}
-		}
-		return null;
 	}
 
 	private void carryOntoHistory(RevCommit c, final int carry) {

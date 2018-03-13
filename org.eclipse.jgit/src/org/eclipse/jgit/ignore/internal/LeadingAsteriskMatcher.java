@@ -44,18 +44,19 @@ package org.eclipse.jgit.ignore.internal;
 
 /**
  * Matcher for simple regex patterns starting with an asterisk, e.g. "*.tmp"
+ *
+ * @since 3.6
  */
 public class LeadingAsteriskMatcher extends NameMatcher {
 
 	LeadingAsteriskMatcher(String pattern, Character pathSeparator, boolean dirOnly) {
-		super(pattern, pathSeparator, dirOnly, true);
+		super(pattern, pathSeparator, dirOnly);
 
 		if (subPattern.charAt(0) != '*')
 			throw new IllegalArgumentException(
 					"Pattern must have leading asterisk: " + pattern); //$NON-NLS-1$
 	}
 
-	@Override
 	public boolean matches(String segment, int startIncl, int endExcl,
 			boolean assumeDirectory) {
 		// faster local access, same as in string.indexOf()

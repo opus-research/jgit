@@ -45,7 +45,6 @@ package org.eclipse.jgit.submodule;
 import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.Locale;
 
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheIterator;
@@ -265,7 +264,7 @@ public class SubmoduleWalk implements AutoCloseable {
 
 		String remoteName = null;
 		// Look up remote URL associated wit HEAD ref
-		Ref ref = parent.exactRef(Constants.HEAD);
+		Ref ref = parent.getRef(Constants.HEAD);
 		if (ref != null) {
 			if (ref.isSymbolic())
 				ref = ref.getLeaf();
@@ -452,14 +451,13 @@ public class SubmoduleWalk implements AutoCloseable {
 	}
 
 	/**
-	 * Checks whether the working tree contains a .gitmodules file. That's a
-	 * hint that the repo contains submodules.
+	 * Checks whether the working tree (or the index in case of a bare repo)
+	 * contains a .gitmodules file. That's a hint that the repo contains
+	 * submodules.
 	 *
 	 * @param repository
 	 *            the repository to check
-	 * @return <code>true</code> if the working tree contains a .gitmodules file,
-	 *         <code>false</code> otherwise. Always returns <code>false</code>
-	 *         for bare repositories.
+	 * @return <code>true</code> if the repo contains a .gitmodules file
 	 * @throws IOException
 	 * @throws CorruptObjectException
 	 * @since 3.6
@@ -467,7 +465,8 @@ public class SubmoduleWalk implements AutoCloseable {
 	public static boolean containsGitModulesFile(Repository repository)
 			throws IOException {
 		if (repository.isBare()) {
-			return false;
+			DirCache dc = repository.readDirCache();
+			return (dc.findEntry(Constants.DOT_GIT_MODULES) >= 0);
 		}
 		File modulesFile = new File(repository.getWorkTree(),
 				Constants.DOT_GIT_MODULES);
@@ -664,8 +663,7 @@ public class SubmoduleWalk implements AutoCloseable {
 				ConfigConstants.CONFIG_KEY_IGNORE);
 		if (name == null)
 			return null;
-		return IgnoreSubmoduleMode
-				.valueOf(name.trim().toUpperCase(Locale.ROOT));
+		return IgnoreSubmoduleMode.valueOf(name.trim().toUpperCase());
 	}
 
 	/**
@@ -706,7 +704,7 @@ public class SubmoduleWalk implements AutoCloseable {
 		if (subRepo == null)
 			return null;
 		try {
-			Ref head = subRepo.exactRef(Constants.HEAD);
+			Ref head = subRepo.getRef(Constants.HEAD);
 			return head != null ? head.getLeaf().getName() : null;
 		} finally {
 			subRepo.close();

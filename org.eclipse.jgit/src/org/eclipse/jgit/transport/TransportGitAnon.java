@@ -46,7 +46,6 @@
 package org.eclipse.jgit.transport;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -63,6 +62,7 @@ import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
  * Transport through a git-daemon waiting for anonymous TCP connections.
@@ -75,33 +75,27 @@ class TransportGitAnon extends TcpTransport implements PackTransport {
 	static final int GIT_PORT = Daemon.DEFAULT_PORT;
 
 	static final TransportProtocol PROTO_GIT = new TransportProtocol() {
-		@Override
 		public String getName() {
 			return JGitText.get().transportProtoGitAnon;
 		}
 
-		@Override
 		public Set<String> getSchemes() {
 			return Collections.singleton("git"); //$NON-NLS-1$
 		}
 
-		@Override
 		public Set<URIishField> getRequiredFields() {
 			return Collections.unmodifiableSet(EnumSet.of(URIishField.HOST,
 					URIishField.PATH));
 		}
 
-		@Override
 		public Set<URIishField> getOptionalFields() {
 			return Collections.unmodifiableSet(EnumSet.of(URIishField.PORT));
 		}
 
-		@Override
 		public int getDefaultPort() {
 			return GIT_PORT;
 		}
 
-		@Override
 		public Transport open(URIish uri, Repository local, String remoteName)
 				throws NotSupportedException {
 			return new TransportGitAnon(local, uri);
@@ -188,7 +182,7 @@ class TransportGitAnon extends TcpTransport implements PackTransport {
 				OutputStream sOut = sock.getOutputStream();
 
 				sIn = new BufferedInputStream(sIn);
-				sOut = new BufferedOutputStream(sOut);
+				sOut = new SafeBufferedOutputStream(sOut);
 
 				init(sIn, sOut);
 				service("git-upload-pack", pckOut); //$NON-NLS-1$
@@ -227,7 +221,7 @@ class TransportGitAnon extends TcpTransport implements PackTransport {
 				OutputStream sOut = sock.getOutputStream();
 
 				sIn = new BufferedInputStream(sIn);
-				sOut = new BufferedOutputStream(sOut);
+				sOut = new SafeBufferedOutputStream(sOut);
 
 				init(sIn, sOut);
 				service("git-receive-pack", pckOut); //$NON-NLS-1$

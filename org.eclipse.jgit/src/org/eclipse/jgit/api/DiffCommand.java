@@ -109,7 +109,6 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 	 *
 	 * @return a DiffEntry for each path which is different
 	 */
-	@Override
 	public List<DiffEntry> call() throws GitAPIException {
 		final DiffFormatter diffFmt;
 		if (out != null && !showNameAndStatusOnly)
@@ -269,9 +268,6 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 	 * @return this instance
 	 */
 	public DiffCommand setProgressMonitor(ProgressMonitor monitor) {
-		if (monitor == null) {
-			monitor = NullProgressMonitor.INSTANCE;
-		}
 		this.monitor = monitor;
 		return this;
 	}

@@ -78,10 +78,10 @@ public class RefMap extends AbstractMap<String, Ref> {
 	 * All reference names in this map must start with this prefix. If the
 	 * prefix is not the empty string, it must end with a '/'.
 	 */
-	final String prefix;
+	private final String prefix;
 
 	/** Immutable collection of the packed references at construction time. */
-	RefList<Ref> packed;
+	private RefList<Ref> packed;
 
 	/**
 	 * Immutable collection of the loose references at construction time.
@@ -91,7 +91,7 @@ public class RefMap extends AbstractMap<String, Ref> {
 	 * are typically unresolved, so they only tell us who their target is, but
 	 * not the current value of the target.
 	 */
-	RefList<Ref> loose;
+	private RefList<Ref> loose;
 
 	/**
 	 * Immutable collection of resolved symbolic references.
@@ -101,11 +101,11 @@ public class RefMap extends AbstractMap<String, Ref> {
 	 * from {@link #loose}. Every entry in this list must be matched by an entry
 	 * in {@code loose}, otherwise it might be omitted by the map.
 	 */
-	RefList<Ref> resolved;
+	private RefList<Ref> resolved;
 
-	int size;
+	private int size;
 
-	boolean sizeIsValid;
+	private boolean sizeIsValid;
 
 	private Set<Entry<String, Ref>> entrySet;
 
@@ -280,7 +280,7 @@ public class RefMap extends AbstractMap<String, Ref> {
 		return name;
 	}
 
-	String toMapKey(Ref ref) {
+	private String toMapKey(Ref ref) {
 		String name = ref.getName();
 		if (0 < prefix.length())
 			name = name.substring(prefix.length());
@@ -304,14 +304,12 @@ public class RefMap extends AbstractMap<String, Ref> {
 			}
 		}
 
-		@Override
 		public boolean hasNext() {
 			if (next == null)
 				next = peek();
 			return next != null;
 		}
 
-		@Override
 		public Entry<String, Ref> next() {
 			if (hasNext()) {
 				Entry<String, Ref> r = next;
@@ -369,7 +367,6 @@ public class RefMap extends AbstractMap<String, Ref> {
 			return null;
 		}
 
-		@Override
 		public void remove() {
 			throw new UnsupportedOperationException();
 		}
@@ -382,17 +379,14 @@ public class RefMap extends AbstractMap<String, Ref> {
 			this.ref = ref;
 		}
 
-		@Override
 		public String getKey() {
 			return toMapKey(ref);
 		}
 
-		@Override
 		public Ref getValue() {
 			return ref;
 		}
 
-		@Override
 		public Ref setValue(Ref value) {
 			Ref prior = put(getKey(), value);
 			ref = value;

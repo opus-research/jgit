@@ -58,14 +58,12 @@ import org.eclipse.jgit.lib.ObjectId;
 public interface PreUploadHook {
 	/** A simple no-op hook. */
 	public static final PreUploadHook NULL = new PreUploadHook() {
-		@Override
 		public void onBeginNegotiateRound(UploadPack up,
 				Collection<? extends ObjectId> wants, int cntOffered)
 				throws ServiceMayNotContinueException {
 			// Do nothing.
 		}
 
-		@Override
 		public void onEndNegotiateRound(UploadPack up,
 				Collection<? extends ObjectId> wants, int cntCommon,
 				int cntNotFound, boolean ready)
@@ -73,7 +71,6 @@ public interface PreUploadHook {
 			// Do nothing.
 		}
 
-		@Override
 		public void onSendPack(UploadPack up,
 				Collection<? extends ObjectId> wants,
 				Collection<? extends ObjectId> haves)

@@ -53,10 +53,9 @@ import org.apache.tools.ant.types.FileSet;
 import org.apache.tools.ant.types.resources.Union;
 import org.eclipse.jgit.api.AddCommand;
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryCache;
-import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.util.FS;
 
 /**
@@ -118,10 +117,10 @@ public class GitAddTask extends Task {
 		}
 
 		AddCommand gitAdd;
-		try (Repository repo = new FileRepositoryBuilder().readEnvironment()
-				.findGitDir(src).build();
-			Git git = new Git(repo);) {
-			gitAdd = git.add();
+		try {
+			Repository repo = new FileRepositoryBuilder().readEnvironment()
+					.findGitDir(src).build();
+			gitAdd = new Git(repo).add();
 		} catch (IOException e) {
 			throw new BuildException("Could not access repository " + src, e);
 		}
@@ -136,7 +135,7 @@ public class GitAddTask extends Task {
 				gitAdd.addFilepattern(toAdd);
 			}
 			gitAdd.call();
-		} catch (IOException | GitAPIException e) {
+		} catch (Exception e) {
 			throw new BuildException("Could not add files to index." + src, e);
 		}
 

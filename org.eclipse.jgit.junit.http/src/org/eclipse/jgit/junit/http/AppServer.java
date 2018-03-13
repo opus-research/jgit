@@ -104,15 +104,6 @@ public class AppServer {
 	private final TestRequestLog log;
 
 	public AppServer() {
-		this(0);
-	}
-
-	/**
-	 * @param port
-	 *            the http port number
-	 * @since 4.2
-	 */
-	public AppServer(int port) {
 		server = new Server();
 
 		HttpConfiguration http_config = new HttpConfiguration();
@@ -122,7 +113,7 @@ public class AppServer {
 
 		connector = new ServerConnector(server,
 				new HttpConnectionFactory(http_config));
-		connector.setPort(port);
+		connector.setPort(0);
 		try {
 			final InetAddress me = InetAddress.getByName("localhost");
 			connector.setHost(me.getHostAddress());
@@ -168,38 +159,21 @@ public class AppServer {
 		return ctx;
 	}
 
-	static class TestMappedLoginService extends MappedLoginService {
-		private String role;
-
-		TestMappedLoginService(String role) {
-			this.role = role;
-		}
-
-		@Override
-		protected UserIdentity loadUser(String who) {
-			return null;
-		}
-
-		@Override
-		protected void loadUsers() throws IOException {
-			putUser(username, new Password(password), new String[] { role });
-		}
-
-		@Override
-		protected String[] loadRoleInfo(KnownUser user) {
-			return null;
-		}
-
-		@Override
-		protected KnownUser loadUserInfo(String usrname) {
-			return null;
-		}
-	}
-
 	private void auth(ServletContextHandler ctx, Authenticator authType) {
 		final String role = "can-access";
 
-		MappedLoginService users = new TestMappedLoginService(role);
+		MappedLoginService users = new MappedLoginService() {
+			@Override
+			protected UserIdentity loadUser(String who) {
+				return null;
+			}
+
+			@Override
+			protected void loadUsers() throws IOException {
+				putUser(username, new Password(password), new String[] { role });
+			}
+		};
+
 		ConstraintMapping cm = new ConstraintMapping();
 		cm.setConstraint(new Constraint());
 		cm.getConstraint().setAuthenticate(true);
@@ -271,7 +245,7 @@ public class AppServer {
 
 	/** @return all requests since the server was started. */
 	public List<AccessEvent> getRequests() {
-		return new ArrayList<>(log.getEvents());
+		return new ArrayList<AccessEvent>(log.getEvents());
 	}
 
 	/**
@@ -291,7 +265,7 @@ public class AppServer {
 	 * @return all requests which match the given path.
 	 */
 	public List<AccessEvent> getRequests(String path) {
-		ArrayList<AccessEvent> r = new ArrayList<>();
+		ArrayList<AccessEvent> r = new ArrayList<AccessEvent>();
 		for (AccessEvent event : log.getEvents()) {
 			if (event.getPath().equals(path)) {
 				r.add(event);

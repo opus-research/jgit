@@ -70,7 +70,6 @@ public class RepoProject implements Comparable<RepoProject> {
 	private final String remote;
 	private final Set<String> groups;
 	private final List<CopyFile> copyfiles;
-	private String recommendShallow;
 	private String url;
 	private String defaultRevision;
 
@@ -135,17 +134,10 @@ public class RepoProject implements Comparable<RepoProject> {
 	 * @param remote
 	 *            name of the remote definition
 	 * @param groups
-	 *            set of groups
-	 * @param recommendShallow
-	 *            recommendation for shallowness
-	 * @since 4.4
+	 *            comma separated group list
 	 */
 	public RepoProject(String name, String path, String revision,
-			String remote, Set<String> groups,
-			String recommendShallow) {
-		if (name == null) {
-			throw new NullPointerException();
-		}
+			String remote, String groups) {
 		this.name = name;
 		if (path != null)
 			this.path = path;
@@ -153,28 +145,10 @@ public class RepoProject implements Comparable<RepoProject> {
 			this.path = name;
 		this.revision = revision;
 		this.remote = remote;
-		this.groups = groups;
-		this.recommendShallow = recommendShallow;
-		copyfiles = new ArrayList<>();
-	}
-
-	/**
-	 * @param name
-	 *            the relative path to the {@code remote}
-	 * @param path
-	 *            the relative path to the super project
-	 * @param revision
-	 *            a SHA-1 or branch name or tag name
-	 * @param remote
-	 *            name of the remote definition
-	 * @param groupsParam
-	 *            comma separated group list
-	 */
-	public RepoProject(String name, String path, String revision,
-			String remote, String groupsParam) {
-		this(name, path, revision, remote, new HashSet<String>(), null);
-		if (groupsParam != null && groupsParam.length() > 0)
-			this.setGroups(groupsParam);
+		this.groups = new HashSet<String>();
+		if (groups != null && groups.length() > 0)
+			this.groups.addAll(Arrays.asList(groups.split(","))); //$NON-NLS-1$
+		copyfiles = new ArrayList<CopyFile>();
 	}
 
 	/**
@@ -185,20 +159,6 @@ public class RepoProject implements Comparable<RepoProject> {
 	 */
 	public RepoProject setUrl(String url) {
 		this.url = url;
-		return this;
-	}
-
-	/**
-	 * Set the url of the sub repo.
-	 *
-	 * @param groupsParam
-	 *            comma separated group list
-	 * @return this for chaining.
-	 * @since 4.4
-	 */
-	public RepoProject setGroups(String groupsParam) {
-		this.groups.clear();
-		this.groups.addAll(Arrays.asList(groupsParam.split(","))); //$NON-NLS-1$
 		return this;
 	}
 
@@ -261,7 +221,7 @@ public class RepoProject implements Comparable<RepoProject> {
 	/**
 	 * Get the name of the remote definition of the sub repo.
 	 *
-	 * @return {@code remote}
+	 * @return {@remote}
 	 */
 	public String getRemote() {
 		return remote;
@@ -278,37 +238,6 @@ public class RepoProject implements Comparable<RepoProject> {
 	}
 
 	/**
-	 * Return the set of groups.
-	 *
-	 * @return a Set of groups.
-	 * @since 4.4
-	 */
-	public Set<String> getGroups() {
-		return groups;
-	}
-
-	/**
-	 * Return the recommendation for shallowness.
-	 *
-	 * @return the String of "clone-depth"
-	 * @since 4.4
-	 */
-	public String getRecommendShallow() {
-		return recommendShallow;
-	}
-
-	/**
-	 * Sets the recommendation for shallowness.
-	 *
-	 * @param recommendShallow
-	 *            recommendation for shallowness
-	 * @since 4.4
-	 */
-	public void setRecommendShallow(String recommendShallow) {
-		this.recommendShallow = recommendShallow;
-	}
-
-	/**
 	 * Add a copy file configuration.
 	 *
 	 * @param copyfile
@@ -320,19 +249,10 @@ public class RepoProject implements Comparable<RepoProject> {
 	/**
 	 * Add a bunch of copyfile configurations.
 	 *
-	 * @param copyFiles
+	 * @param copyfiles
 	 */
-	public void addCopyFiles(Collection<CopyFile> copyFiles) {
-		this.copyfiles.addAll(copyFiles);
-	}
-
-	/**
-	 * Clear all the copyfiles.
-	 *
-	 * @since 4.2
-	 */
-	public void clearCopyFiles() {
-		this.copyfiles.clear();
+	public void addCopyFiles(Collection<CopyFile> copyfiles) {
+		this.copyfiles.addAll(copyfiles);
 	}
 
 	private String getPathWithSlash() {
@@ -350,19 +270,7 @@ public class RepoProject implements Comparable<RepoProject> {
 	 * @return true if this sub repo is the ancestor of given sub repo.
 	 */
 	public boolean isAncestorOf(RepoProject that) {
-		return isAncestorOf(that.getPathWithSlash());
-	}
-
-	/**
-	 * Check if this sub repo is an ancestor of the given path.
-	 *
-	 * @param thatPath
-	 *            path to be checked to see if it is within this repository
-	 * @return true if this sub repo is an ancestor of the given path.
-	 * @since 4.2
-	 */
-	public boolean isAncestorOf(String thatPath) {
-		return thatPath.startsWith(getPathWithSlash());
+		return that.getPathWithSlash().startsWith(this.getPathWithSlash());
 	}
 
 	@Override

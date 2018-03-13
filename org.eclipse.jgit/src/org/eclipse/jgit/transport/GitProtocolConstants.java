@@ -130,14 +130,6 @@ public class GitProtocolConstants {
 	public static final String OPTION_ALLOW_TIP_SHA1_IN_WANT = "allow-tip-sha1-in-want"; //$NON-NLS-1$
 
 	/**
-	 * The client supports fetching objects that are reachable from a tip of a
-	 * ref that is allowed to fetch.
-	 *
-	 * @since 4.1
-	 */
-	public static final String OPTION_ALLOW_REACHABLE_SHA1_IN_WANT = "allow-reachable-sha1-in-want"; //$NON-NLS-1$
-
-	/**
 	 * Symbolic reference support for better negotiation.
 	 *
 	 * @since 3.6
@@ -207,13 +199,6 @@ public class GitProtocolConstants {
 	 * @since 4.0
 	 */
 	public static final String OPTION_AGENT = "agent"; //$NON-NLS-1$
-
-	/**
-	 * The server supports the receiving of push options.
-	 *
-	 * @since 4.5
-	 */
-	public static final String CAPABILITY_PUSH_OPTIONS = "push-options"; //$NON-NLS-1$
 
 	static enum MultiAck {
 		OFF, CONTINUE, DETAILED;

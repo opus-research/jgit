@@ -95,7 +95,6 @@ class SmartOutputStream extends TemporaryBuffer {
 		return out;
 	}
 
-	@Override
 	public void close() throws IOException {
 		super.close();
 

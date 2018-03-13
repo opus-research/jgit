@@ -114,7 +114,6 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 		HttpTransport.setConnectionFactory(cf);
 	}
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
@@ -125,7 +124,6 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 		ServletContextHandler app = server.addContext("/git");
 		GitServlet gs = new GitServlet();
 		gs.setRepositoryResolver(new RepositoryResolver<HttpServletRequest>() {
-			@Override
 			public Repository open(HttpServletRequest req, String name)
 					throws RepositoryNotFoundException,
 					ServiceNotEnabledException {
@@ -201,7 +199,7 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 				.startsWith("JGit/"));
 		assertEquals("*/*", info.getRequestHeader(HDR_ACCEPT));
 		assertEquals(200, info.getStatus());
-		assertEquals("text/plain;charset=utf-8",
+		assertEquals("text/plain; charset=UTF-8",
 				info
 				.getResponseHeader(HDR_CONTENT_TYPE));
 
@@ -227,7 +225,7 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 		}
 
 		assertTrue(dst.hasObject(A_txt));
-		assertEquals(B, dst.exactRef(master).getObjectId());
+		assertEquals(B, dst.getRef(master).getObjectId());
 		fsck(dst, B);
 
 		List<AccessEvent> loose = getRequests(loose(remoteURI, A_txt));
@@ -241,7 +239,7 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 
 	@Test
 	public void testInitialClone_Packed() throws Exception {
-		new TestRepository<>(remoteRepository).packAndPrune();
+		new TestRepository<Repository>(remoteRepository).packAndPrune();
 
 		Repository dst = createBareRepository();
 		assertFalse(dst.hasObject(A_txt));
@@ -255,7 +253,7 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 		}
 
 		assertTrue(dst.hasObject(A_txt));
-		assertEquals(B, dst.exactRef(master).getObjectId());
+		assertEquals(B, dst.getRef(master).getObjectId());
 		fsck(dst, B);
 
 		List<AccessEvent> req;
@@ -271,7 +269,7 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 		assertEquals("GET", req.get(0).getMethod());
 		assertEquals(0, req.get(0).getParameters().size());
 		assertEquals(200, req.get(0).getStatus());
-		assertEquals("text/plain;charset=utf-8",
+		assertEquals("text/plain; charset=UTF-8",
 				req.get(0).getResponseHeader(
 				HDR_CONTENT_TYPE));
 	}

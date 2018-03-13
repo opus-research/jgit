@@ -52,7 +52,6 @@ import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.transport.PushCertificate;
 
 /**
  * Creates, updates or deletes any reference.
@@ -165,9 +164,6 @@ public abstract class RefUpdate {
 
 	/** Result of the update operation. */
 	private Result result = Result.NOT_ATTEMPTED;
-
-	/** Push certificate associated with this update. */
-	private PushCertificate pushCert;
 
 	private final Ref ref;
 
@@ -418,31 +414,6 @@ public abstract class RefUpdate {
 	}
 
 	/**
-	 * Set a push certificate associated with this update.
-	 * <p>
-	 * This usually includes a command to update this ref, but is not required to.
-	 *
-	 * @param cert
-	 *            push certificate, may be null.
-	 * @since 4.1
-	 */
-	public void setPushCertificate(PushCertificate cert) {
-		pushCert = cert;
-	}
-
-	/**
-	 * Set the push certificate associated with this update.
-	 * <p>
-	 * This usually includes a command to update this ref, but is not required to.
-	 *
-	 * @return push certificate, may be null.
-	 * @since 4.1
-	 */
-	protected PushCertificate getPushCertificate() {
-		return pushCert;
-	}
-
-	/**
 	 * Get the status of this update.
 	 * <p>
 	 * The same value that was previously returned from an update method.
@@ -551,11 +522,8 @@ public abstract class RefUpdate {
 	 * @throws IOException
 	 */
 	public Result delete(final RevWalk walk) throws IOException {
-		final String myName = detachingSymbolicRef
-				? getRef().getName()
-				: getRef().getLeaf().getName();
-		if (myName.startsWith(Constants.R_HEADS) && !getRepository().isBare()) {
-			// Don't allow the currently checked out branch to be deleted.
+		final String myName = getRef().getLeaf().getName();
+		if (myName.startsWith(Constants.R_HEADS)) {
 			Ref head = getRefDatabase().getRef(Constants.HEAD);
 			while (head != null && head.isSymbolic()) {
 				head = head.getTarget();
@@ -630,10 +598,7 @@ public abstract class RefUpdate {
 		if (oldValue == null && checkConflicting && getRefDatabase().isNameConflicting(getName()))
 			return Result.LOCK_FAILURE;
 		try {
-			// If we're detaching a symbolic reference, we should update the reference
-			// itself. Otherwise, we will update the leaf reference, which should be
-			// an ObjectIdRef.
-			if (!tryLock(!detachingSymbolicRef))
+			if (!tryLock(true))
 				return Result.LOCK_FAILURE;
 			if (expValue != null) {
 				final ObjectId o;

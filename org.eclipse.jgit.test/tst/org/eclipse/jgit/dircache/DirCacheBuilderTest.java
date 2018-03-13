@@ -211,7 +211,6 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 		DirCache dc = db.lockDirCache();
 		IndexChangedListener listener = new IndexChangedListener() {
 
-			@Override
 			public void onIndexChanged(IndexChangedEvent event) {
 				throw new ReceivedEventMarkerException();
 			}
@@ -239,7 +238,6 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 		dc = db.lockDirCache();
 		listener = new IndexChangedListener() {
 
-			@Override
 			public void onIndexChanged(IndexChangedEvent event) {
 				throw new ReceivedEventMarkerException();
 			}

@@ -60,17 +60,16 @@ import java.util.NoSuchElementException;
  * @param <V>
  *            type of subclass of ObjectId that will be stored in the map.
  */
-public class ObjectIdSubclassMap<V extends ObjectId>
-		implements Iterable<V>, ObjectIdSet {
+public class ObjectIdSubclassMap<V extends ObjectId> implements Iterable<V> {
 	private static final int INITIAL_TABLE_SIZE = 2048;
 
-	int size;
+	private int size;
 
 	private int grow;
 
 	private int mask;
 
-	V[] table;
+	private V[] table;
 
 	/** Create an empty map. */
 	public ObjectIdSubclassMap() {
@@ -111,7 +110,6 @@ public class ObjectIdSubclassMap<V extends ObjectId>
 	 *            object to find.
 	 * @return true if the mapping exists for this object; false otherwise.
 	 */
-	@Override
 	public boolean contains(final AnyObjectId toFind) {
 		return get(toFind) != null;
 	}
@@ -188,19 +186,16 @@ public class ObjectIdSubclassMap<V extends ObjectId>
 		return size == 0;
 	}
 
-	@Override
 	public Iterator<V> iterator() {
 		return new Iterator<V>() {
 			private int found;
 
 			private int i;
 
-			@Override
 			public boolean hasNext() {
 				return found < size;
 			}
 
-			@Override
 			public V next() {
 				while (i < table.length) {
 					final V v = table[i++];
@@ -212,7 +207,6 @@ public class ObjectIdSubclassMap<V extends ObjectId>
 				throw new NoSuchElementException();
 			}
 
-			@Override
 			public void remove() {
 				throw new UnsupportedOperationException();
 			}

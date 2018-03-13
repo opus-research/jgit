@@ -74,7 +74,6 @@ class ReflogReaderImpl implements ReflogReader {
 	/* (non-Javadoc)
 	 * @see org.eclipse.jgit.internal.storage.file.ReflogReaader#getLastEntry()
 	 */
-	@Override
 	public ReflogEntry getLastEntry() throws IOException {
 		return getReverseEntry(0);
 	}
@@ -82,7 +81,6 @@ class ReflogReaderImpl implements ReflogReader {
 	/* (non-Javadoc)
 	 * @see org.eclipse.jgit.internal.storage.file.ReflogReaader#getReverseEntries()
 	 */
-	@Override
 	public List<ReflogEntry> getReverseEntries() throws IOException {
 		return getReverseEntries(Integer.MAX_VALUE);
 	}
@@ -90,7 +88,6 @@ class ReflogReaderImpl implements ReflogReader {
 	/* (non-Javadoc)
 	 * @see org.eclipse.jgit.internal.storage.file.ReflogReaader#getReverseEntry(int)
 	 */
-	@Override
 	public ReflogEntry getReverseEntry(int number) throws IOException {
 		if (number < 0)
 			throw new IllegalArgumentException();
@@ -99,9 +96,6 @@ class ReflogReaderImpl implements ReflogReader {
 		try {
 			log = IO.readFully(logName);
 		} catch (FileNotFoundException e) {
-			if (logName.exists()) {
-				throw e;
-			}
 			return null;
 		}
 
@@ -119,20 +113,16 @@ class ReflogReaderImpl implements ReflogReader {
 	/* (non-Javadoc)
 	 * @see org.eclipse.jgit.internal.storage.file.ReflogReaader#getReverseEntries(int)
 	 */
-	@Override
 	public List<ReflogEntry> getReverseEntries(int max) throws IOException {
 		final byte[] log;
 		try {
 			log = IO.readFully(logName);
 		} catch (FileNotFoundException e) {
-			if (logName.exists()) {
-				throw e;
-			}
 			return Collections.emptyList();
 		}
 
 		int rs = RawParseUtils.prevLF(log, log.length);
-		List<ReflogEntry> ret = new ArrayList<>();
+		List<ReflogEntry> ret = new ArrayList<ReflogEntry>();
 		while (rs >= 0 && max-- > 0) {
 			rs = RawParseUtils.prevLF(log, rs);
 			ReflogEntry entry = new ReflogEntryImpl(log, rs < 0 ? 0 : rs + 2);

@@ -57,19 +57,20 @@ import java.util.List;
 import java.util.TimeZone;
 
 import org.eclipse.jgit.dircache.DirCache;
+import org.eclipse.jgit.dircache.DirCacheBuilder;
+import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.NoMergeBaseException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.CommitBuilder;
-import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.filter.RevFilter;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.EmptyTreeIterator;
+import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 
 /**
@@ -113,17 +114,6 @@ public class RecursiveMerger extends ResolveMerger {
 	}
 
 	/**
-	 * Normal recursive merge, implies inCore.
-	 *
-	 * @param inserter
-	 * @param config
-	 * @since 4.8
-	 */
-	protected RecursiveMerger(ObjectInserter inserter, Config config) {
-		super(inserter, config);
-	}
-
-	/**
 	 * Get a single base commit for two given commits. If the two source commits
 	 * have more than one base commit recursively merge the base commits
 	 * together until you end up with a single base commit.
@@ -160,7 +150,7 @@ public class RecursiveMerger extends ResolveMerger {
 	 */
 	protected RevCommit getBaseCommit(RevCommit a, RevCommit b, int callDepth)
 			throws IOException {
-		ArrayList<RevCommit> baseCommits = new ArrayList<>();
+		ArrayList<RevCommit> baseCommits = new ArrayList<RevCommit>();
 		walk.reset();
 		walk.setRevFilter(RevFilter.MERGE_BASE);
 		walk.markStart(a);
@@ -191,10 +181,10 @@ public class RecursiveMerger extends ResolveMerger {
 		WorkingTreeIterator oldWTreeIt = workingTreeIterator;
 		workingTreeIterator = null;
 		try {
-			dircache = DirCache.read(reader, currentBase.getTree());
+			dircache = dircacheFromTree(currentBase.getTree());
 			inCore = true;
 
-			List<RevCommit> parents = new ArrayList<>();
+			List<RevCommit> parents = new ArrayList<RevCommit>();
 			parents.add(currentBase);
 			for (int commitIdx = 1; commitIdx < baseCommits.size(); commitIdx++) {
 				RevCommit nextBase = baseCommits.get(commitIdx);
@@ -265,5 +255,31 @@ public class RecursiveMerger extends ResolveMerger {
 				name, name + "@JGit", //$NON-NLS-1$
 				new Date((time + 1) * 1000L),
 				TimeZone.getTimeZone("GMT+0000")); //$NON-NLS-1$
+	}
+
+	/**
+	 * Create a new in memory dircache which has the same content as a given
+	 * tree.
+	 *
+	 * @param treeId
+	 *            the tree which should be used to fill the dircache
+	 * @return a new in memory dircache
+	 * @throws IOException
+	 */
+	private DirCache dircacheFromTree(ObjectId treeId) throws IOException {
+		DirCache ret = DirCache.newInCore();
+		DirCacheBuilder aBuilder = ret.builder();
+		try (TreeWalk atw = new TreeWalk(reader)) {
+			atw.addTree(treeId);
+			atw.setRecursive(true);
+			while (atw.next()) {
+				DirCacheEntry e = new DirCacheEntry(atw.getRawPath());
+				e.setFileMode(atw.getFileMode(0));
+				e.setObjectId(atw.getObjectId(0));
+				aBuilder.add(e);
+			}
+		}
+		aBuilder.finish();
+		return ret;
 	}
 }

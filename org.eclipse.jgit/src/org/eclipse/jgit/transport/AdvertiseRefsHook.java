@@ -56,12 +56,10 @@ public interface AdvertiseRefsHook {
 	 * {@link BaseReceivePack#setAdvertisedRefs(java.util.Map,java.util.Set)}.
 	 */
 	public static final AdvertiseRefsHook DEFAULT = new AdvertiseRefsHook() {
-		@Override
 		public void advertiseRefs(UploadPack uploadPack) {
 			// Do nothing.
 		}
 
-		@Override
 		public void advertiseRefs(BaseReceivePack receivePack) {
 			// Do nothing.
 		}

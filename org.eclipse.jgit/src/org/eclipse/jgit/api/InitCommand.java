@@ -73,7 +73,6 @@ public class InitCommand implements Callable<Git> {
 	 *
 	 * @return the newly created {@code Git} object with associated repository
 	 */
-	@Override
 	public Git call() throws GitAPIException {
 		try {
 			RepositoryBuilder builder = new RepositoryBuilder();

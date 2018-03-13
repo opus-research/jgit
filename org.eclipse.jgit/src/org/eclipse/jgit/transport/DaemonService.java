@@ -47,8 +47,8 @@ package org.eclipse.jgit.transport;
 import java.io.IOException;
 
 import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
@@ -65,7 +65,6 @@ public abstract class DaemonService {
 	DaemonService(final String cmdName, final String cfgName) {
 		command = cmdName.startsWith("git-") ? cmdName : "git-" + cmdName; //$NON-NLS-1$ //$NON-NLS-2$
 		configKey = new SectionParser<ServiceConfig>() {
-			@Override
 			public ServiceConfig parse(final Config cfg) {
 				return new ServiceConfig(DaemonService.this, cfg, cfgName);
 			}

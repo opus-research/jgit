@@ -246,8 +246,9 @@ public class SubmoduleInitTest extends RepositoryTestCase {
 		if (File.separatorChar == '\\')
 			base = base.replace('\\', '/');
 		FileBasedConfig config = db.getConfig();
-		config.unset(ConfigConstants.CONFIG_REMOTE_SECTION,
-				Constants.DEFAULT_REMOTE_NAME, ConfigConstants.CONFIG_KEY_URL);
+		config.setString(ConfigConstants.CONFIG_REMOTE_SECTION,
+				Constants.DEFAULT_REMOTE_NAME, ConfigConstants.CONFIG_KEY_URL,
+				null);
 		config.save();
 
 		SubmoduleWalk generator = SubmoduleWalk.forIndex(db);
@@ -321,7 +322,6 @@ public class SubmoduleInitTest extends RepositoryTestCase {
 		DirCacheEditor editor = cache.editor();
 		editor.add(new PathEdit(path) {
 
-			@Override
 			public void apply(DirCacheEntry ent) {
 				ent.setFileMode(FileMode.GITLINK);
 				ent.setObjectId(id);
