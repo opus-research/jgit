@@ -48,7 +48,6 @@ import java.util.Arrays;
 
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.BitmapIndex;
 import org.eclipse.jgit.lib.BitmapIndex.Bitmap;
 import org.eclipse.jgit.lib.BitmapIndex.BitmapBuilder;
@@ -56,10 +55,13 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
-import org.eclipse.jgit.revwalk.filter.ObjectFilter;
 import org.eclipse.jgit.revwalk.filter.RevFilter;
 
-/** Helper class to do ObjectWalks with pack index bitmaps. */
+/**
+ * Helper class to do ObjectWalks with pack index bitmaps.
+ *
+ * @since 4.10
+ */
 public final class BitmapWalker {
 
 	private final ObjectWalk walker;
@@ -164,7 +166,6 @@ public final class BitmapWalker {
 				walker.setRevFilter(
 						new AddUnseenToBitmapFilter(seen, bitmapResult));
 			}
-			walker.setObjectFilter(new BitmapObjectFilter(bitmapResult));
 
 			while (walker.next() != null) {
 				// Iterate through all of the commits. The BitmapRevFilter does
@@ -199,6 +200,8 @@ public final class BitmapWalker {
 	 * commit and its parents are marked as SEEN so that the walk does not
 	 * have to visit its ancestors.  This ensures the walk is very short if
 	 * there is good bitmap coverage.
+	 *
+	 * @since 4.10
 	 */
 	public static class AddToBitmapFilter extends RevFilter {
 		private final BitmapBuilder bitmap;
@@ -251,6 +254,8 @@ public final class BitmapWalker {
 	 * Commits named in {@code seen} are considered already seen.  If one is
 	 * encountered, that commit and its parents will be marked with the SEEN
 	 * flag to prevent the walk from visiting its ancestors.
+	 *
+	 * @since 4.10
 	 */
 	public static class AddUnseenToBitmapFilter extends RevFilter {
 		private final BitmapBuilder seen;
@@ -289,24 +294,6 @@ public final class BitmapWalker {
 		@Override
 		public final boolean requiresCommitBody() {
 			return false;
-		}
-	}
-
-	/**
-	 * Filter that excludes objects already in the given bitmap.
-	 */
-	static class BitmapObjectFilter extends ObjectFilter {
-		private final BitmapBuilder bitmap;
-
-		public BitmapObjectFilter(BitmapBuilder bitmap) {
-			this.bitmap = bitmap;
-		}
-
-		@Override
-		public final boolean include(ObjectWalk walker, AnyObjectId objid)
-			throws MissingObjectException, IncorrectObjectTypeException,
-			       IOException {
-			return !bitmap.contains(objid);
 		}
 	}
 }
