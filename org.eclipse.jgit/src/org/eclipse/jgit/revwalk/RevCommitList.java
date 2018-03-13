@@ -375,7 +375,7 @@ public class RevCommitList<E extends RevCommit> extends RevObjectList<E> {
 		enter(size, (E) c);
 		add((E) c);
 
-		do {
+		while ((highMark == 0 || size <= highMark) && !c.equals(commitToLoad)) {
 			int index = size;
 			Block s = contents;
 			while (index >> s.shift >= BLOCK_SIZE) {
@@ -402,7 +402,7 @@ public class RevCommitList<E extends RevCommit> extends RevObjectList<E> {
 				enter(size++, (E) c);
 				dst[index++] = c;
 			}
-		} while ((highMark == 0 || size <= highMark) && !c.equals(commitToLoad));
+		}
 	}
 
 	/**
