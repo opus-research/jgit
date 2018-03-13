@@ -63,6 +63,7 @@ import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.PushCertificate.NonceStatus;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -293,6 +294,10 @@ public class PushCertificateParserTest {
 		pckParser.receiveSignature(pckIn);
 		PushCertificate pckCert = pckParser.build();
 
+		// Nonce status is unsolicited since this was not parsed in the context of
+		// the wire protocol; as a result, certs are not actually equal.
+		assertEquals(NonceStatus.UNSOLICITED, streamCert.getNonceStatus());
+
 		assertEquals(pckCert.getVersion(), streamCert.getVersion());
 		assertEquals(pckCert.getPusherIdent().getName(),
 				streamCert.getPusherIdent().getName());
@@ -313,8 +318,6 @@ public class PushCertificateParserTest {
 		assertEquals(pckCmd.getRefName(), streamCmd.getRefName());
 		assertEquals(pckCmd.getOldId(), streamCmd.getOldId());
 		assertEquals(pckCmd.getNewId().name(), streamCmd.getNewId().name());
-
-		assertNull(streamCert.getNonceStatus());
 	}
 
 	@Test
@@ -329,26 +332,6 @@ public class PushCertificateParserTest {
 		assertNotNull(PushCertificateParser.fromReader(reader));
 		assertEquals(-1, reader.read());
 		assertNull(PushCertificateParser.fromReader(reader));
-	}
-
-	@Test
-	public void testMissingPusheeField() throws Exception {
-		// Omit pushee line from existing cert. (This means the signature would not
-		// match, but we're not verifying it here.)
-		String input = INPUT.replace("0024pushee git://localhost/repo.git\n", "");
-		assertFalse(input.contains(PushCertificateParser.PUSHEE));
-
-		PacketLineIn pckIn = newPacketLineIn(input);
-		PushCertificateParser parser =
-				new PushCertificateParser(db, newEnabledConfig());
-		parser.receiveHeader(pckIn, false);
-		parser.addCommand(pckIn.readString());
-		assertEquals(PushCertificateParser.BEGIN_SIGNATURE, pckIn.readString());
-		parser.receiveSignature(pckIn);
-
-		PushCertificate cert = parser.build();
-		assertEquals("0.1", cert.getVersion());
-		assertNull(cert.getPushee());
 	}
 
 	private static String concatPacketLines(String input, int begin, int end)

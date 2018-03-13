@@ -98,9 +98,18 @@ public class PushCertificate {
 			throw new IllegalArgumentException(MessageFormat.format(
 					JGitText.get().pushCertificateInvalidField, PUSHER));
 		}
+		if (pushee == null || pushee.isEmpty()) {
+			throw new IllegalArgumentException(MessageFormat.format(
+					JGitText.get().pushCertificateInvalidField, PUSHEE));
+		}
 		if (nonce == null || nonce.isEmpty()) {
 			throw new IllegalArgumentException(MessageFormat.format(
 					JGitText.get().pushCertificateInvalidField, NONCE));
+		}
+		if (nonceStatus == null) {
+			throw new IllegalArgumentException(MessageFormat.format(
+					JGitText.get().pushCertificateInvalidField,
+					"nonce status")); //$NON-NLS-1$
 		}
 		if (commands == null || commands.isEmpty()) {
 			throw new IllegalArgumentException(MessageFormat.format(
