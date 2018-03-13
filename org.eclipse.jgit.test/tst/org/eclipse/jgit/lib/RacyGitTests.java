@@ -51,16 +51,13 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.TreeSet;
 
-import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.FileTreeIteratorWithTimeControl;
 import org.eclipse.jgit.treewalk.NameConflictTreeWalk;
 import org.eclipse.jgit.util.FileUtils;
-import org.junit.Test;
 
 public class RacyGitTests extends RepositoryTestCase {
-	@Test
 	public void testIterator() throws IllegalStateException, IOException,
 			InterruptedException {
 		TreeSet<Long> modTimes = new TreeSet<>();
@@ -124,15 +121,10 @@ public class RacyGitTests extends RepositoryTestCase {
 		}
 	}
 
-	@Test
-	public void testRacyGitDetection() throws Exception {
+	public void testRacyGitDetection() throws IOException,
+			IllegalStateException, InterruptedException {
 		TreeSet<Long> modTimes = new TreeSet<>();
 		File lastFile;
-
-		// Reset to force creation of index file
-		try (Git git = new Git(db)) {
-			git.reset().call();
-		}
 
 		// wait to ensure that modtimes of the file doesn't match last index
 		// file modtime

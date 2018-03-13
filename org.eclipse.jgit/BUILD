@@ -5,7 +5,7 @@ INSECURE_CIPHER_FACTORY = [
 ]
 
 SRCS = glob(
-    ["src/**/*.java"],
+    ["src/**"],
     exclude = INSECURE_CIPHER_FACTORY,
 )
 
@@ -18,9 +18,11 @@ java_library(
     resources = RESOURCES,
     deps = [
         ":insecure_cipher_factory",
-        "//lib:javaewah",
-        "//lib:jsch",
-        "//lib:slf4j-api",
+        "@httpclient//jar",
+        "@javaewah//jar",
+        "@jsch//jar",
+        "@log_api//jar",
+        "@servlet_api_3_1//jar",
     ],
 )
 
