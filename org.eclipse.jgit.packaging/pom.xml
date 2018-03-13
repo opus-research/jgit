@@ -59,18 +59,19 @@
   <name>JGit Tycho Parent (Incubation)</name>
 
   <properties>
-    <tycho-version>0.7.0</tycho-version>
-    <eclipse-site>http://download.eclipse.org/releases/galileo</eclipse-site>
+    <tycho-version>0.8.0</tycho-version>
+    <eclipse-site>http://download.eclipse.org/releases/ganymede</eclipse-site>
   </properties>
 
   <modules>
     <module>org.eclipse.jgit.feature</module>
+    <module>org.eclipse.jgit.junit.feature</module>
     <module>org.eclipse.jgit.updatesite</module>
   </modules>
 
   <repositories>
     <repository>
-      <id>galileo</id>
+      <id>ganymede</id>
       <layout>p2</layout>
       <url>${eclipse-site}</url>
     </repository>
