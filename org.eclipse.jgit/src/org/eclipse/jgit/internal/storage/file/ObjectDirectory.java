@@ -690,14 +690,8 @@ public class ObjectDirectory extends FileObjectDatabase {
 			final BufferedReader reader = open(shallowFile);
 			try {
 				String line;
-				while ((line = reader.readLine()) != null) {
-					try {
-						shallowCommitsIds.add(ObjectId.fromString(line));
-					} catch (IllegalArgumentException ex) {
-						throw new IOException(MessageFormat
-								.format(JGitText.get().badShallowLine, line));
-					}
-				}
+				while ((line = reader.readLine()) != null)
+					shallowCommitsIds.add(ObjectId.fromString(line));
 			} finally {
 				reader.close();
 			}
