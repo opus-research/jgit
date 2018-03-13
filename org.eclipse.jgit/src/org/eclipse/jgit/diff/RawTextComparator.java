@@ -48,8 +48,6 @@ import static org.eclipse.jgit.util.RawCharUtil.isWhitespace;
 import static org.eclipse.jgit.util.RawCharUtil.trimLeadingWhitespace;
 import static org.eclipse.jgit.util.RawCharUtil.trimTrailingWhitespace;
 
-import org.eclipse.jgit.util.IntList;
-
 /** Equivalence function for {@link RawText}. */
 public abstract class RawTextComparator extends SequenceComparator<RawText> {
 	/** No special treatment. */
@@ -58,6 +56,9 @@ public abstract class RawTextComparator extends SequenceComparator<RawText> {
 		public boolean equals(RawText a, int ai, RawText b, int bi) {
 			ai++;
 			bi++;
+
+			if (a.hashes[ai] != b.hashes[bi])
+				return false;
 
 			int as = a.lines.get(ai);
 			int bs = b.lines.get(bi);
@@ -75,7 +76,7 @@ public abstract class RawTextComparator extends SequenceComparator<RawText> {
 		}
 
 		@Override
-		protected int hashRegion(final byte[] raw, int ptr, final int end) {
+		public int hashRegion(final byte[] raw, int ptr, final int end) {
 			int hash = 5381;
 			for (; ptr < end; ptr++)
 				hash = (hash << 5) ^ (raw[ptr] & 0xff);
@@ -89,6 +90,9 @@ public abstract class RawTextComparator extends SequenceComparator<RawText> {
 		public boolean equals(RawText a, int ai, RawText b, int bi) {
 			ai++;
 			bi++;
+
+			if (a.hashes[ai] != b.hashes[bi])
+				return false;
 
 			int as = a.lines.get(ai);
 			int bs = b.lines.get(bi);
@@ -123,7 +127,7 @@ public abstract class RawTextComparator extends SequenceComparator<RawText> {
 		}
 
 		@Override
-		protected int hashRegion(byte[] raw, int ptr, int end) {
+		public int hashRegion(byte[] raw, int ptr, int end) {
 			int hash = 5381;
 			for (; ptr < end; ptr++) {
 				byte c = raw[ptr];
@@ -140,6 +144,9 @@ public abstract class RawTextComparator extends SequenceComparator<RawText> {
 		public boolean equals(RawText a, int ai, RawText b, int bi) {
 			ai++;
 			bi++;
+
+			if (a.hashes[ai] != b.hashes[bi])
+				return false;
 
 			int as = a.lines.get(ai);
 			int bs = b.lines.get(bi);
@@ -160,7 +167,7 @@ public abstract class RawTextComparator extends SequenceComparator<RawText> {
 		}
 
 		@Override
-		protected int hashRegion(final byte[] raw, int ptr, int end) {
+		public int hashRegion(final byte[] raw, int ptr, int end) {
 			int hash = 5381;
 			ptr = trimLeadingWhitespace(raw, ptr, end);
 			for (; ptr < end; ptr++) {
@@ -176,6 +183,9 @@ public abstract class RawTextComparator extends SequenceComparator<RawText> {
 		public boolean equals(RawText a, int ai, RawText b, int bi) {
 			ai++;
 			bi++;
+
+			if (a.hashes[ai] != b.hashes[bi])
+				return false;
 
 			int as = a.lines.get(ai);
 			int bs = b.lines.get(bi);
@@ -196,7 +206,7 @@ public abstract class RawTextComparator extends SequenceComparator<RawText> {
 		}
 
 		@Override
-		protected int hashRegion(final byte[] raw, int ptr, int end) {
+		public int hashRegion(final byte[] raw, int ptr, int end) {
 			int hash = 5381;
 			end = trimTrailingWhitespace(raw, ptr, end);
 			for (; ptr < end; ptr++) {
@@ -212,6 +222,9 @@ public abstract class RawTextComparator extends SequenceComparator<RawText> {
 		public boolean equals(RawText a, int ai, RawText b, int bi) {
 			ai++;
 			bi++;
+
+			if (a.hashes[ai] != b.hashes[bi])
+				return false;
 
 			int as = a.lines.get(ai);
 			int bs = b.lines.get(bi);
@@ -242,7 +255,7 @@ public abstract class RawTextComparator extends SequenceComparator<RawText> {
 		}
 
 		@Override
-		protected int hashRegion(final byte[] raw, int ptr, int end) {
+		public int hashRegion(final byte[] raw, int ptr, int end) {
 			int hash = 5381;
 			end = trimTrailingWhitespace(raw, ptr, end);
 			while (ptr < end) {
@@ -258,69 +271,8 @@ public abstract class RawTextComparator extends SequenceComparator<RawText> {
 	};
 
 	@Override
-	public int hash(RawText seq, int lno) {
-		final int begin = seq.lines.get(lno + 1);
-		final int end = seq.lines.get(lno + 2);
-		return hashRegion(seq.content, begin, end);
-	}
-
-	@Override
-	public Edit reduceCommonStartEnd(RawText a, RawText b, Edit e) {
-		// This is a faster exact match based form that tries to improve
-		// performance for the common case of the header and trailer of
-		// a text file not changing at all. After this fast path we use
-		// the slower path based on the super class' using equals() to
-		// allow for whitespace ignore modes to still work.
-
-		if (e.beginA == e.endA || e.beginB == e.endB)
-			return e;
-
-		byte[] aRaw = a.content;
-		byte[] bRaw = b.content;
-
-		int aPtr = a.lines.get(e.beginA + 1);
-		int bPtr = a.lines.get(e.beginB + 1);
-
-		int aEnd = a.lines.get(e.endA + 1);
-		int bEnd = b.lines.get(e.endB + 1);
-
-		// This can never happen, but the JIT doesn't know that. If we
-		// define this assertion before the tight while loops below it
-		// should be able to skip the array bound checks on access.
-		//
-		if (aPtr < 0 || bPtr < 0 || aEnd > aRaw.length || bEnd > bRaw.length)
-			throw new ArrayIndexOutOfBoundsException();
-
-		while (aPtr < aEnd && bPtr < bEnd && aRaw[aPtr] == bRaw[bPtr]) {
-			aPtr++;
-			bPtr++;
-		}
-
-		while (aPtr < aEnd && bPtr < bEnd && aRaw[aEnd - 1] == bRaw[bEnd - 1]) {
-			aEnd--;
-			bEnd--;
-		}
-
-		e.beginA = findForwardLine(a.lines, e.beginA, aPtr);
-		e.beginB = findForwardLine(b.lines, e.beginB, bPtr);
-
-		e.endA = findReverseLine(a.lines, e.endA, aEnd);
-		e.endB = findReverseLine(b.lines, e.endB, bEnd);
-
-		return super.reduceCommonStartEnd(a, b, e);
-	}
-
-	private static int findForwardLine(IntList lines, int idx, int ptr) {
-		final int end = lines.size() - 2;
-		while (idx < end && lines.get(idx + 2) <= ptr)
-			idx++;
-		return idx;
-	}
-
-	private static int findReverseLine(IntList lines, int idx, int ptr) {
-		while (0 < idx && ptr <= lines.get(idx))
-			idx--;
-		return idx;
+	public int hash(RawText seq, int ptr) {
+		return seq.hashes[ptr + 1];
 	}
 
 	/**
@@ -334,5 +286,5 @@ public abstract class RawTextComparator extends SequenceComparator<RawText> {
 	 *            1 past the last byte of the region.
 	 * @return hash code for the region <code>[ptr, end)</code> of raw.
 	 */
-	protected abstract int hashRegion(byte[] raw, int ptr, int end);
+	public abstract int hashRegion(byte[] raw, int ptr, int end);
 }

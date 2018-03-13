@@ -110,26 +110,7 @@ public class MyersDiff<S extends Sequence> {
 	public static final DiffAlgorithm INSTANCE = new DiffAlgorithm() {
 		public <S extends Sequence, C extends SequenceComparator<? super S>> EditList diff(
 				C cmp, S a, S b) {
-			Edit region = new Edit(0, a.size(), 0, b.size());
-			region = cmp.reduceCommonStartEnd(a, b, region);
-
-			switch (region.getType()) {
-			case INSERT:
-			case DELETE: {
-				EditList r = new EditList();
-				r.add(region);
-				return r;
-			}
-
-			case REPLACE:
-				return new MyersDiff<S>(cmp, a, b, region).getEdits();
-
-			case EMPTY:
-				return new EditList();
-
-			default:
-				throw new IllegalStateException();
-			}
+			return new MyersDiff<S>(cmp, a, b).getEdits();
 		}
 	};
 
@@ -139,31 +120,23 @@ public class MyersDiff<S extends Sequence> {
 	protected EditList edits;
 
 	/** Comparison function for sequences. */
-	protected HashedSequenceComparator<Subsequence<S>> cmp;
+	protected SequenceComparator<? super S> cmp;
 
 	/**
 	 * The first text to be compared. Referred to as "Text A" in the comments
 	 */
-	protected HashedSequence<Subsequence<S>> a;
+	protected S a;
 
 	/**
 	 * The second text to be compared. Referred to as "Text B" in the comments
 	 */
-	protected HashedSequence<Subsequence<S>> b;
+	protected S b;
 
-	private MyersDiff(SequenceComparator<? super S> cmp, S a, S b, Edit region) {
-		Subsequence<S> as = Subsequence.a(a, region);
-		Subsequence<S> bs = Subsequence.b(b, region);
-
-		HashedSequencePair<Subsequence<S>> pair = new HashedSequencePair<Subsequence<S>>(
-				new SubsequenceComparator<S>(cmp), as, bs);
-
-		this.cmp = pair.getComparator();
-		this.a = pair.getA();
-		this.b = pair.getB();
-
+	private MyersDiff(SequenceComparator<? super S> cmp, S a, S b) {
+		this.cmp = cmp;
+		this.a = a;
+		this.b = b;
 		calculateEdits();
-		Subsequence.toBase(edits, as, bs);
 	}
 
 	/**
@@ -565,8 +538,8 @@ if (k < beginK || k > endK)
 		try {
 			RawText a = new RawText(new java.io.File(args[0]));
 			RawText b = new RawText(new java.io.File(args[1]));
-			EditList res = INSTANCE.diff(RawTextComparator.DEFAULT, a, b);
-			System.out.println(res.toString());
+			MyersDiff diff = new MyersDiff(RawTextComparator.DEFAULT, a, b);
+			System.out.println(diff.getEdits().toString());
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
