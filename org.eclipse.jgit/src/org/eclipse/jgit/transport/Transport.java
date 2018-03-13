@@ -311,14 +311,10 @@ public abstract class Transport {
 	public static Transport open(final Repository local, final String remote,
 			final Operation op) throws NotSupportedException,
 			URISyntaxException, TransportException {
-		if (local != null) {
-			final RemoteConfig cfg = new RemoteConfig(local.getConfig(), remote);
-			if (doesNotExist(cfg))
-				return open(local, new URIish(remote), null);
-			return open(local, cfg, op);
-		} else
-			return open(new URIish(remote));
-
+		final RemoteConfig cfg = new RemoteConfig(local.getConfig(), remote);
+		if (doesNotExist(cfg))
+			return open(local, new URIish(remote), null);
+		return open(local, cfg, op);
 	}
 
 	/**
