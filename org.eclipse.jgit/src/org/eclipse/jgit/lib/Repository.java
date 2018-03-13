@@ -572,8 +572,6 @@ public abstract class Repository {
 			case '@':
 				if (rev != null)
 					throw new RevisionSyntaxException(revstr);
-				if (i + 1 < revChars.length && revChars[i + 1] != '{')
-					continue;
 				int m;
 				String time = null;
 				for (m = i + 2; m < revChars.length; ++m) {
@@ -590,8 +588,6 @@ public abstract class Repository {
 							// Currently checked out branch, HEAD if
 							// detached
 							name = Constants.HEAD;
-						if (!Repository.isValidRefName("x/" + name))
-							throw new RevisionSyntaxException(revstr);
 						Ref ref = getRef(name);
 						name = null;
 						if (ref == null)
@@ -640,8 +636,6 @@ public abstract class Repository {
 							name = new String(revChars, done, i);
 						if (name.equals(""))
 							name = Constants.HEAD;
-						if (!Repository.isValidRefName("x/" + name))
-							throw new RevisionSyntaxException(revstr);
 						Ref ref = getRef(name);
 						name = null;
 						if (ref == null)
@@ -687,8 +681,6 @@ public abstract class Repository {
 		if (name != null)
 			return name;
 		name = revstr.substring(done);
-		if (!Repository.isValidRefName("x/" + name))
-			throw new RevisionSyntaxException(revstr);
 		if (getRef(name) != null)
 			return name;
 		return resolveSimple(name);
@@ -717,11 +709,9 @@ public abstract class Repository {
 		if (ObjectId.isId(revstr))
 			return ObjectId.fromString(revstr);
 
-		if (Repository.isValidRefName("x/" + revstr)) {
-			Ref r = getRefDatabase().getRef(revstr);
-			if (r != null)
-				return r.getObjectId();
-		}
+		Ref r = getRefDatabase().getRef(revstr);
+		if (r != null)
+			return r.getObjectId();
 
 		if (AbbreviatedObjectId.isId(revstr))
 			return resolveAbbreviation(revstr);
@@ -1142,8 +1132,6 @@ public abstract class Repository {
 			case '/':
 				if (i == 0 || i == len - 1)
 					return false;
-				if (p == '/')
-					return false;
 				components++;
 				break;
 			case '{':
@@ -1153,7 +1141,6 @@ public abstract class Repository {
 			case '~': case '^': case ':':
 			case '?': case '[': case '*':
 			case '\\':
-			case '\u007F':
 				return false;
 			}
 			p = c;
