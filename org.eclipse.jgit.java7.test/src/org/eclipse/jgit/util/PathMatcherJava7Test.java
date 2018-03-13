@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2013, Obeo
+ * Copyright (C) 2014, Obeo
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available

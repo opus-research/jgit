@@ -1,5 +1,5 @@
-/*******************************************************************************
- * Copyright (C) 2013, Obeo
+/*
+ * Copyright (C) 2013 Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -39,59 +39,39 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *******************************************************************************/
-package org.eclipse.jgit.merge;
+ */
+package org.eclipse.jgit.transport.http;
 
-import java.io.File;
 import java.io.IOException;
-
-import org.eclipse.jgit.lib.Repository;
+import java.net.Proxy;
+import java.net.URL;
 
 /**
- * This interface describes the general contract expected out of a merge driver
- * as can be registered against JGit.
- * <p>
- * Merge driver are expected to be able to determine whether they can handle a
- * given entry within a TreeWalk. The ResolveMerger will then select the highest
- * ranked merge driver that can handle that particular entry.
- * </p>
+ * The interface of a factory returning {@link HttpConnection}
+ *
+ * @since 3.3
  */
-public interface MergeDriver {
+public interface HttpConnectionFactory {
 	/**
-	 * This will be called by the merger strategy on every file it processes
-	 * that needs a non-trivial merge (both ours and theirs have changed since
-	 * their common ancestor).
-	 * <p>
-	 * Merge drivers are expected to leave the result of the merge in
-	 * {@code ours}, overwriting it as necessary.
-	 * </p>
+	 * Creates a new connection to a destination defined by a {@link URL}
 	 *
-	 * @param repository
-	 *            Repository in which we are merging files.
-	 * @param ours
-	 *            A temporary file containing "ours" version of the file to
-	 *            merge.
-	 * @param theirs
-	 *            A temporary file containing "theirs" version of the file to
-	 *            merge.
-	 * @param base
-	 *            A temporary file containing the base (common ancestor of ours
-	 *            and theirs) version of the file to merge.
-	 * @param commitNames
-	 *            names
-	 * @return <code>true</code> if the merge ended successfully,
-	 *         <code>false</code> in case of conflicts or merge errors.
+	 * @param url
+	 * @return a {@link HttpConnection}
 	 * @throws IOException
 	 */
-	boolean merge(Repository repository, File ours, File theirs, File base,
-			String[] commitNames)
-			throws IOException;
+	public HttpConnection create(URL url) throws IOException;
 
 	/**
-	 * @return The human-readable name of this merge driver. Take note that this
-	 *         will be used as an identifier by the
-	 *         {@link org.eclipse.jgit.merge.MergeDriverRegistry merge driver
-	 *         registry}
+	 * Creates a new connection to a destination defined by a {@link URL} using
+	 * a proxy
+	 *
+	 * @param url
+	 * @param proxy
+	 *            the proxy to be used
+	 * @return a {@link HttpConnection}
+	 *
+	 * @throws IOException
 	 */
-	String getName();
+	public HttpConnection create(URL url, Proxy proxy)
+			throws IOException;
 }

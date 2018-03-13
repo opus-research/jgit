@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2012, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2014, Obeo
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -45,8 +46,6 @@ package org.eclipse.jgit.util;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 
 /**
  * FS for Java7 on Windows with Cygwin
@@ -83,6 +82,11 @@ public class FS_Win32_Java7Cygwin extends FS_Win32_Cygwin {
 	@Override
 	public void setLastModified(File path, long time) throws IOException {
 		FileUtil.setLastModified(path, time);
+	}
+
+	@Override
+	public void delete(File path) throws IOException {
+		FileUtil.delete(path);
 	}
 
 	@Override
@@ -125,14 +129,16 @@ public class FS_Win32_Java7Cygwin extends FS_Win32_Cygwin {
 		FileUtil.createSymLink(path, target);
 	}
 
+	/**
+	 * @since 3.3
+	 */
 	@Override
-	public PathMatcher getPathMatcher(String globPattern) {
-		return new PathMatcher_Java7(globPattern);
+	public Attributes getAttributes(File path) {
+		return FileUtil.getFileAttributesBasic(this, path);
 	}
 
 	@Override
-	public void copyFile(File sourceFile, File destFile) throws IOException {
-		Files.copy(sourceFile.toPath(), destFile.toPath(),
-				StandardCopyOption.REPLACE_EXISTING);
+	public PathMatcher getPathMatcher(String globPattern) {
+		return new PathMatcher_Java7(globPattern);
 	}
 }

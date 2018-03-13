@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2013, Obeo
+ * Copyright (C) 2014, Obeo
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -46,16 +46,16 @@ import java.nio.file.FileSystems;
 import java.nio.file.Path;
 
 /**
- * Java 7 implementation of a Path matcher. This will simply delegate to
- * java.nio.file.PathMatcher.
+ * This path matcher will check whether a given path matches a glob pattern by
+ * delegating to a java.nio.file.PathMatcher.
+ * 
+ * @see java.nio.file.FileSystem#getPathMatcher(String)
  */
 public class PathMatcher_Java7 implements PathMatcher {
 	/** The actual matcher we'll delegate to. */
 	private final java.nio.file.PathMatcher matcher;
 
 	/**
-	 * Instantiates this path matcher given the glob it needs to match.
-	 *
 	 * @param globPattern
 	 *            The pattern this instance should match against.
 	 */

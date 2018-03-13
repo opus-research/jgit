@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2013, Obeo
+ * Copyright (C) 2014, Obeo
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,21 +43,13 @@
 package org.eclipse.jgit.util;
 
 /**
- * Path matchers will allow JGit to match paths against a glob syntax, much as
- * would be done by users on the file system.
- * <p>
- * For example, <code>*c</code> matches the path "abc", but does not match
- * "t/abc"; whereas <code>*&#47;*c</code> will match "t/abc" but not "abc".
- * <code>*.*</code> matches file names containing a dot and <code>a?c</code>
- * will match any file which names starts with 'a', finishes with 'c' and has
- * one character (any chararacter) in between : it would match "abc" but not
- * "ac" or "abbc".
- * </p>
+ * Interface that can be implemented to perform matching operations against
+ * paths.
  */
 public interface PathMatcher {
 	/**
 	 * Checks whether the given path matches this matcher's pattern.
-	 * 
+	 *
 	 * @param path
 	 *            The path to match.
 	 * @return <code>true</code> if <code>path</code> matches this matcher's

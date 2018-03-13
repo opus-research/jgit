@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2013, Obeo
+ * Copyright (C) 2014, Obeo
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -46,12 +46,20 @@ import java.io.File;
 import java.util.regex.Pattern;
 
 /**
- * Java 6 implementation of a Path Matcher.
+ * This path matcher will check whether a given path matches a glob pattern.
  * <p>
- * Java 6 did not support the glob syntax; this will convert glob patterns into
- * a system-dependent regex in order to support a subset of that syntax : "**"
- * to match over a whole hierarchy, "*" to match any sequence of characters, "?"
- * to match any single character.
+ * For example, <code>*c</code> matches the path "abc", but does not match
+ * "t/abc"; whereas <code>*&#47;*c</code> will match "t/abc" but not "abc".
+ * <code>*.*</code> matches file names containing a dot and <code>a?c</code>
+ * will match any file which names starts with 'a', finishes with 'c' and has
+ * one character (any character) in between : it would match "abc" but not
+ * "ac" or "abbc".
+ * </p>
+ * <p>
+ * Java did not support the glob syntax until Java 7; this will convert glob
+ * patterns into a system-dependent regex in order to support a subset of that
+ * syntax : "**" to match over a whole hierarchy, "*" to match any sequence of
+ * characters, "?" to match any single character.
  * </p>
  */
 public class PathMatcher_Java5 implements PathMatcher {
@@ -59,8 +67,6 @@ public class PathMatcher_Java5 implements PathMatcher {
 	private final Pattern regex;
 
 	/**
-	 * Instantiates this path matcher given the glob it needs to match.
-	 *
 	 * @param globPattern
 	 *            The pattern this instance should match against.
 	 */

@@ -1,5 +1,5 @@
-/*******************************************************************************
- * Copyright (C) 2013, Obeo
+/*
+ * Copyright (C) 2014 Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -39,43 +39,71 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *******************************************************************************/
-package org.eclipse.jgit.merge;
+ */
+package org.eclipse.jgit.transport.http.apache;
 
-import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
-import org.eclipse.jgit.lib.Repository;
+import org.apache.http.HttpEntity;
+import org.apache.http.entity.AbstractHttpEntity;
+import org.eclipse.jgit.util.TemporaryBuffer;
 
 /**
- * This merge driver should be used for binary files instead of the textual
- * merge driver. Its only action is to take the local version of the file,
- * whatever the changes that happened.
+ * A {@link HttpEntity} which takes it's content from a {@link TemporaryBuffer}
+ *
+ * @since 3.3
  */
-public class BinaryMergeDriver implements MergeDriver {
+public class TemporaryBufferEntity extends AbstractHttpEntity {
+	private TemporaryBuffer buffer;
+
+	private Integer contentLength;
+
 	/**
-	 * {@inheritDoc}
+	 * Construct a new {@link HttpEntity} which will contain the content stored
+	 * in the specified buffer
 	 *
-	 * @see org.eclipse.jgit.merge.MergeDriver#merge(org.eclipse.jgit.lib.Repository,
-	 *      java.io.File, java.io.File, java.io.File, java.lang.String[])
+	 * @param buffer
 	 */
-	public boolean merge(Repository repository, File ours, File theirs,
-			File base,
-			String[] commitNames)
-			throws IOException {
-		/*
-		 * No need for any explicit action. The local file will be kept and
-		 * marked as conflictual without any pre-merging.
-		 */
+	public TemporaryBufferEntity(TemporaryBuffer buffer) {
+		this.buffer = buffer;
+	}
+
+	/**
+	 * @return buffer containing the content
+	 */
+	public TemporaryBuffer getBuffer() {
+		return buffer;
+	}
+
+	public boolean isRepeatable() {
+		return true;
+	}
+
+	public long getContentLength() {
+		if (contentLength != null)
+			return contentLength.intValue();
+		return buffer.length();
+	}
+
+	public InputStream getContent() throws IOException, IllegalStateException {
+		return buffer.openInputStream();
+	}
+
+	public void writeTo(OutputStream outstream) throws IOException {
+		// TODO: dont we need a progressmonitor
+		buffer.writeTo(outstream, null);
+	}
+
+	public boolean isStreaming() {
 		return false;
 	}
 
 	/**
-	 * {@inheritDoc}
-	 *
-	 * @see org.eclipse.jgit.merge.MergeDriver#getName()
+	 * @param contentLength
 	 */
-	public String getName() {
-		return "Binary"; //$NON-NLS-1$
+	public void setContentLength(int contentLength) {
+		this.contentLength = new Integer(contentLength);
 	}
 }

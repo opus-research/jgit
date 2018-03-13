@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (C) 2013, Obeo
+ * Copyright (C) 2014, Obeo
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -49,7 +49,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.LinkedHashSet;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 import org.junit.After;
 import org.junit.Before;
@@ -62,12 +61,7 @@ public class PathMatcherTest {
 
 	@Before
 	public void setUp() throws IOException {
-		// No Files.createTempDirectory before Java 7
-		File temporaryPath = File.createTempFile("JGitPathMatcherTest_",
-				Long.toString(System.currentTimeMillis()));
-		temporaryPath.delete();
-		temporaryFolder = new File(temporaryPath.getPath() + "_Folder");
-		temporaryFolder.mkdir();
+		temporaryFolder = createTempDirectory();
 
 		// Create a few test files and folders
 		testFiles = new File[8];
@@ -80,6 +74,16 @@ public class PathMatcherTest {
 		testFiles[5] = createFile(temporaryFolder, "deaf");
 		testFiles[6] = createFile(temporaryFolder, "test/def");
 		testFiles[7] = createFile(temporaryFolder, "test/folder/def");
+	}
+
+	private static File createTempDirectory() throws IOException {
+		// No Files.createTempDirectory(...) before Java 7, work around it.
+		File temporaryPath = File.createTempFile("JGitPathMatcherTest_",
+				Long.toString(System.currentTimeMillis()));
+		temporaryPath.delete();
+		File tempFolder = new File(temporaryPath.getPath() + "_Folder");
+		tempFolder.mkdir();
+		return tempFolder;
 	}
 
 	@After
@@ -212,7 +216,7 @@ public class PathMatcherTest {
 		if (file.isDirectory()) {
 			for (File child : file.listFiles())
 				matches.addAll(recursiveMatch(matchRoot, child, matcher));
-		} else if (matcher.matches(relativize(matchRoot.getPath(),
+		} else if (matcher.matches(FileUtils.relativize(matchRoot.getPath(),
 				file.getPath())))
 			matches.add(file);
 		return matches;
@@ -228,33 +232,4 @@ public class PathMatcherTest {
 		return file;
 	}
 
-	// TODO Will probably have to be moved to FileUtils. We'll need this in the
-	// registry
-	protected static String relativize(String base, String other) {
-		if (base.equals(other))
-			return other;
-
-		final String[] baseSegments = base.split(Pattern.quote(File.separator));
-		final String[] otherSegments = other.split(Pattern
-				.quote(File.separator));
-
-		int commonPrefix = 0;
-		while (commonPrefix < baseSegments.length
-				&& commonPrefix < otherSegments.length) {
-			if (baseSegments[commonPrefix].equals(otherSegments[commonPrefix]))
-				commonPrefix++;
-			else
-				break;
-		}
-
-		final StringBuilder builder = new StringBuilder();
-		for (int i = commonPrefix; i < baseSegments.length; i++)
-			builder.append("..").append(File.separator);
-		for (int i = commonPrefix; i < otherSegments.length; i++) {
-			builder.append(otherSegments[i]);
-			if (i < otherSegments.length - 1)
-				builder.append(File.separator);
-		}
-		return builder.toString();
-	}
 }
