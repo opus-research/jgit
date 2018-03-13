@@ -165,7 +165,7 @@ public class RepositorySetupWorkDirTest extends LocalDiskRepositoryTestCase {
 	public void testExceptionThrown_BareRepoGetIndex() throws Exception {
 		File gitDir = getFile("workdir");
 		try {
-			new FileRepository(gitDir).getIndex();
+			new FileRepository(gitDir).readDirCache();
 			fail("Expected NoWorkTreeException missing");
 		} catch (NoWorkTreeException e) {
 			// expected
@@ -211,7 +211,7 @@ public class RepositorySetupWorkDirTest extends LocalDiskRepositoryTestCase {
 
 	private FileBasedConfig configFor(File gitDir) throws IOException,
 			ConfigInvalidException {
-		File configPath = new File(gitDir, "config");
+		File configPath = new File(gitDir, Constants.CONFIG);
 		FileBasedConfig cfg = new FileBasedConfig(configPath, FS.DETECTED);
 		cfg.load();
 		return cfg;

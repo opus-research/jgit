@@ -46,12 +46,14 @@ package org.eclipse.jgit.api;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.MergeResult.MergeStatus;
+import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
 import org.eclipse.jgit.api.errors.InvalidMergeHeadsException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
@@ -108,8 +110,8 @@ public class MergeCommand extends GitCommand<MergeResult> {
 	 * @return the result of the merge
 	 */
 	public MergeResult call() throws NoHeadException,
-			ConcurrentRefUpdateException, InvalidMergeHeadsException,
-			WrongRepositoryStateException, NoMessageException {
+			ConcurrentRefUpdateException, CheckoutConflictException,
+			InvalidMergeHeadsException, WrongRepositoryStateException, NoMessageException {
 		checkCallable();
 
 		if (commits.size() != 1)
@@ -121,6 +123,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 									Integer.valueOf(commits.size())));
 
 		RevWalk revWalk = null;
+		DirCacheCheckout dco = null;
 		try {
 			Ref head = repo.getRef(Constants.HEAD);
 			if (head == null)
@@ -146,7 +149,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 			ObjectId headId = head.getObjectId();
 			if (headId == null) {
 				revWalk.parseHeaders(srcCommit);
-				DirCacheCheckout dco = new DirCacheCheckout(repo,
+				dco = new DirCacheCheckout(repo,
 						repo.lockDirCache(), srcCommit.getTree());
 				dco.setFailOnConflict(true);
 				dco.checkout();
@@ -175,7 +178,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 				// FAST_FORWARD detected: skip doing a real merge but only
 				// update HEAD
 				refLogMessage.append(": " + MergeStatus.FAST_FORWARD);
-				DirCacheCheckout dco = new DirCacheCheckout(repo,
+				dco = new DirCacheCheckout(repo,
 						headCommit.getTree(), repo.lockDirCache(),
 						srcCommit.getTree());
 				dco.setFailOnConflict(true);
@@ -209,14 +212,18 @@ public class MergeCommand extends GitCommand<MergeResult> {
 					unmergedPaths = resolveMerger.getUnmergedPaths();
 				} else
 					noProblems = merger.merge(headCommit, srcCommit);
-
+				refLogMessage.append(": Merge made by ");
+				refLogMessage.append(mergeStrategy.getName());
+				refLogMessage.append('.');
 				if (noProblems) {
-					DirCacheCheckout dco = new DirCacheCheckout(repo,
+					dco = new DirCacheCheckout(repo,
 							headCommit.getTree(), repo.lockDirCache(),
 							merger.getResultTreeId());
 					dco.setFailOnConflict(true);
 					dco.checkout();
-					RevCommit newHead = new Git(getRepository()).commit().call();
+
+					RevCommit newHead = new Git(getRepository()).commit()
+							.setReflogComment(refLogMessage.toString()).call();
 					return new MergeResult(newHead.getId(),
 							null, new ObjectId[] {
 									headCommit.getId(), srcCommit.getId() },
@@ -245,6 +252,10 @@ public class MergeCommand extends GitCommand<MergeResult> {
 					}
 				}
 			}
+		} catch (org.eclipse.jgit.errors.CheckoutConflictException e) {
+			List<String> conflicts = (dco == null) ? Collections
+					.<String> emptyList() : dco.getConflicts();
+			throw new CheckoutConflictException(conflicts, e);
 		} catch (IOException e) {
 			throw new JGitInternalException(
 					MessageFormat.format(
