@@ -52,13 +52,14 @@ import org.apache.commons.compress.archivers.tar.TarConstants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectLoader;
 
-class TarFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
+class TarFormat implements ArchiveCommand.Format {
 	public ArchiveOutputStream createArchiveOutputStream(OutputStream s) {
 		return new TarArchiveOutputStream(s);
 	}
 
-	public void putEntry(String path, FileMode mode, ObjectLoader loader,
-				ArchiveOutputStream out) throws IOException {
+	public void putEntry(ArchiveOutputStream out,
+			String path, FileMode mode, ObjectLoader loader)
+			throws IOException {
 		if (mode == FileMode.SYMLINK) {
 			final TarArchiveEntry entry = new TarArchiveEntry(
 					path, TarConstants.LF_SYMLINK);

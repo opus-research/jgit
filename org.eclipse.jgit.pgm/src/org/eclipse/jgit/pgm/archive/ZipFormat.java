@@ -51,13 +51,14 @@ import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectLoader;
 
-class ZipFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
+class ZipFormat implements ArchiveCommand.Format {
 	public ArchiveOutputStream createArchiveOutputStream(OutputStream s) {
 		return new ZipArchiveOutputStream(s);
 	}
 
-	public void putEntry(String path, FileMode mode, ObjectLoader loader,
-				ArchiveOutputStream out) throws IOException {
+	public void putEntry(ArchiveOutputStream out,
+			String path, FileMode mode, ObjectLoader loader)
+			throws IOException {
 		final ZipArchiveEntry entry = new ZipArchiveEntry(path);
 
 		if (mode == FileMode.REGULAR_FILE) {

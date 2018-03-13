@@ -41,7 +41,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.pgm;
+package org.eclipse.jgit.pgm.internal;
 
 import java.text.MessageFormat;
 
@@ -236,6 +236,7 @@ public class CLIText extends TranslationBundle {
 	/***/ public char[] unknownIoErrorStdout;
 	/***/ public String unknownMergeStrategy;
 	/***/ public String unmergedPaths;
+	/***/ public String unsupportedArchiveFormat;
 	/***/ public String unsupportedOperation;
 	/***/ public String untrackedFiles;
 	/***/ public String updating;
