@@ -42,6 +42,8 @@
 
 package org.eclipse.jgit.dircache;
 
+import static org.eclipse.jgit.treewalk.TreeWalk.OperationType.CHECKOUT_OP;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -1148,7 +1150,8 @@ public class DirCacheCheckout {
 	private void update(String path, ObjectId mId, FileMode mode)
 			throws IOException {
 		if (!FileMode.TREE.equals(mode)) {
-			updated.put(path, new CheckoutMetadata(walk.getEolStreamType(),
+			updated.put(path, new CheckoutMetadata(
+					walk.getEolStreamType(CHECKOUT_OP),
 					walk.getFilterCommand(Constants.ATTR_FILTER_TYPE_SMUDGE)));
 
 			DirCacheEntry entry = new DirCacheEntry(path, DirCacheEntry.STAGE_0);
@@ -1388,8 +1391,7 @@ public class DirCacheCheckout {
 				new FileOutputStream(tmpFile), nonNullEolStreamType)) {
 			if (checkoutMetadata.smudgeFilterCommand != null) {
 				if (FilterCommandRegistry
-						.isRegistered(
-								checkoutMetadata.smudgeFilterCommand)) {
+						.isRegistered(checkoutMetadata.smudgeFilterCommand)) {
 					runBuiltinFilterCommand(repo, checkoutMetadata, ol,
 							channel);
 				} else {
@@ -1480,8 +1482,7 @@ public class DirCacheCheckout {
 		FilterCommand command = null;
 		try {
 			command = FilterCommandRegistry.createFilterCommand(
-					checkoutMetadata.smudgeFilterCommand, repo,
-					ol.openStream(),
+					checkoutMetadata.smudgeFilterCommand, repo, ol.openStream(),
 					channel);
 		} catch (IOException e) {
 			LOG.error(JGitText.get().failedToDetermineFilterDefinition, e);
