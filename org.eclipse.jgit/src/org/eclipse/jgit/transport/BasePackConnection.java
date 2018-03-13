@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2009, Constantine Plotnikov <constantine.plotnikov@gmail.com>
- * Copyright (C) 2008-2010, Google Inc.
+ * Copyright (C) 2008-2009, Google Inc.
  * Copyright (C) 2008, Marek Zawirski <marek.zawirski@gmail.com>
  * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
@@ -61,7 +61,6 @@ import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.io.InterruptTimer;
@@ -111,9 +110,6 @@ abstract class BasePackConnection extends BaseConnection {
 	/** Send {@link PacketLineOut#end()} before closing {@link #out}? */
 	protected boolean outNeedsEnd;
 
-	/** True if this is a stateless RPC connection. */
-	protected boolean statelessRPC;
-
 	/** Capability tokens advertised by the remote side. */
 	private final Set<String> remoteCapablities = new HashSet<String>();
 
@@ -121,7 +117,7 @@ abstract class BasePackConnection extends BaseConnection {
 	protected final Set<ObjectId> additionalHaves = new HashSet<ObjectId>();
 
 	BasePackConnection(final PackTransport packTransport) {
-		transport = (Transport) packTransport;
+		transport = (Transport)packTransport;
 		local = transport.local;
 		uri = transport.uri;
 	}
@@ -210,11 +206,11 @@ abstract class BasePackConnection extends BaseConnection {
 				if (prior.getPeeledObjectId() != null)
 					throw duplicateAdvertisement(name + "^{}");
 
-				avail.put(name, new ObjectIdRef.PeeledTag(
-						Ref.Storage.NETWORK, name, prior.getObjectId(), id));
+				avail.put(name, new Ref(Ref.Storage.NETWORK, name, prior
+						.getObjectId(), id, true));
 			} else {
-				final Ref prior = avail.put(name, new ObjectIdRef.PeeledNonTag(
-						Ref.Storage.NETWORK, name, id));
+				final Ref prior;
+				prior = avail.put(name, new Ref(Ref.Storage.NETWORK, name, id));
 				if (prior != null)
 					throw duplicateAdvertisement(name);
 			}
