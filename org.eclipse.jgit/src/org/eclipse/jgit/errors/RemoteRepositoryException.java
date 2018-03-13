@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,49 +41,30 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.errors;
 
-import java.io.IOException;
+import org.eclipse.jgit.transport.URIish;
 
 /**
- * A tree entry representing a symbolic link.
- *
- * Note. Java cannot really handle these as file system objects.
+ * Contains a message from the remote repository indicating a problem.
+ * <p>
+ * Some remote repositories may send customized error messages describing why
+ * they cannot be accessed. These messages are wrapped up in this exception and
+ * thrown to the caller of the transport operation.
  */
-public class SymlinkTreeEntry extends TreeEntry {
+public class RemoteRepositoryException extends TransportException {
 	private static final long serialVersionUID = 1L;
 
 	/**
-	 * Construct a {@link SymlinkTreeEntry} with the specified name and SHA-1 in
-	 * the specified parent
+	 * Constructs a RemoteRepositoryException for a message.
 	 *
-	 * @param parent
-	 * @param id
-	 * @param nameUTF8
+	 * @param uri
+	 *            URI used for transport
+	 * @param message
+	 *            message, exactly as supplied by the remote repository. May
+	 *            contain LFs (newlines) if the remote formatted it that way.
 	 */
-	public SymlinkTreeEntry(final Tree parent, final ObjectId id,
-			final byte[] nameUTF8) {
-		super(parent, id, nameUTF8);
-	}
-
-	public FileMode getMode() {
-		return FileMode.SYMLINK;
-	}
-
-	public void accept(final TreeVisitor tv, final int flags)
-			throws IOException {
-		if ((MODIFIED_ONLY & flags) == MODIFIED_ONLY && !isModified()) {
-			return;
-		}
-
-		tv.visitSymlink(this);
-	}
-
-	public String toString() {
-		final StringBuffer r = new StringBuffer();
-		r.append(ObjectId.toString(getId()));
-		r.append(" S ");
-		r.append(getFullName());
-		return r.toString();
+	public RemoteRepositoryException(URIish uri, String message) {
+		super(uri, message);
 	}
 }

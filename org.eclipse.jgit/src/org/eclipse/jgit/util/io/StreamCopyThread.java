@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2009-2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,49 +41,88 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.util.io;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InterruptedIOException;
+import java.io.OutputStream;
 
-/**
- * A tree entry representing a symbolic link.
- *
- * Note. Java cannot really handle these as file system objects.
- */
-public class SymlinkTreeEntry extends TreeEntry {
-	private static final long serialVersionUID = 1L;
+/** Thread to copy from an input stream to an output stream. */
+public class StreamCopyThread extends Thread {
+	private static final int BUFFER_SIZE = 1024;
+
+	private final InputStream src;
+
+	private final OutputStream dst;
+
+	private volatile boolean doFlush;
 
 	/**
-	 * Construct a {@link SymlinkTreeEntry} with the specified name and SHA-1 in
-	 * the specified parent
+	 * Create a thread to copy data from an input stream to an output stream.
 	 *
-	 * @param parent
-	 * @param id
-	 * @param nameUTF8
+	 * @param i
+	 *            stream to copy from. The thread terminates when this stream
+	 *            reaches EOF. The thread closes this stream before it exits.
+	 * @param o
+	 *            stream to copy into. The destination stream is automatically
+	 *            closed when the thread terminates.
 	 */
-	public SymlinkTreeEntry(final Tree parent, final ObjectId id,
-			final byte[] nameUTF8) {
-		super(parent, id, nameUTF8);
+	public StreamCopyThread(final InputStream i, final OutputStream o) {
+		setName(Thread.currentThread().getName() + "-StreamCopy");
+		src = i;
+		dst = o;
 	}
 
-	public FileMode getMode() {
-		return FileMode.SYMLINK;
-	}
-
-	public void accept(final TreeVisitor tv, final int flags)
-			throws IOException {
-		if ((MODIFIED_ONLY & flags) == MODIFIED_ONLY && !isModified()) {
-			return;
+	/**
+	 * Request the thread to flush the output stream as soon as possible.
+	 * <p>
+	 * This is an asynchronous request to the thread. The actual flush will
+	 * happen at some future point in time, when the thread wakes up to process
+	 * the request.
+	 */
+	public void flush() {
+		if (!doFlush) {
+			doFlush = true;
+			interrupt();
 		}
-
-		tv.visitSymlink(this);
 	}
 
-	public String toString() {
-		final StringBuffer r = new StringBuffer();
-		r.append(ObjectId.toString(getId()));
-		r.append(" S ");
-		r.append(getFullName());
-		return r.toString();
+	@Override
+	public void run() {
+		try {
+			final byte[] buf = new byte[BUFFER_SIZE];
+			for (;;) {
+				try {
+					if (doFlush) {
+						doFlush = false;
+						dst.flush();
+					}
+
+					final int n;
+					try {
+						n = src.read(buf);
+					} catch (InterruptedIOException wakey) {
+						continue;
+					}
+					if (n < 0)
+						break;
+					dst.write(buf, 0, n);
+				} catch (IOException e) {
+					break;
+				}
+			}
+		} finally {
+			try {
+				src.close();
+			} catch (IOException e) {
+				// Ignore IO errors on close
+			}
+			try {
+				dst.close();
+			} catch (IOException e) {
+				// Ignore IO errors on close
+			}
+		}
 	}
 }
