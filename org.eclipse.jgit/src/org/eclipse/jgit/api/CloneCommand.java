@@ -64,7 +64,6 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.FetchResult;
@@ -267,24 +266,11 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	private void addMergeConfig(Repository clonedRepo, Ref head)
 			throws IOException {
 		String branchName = Repository.shortenRefName(head.getName());
-		StoredConfig config = clonedRepo.getConfig();
-
-		config.setString(ConfigConstants.CONFIG_BRANCH_SECTION,
+		clonedRepo.getConfig().setString(ConfigConstants.CONFIG_BRANCH_SECTION,
 				branchName, ConfigConstants.CONFIG_KEY_REMOTE, remote);
-		config.setString(ConfigConstants.CONFIG_BRANCH_SECTION,
+		clonedRepo.getConfig().setString(ConfigConstants.CONFIG_BRANCH_SECTION,
 				branchName, ConfigConstants.CONFIG_KEY_MERGE, head.getName());
-
-		String autoSetupRebase = config.getString(
-				ConfigConstants.CONFIG_BRANCH_SECTION, null,
-				ConfigConstants.CONFIG_KEY_AUTOSETUPREBASE);
-		boolean shouldSetupRebase = ConfigConstants.CONFIG_KEY_ALWAYS
-				.equals(autoSetupRebase)
-				|| ConfigConstants.CONFIG_KEY_REMOTE.equals(autoSetupRebase);
-		if (shouldSetupRebase)
-			config.setBoolean(ConfigConstants.CONFIG_BRANCH_SECTION,
-					branchName, ConfigConstants.CONFIG_KEY_REBASE, true);
-
-		config.save();
+		clonedRepo.getConfig().save();
 	}
 
 	private RevCommit parseCommit(final Repository clonedRepo, final Ref ref)
