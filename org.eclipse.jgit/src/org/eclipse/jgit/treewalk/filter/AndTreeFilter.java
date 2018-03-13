@@ -141,7 +141,6 @@ public abstract class AndTreeFilter extends TreeFilter {
 			return new Binary(a.clone(), b.clone());
 		}
 
-		@SuppressWarnings("nls")
 		@Override
 		public String toString() {
 			return "(" + a.toString() + " AND " + b.toString() + ")";
@@ -182,7 +181,6 @@ public abstract class AndTreeFilter extends TreeFilter {
 			return new List(s);
 		}
 
-		@SuppressWarnings("nls")
 		@Override
 		public String toString() {
 			final StringBuilder r = new StringBuilder();

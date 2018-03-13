@@ -109,14 +109,14 @@ public class UsernamePasswordCredentialsProvider extends CredentialsProvider {
 				continue;
 			}
 			if (i instanceof CredentialItem.StringType) {
-				if (i.getPromptText().equals("Password: ")) { //$NON-NLS-1$
+				if (i.getPromptText().equals("Password: ")) {
 					((CredentialItem.StringType) i).setValue(new String(
 							password));
 					continue;
 				}
 			}
 			throw new UnsupportedCredentialItem(uri, i.getClass().getName()
-					+ ":" + i.getPromptText()); //$NON-NLS-1$
+					+ ":" + i.getPromptText());
 		}
 		return true;
 	}
