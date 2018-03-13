@@ -47,8 +47,7 @@ package org.eclipse.jgit.api;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.api.MergeCommand.FastForwardMode;
-import org.eclipse.jgit.api.MergeCommand.FastForwardMode.Merge;
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.RebaseCommand.Operation;
 import org.eclipse.jgit.api.errors.CanceledException;
 import org.eclipse.jgit.api.errors.DetachedHeadException;
@@ -352,7 +351,6 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 			merge.include(upstreamName, commitToMerge);
 			merge.setStrategy(strategy);
 			merge.setProgressMonitor(monitor);
-			merge.setFastForward(getFastForwardMode());
 			MergeResult mergeRes = merge.call();
 			monitor.update(1);
 			result = new PullResult(fetchRes, remote, mergeRes);
@@ -441,9 +439,10 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 	 * @param recurse
 	 * @return {@code this}
 	 * @since 4.7
+	 * @see FetchCommand#setRecurseSubmodules(FetchRecurseSubmodulesMode)
 	 */
 	public PullCommand setRecurseSubmodules(
-			FetchRecurseSubmodulesMode recurse) {
+			@Nullable FetchRecurseSubmodulesMode recurse) {
 		this.submoduleRecurseMode = recurse;
 		return this;
 	}
@@ -472,13 +471,5 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 					ConfigConstants.CONFIG_KEY_REBASE, BranchRebaseMode.NONE);
 		}
 		return mode;
-	}
-
-	private FastForwardMode getFastForwardMode() {
-		Config config = repo.getConfig();
-		Merge ffMode = config.getEnum(Merge.values(),
-				ConfigConstants.CONFIG_PULL_SECTION, null,
-				ConfigConstants.CONFIG_KEY_FF, null);
-		return ffMode != null ? FastForwardMode.valueOf(ffMode) : null;
 	}
 }
