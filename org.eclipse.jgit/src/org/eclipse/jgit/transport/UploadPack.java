@@ -49,6 +49,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.text.MessageFormat;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -64,7 +65,6 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.AsyncRevObjectQueue;
-import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevFlagSet;
@@ -656,6 +656,10 @@ public class UploadPack {
 			}
 		}
 
+		Collection<? extends ObjectId> want = wantAll;
+		if (want.isEmpty())
+			want = wantIds;
+
 		PackConfig cfg = packConfig;
 		if (cfg == null)
 			cfg = new PackConfig(db);
@@ -664,18 +668,7 @@ public class UploadPack {
 			pw.setUseCachedPacks(true);
 			pw.setDeltaBaseAsOffset(options.contains(OPTION_OFS_DELTA));
 			pw.setThin(options.contains(OPTION_THIN_PACK));
-
-			RevWalk rw = walk;
-			if (wantAll.isEmpty()) {
-				pw.preparePack(pm, wantIds, commonBase);
-			} else {
-				walk.reset();
-
-				ObjectWalk ow = walk.toObjectWalkWithSameObjects();
-				pw.preparePack(pm, ow, wantAll, commonBase);
-				rw = ow;
-			}
-
+			pw.preparePack(pm, want, commonBase);
 			if (options.contains(OPTION_INCLUDE_TAG)) {
 				for (Ref ref : refs.values()) {
 					ObjectId objectId = ref.getObjectId();
@@ -685,7 +678,7 @@ public class UploadPack {
 						if (wantIds.contains(objectId))
 							continue;
 					} else {
-						RevObject obj = rw.lookupOrNull(objectId);
+						RevObject obj = walk.lookupOrNull(objectId);
 						if (obj != null && obj.has(WANT))
 							continue;
 					}
@@ -699,7 +692,7 @@ public class UploadPack {
 
 					objectId = ref.getObjectId();
 					if (pw.willInclude(peeledId) && !pw.willInclude(objectId))
-						pw.addObject(rw.parseAny(objectId));
+						pw.addObject(walk.parseAny(objectId));
 				}
 			}
 
