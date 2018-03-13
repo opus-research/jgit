@@ -47,25 +47,19 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.errors.NotSupportedException;
-import org.eclipse.jgit.errors.TransportException;
+import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.RefComparator;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
-import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.transport.FetchResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
@@ -79,6 +73,9 @@ import org.kohsuke.args4j.Option;
 class Clone extends AbstractFetchCommand {
 	@Option(name = "--origin", aliases = { "-o" }, metaVar = "metaVar_remoteName", usage = "usage_useNameInsteadOfOriginToTrackUpstream")
 	private String remoteName = Constants.DEFAULT_REMOTE_NAME;
+
+	@Option(name = "--branch", aliases = { "-b" }, metaVar = "metaVar_branchName", usage = "usage_checkoutBranchAfterClone")
+	private String branch;
 
 	@Argument(index = 0, required = true, metaVar = "metaVar_uriish")
 	private String sourceUri;
@@ -112,19 +109,27 @@ class Clone extends AbstractFetchCommand {
 		dst = new FileRepository(gitdir);
 		dst.create();
 		final FileBasedConfig dstcfg = dst.getConfig();
-		dstcfg.setBoolean("core", null, "bare", false);
+		dstcfg.setBoolean("core", null, "bare", false); //$NON-NLS-1$ //$NON-NLS-2$
 		dstcfg.save();
 		db = dst;
 
-		out.print(MessageFormat.format(
+		outw.print(MessageFormat.format(
 				CLIText.get().initializedEmptyGitRepositoryIn, gitdir));
-		out.println();
-		out.flush();
+		outw.println();
+		outw.flush();
 
 		saveRemote(uri);
 		final FetchResult r = runFetch();
-		final Ref branch = guessHEAD(r);
-		doCheckout(branch);
+		final Ref checkoutRef;
+		if (branch == null)
+			checkoutRef = guessHEAD(r);
+		else {
+			checkoutRef = r.getAdvertisedRef(Constants.R_HEADS + branch);
+			if (checkoutRef == null)
+				throw die(MessageFormat.format(CLIText.get().noSuchRemoteRef,
+						branch));
+		}
+		doCheckout(checkoutRef);
 	}
 
 	private void saveRemote(final URIish uri) throws URISyntaxException,
@@ -133,14 +138,13 @@ class Clone extends AbstractFetchCommand {
 		final RemoteConfig rc = new RemoteConfig(dstcfg, remoteName);
 		rc.addURI(uri);
 		rc.addFetchRefSpec(new RefSpec().setForceUpdate(true)
-				.setSourceDestination(Constants.R_HEADS + "*",
-						Constants.R_REMOTES + remoteName + "/*"));
+				.setSourceDestination(Constants.R_HEADS + "*", //$NON-NLS-1$
+						Constants.R_REMOTES + remoteName + "/*")); //$NON-NLS-1$
 		rc.update(dstcfg);
 		dstcfg.save();
 	}
 
-	private FetchResult runFetch() throws NotSupportedException,
-			URISyntaxException, TransportException {
+	private FetchResult runFetch() throws URISyntaxException, IOException {
 		final Transport tn = Transport.open(db, remoteName);
 		final FetchResult r;
 		try {
@@ -153,21 +157,18 @@ class Clone extends AbstractFetchCommand {
 		return r;
 	}
 
-	private Ref guessHEAD(final FetchResult result) {
+	private static Ref guessHEAD(final FetchResult result) {
 		final Ref idHEAD = result.getAdvertisedRef(Constants.HEAD);
-		final List<Ref> availableRefs = new ArrayList<Ref>();
 		Ref head = null;
 		for (final Ref r : result.getAdvertisedRefs()) {
 			final String n = r.getName();
 			if (!n.startsWith(Constants.R_HEADS))
 				continue;
-			availableRefs.add(r);
 			if (idHEAD == null || head != null)
 				continue;
 			if (r.getObjectId().equals(idHEAD.getObjectId()))
 				head = r;
 		}
-		Collections.sort(availableRefs, RefComparator.INSTANCE);
 		if (idHEAD != null && head == null)
 			head = idHEAD;
 		return head;

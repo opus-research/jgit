@@ -47,6 +47,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.lib.ConfigConstants;
@@ -89,7 +90,7 @@ public class SubmoduleInitCommand extends GitCommand<Collection<String>> {
 		return this;
 	}
 
-	public Collection<String> call() throws JGitInternalException {
+	public Collection<String> call() throws GitAPIException {
 		checkCallable();
 
 		try {
@@ -106,7 +107,7 @@ public class SubmoduleInitCommand extends GitCommand<Collection<String>> {
 				String path = generator.getPath();
 				// Copy 'url' and 'update' fields from .gitmodules to config
 				// file
-				String url = generator.getModulesUrl();
+				String url = generator.getRemoteUrl();
 				String update = generator.getModulesUpdate();
 				if (url != null)
 					config.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION,

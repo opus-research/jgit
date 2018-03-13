@@ -45,23 +45,24 @@ package org.eclipse.jgit.diff;
 
 import static org.junit.Assert.assertEquals;
 
-import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.dircache.DirCacheIterator;
+import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.patch.FileHeader;
 import org.eclipse.jgit.patch.HunkHeader;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.io.DisabledOutputStream;
+import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -79,13 +80,13 @@ public class DiffFormatterTest extends RepositoryTestCase {
 
 	private DiffFormatter df;
 
-	private TestRepository testDb;
+	private TestRepository<Repository> testDb;
 
 	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		testDb = new TestRepository(db);
+		testDb = new TestRepository<Repository>(db);
 		df = new DiffFormatter(DisabledOutputStream.INSTANCE);
 		df.setRepository(db);
 		df.setAbbreviationLength(8);
@@ -267,7 +268,7 @@ public class DiffFormatterTest extends RepositoryTestCase {
 		write(new File(folder, "folder.txt"), "folder change");
 
 		ByteArrayOutputStream os = new ByteArrayOutputStream();
-		DiffFormatter df = new DiffFormatter(new BufferedOutputStream(os));
+		DiffFormatter df = new DiffFormatter(new SafeBufferedOutputStream(os));
 		df.setRepository(db);
 		df.setPathFilter(PathFilter.create("folder"));
 		DirCacheIterator oldTree = new DirCacheIterator(db.readDirCache());
@@ -287,7 +288,8 @@ public class DiffFormatterTest extends RepositoryTestCase {
 		assertEquals(expected.toString(), actual);
 	}
 
-	private String makeDiffHeader(String pathA, String pathB, ObjectId aId,
+	private static String makeDiffHeader(String pathA, String pathB,
+			ObjectId aId,
 			ObjectId bId) {
 		String a = aId.abbreviate(8).name();
 		String b = bId.abbreviate(8).name();
@@ -297,7 +299,7 @@ public class DiffFormatterTest extends RepositoryTestCase {
 				"+++ b/" + pathB + "\n";
 	}
 
-	private String makeDiffHeaderModeChange(String pathA, String pathB,
+	private static String makeDiffHeaderModeChange(String pathA, String pathB,
 			ObjectId aId, ObjectId bId, String modeA, String modeB) {
 		String a = aId.abbreviate(8).name();
 		String b = bId.abbreviate(8).name();

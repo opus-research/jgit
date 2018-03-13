@@ -44,14 +44,19 @@ package org.eclipse.jgit.submodule;
 
 import java.io.File;
 import java.io.IOException;
+import java.text.MessageFormat;
 
+import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.BlobBasedConfig;
+import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -62,6 +67,7 @@ import org.eclipse.jgit.lib.RepositoryBuilder;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
+import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
@@ -76,6 +82,8 @@ public class SubmoduleWalk {
 	 * Create a generator to walk over the submodule entries currently in the
 	 * index
 	 *
+	 * The {@code .gitmodules} file is read from the index.
+	 *
 	 * @param repository
 	 * @return generator over submodule index entries
 	 * @throws IOException
@@ -83,7 +91,13 @@ public class SubmoduleWalk {
 	public static SubmoduleWalk forIndex(Repository repository)
 			throws IOException {
 		SubmoduleWalk generator = new SubmoduleWalk(repository);
-		generator.setTree(new DirCacheIterator(repository.readDirCache()));
+		try {
+			DirCache index = repository.readDirCache();
+			generator.setTree(new DirCacheIterator(index));
+		} catch (IOException e) {
+			generator.release();
+			throw e;
+		}
 		return generator;
 	}
 
@@ -93,6 +107,8 @@ public class SubmoduleWalk {
 	 *
 	 * @param repository
 	 * @param treeId
+	 *            the root of a tree containing both a submodule at the given path
+	 *            and .gitmodules at the root.
 	 * @param path
 	 * @return generator at given path, null if no submodule at given path
 	 * @throws IOException
@@ -100,12 +116,19 @@ public class SubmoduleWalk {
 	public static SubmoduleWalk forPath(Repository repository,
 			AnyObjectId treeId, String path) throws IOException {
 		SubmoduleWalk generator = new SubmoduleWalk(repository);
-		generator.setTree(treeId);
-		PathFilter filter = PathFilter.create(path);
-		generator.setFilter(filter);
-		while (generator.next())
-			if (filter.isDone(generator.walk))
-				return generator;
+		try {
+			generator.setTree(treeId);
+			PathFilter filter = PathFilter.create(path);
+			generator.setFilter(filter);
+			generator.setRootTree(treeId);
+			while (generator.next())
+				if (filter.isDone(generator.walk))
+					return generator;
+		} catch (IOException e) {
+			generator.release();
+			throw e;
+		}
+		generator.release();
 		return null;
 	}
 
@@ -115,6 +138,8 @@ public class SubmoduleWalk {
 	 *
 	 * @param repository
 	 * @param iterator
+	 *            the root of a tree containing both a submodule at the given path
+	 *            and .gitmodules at the root.
 	 * @param path
 	 * @return generator at given path, null if no submodule at given path
 	 * @throws IOException
@@ -122,12 +147,19 @@ public class SubmoduleWalk {
 	public static SubmoduleWalk forPath(Repository repository,
 			AbstractTreeIterator iterator, String path) throws IOException {
 		SubmoduleWalk generator = new SubmoduleWalk(repository);
-		generator.setTree(iterator);
-		PathFilter filter = PathFilter.create(path);
-		generator.setFilter(filter);
-		while (generator.next())
-			if (filter.isDone(generator.walk))
-				return generator;
+		try {
+			generator.setTree(iterator);
+			PathFilter filter = PathFilter.create(path);
+			generator.setFilter(filter);
+			generator.setRootTree(iterator);
+			while (generator.next())
+				if (filter.isDone(generator.walk))
+					return generator;
+		} catch (IOException e) {
+			generator.release();
+			throw e;
+		}
+		generator.release();
 		return null;
 	}
 
@@ -153,27 +185,109 @@ public class SubmoduleWalk {
 	 */
 	public static Repository getSubmoduleRepository(final Repository parent,
 			final String path) throws IOException {
-		File directory = getSubmoduleGitDirectory(parent, path);
-		if (!directory.isDirectory())
+		return getSubmoduleRepository(parent.getWorkTree(), path);
+	}
+
+	/**
+	 * Get submodule repository at path
+	 *
+	 * @param parent
+	 * @param path
+	 * @return repository or null if repository doesn't exist
+	 * @throws IOException
+	 */
+	public static Repository getSubmoduleRepository(final File parent,
+			final String path) throws IOException {
+		File subWorkTree = new File(parent, path);
+		if (!subWorkTree.isDirectory())
 			return null;
+		File workTree = new File(parent, path);
 		try {
-			return new RepositoryBuilder().setMustExist(true)
-					.setFS(FS.DETECTED).setGitDir(directory).build();
+			return new RepositoryBuilder() //
+					.setMustExist(true) //
+					.setFS(FS.DETECTED) //
+					.setWorkTree(workTree) //
+					.build();
 		} catch (RepositoryNotFoundException e) {
 			return null;
 		}
 	}
 
 	/**
-	 * Get the .git directory for a repository submodule path
+	 * Resolve submodule repository URL.
+	 * <p>
+	 * This handles relative URLs that are typically specified in the
+	 * '.gitmodules' file by resolving them against the remote URL of the parent
+	 * repository.
+	 * <p>
+	 * Relative URLs will be resolved against the parent repository's working
+	 * directory if the parent repository has no configured remote URL.
 	 *
 	 * @param parent
-	 * @param path
-	 * @return .git for submodule repository
+	 *            parent repository
+	 * @param url
+	 *            absolute or relative URL of the submodule repository
+	 * @return resolved URL
+	 * @throws IOException
 	 */
-	public static File getSubmoduleGitDirectory(final Repository parent,
-			final String path) {
-		return new File(getSubmoduleDirectory(parent, path), Constants.DOT_GIT);
+	public static String getSubmoduleRemoteUrl(final Repository parent,
+			final String url) throws IOException {
+		if (!url.startsWith("./") && !url.startsWith("../")) //$NON-NLS-1$ //$NON-NLS-2$
+			return url;
+
+		String remoteName = null;
+		// Look up remote URL associated wit HEAD ref
+		Ref ref = parent.getRef(Constants.HEAD);
+		if (ref != null) {
+			if (ref.isSymbolic())
+				ref = ref.getLeaf();
+			remoteName = parent.getConfig().getString(
+					ConfigConstants.CONFIG_BRANCH_SECTION,
+					Repository.shortenRefName(ref.getName()),
+					ConfigConstants.CONFIG_KEY_REMOTE);
+		}
+
+		// Fall back to 'origin' if current HEAD ref has no remote URL
+		if (remoteName == null)
+			remoteName = Constants.DEFAULT_REMOTE_NAME;
+
+		String remoteUrl = parent.getConfig().getString(
+				ConfigConstants.CONFIG_REMOTE_SECTION, remoteName,
+				ConfigConstants.CONFIG_KEY_URL);
+
+		// Fall back to parent repository's working directory if no remote URL
+		if (remoteUrl == null) {
+			remoteUrl = parent.getWorkTree().getAbsolutePath();
+			// Normalize slashes to '/'
+			if ('\\' == File.separatorChar)
+				remoteUrl = remoteUrl.replace('\\', '/');
+		}
+
+		// Remove trailing '/'
+		if (remoteUrl.charAt(remoteUrl.length() - 1) == '/')
+			remoteUrl = remoteUrl.substring(0, remoteUrl.length() - 1);
+
+		char separator = '/';
+		String submoduleUrl = url;
+		while (submoduleUrl.length() > 0) {
+			if (submoduleUrl.startsWith("./")) //$NON-NLS-1$
+				submoduleUrl = submoduleUrl.substring(2);
+			else if (submoduleUrl.startsWith("../")) { //$NON-NLS-1$
+				int lastSeparator = remoteUrl.lastIndexOf('/');
+				if (lastSeparator < 1) {
+					lastSeparator = remoteUrl.lastIndexOf(':');
+					separator = ':';
+				}
+				if (lastSeparator < 1)
+					throw new IOException(MessageFormat.format(
+							JGitText.get().submoduleParentRemoteUrlInvalid,
+							remoteUrl));
+				remoteUrl = remoteUrl.substring(0, lastSeparator);
+				submoduleUrl = submoduleUrl.substring(3);
+			} else
+				break;
+		}
+		return remoteUrl + separator + submoduleUrl;
 	}
 
 	private final Repository repository;
@@ -182,7 +296,9 @@ public class SubmoduleWalk {
 
 	private StoredConfig repoConfig;
 
-	private FileBasedConfig modulesConfig;
+	private AbstractTreeIterator rootTree;
+
+	private Config modulesConfig;
 
 	private String path;
 
@@ -199,15 +315,120 @@ public class SubmoduleWalk {
 		walk.setRecursive(true);
 	}
 
-	private void loadModulesConfig() throws IOException, ConfigInvalidException {
-		if (modulesConfig == null) {
+	/**
+	 * Set the config used by this walk.
+	 *
+	 * This method need only be called if constructing a walk manually instead of
+	 * with one of the static factory methods above.
+	 *
+	 * @param config
+	 *            .gitmodules config object
+	 * @return this generator
+	 */
+	public SubmoduleWalk setModulesConfig(final Config config) {
+		modulesConfig = config;
+		return this;
+	}
+
+	/**
+	 * Set the tree used by this walk for finding {@code .gitmodules}.
+	 * <p>
+	 * The root tree is not read until the first submodule is encountered by the
+	 * walk.
+	 * <p>
+	 * This method need only be called if constructing a walk manually instead of
+	 * with one of the static factory methods above.
+	 *
+	 * @param tree
+	 *            tree containing .gitmodules
+	 * @return this generator
+	 */
+	public SubmoduleWalk setRootTree(final AbstractTreeIterator tree) {
+		rootTree = tree;
+		modulesConfig = null;
+		return this;
+	}
+
+	/**
+	 * Set the tree used by this walk for finding {@code .gitmodules}.
+	 * <p>
+	 * The root tree is not read until the first submodule is encountered by the
+	 * walk.
+	 * <p>
+	 * This method need only be called if constructing a walk manually instead of
+	 * with one of the static factory methods above.
+	 *
+	 * @param id
+	 *            ID of a tree containing .gitmodules
+	 * @return this generator
+	 * @throws IOException
+	 */
+	public SubmoduleWalk setRootTree(final AnyObjectId id) throws IOException {
+		final CanonicalTreeParser p = new CanonicalTreeParser();
+		p.reset(walk.getObjectReader(), id);
+		rootTree = p;
+		modulesConfig = null;
+		return this;
+	}
+
+	/**
+	 * Load the config for this walk from {@code .gitmodules}.
+	 * <p>
+	 * Uses the root tree if {@link #setRootTree(AbstractTreeIterator)} was
+	 * previously called, otherwise uses the working tree.
+	 * <p>
+	 * If no submodule config is found, loads an empty config.
+	 *
+	 * @return this generator
+	 * @throws IOException if an error occurred, or if the repository is bare
+	 * @throws ConfigInvalidException
+	 */
+	public SubmoduleWalk loadModulesConfig() throws IOException, ConfigInvalidException {
+		if (rootTree == null) {
 			File modulesFile = new File(repository.getWorkTree(),
 					Constants.DOT_GIT_MODULES);
 			FileBasedConfig config = new FileBasedConfig(modulesFile,
 					repository.getFS());
 			config.load();
 			modulesConfig = config;
+		} else {
+			TreeWalk configWalk = new TreeWalk(repository);
+			try {
+				configWalk.addTree(rootTree);
+
+				// The root tree may be part of the submodule walk, so we need to revert
+				// it after this walk.
+				int idx;
+				for (idx = 0; !rootTree.first(); idx++) {
+					rootTree.back(1);
+				}
+
+				try {
+					configWalk.setRecursive(false);
+					PathFilter filter = PathFilter.create(Constants.DOT_GIT_MODULES);
+					configWalk.setFilter(filter);
+					while (configWalk.next()) {
+						if (filter.isDone(configWalk)) {
+							modulesConfig = new BlobBasedConfig(null, repository,
+									configWalk.getObjectId(0));
+							return this;
+						}
+					}
+					modulesConfig = new Config();
+				} finally {
+					if (idx > 0)
+						rootTree.next(idx);
+				}
+			} finally {
+				configWalk.release();
+			}
 		}
+		return this;
+	}
+
+	private void lazyLoadModulesConfig() throws IOException, ConfigInvalidException {
+		if (modulesConfig == null)
+			loadModulesConfig();
 	}
 
 	/**
@@ -270,15 +491,6 @@ public class SubmoduleWalk {
 	}
 
 	/**
-	 * Get the .git directory for the current submodule entry
-	 *
-	 * @return .git for submodule repository
-	 */
-	public File getGitDirectory() {
-		return getSubmoduleGitDirectory(repository, path);
-	}
-
-	/**
 	 * Advance to next submodule in the index tree.
 	 *
 	 * The object id and path of the next entry can be obtained by calling
@@ -325,7 +537,7 @@ public class SubmoduleWalk {
 	 * @throws IOException
 	 */
 	public String getModulesPath() throws IOException, ConfigInvalidException {
-		loadModulesConfig();
+		lazyLoadModulesConfig();
 		return modulesConfig.getString(
 				ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
 				ConfigConstants.CONFIG_KEY_PATH);
@@ -353,7 +565,7 @@ public class SubmoduleWalk {
 	 * @throws IOException
 	 */
 	public String getModulesUrl() throws IOException, ConfigInvalidException {
-		loadModulesConfig();
+		lazyLoadModulesConfig();
 		return modulesConfig.getString(
 				ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
 				ConfigConstants.CONFIG_KEY_URL);
@@ -381,26 +593,15 @@ public class SubmoduleWalk {
 	 * @throws IOException
 	 */
 	public String getModulesUpdate() throws IOException, ConfigInvalidException {
-		loadModulesConfig();
+		lazyLoadModulesConfig();
 		return modulesConfig.getString(
 				ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
 				ConfigConstants.CONFIG_KEY_UPDATE);
 	}
 
 	/**
-	 * Does the current submodule entry have a .git directory in the parent
-	 * repository's working tree?
-	 *
-	 * @return true if .git directory exists, false otherwise
-	 */
-	public boolean hasGitDirectory() {
-		return getGitDirectory().isDirectory();
-	}
-
-	/**
 	 * Get repository for current submodule entry
 	 *
-	 * @see #hasGitDirectory()
 	 * @return repository or null if non-existent
 	 * @throws IOException
 	 */
@@ -416,7 +617,13 @@ public class SubmoduleWalk {
 	 */
 	public ObjectId getHead() throws IOException {
 		Repository subRepo = getRepository();
-		return subRepo != null ? subRepo.resolve(Constants.HEAD) : null;
+		if (subRepo == null)
+			return null;
+		try {
+			return subRepo.resolve(Constants.HEAD);
+		} finally {
+			subRepo.close();
+		}
 	}
 
 	/**
@@ -429,7 +636,31 @@ public class SubmoduleWalk {
 		Repository subRepo = getRepository();
 		if (subRepo == null)
 			return null;
-		Ref head = subRepo.getRef(Constants.HEAD);
-		return head != null ? head.getLeaf().getName() : null;
+		try {
+			Ref head = subRepo.getRef(Constants.HEAD);
+			return head != null ? head.getLeaf().getName() : null;
+		} finally {
+			subRepo.close();
+		}
+	}
+
+	/**
+	 * Get the resolved remote URL for the current submodule.
+	 * <p>
+	 * This method resolves the value of {@link #getModulesUrl()} to an absolute
+	 * URL
+	 *
+	 * @return resolved remote URL
+	 * @throws IOException
+	 * @throws ConfigInvalidException
+	 */
+	public String getRemoteUrl() throws IOException, ConfigInvalidException {
+		String url = getModulesUrl();
+		return url != null ? getSubmoduleRemoteUrl(repository, url) : null;
+	}
+
+	/** Release any resources used by this walker's reader. */
+	public void release() {
+		walk.release();
 	}
 }
