@@ -45,6 +45,8 @@ package org.eclipse.jgit.transport;
 
 import java.io.Serializable;
 
+import org.eclipse.jgit.internal.JGitText;
+
 /**
  * Describes the expected value for a ref being pushed.
  * @since 4.7
@@ -58,14 +60,12 @@ public class RefLeaseSpec implements Serializable {
 	/** Local commitish to get expected value from. */
 	private final String expected;
 
-	/**
-	 *
-	 * @param ref
-	 *            ref being pushed
-	 * @param expected
-	 *            the expected value of the ref
-	 */
-	public RefLeaseSpec(String ref, String expected) {
+	private RefLeaseSpec(final RefLeaseSpec p) {
+		ref = p.getRef();
+		expected = p.getExpected();
+	}
+
+	public RefLeaseSpec(final String ref, final String expected) {
 		this.ref = ref;
 		this.expected = expected;
 	}
