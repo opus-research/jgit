@@ -53,7 +53,6 @@ import static org.junit.Assert.fail;
 import java.io.File;
 import java.net.URI;
 import java.util.List;
-import java.text.MessageFormat;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -329,8 +328,8 @@ public class HttpClientTests extends HttpTestCase {
 				t.openFetch();
 				fail("connection opened even though service disabled");
 			} catch (TransportException err) {
-				String exp = smartAuthNoneURI + ": " + MessageFormat.format(
-						JGitText.get().serviceNotPermitted, "git-upload-pack");
+				String exp = smartAuthNoneURI + ": "
+						+ JGitText.get().serviceNotEnabledNoName;
 				assertEquals(exp, err.getMessage());
 			}
 		}
