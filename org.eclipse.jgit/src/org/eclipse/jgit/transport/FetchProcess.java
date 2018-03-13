@@ -212,8 +212,7 @@ class FetchProcess {
 				cmd.updateType(walk);
 				if (cmd.getType() == UPDATE_NONFASTFORWARD
 						&& cmd instanceof TrackingRefUpdate.Command
-						&& !((TrackingRefUpdate.Command) cmd).canForceUpdate()
-						&& !cmd.getRefName().startsWith(Constants.R_TAGS))
+						&& !((TrackingRefUpdate.Command) cmd).canForceUpdate())
 					cmd.setResult(REJECTED_NONFASTFORWARD);
 			}
 			if (transport.isDryRun()) {
