@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, GitHub Inc.
+ * Copyright (C) 2015, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,65 +40,35 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.errors;
 
-import java.io.File;
-import java.io.IOException;
-import java.text.MessageFormat;
+package org.eclipse.jgit.transport;
 
-import org.eclipse.jgit.internal.JGitText;
+import java.io.OutputStream;
+
+import org.eclipse.jgit.internal.storage.pack.PackWriter;
+import org.eclipse.jgit.lib.ProgressMonitor;
 
 /**
- * An exception occurring when a file cannot be locked
+ * A callback to tell caller the count of objects ASAP.
+ *
+ * @since 4.1
  */
-public class LockFailedException extends IOException {
-	private static final long serialVersionUID = 1L;
-
-	private File file;
-
+public interface ObjectCountCallback {
 	/**
-	 * @param file
-	 *            file that could not be locked
-	 * @param message
-	 *            exception message
-	 * @param cause
-	 *            cause, for later retrieval by {@link Throwable#getCause()}
-	 * @since 4.1
-	 */
-	public LockFailedException(File file, String message, Throwable cause) {
-		super(message, cause);
-		this.file = file;
-	}
-
-	/**
-	 * Construct a CannotLockException for the given file and message
+	 * Invoked when the {@link PackWriter} has counted the objects to be
+	 * written to pack.
+	 * <p>
+	 * An {@code ObjectCountCallback} can use this information to decide
+	 * whether the
+	 * {@link PackWriter#writePack(ProgressMonitor, ProgressMonitor, OutputStream)}
+	 * operation should be aborted.
+	 * <p>
+	 * This callback will be called exactly once.
 	 *
-	 * @param file
-	 *            file that could not be locked
-	 * @param message
-	 *            exception message
+	 * @param objectCount
+	 *            the count of the objects.
+	 * @throws WriteAbortedException
+	 *             to indicate that the write operation should be aborted.
 	 */
-	public LockFailedException(File file, String message) {
-		super(message);
-		this.file = file;
-	}
-
-	/**
-	 * Construct a CannotLockException for the given file
-	 *
-	 * @param file
-	 *            file that could not be locked
-	 */
-	public LockFailedException(File file) {
-		this(file, MessageFormat.format(JGitText.get().cannotLock, file));
-	}
-
-	/**
-	 * Get the file that could not be locked
-	 *
-	 * @return file
-	 */
-	public File getFile() {
-		return file;
-	}
+	void setObjectCount(long objectCount) throws WriteAbortedException;
 }

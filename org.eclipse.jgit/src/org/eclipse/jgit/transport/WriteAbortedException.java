@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, GitHub Inc.
+ * Copyright (C) 2015, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,65 +40,44 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.errors;
 
-import java.io.File;
+package org.eclipse.jgit.transport;
+
 import java.io.IOException;
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.internal.JGitText;
 
 /**
- * An exception occurring when a file cannot be locked
+ * An exception to be thrown when the write operation is aborted.
+ * <p>
+ * That can be thrown inside
+ * {@link ObjectCountCallback#setObjectCount(long)}.
+ *
+ * @since 4.1
  */
-public class LockFailedException extends IOException {
-	private static final long serialVersionUID = 1L;
-
-	private File file;
-
+public class WriteAbortedException extends IOException {
 	/**
-	 * @param file
-	 *            file that could not be locked
-	 * @param message
-	 *            exception message
-	 * @param cause
-	 *            cause, for later retrieval by {@link Throwable#getCause()}
-	 * @since 4.1
+	 * Construct a {@code WriteAbortedException}.
 	 */
-	public LockFailedException(File file, String message, Throwable cause) {
-		super(message, cause);
-		this.file = file;
+	public WriteAbortedException() {
 	}
 
 	/**
-	 * Construct a CannotLockException for the given file and message
+	 * Construct a {@code WriteAbortedException}.
 	 *
-	 * @param file
-	 *            file that could not be locked
-	 * @param message
-	 *            exception message
+	 * @param s message describing the issue
 	 */
-	public LockFailedException(File file, String message) {
-		super(message);
-		this.file = file;
+	public WriteAbortedException(String s) {
+		super(s);
 	}
 
 	/**
-	 * Construct a CannotLockException for the given file
+	 * Construct a {@code WriteAbortedException}.
 	 *
-	 * @param file
-	 *            file that could not be locked
+	 * @param s
+	 *            message describing the issue
+	 * @param why
+	 *            a lower level implementation specific issue.
 	 */
-	public LockFailedException(File file) {
-		this(file, MessageFormat.format(JGitText.get().cannotLock, file));
-	}
-
-	/**
-	 * Get the file that could not be locked
-	 *
-	 * @return file
-	 */
-	public File getFile() {
-		return file;
+	public WriteAbortedException(String s, Throwable why) {
+		super(s, why);
 	}
 }
