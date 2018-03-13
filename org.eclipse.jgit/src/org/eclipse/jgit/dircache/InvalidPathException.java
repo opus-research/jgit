@@ -40,49 +40,24 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util.io;
 
-import java.io.BufferedOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+package org.eclipse.jgit.dircache;
+
+import java.text.MessageFormat;
+
+import org.eclipse.jgit.internal.JGitText;
 
 /**
- * A BufferedOutputStream that throws an error if the final flush fails on
- * close.
- * <p>
- * Java's BufferedOutputStream swallows errors that occur when the output stream
- * tries to write the final bytes to the output during close. This may result in
- * corrupted files without notice.
- * </p>
+ * Thrown when JGit detects and refuses to use an invalid path
  */
-public class SafeBufferedOutputStream extends BufferedOutputStream {
+public class InvalidPathException extends IllegalArgumentException {
+
+	private static final long serialVersionUID = 1L;
 
 	/**
-	 * @see BufferedOutputStream#BufferedOutputStream(OutputStream)
-	 * @param out
-	 *            underlying output stream
+	 * @param path
 	 */
-	public SafeBufferedOutputStream(OutputStream out) {
-		super(out);
-	}
-
-	/**
-	 * @see BufferedOutputStream#BufferedOutputStream(OutputStream, int)
-	 * @param out
-	 *            underlying output stream
-	 * @param size
-	 *            buffer size
-	 */
-	public SafeBufferedOutputStream(OutputStream out, int size) {
-		super(out, size);
-	}
-
-	@Override
-	public void close() throws IOException {
-		try {
-			flush();
-		} finally {
-			super.close();
-		}
+	public InvalidPathException(String path) {
+		super(MessageFormat.format(JGitText.get().invalidPath, path));
 	}
 }

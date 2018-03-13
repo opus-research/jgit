@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Robin Rosenberg
+ * Copyright (C) 2011-2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,49 +40,20 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util.io;
+package org.eclipse.jgit.pgm;
 
-import java.io.BufferedOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import static org.eclipse.jgit.pgm.CLIGitCommand.split;
+import static org.junit.Assert.assertArrayEquals;
 
-/**
- * A BufferedOutputStream that throws an error if the final flush fails on
- * close.
- * <p>
- * Java's BufferedOutputStream swallows errors that occur when the output stream
- * tries to write the final bytes to the output during close. This may result in
- * corrupted files without notice.
- * </p>
- */
-public class SafeBufferedOutputStream extends BufferedOutputStream {
+import org.junit.Test;
 
-	/**
-	 * @see BufferedOutputStream#BufferedOutputStream(OutputStream)
-	 * @param out
-	 *            underlying output stream
-	 */
-	public SafeBufferedOutputStream(OutputStream out) {
-		super(out);
-	}
+public class CLIGitCommandTest {
 
-	/**
-	 * @see BufferedOutputStream#BufferedOutputStream(OutputStream, int)
-	 * @param out
-	 *            underlying output stream
-	 * @param size
-	 *            buffer size
-	 */
-	public SafeBufferedOutputStream(OutputStream out, int size) {
-		super(out, size);
-	}
-
-	@Override
-	public void close() throws IOException {
-		try {
-			flush();
-		} finally {
-			super.close();
-		}
+	@Test
+	public void testSplit() throws Exception {
+		assertArrayEquals(new String[] { "a" }, split("a"));
+		assertArrayEquals(new String[] { "a", "b" }, split("a b"));
+		assertArrayEquals(new String[] { "a", "b c" }, split("a 'b c'"));
+		assertArrayEquals(new String[] { "a", "b c" }, split("a \"b c\""));
 	}
 }
