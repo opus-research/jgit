@@ -182,29 +182,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 					.setURI(uri)
 					.call()
 					.getRepository();
-			try {
-				return readFileFromRepo(repo, ref, path);
-			} finally {
-				FileUtils.delete(dir, FileUtils.RECURSIVE);
-			}
-		}
-
-		/**
-		 * Read a file from the repository
-		 *
-		 * @param repo
-		 *            The repository containing the file
-		 * @param ref
-		 *            The ref (branch/tag/etc.) to read
-		 * @param path
-		 *            The relative path (inside the repo) to the file to read
-		 * @return the file's content
-		 * @throws GitAPIException
-		 * @throws IOException
-		 * @since 3.5
-		 */
-		protected byte[] readFileFromRepo(Repository repo,
-				String ref, String path) throws GitAPIException, IOException {
 			ObjectReader reader = repo.newObjectReader();
 			byte[] result;
 			try {
@@ -212,6 +189,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				result = reader.open(oid).getBytes(Integer.MAX_VALUE);
 			} finally {
 				reader.release();
+				FileUtils.delete(dir, FileUtils.RECURSIVE);
 			}
 			return result;
 		}
@@ -289,13 +267,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			this.command = command;
 			this.inputStream = inputStream;
 			this.filename = filename;
-
-			// Strip trailing /s to match repo behavior.
-			int lastIndex = baseUrl.length() - 1;
-			while (lastIndex >= 0 && baseUrl.charAt(lastIndex) == '/')
-				lastIndex--;
-			this.baseUrl = baseUrl.substring(0, lastIndex + 1);
-
+			this.baseUrl = baseUrl;
 			remotes = new HashMap<String, String>();
 			projects = new ArrayList<Project>();
 			plusGroups = new HashSet<String>();
@@ -338,7 +310,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				String qName,
 				Attributes attributes) throws SAXException {
 			if ("project".equals(qName)) { //$NON-NLS-1$
-				currentProject = new Project(
+				currentProject = new Project( //$NON-NLS-1$
 						attributes.getValue("name"), //$NON-NLS-1$
 						attributes.getValue("path"), //$NON-NLS-1$
 						attributes.getValue("revision"), //$NON-NLS-1$
@@ -455,12 +427,11 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	/**
 	 * Set the input stream to the manifest XML.
 	 *
-	 * Setting inputStream will ignore the path set. It will be closed in
-	 * {@link #call}.
+	 * Setting inputStream will ignore the path set.
+	 * It will be closed in {@link #call}.
 	 *
 	 * @param inputStream
 	 * @return this command
-	 * @since 3.5
 	 */
 	public RepoCommand setInputStream(final InputStream inputStream) {
 		this.inputStream = inputStream;
