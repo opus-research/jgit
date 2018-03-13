@@ -67,7 +67,6 @@ import org.eclipse.jgit.events.ConfigChangedListener;
 import org.eclipse.jgit.events.ListenerHandle;
 import org.eclipse.jgit.events.ListenerList;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.StringUtils;
@@ -1118,18 +1117,9 @@ public class Config {
 			throw new ConfigInvalidException(
 					JGitText.get().invalidLineInConfigFile);
 		}
-		File toInclude = new File(line.value);
-		if (toInclude.getPath().startsWith("~/")) { //$NON-NLS-1$
-			File userHome = FS.DETECTED.userHome();
-			if (userHome != null) {
-				toInclude = new File(userHome,
-						toInclude.getPath().substring(2));
-			}
-
-		}
-
+		File path = new File(line.value);
 		try {
-			byte[] bytes = IO.readFully(toInclude);
+			byte[] bytes = IO.readFully(path);
 			String decoded;
 			if (isUtf8(bytes)) {
 				decoded = RawParseUtils.decode(RawParseUtils.UTF8_CHARSET,
@@ -1139,13 +1129,14 @@ public class Config {
 			}
 			newEntries.addAll(fromTextRecurse(decoded, depth + 1));
 		} catch (FileNotFoundException fnfe) {
-			if (toInclude.exists()) {
-				throw new ConfigInvalidException(MessageFormat.format(
-						JGitText.get().cannotReadFile, toInclude), fnfe);
+			if (path.exists()) {
+				throw new ConfigInvalidException(MessageFormat
+						.format(JGitText.get().cannotReadFile, path), fnfe);
 			}
 		} catch (IOException ioe) {
-			throw new ConfigInvalidException(MessageFormat
-					.format(JGitText.get().cannotReadFile, toInclude), ioe);
+			throw new ConfigInvalidException(
+					MessageFormat.format(JGitText.get().cannotReadFile, path),
+					ioe);
 		}
 	}
 
