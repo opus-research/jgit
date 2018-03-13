@@ -68,7 +68,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.attributes.Attributes;
 import org.eclipse.jgit.diff.DiffAlgorithm;
 import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
@@ -90,11 +89,9 @@ import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
-import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevTree;
-import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.NameConflictTreeWalk;
@@ -120,14 +117,6 @@ public class ResolveMerger extends ThreeWayMerger {
 		/** the merge failed because of a file could not be deleted */
 		COULD_NOT_DELETE
 	}
-
-	/**
-	 * Marker exception if we encounter binary content to merge.
- 	 */
-	private static class BinaryException extends Exception {
-
-	}
-
 
 	/**
 	 * The tree walk which we'll iterate over to merge entries.
@@ -666,13 +655,7 @@ public class ResolveMerger extends ThreeWayMerger {
 				return true;
 			}
 
-			MergeResult<RawText> result;
-			try {
-				result = contentMerge(base, ours, theirs);
-			} catch (BinaryException e) {
-				result = new MergeResult<>(Collections.<RawText> emptyList());
-				result.setContainsConflicts(true);
-			}
+			MergeResult<RawText> result = contentMerge(base, ours, theirs);
 			if (ignoreConflicts) {
 				result.setContainsConflicts(false);
 			}
@@ -684,13 +667,7 @@ public class ResolveMerger extends ThreeWayMerger {
 			// OURS or THEIRS has been deleted
 			if (((modeO != 0 && !tw.idEqual(T_BASE, T_OURS)) || (modeT != 0 && !tw
 					.idEqual(T_BASE, T_THEIRS)))) {
-				MergeResult<RawText> result;
-				try {
-					result = contentMerge(base, ours, theirs);
-				} catch (BinaryException e) {
-					result = new MergeResult<>(Collections.<RawText> emptyList());
-					result.setContainsConflicts(true);
-				}
+
 				add(tw.getRawPath(), base, DirCacheEntry.STAGE_1, 0, 0);
 				add(tw.getRawPath(), ours, DirCacheEntry.STAGE_2, 0, 0);
 				DirCacheEntry e = add(tw.getRawPath(), theirs,
@@ -710,7 +687,8 @@ public class ResolveMerger extends ThreeWayMerger {
 				unmergedPaths.add(tw.getPathString());
 
 				// generate a MergeResult for the deleted file
-				mergeResults.put(tw.getPathString(), result);
+				mergeResults.put(tw.getPathString(),
+						contentMerge(base, ours, theirs));
 			}
 		}
 		return true;
@@ -730,7 +708,7 @@ public class ResolveMerger extends ThreeWayMerger {
 	 */
 	private MergeResult<RawText> contentMerge(CanonicalTreeParser base,
 			CanonicalTreeParser ours, CanonicalTreeParser theirs)
-			throws IOException, BinaryException {
+			throws IOException {
 		RawText baseText = base == null ? RawText.EMPTY_TEXT : getRawText(
 				base.getEntryObjectId(), reader);
 		RawText ourText = ours == null ? RawText.EMPTY_TEXT : getRawText(
@@ -912,19 +890,11 @@ public class ResolveMerger extends ThreeWayMerger {
 		return FileMode.MISSING.getBits();
 	}
 
-	@Nullable
 	private static RawText getRawText(ObjectId id, ObjectReader reader)
-			throws IOException, BinaryException {
+			throws IOException {
 		if (id.equals(ObjectId.zeroId()))
 			return new RawText(new byte[] {});
-
-		ObjectLoader loader = reader.open(id, OBJ_BLOB);
-		int threshold = PackConfig.DEFAULT_BIG_FILE_THRESHOLD;
-		byte []data = RawText.openText(loader, threshold);
-		if (data == null) {
-			throw new BinaryException();
-		}
-		return new RawText(data);
+		return new RawText(reader.open(id, OBJ_BLOB).getCachedBytes());
 	}
 
 	private static boolean nonTree(final int mode) {

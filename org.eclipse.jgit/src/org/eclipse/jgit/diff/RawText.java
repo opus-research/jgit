@@ -49,6 +49,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.util.IO;
@@ -299,42 +300,61 @@ public class RawText extends Sequence {
 	}
 
 	/**
-	 * Read a blob object, but short-circuit the read if the file is binary.
+	 * Read a blob object into RawText, or return null if the blob is binary.
 	 *
 	 * @param ldr
 	 *   the ObjectLoader for the blob
 	 * @param threshold
-	 *   if the blob is larger than this size, we assume it is binary without looking further.
+	 *   if the blob is larger than this size, it is always assumed to be binary.
 	 * @return the bytes representing the blob, or null if the blob is suspected to be binary.
 	 */
-	public static byte[] openText(ObjectLoader ldr, int threshold) throws IOException, LargeObjectException {
+	@Nullable
+	public static RawText load(ObjectLoader ldr, int threshold) throws IOException {
 		long sz = ldr.getSize();
-		if (sz <= FIRST_FEW_BYTES) {
-			byte[] data = ldr.getBytes(threshold);
-			if (RawText.isBinary(data)) {
-				return null;
-			}
-			return data;
-		}
 
+		if (threshold < FIRST_FEW_BYTES) {
+			threshold = FIRST_FEW_BYTES;
+		}
 		if (sz > threshold) {
 			return null;
 		}
 
-		try (InputStream stream = ldr.openStream()) {
-			if (RawText.isBinary(stream)) {
+		if (sz <= FIRST_FEW_BYTES) {
+			byte []data = ldr.getCachedBytes(FIRST_FEW_BYTES);
+			if (isBinary(data)) {
 				return null;
 			}
+			return new RawText(data);
 		}
 
-		try {
-			return ldr.getBytes(threshold);
-		} catch (LargeObjectException.ExceedsLimit overLimit) {
-			return null;
-		} catch (LargeObjectException.ExceedsByteArrayLimit overLimit) {
-			return null;
-		} catch (LargeObjectException.OutOfMemory tooBig) {
-			return null;
+		byte head[] = new byte[FIRST_FEW_BYTES];
+		try (InputStream stream = ldr.openStream()) {
+			int off = 0;
+			int left = head.length;
+			while (left > 0) {
+				int n = stream.read(head, off, left);
+				if (n < 0) {
+					throw new IllegalStateException("negative read");
+				}
+
+				left -= n;
+				off += n;
+			}
+
+			if (isBinary(head)) {
+				return null;
+			}
+
+			byte data[];
+			try {
+				data = new byte[(int)sz];
+			} catch (OutOfMemoryError e) {
+				throw new LargeObjectException.OutOfMemory(e);
+			}
+
+			System.arraycopy(head, 0, data, 0, head.length);
+			IO.readFully(stream, data, off, (int) (sz-off));
+			return new RawText(data);
 		}
 	}
 }
