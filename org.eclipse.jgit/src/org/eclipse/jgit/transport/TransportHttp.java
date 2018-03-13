@@ -134,6 +134,8 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 	private static final String SVC_RECEIVE_PACK = "git-receive-pack"; //$NON-NLS-1$
 
+	private static final String userAgent = computeUserAgent();
+
 	static final TransportProtocol PROTO_HTTP = new TransportProtocol() {
 		private final String[] schemeNames = { "http", "https" }; //$NON-NLS-1$ //$NON-NLS-2$
 
@@ -201,6 +203,17 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			return new TransportHttp(local, uri);
 		}
 	};
+
+	private static String computeUserAgent() {
+		String version;
+		final Package pkg = TransportHttp.class.getPackage();
+		if (pkg != null && pkg.getImplementationVersion() != null) {
+			version = pkg.getImplementationVersion();
+		} else {
+			version = "unknown"; //$NON-NLS-1$
+		}
+		return "JGit/" + version; //$NON-NLS-1$
+	}
 
 	private static final Config.SectionParser<HttpConfig> HTTP_KEY = new SectionParser<HttpConfig>() {
 		public HttpConfig parse(final Config cfg) {
@@ -538,7 +551,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		conn.setUseCaches(false);
 		conn.setRequestProperty(HDR_ACCEPT_ENCODING, ENCODING_GZIP);
 		conn.setRequestProperty(HDR_PRAGMA, "no-cache"); //$NON-NLS-1$
-		conn.setRequestProperty(HDR_USER_AGENT, UserAgent.get());
+		conn.setRequestProperty(HDR_USER_AGENT, userAgent);
 		int timeOut = getTimeout();
 		if (timeOut != -1) {
 			int effTimeOut = timeOut * 1000;

@@ -44,7 +44,6 @@
 package org.eclipse.jgit.transport;
 
 import static org.eclipse.jgit.lib.RefDatabase.ALL;
-import static org.eclipse.jgit.transport.GitProtocolConstants.AGENT;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_ALLOW_TIP_SHA1_IN_WANT;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_INCLUDE_TAG;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_MULTI_ACK;
@@ -254,7 +253,6 @@ public class UploadPack {
 
 	/** Capabilities requested by the client. */
 	private Set<String> options;
-	String userAgent;
 
 	/** Raw ObjectIds the client has asked for, before validating them. */
 	private final Set<ObjectId> wantIds = new HashSet<ObjectId>();
@@ -808,7 +806,6 @@ public class UploadPack {
 				|| policy == RequestPolicy.REACHABLE_COMMIT_TIP
 				|| policy == null)
 			adv.advertiseCapability(OPTION_ALLOW_TIP_SHA1_IN_WANT);
-		adv.advertiseCapability(AGENT + UserAgent.get());
 		adv.setDerefTags(true);
 		Map<String, Ref> refs = getAdvertisedOrDefaultRefs();
 		findSymrefs(adv, refs);
@@ -894,31 +891,10 @@ public class UploadPack {
 	 * @since 4.0
 	 */
 	public int getDepth() {
-		if (options == null)
-			throw new RequestNotYetReadException();
-		return depth;
-	}
-
-	/**
-	 * Get the user agent of the client.
-	 * <p>
-	 * If the client is new enough to use {@code agent=} capability that value
-	 * will be returned. Older HTTP clients may also supply their version using
-	 * the HTTP {@code User-Agent} header. The capability overrides the HTTP
-	 * header if both are available.
-	 *
-	 * @return user agent supplied by the client. Available only if the client
-	 *         is new enough to advertise its user agent.
-	 * @since 4.0
-	 */
-	public String getPeerUserAgent() {
-		if (options == null)
-			throw new RequestNotYetReadException();
-		for (String o : options) {
-			if (o.startsWith(AGENT))
-				return o.substring(AGENT.length());
+		if (options == null) {
+			throw new IllegalStateException("do not call getDepth() before recvWants()");
 		}
-		return userAgent;
+		return depth;
 	}
 
 	private boolean negotiate() throws IOException {
