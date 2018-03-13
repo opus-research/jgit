@@ -177,12 +177,9 @@ public class CloneCommand implements Callable<Git> {
 		u.setNewObjectId(commit.getId());
 		u.forceUpdate();
 
-		if (!bare) {
-			DirCache dc = repo.lockDirCache();
-			DirCacheCheckout co = new DirCacheCheckout(repo, dc,
-					commit.getTree());
-			co.checkout();
-		}
+		DirCache dc = repo.lockDirCache();
+		DirCacheCheckout co = new DirCacheCheckout(repo, dc, commit.getTree());
+		co.checkout();
 	}
 
 	private RevCommit parseCommit(final Repository repo, final Ref ref)

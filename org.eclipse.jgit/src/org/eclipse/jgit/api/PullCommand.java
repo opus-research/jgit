@@ -277,10 +277,9 @@ public class PullCommand extends GitCommand<PullResult> {
 			}
 		} else {
 			MergeCommand merge = new MergeCommand(repo);
-			String name = "branch \'"
-					+ Repository.shortenRefName(remoteBranchName) + "\' of "
-					+ remoteUri;
-			merge.include(name, commitToMerge);
+			merge.include(
+					"branch \'" + remoteBranchName + "\' of " + remoteUri,
+					commitToMerge);
 			MergeResult mergeRes;
 			try {
 				mergeRes = merge.call();
