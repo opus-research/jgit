@@ -242,13 +242,14 @@ public class TransportSftp extends SshTransport implements WalkTransport {
 					if (!files.containsKey(in))
 						continue;
 
-					mtimes.put(n, ent.getAttrs().getMTime());
+					mtimes.put(n, Integer.valueOf(ent.getAttrs().getMTime()));
 					packs.add(n);
 				}
 
 				Collections.sort(packs, new Comparator<String>() {
 					public int compare(final String o1, final String o2) {
-						return mtimes.get(o2) - mtimes.get(o1);
+						return mtimes.get(o2).intValue()
+								- mtimes.get(o1).intValue();
 					}
 				});
 			} catch (SftpException je) {
