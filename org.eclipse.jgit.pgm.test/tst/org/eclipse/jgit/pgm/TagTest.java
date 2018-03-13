@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2012, Tomasz Zarna <tomasz.zarna@tasktop.com> and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,60 +40,34 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.pgm;
 
-package org.eclipse.jgit.iplog;
+import static org.junit.Assert.assertEquals;
 
-import java.util.Comparator;
-import java.util.Date;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.junit.Before;
+import org.junit.Test;
 
-/** A single contribution by a {@link Contributor}. */
-class SingleContribution {
-	/** Sorts contributors by their name first name, then last name. */
-	public static final Comparator<SingleContribution> COMPARATOR = new Comparator<SingleContribution>() {
-		public int compare(SingleContribution a, SingleContribution b) {
-			return a.created.compareTo(b.created);
-		}
-	};
+public class TagTest extends CLIRepositoryTestCase {
+	private Git git;
 
-	private final String id;
-
-	private String summary;
-
-	private Date created;
-
-	private String size;
-
-	/**
-	 * @param id
-	 * @param created
-	 * @param summary
-	 */
-	SingleContribution(String id, Date created, String summary) {
-		this.id = id;
-		this.summary = summary;
-		this.created = created;
+	@Override
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		git = new Git(db);
+		git.commit().setMessage("initial commit").call();
 	}
 
-	/** @return unique identity of the contribution. */
-	String getID() {
-		return id;
-	}
+	@Test
+	public void testTagTwice() throws Exception {
+		git.tag().setName("test").call();
+		writeTrashFile("file", "content");
+		git.add().addFilepattern("file").call();
+		git.commit().setMessage("commit").call();
 
-	/** @return date the contribution was created. */
-	Date getCreated() {
-		return created;
-	}
-
-	/** @return summary of the contribution. */
-	String getSummary() {
-		return summary;
-	}
-
-	String getSize() {
-		return size;
-	}
-
-	void setSize(String sz) {
-		size = sz;
+		assertEquals("fatal: tag 'test' already exists",
+				execute("git tag test")[0]);
 	}
 }
