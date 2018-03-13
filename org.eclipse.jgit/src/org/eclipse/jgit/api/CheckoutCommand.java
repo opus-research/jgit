@@ -331,13 +331,9 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	}
 
 	private String getShortBranchName(Ref headRef) {
-		if (headRef.isSymbolic()) {
-			return Repository.shortenRefName(headRef.getTarget().getName());
-		}
-		// detached HEAD
-		ObjectId id = headRef.getObjectId();
-		assert (id != null);
-		return id.getName();
+		if (headRef.getTarget().getName().equals(headRef.getName()))
+			return headRef.getTarget().getObjectId().getName();
+		return Repository.shortenRefName(headRef.getTarget().getName());
 	}
 
 	/**
