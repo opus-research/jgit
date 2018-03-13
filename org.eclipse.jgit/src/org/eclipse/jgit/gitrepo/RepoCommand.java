@@ -55,7 +55,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.Git;
@@ -573,22 +572,12 @@ public class RepoCommand extends GitCommand<RevCommit> {
 						builder.add(dcEntry);
 					}
 					for (LinkFile linkfile : proj.getLinkFiles()) {
-						String link;
-						if (linkfile.dest.contains("/")) { //$NON-NLS-1$
-							link = FileUtils.relativize(
-									linkfile.dest.substring(0,
-											linkfile.dest.lastIndexOf('/')),
-									proj.getPath() + "/" + linkfile.src); //$NON-NLS-1$
-						} else {
-							link = proj.getPath() + "/" + linkfile.src; //$NON-NLS-1$
-						}
-
-						objectId = inserter.insert(Constants.OBJ_BLOB,
-								link.getBytes(
-										Constants.CHARACTER_ENCODING));
+						byte[] src = callback.readFile(
+								nameUri, proj.getRevision(), linkfile.src);
+						objectId = inserter.insert(Constants.OBJ_BLOB, src);
 						dcEntry = new DirCacheEntry(linkfile.dest);
 						dcEntry.setObjectId(objectId);
-						dcEntry.setFileMode(FileMode.SYMLINK);
+						dcEntry.setFileMode(FileMode.REGULAR_FILE);
 						builder.add(dcEntry);
 					}
 				}
@@ -696,7 +685,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			}
 			if (!linkfiles.isEmpty()) {
 				throw new UnsupportedOperationException(
-						JGitText.get().nonBareLinkFilesNotSupported);
+					"Link files supported not nonbare repos");
 			}
 		}
 	}
