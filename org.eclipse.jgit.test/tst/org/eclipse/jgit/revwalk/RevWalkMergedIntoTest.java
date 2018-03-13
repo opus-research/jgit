@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2014, Sven Selberg <sven.selberg@sonymobile.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,35 +40,41 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.revwalk;
 
-package org.eclipse.jgit.internal.storage.dfs;
+import static org.junit.Assert.assertTrue;
 
-import java.io.IOException;
+import org.junit.Test;
 
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.RefRename;
-import org.eclipse.jgit.lib.RefUpdate;
-import org.eclipse.jgit.lib.RefUpdate.Result;
+public class RevWalkMergedIntoTest extends RevWalkTestCase {
 
-final class DfsRefRename extends RefRename {
-	DfsRefRename(RefUpdate src, RefUpdate dst) {
-		super(src, dst);
-	}
-
-	@Override
-	protected Result doRename() throws IOException {
-		// TODO Correctly handle renaming foo/bar to foo.
-		// TODO Batch these together into one log update.
-
-		destination.setExpectedOldObjectId(ObjectId.zeroId());
-		destination.setNewObjectId(source.getRef().getObjectId());
-		switch (destination.update()) {
-		case NEW:
-			source.delete();
-			return Result.RENAMED;
-
-		default:
-			return destination.getResult();
-		}
+	@Test
+	public void testOldCommitWalk() throws Exception {
+		/*
+		 * Sometimes a merge is performed on a machine with faulty time.
+		 * This makes the traversal of the graph, when trying to find out if B
+		 * is merged into T, complex since the algorithm uses the time stamps
+		 * of commits to find the best route.
+		 * When for example O(ld) has a very old time stamp compared to one of the
+		 * commits (N(ew)) on the upper route between T and F(alse base), the route
+		 * to False is deemed the better option even though the alternate route leeds
+		 * to B(ase) which was the commit we were after.
+		 *
+		 *             o---o---o---o---N
+		 *            /                 \
+		 *           /   o---o---o---O---T
+		 *          /   /
+		 *      ---F---B
+		 *
+		 * This test is asserting that isMergedInto(B, T) returns true even
+		 * under those circumstances.
+		 */
+		final int threeDaysInSecs = 3 * 24 * 60 * 60;
+		final RevCommit f = commit();
+		final RevCommit b = commit(f);
+		final RevCommit o = commit(-threeDaysInSecs, commit(commit(commit(b))));
+		final RevCommit n = commit(commit(commit(commit(commit(f)))));
+		final RevCommit t = commit(n, o);
+		assertTrue(rw.isMergedInto(b, t));
 	}
 }

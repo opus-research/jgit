@@ -189,48 +189,12 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 		}
 	}
 
-	private static class FormatEntry {
-		final Format<?> format;
-		/** Number of times this format has been registered. */
-		final int refcnt;
-
-		public FormatEntry(Format<?> format, int refcnt) {
-			if (format == null)
-				throw new NullPointerException();
-			this.format = format;
-			this.refcnt = refcnt;
-		}
-	};
-
 	/**
 	 * Available archival formats (corresponding to values for
 	 * the --format= option)
 	 */
-	private static final ConcurrentMap<String, FormatEntry> formats =
-			new ConcurrentHashMap<String, FormatEntry>();
-
-	/**
-	 * Replaces the entry for a key only if currently mapped to a given
-	 * value.
-	 *
-	 * @param map a map
-	 * @param key key with which the specified value is associated
-	 * @param oldValue expected value for the key (null if should be absent).
-	 * @param newValue value to be associated with the key (null to remove).
-	 * @return true if the value was replaced
-	 */
-	private static <K, V> boolean replace(ConcurrentMap<K, V> map,
-			K key, V oldValue, V newValue) {
-		if (oldValue == null && newValue == null) // Nothing to do.
-			return true;
-
-		if (oldValue == null)
-			return map.putIfAbsent(key, newValue) == null;
-		else if (newValue == null)
-			return map.remove(key, oldValue);
-		else
-			return map.replace(key, oldValue, newValue);
-	}
+	private static final ConcurrentMap<String, Format<?>> formats =
+			new ConcurrentHashMap<String, Format<?>>();
 
 	/**
 	 * Adds support for an additional archival format.  To avoid
@@ -246,25 +210,12 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	 *              An archival format with that name was already registered.
 	 */
 	public static void registerFormat(String name, Format<?> fmt) {
-		if (fmt == null)
-			throw new NullPointerException();
-
 		// TODO(jrn): Check that suffixes don't overlap.
 
-		FormatEntry old = null;
-		FormatEntry entry = new FormatEntry(fmt, 1);
-		while (!replace(formats, name, old, entry)) {
-			old = formats.get(name);
-			if (old == null) {
-				entry = new FormatEntry(fmt, 1);
-				continue;
-			}
-			if (!old.format.equals(fmt))
-				throw new JGitInternalException(MessageFormat.format(
-						JGitText.get().archiveFormatAlreadyRegistered,
-						name));
-			entry = new FormatEntry(old.format, old.refcnt + 1);
-		}
+		if (formats.putIfAbsent(name, fmt) != null)
+			throw new JGitInternalException(MessageFormat.format(
+					JGitText.get().archiveFormatAlreadyRegistered,
+					name));
 	}
 
 	/**
@@ -276,38 +227,27 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	 *              No such archival format was registered.
 	 */
 	public static void unregisterFormat(String name) {
-		FormatEntry old, entry;
-		do {
-			old = formats.get(name);
-			if (old == null)
-				throw new JGitInternalException(MessageFormat.format(
-						JGitText.get().archiveFormatAlreadyAbsent,
-						name));
-			if (old.refcnt == 1) {
-				entry = null;
-				continue;
-			}
-			entry = new FormatEntry(old.format, old.refcnt - 1);
-		} while (!replace(formats, name, old, entry));
+		if (formats.remove(name) == null)
+			throw new JGitInternalException(MessageFormat.format(
+					JGitText.get().archiveFormatAlreadyAbsent,
+					name));
 	}
 
 	private static Format<?> formatBySuffix(String filenameSuffix)
 			throws UnsupportedFormatException {
 		if (filenameSuffix != null)
-			for (FormatEntry entry : formats.values()) {
-				Format<?> fmt = entry.format;
+			for (Format<?> fmt : formats.values())
 				for (String sfx : fmt.suffixes())
 					if (filenameSuffix.endsWith(sfx))
 						return fmt;
-			}
 		return lookupFormat("tar"); //$NON-NLS-1$
 	}
 
 	private static Format<?> lookupFormat(String formatName) throws UnsupportedFormatException {
-		FormatEntry entry = formats.get(formatName);
-		if (entry == null)
+		Format<?> fmt = formats.get(formatName);
+		if (fmt == null)
 			throw new UnsupportedFormatException(formatName);
-		return entry.format;
+		return fmt;
 	}
 
 	private OutputStream out;
