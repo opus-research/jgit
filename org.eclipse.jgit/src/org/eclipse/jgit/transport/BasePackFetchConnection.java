@@ -184,7 +184,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	/**
 	 * The client supports fetching objects at the tip of any ref, even if not
 	 * advertised.
-	 * @since 3.0
+	 * @since 3.1
 	 */
 	public static final String OPTION_ALLOW_TIP_SHA1_IN_WANT = "allow-tip-sha1-in-want"; //$NON-NLS-1$
 
