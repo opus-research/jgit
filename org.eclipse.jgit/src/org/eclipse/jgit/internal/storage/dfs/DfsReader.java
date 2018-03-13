@@ -44,12 +44,12 @@
 
 package org.eclipse.jgit.internal.storage.dfs;
 
-import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.UNREACHABLE_GARBAGE;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.PACK;
 import static org.eclipse.jgit.lib.Constants.OBJECT_ID_LENGTH;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -566,22 +566,10 @@ public class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 	public void selectObjectRepresentation(PackWriter packer,
 			ProgressMonitor monitor, Iterable<ObjectToPack> objects)
 			throws IOException, MissingObjectException {
-		// Don't check dirty bit on PackList; assume ObjectToPacks all came
-		// from the current list.
-		List<DfsPackFile> packs = sortPacksForSelectRepresentation();
-		trySelectRepresentation(packer, monitor, objects, packs, false);
-
-		List<DfsPackFile> garbage = garbagePacksForSelectRepresentation();
-		if (!garbage.isEmpty() && checkGarbagePacks(objects)) {
-			trySelectRepresentation(packer, monitor, objects, garbage, true);
-		}
-	}
-
-	private void trySelectRepresentation(PackWriter packer,
-			ProgressMonitor monitor, Iterable<ObjectToPack> objects,
-			List<DfsPackFile> packs, boolean skipFound) throws IOException {
-		for (DfsPackFile pack : packs) {
-			List<DfsObjectToPack> tmp = findAllFromPack(pack, objects, skipFound);
+		// Don't check dirty bit on PackList; assume ObjectToPacks all came from the
+		// current list.
+		for (DfsPackFile pack : sortPacksForSelectRepresentation()) {
+			List<DfsObjectToPack> tmp = findAllFromPack(pack, objects);
 			if (tmp.isEmpty())
 				continue;
 			Collections.sort(tmp, OFFSET_SORT);
@@ -620,54 +608,24 @@ public class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		}
 	};
 
-	private List<DfsPackFile> sortPacksForSelectRepresentation()
+	private DfsPackFile[] sortPacksForSelectRepresentation()
 			throws IOException {
 		DfsPackFile[] packs = db.getPacks();
-		List<DfsPackFile> sorted = new ArrayList<>(packs.length);
-		for (DfsPackFile p : packs) {
-			if (p.getPackDescription().getPackSource() != UNREACHABLE_GARBAGE) {
-				sorted.add(p);
-			}
-		}
-		Collections.sort(sorted, PACK_SORT_FOR_REUSE);
+		DfsPackFile[] sorted = new DfsPackFile[packs.length];
+		System.arraycopy(packs, 0, sorted, 0, packs.length);
+		Arrays.sort(sorted, PACK_SORT_FOR_REUSE);
 		return sorted;
 	}
 
-	private List<DfsPackFile> garbagePacksForSelectRepresentation()
-			throws IOException {
-		DfsPackFile[] packs = db.getPacks();
-		List<DfsPackFile> garbage = new ArrayList<>(packs.length);
-		for (DfsPackFile p : packs) {
-			if (p.getPackDescription().getPackSource() == UNREACHABLE_GARBAGE) {
-				garbage.add(p);
-			}
-		}
-		return garbage;
-	}
-
-	private static boolean checkGarbagePacks(Iterable<ObjectToPack> objects) {
-		for (ObjectToPack otp : objects) {
-			if (!((DfsObjectToPack) otp).isFound()) {
-				return true;
-			}
-		}
-		return false;
-	}
-
 	private List<DfsObjectToPack> findAllFromPack(DfsPackFile pack,
-			Iterable<ObjectToPack> objects, boolean skipFound)
-					throws IOException {
+			Iterable<ObjectToPack> objects) throws IOException {
 		List<DfsObjectToPack> tmp = new BlockList<>();
 		PackIndex idx = pack.getPackIndex(this);
-		for (ObjectToPack obj : objects) {
-			DfsObjectToPack otp = (DfsObjectToPack) obj;
-			if (skipFound && otp.isFound()) {
-				continue;
-			}
+		for (ObjectToPack otp : objects) {
 			long p = idx.findOffset(otp);
 			if (0 < p && !pack.isCorrupt(p)) {
 				otp.setOffset(p);
-				tmp.add(otp);
+				tmp.add((DfsObjectToPack) otp);
 			}
 		}
 		return tmp;
@@ -697,7 +655,7 @@ public class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 	/**
 	 * Copy bytes from the window to a caller supplied buffer.
 	 *
-	 * @param pack
+	 * @param file
 	 *            the file the desired window is stored within.
 	 * @param position
 	 *            position within the file to read from.
@@ -716,24 +674,24 @@ public class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 	 *             this cursor does not match the provider or id and the proper
 	 *             window could not be acquired through the provider's cache.
 	 */
-	int copy(DfsPackFile pack, long position, byte[] dstbuf, int dstoff, int cnt)
-			throws IOException {
+	int copy(BlockBasedFile file, long position, byte[] dstbuf, int dstoff,
+			int cnt) throws IOException {
 		if (cnt == 0)
 			return 0;
 
-		long length = pack.length;
+		long length = file.length;
 		if (0 <= length && length <= position)
 			return 0;
 
 		int need = cnt;
 		do {
-			pin(pack, position);
+			pin(file, position);
 			int r = block.copy(position, dstbuf, dstoff, need);
 			position += r;
 			dstoff += r;
 			need -= r;
 			if (length < 0)
-				length = pack.length;
+				length = file.length;
 		} while (0 < need && position < length);
 		return cnt - need;
 	}
@@ -798,14 +756,14 @@ public class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 			inf.reset();
 	}
 
-	void pin(DfsPackFile pack, long position) throws IOException {
-		if (block == null || !block.contains(pack.key, position)) {
+	void pin(BlockBasedFile file, long position) throws IOException {
+		if (block == null || !block.contains(file.key, position)) {
 			// If memory is low, we may need what is in our window field to
 			// be cleaned up by the GC during the get for the next window.
 			// So we always clear it, even though we are just going to set
 			// it again.
 			block = null;
-			block = pack.getOrLoadBlock(position, this);
+			block = file.getOrLoadBlock(position, this);
 		}
 	}
 
