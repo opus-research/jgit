@@ -1069,9 +1069,11 @@ public class PackWriter {
 		for (ObjectId id : interestingObjects)
 			walker.markStart(walker.lookupOrNull(id));
 
+		RevFlag added = walker.newFlag("added");
 		RevObject o;
 		while ((o = walker.next()) != null) {
 			addResult(o, 0);
+			o.add(added);
 			if (restartedProgress != 0)
 				restartedProgress--;
 			else
@@ -1079,6 +1081,7 @@ public class PackWriter {
 		}
 		while ((o = walker.nextObject()) != null) {
 			addResult(o, walker.getPathHashCode());
+			o.add(added);
 			if (restartedProgress != 0)
 				restartedProgress--;
 			else
@@ -1087,26 +1090,25 @@ public class PackWriter {
 
 		ObjectListIterator itr = reader.openObjectList(listName, walker);
 		try {
-			ObjectToPack otp;
-
-			while (restartedProgress != 0
-					&& (otp = itr.nextObjectToPack()) != null) {
-				if (objectsMap.addIfAbsent(otp) == otp) {
-					otp.setPathHash(itr.getPathHashCode());
-					objectsLists[otp.getType()].add(otp);
-					if (restartedProgress != 0)
-						restartedProgress--;
-					else
-						countingMonitor.update(1);
-				}
-			}
-
-			while ((otp = itr.nextObjectToPack()) != null) {
-				if (objectsMap.addIfAbsent(otp) == otp) {
-					otp.setPathHash(itr.getPathHashCode());
-					objectsLists[otp.getType()].add(otp);
+			while ((o = itr.next()) != null) {
+				if (o.has(added))
+					continue;
+				addResult(o, 0);
+				o.add(added);
+				if (restartedProgress != 0)
+					restartedProgress--;
+				else
 					countingMonitor.update(1);
-				}
+			}
+			while ((o = itr.nextObject()) != null) {
+				if (o.has(added))
+					continue;
+				addResult(o, itr.getPathHashCode());
+				o.add(added);
+				if (restartedProgress != 0)
+					restartedProgress--;
+				else
+					countingMonitor.update(1);
 			}
 		} finally {
 			itr.release();
@@ -1130,7 +1132,8 @@ public class PackWriter {
 		addResultOrBase(object, 0);
 	}
 
-	private void addResultOrBase(final RevObject object, final int pathHashCode) {
+	private void addResultOrBase(final RevObject object, final int pathHashCode)
+			throws IncorrectObjectTypeException {
 		if (object.has(RevFlag.UNINTERESTING)) {
 			switch (object.getType()) {
 			case Constants.OBJ_TREE:
@@ -1147,14 +1150,25 @@ public class PackWriter {
 		}
 	}
 
-	private void addResult(final RevObject object, final int pathHashCode) {
+	private void addResult(final RevObject object, final int pathHashCode)
+			throws IncorrectObjectTypeException {
 		final ObjectToPack otp;
 		if (reuseSupport != null)
 			otp = reuseSupport.newObjectToPack(object);
 		else
 			otp = new ObjectToPack(object);
 		otp.setPathHash(pathHashCode);
-		objectsLists[otp.getType()].add(otp);
+
+		try {
+			objectsLists[object.getType()].add(otp);
+		} catch (ArrayIndexOutOfBoundsException x) {
+			throw new IncorrectObjectTypeException(object,
+					JGitText.get().incorrectObjectType_COMMITnorTREEnorBLOBnorTAG);
+		} catch (UnsupportedOperationException x) {
+			// index pointing to "dummy" empty list
+			throw new IncorrectObjectTypeException(object,
+					JGitText.get().incorrectObjectType_COMMITnorTREEnorBLOBnorTAG);
+		}
 		objectsMap.add(otp);
 	}
 
