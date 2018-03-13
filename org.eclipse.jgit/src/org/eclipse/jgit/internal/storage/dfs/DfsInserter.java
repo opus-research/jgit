@@ -479,7 +479,7 @@ public class DfsInserter extends ObjectInserter {
 				b.setInput(inf, pos);
 				return b;
 			}
-			inf.setInput(currBuf, 0, currPtr);
+			inf.setInput(currBuf, (int) (pos - currPos), currPtr);
 			return null;
 		}
 
