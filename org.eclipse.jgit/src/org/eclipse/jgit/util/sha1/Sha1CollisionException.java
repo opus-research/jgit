@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008, Google Inc.
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2017, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,74 +41,30 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.treewalk.filter;
+package org.eclipse.jgit.util.sha1;
 
-import java.io.IOException;
+import java.text.MessageFormat;
 
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.lib.ObjectId;
 
-/** Includes an entry only if the subfilter does not include the entry. */
-public class NotTreeFilter extends TreeFilter {
+/**
+ * Thrown by {@link SHA1} if it detects a likely hash collision.
+ *
+ * @since 4.7
+ */
+public class Sha1CollisionException extends RuntimeException {
+	private static final long serialVersionUID = 1L;
+
 	/**
-	 * Create a filter that negates the result of another filter.
+	 * Initialize with default message.
 	 *
-	 * @param a
-	 *            filter to negate.
-	 * @return a filter that does the reverse of <code>a</code>.
+	 * @param id
+	 *            object whose contents are a hash collision.
 	 */
-	public static TreeFilter create(final TreeFilter a) {
-		return new NotTreeFilter(a);
-	}
-
-	private final TreeFilter a;
-
-	private NotTreeFilter(final TreeFilter one) {
-		a = one;
-	}
-
-	@Override
-	public TreeFilter negate() {
-		return a;
-	}
-
-	@Override
-	public boolean include(final TreeWalk walker)
-			throws MissingObjectException, IncorrectObjectTypeException,
-			IOException {
-		return matchFilter(walker) == 0;
-	}
-
-	@Override
-	public int matchFilter(TreeWalk walker)
-			throws MissingObjectException, IncorrectObjectTypeException,
-			IOException {
-		final int r = a.matchFilter(walker);
-		// switch 0 and 1, keep -1 as that defines a subpath that must be
-		// traversed before a final verdict can be made.
-		if (r == 0) {
-			return 1;
-		}
-		if (r == 1) {
-			return 0;
-		}
-		return -1;
-	}
-
-	@Override
-	public boolean shouldBeRecursive() {
-		return a.shouldBeRecursive();
-	}
-
-	@Override
-	public TreeFilter clone() {
-		final TreeFilter n = a.clone();
-		return n == a ? this : new NotTreeFilter(n);
-	}
-
-	@Override
-	public String toString() {
-		return "NOT " + a.toString(); //$NON-NLS-1$
+	public Sha1CollisionException(ObjectId id) {
+		super(MessageFormat.format(
+				JGitText.get().sha1CollisionDetected1,
+				id.name()));
 	}
 }
