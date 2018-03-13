@@ -157,34 +157,6 @@ public class ResetCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testHardResetWithConflicts_DoOverWriteUntrackedFile()
-			throws JGitInternalException,
-			AmbiguousObjectException, IOException, GitAPIException {
-		setupRepository();
-		git.rm().setCached(true).addFilepattern("a.txt").call();
-		assertTrue(new File(db.getWorkTree(), "a.txt").exists());
-		git.reset().setMode(ResetType.HARD).setRef(Constants.HEAD)
-				.call();
-		assertTrue(new File(db.getWorkTree(), "a.txt").exists());
-		assertEquals("content", read(new File(db.getWorkTree(), "a.txt")));
-	}
-
-	@Test
-	public void testHardResetWithConflicts_DoDeleteFileFolderConflicts()
-			throws JGitInternalException,
-			AmbiguousObjectException, IOException, GitAPIException {
-		setupRepository();
-		writeTrashFile("d/c.txt", "x");
-		git.add().addFilepattern("d/c.txt").call();
-		FileUtils.delete(new File(db.getWorkTree(), "d"), FileUtils.RECURSIVE);
-		writeTrashFile("d", "y");
-
-		git.reset().setMode(ResetType.HARD).setRef(Constants.HEAD)
-				.call();
-		assertFalse(new File(db.getWorkTree(), "d").exists());
-	}
-
-	@Test
 	public void testResetToNonexistingHEAD() throws JGitInternalException,
 			AmbiguousObjectException, IOException, GitAPIException {
 
@@ -596,7 +568,7 @@ public class ResetCommandTest extends RepositoryTestCase {
 	 * @throws IOException
 	 */
 	private void assertSameAsHead(Ref ref) throws IOException {
-		Ref headRef = db.exactRef(Constants.HEAD);
+		Ref headRef = db.getRef(Constants.HEAD);
 		assertEquals(headRef.getName(), ref.getName());
 		assertEquals(headRef.getObjectId(), ref.getObjectId());
 	}
