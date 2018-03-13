@@ -55,7 +55,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.lib.Constants;
@@ -401,60 +400,23 @@ public class UploadPack {
 			}
 		}
 
-		boolean sendPack;
-		try {
-			recvWants();
-			if (wantIds.isEmpty()) {
-				preUploadHook.onBeginNegotiateRound(this, wantIds, 0);
-				preUploadHook.onEndNegotiateRound(this, wantIds, 0, 0, false);
-				return;
-			}
-
-			if (options.contains(OPTION_MULTI_ACK_DETAILED)) {
-				multiAck = MultiAck.DETAILED;
-				noDone = options.contains(OPTION_NO_DONE);
-			} else if (options.contains(OPTION_MULTI_ACK))
-				multiAck = MultiAck.CONTINUE;
-			else
-				multiAck = MultiAck.OFF;
-
-			sendPack = negotiate();
-		} catch (PackProtocolException err) {
-			reportErrorDuringNegotiate(err.getMessage());
-			throw err;
-
-		} catch (UploadPackMayNotContinueException err) {
-			if (!err.isOutput() && err.getMessage() != null) {
-				try {
-					pckOut.writeString("ERR " + err.getMessage() + "\n");
-					err.setOutput();
-				} catch (Throwable err2) {
-					// Ignore this secondary failure (and not mark output).
-				}
-			}
-			throw err;
-
-		} catch (IOException err) {
-			reportErrorDuringNegotiate(JGitText.get().internalServerError);
-			throw err;
-		} catch (RuntimeException err) {
-			reportErrorDuringNegotiate(JGitText.get().internalServerError);
-			throw err;
-		} catch (Error err) {
-			reportErrorDuringNegotiate(JGitText.get().internalServerError);
-			throw err;
+		recvWants();
+		if (wantIds.isEmpty()) {
+			preUploadHook.onBeginNegotiateRound(this, wantIds, 0);
+			preUploadHook.onEndNegotiateRound(this, wantIds, 0, 0, false);
+			return;
 		}
 
-		if (sendPack)
+		if (options.contains(OPTION_MULTI_ACK_DETAILED)) {
+			multiAck = MultiAck.DETAILED;
+			noDone = options.contains(OPTION_NO_DONE);
+		} else if (options.contains(OPTION_MULTI_ACK))
+			multiAck = MultiAck.CONTINUE;
+		else
+			multiAck = MultiAck.OFF;
+
+		if (negotiate())
 			sendPack();
-	}
-
-	private void reportErrorDuringNegotiate(String msg) {
-		try {
-			pckOut.writeString("ERR " + msg + "\n");
-		} catch (Throwable err) {
-			// Ignore this secondary failure.
-		}
 	}
 
 	/**
@@ -573,7 +535,16 @@ public class UploadPack {
 
 	private ObjectId processHaveLines(List<ObjectId> peerHas, ObjectId last)
 			throws IOException {
-		preUploadHook.onBeginNegotiateRound(this, wantIds, peerHas.size());
+		try {
+			preUploadHook.onBeginNegotiateRound(this, wantIds, peerHas.size());
+		} catch (UploadPackMayNotContinueException fail) {
+			if (fail.getMessage() != null) {
+				pckOut.writeString("ERR " + fail.getMessage() + "\n");
+				fail.setOutput();
+			}
+			throw fail;
+		}
+
 		if (peerHas.isEmpty())
 			return last;
 
@@ -604,6 +575,7 @@ public class UploadPack {
 					if (wantIds.contains(id)) {
 						String msg = MessageFormat.format(
 								JGitText.get().wantNotValid, id.name());
+						pckOut.writeString("ERR " + msg);
 						throw new PackProtocolException(msg, notFound);
 					}
 					continue;
@@ -618,6 +590,7 @@ public class UploadPack {
 					if (!advertised.contains(obj)) {
 						String msg = MessageFormat.format(
 								JGitText.get().wantNotValid, obj.name());
+						pckOut.writeString("ERR " + msg);
 						throw new PackProtocolException(msg);
 					}
 
@@ -715,7 +688,17 @@ public class UploadPack {
 			sentReady = true;
 		}
 
-		preUploadHook.onEndNegotiateRound(this, wantAll, haveCnt, missCnt, sentReady);
+		try {
+			preUploadHook.onEndNegotiateRound(this, wantAll, //
+					haveCnt, missCnt, sentReady);
+		} catch (UploadPackMayNotContinueException fail) {
+			if (fail.getMessage() != null) {
+				pckOut.writeString("ERR " + fail.getMessage() + "\n");
+				fail.setOutput();
+			}
+			throw fail;
+		}
+
 		peerHas.clear();
 		return last;
 	}
@@ -774,59 +757,6 @@ public class UploadPack {
 		final boolean sideband = options.contains(OPTION_SIDE_BAND)
 				|| options.contains(OPTION_SIDE_BAND_64K);
 
-		if (!biDirectionalPipe) {
-			// Ensure the request was fully consumed. Any remaining input must
-			// be a protocol error. If we aren't at EOF the implementation is broken.
-			int eof = rawIn.read();
-			if (0 <= eof)
-				throw new CorruptObjectException(MessageFormat.format(
-						JGitText.get().expectedEOFReceived,
-						"\\x" + Integer.toHexString(eof)));
-		}
-
-		if (sideband) {
-			try {
-				sendPack(true);
-			} catch (UploadPackMayNotContinueException noPack) {
-				// This was already reported on (below).
-				throw noPack;
-			} catch (IOException err) {
-				if (reportInternalServerErrorOverSideband())
-					throw new UploadPackInternalServerErrorException(err);
-				else
-					throw err;
-			} catch (RuntimeException err) {
-				if (reportInternalServerErrorOverSideband())
-					throw new UploadPackInternalServerErrorException(err);
-				else
-					throw err;
-			} catch (Error err) {
-				if (reportInternalServerErrorOverSideband())
-					throw new UploadPackInternalServerErrorException(err);
-				else
-					throw err;
-			}
-		} else {
-			sendPack(false);
-		}
-	}
-
-	private boolean reportInternalServerErrorOverSideband() {
-		try {
-			SideBandOutputStream err = new SideBandOutputStream(
-					SideBandOutputStream.CH_ERROR,
-					SideBandOutputStream.SMALL_BUF,
-					rawOut);
-			err.write(Constants.encode(JGitText.get().internalServerError));
-			err.flush();
-			return true;
-		} catch (Throwable cannotReport) {
-			// Ignore the reason. This is a secondary failure.
-			return false;
-		}
-	}
-
-	private void sendPack(final boolean sideband) throws IOException {
 		ProgressMonitor pm = NullProgressMonitor.INSTANCE;
 		OutputStream packOut = rawOut;
 		SideBandOutputStream msgOut = null;

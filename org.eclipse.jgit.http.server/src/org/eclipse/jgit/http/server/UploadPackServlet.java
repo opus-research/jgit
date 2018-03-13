@@ -68,7 +68,6 @@ import javax.servlet.http.HttpServletResponse;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 import org.eclipse.jgit.transport.UploadPack;
-import org.eclipse.jgit.transport.UploadPackInternalServerErrorException;
 import org.eclipse.jgit.transport.UploadPackMayNotContinueException;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
@@ -176,23 +175,14 @@ class UploadPackServlet extends HttpServlet {
 			out.close();
 
 		} catch (UploadPackMayNotContinueException e) {
-			if (!e.isOutput() && !rsp.isCommitted()) {
-				rsp.reset();
+			if (!e.isOutput())
 				rsp.sendError(SC_SERVICE_UNAVAILABLE);
-			}
 			return;
-
-		} catch (UploadPackInternalServerErrorException e) {
-			getServletContext().log(
-					HttpServerText.get().internalErrorDuringUploadPack,
-					e.getCause());
 
 		} catch (IOException e) {
 			getServletContext().log(HttpServerText.get().internalErrorDuringUploadPack, e);
-			if (!rsp.isCommitted()) {
-				rsp.reset();
-				rsp.sendError(SC_INTERNAL_SERVER_ERROR);
-			}
+			rsp.reset();
+			rsp.sendError(SC_INTERNAL_SERVER_ERROR);
 			return;
 		}
 	}

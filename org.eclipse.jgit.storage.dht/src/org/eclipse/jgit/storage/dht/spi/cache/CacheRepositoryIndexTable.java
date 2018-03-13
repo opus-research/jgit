@@ -128,18 +128,4 @@ public class CacheRepositoryIndexTable implements RepositoryIndexTable {
 			throw new TimeoutException();
 		}
 	}
-
-	public void remove(RepositoryName name, RepositoryKey key)
-			throws DhtException, TimeoutException {
-		db.remove(name, key);
-
-		Sync<Void> sync = Sync.create();
-		CacheKey memKey = ns.key(name);
-		client.modify(singleton(Change.remove(memKey)), sync);
-		try {
-			sync.get(options.getTimeout());
-		} catch (InterruptedException e) {
-			throw new TimeoutException();
-		}
-	}
 }
