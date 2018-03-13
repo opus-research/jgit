@@ -202,7 +202,9 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	}
 
 	/**
-	 * @return the repositoryt this iterator works with
+	 * @return the repository this iterator works with
+	 *
+	 * @since 3.3
 	 */
 	public Repository getRepository() {
 		return repository;
@@ -861,7 +863,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *
 	 * @param entry
 	 *            the entry to be checked
-	 * @return <code>true</code> if the content differs, <code>false</code>
+	 * @return <code>true</code> if the content matches, <code>false</code>
 	 *         otherwise
 	 * @throws IOException
 	 */

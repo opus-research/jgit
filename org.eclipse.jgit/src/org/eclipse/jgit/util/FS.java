@@ -275,10 +275,11 @@ public abstract class FS {
 
 	/**
 	 * Delete a file. Throws an exception if delete fails.
-	 *
+	 * 
 	 * @param f
 	 * @throws IOException
 	 *             this may be a Java7 subclass with detailed information
+	 * @since 3.3
 	 */
 	public void delete(File f) throws IOException {
 		if (!f.delete())
@@ -636,6 +637,8 @@ public abstract class FS {
 
 	/**
 	 * File attributes we typically care for.
+	 *
+	 * @since 3.3
 	 */
 	public static class Attributes {
 
@@ -763,6 +766,7 @@ public abstract class FS {
 	/**
 	 * @param path
 	 * @return the file attributes we care for
+	 * @since 3.3
 	 */
 	public Attributes getAttributes(File path) {
 		boolean isDirectory = isDirectory(path);
