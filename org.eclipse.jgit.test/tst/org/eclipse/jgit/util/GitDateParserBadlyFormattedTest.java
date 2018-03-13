@@ -1,8 +1,5 @@
 /*
- * Copyright (C) 2008, Google Inc.
- * Copyright (C) 2008, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
- * Copyright (C) 2011, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2012, Christian Halstrick
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,44 +40,60 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.util;
 
-package org.eclipse.jgit.pgm.debug;
+import static org.junit.Assert.fail;
 
-import static java.lang.Integer.valueOf;
+import java.text.ParseException;
+import java.util.Calendar;
+import java.util.GregorianCalendar;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import org.junit.experimental.theories.DataPoints;
+import org.junit.experimental.theories.Theories;
+import org.junit.experimental.theories.Theory;
+import org.junit.runner.RunWith;
 
-import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.dircache.DirCacheEntry;
-import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.pgm.TextBuiltin;
+/**
+ * Tests which assert that unparseable Strings lead to ParseExceptions
+ */
+@RunWith(Theories.class)
+public class GitDateParserBadlyFormattedTest {
+	private String dateStr;
 
-class ShowDirCache extends TextBuiltin {
-	@Override
-	protected void run() throws Exception {
-		final SimpleDateFormat fmt;
-		fmt = new SimpleDateFormat("yyyy-MM-dd,HH:mm:ss.SSS");
+	public GitDateParserBadlyFormattedTest(String dateStr) {
+		this.dateStr = dateStr;
+	}
 
-		final DirCache cache = db.readDirCache();
-		for (int i = 0; i < cache.getEntryCount(); i++) {
-			final DirCacheEntry ent = cache.getEntry(i);
-			final FileMode mode = FileMode.fromBits(ent.getRawMode());
-			final int len = ent.getLength();
-			final Date mtime = new Date(ent.getLastModified());
-			final int stage = ent.getStage();
+	@DataPoints
+	static public String[] getDataPoints() {
+		return new String[] { "", "1970", "3000.3000.3000", "3 yesterday ago",
+				"now yesterday ago", "yesterdays", "3.day. 2.week.ago",
+				"day ago", "Gra Feb 21 15:35:00 2007 +0100",
+				"Sun Feb 21 15:35:00 2007 +0100",
+				"Wed Feb 21 15:35:00 Grand +0100" };
+	}
 
-			outw.print(mode);
-			outw.format(" %6d", valueOf(len));
-			outw.print(' ');
-			outw.print(fmt.format(mtime));
-			outw.print(' ');
-			outw.print(ent.getObjectId().name());
-			outw.print(' ');
-			outw.print(stage);
-			outw.print('\t');
-			outw.print(ent.getPathString());
-			outw.println();
+	@Theory
+	public void badlyFormattedWithExplicitRef() {
+		Calendar ref = new GregorianCalendar(SystemReader.getInstance()
+				.getTimeZone(), SystemReader.getInstance().getLocale());
+		try {
+			GitDateParser.parse(dateStr, ref);
+			fail("The expected ParseException while parsing '" + dateStr
+					+ "' did not occur.");
+		} catch (ParseException e) {
+			// expected
+		}
+	}
+
+	@Theory
+	public void badlyFormattedWithoutRef() {
+		try {
+			GitDateParser.parse(dateStr, null);
+			fail("The expected ParseException while parsing '" + dateStr
+					+ "' did not occur.");
+		} catch (ParseException e) {
+			// expected
 		}
 	}
 }

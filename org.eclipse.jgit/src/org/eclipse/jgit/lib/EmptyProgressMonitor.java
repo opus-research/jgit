@@ -1,8 +1,5 @@
 /*
- * Copyright (C) 2008, Google Inc.
- * Copyright (C) 2008, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
- * Copyright (C) 2011, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2012, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,44 +40,35 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.lib;
 
-package org.eclipse.jgit.pgm.debug;
+/**
+ * A convenient base class which provides empty method bodies for all
+ * ProgressMonitor methods.
+ * <p>
+ * Could be used in scenarios when only some of the progress notifications are
+ * important and others can be ignored.
+ */
+public abstract class EmptyProgressMonitor implements ProgressMonitor {
 
-import static java.lang.Integer.valueOf;
-
-import java.text.SimpleDateFormat;
-import java.util.Date;
-
-import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.dircache.DirCacheEntry;
-import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.pgm.TextBuiltin;
-
-class ShowDirCache extends TextBuiltin {
-	@Override
-	protected void run() throws Exception {
-		final SimpleDateFormat fmt;
-		fmt = new SimpleDateFormat("yyyy-MM-dd,HH:mm:ss.SSS");
-
-		final DirCache cache = db.readDirCache();
-		for (int i = 0; i < cache.getEntryCount(); i++) {
-			final DirCacheEntry ent = cache.getEntry(i);
-			final FileMode mode = FileMode.fromBits(ent.getRawMode());
-			final int len = ent.getLength();
-			final Date mtime = new Date(ent.getLastModified());
-			final int stage = ent.getStage();
-
-			outw.print(mode);
-			outw.format(" %6d", valueOf(len));
-			outw.print(' ');
-			outw.print(fmt.format(mtime));
-			outw.print(' ');
-			outw.print(ent.getObjectId().name());
-			outw.print(' ');
-			outw.print(stage);
-			outw.print('\t');
-			outw.print(ent.getPathString());
-			outw.println();
-		}
+	public void start(int totalTasks) {
+		// empty
 	}
+
+	public void beginTask(String title, int totalWork) {
+		// empty
+	}
+
+	public void update(int completed) {
+		// empty
+	}
+
+	public void endTask() {
+		// empty
+	}
+
+	public boolean isCancelled() {
+		return false;
+	}
+
 }
