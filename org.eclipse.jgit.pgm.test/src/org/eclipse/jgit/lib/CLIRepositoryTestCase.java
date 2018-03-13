@@ -46,6 +46,7 @@ import static org.junit.Assert.assertEquals;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -69,11 +70,33 @@ public class CLIRepositoryTestCase extends LocalDiskRepositoryTestCase {
 		trash = db.getWorkTree();
 	}
 
+	/**
+	 * Executes specified git commands (with arguments)
+	 *
+	 * @param cmds
+	 *            each string argument must be a valid git command line, e.g.
+	 *            "git branch -h"
+	 * @return command output
+	 * @throws Exception
+	 */
 	protected String[] execute(String... cmds) throws Exception {
 		List<String> result = new ArrayList<String>(cmds.length);
-		for (String cmd : cmds)
+		for (String cmd : cmds) {
 			result.addAll(CLIGitCommand.execute(cmd, db));
+		}
 		return result.toArray(new String[0]);
+	}
+
+	/**
+	 * @param link
+	 *            the path of the symbolic link to create
+	 * @param target
+	 *            the target of the symbolic link
+	 * @return the path to the symbolic link
+	 * @throws Exception
+	 */
+	protected Path writeLink(String link, String target) throws Exception {
+		return JGitTestUtil.writeLink(db, link, target);
 	}
 
 	protected File writeTrashFile(final String name, final String data)
