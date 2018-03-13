@@ -44,52 +44,36 @@
 package org.eclipse.jgit.diff;
 
 /**
- * Equivalence function for a {@link Sequence} compared by difference algorithm.
+ * Compares two {@link Sequence}s to create an {@link EditList} of changes.
  *
- * Difference algorithms can use a comparator to compare portions of two
- * sequences and discover the minimal edits required to transform from one
- * sequence to the other sequence.
- *
- * Indexes within a sequence are zero-based.
- *
- * @param <S>
- *            type of sequence the comparator supports.
+ * An algorithm's {@code diff} method must be callable from concurrent threads
+ * without data collisions. This permits some algorithms to use a singleton
+ * pattern, with concurrent invocations using the same singleton. Other
+ * algorithms may support parameterization, in which case the caller can create
+ * a unique instance per thread.
  */
-public abstract class SequenceComparator<S extends Sequence> {
+public interface DiffAlgorithm {
 	/**
-	 * Compare two items to determine if they are equivalent.
+	 * Compare two sequences and identify a list of edits between them.
 	 *
-	 * It is permissible to compare sequence {@code a} with itself (by passing
-	 * {@code a} again in position {@code b}).
-	 *
+	 * @param <S>
+	 *            type of sequence being compared.
+	 * @param <C>
+	 *            type of comparator to evaluate the sequence elements.
+	 * @param cmp
+	 *            the comparator supplying the element equivalence function.
 	 * @param a
-	 *            the first sequence.
-	 * @param ai
-	 *            item of {@code ai} to compare.
+	 *            the first (also known as old or pre-image) sequence. Edits
+	 *            returned by this algorithm will reference indexes using the
+	 *            'A' side: {@link Edit#getBeginA()}, {@link Edit#getEndA()}.
 	 * @param b
-	 *            the second sequence.
-	 * @param bi
-	 *            item of {@code bi} to compare.
-	 * @return true if the two items are identical according to this function's
-	 *         equivalence rule.
+	 *            the first (also known as new or post-image) sequence. Edits
+	 *            returned by this algorithm will reference indexes using the
+	 *            'B' side: {@link Edit#getBeginB()}, {@link Edit#getEndB()}.
+	 * @return a modifiable edit list comparing the two sequences. If empty, the
+	 *         sequences are identical according to {@code cmp}'s rules. The
+	 *         result list is never null.
 	 */
-	public abstract boolean equals(S a, int ai, S b, int bi);
-
-	/**
-	 * Get a hash value for an item in a sequence.
-	 *
-	 * If two items are equal according to this comparator's
-	 * {@link #equals(Sequence, int, Sequence, int)} method, then this hash
-	 * method must produce the same integer result for both items.
-	 *
-	 * It is not required for two items to have different hash values if they
-	 * are are unequal according to the {@code equals()} method.
-	 *
-	 * @param seq
-	 *            the sequence.
-	 * @param ptr
-	 *            the item to obtain the hash for.
-	 * @return hash the hash value.
-	 */
-	public abstract int hash(S seq, int ptr);
+	public <S extends Sequence, C extends SequenceComparator<? super S>> EditList diff(
+			C cmp, S a, S b);
 }

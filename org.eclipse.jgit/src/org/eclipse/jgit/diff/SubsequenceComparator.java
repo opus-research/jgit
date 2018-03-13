@@ -44,52 +44,36 @@
 package org.eclipse.jgit.diff;
 
 /**
- * Equivalence function for a {@link Sequence} compared by difference algorithm.
+ * Wrap another comparator for use with {@link Subsequence}.
  *
- * Difference algorithms can use a comparator to compare portions of two
- * sequences and discover the minimal edits required to transform from one
- * sequence to the other sequence.
- *
- * Indexes within a sequence are zero-based.
+ * This comparator acts as a proxy for the real comparator, translating element
+ * indexes on the fly by adding the subsequence's begin offset to them.
+ * Comparators of this type must be used with a {@link Subsequence}.
  *
  * @param <S>
- *            type of sequence the comparator supports.
+ *            the base sequence type.
  */
-public abstract class SequenceComparator<S extends Sequence> {
-	/**
-	 * Compare two items to determine if they are equivalent.
-	 *
-	 * It is permissible to compare sequence {@code a} with itself (by passing
-	 * {@code a} again in position {@code b}).
-	 *
-	 * @param a
-	 *            the first sequence.
-	 * @param ai
-	 *            item of {@code ai} to compare.
-	 * @param b
-	 *            the second sequence.
-	 * @param bi
-	 *            item of {@code bi} to compare.
-	 * @return true if the two items are identical according to this function's
-	 *         equivalence rule.
-	 */
-	public abstract boolean equals(S a, int ai, S b, int bi);
+public final class SubsequenceComparator<S extends Sequence> extends
+		SequenceComparator<Subsequence<S>> {
+	private final SequenceComparator<? super S> cmp;
 
 	/**
-	 * Get a hash value for an item in a sequence.
+	 * Construct a comparator wrapping another comparator.
 	 *
-	 * If two items are equal according to this comparator's
-	 * {@link #equals(Sequence, int, Sequence, int)} method, then this hash
-	 * method must produce the same integer result for both items.
-	 *
-	 * It is not required for two items to have different hash values if they
-	 * are are unequal according to the {@code equals()} method.
-	 *
-	 * @param seq
-	 *            the sequence.
-	 * @param ptr
-	 *            the item to obtain the hash for.
-	 * @return hash the hash value.
+	 * @param cmp
+	 *            the real comparator.
 	 */
-	public abstract int hash(S seq, int ptr);
+	public SubsequenceComparator(SequenceComparator<? super S> cmp) {
+		this.cmp = cmp;
+	}
+
+	@Override
+	public boolean equals(Subsequence<S> a, int ai, Subsequence<S> b, int bi) {
+		return cmp.equals(a.base, ai + a.begin, b.base, bi + b.begin);
+	}
+
+	@Override
+	public int hash(Subsequence<S> seq, int ptr) {
+		return cmp.hash(seq.base, ptr + seq.begin);
+	}
 }
