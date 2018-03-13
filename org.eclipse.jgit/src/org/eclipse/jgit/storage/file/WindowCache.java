@@ -187,7 +187,7 @@ public class WindowCache {
 			oc.removeAll();
 		cache = nc;
 		streamFileThreshold = cfg.getStreamFileThreshold();
-		UnpackedObjectCache.reconfigure(cfg);
+		DeltaBaseCache.reconfigure(cfg);
 	}
 
 	static int getStreamFileThreshold() {
@@ -518,7 +518,6 @@ public class WindowCache {
 		gc();
 	}
 
-	@SuppressWarnings("unchecked")
 	private void gc() {
 		Ref r;
 		while ((r = (Ref) queue.poll()) != null) {
