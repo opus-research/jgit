@@ -43,7 +43,8 @@
 
 package org.eclipse.jgit.revwalk;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.fail;
 
 import org.eclipse.jgit.revwalk.filter.RevFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;

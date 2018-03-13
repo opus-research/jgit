@@ -43,7 +43,7 @@
 
 package org.eclipse.jgit.http.test;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 import java.net.HttpURLConnection;
 import java.net.URI;

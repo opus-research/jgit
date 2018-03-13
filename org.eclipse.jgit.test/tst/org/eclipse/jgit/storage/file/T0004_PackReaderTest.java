@@ -46,7 +46,8 @@
 
 package org.eclipse.jgit.storage.file;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 import java.io.File;
 import java.io.IOException;

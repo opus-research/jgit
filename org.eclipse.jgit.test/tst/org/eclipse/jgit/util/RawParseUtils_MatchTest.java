@@ -43,7 +43,7 @@
 
 package org.eclipse.jgit.util;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertTrue;
 
 import org.eclipse.jgit.lib.Constants;
 import org.junit.Test;

@@ -44,7 +44,9 @@
 
 package org.eclipse.jgit.diff;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import org.eclipse.jgit.lib.Constants;
 import org.junit.Test;

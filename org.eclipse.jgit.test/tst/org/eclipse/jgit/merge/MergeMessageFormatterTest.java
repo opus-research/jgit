@@ -42,7 +42,7 @@
  */
 package org.eclipse.jgit.merge;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -50,9 +50,9 @@ import java.util.Arrays;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
-import org.eclipse.jgit.lib.Ref.Storage;
 import org.junit.Before;
 import org.junit.Test;
 

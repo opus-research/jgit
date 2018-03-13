@@ -46,7 +46,9 @@ package org.eclipse.jgit.util;
 import static org.eclipse.jgit.util.RawCharUtil.isWhitespace;
 import static org.eclipse.jgit.util.RawCharUtil.trimLeadingWhitespace;
 import static org.eclipse.jgit.util.RawCharUtil.trimTrailingWhitespace;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import java.io.UnsupportedEncodingException;
 
