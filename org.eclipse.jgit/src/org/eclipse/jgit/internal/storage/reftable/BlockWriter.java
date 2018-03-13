@@ -172,7 +172,7 @@ class BlockWriter {
 	private int computeBlockSize(int key, boolean restart) {
 		return 4 // 4-byte block header
 				+ bytesInKeyTable + key
-				+ (restartCnt + (restart ? 1 : 0)) * 4
+				+ (restartCnt + (restart ? 1 : 0)) * 3
 				+ 2; // 2-byte restart_count
 	}
 
@@ -198,7 +198,7 @@ class BlockWriter {
 			prior = entry.key;
 		}
 		for (int i = 0; i < restartOffsets.size(); i++) {
-			os.writeInt32(restartOffsets.get(i));
+			os.writeInt24(restartOffsets.get(i));
 		}
 		os.writeInt16(restartOffsets.size());
 		os.flushBlock();
