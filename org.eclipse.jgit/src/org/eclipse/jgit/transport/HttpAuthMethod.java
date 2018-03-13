@@ -85,21 +85,11 @@ abstract class HttpAuthMethod {
 			public HttpAuthMethod method(String hdr) {
 				return None.INSTANCE;
 			}
-
-			@Override
-			public String getSchemeName() {
-				return "None"; //$NON-NLS-1$
-			}
 		},
 		BASIC {
 			@Override
 			public HttpAuthMethod method(String hdr) {
 				return new Basic();
-			}
-
-			@Override
-			public String getSchemeName() {
-				return "Basic"; //$NON-NLS-1$
 			}
 		},
 		DIGEST {
@@ -107,21 +97,11 @@ abstract class HttpAuthMethod {
 			public HttpAuthMethod method(String hdr) {
 				return new Digest(hdr);
 			}
-
-			@Override
-			public String getSchemeName() {
-				return "Digest"; //$NON-NLS-1$
-			}
 		},
 		NEGOTIATE {
 			@Override
 			public HttpAuthMethod method(String hdr) {
 				return new Negotiate(hdr);
-			}
-
-			@Override
-			public String getSchemeName() {
-				return "Negotiate"; //$NON-NLS-1$
 			}
 		};
 		/**
@@ -132,13 +112,6 @@ abstract class HttpAuthMethod {
 		 * @return a configured HttpAuthMethod instance
 		 */
 		public abstract HttpAuthMethod method(String hdr);
-
-		/**
-		 * @return the name of the authentication scheme in the form to be used
-		 *         in HTTP authentication headers as specified in RFC2617 and
-		 *         RFC4559
-		 */
-		public abstract String getSchemeName();
 	}
 
 	static final String EMPTY_STRING = ""; //$NON-NLS-1$
@@ -297,7 +270,7 @@ abstract class HttpAuthMethod {
 		void configureRequest(final HttpConnection conn) throws IOException {
 			String ident = user + ":" + pass; //$NON-NLS-1$
 			String enc = Base64.encodeBytes(ident.getBytes("UTF-8")); //$NON-NLS-1$
-			conn.setRequestProperty(HDR_AUTHORIZATION, type.getSchemeName()
+			conn.setRequestProperty(HDR_AUTHORIZATION, type.name()
 					+ " " + enc); //$NON-NLS-1$
 		}
 	}
@@ -384,7 +357,7 @@ abstract class HttpAuthMethod {
 				v.append(e.getValue());
 				v.append('"');
 			}
-			conn.setRequestProperty(HDR_AUTHORIZATION, type.getSchemeName()
+			conn.setRequestProperty(HDR_AUTHORIZATION, type.name()
 					+ " " + v); //$NON-NLS-1$
 		}
 
@@ -541,7 +514,7 @@ abstract class HttpAuthMethod {
 				byte[] token = context.initSecContext(prevToken, 0,
 						prevToken.length);
 
-				conn.setRequestProperty(HDR_AUTHORIZATION, getType().getSchemeName()
+				conn.setRequestProperty(HDR_AUTHORIZATION, getType().name()
 						+ " " + Base64.encodeBytes(token)); //$NON-NLS-1$
 			} catch (GSSException e) {
 				IOException ioe = new IOException();
