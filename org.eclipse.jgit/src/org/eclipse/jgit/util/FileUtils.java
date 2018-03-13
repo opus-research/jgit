@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2010, Google Inc.
  * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
  * Copyright (C) 2010, Jens Baumgart <jens.baumgart@sap.com>
  * and other copyright owners as documented in the project's IP log.
@@ -54,92 +55,76 @@ import org.eclipse.jgit.JGitText;
  * File Utilities
  */
 public class FileUtils {
+
 	/**
+	 * Option to delete given {@code File}
+	 */
+	public static final int NONE = 0;
+
+	/**
+	 * Option to recursively delete given {@code File}
+	 */
+	public static final int RECURSIVE = 1;
+
+	/**
+	 * Option to retry deletion if not successful
+	 */
+	public static final int RETRY = 2;
+
+	/**
+	 * Delete file or empty folder
+	 *
 	 * @param f
-	 *            the File to be deleted
+	 *            {@code File} to be deleted
 	 * @throws IOException
-	 *             if file deletion failed
+	 *             if deletion of {@code f} fails. This may occur if {@code f}
+	 *             didn't exist when the method was called. This can therefore
+	 *             cause IOExceptions during race conditions when multiple
+	 *             concurrent threads all try to delete the same file.
 	 */
 	public static void delete(final File f) throws IOException {
-		if (!f.exists())
-			return;
+		delete(f, NONE);
+	}
 
-		if (!f.delete())
+	/**
+	 * Delete file or folder
+	 *
+	 * @param f
+	 *            {@code File} to be deleted
+	 * @param options
+	 *            deletion options, {@code RECURSIVE} for recursive deletion of
+	 *            a subtree, {@code RETRY} to retry when deletion failed.
+	 *            Retrying may help if the underlying file system doesn't allow
+	 *            deletion of files being read by another thread.
+	 * @throws IOException
+	 *             if deletion of {@code f} fails. This may occur if {@code f}
+	 *             didn't exist when the method was called. This can therefore
+	 *             cause IOExceptions during race conditions when multiple
+	 *             concurrent threads all try to delete the same file.
+	 */
+	public static void delete(final File f, int options) throws IOException {
+		if ((options & RECURSIVE) != 0 && f.isDirectory()) {
+			final File[] items = f.listFiles();
+			if (items != null) {
+				for (File c : items)
+					delete(c, options);
+			}
+		}
+		if (!f.delete()) {
+			if ((options & RETRY) != 0 && f.exists()) {
+				for (int i = 1; i < 10; i++) {
+					try {
+						Thread.sleep(100);
+					} catch (InterruptedException e) {
+						// ignore
+					}
+					if (f.delete())
+						return;
+				}
+			}
 			throw new IOException(MessageFormat.format(
 					JGitText.get().deleteFileFailed, f.getAbsolutePath()));
-	}
-
-	/**
-	 * Recursively delete a file or directory
-	 *
-	 * @param d
-	 *            the File to delete recursively
-	 * @throws IOException
-	 *             if file deletion failed
-	 */
-	public static void recursiveDelete(final File d) throws IOException {
-		if (!d.exists())
-			return;
-
-		if (d.isDirectory()) {
-			final File[] items = d.listFiles();
-			if (items != null) {
-				for (final File c : items)
-					recursiveDelete(c);
-			}
 		}
-		FileUtils.delete(d);
-	}
-
-	/**
-	 * Deletes a file. Deletion is retried 10 times to avoid failing deletion
-	 * caused by concurrent read.
-	 *
-	 * @param file
-	 *            File to be deleted
-	 * @throws IOException
-	 */
-	public static void deleteRepeated(File file) throws IOException {
-		boolean deleted = false;
-		for (int i = 0; i < 10; i++) {
-			deleted = file.delete();
-			if (deleted)
-				break;
-			try {
-				Thread.sleep(100);
-			} catch (InterruptedException e) {
-				// ignore
-			}
-		}
-		if (!deleted) {
-			throw new IOException(MessageFormat.format(
-					JGitText.get().deleteFileWithRepetitionsFailed,
-					file.getPath()));
-		}
-	}
-
-	/**
-	 * Recursively delete a file or directory. Deletion is retried 10 times to
-	 * avoid failing deletion caused by concurrent read.
-	 *
-	 * @param d
-	 *            the File to delete recursively
-	 * @throws IOException
-	 *             if file can not be deleted
-	 */
-	public static void recursiveDeleteRepeated(File d) throws IOException {
-		if (!d.exists())
-			return;
-
-		if (d.isDirectory()) {
-			final File[] items = d.listFiles();
-			if (items != null) {
-				for (final File c : items)
-					recursiveDeleteRepeated(c);
-			}
-		}
-		deleteRepeated(d);
-		assert !d.exists();
 	}
 
 }
