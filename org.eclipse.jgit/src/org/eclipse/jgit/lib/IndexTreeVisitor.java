@@ -1,5 +1,7 @@
 /*
- * Copyright (C) 2011, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2007, Dave Watson <dwatson@mimvista.com>
+ * Copyright (C) 2007-2008, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2006, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,64 +42,66 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
 
+package org.eclipse.jgit.lib;
+
+import java.io.File;
 import java.io.IOException;
 
-import org.eclipse.jgit.errors.NoWorkTreeException;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.IndexDiff;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.treewalk.FileTreeIterator;
-import org.eclipse.jgit.treewalk.WorkingTreeIterator;
+import org.eclipse.jgit.lib.GitIndex.Entry;
 
 /**
- * A class used to execute a {@code Status} command. It has setters for all
- * supported options and arguments of this command and a {@link #call()} method
- * to finally execute the command. Each instance of this class should only be
- * used for one invocation of the command (means: one call to {@link #call()})
+ * Visitor interface for traversing the index and two trees in parallel.
  *
- * @see <a
- *      href="http://www.kernel.org/pub/software/scm/git/docs/git-status.html"
- *      >Git documentation about Status</a>
+ * When merging we deal with up to two tree nodes and a base node. Then
+ * we figure out what to do.
+ *
+ * A File argument is supplied to allow us to check for modifications in
+ * a work tree or update the file.
+ *
+ * @deprecated Use {@link org.eclipse.jgit.treewalk.TreeWalk} instead, with
+ * a {@link org.eclipse.jgit.dircache.DirCacheIterator} as a member.
  */
-public class StatusCommand extends GitCommand<Status> {
-	private WorkingTreeIterator workingTreeIt;
-
+@Deprecated
+public interface IndexTreeVisitor {
 	/**
-	 * @param repo
-	 */
-	protected StatusCommand(Repository repo) {
-		super(repo);
-		// TODO Auto-generated constructor stub
-	}
-
-	/**
-	 * Executes the {@code Status} command with all the options and parameters
-	 * collected by the setter methods of this class. Each instance of this
-	 * class should only be used for one invocation of the command. Don't call
-	 * this method twice on an instance.
+	 * Visit a blob, and corresponding tree and index entries.
 	 *
-	 * @return a {@link Status} object telling about each path where working
-	 *         tree, index or HEAD differ from each other.
+	 * @param treeEntry
+	 * @param indexEntry
+	 * @param file
+	 * @throws IOException
 	 */
-	public Status call() throws IOException, NoWorkTreeException {
-		if (workingTreeIt == null)
-			workingTreeIt = new FileTreeIterator(repo);
-
-		IndexDiff diff = new IndexDiff(repo, Constants.HEAD, workingTreeIt);
-		diff.diff();
-
-		return new Status(diff);
-	}
+	public void visitEntry(TreeEntry treeEntry, Entry indexEntry, File file) throws IOException;
 
 	/**
-	 * To set the {@link WorkingTreeIterator} which should be used. If this
-	 * method is not called a standard {@link FileTreeIterator} is used.
+	 * Visit a blob, and corresponding tree nodes and associated index entry.
 	 *
-	 * @param workingTreeIt
+	 * @param treeEntry
+	 * @param auxEntry
+	 * @param indexEntry
+	 * @param file
+	 * @throws IOException
 	 */
-	public void setWorkingTreeIt(WorkingTreeIterator workingTreeIt) {
-		this.workingTreeIt = workingTreeIt;
-	}
+	public void visitEntry(TreeEntry treeEntry, TreeEntry auxEntry, Entry indexEntry, File file) throws IOException;
+
+	/**
+	 * Invoked after handling all child nodes of a tree, during a three way merge
+	 *
+	 * @param tree
+	 * @param auxTree
+	 * @param curDir
+	 * @throws IOException
+	 */
+	public void finishVisitTree(Tree tree, Tree auxTree, String curDir) throws IOException;
+
+	/**
+	 * Invoked after handling all child nodes of a tree, during two way merge.
+	 *
+	 * @param tree
+	 * @param i
+	 * @param curDir
+	 * @throws IOException
+	 */
+	public void finishVisitTree(Tree tree, int i, String curDir) throws IOException;
 }

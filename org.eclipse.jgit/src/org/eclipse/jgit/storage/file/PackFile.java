@@ -96,8 +96,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 	private final File packFile;
 
-	private volatile String packName;
-
 	final int hash;
 
 	private RandomAccessFile fd;
@@ -179,15 +177,11 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 	/** @return name extracted from {@code pack-*.pack} pattern. */
 	public String getPackName() {
-		String name = packName;
-		if (name == null) {
-			name = getPackFile().getName();
-			if (name.startsWith("pack-"))
-				name = name.substring("pack-".length());
-			if (name.endsWith(".pack"))
-				name = name.substring(0, name.length() - ".pack".length());
-			packName = name;
-		}
+		String name = getPackFile().getName();
+		if (name.startsWith("pack-"))
+			name = name.substring("pack-".length());
+		if (name.endsWith(".pack"))
+			name = name.substring(0, name.length() - ".pack".length());
 		return name;
 	}
 
@@ -474,16 +468,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			// Tiny optimization: Lots of objects are very small deltas or
 			// deflated commits that are likely to fit in the copy buffer.
 			//
-			if (!validate) {
-				long pos = dataOffset;
-				long cnt = dataLength;
-				while (cnt > 0) {
-					final int n = (int) Math.min(cnt, buf.length);
-					readFully(pos, buf, 0, n, curs);
-					pos += n;
-					cnt -= n;
-				}
-			}
 			out.writeHeader(src, inflatedLength);
 			out.write(buf, 0, (int) dataLength);
 		} else {

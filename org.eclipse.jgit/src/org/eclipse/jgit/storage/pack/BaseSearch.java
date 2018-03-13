@@ -56,7 +56,7 @@ import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdOwnerMap;
+import org.eclipse.jgit.lib.ObjectIdSubclassMap;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
@@ -74,20 +74,20 @@ class BaseSearch {
 
 	private final ObjectId[] baseTrees;
 
-	private final ObjectIdOwnerMap<ObjectToPack> objectsMap;
+	private final ObjectIdSubclassMap<ObjectToPack> objectsMap;
 
 	private final List<ObjectToPack> edgeObjects;
 
 	private final IntSet alreadyProcessed;
 
-	private final ObjectIdOwnerMap<TreeWithData> treeCache;
+	private final ObjectIdSubclassMap<TreeWithData> treeCache;
 
 	private final CanonicalTreeParser parser;
 
 	private final MutableObjectId idBuf;
 
 	BaseSearch(ProgressMonitor countingMonitor, Set<RevTree> bases,
-			ObjectIdOwnerMap<ObjectToPack> objects,
+			ObjectIdSubclassMap<ObjectToPack> objects,
 			List<ObjectToPack> edges, ObjectReader or) {
 		progress = countingMonitor;
 		reader = or;
@@ -96,7 +96,7 @@ class BaseSearch {
 		edgeObjects = edges;
 
 		alreadyProcessed = new IntSet();
-		treeCache = new ObjectIdOwnerMap<TreeWithData>();
+		treeCache = new ObjectIdSubclassMap<TreeWithData>();
 		parser = new CanonicalTreeParser();
 		idBuf = new MutableObjectId();
 	}
@@ -198,7 +198,7 @@ class BaseSearch {
 		return buf;
 	}
 
-	private static class TreeWithData extends ObjectIdOwnerMap.Entry {
+	private static class TreeWithData extends ObjectId {
 		final byte[] buf;
 
 		TreeWithData(AnyObjectId id, byte[] buf) {

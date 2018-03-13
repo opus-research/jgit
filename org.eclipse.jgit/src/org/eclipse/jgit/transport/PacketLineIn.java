@@ -101,8 +101,6 @@ class PacketLineIn {
 			else if (arg.equals(" ready"))
 				return AckNackResult.ACK_READY;
 		}
-		if (line.startsWith("ERR "))
-			throw new PackProtocolException(line.substring(4));
 		throw new PackProtocolException(MessageFormat.format(JGitText.get().expectedACKNAKGot, line));
 	}
 
@@ -115,12 +113,7 @@ class PacketLineIn {
 		if (len == 0)
 			return "";
 
-		byte[] raw;
-		if (len <= lineBuffer.length)
-			raw = lineBuffer;
-		else
-			raw = new byte[len];
-
+		final byte[] raw = new byte[len];
 		IO.readFully(in, raw, 0, len);
 		if (raw[len - 1] == '\n')
 			len--;
