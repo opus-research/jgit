@@ -197,14 +197,6 @@ public abstract class RefDatabase {
 	}
 
 	/**
-	 * @return if the database performs {@code newBatchUpdate()} as an atomic
-	 *         transaction.
-	 */
-	public boolean performsAtomicTransactions() {
-		return false;
-	}
-
-	/**
 	 * Read a single reference.
 	 * <p>
 	 * Aside from taking advantage of {@link #SEARCH_PATH}, this method may be

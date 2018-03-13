@@ -43,7 +43,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_ATOMIC;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_DELETE_REFS;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_OFS_DELTA;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_REPORT_STATUS;
@@ -909,8 +908,6 @@ public abstract class BaseReceivePack {
 		adv.advertiseCapability(CAPABILITY_SIDE_BAND_64K);
 		adv.advertiseCapability(CAPABILITY_DELETE_REFS);
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
-		if (db.getRefDatabase().performsAtomicTransactions())
-			adv.advertiseCapability(CAPABILITY_ATOMIC);
 		if (allowOfsDelta)
 			adv.advertiseCapability(CAPABILITY_OFS_DELTA);
 		adv.send(getAdvertisedOrDefaultRefs());
@@ -1252,17 +1249,6 @@ public abstract class BaseReceivePack {
 				cmd.setResult(Result.REJECTED_OTHER_REASON, JGitText.get().funnyRefname);
 			}
 		}
-	}
-
-	/**
-	 * @return if any commands have been rejected so far.
-	 */
-	protected boolean anyRejects() {
-		for (final ReceiveCommand cmd : commands) {
-			if (cmd.getResult() != Result.NOT_ATTEMPTED || cmd.getResult() != Result.OK)
-				return false;
-		}
-		return true;
 	}
 
 	/**
