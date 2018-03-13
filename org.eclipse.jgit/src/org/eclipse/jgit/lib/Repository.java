@@ -107,12 +107,8 @@ public abstract class Repository implements AutoCloseable {
 		return globalListeners;
 	}
 
-	/**
-	 * Use counter
-	 *
-	 * @since 4.1
-	 */
-	protected final AtomicInteger useCnt = new AtomicInteger(1);
+	/** Use counter */
+	final AtomicInteger useCnt = new AtomicInteger(1);
 
 	/** Metadata directory holding the repository's critical files. */
 	private final File gitDir;
