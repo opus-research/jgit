@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2011, Ketan Padegaonkar <ketanpadegaonkar@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,36 +40,65 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.api;
 
-package org.eclipse.jgit.errors;
-
-import java.io.File;
 import java.io.IOException;
-import java.text.MessageFormat;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
 
-import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.revwalk.RevTag;
+import org.eclipse.jgit.revwalk.RevWalk;
 
-/** Thrown when a PackFile previously failed and is known to be unusable */
-public class PackInvalidException extends IOException {
-	private static final long serialVersionUID = 1L;
+/**
+ * Used to obtain a list of tags.
+ *
+ * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-tag.html"
+ *      >Git documentation about Tag</a>
+ */
+public class ListTagCommand extends GitCommand<List<RevTag>> {
 
 	/**
-	 * Construct a pack invalid error.
-	 *
-	 * @param path
-	 *            path of the invalid pack file.
+	 * @param repo
 	 */
-	public PackInvalidException(final File path) {
-		this(path.getAbsolutePath());
+	protected ListTagCommand(Repository repo) {
+		super(repo);
 	}
 
 	/**
-	 * Construct a pack invalid error.
-	 *
-	 * @param path
-	 *            path of the invalid pack file.
+	 * @throws JGitInternalException
+	 *             upon internal failure
+	 * @return the tags available
 	 */
-	public PackInvalidException(final String path) {
-		super(MessageFormat.format(JGitText.get().packFileInvalid, path));
+	public List<RevTag> call() throws JGitInternalException {
+		checkCallable();
+		Map<String, Ref> refList;
+		List<RevTag> tags = new ArrayList<RevTag>();
+		RevWalk revWalk = new RevWalk(repo);
+		try {
+			refList = repo.getRefDatabase().getRefs(Constants.R_TAGS);
+			for (Ref ref : refList.values()) {
+				RevTag tag = revWalk.parseTag(ref.getObjectId());
+				tags.add(tag);
+			}
+		} catch (IOException e) {
+			throw new JGitInternalException(e.getMessage(), e);
+		} finally {
+			revWalk.release();
+		}
+		Collections.sort(tags, new Comparator<RevTag>() {
+			public int compare(RevTag o1, RevTag o2) {
+				return o1.getTagName().compareTo(o2.getTagName());
+			}
+		});
+		setCallable(false);
+		return tags;
 	}
+
 }
