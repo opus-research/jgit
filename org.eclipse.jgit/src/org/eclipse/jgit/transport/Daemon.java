@@ -336,12 +336,15 @@ public class Daemon {
 			public void run() {
 				try {
 					dc.execute(s);
+				} catch (RepositoryNotFoundException e) {
+					// Ignored. Client cannot use this repository.
 				} catch (ServiceNotEnabledException e) {
 					// Ignored. Client cannot use this repository.
 				} catch (ServiceNotAuthorizedException e) {
 					// Ignored. Client cannot use this repository.
 				} catch (IOException e) {
 					// Ignore unexpected IO exceptions from clients
+					e.printStackTrace();
 				} finally {
 					try {
 						s.getInputStream().close();

@@ -46,10 +46,8 @@ import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 
 import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.api.MergeResult.MergeStatus;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.MultipleParentsNotAllowedException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
@@ -64,7 +62,6 @@ import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.merge.ResolveMerger;
-import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
@@ -83,8 +80,6 @@ public class RevertCommand extends GitCommand<RevCommit> {
 	private List<Ref> commits = new LinkedList<Ref>();
 
 	private List<Ref> revertedRefs = new LinkedList<Ref>();
-
-	private MergeResult failingResult;
 
 	/**
 	 * @param repo
@@ -160,15 +155,6 @@ public class RevertCommand extends GitCommand<RevCommit> {
 							.setReflogComment("revert: " + shortMessage).call();
 					revertedRefs.add(src);
 				} else {
-					Map<String, MergeFailureReason> failingPaths = merger
-							.getFailingPaths();
-					if (failingPaths != null)
-						failingResult = new MergeResult(null,
-								merger.getBaseCommit(0, 1),
-								new ObjectId[] { headCommit.getId(),
-										srcParent.getId() },
-								MergeStatus.FAILED, MergeStrategy.RESOLVE,
-								merger.getMergeResults(), failingPaths, null);
 					return null;
 				}
 			}
@@ -223,13 +209,5 @@ public class RevertCommand extends GitCommand<RevCommit> {
 	 */
 	public List<Ref> getRevertedRefs() {
 		return revertedRefs;
-	}
-
-	/**
-	 * @return the result of the merge failure, <code>null</code> if no merge
-	 *         failure occurred during the revert
-	 */
-	public MergeResult getFailingResult() {
-		return failingResult;
 	}
 }
