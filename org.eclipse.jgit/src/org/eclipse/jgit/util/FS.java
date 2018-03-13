@@ -236,21 +236,6 @@ public abstract class FS {
 	public abstract boolean supportsExecute();
 
 	/**
-	 * Does this file system support atomic file creation via
-	 * java.io.File#createNewFile()? In certain environments (e.g. on NFS) it is
-	 * not guaranteed that when two file system clients run createNewFile() in
-	 * parallel only one will succeed. In such cases both clients may think they
-	 * created a new file.
-	 *
-	 * @return true if this implementation support atomic creation of new
-	 *         Files by {@link File#createNewFile()}
-	 * @since 4.5
-	 */
-	public boolean supportsAtomicCreateNewFile() {
-		return true;
-	}
-
-	/**
 	 * Does this operating system and JRE supports symbolic links. The
 	 * capability to handle symbolic links is detected at runtime.
 	 *
@@ -512,7 +497,13 @@ public abstract class FS {
 			if (env != null) {
 				pb.environment().putAll(env);
 			}
-			Process p = pb.start();
+			Process p;
+			try {
+				p = pb.start();
+			} catch (IOException e) {
+				// Process failed to start
+				throw new CommandFailedException(-1, e.getMessage(), e);
+			}
 			p.getOutputStream().close();
 			GobblerThread gobbler = new GobblerThread(p, command, dir);
 			gobbler.start();
@@ -792,23 +783,7 @@ public abstract class FS {
 	}
 
 	/**
-	 * Create a new file. See {@link File#createNewFile()}. Subclasses of this
-	 * class may take care to provide a safe implementation for this even if
-	 * {@link #supportsAtomicCreateNewFile()} is <code>false</code>
-	 *
-	 * @param path
-	 *            the file to be created
-	 * @return <code>true</code> if the file was created, <code>false</code> if
-	 *         the file already existed
-	 * @throws IOException
-	 * @since 4.5
-	 */
-	public boolean createNewFile(File path) throws IOException {
-		return path.createNewFile();
-	}
-
-	/**
-	 * See {@link FileUtils#relativize(String, String)}.
+	 * See {@link FileUtils#relativizePath(String, String, String, boolean)}.
 	 *
 	 * @param base
 	 *            The path against which <code>other</code> should be
@@ -817,11 +792,11 @@ public abstract class FS {
 	 *            The path that will be made relative to <code>base</code>.
 	 * @return A relative path that, when resolved against <code>base</code>,
 	 *         will yield the original <code>other</code>.
-	 * @see FileUtils#relativize(String, String)
+	 * @see FileUtils#relativizePath(String, String, String, boolean)
 	 * @since 3.7
 	 */
 	public String relativize(String base, String other) {
-		return FileUtils.relativize(base, other);
+		return FileUtils.relativizePath(base, other, File.separator, this.isCaseSensitive());
 	}
 
 	/**
