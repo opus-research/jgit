@@ -99,6 +99,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotCreateConfig;
 	/***/ public String cannotCreateDirectory;
 	/***/ public String cannotCreateHEAD;
+	/***/ public String cannotCreateIndexfile;
 	/***/ public String cannotDeleteCheckedOutBranch;
 	/***/ public String cannotDeleteFile;
 	/***/ public String cannotDeleteStaleTrackingRef;
@@ -314,7 +315,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidRefName;
 	/***/ public String invalidRemote;
 	/***/ public String invalidStageForPath;
-	/***/ public String invalidSubscribeRequest;
 	/***/ public String invalidTagOption;
 	/***/ public String invalidTimeout;
 	/***/ public String invalidURL;
@@ -366,7 +366,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String noApplyInDelete;
 	/***/ public String noClosingBracket;
 	/***/ public String noHEADExistsAndNoExplicitStartingRevisionWasSpecified;
-	/***/ public String noMatchingFetchSpec;
 	/***/ public String noHMACsupport;
 	/***/ public String noMergeHeadSpecified;
 	/***/ public String noSuchRef;
@@ -409,8 +408,10 @@ public class JGitText extends TranslationBundle {
 	/***/ public String packHasUnresolvedDeltas;
 	/***/ public String packingCancelledDuringObjectsWriting;
 	/***/ public String packObjectCountMismatch;
+	/***/ public String packRefs;
 	/***/ public String packTooLargeForIndexVersion1;
 	/***/ public String packWriterStatistics;
+	/***/ public String panicCantRenameIndexFile;
 	/***/ public String patchApplyException;
 	/***/ public String patchFormatException;
 	/***/ public String pathIsNotInWorkingDir;
@@ -421,6 +422,8 @@ public class JGitText extends TranslationBundle {
 	/***/ public String problemWithResolvingPushRefSpecsLocally;
 	/***/ public String progressMonUploading;
 	/***/ public String propertyIsAlreadyNonNull;
+	/***/ public String pruneLoosePackedObjects;
+	/***/ public String pruneLooseUnreferencedObjects;
 	/***/ public String pullOnRepoWithoutHEADCurrentlyNotSupported;
 	/***/ public String pullTaskName;
 	/***/ public String pushCancelled;
@@ -439,7 +442,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String remoteConfigHasNoURIAssociated;
 	/***/ public String remoteDoesNotHaveSpec;
 	/***/ public String remoteDoesNotSupportSmartHTTPPush;
-	/***/ public String remoteDoesNotSupportSmartHTTPSubscribe;
 	/***/ public String remoteHungUpUnexpectedly;
 	/***/ public String remoteNameCantBeNull;
 	/***/ public String renameBranchFailedBecauseTag;
@@ -454,7 +456,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String repositoryAlreadyExists;
 	/***/ public String repositoryConfigFileInvalid;
 	/***/ public String repositoryIsRequired;
-	/***/ public String repositoryMustHaveDirectory;
 	/***/ public String repositoryNotFound;
 	/***/ public String repositoryState_applyMailbox;
 	/***/ public String repositoryState_bisecting;
@@ -502,13 +503,9 @@ public class JGitText extends TranslationBundle {
 	/***/ public String stashFailed;
 	/***/ public String stashResolveFailed;
 	/***/ public String statelessRPCRequiresOptionToBeEnabled;
-	/***/ public String stopCommandNotSupported;
 	/***/ public String submoduleExists;
 	/***/ public String submodulesNotSupported;
 	/***/ public String submoduleParentRemoteUrlInvalid;
-	/***/ public String subscribeError;
-	/***/ public String subscribeNewUpdate;
-	/***/ public String subscribeNotSupported;
 	/***/ public String symlinkCannotBeWrittenAsTheLinkTarget;
 	/***/ public String systemConfigFileInvalid;
 	/***/ public String tagNameInvalid;

@@ -41,52 +41,45 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.transport;
+package org.eclipse.jgit.http.server;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.Collections;
-import java.util.List;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.eclipse.jgit.http.server.ClientVersionUtil.hasPushStatusBug;
+import static org.eclipse.jgit.http.server.ClientVersionUtil.invalidVersion;
+import static org.eclipse.jgit.http.server.ClientVersionUtil.parseVersion;
 
-/**
- * A PublisherPack is a single pack update for the listed commands. It may be
- * split into multiple PublisherPackSlices, each of which may be stored in
- * memory or on disk.
- */
-public class PublisherPack {
-	/** The Slices of data for this pack. This list will not change. */
-	private final List<PublisherPackSlice> dataSlices;
+import org.junit.Assert;
+import org.junit.Test;
 
-	/**
-	 * @param slices
-	 */
-	public PublisherPack(List<PublisherPackSlice> slices) {
-		dataSlices = Collections.unmodifiableList(slices);
+public class ClientVersionUtilTest {
+	@Test
+	public void testParse() {
+		assertEquals("1.6.5", parseVersion("git/1.6.6-rc0"));
+		assertEquals("1.6.6", parseVersion("git/1.6.6"));
+		assertEquals("1.7.5", parseVersion("git/1.7.5.GIT"));
+		assertEquals("1.7.6.1", parseVersion("git/1.7.6.1.45.gbe0cc"));
+
+		assertEquals("1.5.4.3", parseVersion("git/1.5.4.3,gzip(proxy)"));
+		assertEquals("1.7.0.2", parseVersion("git/1.7.0.2.msysgit.0.14.g956d7,gzip"));
+		assertEquals("1.7.10.2", parseVersion("git/1.7.10.2 (Apple Git-33)"));
+
+		assertEquals(ClientVersionUtil.toString(invalidVersion()), parseVersion("foo"));
 	}
 
-	/**
-	 * Write the pack to the output stream.
-	 *
-	 * @param out
-	 * @throws IOException
-	 */
-	public void writeToStream(OutputStream out) throws IOException {
-		for (PublisherPackSlice s : dataSlices)
-			s.writeToStream(out);
+	@Test
+	public void testPushStatusBug() {
+		assertTrue(hasPushStatusBug(parseVersion("git/1.6.6")));
+		assertTrue(hasPushStatusBug(parseVersion("git/1.6.6.1")));
+		assertTrue(hasPushStatusBug(parseVersion("git/1.7.9")));
+
+		assertFalse(hasPushStatusBug(parseVersion("git/1.7.8.6")));
+		assertFalse(hasPushStatusBug(parseVersion("git/1.7.9.1")));
+		assertFalse(hasPushStatusBug(parseVersion("git/1.7.9.2")));
+		assertFalse(hasPushStatusBug(parseVersion("git/1.7.10")));
 	}
 
-	/**
-	 * Close all data slices.
-	 *
-	 * @throws PublisherException
-	 */
-	public void close() throws PublisherException {
-		for (PublisherPackSlice s : dataSlices)
-			s.close();
-	}
-
-	@Override
-	public String toString() {
-		return "PublisherPack[slices=" + dataSlices.size() + "]";
+	private static void assertEquals(String exp, int[] act) {
+		Assert.assertEquals(exp, ClientVersionUtil.toString(act));
 	}
 }
