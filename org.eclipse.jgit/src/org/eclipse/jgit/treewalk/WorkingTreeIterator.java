@@ -266,6 +266,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			// If there is a matching DirCacheIterator, we can reuse
 			// its idBuffer, but only if we appear to be clean against
 			// the cached index information for the path.
+			//
 			DirCacheIterator i = state.walk.getTree(state.dirCacheTree,
 							DirCacheIterator.class);
 			if (i != null) {
@@ -395,9 +396,15 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 		if (len <= MAXIMUM_FILE_SIZE_TO_READ_FULLY) {
 			ByteBuffer rawbuf = IO.readWholeStream(is, (int) len);
-			rawbuf = filterClean(rawbuf.array(), rawbuf.limit(), opType);
-			canonLen = rawbuf.limit();
-			return new ByteArrayInputStream(rawbuf.array(), 0, (int) canonLen);
+			byte[] raw = rawbuf.array();
+			int n = rawbuf.limit();
+			if (!isBinary(raw, n)) {
+				rawbuf = filterClean(raw, n, opType);
+				raw = rawbuf.array();
+				n = rawbuf.limit();
+			}
+			canonLen = n;
+			return new ByteArrayInputStream(raw, 0, n);
 		}
 
 		if (getCleanFilterCommand() == null && isBinary(e)) {
@@ -423,6 +430,10 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			// stream. We don't care, we should not have any
 			// outstanding data to flush or anything like that.
 		}
+	}
+
+	private static boolean isBinary(byte[] content, int sz) {
+		return RawText.isBinary(content, sz);
 	}
 
 	private static boolean isBinary(Entry entry) throws IOException {
@@ -455,37 +466,36 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		if (filterCommand != null) {
 			if (Repository.isRegistered(filterCommand)) {
 				LocalFile buffer = new TemporaryBuffer.LocalFile(null);
-
 				FilterCommand command = Repository.getCommand(filterCommand,
-						repository,
-						in, buffer);
-				while (command.run() != -1)
-					;
+						repository, in, buffer);
+				while (command.run() != -1) {
+					// loop as long as command.run() tells there is work to do
+				}
 				return buffer.openInputStream();
-			} else {
-				FS fs = repository.getFS();
-				ProcessBuilder filterProcessBuilder = fs.runInShell(filterCommand,
-						new String[0]);
-				filterProcessBuilder.directory(repository.getWorkTree());
-				filterProcessBuilder.environment().put(Constants.GIT_DIR_KEY,
-						repository.getDirectory().getAbsolutePath());
-				ExecutionResult result;
-				try {
-					result = fs.execute(filterProcessBuilder, in);
-				} catch (IOException | InterruptedException e) {
-					throw new IOException(new FilterFailedException(e,
-							filterCommand, getEntryPathString()));
-				}
-				int rc = result.getRc();
-				if (rc != 0) {
-					throw new IOException(new FilterFailedException(rc,
-							filterCommand, getEntryPathString(),
-							result.getStdout().toByteArray(MAX_EXCEPTION_TEXT_SIZE),
-							RawParseUtils.decode(result.getStderr()
-									.toByteArray(MAX_EXCEPTION_TEXT_SIZE))));
-				}
-				return result.getStdout().openInputStream();
 			}
+			FS fs = repository.getFS();
+			ProcessBuilder filterProcessBuilder = fs.runInShell(filterCommand,
+					new String[0]);
+			filterProcessBuilder.directory(repository.getWorkTree());
+			filterProcessBuilder.environment().put(Constants.GIT_DIR_KEY,
+					repository.getDirectory().getAbsolutePath());
+			ExecutionResult result;
+			try {
+				result = fs.execute(filterProcessBuilder, in);
+			} catch (IOException | InterruptedException e) {
+				throw new IOException(new FilterFailedException(e,
+						filterCommand, getEntryPathString()));
+			}
+			int rc = result.getRc();
+			if (rc != 0) {
+				throw new IOException(new FilterFailedException(rc,
+						filterCommand, getEntryPathString(),
+						result.getStdout().toByteArray(MAX_EXCEPTION_TEXT_SIZE),
+						RawParseUtils.decode(result.getStderr()
+								.toByteArray(MAX_EXCEPTION_TEXT_SIZE))));
+			}
+			return result.getStdout().openInputStream();
+
 		}
 		return in;
 	}

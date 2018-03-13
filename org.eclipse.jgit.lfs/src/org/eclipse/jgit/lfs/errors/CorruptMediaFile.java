@@ -49,7 +49,7 @@ import java.text.MessageFormat;
 import org.eclipse.jgit.lfs.internal.LfsText;
 
 /**
- * Thrown when a lfs mediafile is found which doesn't have the expected size
+ * Thrown when an LFS mediafile is found which doesn't have the expected size
  *
  * @since 4.5
  */

@@ -113,8 +113,9 @@ public class LfsUtil {
 	/**
 	 * Create a new temp file in the LFS directory
 	 *
-	 * @return a new temporary file in the lfs directory
+	 * @return a new temporary file in the LFS directory
 	 * @throws IOException
+	 *             when the temp file could not be created
 	 */
 	public Path createTmpFile() throws IOException {
 		return Files.createTempFile(getLfsTmpDir(), null, null);
