@@ -41,31 +41,84 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.notes;
+package org.eclipse.jgit.transport;
 
-/** A note bucket that has been loaded into the process. */
-abstract class InMemoryNoteBucket extends NoteBucket {
+import java.util.Arrays;
+
+import org.eclipse.jgit.errors.UnsupportedCredentialItem;
+
+/**
+ * Simple {@link CredentialsProvider} that always uses the same information.
+ */
+public class UsernamePasswordCredentialsProvider extends CredentialsProvider {
+	private String username;
+
+	private char[] password;
+
 	/**
-	 * Number of leading digits that leads to this bucket in the note path.
+	 * Initialize the provider with a single username and password.
 	 *
-	 * This is counted in terms of hex digits, not raw bytes. Each bucket level
-	 * is typically 2 higher than its parent, placing about 256 items in each
-	 * level of the tree.
+	 * @param username
+	 * @param password
 	 */
-	final int prefixLen;
+	public UsernamePasswordCredentialsProvider(String username, String password) {
+		this(username, password.toCharArray());
+	}
 
 	/**
-	 * Chain of non-note tree entries found at this path in the tree.
+	 * Initialize the provider with a single username and password.
 	 *
-	 * During parsing of a note tree into the in-memory representation,
-	 * {@link NoteParser} keeps track of all non-note tree entries and stores
-	 * them here as a sorted linked list. That list can be merged back with the
-	 * note data that is held by the subclass, allowing the tree to be
-	 * recreated.
+	 * @param username
+	 * @param password
 	 */
-	NonNoteEntry nonNotes;
+	public UsernamePasswordCredentialsProvider(String username, char[] password) {
+		this.username = username;
+		this.password = password;
+	}
 
-	InMemoryNoteBucket(int prefixLen) {
-		this.prefixLen = prefixLen;
+	@Override
+	public boolean isInteractive() {
+		return false;
+	}
+
+	@Override
+	public boolean supports(CredentialItem... items) {
+		for (CredentialItem i : items) {
+			if (i instanceof CredentialItem.Username)
+				continue;
+
+			else if (i instanceof CredentialItem.Password)
+				continue;
+
+			else
+				return false;
+		}
+		return true;
+	}
+
+	@Override
+	public boolean get(URIish uri, CredentialItem... items)
+			throws UnsupportedCredentialItem {
+		for (CredentialItem i : items) {
+			if (i instanceof CredentialItem.Username)
+				((CredentialItem.Username) i).setValue(username);
+
+			else if (i instanceof CredentialItem.Password)
+				((CredentialItem.Password) i).setValue(password);
+
+			else
+				throw new UnsupportedCredentialItem(uri, i.getPromptText());
+		}
+		return true;
+	}
+
+	/** Destroy the saved username and password.. */
+	public void clear() {
+		username = null;
+
+		if (password != null) {
+			Arrays.fill(password, (char) 0);
+			password = null;
+		}
 	}
 }

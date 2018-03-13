@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,31 +41,31 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.notes;
+package org.eclipse.jgit.pgm;
 
-/** A note bucket that has been loaded into the process. */
-abstract class InMemoryNoteBucket extends NoteBucket {
-	/**
-	 * Number of leading digits that leads to this bucket in the note path.
-	 *
-	 * This is counted in terms of hex digits, not raw bytes. Each bucket level
-	 * is typically 2 higher than its parent, placing about 256 items in each
-	 * level of the tree.
-	 */
-	final int prefixLen;
+import java.util.ArrayList;
+import java.util.List;
 
-	/**
-	 * Chain of non-note tree entries found at this path in the tree.
-	 *
-	 * During parsing of a note tree into the in-memory representation,
-	 * {@link NoteParser} keeps track of all non-note tree entries and stores
-	 * them here as a sorted linked list. That list can be merged back with the
-	 * note data that is held by the subclass, allowing the tree to be
-	 * recreated.
-	 */
-	NonNoteEntry nonNotes;
+import org.eclipse.jgit.api.AddCommand;
+import org.eclipse.jgit.api.Git;
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.Option;
 
-	InMemoryNoteBucket(int prefixLen) {
-		this.prefixLen = prefixLen;
+@Command(common = true, usage = "usage_addFileContentsToTheIndex")
+class Add extends TextBuiltin {
+
+	@Option(name = "--update", aliases = { "-u" }, usage = "usage_onlyMatchAgainstAlreadyTrackedFiles")
+	private boolean update = false;
+
+	@Argument(required = true, metaVar = "metavar_filepattern", usage = "usage_filesToAddContentFrom")
+	private List<String> filepatterns = new ArrayList<String>();
+
+	@Override
+	protected void run() throws Exception {
+		AddCommand addCmd = new Git(db).add();
+		addCmd.setUpdate(update);
+		for (String p : filepatterns)
+			addCmd.addFilepattern(p);
+		addCmd.call();
 	}
 }
