@@ -147,23 +147,23 @@ public class DiffPerformanceTest extends TestCase {
 		}
 	}
 
-	public void testPatience() {
+	public void testHistogram() {
 		if (stopwatch != null) {
 			// run some tests without recording to let JIT do its optimization
-			testPatience(10000);
-			testPatience(20000);
-			testPatience(10000);
-			testPatience(20000);
+			testHistogram(10000);
+			testHistogram(20000);
+			testHistogram(10000);
+			testHistogram(20000);
 
 			List<PerfData> perfData = new LinkedList<PerfData>();
-			perfData.add(testPatience(10000));
-			perfData.add(testPatience(20000));
-			perfData.add(testPatience(40000));
-			perfData.add(testPatience(80000));
-			perfData.add(testPatience(160000));
-			perfData.add(testPatience(320000));
-			perfData.add(testPatience(640000));
-			perfData.add(testPatience(1280000));
+			perfData.add(testHistogram(10000));
+			perfData.add(testHistogram(20000));
+			perfData.add(testHistogram(40000));
+			perfData.add(testHistogram(80000));
+			perfData.add(testHistogram(160000));
+			perfData.add(testHistogram(320000));
+			perfData.add(testHistogram(640000));
+			perfData.add(testHistogram(1280000));
 
 			Comparator<PerfData> c = getComparator(1);
 			double factor = Collections.max(perfData, c).perf1()
@@ -178,8 +178,8 @@ public class DiffPerformanceTest extends TestCase {
 		}
 	}
 
-	private PerfData testPatience(int characters) {
-		final PatienceDiff pd = new PatienceDiff();
+	private PerfData testHistogram(int characters) {
+		final HistogramDiff pd = new HistogramDiff();
 		pd.setFallbackAlgorithm(null);
 
 		PerfData ret = new PerfData();
