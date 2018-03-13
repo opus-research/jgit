@@ -48,6 +48,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 import org.eclipse.jgit.errors.InvalidPatternException;
 import org.eclipse.jgit.ignore.FastIgnoreRule;
@@ -142,9 +143,27 @@ public class Strings {
 			if (idx2 > idx1)
 				return true;
 		}
-		// required to match escaped backslashes '\\\\'
-		if (pattern.indexOf('?') != -1 || pattern.indexOf('\\') != -1)
+		if (pattern.indexOf('?') != -1) {
 			return true;
+		} else {
+			// check if the backslash escapes one of the glob special characters
+			// if not, backslash is not part of a regex and treated literally
+			int backSlash = pattern.indexOf('\\');
+			if (backSlash >= 0) {
+				int nextIdx = backSlash + 1;
+				if (pattern.length() == nextIdx) {
+					return false;
+				}
+				char nextChar = pattern.charAt(nextIdx);
+				if (nextChar == '?' || nextChar == '*' || nextChar == '['
+				// required to match escaped backslashes '\\\\'
+						|| nextChar == '\\') {
+					return true;
+				} else {
+					return false;
+				}
+			}
+		}
 		return false;
 	}
 
@@ -349,7 +368,16 @@ public class Strings {
 
 		if (in_brackets > 0)
 			throw new InvalidPatternException("Not closed bracket?", pattern); //$NON-NLS-1$
-		return Pattern.compile(sb.toString());
+		try {
+			return Pattern.compile(sb.toString());
+		} catch (PatternSyntaxException e) {
+			InvalidPatternException patternException = new InvalidPatternException(
+					"Exception caught while parsing ignore rule '" + pattern //$NON-NLS-1$
+							+ "'.", //$NON-NLS-1$
+					pattern);
+			patternException.initCause(e);
+			throw patternException;
+		}
 	}
 
 	/**
