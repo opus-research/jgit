@@ -50,7 +50,13 @@ import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.rmi.RemoteException;
 import java.util.regex.Matcher;
+
+import javax.management.remote.JMXProviderException;
 
 import org.eclipse.jgit.junit.JGitTestUtil;
 import org.junit.After;
@@ -58,7 +64,18 @@ import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 
-public class FileUtilTest {
+public class FileUtilsTest {
+	private static final String MSG = "Stale file handle";
+
+	private static final String SOME_ERROR_MSG = "some error message";
+
+	private static final IOException IO_EXCEPTION = new UnsupportedEncodingException(
+			MSG);
+
+	private static final IOException IO_EXCEPTION_WITH_CAUSE = new RemoteException(
+			SOME_ERROR_MSG,
+			new JMXProviderException(SOME_ERROR_MSG, IO_EXCEPTION));
+
 	private File trash;
 
 	@Before
@@ -508,8 +525,60 @@ public class FileUtilTest {
 		assertEquals(expected, actual);
 	}
 
+	@Test
+	public void testDeleteSymlinkToDirectoryDoesNotDeleteTarget()
+			throws IOException {
+		org.junit.Assume.assumeTrue(FS.DETECTED.supportsSymlinks());
+		FS fs = FS.DETECTED;
+		File dir = new File(trash, "dir");
+		File file = new File(dir, "file");
+		File link = new File(trash, "link");
+		FileUtils.mkdirs(dir);
+		FileUtils.createNewFile(file);
+		fs.createSymLink(link, "dir");
+		FileUtils.delete(link, FileUtils.RECURSIVE);
+		assertFalse(link.exists());
+		assertTrue(dir.exists());
+		assertTrue(file.exists());
+	}
+
+	@Test
+	public void testAtomicMove() throws IOException {
+		File src = new File(trash, "src");
+		Files.createFile(src.toPath());
+		File dst = new File(trash, "dst");
+		FileUtils.rename(src, dst, StandardCopyOption.ATOMIC_MOVE);
+		assertFalse(Files.exists(src.toPath()));
+		assertTrue(Files.exists(dst.toPath()));
+	}
+
 	private String toOSPathString(String path) {
 		return path.replaceAll("/|\\\\",
 				Matcher.quoteReplacement(File.separator));
+	}
+
+	@Test
+	public void testIsStaleFileHandleWithDirectCause() throws Exception {
+		assertTrue(FileUtils.isStaleFileHandle(IO_EXCEPTION));
+	}
+
+	@Test
+	public void testIsStaleFileHandleWithIndirectCause() throws Exception {
+		assertFalse(
+				FileUtils.isStaleFileHandle(IO_EXCEPTION_WITH_CAUSE));
+	}
+
+	@Test
+	public void testIsStaleFileHandleInCausalChainWithDirectCause()
+			throws Exception {
+		assertTrue(
+				FileUtils.isStaleFileHandleInCausalChain(IO_EXCEPTION));
+	}
+
+	@Test
+	public void testIsStaleFileHandleInCausalChainWithIndirectCause()
+			throws Exception {
+		assertTrue(FileUtils
+				.isStaleFileHandleInCausalChain(IO_EXCEPTION_WITH_CAUSE));
 	}
 }
