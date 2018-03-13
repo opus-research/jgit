@@ -113,6 +113,11 @@ public class HttpAuthTest {
 		}
 
 		@Override
+		public void disconnect() {
+			fail("The disconnect method shouldn't be invoked");
+		}
+
+		@Override
 		public boolean usingProxy() {
 			return false;
 		}

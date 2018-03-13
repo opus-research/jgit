@@ -170,6 +170,10 @@ public class JDKHttpConnection implements HttpConnection {
 		return wrappedUrlConnection.getRequestMethod();
 	}
 
+	public void disconnect() {
+		wrappedUrlConnection.disconnect();
+	}
+
 	public boolean usingProxy() {
 		return wrappedUrlConnection.usingProxy();
 	}
