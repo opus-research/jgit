@@ -222,11 +222,11 @@ public class FileRepository extends Repository {
 			throw new IllegalStateException(MessageFormat.format(
 					JGitText.get().repositoryAlreadyExists, getDirectory()));
 		}
-		FileUtils.mkdirs(getDirectory(), true);
+		getDirectory().mkdirs();
 		refs.create();
 		objectDatabase.create();
 
-		FileUtils.mkdir(new File(getDirectory(), "branches"));
+		new File(getDirectory(), "branches").mkdir();
 
 		RefUpdate head = updateRef(Constants.HEAD);
 		head.disableRefLog();

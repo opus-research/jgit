@@ -77,11 +77,6 @@ public class FileUtils {
 	public static final int SKIP_MISSING = 4;
 
 	/**
-	 * Option to skip creation if file already exists
-	 */
-	public static final int SKIP_EXISTING = 4;
-
-	/**
 	 * Delete file or empty folder
 	 *
 	 * @param f
@@ -172,12 +167,12 @@ public class FileUtils {
 	 */
 	public static void mkdir(final File d, boolean skipExisting)
 			throws IOException {
-		if (skipExisting && d.exists() && d.isDirectory())
-			return;
-
-		if (!d.mkdir())
+		if (!d.mkdir()) {
+			if (skipExisting && d.isDirectory())
+				return;
 			throw new IOException(MessageFormat.format(
 					JGitText.get().mkDirFailed, d.getAbsolutePath()));
+		}
 	}
 
 	/**
@@ -217,11 +212,11 @@ public class FileUtils {
 	 */
 	public static void mkdirs(final File d, boolean skipExisting)
 			throws IOException {
-		if (skipExisting && d.exists() && d.isDirectory())
-			return;
-
-		if (!d.mkdirs())
+		if (!d.mkdirs()) {
+			if (skipExisting && d.isDirectory())
+				return;
 			throw new IOException(MessageFormat.format(
 					JGitText.get().mkDirsFailed, d.getAbsolutePath()));
+		}
 	}
 }

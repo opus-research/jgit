@@ -51,7 +51,7 @@ public class FileRepositoryBuilderTest extends LocalDiskRepositoryTestCase {
 	public void testShouldAutomagicallyDetectGitDirectory() throws Exception {
 		FileRepository r = createWorkRepository();
 		File d = new File(r.getDirectory(), "sub-dir");
-		assertTrue(d.mkdir());
+		d.mkdir();
 
 		assertEquals(r.getDirectory(), new FileRepositoryBuilder()
 				.findGitDir(d).getGitDir());
