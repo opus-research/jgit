@@ -73,6 +73,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.InvalidObjectIdException;
 import org.eclipse.jgit.errors.LockFailedException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -138,7 +139,7 @@ public class RefDirectory extends RefDatabase {
 
 	private final File gitDir;
 
-	private final File refsDir;
+	final File refsDir;
 
 	private final ReflogWriter logWriter;
 
@@ -155,7 +156,7 @@ public class RefDirectory extends RefDatabase {
 	private final AtomicReference<RefList<LooseRef>> looseRefs = new AtomicReference<RefList<LooseRef>>();
 
 	/** Immutable sorted list of packed references. */
-	private final AtomicReference<PackedRefList> packedRefs = new AtomicReference<PackedRefList>();
+	final AtomicReference<PackedRefList> packedRefs = new AtomicReference<PackedRefList>();
 
 	/**
 	 * Number of modifications made to this database.
@@ -261,6 +262,7 @@ public class RefDirectory extends RefDatabase {
 		return loose;
 	}
 
+	@Nullable
 	private Ref readAndResolve(String name, RefList<Ref> packed) throws IOException {
 		try {
 			Ref ref = readRef(name, packed);
@@ -283,27 +285,23 @@ public class RefDirectory extends RefDatabase {
 
 	@Override
 	public Ref exactRef(String name) throws IOException {
-		try {
-			return readAndResolve(name, getPackedRefs());
-		} finally {
-			fireRefsChanged();
-		}
+		Ref ref = readAndResolve(name, getPackedRefs());
+		fireRefsChanged();
+		return ref;
 	}
 
 	@Override
 	public Ref getRef(final String needle) throws IOException {
-		try {
-			RefList<Ref> packed = getPackedRefs();
-			for (String prefix : SEARCH_PATH) {
-				Ref ref = readAndResolve(prefix + needle, packed);
-				if (ref != null) {
-					return ref;
-				}
+		final RefList<Ref> packed = getPackedRefs();
+		Ref ref = null;
+		for (String prefix : SEARCH_PATH) {
+			ref = readAndResolve(prefix + needle, packed);
+			if (ref != null) {
+				break;
 			}
-			return null;
-		} finally {
-			fireRefsChanged();
 		}
+		fireRefsChanged();
+		return ref;
 	}
 
 	@Override
@@ -924,7 +922,7 @@ public class RefDirectory extends RefDatabase {
 		return n;
 	}
 
-	private LooseRef scanRef(LooseRef ref, String name) throws IOException {
+	LooseRef scanRef(LooseRef ref, String name) throws IOException {
 		final File path = fileFor(name);
 		FileSnapshot currentSnapshot = null;
 
