@@ -157,13 +157,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	}
 
 	/**
-	 * @return the git directory
-	 */
-	File getDirectory() {
-		return directory;
-	}
-
-	/**
 	 * Executes the {@code Clone} command.
 	 *
 	 * The Git instance returned by this command needs to be closed by the
@@ -239,9 +232,9 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 		return false;
 	}
 
-	void verifyDirectories(URIish u) {
+	private void verifyDirectories(URIish u) {
 		if (directory == null && gitDir == null) {
-			directory = new File(u.getHumanishName() + (bare ? Constants.DOT_GIT : "")); //$NON-NLS-1$
+			directory = new File(u.getHumanishName(), Constants.DOT_GIT);
 		}
 		directoryExistsInitially = directory != null && directory.exists();
 		gitDirExistsInitially = gitDir != null && gitDir.exists();
