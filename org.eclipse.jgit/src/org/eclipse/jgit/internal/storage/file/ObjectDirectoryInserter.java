@@ -138,7 +138,7 @@ class ObjectDirectoryInserter extends ObjectInserter {
 
 	@Override
 	public void flush() throws IOException {
-		// Do nothing. Loose objects are immediately visible.
+		// Do nothing. Objects are immediately visible.
 	}
 
 	@Override
@@ -188,7 +188,7 @@ class ObjectDirectoryInserter extends ObjectInserter {
 			return tmp;
 		} finally {
 			if (delete)
-				FileUtils.delete(tmp, FileUtils.RETRY);
+				FileUtils.delete(tmp);
 		}
 	}
 
@@ -217,7 +217,7 @@ class ObjectDirectoryInserter extends ObjectInserter {
 			return tmp;
 		} finally {
 			if (delete)
-				FileUtils.delete(tmp, FileUtils.RETRY);
+				FileUtils.delete(tmp);
 		}
 	}
 

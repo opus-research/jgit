@@ -390,17 +390,11 @@ public abstract class ObjectInserter {
 	public abstract PackParser newPackParser(InputStream in) throws IOException;
 
 	/**
-	 * Open a reader for objects that may have been written by this inserter.
-	 * <p>
-	 * The returned reader allows the calling thread to read back recently
-	 * inserted objects without first calling {@code flush()} to make them
-	 * visible to the repository. The returned reader should only be used from
-	 * the same thread as the inserter. Objects written by this inserter may not
-	 * be visible to {@code this.newReader().newReader()}.
-	 *
-	 * @since 3.5
-	 * @return reader for any object, including an object recently inserted by
-	 *         this inserter since the last flush.
+	 * @return a reader for objects that may have been written by this inserter,
+	 *         without having to flush first. Should only be used from the same
+	 *         thread as this inserter; objects written by this inserter may not
+	 *         be visible to {@code this.newReader().newReader()}.
+	 * @since 3.0
 	 */
 	public abstract ObjectReader newReader();
 

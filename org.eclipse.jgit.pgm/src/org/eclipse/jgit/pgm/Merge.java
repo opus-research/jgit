@@ -58,7 +58,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
-import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.kohsuke.args4j.Argument;
@@ -78,22 +77,18 @@ class Merge extends TextBuiltin {
 
 	private MergeStrategy mergeStrategy = MergeStrategy.RECURSIVE;
 
-	@Argument(required = true, metaVar = "metaVar_ref", usage = "usage_mergeRef")
+	@Argument(required = true)
 	private String ref;
 
+	@Option(name = "--ff")
 	private FastForwardMode ff = FastForwardMode.FF;
 
-	@Option(name = "--ff", usage = "usage_mergeFf")
-	void ff(@SuppressWarnings("unused") final boolean ignored) {
-		ff = FastForwardMode.FF;
-	}
-
-	@Option(name = "--no-ff", usage = "usage_mergeNoFf")
+	@Option(name = "--no-ff")
 	void noff(@SuppressWarnings("unused") final boolean ignored) {
 		ff = FastForwardMode.NO_FF;
 	}
 
-	@Option(name = "--ff-only", usage = "usage_mergeFfOnly")
+	@Option(name = "--ff-only")
 	void ffonly(@SuppressWarnings("unused") final boolean ignored) {
 		ff = FastForwardMode.FF_ONLY;
 	}

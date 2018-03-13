@@ -43,6 +43,8 @@
 
 package org.eclipse.jgit.util;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.endsWith;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -57,13 +59,12 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class FileUtilTest {
-	private File trash;
+
+	private final File trash = new File(new File("target"), "trash");
 
 	@Before
 	public void setUp() throws Exception {
-		trash = File.createTempFile("tmp_", "");
-		trash.delete();
-		assertTrue("mkdir " + trash, trash.mkdir());
+		assertTrue(trash.mkdirs());
 	}
 
 	@After
@@ -331,7 +332,7 @@ public class FileUtilTest {
 			FileUtils.delete(t, FileUtils.EMPTY_DIRECTORIES_ONLY | FileUtils.RECURSIVE);
 			fail("expected failure to delete f");
 		} catch (IOException e) {
-			assertTrue(e.getMessage().endsWith(f.getAbsolutePath()));
+			assertThat(e.getMessage(), endsWith(f.getAbsolutePath()));
 		}
 		assertTrue(t.exists());
 	}
@@ -418,20 +419,5 @@ public class FileUtilTest {
 		assertFalse(f1.exists());
 		assertTrue(f2.exists());
 		assertEquals("f1", JGitTestUtil.read(f2));
-	}
-
-	@Test
-	public void testCreateSymlink() throws IOException {
-		FS fs = FS.DETECTED;
-		try {
-			fs.createSymLink(new File(trash, "x"), "y");
-		} catch (IOException e) {
-			if (fs.supportsSymlinks())
-				fail("FS claims to support symlinks but attempt to create symlink failed");
-			return;
-		}
-		assertTrue(fs.supportsSymlinks());
-		String target = fs.readSymLink(new File(trash, "x"));
-		assertEquals("y", target);
 	}
 }

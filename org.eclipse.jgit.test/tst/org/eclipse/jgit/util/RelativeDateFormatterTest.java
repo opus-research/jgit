@@ -53,7 +53,6 @@ import java.util.Date;
 
 import org.eclipse.jgit.junit.MockSystemReader;
 import org.eclipse.jgit.util.RelativeDateFormatter;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -62,11 +61,6 @@ public class RelativeDateFormatterTest {
 	@Before
 	public void setUp() {
 		SystemReader.setInstance(new MockSystemReader());
-	}
-
-	@After
-	public void tearDown() {
-		SystemReader.setInstance(null);
 	}
 
 	private static void assertFormat(long ageFromNow, long timeUnit,

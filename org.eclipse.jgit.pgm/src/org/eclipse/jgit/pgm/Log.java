@@ -68,7 +68,6 @@ import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.notes.NoteMap;
-import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.util.GitDateFormatter;
@@ -272,7 +271,7 @@ class Log extends RevWalkTextBuiltin {
 		if (showNotes(c))
 			outw.println();
 
-		if (c.getParentCount() <= 1 && (showNameAndStatusOnly || showPatch))
+		if (c.getParentCount() == 1 && (showNameAndStatusOnly || showPatch))
 			showDiff(c);
 		outw.flush();
 	}
@@ -345,8 +344,7 @@ class Log extends RevWalkTextBuiltin {
 	}
 
 	private void showDiff(RevCommit c) throws IOException {
-		final RevTree a = c.getParentCount() > 0 ? c.getParent(0).getTree()
-				: null;
+		final RevTree a = c.getParent(0).getTree();
 		final RevTree b = c.getTree();
 
 		if (showNameAndStatusOnly)

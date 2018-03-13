@@ -308,8 +308,6 @@ public class DiffEntry {
 		r.changeType = changeType;
 		r.score = score;
 
-		r.treeFilterMarks = src.treeFilterMarks | dst.treeFilterMarks;
-
 		return r;
 	}
 
@@ -372,7 +370,7 @@ public class DiffEntry {
 	 * <li><i>file modify</i>: always {@link #getOldPath()}</li>
 	 * <li><i>file delete</i>: always <code>/dev/null</code></li>
 	 * <li><i>file copy</i>: destination file the copy ends up at</li>
-	 * <li><i>file rename</i>: destination file the rename ends up at</li>
+	 * <li><i>file rename</i>: destination file the rename ends up at/li>
 	 * </ul>
 	 *
 	 * @return new name for this file.
@@ -453,7 +451,7 @@ public class DiffEntry {
 	 * <pre>
 	 * TreeFilter filterA = ...;
 	 * TreeFilter filterB = ...;
-	 * List&lt;DiffEntry&gt; entries = DiffEntry.scan(walk, false, filterA, filterB);
+	 * List<DiffEntry> entries = DiffEntry.scan(walk, false, filterA, filterB);
 	 * DiffEntry entry = entries.get(0);
 	 * boolean filterAMatched = entry.isMarked(0);
 	 * boolean filterBMatched = entry.isMarked(1);

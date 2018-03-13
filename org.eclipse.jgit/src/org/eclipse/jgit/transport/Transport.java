@@ -46,8 +46,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -561,9 +559,6 @@ public abstract class Transport {
 
 	/**
 	 * Open a new transport with no local repository.
-	 * <p>
-	 * Note that the resulting transport instance can not be used for fetching
-	 * or pushing, but only for reading remote refs.
 	 *
 	 * @param uri
 	 * @return new Transport instance
@@ -646,9 +641,8 @@ public abstract class Transport {
 	}
 
 	private static Collection<RefSpec> expandPushWildcardsFor(
-			final Repository db, final Collection<RefSpec> specs)
-			throws IOException {
-		final Map<String, Ref> localRefs = db.getRefDatabase().getRefs(ALL);
+			final Repository db, final Collection<RefSpec> specs) {
+		final Map<String, Ref> localRefs = db.getAllRefs();
 		final Collection<RefSpec> procRefs = new HashSet<RefSpec>();
 
 		for (final RefSpec spec : specs) {
@@ -1244,9 +1238,6 @@ public abstract class Transport {
 
 	/**
 	 * Begins a new connection for fetching from the remote repository.
-	 * <p>
-	 * If the transport has no local repository, the fetch connection can only
-	 * be used for reading remote refs.
 	 *
 	 * @return a fresh connection to fetch from the remote repository.
 	 * @throws NotSupportedException

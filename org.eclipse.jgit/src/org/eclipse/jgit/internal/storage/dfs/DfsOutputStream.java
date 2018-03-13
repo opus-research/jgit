@@ -102,57 +102,75 @@ public abstract class DfsOutputStream extends OutputStream {
 	 * Open a stream to read back a portion of already written data.
 	 * <p>
 	 * The writing position of the output stream is not affected by a read. The
-	 * input stream can be read up to the current writing position. Closing the
-	 * returned stream has no effect on the underlying {@link DfsOutputStream}.
+	 * input stream can be read up to the current writing position.
 	 *
 	 * @param position
 	 *            offset to read from.
 	 * @return new input stream
 	 */
 	public InputStream openInputStream(final long position) {
-		return new ReadBackStream(position);
+		return new ReadBackStream(this, position);
 	}
 
-	private class ReadBackStream extends InputStream {
-		private final ByteBuffer buf;
+	private static class ReadBackStream extends InputStream {
+		private final DfsOutputStream os;
+		private ByteBuffer buf;
 		private long position;
 
-		private ReadBackStream(long position) {
-			int bs = blockSize();
+		private ReadBackStream(DfsOutputStream os, long position) {
+			this.os = os;
 			this.position = position;
-			buf = ByteBuffer.allocate(bs > 0 ? bs : 8192);
-			buf.position(buf.limit());
+		}
+
+		private void prepare() throws IOException {
+			if (buf == null) {
+				int bs = os.blockSize();
+				buf = ByteBuffer.allocate(bs > 0 ? bs : 8192);
+				os.read(position, buf);
+				buf.flip();
+			}
 		}
 
 		@Override
 		public int read(byte[] b, int off, int len) throws IOException {
-			int cnt = 0;
-			while (0 < len) {
-				if (!buf.hasRemaining()) {
-					buf.rewind();
-					int nr = DfsOutputStream.this.read(position, buf);
-					if (nr < 0) {
-						buf.position(buf.limit());
-						break;
-					}
-					position += nr;
-					buf.flip();
+			prepare();
+			int p = off;
+			int n = 0;
+			while (true) {
+				if (len <= buf.remaining()) {
+					buf.get(b, off, len);
+					return n + len;
 				}
-				int n = Math.min(len, buf.remaining());
-				buf.get(b, off, n);
-				off += n;
-				len -= n;
-				cnt += n;
+				int r = buf.remaining();
+				buf.get(b, p, r);
+				n += r;
+				p += r;
+				buf.rewind();
+				position += buf.capacity();
+				int nr = os.read(position, buf);
+				if (nr < 0) {
+					buf.limit(0);
+					return n > 0 ? n : -1;
+				}
+				buf.flip();
 			}
-			if (cnt == 0 && len > 0) return -1;
-			return cnt;
 		}
 
 		@Override
 		public int read() throws IOException {
-			byte[] b = new byte[1];
-			int n = read(b);
-			return n == 1 ? b[0] & 0xff : -1;
+			prepare();
+			if (buf.remaining() > 0) {
+				return buf.get();
+			}
+			buf.rewind();
+			position += buf.capacity();
+			int nr = os.read(position, buf);
+			if (nr < 0) {
+				buf.limit(0);
+				return -1;
+			}
+			buf.flip();
+			return buf.get();
 		}
 	}
 }

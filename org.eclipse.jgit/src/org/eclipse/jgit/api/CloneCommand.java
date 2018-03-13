@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2013 Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2011, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -198,18 +198,11 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException, GitAPIException {
 
-		Ref head = null;
+		Ref head = result.getAdvertisedRef(branch);
 		if (branch.equals(Constants.HEAD)) {
 			Ref foundBranch = findBranchToCheckout(result);
 			if (foundBranch != null)
 				head = foundBranch;
-		}
-		if (head == null) {
-			head = result.getAdvertisedRef(branch);
-			if (head == null)
-				head = result.getAdvertisedRef(Constants.R_HEADS + branch);
-			if (head == null)
-				head = result.getAdvertisedRef(Constants.R_TAGS + branch);
 		}
 
 		if (head == null || head.getObjectId() == null)
@@ -369,9 +362,7 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 
 	/**
 	 * @param branch
-	 *            the initial branch to check out when cloning the repository.
-	 *            Can be specified as ref name (<code>refs/heads/master</code>),
-	 *            branch name (<code>master</code>) or tag name (<code>v1.2.3</code>).
+	 *            the initial branch to check out when cloning the repository
 	 * @return this instance
 	 */
 	public CloneCommand setBranch(String branch) {
@@ -418,8 +409,7 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	/**
 	 * @param branchesToClone
 	 *            collection of branches to clone. Ignored when allSelected is
-	 *            true. Must be specified as full ref names (e.g.
-	 *            <code>refs/heads/master</code>).
+	 *            true.
 	 * @return {@code this}
 	 */
 	public CloneCommand setBranchesToClone(Collection<String> branchesToClone) {

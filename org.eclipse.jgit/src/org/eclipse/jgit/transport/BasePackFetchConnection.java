@@ -45,8 +45,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -54,7 +52,6 @@ import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
-import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.jgit.errors.PackProtocolException;
@@ -66,12 +63,10 @@ import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
-import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.transport.GitProtocolConstants.MultiAck;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevCommitList;
 import org.eclipse.jgit.revwalk.RevFlag;
@@ -130,68 +125,65 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	 * Include tags if we are also including the referenced objects.
 	 * @since 2.0
 	 */
-	public static final String OPTION_INCLUDE_TAG = GitProtocolConstants.OPTION_INCLUDE_TAG;
+	public static final String OPTION_INCLUDE_TAG = "include-tag"; //$NON-NLS-1$
 
 	/**
 	 * Mutli-ACK support for improved negotiation.
 	 * @since 2.0
 	 */
-	public static final String OPTION_MULTI_ACK = GitProtocolConstants.OPTION_MULTI_ACK;
+	public static final String OPTION_MULTI_ACK = "multi_ack"; //$NON-NLS-1$
 
 	/**
 	 * Mutli-ACK detailed support for improved negotiation.
 	 * @since 2.0
 	 */
-	public static final String OPTION_MULTI_ACK_DETAILED = GitProtocolConstants.OPTION_MULTI_ACK_DETAILED;
+	public static final String OPTION_MULTI_ACK_DETAILED = "multi_ack_detailed"; //$NON-NLS-1$
 
 	/**
 	 * The client supports packs with deltas but not their bases.
 	 * @since 2.0
 	 */
-	public static final String OPTION_THIN_PACK = GitProtocolConstants.OPTION_THIN_PACK;
+	public static final String OPTION_THIN_PACK = "thin-pack"; //$NON-NLS-1$
 
 	/**
 	 * The client supports using the side-band for progress messages.
 	 * @since 2.0
 	 */
-	public static final String OPTION_SIDE_BAND = GitProtocolConstants.OPTION_SIDE_BAND;
+	public static final String OPTION_SIDE_BAND = "side-band"; //$NON-NLS-1$
 
 	/**
 	 * The client supports using the 64K side-band for progress messages.
 	 * @since 2.0
 	 */
-	public static final String OPTION_SIDE_BAND_64K = GitProtocolConstants.OPTION_SIDE_BAND_64K;
+	public static final String OPTION_SIDE_BAND_64K = "side-band-64k"; //$NON-NLS-1$
 
 	/**
 	 * The client supports packs with OFS deltas.
 	 * @since 2.0
 	 */
-	public static final String OPTION_OFS_DELTA = GitProtocolConstants.OPTION_OFS_DELTA;
+	public static final String OPTION_OFS_DELTA = "ofs-delta"; //$NON-NLS-1$
 
 	/**
 	 * The client supports shallow fetches.
 	 * @since 2.0
 	 */
-	public static final String OPTION_SHALLOW = GitProtocolConstants.OPTION_SHALLOW;
+	public static final String OPTION_SHALLOW = "shallow"; //$NON-NLS-1$
 
 	/**
 	 * The client does not want progress messages and will ignore them.
 	 * @since 2.0
 	 */
-	public static final String OPTION_NO_PROGRESS = GitProtocolConstants.OPTION_NO_PROGRESS;
+	public static final String OPTION_NO_PROGRESS = "no-progress"; //$NON-NLS-1$
 
 	/**
 	 * The client supports receiving a pack before it has sent "done".
 	 * @since 2.0
 	 */
-	public static final String OPTION_NO_DONE = GitProtocolConstants.OPTION_NO_DONE;
+	public static final String OPTION_NO_DONE = "no-done"; //$NON-NLS-1$
 
-	/**
-	 * The client supports fetching objects at the tip of any ref, even if not
-	 * advertised.
-	 * @since 3.1
-	 */
-	public static final String OPTION_ALLOW_TIP_SHA1_IN_WANT = GitProtocolConstants.OPTION_ALLOW_TIP_SHA1_IN_WANT;
+	static enum MultiAck {
+		OFF, CONTINUE, DETAILED;
+	}
 
 	private final RevWalk walk;
 
@@ -222,8 +214,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 	private boolean noDone;
 
-	private boolean noProgress;
-
 	private String lockMessage;
 
 	private PackLock packLock;
@@ -242,33 +232,21 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	public BasePackFetchConnection(final PackTransport packTransport) {
 		super(packTransport);
 
-		if (local != null) {
-			final FetchConfig cfg = local.getConfig().get(FetchConfig.KEY);
-			allowOfsDelta = cfg.allowOfsDelta;
-		} else {
-			allowOfsDelta = true;
-		}
+		final FetchConfig cfg = local.getConfig().get(FetchConfig.KEY);
 		includeTags = transport.getTagOpt() != TagOpt.NO_TAGS;
 		thinPack = transport.isFetchThin();
+		allowOfsDelta = cfg.allowOfsDelta;
 
-		if (local != null) {
-			walk = new RevWalk(local);
-			reachableCommits = new RevCommitList<RevCommit>();
-			REACHABLE = walk.newFlag("REACHABLE"); //$NON-NLS-1$
-			COMMON = walk.newFlag("COMMON"); //$NON-NLS-1$
-			STATE = walk.newFlag("STATE"); //$NON-NLS-1$
-			ADVERTISED = walk.newFlag("ADVERTISED"); //$NON-NLS-1$
+		walk = new RevWalk(local);
+		reachableCommits = new RevCommitList<RevCommit>();
+		REACHABLE = walk.newFlag("REACHABLE"); //$NON-NLS-1$
+		COMMON = walk.newFlag("COMMON"); //$NON-NLS-1$
+		STATE = walk.newFlag("STATE"); //$NON-NLS-1$
+		ADVERTISED = walk.newFlag("ADVERTISED"); //$NON-NLS-1$
 
-			walk.carry(COMMON);
-			walk.carry(REACHABLE);
-			walk.carry(ADVERTISED);
-		} else {
-			walk = null;
-			REACHABLE = null;
-			COMMON = null;
-			STATE = null;
-			ADVERTISED = null;
-		}
+		walk.carry(COMMON);
+		walk.carry(REACHABLE);
+		walk.carry(ADVERTISED);
 	}
 
 	private static class FetchConfig {
@@ -323,9 +301,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	 * Execute common ancestor negotiation and fetch the objects.
 	 *
 	 * @param monitor
-	 *            progress monitor to receive status updates. If the monitor is
-	 *            the {@link NullProgressMonitor#INSTANCE}, then the no-progress
-	 *            option enabled.
+	 *            progress monitor to receive status updates.
 	 * @param want
 	 *            the advertised remote references the caller wants to fetch.
 	 * @param have
@@ -342,8 +318,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 			final Collection<Ref> want, final Set<ObjectId> have,
 			OutputStream outputStream) throws TransportException {
 		try {
-			noProgress = monitor == NullProgressMonitor.INSTANCE;
-
 			markRefsAdvertised();
 			markReachable(have, maxTimeWanted(want));
 
@@ -376,8 +350,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 	@Override
 	public void close() {
-		if (walk != null)
-			walk.release();
+		walk.release();
 		super.close();
 	}
 
@@ -400,8 +373,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 	private void markReachable(final Set<ObjectId> have, final int maxTime)
 			throws IOException {
-		Map<String, Ref> refs = local.getRefDatabase().getRefs(ALL);
-		for (final Ref r : refs.values()) {
+		for (final Ref r : local.getAllRefs().values()) {
 			ObjectId id = r.getPeeledObjectId();
 			if (id == null)
 				id = r.getObjectId();
@@ -488,8 +460,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 	private String enableCapabilities() throws TransportException {
 		final StringBuilder line = new StringBuilder();
-		if (noProgress)
-			wantCapability(line, OPTION_NO_PROGRESS);
 		if (includeTags)
 			includeTags = wantCapability(line, OPTION_INCLUDE_TAG);
 		if (allowOfsDelta)
