@@ -67,8 +67,8 @@ class LsTree extends TextBuiltin {
 	private AbstractTreeIterator tree;
 
 	@Argument(index = 1)
-	@Option(name = "--", metaVar = "metaVar_paths", handler = StopOptionHandler.class)
-	private List<String> paths = new ArrayList<>();
+	@Option(name = "--", metaVar = "metaVar_paths", multiValued = true, handler = StopOptionHandler.class)
+	private List<String> paths = new ArrayList<String>();
 
 	@Override
 	protected void run() throws Exception {

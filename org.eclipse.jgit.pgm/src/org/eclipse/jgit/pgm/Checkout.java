@@ -77,8 +77,8 @@ class Checkout extends TextBuiltin {
 	@Argument(required = false, index = 0, metaVar = "metaVar_name", usage = "usage_checkout")
 	private String name;
 
-	@Option(name = "--", metaVar = "metaVar_paths", handler = RestOfArgumentsHandler.class)
-	private List<String> paths = new ArrayList<>();
+	@Option(name = "--", metaVar = "metaVar_paths", multiValued = true, handler = RestOfArgumentsHandler.class)
+	private List<String> paths = new ArrayList<String>();
 
 	@Override
 	protected void run() throws Exception {
@@ -92,11 +92,8 @@ class Checkout extends TextBuiltin {
 			CheckoutCommand command = git.checkout();
 			if (paths.size() > 0) {
 				command.setStartPoint(name);
-				if (paths.size() == 1 && paths.get(0).equals(".")) { //$NON-NLS-1$
-					command.setAllPaths(true);
-				} else {
-					command.addPaths(paths);
-				}
+				for (String path : paths)
+					command.addPath(path);
 			} else {
 				command.setCreateBranch(createBranch);
 				command.setName(name);
@@ -122,21 +119,17 @@ class Checkout extends TextBuiltin {
 							CLIText.get().switchedToBranch,
 							Repository.shortenRefName(ref.getName())));
 			} catch (RefNotFoundException e) {
-				throw die(MessageFormat
-						.format(CLIText.get().pathspecDidNotMatch, name), e);
+				outw.println(MessageFormat.format(
+						CLIText.get().pathspecDidNotMatch,
+						name));
 			} catch (RefAlreadyExistsException e) {
-				throw die(MessageFormat
-						.format(CLIText.get().branchAlreadyExists, name));
+				throw die(MessageFormat.format(CLIText.get().branchAlreadyExists,
+						name));
 			} catch (CheckoutConflictException e) {
-				StringBuilder builder = new StringBuilder();
-				builder.append(CLIText.get().checkoutConflict);
-				builder.append(System.lineSeparator());
-				for (String path : e.getConflictingPaths()) {
-					builder.append(MessageFormat.format(
+				outw.println(CLIText.get().checkoutConflict);
+				for (String path : e.getConflictingPaths())
+					outw.println(MessageFormat.format(
 							CLIText.get().checkoutConflictPathLine, path));
-					builder.append(System.lineSeparator());
-				}
-				throw die(builder.toString(), e);
 			}
 		}
 	}

@@ -110,7 +110,6 @@ public class LockFile {
 
 	/** Filter to skip over active lock files when listing a directory. */
 	static final FilenameFilter FILTER = new FilenameFilter() {
-		@Override
 		public boolean accept(File dir, String name) {
 			return !name.endsWith(SUFFIX);
 		}
@@ -151,6 +150,7 @@ public class LockFile {
 	 *
 	 * @param f
 	 *            the file that will be locked.
+	 * @since 4.2
 	 */
 	public LockFile(final File f) {
 		ref = f;
@@ -168,7 +168,7 @@ public class LockFile {
 	 */
 	public boolean lock() throws IOException {
 		FileUtils.mkdirs(lck.getParentFile(), true);
-		if (FS.DETECTED.createNewFile(lck)) {
+		if (lck.createNewFile()) {
 			haveLck = true;
 			try {
 				os = new FileOutputStream(lck);
@@ -374,7 +374,7 @@ public class LockFile {
 		};
 	}
 
-	void requireLock() {
+	private void requireLock() {
 		if (os == null) {
 			unlock();
 			throw new IllegalStateException(MessageFormat.format(JGitText.get().lockOnNotHeld, ref));

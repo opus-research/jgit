@@ -56,6 +56,7 @@ import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CharsetEncoder;
+import java.security.MessageDigest;
 import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Collections;
@@ -98,7 +99,6 @@ import org.eclipse.jgit.util.TemporaryBuffer;
 import org.eclipse.jgit.util.TemporaryBuffer.LocalFile;
 import org.eclipse.jgit.util.io.AutoLFInputStream;
 import org.eclipse.jgit.util.io.EolStreamTypeUtil;
-import org.eclipse.jgit.util.sha1.SHA1;
 
 /**
  * Walks a working directory tree as part of a {@link TreeWalk}.
@@ -364,7 +364,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			if (is == null)
 				return zeroid;
 			try {
-				state.initializeReadBuffer();
+				state.initializeDigestAndReadBuffer();
 
 				final long len = e.getLength();
 				InputStream filteredIs = possiblyFilteredInputStream(e, is, len,
@@ -715,7 +715,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	}
 
 	private static final Comparator<Entry> ENTRY_CMP = new Comparator<Entry>() {
-		@Override
 		public int compare(Entry a, Entry b) {
 			return Paths.compare(
 					a.encodedName, 0, a.encodedNameLen, a.getMode().getBits(),
@@ -1099,9 +1098,10 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	}
 
 	private byte[] computeHash(InputStream in, long length) throws IOException {
-		SHA1 contentDigest = SHA1.newInstance();
+		final MessageDigest contentDigest = state.contentDigest;
 		final byte[] contentReadBuffer = state.contentReadBuffer;
 
+		contentDigest.reset();
 		contentDigest.update(hblob);
 		contentDigest.update((byte) ' ');
 
@@ -1154,7 +1154,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				b.get(encodedName = new byte[encodedNameLen]);
 		}
 
-		@Override
 		public String toString() {
 			return getMode().toString() + " " + getName(); //$NON-NLS-1$
 		}
@@ -1329,6 +1328,9 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		/** File name character encoder. */
 		final CharsetEncoder nameEncoder;
 
+		/** Digest computer for {@link #contentId} computations. */
+		MessageDigest contentDigest;
+
 		/** Buffer used to perform {@link #contentId} computations. */
 		byte[] contentReadBuffer;
 
@@ -1343,8 +1345,9 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			this.nameEncoder = Constants.CHARSET.newEncoder();
 		}
 
-		void initializeReadBuffer() {
-			if (contentReadBuffer == null) {
+		void initializeDigestAndReadBuffer() {
+			if (contentDigest == null) {
+				contentDigest = Constants.newMessageDigest();
 				contentReadBuffer = new byte[BUFFER_SIZE];
 			}
 		}
@@ -1363,7 +1366,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				cmd = state.walk
 						.getFilterCommand(Constants.ATTR_FILTER_TYPE_CLEAN);
 			}
-			cleanFilterCommandHolder = new Holder<>(cmd);
+			cleanFilterCommandHolder = new Holder<String>(cmd);
 		}
 		return cleanFilterCommandHolder.get();
 	}
@@ -1394,7 +1397,11 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		if (eolStreamTypeHolder == null) {
 			EolStreamType type=null;
 			if (state.walk != null) {
-				type = state.walk.getEolStreamType(opType);
+				if (opType != null) {
+					type = state.walk.getEolStreamType(opType);
+				} else {
+					type=state.walk.getEolStreamType();
+				}
 			} else {
 				switch (getOptions().getAutoCRLF()) {
 				case FALSE:
@@ -1406,7 +1413,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 					break;
 				}
 			}
-			eolStreamTypeHolder = new Holder<>(type);
+			eolStreamTypeHolder = new Holder<EolStreamType>(type);
 		}
 		return eolStreamTypeHolder.get();
 	}

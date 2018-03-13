@@ -78,6 +78,7 @@ import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.PackLock;
 import org.eclipse.jgit.lib.BatchRefUpdate;
 import org.eclipse.jgit.lib.Config;
+import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectChecker;
@@ -96,7 +97,6 @@ import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.transport.PacketLineIn.InputOverLimitIOException;
 import org.eclipse.jgit.transport.ReceiveCommand.Result;
 import org.eclipse.jgit.util.io.InterruptTimer;
 import org.eclipse.jgit.util.io.LimitedInputStream;
@@ -123,7 +123,7 @@ public abstract class BaseReceivePack {
 		 *            line from the client.
 		 */
 		public FirstLine(String line) {
-			final HashSet<String> caps = new HashSet<>();
+			final HashSet<String> caps = new HashSet<String>();
 			final int nul = line.indexOf('\0');
 			if (nul >= 0) {
 				for (String c : line.substring(nul + 1).split(" ")) //$NON-NLS-1$
@@ -244,8 +244,6 @@ public abstract class BaseReceivePack {
 	String userAgent;
 	private Set<ObjectId> clientShallowCommits;
 	private List<ReceiveCommand> commands;
-	private long maxCommandBytes;
-	private long maxDiscardBytes;
 
 	private StringBuilder advertiseError;
 
@@ -313,31 +311,34 @@ public abstract class BaseReceivePack {
 		TransferConfig tc = db.getConfig().get(TransferConfig.KEY);
 		objectChecker = tc.newReceiveObjectChecker();
 
-		ReceiveConfig rc = db.getConfig().get(ReceiveConfig::new);
+		ReceiveConfig rc = db.getConfig().get(ReceiveConfig.KEY);
 		allowCreates = rc.allowCreates;
 		allowAnyDeletes = true;
 		allowBranchDeletes = rc.allowDeletes;
 		allowNonFastForwards = rc.allowNonFastForwards;
 		allowOfsDelta = rc.allowOfsDelta;
 		allowPushOptions = rc.allowPushOptions;
-		maxCommandBytes = rc.maxCommandBytes;
-		maxDiscardBytes = rc.maxDiscardBytes;
 		advertiseRefsHook = AdvertiseRefsHook.DEFAULT;
 		refFilter = RefFilter.DEFAULT;
-		advertisedHaves = new HashSet<>();
-		clientShallowCommits = new HashSet<>();
+		advertisedHaves = new HashSet<ObjectId>();
+		clientShallowCommits = new HashSet<ObjectId>();
 		signedPushConfig = rc.signedPush;
 	}
 
 	/** Configuration for receive operations. */
 	protected static class ReceiveConfig {
+		static final SectionParser<ReceiveConfig> KEY = new SectionParser<ReceiveConfig>() {
+			public ReceiveConfig parse(final Config cfg) {
+				return new ReceiveConfig(cfg);
+			}
+		};
+
 		final boolean allowCreates;
 		final boolean allowDeletes;
 		final boolean allowNonFastForwards;
 		final boolean allowOfsDelta;
 		final boolean allowPushOptions;
-		final long maxCommandBytes;
-		final long maxDiscardBytes;
+
 		final SignedPushConfig signedPush;
 
 		ReceiveConfig(final Config config) {
@@ -349,12 +350,6 @@ public abstract class BaseReceivePack {
 					true);
 			allowPushOptions = config.getBoolean("receive", "pushoptions", //$NON-NLS-1$ //$NON-NLS-2$
 					false);
-			maxCommandBytes = config.getLong("receive", //$NON-NLS-1$
-					"maxCommandBytes", //$NON-NLS-1$
-					3 << 20);
-			maxDiscardBytes = config.getLong("receive", //$NON-NLS-1$
-					"maxCommandDiscardBytes", //$NON-NLS-1$
-					-1);
 			signedPush = SignedPushConfig.KEY.parse(config);
 		}
 	}
@@ -447,7 +442,6 @@ public abstract class BaseReceivePack {
 	public void setAdvertisedRefs(Map<String, Ref> allRefs, Set<ObjectId> additionalHaves) {
 		refs = allRefs != null ? allRefs : db.getAllRefs();
 		refs = refFilter.filter(refs);
-		advertisedHaves.clear();
 
 		Ref head = refs.get(Constants.HEAD);
 		if (head != null && head.isSymbolic())
@@ -735,38 +729,6 @@ public abstract class BaseReceivePack {
 	}
 
 	/**
-	 * Set the maximum number of command bytes to read from the client.
-	 *
-	 * @param limit
-	 *            command limit in bytes; if 0 there is no limit.
-	 * @since 4.7
-	 */
-	public void setMaxCommandBytes(long limit) {
-		maxCommandBytes = limit;
-	}
-
-	/**
-	 * Set the maximum number of command bytes to discard from the client.
-	 * <p>
-	 * Discarding remaining bytes allows this instance to consume the rest of
-	 * the command block and send a human readable over-limit error via the
-	 * side-band channel. If the client sends an excessive number of bytes this
-	 * limit kicks in and the instance disconnects, resulting in a non-specific
-	 * 'pipe closed', 'end of stream', or similar generic error at the client.
-	 * <p>
-	 * When the limit is set to {@code -1} the implementation will default to
-	 * the larger of {@code 3 * maxCommandBytes} or {@code 3 MiB}.
-	 *
-	 * @param limit
-	 *            discard limit in bytes; if 0 there is no limit; if -1 the
-	 *            implementation tries to set a reasonable default.
-	 * @since 4.7
-	 */
-	public void setMaxCommandDiscardBytes(long limit) {
-		maxDiscardBytes = limit;
-	}
-
-	/**
 	 * Set the maximum allowed Git object size.
 	 * <p>
 	 * If an object is larger than the given size the pack-parsing will throw an
@@ -778,6 +740,7 @@ public abstract class BaseReceivePack {
 	public void setMaxObjectSizeLimit(final long limit) {
 		maxObjectSizeLimit = limit;
 	}
+
 
 	/**
 	 * Set the maximum allowed pack size.
@@ -1051,12 +1014,20 @@ public abstract class BaseReceivePack {
 			rawOut = o;
 		}
 
+		if (maxPackSizeLimit >= 0)
+			rawIn = new LimitedInputStream(rawIn, maxPackSizeLimit) {
+				@Override
+				protected void limitExceeded() throws TooLargePackException {
+					throw new TooLargePackException(limit);
+				}
+			};
+
 		pckIn = new PacketLineIn(rawIn);
 		pckOut = new PacketLineOut(rawOut);
 		pckOut.setFlushOnEnd(false);
 
-		enabledCapabilities = new HashSet<>();
-		commands = new ArrayList<>();
+		enabledCapabilities = new HashSet<String>();
+		commands = new ArrayList<ReceiveCommand>();
 	}
 
 	/** @return advertised refs, or the default if not explicitly advertised. */
@@ -1163,16 +1134,13 @@ public abstract class BaseReceivePack {
 	 * @throws IOException
 	 */
 	protected void recvCommands() throws IOException {
-		PacketLineIn pck = maxCommandBytes > 0
-				? new PacketLineIn(rawIn, maxCommandBytes)
-				: pckIn;
 		PushCertificateParser certParser = getPushCertificateParser();
 		boolean firstPkt = true;
 		try {
 			for (;;) {
 				String line;
 				try {
-					line = pck.readString();
+					line = pckIn.readString();
 				} catch (EOFException eof) {
 					if (commands.isEmpty())
 						return;
@@ -1195,13 +1163,13 @@ public abstract class BaseReceivePack {
 					enableCapabilities();
 
 					if (line.equals(GitProtocolConstants.OPTION_PUSH_CERT)) {
-						certParser.receiveHeader(pck, !isBiDirectionalPipe());
+						certParser.receiveHeader(pckIn, !isBiDirectionalPipe());
 						continue;
 					}
 				}
 
 				if (line.equals(PushCertificateParser.BEGIN_SIGNATURE)) {
-					certParser.receiveSignature(pck);
+					certParser.receiveSignature(pckIn);
 					continue;
 				}
 
@@ -1218,31 +1186,18 @@ public abstract class BaseReceivePack {
 			}
 			pushCert = certParser.build();
 			if (hasCommands()) {
-				readPostCommands(pck);
+				readPostCommands(pckIn);
 			}
 		} catch (PackProtocolException e) {
-			discardCommands();
+			if (sideBand) {
+				try {
+					pckIn.discardUntilEnd();
+				} catch (IOException e2) {
+					// Ignore read failures attempting to discard.
+				}
+			}
 			fatalError(e.getMessage());
 			throw e;
-		} catch (InputOverLimitIOException e) {
-			String msg = JGitText.get().tooManyCommands;
-			discardCommands();
-			fatalError(msg);
-			throw new PackProtocolException(msg);
-		}
-	}
-
-	private void discardCommands() {
-		if (sideBand) {
-			long max = maxDiscardBytes;
-			if (max < 0) {
-				max = Math.max(3 * maxCommandBytes, 3L << 20);
-			}
-			try {
-				new PacketLineIn(rawIn, max).discardUntilEnd();
-			} catch (IOException e) {
-				// Ignore read failures attempting to discard.
-			}
 		}
 	}
 
@@ -1354,7 +1309,7 @@ public abstract class BaseReceivePack {
 			if (getRefLogIdent() != null)
 				lockMsg += " from " + getRefLogIdent().toExternalString(); //$NON-NLS-1$
 
-			parser = ins.newPackParser(packInputStream());
+			parser = ins.newPackParser(rawIn);
 			parser.setAllowThin(true);
 			parser.setNeedNewObjectIds(checkReferencedIsReachable);
 			parser.setNeedBaseObjectIds(checkReferencedIsReachable);
@@ -1372,19 +1327,6 @@ public abstract class BaseReceivePack {
 
 		if (timeoutIn != null)
 			timeoutIn.setTimeout(timeout * 1000);
-	}
-
-	private InputStream packInputStream() {
-		InputStream packIn = rawIn;
-		if (maxPackSizeLimit >= 0) {
-			packIn = new LimitedInputStream(packIn, maxPackSizeLimit) {
-				@Override
-				protected void limitExceeded() throws TooLargePackException {
-					throw new TooLargePackException(limit);
-				}
-			};
-		}
-		return packIn;
 	}
 
 	private boolean needCheckConnectivity() {

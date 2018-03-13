@@ -106,22 +106,17 @@ public class DfsBlockCacheConfig {
 	/**
 	 * @param newSize
 	 *            size in bytes of a single window read in from the pack file.
-	 *            The value must be a power of 2.
 	 * @return {@code this}
 	 */
 	public DfsBlockCacheConfig setBlockSize(final int newSize) {
-		int size = Math.max(512, newSize);
-		if ((size & (size - 1)) != 0) {
-			throw new IllegalArgumentException(
-					JGitText.get().blockSizeNotPowerOf2);
-		}
-		blockSize = size;
+		blockSize = Math.max(512, newSize);
 		return this;
 	}
 
 	/**
 	 * @return the estimated number of threads concurrently accessing the cache.
 	 *         <b>Default is 32.</b>
+	 * @since 4.6
 	 */
 	public int getConcurrencyLevel() {
 		return concurrencyLevel;
@@ -132,6 +127,7 @@ public class DfsBlockCacheConfig {
 	 *            the estimated number of threads concurrently accessing the
 	 *            cache.
 	 * @return {@code this}
+	 * @since 4.6
 	 */
 	public DfsBlockCacheConfig setConcurrencyLevel(
 			final int newConcurrencyLevel) {
@@ -143,6 +139,7 @@ public class DfsBlockCacheConfig {
 	 * @return highest percentage of {@link #getBlockLimit()} a single pack can
 	 *         occupy while being copied by the pack reuse strategy. <b>Default
 	 *         is 0.30, or 30%</b>.
+	 * @since 4.0
 	 */
 	public double getStreamRatio() {
 		return streamRatio;
@@ -152,6 +149,7 @@ public class DfsBlockCacheConfig {
 	 * @param ratio
 	 *            percentage of cache to occupy with a copied pack.
 	 * @return {@code this}
+	 * @since 4.0
 	 */
 	public DfsBlockCacheConfig setStreamRatio(double ratio) {
 		streamRatio = Math.max(0, Math.min(ratio, 1.0));

@@ -90,7 +90,6 @@ import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.TemporaryBuffer;
 import org.eclipse.jgit.util.io.CountingOutputStream;
-import org.eclipse.jgit.util.sha1.SHA1;
 
 /** Inserts objects into the DFS. */
 public class DfsInserter extends ObjectInserter {
@@ -104,7 +103,7 @@ public class DfsInserter extends ObjectInserter {
 	ObjectIdOwnerMap<PackedObjectInfo> objectMap;
 
 	DfsBlockCache cache;
-	DfsStreamKey packKey;
+	DfsPackKey packKey;
 	DfsPackDescription packDsc;
 	PackStream packOut;
 	private boolean rollback;
@@ -169,7 +168,7 @@ public class DfsInserter extends ObjectInserter {
 		}
 
 		long offset = beginObject(type, len);
-		SHA1 md = digest();
+		MessageDigest md = digest();
 		md.update(Constants.encodedTypeString(type));
 		md.update((byte) ' ');
 		md.update(Constants.encodeASCII(len));
@@ -184,7 +183,7 @@ public class DfsInserter extends ObjectInserter {
 			len -= n;
 		}
 		packOut.compress.finish();
-		return endObject(md.toObjectId(), offset);
+		return endObject(ObjectId.fromRaw(md.digest()), offset);
 	}
 
 	private byte[] insertBuffer(long len) {
@@ -221,7 +220,7 @@ public class DfsInserter extends ObjectInserter {
 		db.commitPack(Collections.singletonList(packDsc), null);
 		rollback = false;
 
-		DfsPackFile p = new DfsPackFile(cache, packDsc);
+		DfsPackFile p = cache.getOrCreate(packDsc, packKey);
 		if (index != null)
 			p.setPackIndex(index);
 		db.addPack(p);
@@ -275,16 +274,14 @@ public class DfsInserter extends ObjectInserter {
 	}
 
 	private void beginPack() throws IOException {
-		objectList = new BlockList<>();
-		objectMap = new ObjectIdOwnerMap<>();
+		objectList = new BlockList<PackedObjectInfo>();
+		objectMap = new ObjectIdOwnerMap<PackedObjectInfo>();
 		cache = DfsBlockCache.getInstance();
 
 		rollback = true;
 		packDsc = db.newPack(DfsObjDatabase.PackSource.INSERT);
-		DfsOutputStream dfsOut = db.writeFile(packDsc, PACK);
-		packDsc.setBlockSize(PACK, dfsOut.blockSize());
-		packOut = new PackStream(dfsOut);
-		packKey = packDsc.getStreamKey(PACK);
+		packOut = new PackStream(db.writeFile(packDsc, PACK));
+		packKey = new DfsPackKey();
 
 		// Write the header as though it were a single object pack.
 		byte[] buf = packOut.hdrBuf;
@@ -314,19 +311,17 @@ public class DfsInserter extends ObjectInserter {
 			packIndex = PackIndex.read(buf.openInputStream());
 		}
 
-		try (DfsOutputStream os = db.writeFile(pack, INDEX)) {
+		DfsOutputStream os = db.writeFile(pack, INDEX);
+		try {
 			CountingOutputStream cnt = new CountingOutputStream(os);
 			if (buf != null)
 				buf.writeTo(cnt, null);
 			else
 				index(cnt, packHash, list);
 			pack.addFileExt(INDEX);
-			pack.setBlockSize(INDEX, os.blockSize());
 			pack.setFileSize(INDEX, cnt.getCount());
 		} finally {
-			if (buf != null) {
-				buf.close();
-			}
+			os.close();
 		}
 		return packIndex;
 	}
@@ -500,7 +495,7 @@ public class DfsInserter extends ObjectInserter {
 				inf.setInput(currBuf, s, n);
 				return n;
 			}
-			throw new EOFException(JGitText.get().unexpectedEofInPack);
+			throw new EOFException(DfsText.get().unexpectedEofInPack);
 		}
 
 		private DfsBlock getOrLoadBlock(long pos) throws IOException {
@@ -513,7 +508,7 @@ public class DfsInserter extends ObjectInserter {
 			for (int p = 0; p < blockSize;) {
 				int n = out.read(s + p, ByteBuffer.wrap(d, p, blockSize - p));
 				if (n <= 0)
-					throw new EOFException(JGitText.get().unexpectedEofInPack);
+					throw new EOFException(DfsText.get().unexpectedEofInPack);
 				p += n;
 			}
 			b = new DfsBlock(packKey, s, d);
@@ -533,7 +528,7 @@ public class DfsInserter extends ObjectInserter {
 	}
 
 	private class Reader extends ObjectReader {
-		private final DfsReader ctx = db.newReader();
+		private final DfsReader ctx = new DfsReader(db);
 
 		@Override
 		public ObjectReader newReader() {
@@ -547,7 +542,7 @@ public class DfsInserter extends ObjectInserter {
 			if (objectList == null)
 				return stored;
 
-			Set<ObjectId> r = new HashSet<>(stored.size() + 2);
+			Set<ObjectId> r = new HashSet<ObjectId>(stored.size() + 2);
 			r.addAll(stored);
 			for (PackedObjectInfo obj : objectList) {
 				if (id.prefixCompare(obj) == 0)
@@ -569,13 +564,13 @@ public class DfsInserter extends ObjectInserter {
 			byte[] buf = buffer();
 			int cnt = packOut.read(obj.getOffset(), buf, 0, 20);
 			if (cnt <= 0)
-					throw new EOFException(JGitText.get().unexpectedEofInPack);
+					throw new EOFException(DfsText.get().unexpectedEofInPack);
 
 			int c = buf[0] & 0xff;
 			int type = (c >> 4) & 7;
 			if (type == OBJ_OFS_DELTA || type == OBJ_REF_DELTA)
 				throw new IOException(MessageFormat.format(
-						JGitText.get().cannotReadBackDelta, Integer.toString(type)));
+						DfsText.get().cannotReadBackDelta, Integer.toString(type)));
 			if (typeHint != OBJ_ANY && type != typeHint) {
 				throw new IncorrectObjectTypeException(objectId.copy(), typeHint);
 			}
@@ -585,7 +580,7 @@ public class DfsInserter extends ObjectInserter {
 			int shift = 4;
 			while ((c & 0x80) != 0) {
 				if (ptr >= cnt)
-					throw new EOFException(JGitText.get().unexpectedEofInPack);
+					throw new EOFException(DfsText.get().unexpectedEofInPack);
 				c = buf[ptr++] & 0xff;
 				sz += ((long) (c & 0x7f)) << shift;
 				shift += 7;
@@ -616,12 +611,6 @@ public class DfsInserter extends ObjectInserter {
 		}
 
 		@Override
-		public boolean has(AnyObjectId objectId) throws IOException {
-			return (objectMap != null && objectMap.contains(objectId))
-					|| ctx.has(objectId);
-		}
-
-		@Override
 		public Set<ObjectId> getShallowCommits() throws IOException {
 			return ctx.getShallowCommits();
 		}
@@ -642,11 +631,11 @@ public class DfsInserter extends ObjectInserter {
 		private final int type;
 		private final long size;
 
-		private final DfsStreamKey srcPack;
+		private final DfsPackKey srcPack;
 		private final long pos;
 
 		StreamLoader(ObjectId id, int type, long sz,
-				DfsStreamKey key, long pos) {
+				DfsPackKey key, long pos) {
 			this.id = id;
 			this.type = type;
 			this.size = sz;
@@ -656,7 +645,7 @@ public class DfsInserter extends ObjectInserter {
 
 		@Override
 		public ObjectStream openStream() throws IOException {
-			final DfsReader ctx = db.newReader();
+			final DfsReader ctx = new DfsReader(db);
 			if (srcPack != packKey) {
 				try {
 					// Post DfsInserter.flush() use the normal code path.

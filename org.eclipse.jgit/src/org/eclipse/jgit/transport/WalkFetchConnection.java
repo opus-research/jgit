@@ -197,20 +197,20 @@ class WalkFetchConnection extends BaseFetchConnection {
 		inserter = local.newObjectInserter();
 		reader = inserter.newReader();
 
-		remotes = new ArrayList<>();
+		remotes = new ArrayList<WalkRemoteObjectDatabase>();
 		remotes.add(w);
 
-		unfetchedPacks = new LinkedList<>();
-		packsConsidered = new HashSet<>();
+		unfetchedPacks = new LinkedList<RemotePack>();
+		packsConsidered = new HashSet<String>();
 
-		noPacksYet = new LinkedList<>();
+		noPacksYet = new LinkedList<WalkRemoteObjectDatabase>();
 		noPacksYet.add(w);
 
-		noAlternatesYet = new LinkedList<>();
+		noAlternatesYet = new LinkedList<WalkRemoteObjectDatabase>();
 		noAlternatesYet.add(w);
 
-		fetchErrors = new HashMap<>();
-		packLocks = new ArrayList<>(4);
+		fetchErrors = new HashMap<ObjectId, List<Throwable>>();
+		packLocks = new ArrayList<PackLock>(4);
 
 		revWalk = new RevWalk(reader);
 		revWalk.setRetainBody(false);
@@ -220,10 +220,9 @@ class WalkFetchConnection extends BaseFetchConnection {
 		LOCALLY_SEEN = revWalk.newFlag("LOCALLY_SEEN"); //$NON-NLS-1$
 
 		localCommitQueue = new DateRevQueue();
-		workQueue = new LinkedList<>();
+		workQueue = new LinkedList<ObjectId>();
 	}
 
-	@Override
 	public boolean didFetchTestConnectivity() {
 		return true;
 	}
@@ -249,12 +248,10 @@ class WalkFetchConnection extends BaseFetchConnection {
 		}
 	}
 
-	@Override
 	public Collection<PackLock> getPackLocks() {
 		return packLocks;
 	}
 
-	@Override
 	public void setPackLockMessage(final String message) {
 		lockMessage = message;
 	}
@@ -273,7 +270,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 
 	private void queueWants(final Collection<Ref> want)
 			throws TransportException {
-		final HashSet<ObjectId> inWorkQueue = new HashSet<>();
+		final HashSet<ObjectId> inWorkQueue = new HashSet<ObjectId>();
 		for (final Ref r : want) {
 			final ObjectId id = r.getObjectId();
 			if (id == null) {
@@ -597,7 +594,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 
 	private Iterator<ObjectId> swapFetchQueue() {
 		final Iterator<ObjectId> r = workQueue.iterator();
-		workQueue = new LinkedList<>();
+		workQueue = new LinkedList<ObjectId>();
 		return r;
 	}
 
@@ -794,7 +791,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 		final ObjectId objId = id.copy();
 		List<Throwable> errors = fetchErrors.get(objId);
 		if (errors == null) {
-			errors = new ArrayList<>(2);
+			errors = new ArrayList<Throwable>(2);
 			fetchErrors.put(objId, errors);
 		}
 		errors.add(what);
@@ -884,17 +881,13 @@ class WalkFetchConnection extends BaseFetchConnection {
 		void downloadPack(final ProgressMonitor monitor) throws IOException {
 			String name = "pack/" + packName; //$NON-NLS-1$
 			WalkRemoteObjectDatabase.FileStream s = connection.open(name);
-			try {
-				PackParser parser = inserter.newPackParser(s.in);
-				parser.setAllowThin(false);
-				parser.setObjectChecker(objCheck);
-				parser.setLockMessage(lockMessage);
-				PackLock lock = parser.parse(monitor);
-				if (lock != null)
-					packLocks.add(lock);
-			} finally {
-				s.in.close();
-			}
+			PackParser parser = inserter.newPackParser(s.in);
+			parser.setAllowThin(false);
+			parser.setObjectChecker(objCheck);
+			parser.setLockMessage(lockMessage);
+			PackLock lock = parser.parse(monitor);
+			if (lock != null)
+				packLocks.add(lock);
 		}
 	}
 }

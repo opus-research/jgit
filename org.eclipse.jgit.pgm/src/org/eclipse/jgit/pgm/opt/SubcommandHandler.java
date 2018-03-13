@@ -43,16 +43,18 @@
 
 package org.eclipse.jgit.pgm.opt;
 
-import org.eclipse.jgit.pgm.CommandCatalog;
-import org.eclipse.jgit.pgm.CommandRef;
-import org.eclipse.jgit.pgm.TextBuiltin;
-import org.eclipse.jgit.pgm.internal.CLIText;
+import java.text.MessageFormat;
+
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.OptionDef;
 import org.kohsuke.args4j.spi.OptionHandler;
 import org.kohsuke.args4j.spi.Parameters;
 import org.kohsuke.args4j.spi.Setter;
+import org.eclipse.jgit.pgm.CommandCatalog;
+import org.eclipse.jgit.pgm.CommandRef;
+import org.eclipse.jgit.pgm.TextBuiltin;
+import org.eclipse.jgit.pgm.internal.CLIText;
 
 /**
  * Custom Argument handler for jgit command selection.
@@ -83,8 +85,8 @@ public class SubcommandHandler extends OptionHandler<TextBuiltin> {
 		final String name = params.getParameter(0);
 		final CommandRef cr = CommandCatalog.get(name);
 		if (cr == null)
-			throw new CmdLineException(clp,
-					CLIText.format(CLIText.get().notAJgitCommand), name);
+			throw new CmdLineException(clp, MessageFormat.format(
+					CLIText.get().notAJgitCommand, name));
 
 		// Force option parsing to stop. Everything after us should
 		// be arguments known only to this command and must not be

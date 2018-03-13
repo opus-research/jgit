@@ -42,16 +42,17 @@
  */
 package org.eclipse.jgit.util;
 
-import static org.eclipse.jgit.util.RelativeDateFormatter.DAY_IN_MILLIS;
-import static org.eclipse.jgit.util.RelativeDateFormatter.HOUR_IN_MILLIS;
-import static org.eclipse.jgit.util.RelativeDateFormatter.MINUTE_IN_MILLIS;
-import static org.eclipse.jgit.util.RelativeDateFormatter.SECOND_IN_MILLIS;
-import static org.eclipse.jgit.util.RelativeDateFormatter.YEAR_IN_MILLIS;
 import static org.junit.Assert.assertEquals;
+import static org.eclipse.jgit.util.RelativeDateFormatter.YEAR_IN_MILLIS;
+import static org.eclipse.jgit.util.RelativeDateFormatter.SECOND_IN_MILLIS;
+import static org.eclipse.jgit.util.RelativeDateFormatter.MINUTE_IN_MILLIS;
+import static org.eclipse.jgit.util.RelativeDateFormatter.HOUR_IN_MILLIS;
+import static org.eclipse.jgit.util.RelativeDateFormatter.DAY_IN_MILLIS;
 
 import java.util.Date;
 
 import org.eclipse.jgit.junit.MockSystemReader;
+import org.eclipse.jgit.util.RelativeDateFormatter;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -128,14 +129,7 @@ public class RelativeDateFormatterTest {
 		assertFormat(380, DAY_IN_MILLIS, "1 year, 1 month ago");
 		assertFormat(410, DAY_IN_MILLIS, "1 year, 2 months ago");
 		assertFormat(2, YEAR_IN_MILLIS, "2 years ago");
-	}
-
-	@Test
-	public void testFullYearMissingSomeDays() {
-		// avoid "x year(s), 12 months", as humans would always round this up to
-		// "x+1 years"
-		assertFormat(5 * 365 + 1, DAY_IN_MILLIS, "5 years ago");
-		assertFormat(2 * 365 - 10, DAY_IN_MILLIS, "2 years ago");
+		assertFormat(1824, DAY_IN_MILLIS, "4 years, 12 months ago");
 	}
 
 	@Test

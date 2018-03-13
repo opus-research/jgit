@@ -53,19 +53,14 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.net.ConnectException;
 import java.net.UnknownHostException;
-import java.text.MessageFormat;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.util.FS;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.JSchException;
@@ -85,11 +80,7 @@ import com.jcraft.jsch.UserInfo;
  * to supply appropriate {@link UserInfo} to the session.
  */
 public abstract class JschConfigSessionFactory extends SshSessionFactory {
-
-	private static final Logger LOG = LoggerFactory
-			.getLogger(JschConfigSessionFactory.class);
-
-	private final Map<String, JSch> byIdentityFile = new HashMap<>();
+	private final Map<String, JSch> byIdentityFile = new HashMap<String, JSch>();
 
 	private JSch defaultJSch;
 
@@ -162,13 +153,10 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 
 		} catch (JSchException je) {
 			final Throwable c = je.getCause();
-			if (c instanceof UnknownHostException) {
-				throw new TransportException(uri, JGitText.get().unknownHost,
-						je);
-			}
-			if (c instanceof ConnectException) {
-				throw new TransportException(uri, c.getMessage(), je);
-			}
+			if (c instanceof UnknownHostException)
+				throw new TransportException(uri, JGitText.get().unknownHost);
+			if (c instanceof ConnectException)
+				throw new TransportException(uri, c.getMessage());
 			throw new TransportException(uri, je.getMessage(), je);
 		}
 
@@ -186,9 +174,6 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 			FS fs, String user, final String pass, String host, int port,
 			final OpenSshConfig.Host hc) throws JSchException {
 		final Session session = createSession(hc, user, host, port, fs);
-		// Jsch will have overridden the explicit user by the one from the SSH
-		// config file...
-		setUserName(session, user);
 		// We retry already in getSession() method. JSch must not retry
 		// on its own.
 		session.setConfig("MaxAuthTries", "1"); //$NON-NLS-1$ //$NON-NLS-2$
@@ -209,28 +194,6 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 		}
 		configure(hc, session);
 		return session;
-	}
-
-	private void setUserName(Session session, String userName) {
-		// Jsch 0.1.54 picks up the user name from the ssh config, even if an
-		// explicit user name was given! We must correct that if ~/.ssh/config
-		// has a different user name.
-		if (userName == null || userName.isEmpty()
-				|| userName.equals(session.getUserName())) {
-			return;
-		}
-		try {
-			Class<?>[] parameterTypes = { String.class };
-			Method method = Session.class.getDeclaredMethod("setUserName", //$NON-NLS-1$
-					parameterTypes);
-			method.setAccessible(true);
-			method.invoke(session, userName);
-		} catch (NullPointerException | IllegalAccessException
-				| IllegalArgumentException | InvocationTargetException
-				| NoSuchMethodException | SecurityException e) {
-			LOG.error(MessageFormat.format(JGitText.get().sshUserNameError,
-					userName, session.getUserName()), e);
-		}
 	}
 
 	/**
@@ -296,9 +259,6 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 	protected JSch getJSch(final OpenSshConfig.Host hc, FS fs) throws JSchException {
 		if (defaultJSch == null) {
 			defaultJSch = createDefaultJSch(fs);
-			if (defaultJSch.getConfigRepository() == null) {
-				defaultJSch.setConfigRepository(config);
-			}
 			for (Object name : defaultJSch.getIdentityNames())
 				byIdentityFile.put((String) name, defaultJSch);
 		}
@@ -312,9 +272,6 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 		if (jsch == null) {
 			jsch = new JSch();
 			configureJSch(jsch);
-			if (jsch.getConfigRepository() == null) {
-				jsch.setConfigRepository(defaultJSch.getConfigRepository());
-			}
 			jsch.setHostKeyRepository(defaultJSch.getHostKeyRepository());
 			jsch.addIdentity(identityKey);
 			byIdentityFile.put(identityKey, jsch);

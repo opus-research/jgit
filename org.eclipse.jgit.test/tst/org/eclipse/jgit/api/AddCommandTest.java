@@ -303,21 +303,6 @@ public class AddCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testAttributesConflictingMatch() throws Exception {
-		writeTrashFile(".gitattributes", "foo/** crlf=input\n*.jar binary");
-		writeTrashFile("foo/bar.jar", "\r\n");
-		// We end up with attributes [binary -diff -merge -text crlf=input].
-		// crlf should have no effect when -text is present.
-		try (Git git = new Git(db)) {
-			git.add().addFilepattern(".").call();
-			assertEquals(
-					"[.gitattributes, mode:100644, content:foo/** crlf=input\n*.jar binary]"
-							+ "[foo/bar.jar, mode:100644, content:\r\n]",
-					indexState(CONTENT));
-		}
-	}
-
-	@Test
 	public void testCleanFilterEnvironment()
 			throws IOException, GitAPIException {
 		writeTrashFile(".gitattributes", "*.txt filter=tstFilter");
@@ -1089,37 +1074,30 @@ public class AddCommandTest extends RepositoryTestCase {
 
 		FS executableFs = new FS() {
 
-			@Override
 			public boolean supportsExecute() {
 				return true;
 			}
 
-			@Override
 			public boolean setExecute(File f, boolean canExec) {
 				return true;
 			}
 
-			@Override
 			public ProcessBuilder runInShell(String cmd, String[] args) {
 				return null;
 			}
 
-			@Override
 			public boolean retryFailedLockFileCommit() {
 				return false;
 			}
 
-			@Override
 			public FS newInstance() {
 				return this;
 			}
 
-			@Override
 			protected File discoverGitExe() {
 				return null;
 			}
 
-			@Override
 			public boolean canExecute(File f) {
 				try {
 					return read(f).startsWith("binary:");

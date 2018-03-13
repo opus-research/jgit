@@ -139,7 +139,7 @@ public class ConfigTest {
 	@Test
 	public void test005_PutGetStringList() {
 		Config c = new Config();
-		final LinkedList<String> values = new LinkedList<>();
+		final LinkedList<String> values = new LinkedList<String>();
 		values.add("value1");
 		values.add("value2");
 		c.setStringList("my", null, "somename", values);
@@ -964,57 +964,5 @@ public class ConfigTest {
 	public void testTimeUnitNegative() throws ConfigInvalidException {
 		expectedEx.expect(IllegalArgumentException.class);
 		parseTime("-1", MILLISECONDS);
-	}
-
-	@Test
-	public void testEscapeSpacesOnly() throws ConfigInvalidException {
-		assertEquals("", Config.escapeValue(""));
-		assertEquals("\" \"", Config.escapeValue(" "));
-		assertEquals("\"  \"", Config.escapeValue("  "));
-
-		assertParseRoundTrip(" ");
-		assertParseRoundTrip("  ");
-	}
-
-	@Test
-	public void testEscapeLeadingSpace() throws ConfigInvalidException {
-		assertEquals("x", Config.escapeValue("x"));
-		assertEquals("\" x\"", Config.escapeValue(" x"));
-		assertEquals("\"  x\"", Config.escapeValue("  x"));
-
-		assertParseRoundTrip("x");
-		assertParseRoundTrip(" x");
-		assertParseRoundTrip("  x");
-	}
-
-	@Test
-	public void testEscapeTrailingSpace() throws ConfigInvalidException {
-		assertEquals("x", Config.escapeValue("x"));
-		assertEquals("\"x  \"", Config.escapeValue("x  "));
-		assertEquals("x\" \"", Config.escapeValue("x "));
-
-		assertParseRoundTrip("x");
-		assertParseRoundTrip("x ");
-		assertParseRoundTrip("x  ");
-	}
-
-	@Test
-	public void testEscapeLeadingAndTrailingSpace()
-			throws ConfigInvalidException {
-		assertEquals("\" x \"", Config.escapeValue(" x "));
-		assertEquals("\"  x \"", Config.escapeValue("  x "));
-		assertEquals("\" x  \"", Config.escapeValue(" x  "));
-		assertEquals("\"  x  \"", Config.escapeValue("  x  "));
-
-		assertParseRoundTrip(" x ");
-		assertParseRoundTrip(" x  ");
-		assertParseRoundTrip("  x ");
-		assertParseRoundTrip("  x  ");
-	}
-
-	private static void assertParseRoundTrip(String value)
-			throws ConfigInvalidException {
-		Config c = parse("[foo]\nbar = " + Config.escapeValue(value));
-		assertEquals(value, c.getString("foo", null, "bar"));
 	}
 }

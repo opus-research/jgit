@@ -53,11 +53,11 @@ import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.attributes.Attribute;
 import org.eclipse.jgit.attributes.Attributes;
-import org.eclipse.jgit.attributes.AttributesHandler;
 import org.eclipse.jgit.attributes.AttributesNodeProvider;
 import org.eclipse.jgit.attributes.AttributesProvider;
 import org.eclipse.jgit.attributes.FilterCommandRegistry;
 import org.eclipse.jgit.dircache.DirCacheBuildIterator;
+import org.eclipse.jgit.attributes.AttributesHandler;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -65,7 +65,6 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StopWalkException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig.EolStreamType;
 import org.eclipse.jgit.lib.FileMode;
@@ -128,7 +127,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 * The filter command as defined in gitattributes. The keys are
 	 * filterName+"."+filterCommandType. E.g. "lfs.clean"
 	 */
-	private Map<String, String> filterCommandsByNameDotType = new HashMap<>();
+	private Map<String, String> filterCommandsByNameDotType = new HashMap<String, String>();
 
 	/**
 	 * @param operationType
@@ -559,7 +558,6 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 * @return a {@link Set} of {@link Attribute}s that match the current entry.
 	 * @since 4.2
 	 */
-	@Override
 	public Attributes getAttributes() {
 		if (attrs != null)
 			return attrs;
@@ -592,14 +590,13 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 * @return the EOL stream type of the current entry using the config and
 	 *         {@link #getAttributes()} Note that this method may return null if
 	 *         the {@link TreeWalk} is not based on a working tree
-	 * @since 4.10
 	 */
+	// TODO(msohn) make this method public in 4.4
 	@Nullable
-	public EolStreamType getEolStreamType(OperationType opType) {
-		if (attributesNodeProvider == null || config == null)
-			return null;
-		return EolStreamTypeUtil.detectStreamType(
-				opType != null ? opType : operationType,
+	EolStreamType getEolStreamType(OperationType opType) {
+			if (attributesNodeProvider == null || config == null)
+				return null;
+		return EolStreamTypeUtil.detectStreamType(opType,
 					config.get(WorkingTreeOptions.KEY), getAttributes());
 	}
 
@@ -608,9 +605,8 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 *         {@link #getAttributes()} Note that this method may return null if
 	 *         the {@link TreeWalk} is not based on a working tree
 	 * @since 4.3
-	 * @deprecated use {@link #getEolStreamType(OperationType)} instead.
 	 */
-	@Deprecated
+	// TODO(msohn) deprecate this method in 4.4
 	public @Nullable EolStreamType getEolStreamType() {
 		return (getEolStreamType(operationType));
 	}
@@ -828,7 +824,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 				}
 
 				currentHead = t;
-				if (filter.matchFilter(this) == 1) {
+				if (!filter.include(this)) {
 					skipEntriesEqual();
 					continue;
 				}
@@ -1059,60 +1055,6 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 */
 	public int getPathLength() {
 		return currentHead.pathLen;
-	}
-
-	/**
-	 * Test if the supplied path matches the current entry's path.
-	 * <p>
-	 * This method detects if the supplied path is equal to, a subtree of, or
-	 * not similar at all to the current entry. It is faster to use this
-	 * method than to use {@link #getPathString()} to first create a String
-	 * object, then test <code>startsWith</code> or some other type of string
-	 * match function.
-	 * <p>
-	 * If the current entry is a subtree, then all paths within the subtree
-	 * are considered to match it.
-	 *
-	 * @param p
-	 *            path buffer to test. Callers should ensure the path does not
-	 *            end with '/' prior to invocation.
-	 * @param pLen
-	 *            number of bytes from <code>buf</code> to test.
-	 * @return -1 if the current path is a parent to p; 0 if p matches the current
-	 *         path; 1 if the current path is different and will never match
-	 *         again on this tree walk.
-	 * @since 4.7
-	 */
-	public int isPathMatch(final byte[] p, final int pLen) {
-		final AbstractTreeIterator t = currentHead;
-		final byte[] c = t.path;
-		final int cLen = t.pathLen;
-		int ci;
-
-		for (ci = 0; ci < cLen && ci < pLen; ci++) {
-			final int c_value = (c[ci] & 0xff) - (p[ci] & 0xff);
-			if (c_value != 0) {
-				// Paths do not and will never match
-				return 1;
-			}
-		}
-
-		if (ci < cLen) {
-			// Ran out of pattern but we still had current data.
-			// If c[ci] == '/' then pattern matches the subtree.
-			// Otherwise it is a partial match == miss
-			return c[ci] == '/' ? 0 : 1;
-		}
-
-		if (ci < pLen) {
-			// Ran out of current, but we still have pattern data.
-			// If p[ci] == '/' then this subtree is a parent in the pattern,
-			// otherwise it's a miss.
-			return p[ci] == '/' && FileMode.TREE.equals(t.mode) ? -1 : 1;
-		}
-
-		// Both strings are identical.
-		return 0;
 	}
 
 	/**
@@ -1377,7 +1319,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 
 	/**
 	 * Inspect config and attributes to return a filtercommand applicable for
-	 * the current path, but without expanding %f occurences
+	 * the current path
 	 *
 	 * @param filterCommandType
 	 *            which type of filterCommand should be executed. E.g. "clean",
@@ -1430,11 +1372,10 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 		String filterCommand = filterCommandsByNameDotType.get(key);
 		if (filterCommand != null)
 			return filterCommand;
-		filterCommand = config.getString(ConfigConstants.CONFIG_FILTER_SECTION,
+		filterCommand = config.getString(Constants.ATTR_FILTER,
 				filterDriverName, filterCommandType);
-		boolean useBuiltin = config.getBoolean(
-				ConfigConstants.CONFIG_FILTER_SECTION,
-				filterDriverName, ConfigConstants.CONFIG_KEY_USEJGITBUILTIN, false);
+		boolean useBuiltin = config.getBoolean(Constants.ATTR_FILTER,
+				filterDriverName, Constants.ATTR_FILTER_USE_BUILTIN, false);
 		if (useBuiltin) {
 			String builtinFilterCommand = Constants.BUILTIN_FILTER_PREFIX
 					+ filterDriverName + '/' + filterCommandType;

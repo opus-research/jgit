@@ -44,10 +44,8 @@ package org.eclipse.jgit.api;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
-import java.util.List;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
@@ -55,7 +53,6 @@ import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuildIterator;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
-import org.eclipse.jgit.events.WorkingTreeModifiedEvent;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -102,7 +99,7 @@ public class RmCommand extends GitCommand<DirCache> {
 	 */
 	public RmCommand(Repository repo) {
 		super(repo);
-		filepatterns = new LinkedList<>();
+		filepatterns = new LinkedList<String>();
 	}
 
 	/**
@@ -139,7 +136,6 @@ public class RmCommand extends GitCommand<DirCache> {
 	 *
 	 * @return the DirCache after Rm
 	 */
-	@Override
 	public DirCache call() throws GitAPIException,
 			NoFilepatternException {
 
@@ -148,7 +144,6 @@ public class RmCommand extends GitCommand<DirCache> {
 		checkCallable();
 		DirCache dc = null;
 
-		List<String> actuallyDeletedFiles = new ArrayList<>();
 		try (final TreeWalk tw = new TreeWalk(repo)) {
 			dc = repo.lockDirCache();
 			DirCacheBuilder builder = dc.builder();
@@ -161,14 +156,11 @@ public class RmCommand extends GitCommand<DirCache> {
 				if (!cached) {
 					final FileMode mode = tw.getFileMode(0);
 					if (mode.getObjectType() == Constants.OBJ_BLOB) {
-						String relativePath = tw.getPathString();
 						final File path = new File(repo.getWorkTree(),
-								relativePath);
+								tw.getPathString());
 						// Deleting a blob is simply a matter of removing
 						// the file or symlink named by the tree entry.
-						if (delete(path)) {
-							actuallyDeletedFiles.add(relativePath);
-						}
+						delete(path);
 					}
 				}
 			}
@@ -178,28 +170,16 @@ public class RmCommand extends GitCommand<DirCache> {
 			throw new JGitInternalException(
 					JGitText.get().exceptionCaughtDuringExecutionOfRmCommand, e);
 		} finally {
-			try {
-				if (dc != null) {
-					dc.unlock();
-				}
-			} finally {
-				if (!actuallyDeletedFiles.isEmpty()) {
-					repo.fireEvent(new WorkingTreeModifiedEvent(null,
-							actuallyDeletedFiles));
-				}
-			}
+			if (dc != null)
+				dc.unlock();
 		}
 
 		return dc;
 	}
 
-	private boolean delete(File p) {
-		boolean deleted = false;
-		while (p != null && !p.equals(repo.getWorkTree()) && p.delete()) {
-			deleted = true;
+	private void delete(File p) {
+		while (p != null && !p.equals(repo.getWorkTree()) && p.delete())
 			p = p.getParentFile();
-		}
-		return deleted;
 	}
 
 }

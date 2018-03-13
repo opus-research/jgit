@@ -48,6 +48,12 @@ import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
 
+import org.kohsuke.args4j.CmdLineException;
+import org.kohsuke.args4j.CmdLineParser;
+import org.kohsuke.args4j.OptionDef;
+import org.kohsuke.args4j.spi.OptionHandler;
+import org.kohsuke.args4j.spi.Parameters;
+import org.kohsuke.args4j.spi.Setter;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -60,12 +66,6 @@ import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.eclipse.jgit.util.FS;
-import org.kohsuke.args4j.CmdLineException;
-import org.kohsuke.args4j.CmdLineParser;
-import org.kohsuke.args4j.OptionDef;
-import org.kohsuke.args4j.spi.OptionHandler;
-import org.kohsuke.args4j.spi.Parameters;
-import org.kohsuke.args4j.spi.Setter;
 
 /**
  * Custom argument handler {@link AbstractTreeIterator} from string values.
@@ -119,25 +119,20 @@ public class AbstractTreeIteratorHandler extends
 		try {
 			id = clp.getRepository().resolve(name);
 		} catch (IOException e) {
-			throw new CmdLineException(clp, CLIText.format(e.getMessage()));
+			throw new CmdLineException(clp, e.getMessage());
 		}
 		if (id == null)
-			throw new CmdLineException(clp,
-					CLIText.format(CLIText.get().notATree), name);
+			throw new CmdLineException(clp, MessageFormat.format(CLIText.get().notATree, name));
 
 		final CanonicalTreeParser p = new CanonicalTreeParser();
 		try (ObjectReader curs = clp.getRepository().newObjectReader()) {
 			p.reset(curs, clp.getRevWalk().parseTree(id));
 		} catch (MissingObjectException e) {
-			throw new CmdLineException(clp,
-					CLIText.format(CLIText.get().notATree), name);
+			throw new CmdLineException(clp, MessageFormat.format(CLIText.get().notATree, name));
 		} catch (IncorrectObjectTypeException e) {
-			throw new CmdLineException(clp,
-					CLIText.format(CLIText.get().notATree), name);
+			throw new CmdLineException(clp, MessageFormat.format(CLIText.get().notATree, name));
 		} catch (IOException e) {
-			throw new CmdLineException(clp,
-					CLIText.format(CLIText.get().cannotReadBecause), name,
-					e.getMessage());
+			throw new CmdLineException(clp, MessageFormat.format(CLIText.get().cannotReadBecause, name, e.getMessage()));
 		}
 
 		setter.addValue(p);

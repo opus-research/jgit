@@ -64,8 +64,8 @@ import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.lfs.server.LargeFileRepository;
 import org.eclipse.jgit.lfs.server.LfsProtocolServlet;
-import org.eclipse.jgit.lfs.server.fs.FileLfsRepository;
 import org.eclipse.jgit.lfs.server.fs.FileLfsServlet;
+import org.eclipse.jgit.lfs.server.fs.FileLfsRepository;
 import org.eclipse.jgit.lfs.server.s3.S3Config;
 import org.eclipse.jgit.lfs.server.s3.S3Repository;
 import org.eclipse.jgit.pgm.Command;
@@ -219,7 +219,6 @@ class LfsStore extends TextBuiltin {
 		return false;
 	}
 
-	@Override
 	protected void run() throws Exception {
 		AppServer server = new AppServer(port);
 		URI baseURI = server.getURI();
@@ -255,7 +254,7 @@ class LfsStore extends TextBuiltin {
 
 			@Override
 			protected LargeFileRepository getLargeFileRepository(
-					LfsRequest request, String path, String auth) {
+					LfsRequest request, String path) {
 				return repository;
 			}
 		};

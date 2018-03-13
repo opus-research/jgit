@@ -45,8 +45,12 @@ package org.eclipse.jgit.api;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
+import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.Collection;
 
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -56,6 +60,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.transport.FetchResult;
+import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.transport.TagOpt;
 import org.eclipse.jgit.transport.TrackingRefUpdate;
@@ -69,7 +74,7 @@ public class FetchCommandTest extends RepositoryTestCase {
 	private Git remoteGit;
 
 	@Before
-	public void setupRemoteRepository() throws Exception {
+	public void setupRemoteRepository() throws IOException, URISyntaxException {
 		git = new Git(db);
 
 		// create other repository
@@ -86,14 +91,16 @@ public class FetchCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testFetch() throws Exception {
+	public void testFetch() throws JGitInternalException, IOException,
+			GitAPIException {
 
 		// create some refs via commits and tag
 		RevCommit commit = remoteGit.commit().setMessage("initial commit").call();
 		Ref tagRef = remoteGit.tag().setName("tag").call();
 
-		git.fetch().setRemote("test")
-				.setRefSpecs("refs/heads/master:refs/heads/x").call();
+		RefSpec spec = new RefSpec("refs/heads/master:refs/heads/x");
+		git.fetch().setRemote("test").setRefSpecs(spec)
+				.call();
 
 		assertEquals(commit.getId(),
 				db.resolve(commit.getId().getName() + "^{commit}"));
@@ -106,8 +113,8 @@ public class FetchCommandTest extends RepositoryTestCase {
 		remoteGit.commit().setMessage("commit").call();
 		Ref tagRef = remoteGit.tag().setName("foo").call();
 
-		git.fetch().setRemote("test")
-				.setRefSpecs("refs/heads/*:refs/remotes/origin/*")
+		RefSpec spec = new RefSpec("refs/heads/*:refs/remotes/origin/*");
+		git.fetch().setRemote("test").setRefSpecs(spec)
 				.setTagOpt(TagOpt.AUTO_FOLLOW).call();
 
 		assertEquals(tagRef.getObjectId(), db.resolve("foo"));
@@ -118,8 +125,8 @@ public class FetchCommandTest extends RepositoryTestCase {
 		remoteGit.commit().setMessage("commit").call();
 		Ref tagRef = remoteGit.tag().setName("foo").call();
 		remoteGit.commit().setMessage("commit2").call();
-		git.fetch().setRemote("test")
-				.setRefSpecs("refs/heads/*:refs/remotes/origin/*")
+		RefSpec spec = new RefSpec("refs/heads/*:refs/remotes/origin/*");
+		git.fetch().setRemote("test").setRefSpecs(spec)
 				.setTagOpt(TagOpt.AUTO_FOLLOW).call();
 		assertEquals(tagRef.getObjectId(), db.resolve("foo"));
 	}
@@ -130,8 +137,9 @@ public class FetchCommandTest extends RepositoryTestCase {
 		remoteGit.checkout().setName("other").setCreateBranch(true).call();
 		remoteGit.commit().setMessage("commit2").call();
 		remoteGit.tag().setName("foo").call();
-		git.fetch().setRemote("test")
-				.setRefSpecs("refs/heads/master:refs/remotes/origin/master")
+		RefSpec spec = new RefSpec(
+				"refs/heads/master:refs/remotes/origin/master");
+		git.fetch().setRemote("test").setRefSpecs(spec)
 				.setTagOpt(TagOpt.AUTO_FOLLOW).call();
 		assertNull(db.resolve("foo"));
 	}
@@ -143,7 +151,7 @@ public class FetchCommandTest extends RepositoryTestCase {
 		Ref tagRef = remoteGit.tag().setName(tagName).call();
 		ObjectId originalId = tagRef.getObjectId();
 
-		String spec = "refs/heads/*:refs/remotes/origin/*";
+		RefSpec spec = new RefSpec("refs/heads/*:refs/remotes/origin/*");
 		git.fetch().setRemote("test").setRefSpecs(spec)
 				.setTagOpt(TagOpt.AUTO_FOLLOW).call();
 		assertEquals(originalId, db.resolve(tagName));
@@ -169,7 +177,7 @@ public class FetchCommandTest extends RepositoryTestCase {
 		remoteGit.commit().setMessage("commit").call();
 		Ref tagRef1 = remoteGit.tag().setName(tagName).call();
 
-		String spec = "refs/heads/*:refs/remotes/origin/*";
+		RefSpec spec = new RefSpec("refs/heads/*:refs/remotes/origin/*");
 		git.fetch().setRemote("test").setRefSpecs(spec)
 				.setTagOpt(TagOpt.AUTO_FOLLOW).call();
 		assertEquals(tagRef1.getObjectId(), db.resolve(tagName));

@@ -56,7 +56,6 @@ import java.util.List;
 import java.util.Random;
 
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.util.FileUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -157,7 +156,7 @@ public class CGitVsJGitRandomIgnorePatternTest {
 				throws UnsupportedEncodingException, IOException {
 			this.gitDir = gitDir;
 			this.pattern = pattern;
-			Files.write(FileUtils.toPath(new File(gitDir, ".gitignore")),
+			Files.write(new File(gitDir, ".gitignore").toPath(),
 					(pattern + "\n").getBytes("UTF-8"),
 					StandardOpenOption.CREATE,
 					StandardOpenOption.TRUNCATE_EXISTING,

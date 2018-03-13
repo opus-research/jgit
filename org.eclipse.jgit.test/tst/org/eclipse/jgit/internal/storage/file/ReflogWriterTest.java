@@ -61,8 +61,7 @@ public class ReflogWriterTest extends SampleDataRepositoryTestCase {
 
 	@Test
 	public void shouldFilterLineFeedFromMessage() throws Exception {
-		ReflogWriter writer =
-				new ReflogWriter((RefDirectory) db.getRefDatabase());
+		ReflogWriter writer = new ReflogWriter(db);
 		PersonIdent ident = new PersonIdent("John Doe", "john@doe.com",
 				1243028200000L, 120);
 		ObjectId oldId = ObjectId

@@ -42,18 +42,12 @@
  */
 package org.eclipse.jgit.merge;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.MergeResult;
@@ -65,18 +59,8 @@ import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.errors.NoMergeBaseException;
 import org.eclipse.jgit.errors.NoMergeBaseException.MergeBaseFailureReason;
 import org.eclipse.jgit.junit.RepositoryTestCase;
-import org.eclipse.jgit.junit.TestRepository;
-import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectInserter;
-import org.eclipse.jgit.lib.ObjectLoader;
-import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.lib.ObjectStream;
 import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevObject;
-import org.eclipse.jgit.revwalk.RevTree;
-import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
@@ -424,7 +408,7 @@ public class ResolveMergerTest extends RepositoryTestCase {
 
 	/**
 	 * Merging two equal subtrees with an incore merger should lead to a merged
-	 * state.
+	 * state (The 'Gerrit' use case).
 	 *
 	 * @param strategy
 	 * @throws Exception
@@ -455,43 +439,6 @@ public class ResolveMergerTest extends RepositoryTestCase {
 				true);
 		boolean noProblems = resolveMerger.merge(masterCommit, sideCommit);
 		assertTrue(noProblems);
-	}
-
-	/**
-	 * Merging two equal subtrees with an incore merger should lead to a merged
-	 * state, without using a Repository (the 'Gerrit' use case).
-	 *
-	 * @param strategy
-	 * @throws Exception
-	 */
-	@Theory
-	public void checkMergeEqualTreesInCore_noRepo(MergeStrategy strategy)
-			throws Exception {
-		Git git = Git.wrap(db);
-
-		writeTrashFile("d/1", "orig");
-		git.add().addFilepattern("d/1").call();
-		RevCommit first = git.commit().setMessage("added d/1").call();
-
-		writeTrashFile("d/1", "modified");
-		RevCommit masterCommit = git.commit().setAll(true)
-				.setMessage("modified d/1 on master").call();
-
-		git.checkout().setCreateBranch(true).setStartPoint(first)
-				.setName("side").call();
-		writeTrashFile("d/1", "modified");
-		RevCommit sideCommit = git.commit().setAll(true)
-				.setMessage("modified d/1 on side").call();
-
-		git.rm().addFilepattern("d/1").call();
-		git.rm().addFilepattern("d").call();
-
-		try (ObjectInserter ins = db.newObjectInserter()) {
-			ThreeWayMerger resolveMerger =
-					(ThreeWayMerger) strategy.newMerger(ins, db.getConfig());
-			boolean noProblems = resolveMerger.merge(masterCommit, sideCommit);
-			assertTrue(noProblems);
-		}
 	}
 
 	/**
@@ -636,273 +583,6 @@ public class ResolveMergerTest extends RepositoryTestCase {
 		} catch (CheckoutConflictException e) {
 			assertEquals(1, e.getConflictingPaths().size());
 			assertEquals("0/0", e.getConflictingPaths().get(0));
-		}
-	}
-
-	@Theory
-	public void checkContentMergeNoConflict(MergeStrategy strategy)
-			throws Exception {
-		Git git = Git.wrap(db);
-
-		writeTrashFile("file", "1\n2\n3");
-		git.add().addFilepattern("file").call();
-		RevCommit first = git.commit().setMessage("added file").call();
-
-		writeTrashFile("file", "1master\n2\n3");
-		git.commit().setAll(true).setMessage("modified file on master").call();
-
-		git.checkout().setCreateBranch(true).setStartPoint(first)
-				.setName("side").call();
-		writeTrashFile("file", "1\n2\n3side");
-		RevCommit sideCommit = git.commit().setAll(true)
-				.setMessage("modified file on side").call();
-
-		git.checkout().setName("master").call();
-		MergeResult result =
-				git.merge().setStrategy(strategy).include(sideCommit).call();
-		assertEquals(MergeStatus.MERGED, result.getMergeStatus());
-		String expected = "1master\n2\n3side";
-		assertEquals(expected, read("file"));
-	}
-
-	@Theory
-	public void checkContentMergeNoConflict_noRepo(MergeStrategy strategy)
-			throws Exception {
-		Git git = Git.wrap(db);
-
-		writeTrashFile("file", "1\n2\n3");
-		git.add().addFilepattern("file").call();
-		RevCommit first = git.commit().setMessage("added file").call();
-
-		writeTrashFile("file", "1master\n2\n3");
-		RevCommit masterCommit = git.commit().setAll(true)
-				.setMessage("modified file on master").call();
-
-		git.checkout().setCreateBranch(true).setStartPoint(first)
-				.setName("side").call();
-		writeTrashFile("file", "1\n2\n3side");
-		RevCommit sideCommit = git.commit().setAll(true)
-				.setMessage("modified file on side").call();
-
-		try (ObjectInserter ins = db.newObjectInserter()) {
-			ResolveMerger merger =
-					(ResolveMerger) strategy.newMerger(ins, db.getConfig());
-			boolean noProblems = merger.merge(masterCommit, sideCommit);
-			assertTrue(noProblems);
-			assertEquals("1master\n2\n3side",
-					readBlob(merger.getResultTreeId(), "file"));
-		}
-	}
-
-
-	/**
-	 * Merging a change involving large binary files should short-circuit reads.
-	 *
-	 * @param strategy
-	 * @throws Exception
-	 */
-	@Theory
-	public void checkContentMergeLargeBinaries(MergeStrategy strategy) throws Exception {
-		Git git = Git.wrap(db);
-		final int LINELEN = 72;
-
-		// setup a merge that would work correctly if we disconsider the stray '\0'
-		// that the file contains near the start.
-		byte[] binary = new byte[LINELEN * 2000];
-		for (int i = 0; i < binary.length; i++) {
-			binary[i] = (byte)((i % LINELEN) == 0 ? '\n' : 'x');
-		}
-		binary[50] = '\0';
-
-		writeTrashFile("file", new String(binary, StandardCharsets.UTF_8));
-		git.add().addFilepattern("file").call();
-		RevCommit first = git.commit().setMessage("added file").call();
-
-		// Generate an edit in a single line.
-		int idx = LINELEN * 1200 + 1;
-		byte save = binary[idx];
-		binary[idx] = '@';
-		writeTrashFile("file", new String(binary, StandardCharsets.UTF_8));
-
-		binary[idx] = save;
-		git.add().addFilepattern("file").call();
-		RevCommit masterCommit = git.commit().setAll(true)
-			.setMessage("modified file l 1200").call();
-
-		git.checkout().setCreateBranch(true).setStartPoint(first).setName("side").call();
-		binary[LINELEN * 1500 + 1] = '!';
-		writeTrashFile("file", new String(binary, StandardCharsets.UTF_8));
-		git.add().addFilepattern("file").call();
-		RevCommit sideCommit = git.commit().setAll(true)
-			.setMessage("modified file l 1500").call();
-
-		try (ObjectInserter ins = db.newObjectInserter()) {
-			// Check that we don't read the large blobs.
-			ObjectInserter forbidInserter = new ObjectInserter.Filter() {
-				@Override
-				protected ObjectInserter delegate() {
-					return ins;
-				}
-
-				@Override
-				public ObjectReader newReader() {
-					return new BigReadForbiddenReader(super.newReader(), 8000);
-				}
-			};
-
-			ResolveMerger merger =
-				(ResolveMerger) strategy.newMerger(forbidInserter, db.getConfig());
-			boolean noProblems = merger.merge(masterCommit, sideCommit);
-			assertFalse(noProblems);
-		}
-	}
-
-	/**
-	 * Throws an exception if reading beyond limit.
-	 */
-	class BigReadForbiddenStream extends ObjectStream.Filter {
-		int limit;
-
-		BigReadForbiddenStream(ObjectStream orig, int limit) {
-			super(orig.getType(), orig.getSize(), orig);
-			this.limit = limit;
-		}
-
-		@Override
-		public long skip(long n) throws IOException {
-			limit -= n;
-			if (limit < 0) {
-				throw new IllegalStateException();
-			}
-
-			return super.skip(n);
-		}
-
-		@Override
-		public int read() throws IOException {
-			int r = super.read();
-			limit--;
-			if (limit < 0) {
-				throw new IllegalStateException();
-			}
-			return r;
-		}
-
-		@Override
-		public int read(byte[] b, int off, int len) throws IOException {
-			int n = super.read(b, off, len);
-			limit -= n;
-			if (limit < 0) {
-				throw new IllegalStateException();
-			}
-			return n;
-		}
-	}
-
-	class BigReadForbiddenReader extends ObjectReader.Filter {
-		ObjectReader delegate;
-		int limit;
-
-		@Override
-		protected ObjectReader delegate() {
-			return delegate;
-		}
-
-		BigReadForbiddenReader(ObjectReader delegate, int limit) {
-			this.delegate = delegate;
-			this.limit = limit;
-		}
-
-		@Override
-		public ObjectLoader open(AnyObjectId objectId, int typeHint) throws IOException {
-			ObjectLoader orig = super.open(objectId, typeHint);
-			return new ObjectLoader.Filter() {
-				@Override
-				protected ObjectLoader delegate() {
-					return orig;
-				}
-
-				@Override
-				public ObjectStream openStream() throws IOException {
-					ObjectStream os = orig.openStream();
-					return new BigReadForbiddenStream(os, limit);
-				}
-			};
-		}
-	}
-
-	@Theory
-	public void checkContentMergeConflict(MergeStrategy strategy)
-			throws Exception {
-		Git git = Git.wrap(db);
-
-		writeTrashFile("file", "1\n2\n3");
-		git.add().addFilepattern("file").call();
-		RevCommit first = git.commit().setMessage("added file").call();
-
-		writeTrashFile("file", "1master\n2\n3");
-		git.commit().setAll(true).setMessage("modified file on master").call();
-
-		git.checkout().setCreateBranch(true).setStartPoint(first)
-				.setName("side").call();
-		writeTrashFile("file", "1side\n2\n3");
-		RevCommit sideCommit = git.commit().setAll(true)
-				.setMessage("modified file on side").call();
-
-		git.checkout().setName("master").call();
-		MergeResult result =
-				git.merge().setStrategy(strategy).include(sideCommit).call();
-		assertEquals(MergeStatus.CONFLICTING, result.getMergeStatus());
-		String expected = "<<<<<<< HEAD\n"
-				+ "1master\n"
-				+ "=======\n"
-				+ "1side\n"
-				+ ">>>>>>> " + sideCommit.name() + "\n"
-				+ "2\n"
-				+ "3";
-		assertEquals(expected, read("file"));
-	}
-
-	@Theory
-	public void checkContentMergeConflict_noTree(MergeStrategy strategy)
-			throws Exception {
-		Git git = Git.wrap(db);
-
-		writeTrashFile("file", "1\n2\n3");
-		git.add().addFilepattern("file").call();
-		RevCommit first = git.commit().setMessage("added file").call();
-
-		writeTrashFile("file", "1master\n2\n3");
-		RevCommit masterCommit = git.commit().setAll(true)
-				.setMessage("modified file on master").call();
-
-		git.checkout().setCreateBranch(true).setStartPoint(first)
-				.setName("side").call();
-		writeTrashFile("file", "1side\n2\n3");
-		RevCommit sideCommit = git.commit().setAll(true)
-				.setMessage("modified file on side").call();
-
-		try (ObjectInserter ins = db.newObjectInserter()) {
-			ResolveMerger merger =
-					(ResolveMerger) strategy.newMerger(ins, db.getConfig());
-			boolean noProblems = merger.merge(masterCommit, sideCommit);
-			assertFalse(noProblems);
-			assertEquals(Arrays.asList("file"), merger.getUnmergedPaths());
-
-			MergeFormatter fmt = new MergeFormatter();
-			merger.getMergeResults().get("file");
-			try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-				fmt.formatMerge(out, merger.getMergeResults().get("file"),
-						"BASE", "OURS", "THEIRS", UTF_8.name());
-				String expected = "<<<<<<< OURS\n"
-						+ "1master\n"
-						+ "=======\n"
-						+ "1side\n"
-						+ ">>>>>>> THEIRS\n"
-						+ "2\n"
-						+ "3";
-				assertEquals(expected, new String(out.toByteArray(), UTF_8));
-			}
 		}
 	}
 
@@ -1136,16 +816,5 @@ public class ResolveMergerTest extends RepositoryTestCase {
 				assertTrue("path " + p + " is older than predecesssor",
 						curMod >= lastMod);
 		}
-	}
-
-	private String readBlob(ObjectId treeish, String path) throws Exception {
-		TestRepository<?> tr = new TestRepository<>(db);
-		RevWalk rw = tr.getRevWalk();
-		RevTree tree = rw.parseTree(treeish);
-		RevObject obj = tr.get(tree, path);
-		if (obj == null) {
-			return null;
-		}
-		return new String(rw.getObjectReader().open(obj, OBJ_BLOB).getBytes(), UTF_8);
 	}
 }

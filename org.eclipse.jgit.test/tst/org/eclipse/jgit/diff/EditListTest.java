@@ -53,7 +53,6 @@ import java.util.Iterator;
 import org.junit.Test;
 
 public class EditListTest {
-	@SuppressWarnings("unlikely-arg-type")
 	@Test
 	public void testEmpty() {
 		final EditList l = new EditList();
