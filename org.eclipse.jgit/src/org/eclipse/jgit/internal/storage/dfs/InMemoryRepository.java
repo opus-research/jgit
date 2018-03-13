@@ -310,7 +310,7 @@ public class InMemoryRepository extends DfsRepository {
 			}
 			ids.sort();
 			sym.sort();
-			objdb.getCurrentPackList().markDirty();
+			objdb.markDirty();
 			return new RefCache(ids.toRefList(), sym.toRefList());
 		}
 

@@ -68,7 +68,7 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		}
 
 		@Override
-		public void markDirty() {
+		void markDirty() {
 			// Always dirty.
 		}
 	};
@@ -186,16 +186,7 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		return getPackList().packs;
 	}
 
-	/**
-	 * Scan and list all available pack files in the repository.
-	 *
-	 * @return list of available packs, with some additional metadata. The
-	 *         returned array is shared with the implementation and must not be
-	 *         modified by the caller.
-	 * @throws IOException
-	 *             the pack list cannot be initialized.
-	 */
-	public PackList getPackList() throws IOException {
+	PackList getPackList() throws IOException {
 		return scanPacks(NO_PACKS);
 	}
 
@@ -211,18 +202,7 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 	 *         implementation and must not be modified by the caller.
 	 */
 	public DfsPackFile[] getCurrentPacks() {
-		return getCurrentPackList().packs;
-	}
-
-	/**
-	 * List currently known pack files in the repository, without scanning.
-	 *
-	 * @return list of available packs, with some additional metadata. The
-	 *         returned array is shared with the implementation and must not be
-	 *         modified by the caller.
-	 */
-	public PackList getCurrentPackList() {
-		return packList.get();
+		return packList.get().packs;
 	}
 
 	/**
@@ -480,6 +460,17 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		packList.set(NO_PACKS);
 	}
 
+	/**
+	 * Mark object database as dirty.
+	 * <p>
+	 * Used when the caller knows that new data might have been written to the
+	 * repository that could invalidate open readers, for example if refs are
+	 * newly scanned.
+	 */
+	protected void markDirty() {
+		packList.get().markDirty();
+	}
+
 	@Override
 	public void close() {
 		// PackList packs = packList.get();
@@ -490,25 +481,17 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		// p.close();
 	}
 
-	/** Snapshot of packs scanned in a single pass. */
-	public static abstract class PackList {
+	static abstract class PackList {
 		/** All known packs, sorted. */
-		public final DfsPackFile[] packs;
+		final DfsPackFile[] packs;
 
-		PackList(DfsPackFile[] packs) {
+		PackList(final DfsPackFile[] packs) {
 			this.packs = packs;
 		}
 
 		abstract boolean dirty();
 
-	/**
-	 * Mark pack list as dirty.
-	 * <p>
-	 * Used when the caller knows that new data might have been written to the
-	 * repository that could invalidate open readers depending on this pack list,
-	 * for example if refs are newly scanned.
-	 */
-		public abstract void markDirty();
+		abstract void markDirty();
 	}
 
 	private static final class PackListImpl extends PackList {
@@ -524,7 +507,7 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		}
 
 		@Override
-		public void markDirty() {
+		void markDirty() {
 			dirty = true;
 		}
 	}
