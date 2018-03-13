@@ -44,9 +44,11 @@
 
 package org.eclipse.jgit.diff;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
 import org.eclipse.jgit.util.IntList;
-import org.eclipse.jgit.util.IntPair;
-import org.eclipse.jgit.util.IntPairList;
 
 public class MyersDiff {
 	protected EditList edits;
@@ -200,7 +202,7 @@ public class MyersDiff {
 
 		abstract class EditPaths {
 			private IntList x = new IntList();
-			private IntPairList snake = new IntPairList();
+			private IntList snake = new IntList();
 			int beginK, endK, middleK;
 			int prevBeginK, prevEndK;
 			/* if we hit one end early, no need to look further */
@@ -220,7 +222,7 @@ if (k < beginK || k > endK)
 				return x.get(getIndex(d, k));
 			}
 
-			final IntPair getSnake(int d, int k) {
+			final int getSnake(int d, int k) {
 // TODO: remove
 if (k < beginK || k > endK)
 	throw new RuntimeException("k " + k + " not in " + beginK + " - " + endK);
@@ -251,16 +253,24 @@ if (k < beginK || k > endK)
 			abstract int getRight(int x);
 			abstract boolean isBetter(int left, int right);
 			abstract void adjustMinMaxK(final int k, final int x);
-			abstract boolean meets(int d, int k, int x, IntPair snake);
+			abstract boolean meets(int d, int k, int x, int snake);
 
-			// TODO: this should return an int[2]
-			final IntPair newSnake(int k, int x) {
-				return new IntPair(x, k+x);
+			final int newSnake(int k, int x) {
+				int y = k + x;
+				return x + (endA + 1) * y;
 			}
 
-			final boolean makeEdit(IntPair snake1, IntPair snake2) {
-				int x1 = snake1.getX(), x2 = snake2.getX();
-				int y1 = snake1.getY(), y2 = snake2.getY();
+			final int snake2x(int snake) {
+				return snake % (endA + 1);
+			}
+
+			final int snake2y(int snake) {
+				return snake / (endA + 1);
+			}
+
+			final boolean makeEdit(int snake1, int snake2) {
+				int x1 = snake2x(snake1), x2 = snake2x(snake2);
+				int y1 = snake2y(snake1), y2 = snake2y(snake2);
 				/*
 				 * Check for incompatible partial edit paths:
 				 * when there are ambiguities, we might have
@@ -291,7 +301,7 @@ if (k < beginK || k > endK)
 				// go backwards so that we can avoid temp vars
 				for (int k = endK; k >= beginK; k -= 2) {
 					int left = -1, right = -1;
-					IntPair leftSnake = null, rightSnake = null;
+					int leftSnake = -1, rightSnake = -1;
 					// TODO: refactor into its own function
 					if (k > prevBeginK) {
 						int i = getIndex(d - 1, k - 1);
@@ -315,8 +325,7 @@ if (k < beginK || k > endK)
 							return true;
 						right = getRight(end);
 					}
-					int newX;
-					IntPair newSnake;
+					int newX, newSnake;
 					if (k >= prevEndK ||
 							(k > prevBeginK &&
 							 isBetter(left, right))) {
@@ -367,7 +376,7 @@ if (k < beginK || k > endK)
 				}
 			}
 
-			final boolean meets(int d, int k, int x, IntPair snake) {
+			final boolean meets(int d, int k, int x, int snake) {
 				if (k < backward.beginK || k > backward.endK)
 					return false;
 				// TODO: move out of loop
@@ -409,7 +418,7 @@ if (k < beginK || k > endK)
 				}
 			}
 
-			final boolean meets(int d, int k, int x, IntPair snake) {
+			final boolean meets(int d, int k, int x, int snake) {
 				if (k < forward.beginK || k > forward.endK)
 					return false;
 				// TODO: move out of loop
@@ -456,5 +465,5 @@ if (k < beginK || k > endK)
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-	}	
+	}
 }
