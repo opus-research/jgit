@@ -63,7 +63,6 @@ import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.Config.ConfigEnum;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
@@ -82,7 +81,6 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.revwalk.RevWalkUtils;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
-import org.eclipse.jgit.util.StringUtils;
 
 /**
  * A class used to execute a {@code Merge} command. It has setters for all
@@ -104,11 +102,10 @@ public class MergeCommand extends GitCommand<MergeResult> {
 	private FastForwardMode fastForwardMode = FastForwardMode.FF;
 
 	/**
-	 * The modes available for fast forward merges corresponding to the
-	 * <code>--ff</code>, <code>--no-ff</code> and <code>--ff-only</code>
-	 * options under <code>branch.<name>.mergeoptions</code>.
+	 * The modes available for fast forward merges (corresponding to the --ff,
+	 * --no-ff and --ff-only options).
 	 */
-	public enum FastForwardMode implements ConfigEnum {
+	public enum FastForwardMode {
 		/**
 		 * Corresponds to the default --ff option (for a fast forward update the
 		 * branch pointer only).
@@ -125,21 +122,47 @@ public class MergeCommand extends GitCommand<MergeResult> {
 		 */
 		FF_ONLY;
 
-		public String toConfigValue() {
-			return "--" + name().toLowerCase().replace('_', '-'); //$NON-NLS-1$
-		}
+		/**
+		 * The modes available for fast forward merges corresponding to the
+		 * options under branch.<name>.branch config option.
+		 */
+		public enum MergeOptions {
+			/**
+			 * {@link FastForwardMode#FF}.
+			 */
+			__FF,
+			/**
+			 * {@link FastForwardMode#NO_FF}.
+			 */
+			__NO_FF,
+			/**
+			 * {@link FastForwardMode#FF_ONLY}.
+			 */
+			__FF_ONLY;
 
-		public boolean matchConfigValue(String in) {
-			if (StringUtils.isEmptyOrNull(in))
-				return false;
-			if (!in.startsWith("--")) //$NON-NLS-1$
-				return false;
-			return name().equalsIgnoreCase(in.substring(2).replace('-', '_'));
+			/**
+			 * Map from <code>FastForwardMode</code> to
+			 * <code>FastForwardMode.MergeOptions</code>.
+			 *
+			 * @param ffMode
+			 *            the <code>FastForwardMode</code> value to be mapped
+			 * @return the mapped code>FastForwardMode.MergeOptions</code> value
+			 */
+			public static MergeOptions valueOf(FastForwardMode ffMode) {
+				switch (ffMode) {
+				case NO_FF:
+					return __NO_FF;
+				case FF_ONLY:
+					return __FF_ONLY;
+				default:
+					return __FF;
+				}
+			}
 		}
 
 		/**
 		 * The modes available for fast forward merges corresponding to the
-		 * options under <code>merge.ff</code>.
+		 * options under merge.ff config option.
 		 */
 		public enum Merge {
 			/**
@@ -188,6 +211,27 @@ public class MergeCommand extends GitCommand<MergeResult> {
 			case FALSE:
 				return NO_FF;
 			case ONLY:
+				return FF_ONLY;
+			default:
+				return FF;
+			}
+		}
+
+		/**
+		 * Map from <code>FastForwardMode.MergeOptions</code> to
+		 * <code>FastForwardMode</code>.
+		 *
+		 * @param ffMode
+		 *            the <code>FastForwardMode.MergeOptions</code> value to be
+		 *            mapped
+		 * @return the mapped code>FastForwardMode</code> value
+		 */
+		public static FastForwardMode valueOf(
+				FastForwardMode.MergeOptions ffMode) {
+			switch (ffMode) {
+			case __NO_FF:
+				return NO_FF;
+			case __FF_ONLY:
 				return FF_ONLY;
 			default:
 				return FF;

@@ -103,6 +103,7 @@ import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevTree;
+import org.eclipse.jgit.storage.file.PackIndex;
 import org.eclipse.jgit.storage.file.PackIndexWriter;
 import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.TemporaryBuffer;
@@ -142,18 +143,6 @@ import org.eclipse.jgit.util.TemporaryBuffer;
  */
 public class PackWriter {
 	private static final int PACK_VERSION_GENERATED = 2;
-
-	/** A collection of object ids. */
-	public interface ObjectIdSet {
-		/**
-		 * Returns true if the objectId is contained within the collection.
-		 *
-		 * @param objectId
-		 *            the objectId to find
-		 * @return whether the collection contains the objectId.
-		 */
-		boolean contains(AnyObjectId objectId);
-	}
 
 	private static final Map<WeakReference<PackWriter>, Boolean> instances =
 			new ConcurrentHashMap<WeakReference<PackWriter>, Boolean>();
@@ -217,9 +206,9 @@ public class PackWriter {
 
 	private Set<ObjectId> tagTargets = Collections.emptySet();
 
-	private ObjectIdSet[] excludeInPacks;
+	private PackIndex[] excludeInPacks;
 
-	private ObjectIdSet excludeInPackLast;
+	private PackIndex excludeInPackLast;
 
 	private Deflater myDeflater;
 
@@ -519,39 +508,18 @@ public class PackWriter {
 	}
 
 	/**
-	 * Returns the object ids in the pack file that was created by this writer,
-	 * sorted by name.
-	 *
-	 * This method can only be invoked after
-	 * {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)} has
-	 * been invoked and completed successfully.
-	 *
-	 * @return number of objects in pack.
-	 * @throws IOException
-	 *             a cached pack cannot supply its object ids.
-	 */
-	public List<ObjectId> getObjectList() throws IOException {
-		if (!cachedPacks.isEmpty())
-			throw new IOException(
-					JGitText.get().cachedPacksPreventsListingObjects);
-
-		return Collections.unmodifiableList(
-				(List<? extends ObjectId>) sortByName());
-	}
-
-	/**
 	 * Add a pack index whose contents should be excluded from the result.
 	 *
 	 * @param idx
 	 *            objects in this index will not be in the output pack.
 	 */
-	public void excludeObjects(ObjectIdSet idx) {
+	public void excludeObjects(PackIndex idx) {
 		if (excludeInPacks == null) {
-			excludeInPacks = new ObjectIdSet[] { idx };
+			excludeInPacks = new PackIndex[] { idx };
 			excludeInPackLast = idx;
 		} else {
 			int cnt = excludeInPacks.length;
-			ObjectIdSet[] newList = new ObjectIdSet[cnt + 1];
+			PackIndex[] newList = new PackIndex[cnt + 1];
 			System.arraycopy(excludeInPacks, 0, newList, 0, cnt);
 			newList[cnt] = idx;
 			excludeInPacks = newList;
@@ -1830,10 +1798,10 @@ public class PackWriter {
 	private boolean exclude(AnyObjectId objectId) {
 		if (excludeInPacks == null)
 			return false;
-		if (excludeInPackLast.contains(objectId))
+		if (excludeInPackLast.hasObject(objectId))
 			return true;
-		for (ObjectIdSet idx : excludeInPacks) {
-			if (idx.contains(objectId)) {
+		for (PackIndex idx : excludeInPacks) {
+			if (idx.hasObject(objectId)) {
 				excludeInPackLast = idx;
 				return true;
 			}
