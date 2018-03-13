@@ -138,7 +138,7 @@ public class RefDirectory extends RefDatabase {
 
 	private final File gitDir;
 
-	final File refsDir;
+	private final File refsDir;
 
 	private final ReflogWriter logWriter;
 
@@ -155,7 +155,7 @@ public class RefDirectory extends RefDatabase {
 	private final AtomicReference<RefList<LooseRef>> looseRefs = new AtomicReference<RefList<LooseRef>>();
 
 	/** Immutable sorted list of packed references. */
-	final AtomicReference<PackedRefList> packedRefs = new AtomicReference<PackedRefList>();
+	private final AtomicReference<PackedRefList> packedRefs = new AtomicReference<PackedRefList>();
 
 	/**
 	 * Number of modifications made to this database.
@@ -259,30 +259,6 @@ public class RefDirectory extends RefDatabase {
 		} else
 			loose = oldLoose;
 		return loose;
-	}
-
-	@Override
-	public Ref exactRef(String name) throws IOException {
-		RefList<Ref> packed = getPackedRefs();
-		Ref ref;
-		try {
-			ref = readRef(name, packed);
-			if (ref != null) {
-				ref = resolve(ref, 0, null, null, packed);
-			}
-		} catch (IOException e) {
-			if (name.contains("/") //$NON-NLS-1$
-					|| !(e.getCause() instanceof InvalidObjectIdException)) {
-				throw e;
-			}
-
-			// While looking for a ref outside of refs/ (e.g., 'config'), we
-			// found a non-ref file (e.g., a config file) instead.  Treat this
-			// as a ref-not-found condition.
-			ref = null;
-		}
-		fireRefsChanged();
-		return ref;
 	}
 
 	@Override
@@ -925,7 +901,7 @@ public class RefDirectory extends RefDatabase {
 		return n;
 	}
 
-	LooseRef scanRef(LooseRef ref, String name) throws IOException {
+	private LooseRef scanRef(LooseRef ref, String name) throws IOException {
 		final File path = fileFor(name);
 		FileSnapshot currentSnapshot = null;
 
