@@ -214,7 +214,7 @@ public final class DfsPackFile implements AutoCloseable {
 		index = cache.put(key, POS_INDEX, sz, idx);
 	}
 
-	public PackIndex getPackIndex(DfsReader ctx) throws IOException {
+	PackIndex getPackIndex(DfsReader ctx) throws IOException {
 		return idx(ctx);
 	}
 
