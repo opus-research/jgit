@@ -53,7 +53,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.MergeResult.MergeStatus;
 import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
@@ -64,7 +63,6 @@ import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.api.errors.NoMessageException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
-import org.eclipse.jgit.events.WorkingTreeModifiedEvent;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Config.ConfigEnum;
@@ -356,10 +354,6 @@ public class MergeCommand extends GitCommand<MergeResult> {
 							.getMergeResults();
 					failingPaths = resolveMerger.getFailingPaths();
 					unmergedPaths = resolveMerger.getUnmergedPaths();
-					if (!resolveMerger.getModifiedFiles().isEmpty()) {
-						repo.fireEvent(new WorkingTreeModifiedEvent(
-								resolveMerger.getModifiedFiles(), null));
-					}
 				} else
 					noProblems = merger.merge(headCommit, srcCommit);
 				refLogMessage.append(": Merge made by "); //$NON-NLS-1$
@@ -560,15 +554,12 @@ public class MergeCommand extends GitCommand<MergeResult> {
 	 * Sets the fast forward mode.
 	 *
 	 * @param fastForwardMode
-	 *            corresponds to the --ff/--no-ff/--ff-only options. If
-	 *            {@code null} use the value of the {@code merge.ff} option
-	 *            configured in git config. If this option is not configured
-	 *            --ff is the built-in default.
+	 *            corresponds to the --ff/--no-ff/--ff-only options. --ff is the
+	 *            default option.
 	 * @return {@code this}
 	 * @since 2.2
 	 */
-	public MergeCommand setFastForward(
-			@Nullable FastForwardMode fastForwardMode) {
+	public MergeCommand setFastForward(FastForwardMode fastForwardMode) {
 		checkCallable();
 		this.fastForwardMode = fastForwardMode;
 		return this;
