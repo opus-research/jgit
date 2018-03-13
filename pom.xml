@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-   Copyright (C) 2009, Google Inc.
+   Copyright (C) 2009-2010, Google Inc.
    and other copyright owners as documented in the project's IP log.
 
    This program and the accompanying materials are made available
@@ -135,6 +135,11 @@
 
     <args4j-CQ>CQ 3454</args4j-CQ>
     <args4j-version>2.0.12</args4j-version>
+
+    <servlet-api-CQ>CQ 3565</servlet-api-CQ>
+    <servlet-api-version>2.5</servlet-api-version>
+
+    <jetty-version>7.0.1.v20091125</jetty-version>
   </properties>
 
   <build>
@@ -156,7 +161,6 @@
               <Bundle-Copyright>${jgit-copyright}</Bundle-Copyright>
               <Bundle-License>http://www.eclipse.org/org/documents/edl-v10.php</Bundle-License>
               <Bundle-SymbolicName>${project.artifactId}</Bundle-SymbolicName>
-              <Bundle-Version>$(replace;$(project.version);-SNAPSHOT;"").$(tstamp;yyyyMMdd-HHmm)</Bundle-Version>
               <_versionpolicy>[$(version;==;$(@)),$(version;+;$(@)))</_versionpolicy>
             </instructions>
           </configuration>
@@ -292,6 +296,18 @@
         <artifactId>junit</artifactId>
         <version>${junit-version}</version>
       </dependency>
+
+      <dependency>
+        <groupId>javax.servlet</groupId>
+        <artifactId>servlet-api</artifactId>
+        <version>${servlet-api-version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-servlet</artifactId>
+        <version>${jetty-version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -322,8 +338,11 @@
   <modules>
     <module>org.eclipse.jgit</module>
     <module>org.eclipse.jgit.ui</module>
+    <module>org.eclipse.jgit.http.server</module>
     <module>org.eclipse.jgit.pgm</module>
     <module>org.eclipse.jgit.junit</module>
+
     <module>org.eclipse.jgit.test</module>
+    <module>org.eclipse.jgit.http.test</module>
   </modules>
 </project>
