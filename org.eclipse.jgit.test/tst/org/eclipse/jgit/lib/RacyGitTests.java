@@ -43,10 +43,14 @@
 package org.eclipse.jgit.lib;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.TreeSet;
 
+import org.eclipse.jgit.dircache.DirCache;
+import org.eclipse.jgit.dircache.DirCacheBuilder;
+import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.FileTreeIteratorWithTimeControl;
 import org.eclipse.jgit.treewalk.NameConflictTreeWalk;
@@ -114,6 +118,7 @@ public class RacyGitTests extends RepositoryTestCase {
 
 	public void testRacyGitDetection() throws IOException,
 			IllegalStateException, InterruptedException {
+		DirCache dc;
 		TreeSet<Long> modTimes = new TreeSet<Long>();
 		File lastFile;
 
@@ -130,12 +135,9 @@ public class RacyGitTests extends RepositoryTestCase {
 		modTimes.add(fsTick(lastFile));
 
 		// now add both files to the index. No racy git expected
-		resetIndex(new FileTreeIteratorWithTimeControl(db, modTimes));
+		addToIndex(modTimes);
 
-		assertEquals(
-				"[a, mode:100644, time:t0, length:1, content:a]" +
-				"[b, mode:100644, time:t0, length:1, content:b]",
-				indexState(SMUDGE | MOD_TIME | LENGTH | CONTENT));
+		assertEquals("[[a, modTime(index/file): t0/t0], [b, modTime(index/file): t0/t0]]", indexState(modTimes));
 
 		// Remember the last modTime of index file. All modifications times of
 		// further modification are translated to this value so it looks that
@@ -147,14 +149,67 @@ public class RacyGitTests extends RepositoryTestCase {
 		// now update the index the index. 'a' has to be racily clean -- because
 		// it's modification time is exactly the same as the previous index file
 		// mod time.
-		resetIndex(new FileTreeIteratorWithTimeControl(db, modTimes));
+		addToIndex(modTimes);
 
-		db.readDirCache();
-		// although racily clean a should not be reported as being dirty
-		assertEquals(
-				"[a, mode:100644, time:t1, smudged, length:0, content:a2]" +
-				"[b, mode:100644, time:t0, length:1, content:b]",
-				indexState(SMUDGE|MOD_TIME|LENGTH|CONTENT));
+		dc = db.readDirCache();
+		assertTrue(dc.getEntryCount() == 2);
+		assertTrue(dc.getEntry("a").isSmudged());
+		assertFalse(dc.getEntry("b").isSmudged());
+
+		// although racily clean a should not be reported as beeing dirty
+		assertEquals("[[a, modTime(index/file): t0/t0, unsmudged], [b, modTime(index/file): t1/t1]]", indexState(modTimes));
+		assertEquals("[[a, modTime(index/file): t0/t0, unsmudged], [b, modTime(index/file): t1/t1]]", indexState(modTimes));
+
+	}
+
+	/**
+	 * Waits until it is guaranteed that the filesystem timer (used e.g. for
+	 * lastModified) has a value greater than the lastmodified time of the given
+	 * file. This is done by touch a file, reading the lastmodified and sleeping
+	 * attribute sleeping
+	 *
+	 * @param lastFile
+	 * @return return the last measured value of the filesystem timer which is
+	 *         greater than then the lastmodification time of lastfile.
+	 * @throws InterruptedException
+	 * @throws IOException
+	 */
+	public static long fsTick(File lastFile) throws InterruptedException,
+			IOException {
+		long sleepTime = 1;
+		File tmp = File.createTempFile("FileTreeIteratorWithTimeControl", null);
+		try {
+			long startTime = (lastFile == null) ? tmp.lastModified() : lastFile
+					.lastModified();
+			long actTime = tmp.lastModified();
+			while (actTime <= startTime) {
+				Thread.sleep(sleepTime);
+				sleepTime *= 5;
+				tmp.setLastModified(System.currentTimeMillis());
+				actTime = tmp.lastModified();
+			}
+			return actTime;
+		} finally {
+			tmp.delete();
+		}
+	}
+
+	private void addToIndex(TreeSet<Long> modTimes)
+			throws FileNotFoundException, IOException {
+		DirCacheBuilder builder = db.lockDirCache().builder();
+		FileTreeIterator fIt = new FileTreeIteratorWithTimeControl(
+				db, modTimes);
+		DirCacheEntry dce;
+		while (!fIt.eof()) {
+			dce = new DirCacheEntry(fIt.getEntryPathString());
+			dce.setFileMode(fIt.getEntryFileMode());
+			dce.setLastModified(fIt.getEntryLastModified());
+			dce.setLength((int) fIt.getEntryLength());
+			dce.setObjectId(fIt.getEntryObjectId());
+			builder.add(dce);
+			fIt.next(1);
+		}
+		builder.commit();
 	}
 
 	private File addToWorkDir(String path, String content) throws IOException {

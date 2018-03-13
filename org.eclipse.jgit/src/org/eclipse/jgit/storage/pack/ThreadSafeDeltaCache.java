@@ -48,8 +48,8 @@ import java.util.concurrent.locks.ReentrantLock;
 class ThreadSafeDeltaCache extends DeltaCache {
 	private final ReentrantLock lock;
 
-	ThreadSafeDeltaCache(PackConfig pc) {
-		super(pc);
+	ThreadSafeDeltaCache(PackWriter pw) {
+		super(pw);
 		lock = new ReentrantLock();
 	}
 

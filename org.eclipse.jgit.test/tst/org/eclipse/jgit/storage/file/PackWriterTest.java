@@ -66,7 +66,6 @@ import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.PackIndex.MutableEntry;
-import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.transport.IndexPack;
 import org.eclipse.jgit.util.JGitTestUtil;
@@ -78,8 +77,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 
 	private static final List<RevObject> EMPTY_LIST_REVS = Collections
 			.<RevObject> emptyList();
-
-	private PackConfig config;
 
 	private PackWriter writer;
 
@@ -99,23 +96,16 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		packBase = new File(trash, "tmp_pack");
 		packFile = new File(trash, "tmp_pack.pack");
 		indexFile = new File(trash, "tmp_pack.idx");
-		config = new PackConfig(db);
-	}
-
-	public void tearDown() throws Exception {
-		if (writer != null)
-			writer.release();
-		super.tearDown();
+		writer = new PackWriter(db);
 	}
 
 	/**
 	 * Test constructor for exceptions, default settings, initialization.
 	 */
 	public void testContructor() {
-		writer = new PackWriter(config, db.newObjectReader());
 		assertEquals(false, writer.isDeltaBaseAsOffset());
-		assertEquals(true, config.isReuseDeltas());
-		assertEquals(true, config.isReuseObjects());
+		assertEquals(true, writer.isReuseDeltas());
+		assertEquals(true, writer.isReuseObjects());
 		assertEquals(0, writer.getObjectsNumber());
 	}
 
@@ -123,17 +113,13 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	 * Change default settings and verify them.
 	 */
 	public void testModifySettings() {
-		config.setReuseDeltas(false);
-		config.setReuseObjects(false);
-		config.setDeltaBaseAsOffset(false);
-		assertEquals(false, config.isReuseDeltas());
-		assertEquals(false, config.isReuseObjects());
-		assertEquals(false, config.isDeltaBaseAsOffset());
-
-		writer = new PackWriter(config, db.newObjectReader());
 		writer.setDeltaBaseAsOffset(true);
+		writer.setReuseDeltas(false);
+		writer.setReuseObjects(false);
+
 		assertEquals(true, writer.isDeltaBaseAsOffset());
-		assertEquals(false, config.isDeltaBaseAsOffset());
+		assertEquals(false, writer.isReuseDeltas());
+		assertEquals(false, writer.isReuseObjects());
 	}
 
 	/**
@@ -202,7 +188,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	 * @throws IOException
 	 */
 	public void testWritePack1() throws IOException {
-		config.setReuseDeltas(false);
+		writer.setReuseDeltas(false);
 		writeVerifyPack1();
 	}
 
@@ -213,8 +199,8 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	 * @throws IOException
 	 */
 	public void testWritePack1NoObjectReuse() throws IOException {
-		config.setReuseDeltas(false);
-		config.setReuseObjects(false);
+		writer.setReuseDeltas(false);
+		writer.setReuseObjects(false);
 		writeVerifyPack1();
 	}
 
@@ -245,7 +231,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	 * @throws IOException
 	 */
 	public void testWritePack2DeltasReuseOffsets() throws IOException {
-		config.setDeltaBaseAsOffset(true);
+		writer.setDeltaBaseAsOffset(true);
 		writeVerifyPack2(true);
 	}
 
@@ -279,7 +265,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	 *
 	 */
 	public void testWritePack3() throws MissingObjectException, IOException {
-		config.setReuseDeltas(false);
+		writer.setReuseDeltas(false);
 		final ObjectId forcedOrder[] = new ObjectId[] {
 				ObjectId.fromString("82c6b885ff600be425b4ea96dee75dca255b69e7"),
 				ObjectId.fromString("c59759f143fb1fe21c197981df75a7ee00290799"),
@@ -377,7 +363,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	}
 
 	public void testWriteIndex() throws Exception {
-		config.setIndexVersion(2);
+		writer.setIndexVersion(2);
 		writeVerifyPack4(false);
 
 		// Validate that IndexPack came up with the right CRC32 value.
@@ -433,7 +419,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	}
 
 	private void writeVerifyPack2(boolean deltaReuse) throws IOException {
-		config.setReuseDeltas(deltaReuse);
+		writer.setReuseDeltas(deltaReuse);
 		final LinkedList<ObjectId> interestings = new LinkedList<ObjectId>();
 		interestings.add(ObjectId
 				.fromString("82c6b885ff600be425b4ea96dee75dca255b69e7"));
@@ -496,7 +482,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 			final boolean ignoreMissingUninteresting)
 			throws MissingObjectException, IOException {
 		NullProgressMonitor m = NullProgressMonitor.INSTANCE;
-		writer = new PackWriter(config, db.newObjectReader());
 		writer.setThin(thin);
 		writer.setIgnoreMissingUninteresting(ignoreMissingUninteresting);
 		writer.preparePack(m, interestings, uninterestings);
@@ -508,7 +493,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	private void createVerifyOpenPack(final Iterator<RevObject> objectSource)
 			throws MissingObjectException, IOException {
 		NullProgressMonitor m = NullProgressMonitor.INSTANCE;
-		writer = new PackWriter(config, db.newObjectReader());
 		writer.preparePack(objectSource);
 		writer.writePack(m, m, os);
 		writer.release();

@@ -112,15 +112,15 @@ public class DiffEntry {
 
 			entry.oldMode = walk.getFileMode(0);
 			entry.newMode = walk.getFileMode(1);
-			entry.newPath = entry.oldPath = walk.getPathString();
+			entry.newName = entry.oldName = walk.getPathString();
 
 			if (entry.oldMode == FileMode.MISSING) {
-				entry.oldPath = DiffEntry.DEV_NULL;
+				entry.oldName = DiffEntry.DEV_NULL;
 				entry.changeType = ChangeType.ADD;
 				r.add(entry);
 
 			} else if (entry.newMode == FileMode.MISSING) {
-				entry.newPath = DiffEntry.DEV_NULL;
+				entry.newName = DiffEntry.DEV_NULL;
 				entry.changeType = ChangeType.DELETE;
 				r.add(entry);
 
@@ -139,11 +139,11 @@ public class DiffEntry {
 		DiffEntry e = new DiffEntry();
 		e.oldId = A_ZERO;
 		e.oldMode = FileMode.MISSING;
-		e.oldPath = DEV_NULL;
+		e.oldName = DEV_NULL;
 
 		e.newId = AbbreviatedObjectId.fromObjectId(id);
 		e.newMode = FileMode.REGULAR_FILE;
-		e.newPath = path;
+		e.newName = path;
 		e.changeType = ChangeType.ADD;
 		return e;
 	}
@@ -152,11 +152,11 @@ public class DiffEntry {
 		DiffEntry e = new DiffEntry();
 		e.oldId = AbbreviatedObjectId.fromObjectId(id);
 		e.oldMode = FileMode.REGULAR_FILE;
-		e.oldPath = path;
+		e.oldName = path;
 
 		e.newId = A_ZERO;
 		e.newMode = FileMode.MISSING;
-		e.newPath = DEV_NULL;
+		e.newName = DEV_NULL;
 		e.changeType = ChangeType.DELETE;
 		return e;
 	}
@@ -164,10 +164,10 @@ public class DiffEntry {
 	static DiffEntry modify(String path) {
 		DiffEntry e = new DiffEntry();
 		e.oldMode = FileMode.REGULAR_FILE;
-		e.oldPath = path;
+		e.oldName = path;
 
 		e.newMode = FileMode.REGULAR_FILE;
-		e.newPath = path;
+		e.newName = path;
 		e.changeType = ChangeType.MODIFY;
 		return e;
 	}
@@ -185,21 +185,21 @@ public class DiffEntry {
 		DiffEntry del = new DiffEntry();
 		del.oldId = entry.getOldId();
 		del.oldMode = entry.getOldMode();
-		del.oldPath = entry.getOldPath();
+		del.oldName = entry.getOldName();
 
 		del.newId = A_ZERO;
 		del.newMode = FileMode.MISSING;
-		del.newPath = DiffEntry.DEV_NULL;
+		del.newName = DiffEntry.DEV_NULL;
 		del.changeType = ChangeType.DELETE;
 
 		DiffEntry add = new DiffEntry();
 		add.oldId = A_ZERO;
 		add.oldMode = FileMode.MISSING;
-		add.oldPath = DiffEntry.DEV_NULL;
+		add.oldName = DiffEntry.DEV_NULL;
 
 		add.newId = entry.getNewId();
 		add.newMode = entry.getNewMode();
-		add.newPath = entry.getNewPath();
+		add.newName = entry.getNewName();
 		add.changeType = ChangeType.ADD;
 		return Arrays.asList(del, add);
 	}
@@ -210,11 +210,11 @@ public class DiffEntry {
 
 		r.oldId = src.oldId;
 		r.oldMode = src.oldMode;
-		r.oldPath = src.oldPath;
+		r.oldName = src.oldName;
 
 		r.newId = dst.newId;
 		r.newMode = dst.newMode;
-		r.newPath = dst.newPath;
+		r.newName = dst.newName;
 
 		r.changeType = changeType;
 		r.score = score;
@@ -223,10 +223,10 @@ public class DiffEntry {
 	}
 
 	/** File name of the old (pre-image). */
-	protected String oldPath;
+	protected String oldName;
 
 	/** File name of the new (post-image). */
-	protected String newPath;
+	protected String newName;
 
 	/** Old mode of the file, if described by the patch, else null. */
 	protected FileMode oldMode;
@@ -253,7 +253,7 @@ public class DiffEntry {
 	 * of this patch:
 	 * <ul>
 	 * <li><i>file add</i>: always <code>/dev/null</code></li>
-	 * <li><i>file modify</i>: always {@link #getNewPath()}</li>
+	 * <li><i>file modify</i>: always {@link #getNewName()}</li>
 	 * <li><i>file delete</i>: always the file being deleted</li>
 	 * <li><i>file copy</i>: source file the copy originates from</li>
 	 * <li><i>file rename</i>: source file the rename originates from</li>
@@ -261,8 +261,8 @@ public class DiffEntry {
 	 *
 	 * @return old name for this file.
 	 */
-	public String getOldPath() {
-		return oldPath;
+	public String getOldName() {
+		return oldName;
 	}
 
 	/**
@@ -272,7 +272,7 @@ public class DiffEntry {
 	 * of this patch:
 	 * <ul>
 	 * <li><i>file add</i>: always the file being created</li>
-	 * <li><i>file modify</i>: always {@link #getOldPath()}</li>
+	 * <li><i>file modify</i>: always {@link #getOldName()}</li>
 	 * <li><i>file delete</i>: always <code>/dev/null</code></li>
 	 * <li><i>file copy</i>: destination file the copy ends up at</li>
 	 * <li><i>file rename</i>: destination file the rename ends up at/li>
@@ -280,8 +280,8 @@ public class DiffEntry {
 	 *
 	 * @return new name for this file.
 	 */
-	public String getNewPath() {
-		return newPath;
+	public String getNewName() {
+		return newName;
 	}
 
 	/** @return the old file mode, if described in the patch */
@@ -294,14 +294,14 @@ public class DiffEntry {
 		return newMode;
 	}
 
-	/** @return the type of change this patch makes on {@link #getNewPath()} */
+	/** @return the type of change this patch makes on {@link #getNewName()} */
 	public ChangeType getChangeType() {
 		return changeType;
 	}
 
 	/**
-	 * @return similarity score between {@link #getOldPath()} and
-	 *         {@link #getNewPath()} if {@link #getChangeType()} is
+	 * @return similarity score between {@link #getOldName()} and
+	 *         {@link #getNewName()} if {@link #getChangeType()} is
 	 *         {@link ChangeType#COPY} or {@link ChangeType#RENAME}.
 	 */
 	public int getScore() {
@@ -334,19 +334,19 @@ public class DiffEntry {
 		buf.append(" ");
 		switch (changeType) {
 		case ADD:
-			buf.append(newPath);
+			buf.append(newName);
 			break;
 		case COPY:
-			buf.append(oldPath + "->" + newPath);
+			buf.append(oldName + "->" + newName);
 			break;
 		case DELETE:
-			buf.append(oldPath);
+			buf.append(oldName);
 			break;
 		case MODIFY:
-			buf.append(oldPath);
+			buf.append(oldName);
 			break;
 		case RENAME:
-			buf.append(oldPath + "->" + newPath);
+			buf.append(oldName + "->" + newName);
 			break;
 		}
 		buf.append("]");
