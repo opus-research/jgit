@@ -51,12 +51,12 @@ import junit.framework.TestCase;
 public class RawTextIgnoreAllWhitespaceTest extends TestCase {
 	public void testEqualsWithoutWhitespace() {
 		final RawText a = new RawTextIgnoreAllWhitespace(Constants
-				.encodeASCII("foo-a\nfoo-b\nfoo\n"));
+				.encodeASCII("foo-a\nfoo-b\n"));
 		final RawText b = new RawTextIgnoreAllWhitespace(Constants
-				.encodeASCII("foo-b\nfoo-c\nf\n"));
+				.encodeASCII("foo-b\nfoo-c\n"));
 
-		assertEquals(3, a.size());
-		assertEquals(3, b.size());
+		assertEquals(2, a.size());
+		assertEquals(2, b.size());
 
 		// foo-a != foo-b
 		assertFalse(a.equals(0, b, 0));
@@ -65,17 +65,13 @@ public class RawTextIgnoreAllWhitespaceTest extends TestCase {
 		// foo-b == foo-b
 		assertTrue(a.equals(1, b, 0));
 		assertTrue(b.equals(0, a, 1));
-
-		// foo != f
-		assertFalse(a.equals(2, b, 2));
-		assertFalse(b.equals(2, a, 2));
 	}
 
 	public void testEqualsWithWhitespace() {
 		final RawText a = new RawTextIgnoreAllWhitespace(Constants
-				.encodeASCII("foo-a\n         \n a b c\na      \n"));
+				.encodeASCII("foo-a\n         \n a b c\na      "));
 		final RawText b = new RawTextIgnoreAllWhitespace(Constants
-				.encodeASCII("foo-a        b\n\nab  c\na\n"));
+				.encodeASCII("foo-a        b\n\nab  c\na"));
 
 		// "foo-a" != "foo-a        b"
 		assertFalse(a.equals(0, b, 0));
