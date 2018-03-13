@@ -63,6 +63,7 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.TreeFormatter;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.ReceiveCommand;
@@ -71,7 +72,8 @@ import org.eclipse.jgit.transport.ReceiveCommand;
 class Batch extends BatchRefUpdate {
 	private final RefTreeDb refdb;
 	private Ref src;
-	private ObjectId oldId;
+	private ObjectId parentId;
+	private ObjectId parentTree;
 	private RefTree tree;
 
 	Batch(RefTreeDb refdb) {
@@ -94,17 +96,20 @@ class Batch extends BatchRefUpdate {
 		src = refdb.exactRef(R_TXN_COMMITTED);
 		if (src != null && src.getObjectId() != null) {
 			RevCommit c = rw.parseCommit(src.getObjectId());
-			tree = RefTree.read(rw.getObjectReader(), c);
-			oldId = c;
+			parentId = c;
+			parentTree = c.getTree();
+			tree = RefTree.readTree(rw.getObjectReader(), parentTree);
 		} else {
 			tree = RefTree.newEmptyTree();
-			oldId = ObjectId.zeroId();
+			parentId = ObjectId.zeroId();
+			parentTree = new ObjectInserter.Formatter()
+					.idFor(new TreeFormatter());
 		}
 	}
 
 	@Nullable
 	Ref getRef(String name) throws IOException {
-		return tree.getRef(name);
+		return tree.exactRef(name);
 	}
 
 	void execute(RevWalk rw, List<Command> todo) throws IOException {
@@ -123,8 +128,14 @@ class Batch extends BatchRefUpdate {
 		try (ObjectInserter ins = repo.newObjectInserter()) {
 			CommitBuilder b = new CommitBuilder();
 			b.setTreeId(tree.writeTree(ins));
-			if (!oldId.equals(ObjectId.zeroId())) {
-				b.setParentId(oldId);
+			if (parentTree.equals(b.getTreeId())) {
+				for (Command c : todo) {
+					c.setResult(OK);
+				}
+				return;
+			}
+			if (!parentId.equals(ObjectId.zeroId())) {
+				b.setParentId(parentId);
 			}
 			b.setAuthor(who);
 			b.setCommitter(who);
@@ -134,7 +145,7 @@ class Batch extends BatchRefUpdate {
 		}
 
 		RefUpdate u = refdb.newUpdate(R_TXN_COMMITTED, false);
-		u.setExpectedOldObjectId(oldId);
+		u.setExpectedOldObjectId(parentId);
 		u.setNewObjectId(next);
 		u.setRefLogIdent(who);
 		u.setRefLogMessage("commit", false); //$NON-NLS-1$
@@ -146,7 +157,6 @@ class Batch extends BatchRefUpdate {
 			for (Command c : todo) {
 				c.setResult(OK);
 			}
-			refdb.refresh();
 			break;
 
 		default:

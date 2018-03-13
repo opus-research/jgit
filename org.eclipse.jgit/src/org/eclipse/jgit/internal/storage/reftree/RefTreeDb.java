@@ -43,10 +43,10 @@
 
 package org.eclipse.jgit.internal.storage.reftree;
 
+import static org.eclipse.jgit.lib.Ref.Storage.LOOSE;
 import static org.eclipse.jgit.lib.Ref.Storage.PACKED;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -109,13 +109,7 @@ public class RefTreeDb extends RefDatabase {
 
 	@Override
 	public Ref getRef(String name) throws IOException {
-		for (String p : SEARCH_PATH) {
-			Ref r = exactRef(p + name);
-			if (r != null) {
-				return r;
-			}
-		}
-		return null;
+		return findRef(getRefs(ALL), name);
 	}
 
 	@Override
@@ -123,7 +117,34 @@ public class RefTreeDb extends RefDatabase {
 		if (name.startsWith(R_TXN)) {
 			return bootstrap.exactRef(name);
 		}
-		return getRefs(ALL).get(name);
+
+		boolean partial = false;
+		Ref src = bootstrap.exactRef(R_TXN_COMMITTED);
+		Scanner.Result c = refs;
+		if (c == null || !c.id.equals(idOf(src))) {
+			c = Scanner.scanRefTree(repo, src, prefixOf(name), false);
+			partial = true;
+		}
+
+		Ref r = c.all.get(name);
+		if (r != null && r.isSymbolic()) {
+			r = c.sym.get(name);
+			if (partial && r.getObjectId() == null) {
+				// Attempting exactRef("HEAD") with partial scan will leave
+				// an unresolved symref as its target e.g. refs/heads/master
+				// was not read by the partial scan. Scan everything instead.
+				return getRefs(ALL).get(name);
+			}
+		}
+		return r;
+	}
+
+	private static String prefixOf(String name) {
+		int s = name.lastIndexOf('/');
+		if (s >= 0) {
+			return name.substring(0, s);
+		}
+		return ""; //$NON-NLS-1$
 	}
 
 	@Override
@@ -142,12 +163,14 @@ public class RefTreeDb extends RefDatabase {
 			src = bootstrap.exactRef(R_TXN_COMMITTED);
 		}
 
-		Scanner.Result r = refs;
-		if (r == null || !r.id.equals(idOf(src))) {
-			r = Scanner.scanRefTree(repo, src);
-			refs = r;
+		Scanner.Result c = refs;
+		if (c == null || !c.id.equals(idOf(src))) {
+			c = Scanner.scanRefTree(repo, src, prefix, true);
+			if (prefix.isEmpty()) {
+				refs = c;
+			}
 		}
-		return new RefMap(prefix, txn, r.all, r.sym);
+		return new RefMap(prefix, txn, c.all, c.sym);
 	}
 
 	private static ObjectId idOf(@Nullable Ref src) {
@@ -166,8 +189,8 @@ public class RefTreeDb extends RefDatabase {
 	}
 
 	@Override
-	public List<Ref> getAdditionalRefs() {
-		return Collections.emptyList();
+	public List<Ref> getAdditionalRefs() throws IOException {
+		return bootstrap.getAdditionalRefs();
 	}
 
 	@Override
@@ -231,10 +254,17 @@ public class RefTreeDb extends RefDatabase {
 		if (r == null) {
 			r = new ObjectIdRef.Unpeeled(Storage.NEW, name, null);
 		}
-		if (!detach && r.isSymbolic()) {
-			r = r.getLeaf();
+
+		boolean detaching = detach && r.isSymbolic();
+		if (detaching) {
+			r = new ObjectIdRef.Unpeeled(LOOSE, name, r.getObjectId());
 		}
-		return new Update(this, r);
+
+		Update u = new Update(this, r);
+		if (detaching) {
+			u.setDetachingSymbolicRef();
+		}
+		return u;
 	}
 
 	@Override
@@ -243,8 +273,9 @@ public class RefTreeDb extends RefDatabase {
 		if (fromName.startsWith(R_TXN) && toName.startsWith(R_TXN)) {
 			return bootstrap.newRename(fromName, toName);
 		}
-		return new Rename(this,
-				newUpdate(fromName, true),
-				newUpdate(toName, true));
+
+		RefUpdate from = newUpdate(fromName, true);
+		RefUpdate to = newUpdate(toName, true);
+		return new Rename(this, from, to);
 	}
 }

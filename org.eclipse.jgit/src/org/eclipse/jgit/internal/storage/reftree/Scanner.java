@@ -51,6 +51,7 @@ import static org.eclipse.jgit.lib.Constants.encode;
 import static org.eclipse.jgit.lib.FileMode.TYPE_GITLINK;
 import static org.eclipse.jgit.lib.FileMode.TYPE_SYMLINK;
 import static org.eclipse.jgit.lib.FileMode.TYPE_TREE;
+import static org.eclipse.jgit.lib.Ref.Storage.NEW;
 import static org.eclipse.jgit.lib.Ref.Storage.PACKED;
 
 import java.io.IOException;
@@ -66,6 +67,7 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.SymbolicRef;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
+import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.RefList;
 
@@ -87,8 +89,9 @@ class Scanner {
 		}
 	}
 
-	static Result scanRefTree(Repository repo, @Nullable Ref src)
-			throws IOException, IncorrectObjectTypeException {
+	static Result scanRefTree(Repository repo, @Nullable Ref src,
+			String prefix, boolean recursive)
+					throws IOException, IncorrectObjectTypeException {
 		RefList.Builder<Ref> all = new RefList.Builder<>();
 		RefList.Builder<Ref> sym = new RefList.Builder<>();
 
@@ -96,7 +99,7 @@ class Scanner {
 		if (src != null && src.getObjectId() != null) {
 			try (ObjectReader reader = repo.newObjectReader()) {
 				srcId = src.getObjectId();
-				scan(reader, srcId, all, sym);
+				scan(reader, srcId, prefix, recursive, all, sym);
 			}
 		} else {
 			srcId = ObjectId.zeroId();
@@ -110,16 +113,31 @@ class Scanner {
 	}
 
 	private static void scan(ObjectReader reader, AnyObjectId srcId,
+			String prefix, boolean recursive,
 			RefList.Builder<Ref> all, RefList.Builder<Ref> sym)
 					throws IncorrectObjectTypeException, IOException {
-		CanonicalTreeParser p = new CanonicalTreeParser(
-				BINARY_R_REFS,
-				reader,
-				commitToTree(reader, srcId));
+		MutableObjectId root = commitToTree(reader, srcId);
+		CanonicalTreeParser p;
+		if (prefix.isEmpty()) {
+			p = new CanonicalTreeParser(BINARY_R_REFS, reader, root);
+		} else {
+			TreeWalk tw = TreeWalk.forPath(reader, prefix, root);
+			if (tw == null || !tw.isSubtree()) {
+				return;
+			}
+
+			tw.getObjectId(root, 0);
+			p = new CanonicalTreeParser(encode(prefix), reader, root);
+		}
+
 		while (!p.eof()) {
 			int mode = p.getEntryRawMode();
 			if (mode == TYPE_TREE) {
-				p = p.createSubtreeIterator(reader);
+				if (recursive) {
+					p = p.createSubtreeIterator(reader);
+				} else {
+					p = p.next();
+				}
 				continue;
 			}
 
@@ -150,8 +168,8 @@ class Scanner {
 		return ref;
 	}
 
-	private static AnyObjectId commitToTree(ObjectReader reader, AnyObjectId id)
-			throws IOException {
+	private static MutableObjectId commitToTree(ObjectReader reader,
+			AnyObjectId id) throws IOException {
 		byte[] raw = reader.open(id, OBJ_COMMIT).getCachedBytes();
 		MutableObjectId idBuf = new MutableObjectId();
 		idBuf.fromString(raw, 5);
@@ -192,7 +210,7 @@ class Scanner {
 			byte[] bin = reader.open(id, OBJ_BLOB)
 					.getCachedBytes(MAX_SYMLINK_BYTES);
 			String dst = RawParseUtils.decode(bin);
-			Ref trg = new ObjectIdRef.Unpeeled(PACKED, dst, null);
+			Ref trg = new ObjectIdRef.Unpeeled(NEW, dst, null);
 			String name = refName(p, false);
 			return new SymbolicRef(name, trg);
 		}

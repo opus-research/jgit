@@ -72,6 +72,7 @@ class Update extends RefUpdate {
 
 	Update(RefTreeDb refdb, Ref ref) {
 		super(ref);
+		setCheckConflicting(false); // Done automatically by doUpdate.
 		this.refdb = refdb;
 	}
 

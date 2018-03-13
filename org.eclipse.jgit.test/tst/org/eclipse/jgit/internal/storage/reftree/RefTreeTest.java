@@ -93,8 +93,8 @@ public class RefTreeTest {
 	@Test
 	public void testEmptyTree() throws IOException {
 		RefTree tree = RefTree.newEmptyTree();
-		assertNull(HEAD, tree.getRef(HEAD));
-		assertNull("master", tree.getRef(R_MASTER));
+		assertNull(HEAD, tree.exactRef(HEAD));
+		assertNull("master", tree.exactRef(R_MASTER));
 		tree.close(); // Should not throw.
 	}
 
@@ -106,7 +106,7 @@ public class RefTreeTest {
 		assertTrue(tree.apply(Collections.singletonList(cmd)));
 		assertSame(NOT_ATTEMPTED, cmd.getResult());
 
-		Ref m = tree.getRef(R_MASTER);
+		Ref m = tree.exactRef(R_MASTER);
 		assertNotNull(R_MASTER, m);
 		assertEquals(R_MASTER, m.getName());
 		assertEquals(id, m.getObjectId());
@@ -123,7 +123,7 @@ public class RefTreeTest {
 		assertSame(NOT_ATTEMPTED, cmd1.getResult());
 		assertSame(NOT_ATTEMPTED, cmd2.getResult());
 
-		Ref m = tree.getRef(HEAD);
+		Ref m = tree.exactRef(HEAD);
 		assertNotNull(HEAD, m);
 		assertEquals(HEAD, m.getName());
 		assertTrue("symbolic", m.isSymbolic());
@@ -133,7 +133,7 @@ public class RefTreeTest {
 
 		// Writing flushes some buffers, re-read from blob.
 		tree = RefTree.readTree(repo.newObjectReader(), write(tree));
-		m = tree.getRef(HEAD);
+		m = tree.exactRef(HEAD);
 		assertEquals(R_MASTER, m.getTarget().getName());
 	}
 
@@ -149,7 +149,7 @@ public class RefTreeTest {
 		assertTrue(tree.apply(Collections.singletonList(cmd)));
 		assertSame(NOT_ATTEMPTED, cmd.getResult());
 
-		Ref m = tree.getRef(ref);
+		Ref m = tree.exactRef(ref);
 		assertNotNull(ref, m);
 		assertEquals(ref, m.getName());
 		assertEquals(tag, m.getObjectId());
