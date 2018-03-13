@@ -95,7 +95,7 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 	 *
 	 * @return the result of the cherry-pick
 	 */
-	public CherryPickResult call() throws GitAPIException {
+	public CherryPickResult call() throws GitAPIException, GitAPIException {
 		RevCommit newHead = null;
 		List<Ref> cherryPickedRefs = new LinkedList<Ref>();
 		checkCallable();
@@ -122,13 +122,10 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 				RevCommit srcCommit = revWalk.parseCommit(srcObjectId);
 
 				// get the parent of the commit to cherry-pick
-				if (srcCommit.getParentCount() != 1)
+				if (srcCommit.getParentCount() != 1) {
 					throw new MultipleParentsNotAllowedException(
-							MessageFormat.format(
-									JGitText.get().canOnlyCherryPickCommitsWithOneParent,
-									srcCommit.name(),
-									Integer.valueOf(srcCommit.getParentCount())));
-
+							JGitText.get().canOnlyCherryPickCommitsWithOneParent);
+				}
 				RevCommit srcParent = srcCommit.getParent(0);
 				revWalk.parseHeaders(srcParent);
 

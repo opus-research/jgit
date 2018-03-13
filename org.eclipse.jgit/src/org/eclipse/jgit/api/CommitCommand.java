@@ -51,6 +51,7 @@ import java.util.List;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.api.errors.NoHeadException;
@@ -146,7 +147,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 *             {@link IOException} (e.g. {@link UnmergedPathException}) are
 	 *             typically not wrapped here but thrown as original exception
 	 */
-	public RevCommit call() throws NoHeadException, NoMessageException,
+	public RevCommit call() throws GitAPIException, NoHeadException, NoMessageException,
 			UnmergedPathException, ConcurrentRefUpdateException,
 			JGitInternalException, WrongRepositoryStateException {
 		checkCallable();
@@ -228,10 +229,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 							ru.setRefLogMessage(
 									prefix + revCommit.getShortMessage(), false);
 						}
-						if (headId != null)
-							ru.setExpectedOldObjectId(headId);
-						else
-							ru.setExpectedOldObjectId(ObjectId.zeroId());
+						ru.setExpectedOldObjectId(headId);
 						Result rc = ru.forceUpdate();
 						switch (rc) {
 						case NEW:
@@ -343,7 +341,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 					long entryLength = fTree.getEntryLength();
 					dcEntry.setLength(entryLength);
 					dcEntry.setLastModified(fTree.getEntryLastModified());
-					dcEntry.setFileMode(fTree.getIndexFileMode(dcTree));
+					dcEntry.setFileMode(fTree.getEntryFileMode());
 
 					boolean objectExists = (dcTree != null && fTree
 							.idEqual(dcTree))
@@ -382,10 +380,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 					// add to temporary in-core index
 					dcBuilder.add(dcEntry);
 
-					if (emptyCommit
-							&& (hTree == null || !hTree.idEqual(fTree) || hTree
-									.getEntryRawMode() != fTree
-									.getEntryRawMode()))
+					if (emptyCommit && (hTree == null || !hTree.idEqual(fTree)))
 						// this is a change
 						emptyCommit = false;
 				} else {

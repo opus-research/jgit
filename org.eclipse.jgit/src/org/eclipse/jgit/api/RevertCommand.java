@@ -51,8 +51,8 @@ import java.util.Map;
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.MergeResult.MergeStatus;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.MultipleParentsNotAllowedException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.api.errors.MultipleParentsNotAllowedException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.lib.AnyObjectId;
@@ -86,8 +86,6 @@ public class RevertCommand extends GitCommand<RevCommit> {
 
 	private MergeResult failingResult;
 
-	private List<String> unmergedPaths;
-
 	/**
 	 * @param repo
 	 */
@@ -106,7 +104,7 @@ public class RevertCommand extends GitCommand<RevCommit> {
 	 *         is returned. The list of successfully reverted {@link Ref}'s can
 	 *         be obtained by calling {@link #getRevertedRefs()}
 	 */
-	public RevCommit call() throws GitAPIException {
+	public RevCommit call() throws GitAPIException, GitAPIException {
 		RevCommit newHead = null;
 		checkCallable();
 
@@ -162,7 +160,6 @@ public class RevertCommand extends GitCommand<RevCommit> {
 							.setReflogComment("revert: " + shortMessage).call();
 					revertedRefs.add(src);
 				} else {
-					unmergedPaths = merger.getUnmergedPaths();
 					Map<String, MergeFailureReason> failingPaths = merger
 							.getFailingPaths();
 					if (failingPaths != null)
@@ -234,12 +231,5 @@ public class RevertCommand extends GitCommand<RevCommit> {
 	 */
 	public MergeResult getFailingResult() {
 		return failingResult;
-	}
-
-	/**
-	 * @return the unmerged paths, will be null if no merge conflicts
-	 */
-	public List<String> getUnmergedPaths() {
-		return unmergedPaths;
 	}
 }
