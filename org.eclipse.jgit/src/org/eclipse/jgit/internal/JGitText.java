@@ -300,6 +300,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String errorListing;
 	/***/ public String errorOccurredDuringUnpackingOnTheRemoteEnd;
 	/***/ public String errorReadingInfoRefs;
+	/***/ public String errorSymlinksNotSupported;
 	/***/ public String exceptionCaughtDuringExecutionOfHook;
 	/***/ public String exceptionCaughtDuringExecutionOfAddCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfArchiveCommand;
