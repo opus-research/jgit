@@ -162,7 +162,7 @@ class CachedObjectDirectory extends FileObjectDatabase {
 		return alts;
 	}
 
-	Set<AlternateHandle.Id> skipMe(Set<AlternateHandle.Id> skips) {
+	private Set<AlternateHandle.Id> skipMe(Set<AlternateHandle.Id> skips) {
 		Set<AlternateHandle.Id> withMe = new HashSet<>();
 		if (skips != null) {
 			withMe.addAll(skips);
@@ -290,7 +290,7 @@ class CachedObjectDirectory extends FileObjectDatabase {
 		}
 	}
 
-	AlternateHandle.Id getAlternateId() {
+	private AlternateHandle.Id getAlternateId() {
 		return wrapped.getAlternateId();
 	}
 }
