@@ -43,15 +43,12 @@
 
 package org.eclipse.jgit.transport;
 
-import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.eclipse.jgit.internal.storage.file.LazyObjectIdSetFile;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.ObjectChecker;
-import org.eclipse.jgit.lib.ObjectIdSet;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.SystemReader;
@@ -69,7 +66,6 @@ public class TransferConfig {
 	};
 
 	private final boolean checkReceivedObjects;
-	private final String fsckSkipList;
 	private final boolean allowLeadingZeroFileMode;
 	private final boolean allowInvalidPersonIdent;
 	private final boolean safeForWindows;
@@ -86,7 +82,6 @@ public class TransferConfig {
 		checkReceivedObjects = rc.getBoolean(
 				"fetch", "fsckobjects", //$NON-NLS-1$ //$NON-NLS-2$
 				rc.getBoolean("transfer", "fsckobjects", false)); //$NON-NLS-1$ //$NON-NLS-2$
-		fsckSkipList = rc.getString("fsck", null, "skipList"); //$NON-NLS-1$ //$NON-NLS-2$
 		allowLeadingZeroFileMode = checkReceivedObjects
 				&& rc.getBoolean("fsck", "allowLeadingZeroFileMode", false); //$NON-NLS-1$ //$NON-NLS-2$
 		allowInvalidPersonIdent = checkReceivedObjects
@@ -117,15 +112,7 @@ public class TransferConfig {
 			.setAllowLeadingZeroFileMode(allowLeadingZeroFileMode)
 			.setAllowInvalidPersonIdent(allowInvalidPersonIdent)
 			.setSafeForWindows(safeForWindows)
-			.setSafeForMacOS(safeForMacOS)
-			.setSkipList(skipList());
-	}
-
-	private ObjectIdSet skipList() {
-		if (fsckSkipList != null && !fsckSkipList.isEmpty()) {
-			return new LazyObjectIdSetFile(new File(fsckSkipList));
-		}
-		return null;
+			.setSafeForMacOS(safeForMacOS);
 	}
 
 	/**
