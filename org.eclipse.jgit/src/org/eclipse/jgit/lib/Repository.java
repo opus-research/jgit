@@ -816,7 +816,6 @@ public abstract class Repository {
 	 * @throws NoWorkTreeException
 	 *             if this is bare, which implies it has no working directory.
 	 *             See {@link #isBare()}.
-	 * @deprecated Use {@link #readDirCache()} instead
 	 */
 	public GitIndex getIndex() throws IOException, NoWorkTreeException {
 		if (isBare())
