@@ -60,7 +60,6 @@ import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FileUtils;
 
 /**
  * Git style file locking and replacement.
@@ -123,7 +122,7 @@ public class LockFile {
 	 *             does not hold the lock.
 	 */
 	public boolean lock() throws IOException {
-		FileUtils.mkdirs(lck.getParentFile(), true);
+		lck.getParentFile().mkdirs();
 		if (lck.createNewFile()) {
 			haveLck = true;
 			try {

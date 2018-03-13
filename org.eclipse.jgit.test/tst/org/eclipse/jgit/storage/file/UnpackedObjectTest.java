@@ -64,7 +64,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectStream;
-import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.IO;
 
 public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
@@ -536,7 +535,7 @@ public class UnpackedObjectTest extends LocalDiskRepositoryTestCase {
 
 	private void write(ObjectId id, byte[] data) throws IOException {
 		File path = path(id);
-		FileUtils.mkdirs(path.getParentFile());
+		path.getParentFile().mkdirs();
 		FileOutputStream out = new FileOutputStream(path);
 		try {
 			out.write(data);
