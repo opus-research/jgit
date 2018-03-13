@@ -82,8 +82,6 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 * the strategy used to compute the FileMode for a FileEntry. Can be used to
 	 * control things such as whether to recurse into a directory or create a
 	 * gitlink.
-	 *
-	 * @since 4.3
 	 */
 	protected final FileModeStrategy fileModeStrategy;
 
@@ -105,8 +103,6 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 * @param fileModeStrategy
 	 *            the strategy to use to determine the FileMode for a FileEntry;
 	 *            controls gitlinks etc.
-	 *
-	 * @since 4.3
 	 */
 	public FileTreeIterator(Repository repo, FileModeStrategy fileModeStrategy) {
 		this(repo.getWorkTree(), repo.getFS(),
@@ -145,8 +141,6 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 * @param fileModeStrategy
 	 *            the strategy to use to determine the FileMode for a FileEntry;
 	 *            controls gitlinks etc.
-	 *
-	 * @since 4.3
 	 */
 	public FileTreeIterator(final File root, FS fs, WorkingTreeOptions options,
 							FileModeStrategy fileModeStrategy) {
@@ -168,28 +162,6 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 * @param fs
 	 *            the file system abstraction which will be necessary to perform
 	 *            certain file system operations.
-	 * @since 4.3
-	 * @deprecated use {@link #FileTreeIterator(FileTreeIterator, File, FS)}
-	 *             instead.
-	 */
-	protected FileTreeIterator(final WorkingTreeIterator p, final File root,
-			FS fs) {
-		this(p, root, fs, DefaultFileModeStrategy.INSTANCE);
-	}
-
-	/**
-	 * Create a new iterator to traverse a subdirectory.
-	 *
-	 * @param p
-	 *            the parent iterator we were created from.
-	 * @param root
-	 *            the subdirectory. This should be a directory contained within
-	 *            the parent directory.
-	 * @param fs
-	 *            the file system abstraction which will be necessary to perform
-	 *            certain file system operations.
-	 *
-	 * @since 4.3
 	 */
 	protected FileTreeIterator(final FileTreeIterator p, final File root,
 			FS fs) {
@@ -211,10 +183,8 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 * @param fileModeStrategy
 	 *            the strategy to use to determine the FileMode for a given
 	 *            FileEntry.
-	 *
-	 * @since 4.3
 	 */
-	protected FileTreeIterator(final WorkingTreeIterator p, final File root,
+	protected FileTreeIterator(final FileTreeIterator p, final File root,
 			FS fs, FileModeStrategy fileModeStrategy) {
 		super(p);
 		directory = root;
@@ -242,8 +212,6 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	/**
 	 * An interface representing the methods used to determine the FileMode for
 	 * a FileEntry.
-	 *
-	 * @since 4.3
 	 */
 	public interface FileModeStrategy {
 		/**
@@ -262,31 +230,26 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	/**
 	 * A default implementation of a FileModeStrategy; defaults to treating
 	 * nested .git directories as gitlinks, etc.
-	 *
-	 * @since 4.3
 	 */
 	static public class DefaultFileModeStrategy implements FileModeStrategy {
 		/**
 		 * a singleton instance of the default FileModeStrategy
 		 */
-		public final static DefaultFileModeStrategy INSTANCE =
-				new DefaultFileModeStrategy();
+		public final static DefaultFileModeStrategy INSTANCE = new DefaultFileModeStrategy();
 
 		@Override
 		public FileMode getMode(File f, FS.Attributes attributes) {
-			if (attributes.isSymbolicLink()) {
+			if (attributes.isSymbolicLink())
 				return FileMode.SYMLINK;
-			} else if (attributes.isDirectory()) {
-				if (new File(f, Constants.DOT_GIT).exists()) {
+			else if (attributes.isDirectory()) {
+				if (new File(f, Constants.DOT_GIT).exists())
 					return FileMode.GITLINK;
-				} else {
+				else
 					return FileMode.TREE;
-				}
-			} else if (attributes.isExecutable()) {
+			} else if (attributes.isExecutable())
 				return FileMode.EXECUTABLE_FILE;
-			} else {
+			else
 				return FileMode.REGULAR_FILE;
-			}
 		}
 	}
 
@@ -323,8 +286,6 @@ public class FileTreeIterator extends WorkingTreeIterator {
 		 * @param fileModeStrategy
 		 *            the strategy to use when determining the FileMode of a
 		 *            file; controls gitlinks etc.
-		 *
-		 * @since 4.3
 		 */
 		public FileEntry(File f, FS fs, FileModeStrategy fileModeStrategy) {
 			this.fs = fs;

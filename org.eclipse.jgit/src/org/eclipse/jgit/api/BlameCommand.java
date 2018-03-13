@@ -66,7 +66,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
 import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.eclipse.jgit.util.IO;
-import org.eclipse.jgit.util.io.AutoLFInputStream;
+import org.eclipse.jgit.util.io.EolCanonicalizingInputStream;
 
 /**
  * Blame command for building a {@link BlameResult} for a file path.
@@ -248,7 +248,7 @@ public class BlameCommand extends GitCommand<BlameResult> {
 			rawText = new RawText(inTree);
 			break;
 		case TRUE:
-			AutoLFInputStream in = new AutoLFInputStream(
+			EolCanonicalizingInputStream in = new EolCanonicalizingInputStream(
 					new FileInputStream(inTree), true);
 			// Canonicalization should lead to same or shorter length
 			// (CRLF to LF), so the file size on disk is an upper size bound
