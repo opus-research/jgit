@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2015, Christian Halstrick <christian.halstrick@sap.com>
- * and other copyright owners as documented in the project's IP log.
+ * Copyright (C) 2015, Ivan Motsch <ivan.motsch@bsiag.com>
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -42,14 +41,20 @@
  */
 package org.eclipse.jgit.attributes;
 
+import java.util.Collection;
+import java.util.Collections;
+
 /**
- * Interface for classes which provide git attributes
+ * Fixture implementation of {@link MacroExpander} that always returns the
+ * attribute itself.
+ * <p>
+ * Used by attribute node tests
  *
  * @since 4.2
  */
-public interface AttributesProvider {
-	/**
-	 * @return the currently active attributes
-	 */
-	public Attributes getAttributes();
+public class NullMacroExpander implements MacroExpander {
+	@Override
+	public Collection<Attribute> expandMacro(Attribute attr) {
+		return Collections.singleton(attr);
+	}
 }
