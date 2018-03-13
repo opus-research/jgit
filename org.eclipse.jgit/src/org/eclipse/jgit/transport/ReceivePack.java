@@ -658,7 +658,7 @@ public class ReceivePack implements ReceiveSession {
 				});
 			}
 
-			onPostReceive();
+			postReceive.onPostReceive(this, filterCommands(Result.OK));
 
 			if (unpackError != null)
 				throw new UnpackException(unpackError);
@@ -989,7 +989,7 @@ public class ReceivePack implements ReceiveSession {
 	}
 
 	private void executeCommands() {
-		onPreReceive();
+		preReceive.onPreReceive(this, filterCommands(Result.NOT_ATTEMPTED));
 
 		List<ReceiveCommand> toApply = filterCommands(Result.NOT_ATTEMPTED);
 		ProgressMonitor updating = NullProgressMonitor.INSTANCE;
