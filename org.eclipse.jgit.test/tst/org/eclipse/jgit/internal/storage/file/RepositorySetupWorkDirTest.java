@@ -187,15 +187,16 @@ public class RepositorySetupWorkDirTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	private File getFile(String... pathComponents) throws IOException {
-		File dir = getTemporaryDirectory();
+	private static File getFile(String... pathComponents) throws IOException {
+		String rootPath = new File(new File("target"), "trash").getPath();
 		for (String pathComponent : pathComponents)
-			dir = new File(dir, pathComponent);
-		FileUtils.mkdirs(dir, true);
-		return dir;
+			rootPath = rootPath + File.separatorChar + pathComponent;
+		File result = new File(rootPath);
+		FileUtils.mkdirs(result, true);
+		return result;
 	}
 
-	private void setBare(File gitDir, boolean bare) throws IOException,
+	private static void setBare(File gitDir, boolean bare) throws IOException,
 			ConfigInvalidException {
 		FileBasedConfig cfg = configFor(gitDir);
 		cfg.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
@@ -203,7 +204,7 @@ public class RepositorySetupWorkDirTest extends LocalDiskRepositoryTestCase {
 		cfg.save();
 	}
 
-	private void setWorkTree(File gitDir, File workTree)
+	private static void setWorkTree(File gitDir, File workTree)
 			throws IOException,
 			ConfigInvalidException {
 		String path = workTree.getAbsolutePath();
@@ -213,7 +214,7 @@ public class RepositorySetupWorkDirTest extends LocalDiskRepositoryTestCase {
 		cfg.save();
 	}
 
-	private FileBasedConfig configFor(File gitDir) throws IOException,
+	private static FileBasedConfig configFor(File gitDir) throws IOException,
 			ConfigInvalidException {
 		File configPath = new File(gitDir, Constants.CONFIG);
 		FileBasedConfig cfg = new FileBasedConfig(configPath, FS.DETECTED);
@@ -221,14 +222,14 @@ public class RepositorySetupWorkDirTest extends LocalDiskRepositoryTestCase {
 		return cfg;
 	}
 
-	private void assertGitdirPath(Repository repo, String... expected)
+	private static void assertGitdirPath(Repository repo, String... expected)
 			throws IOException {
 		File exp = getFile(expected).getCanonicalFile();
 		File act = repo.getDirectory().getCanonicalFile();
 		assertEquals("Wrong Git Directory", exp, act);
 	}
 
-	private void assertWorkdirPath(Repository repo, String... expected)
+	private static void assertWorkdirPath(Repository repo, String... expected)
 			throws IOException {
 		File exp = getFile(expected).getCanonicalFile();
 		File act = repo.getWorkTree().getCanonicalFile();
