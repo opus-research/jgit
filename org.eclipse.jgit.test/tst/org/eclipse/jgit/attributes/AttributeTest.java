@@ -49,6 +49,7 @@ import static org.junit.Assert.assertNull;
 import org.eclipse.jgit.attributes.Attribute.State;
 import org.junit.Test;
 
+
 /**
  * Tests {@link Attribute}
  */

@@ -46,7 +46,6 @@ import static java.util.Arrays.asList;
 import static org.hamcrest.CoreMatchers.hasItem;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -122,8 +121,6 @@ public class AttributesNodeDirCacheIteratorTest extends RepositoryTestCase {
 
 		assertIteration(F, "windows.file", null);
 		assertIteration(F, "windows.txt", asList(EOL_LF));
-
-		endWalk();
 	}
 
 	/**
@@ -149,8 +146,6 @@ public class AttributesNodeDirCacheIteratorTest extends RepositoryTestCase {
 
 		assertIteration(D, "level1/level2");
 		assertIteration(F, "level1/level2/l2.txt");
-
-		endWalk();
 	}
 
 	/**
@@ -178,8 +173,6 @@ public class AttributesNodeDirCacheIteratorTest extends RepositoryTestCase {
 
 		assertIteration(D, "level1/level2");
 		assertIteration(F, "level1/level2/l2.txt");
-
-		endWalk();
 	}
 
 	@Test
@@ -203,31 +196,6 @@ public class AttributesNodeDirCacheIteratorTest extends RepositoryTestCase {
 
 		assertIteration(D, "levelB");
 		assertIteration(F, "levelB/.gitattributes");
-
-		endWalk();
-	}
-
-	@Test
-	public void testIncorrectAttributeFileName() throws Exception {
-		writeAttributesFile("levelA/file.gitattributes", "*.txt -delta");
-		writeAttributesFile("gitattributes", "*.txt eol=lf");
-
-		writeTrashFile("l0.txt", "");
-		writeTrashFile("levelA/lA.txt", "");
-
-		// Adds file to index
-		git.add().addFilepattern(".").call();
-		walk = beginWalk();
-
-		assertIteration(F, "gitattributes");
-
-		assertIteration(F, "l0.txt");
-
-		assertIteration(D, "levelA");
-		assertIteration(F, "levelA/file.gitattributes");
-		assertIteration(F, "levelA/lA.txt");
-
-		endWalk();
 	}
 
 	private void assertIteration(FileMode type, String pathName)
@@ -288,9 +256,5 @@ public class AttributesNodeDirCacheIteratorTest extends RepositoryTestCase {
 		TreeWalk newWalk = new TreeWalk(db);
 		newWalk.addTree(new DirCacheIterator(db.readDirCache()));
 		return newWalk;
-	}
-
-	private void endWalk() throws IOException {
-		assertFalse("Not all files tested", walk.next());
 	}
 }

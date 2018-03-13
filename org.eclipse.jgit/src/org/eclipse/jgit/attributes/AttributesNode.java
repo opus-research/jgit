@@ -49,7 +49,6 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Map;
 
 import org.eclipse.jgit.lib.Constants;
@@ -58,8 +57,6 @@ import org.eclipse.jgit.lib.Constants;
  * Represents a bundle of attributes inherited from a base directory.
  *
  * This class is not thread safe, it maintains state about the last match.
- *
- * @since 3.7
  */
 public class AttributesNode {
 	/** The rules that have been parsed into this node. */
@@ -81,7 +78,7 @@ public class AttributesNode {
 	}
 
 	/**
-	 * Parse files according to gitattribute standards.
+	 * Parse files according to gitignore standards.
 	 *
 	 * @param in
 	 *            input stream holding the standard ignore format. The caller is
@@ -94,19 +91,8 @@ public class AttributesNode {
 		String txt;
 		while ((txt = br.readLine()) != null) {
 			txt = txt.trim();
-			if (txt.length() > 0 && !txt.startsWith("#") /* Comments *///$NON-NLS-1$
-					&& !txt.startsWith("!") /* Negative pattern forbidden for attributes */) { //$NON-NLS-1$
-				int patternEndSpace = txt.indexOf(' ');
-				int patternEndTab = txt.indexOf('\t');
-
-				final int patternEnd;
-				if (patternEndSpace == -1)
-					patternEnd = patternEndTab;
-				else if (patternEndTab == -1)
-					patternEnd = patternEndSpace;
-				else
-					patternEnd = Math.min(patternEndSpace, patternEndTab);
-
+			if (txt.length() > 0 && !txt.startsWith("#")) { //$NON-NLS-1$
+				int patternEnd = txt.indexOf(' '); // TODO: clarify handling to tabs and escaping
 				if (patternEnd > -1)
 					rules.add(new AttributesRule(txt.substring(0, patternEnd),
 							txt.substring(patternEnd + 1).trim()));
@@ -141,19 +127,17 @@ public class AttributesNode {
 			Map<String, Attribute> attributes) {
 		// Parse rules in the reverse order that they were read since the last
 		// entry should be used
-		ListIterator<AttributesRule> ruleIterator = rules.listIterator(rules
-				.size());
-		while (ruleIterator.hasPrevious()) {
-			AttributesRule rule = ruleIterator.previous();
+		for (int i = rules.size() - 1; i >= 0; i--) {
+			AttributesRule rule = rules.get(i);
 			if (rule.isMatch(entryPath, isDirectory)) {
-				ListIterator<Attribute> attributeIte = rule.getAttributes()
-						.listIterator(rule.getAttributes().size());
+				List<Attribute> attrs = rule.getAttributes();
 				// Parses the attributes in the reverse order that they were
 				// read since the last entry should be used
-				while (attributeIte.hasPrevious()) {
-					Attribute attr = attributeIte.previous();
-					if (!attributes.containsKey(attr.getKey()))
+				for (int attrIndex = attrs.size() - 1; attrIndex >= 0; attrIndex--) {
+					Attribute attr = attrs.get(attrIndex);
+					if (!attributes.containsKey(attr.getKey())) {
 						attributes.put(attr.getKey(), attr);
+					}
 				}
 			}
 		}

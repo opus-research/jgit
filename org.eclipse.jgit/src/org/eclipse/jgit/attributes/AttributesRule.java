@@ -42,24 +42,18 @@
  */
 package org.eclipse.jgit.attributes;
 
-import static org.eclipse.jgit.ignore.internal.IMatcher.NO_MATCH;
-
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import org.eclipse.jgit.attributes.Attribute.State;
 import org.eclipse.jgit.errors.InvalidPatternException;
-import org.eclipse.jgit.ignore.FastIgnoreRule;
-import org.eclipse.jgit.ignore.internal.IMatcher;
-import org.eclipse.jgit.ignore.internal.PathMatcher;
+import org.eclipse.jgit.fnmatch.FileNameMatcher;
+import org.eclipse.jgit.ignore.IgnoreRule;
 
 /**
  * A single attributes rule corresponding to one line in a .gitattributes file.
- *
- * Inspiration from: {@link FastIgnoreRule}
- *
- * @since 3.7
+ * 
+ * Inspiration from: {@link IgnoreRule}
  */
 public class AttributesRule {
 
@@ -78,26 +72,20 @@ public class AttributesRule {
 				continue;
 
 			if (attribute.startsWith("-")) {//$NON-NLS-1$
-				if (attribute.length() > 1)
-					result.add(new Attribute(attribute.substring(1),
-							State.UNSET));
+				result.add(new Attribute(attribute.substring(1), State.UNSET));
 				continue;
 			}
 
 			final int equalsIndex = attribute.indexOf("="); //$NON-NLS-1$
 			if (equalsIndex == -1)
 				result.add(new Attribute(attribute, State.SET));
-			else {
-				String attributeKey = attribute.substring(0, equalsIndex);
-				if (attributeKey.length() > 0) {
-					String attributeValue = attribute
-							.substring(equalsIndex + 1);
-					result.add(new Attribute(attributeKey, attributeValue));
-				}
-			}
+			else
+				result.add(new Attribute(attribute.substring(0, equalsIndex),
+						attribute.substring(equalsIndex + 1)));
 		}
 		return result;
 	}
+
 
 	private final String pattern;
 	private final List<Attribute> attributes;
@@ -105,7 +93,7 @@ public class AttributesRule {
 	private boolean nameOnly;
 	private boolean dirOnly;
 
-	private IMatcher matcher;
+	private FileNameMatcher matcher;
 
 	/**
 	 * Create a new attribute rule with the given pattern. Assumes that the
@@ -113,8 +101,7 @@ public class AttributesRule {
 	 *
 	 * @param pattern
 	 *            Base pattern for the attributes rule. This pattern will be
-	 *            parsed to generate rule parameters. It can not be
-	 *            <code>null</code>.
+	 *            parsed to generate rule parameters.
 	 * @param attributes
 	 *            the rule attributes. This string will be parsed to read the
 	 *            attributes.
@@ -124,29 +111,35 @@ public class AttributesRule {
 		nameOnly = false;
 		dirOnly = false;
 
+		int endIndex = pattern.length();
+
 		if (pattern.endsWith("/")) { //$NON-NLS-1$
-			pattern = pattern.substring(0, pattern.length() - 1);
+			endIndex--;
 			dirOnly = true;
 		}
 
-		boolean hasSlash = pattern.contains("/"); //$NON-NLS-1$
+		String pattern2 = pattern.substring(0, endIndex);
+		boolean hasSlash = pattern2.contains("/"); //$NON-NLS-1$
 
 		if (!hasSlash)
 			nameOnly = true;
-		else if (!pattern.startsWith("/")) { //$NON-NLS-1$
+		else if (!pattern2.startsWith("/")) { //$NON-NLS-1$
 			// Contains "/" but does not start with one
 			// Adding / to the start should not interfere with matching
-			pattern = "/" + pattern; //$NON-NLS-1$
+			pattern2 = "/" + pattern2; //$NON-NLS-1$
 		}
 
-		try {
-			matcher = PathMatcher.createPathMatcher(pattern,
-					Character.valueOf(FastIgnoreRule.PATH_SEPARATOR), dirOnly);
-		} catch (InvalidPatternException e) {
-			matcher = NO_MATCH;
+		if (pattern2.contains("*") //$NON-NLS-1$
+				|| pattern2.contains("?") //$NON-NLS-1$
+				|| pattern2.contains("[")) { //$NON-NLS-1$
+			try {
+				matcher = new FileNameMatcher(pattern2, Character.valueOf('/'));
+			} catch (InvalidPatternException e) {
+				// Ignore pattern exceptions
+			}
 		}
 
-		this.pattern = pattern;
+		this.pattern = pattern2;
 	}
 
 	/**
@@ -156,14 +149,37 @@ public class AttributesRule {
 		return dirOnly;
 	}
 
+	private boolean doesMatchDirectoryExpectations(boolean isDirectory,
+			int segmentIdx, int segmentLength) {
+		// The segment we are checking is a directory, expectations are met.
+		if (segmentIdx < segmentLength - 1) {
+			return true;
+		}
+
+		// We are checking the last part of the segment for which isDirectory
+		// has to be considered.
+		return !dirOnly || isDirectory;
+	}
+
+	private boolean doesMatchDirectoryExpectations(boolean isDirectory,
+			boolean lastSegment) {
+		// The segment we are checking is a directory, expectations are met.
+		if (!lastSegment) {
+			return true;
+		}
+
+		// We are checking the last part of the segment for which isDirectory
+		// has to be considered.
+		return !dirOnly || isDirectory;
+	}
+
 	/**
 	 * Returns the attributes.
 	 *
-	 * @return an unmodifiable list of attributes (never returns
-	 *         <code>null</code>)
+	 * @return the attributes
 	 */
 	public List<Attribute> getAttributes() {
-		return Collections.unmodifiableList(attributes);
+		return attributes;
 	}
 
 	/**
@@ -175,8 +191,7 @@ public class AttributesRule {
 	}
 
 	/**
-	 * @return The blob pattern to be used as a matcher (never returns
-	 *         <code>null</code>)
+	 * @return The blob pattern to be used as a matcher
 	 */
 	public String getPattern() {
 		return pattern;
@@ -193,11 +208,90 @@ public class AttributesRule {
 	 * @return True if a match was made.
 	 */
 	public boolean isMatch(String relativeTarget, boolean isDirectory) {
-		if (relativeTarget == null)
-			return false;
-		if (relativeTarget.length() == 0)
-			return false;
-		boolean match = matcher.matches(relativeTarget, isDirectory);
-		return match;
+		String target = relativeTarget;
+		if (!target.startsWith("/")) //$NON-NLS-1$
+			target = "/" + target; //$NON-NLS-1$
+
+		if (matcher == null) {
+			if (target.equals(pattern)) {
+				// Exact match
+				if (dirOnly && !isDirectory)
+					// Directory expectations not met
+					return false;
+				else
+					// Directory expectations met
+					return true;
+			}
+
+			/*
+			 * Add slashes for startsWith check. This avoids matching e.g.
+			 * "/src/new" to /src/newfile" but allows "/src/new" to match
+			 * "/src/new/newfile", as is the git standard
+			 */
+			if (target.startsWith(pattern + "/")) //$NON-NLS-1$
+				return true;
+
+			if (nameOnly) {
+				// Iterate through each sub-name
+				int segmentStart = 0;
+				int segmentEnd = target.indexOf('/');
+				while (true) {
+					if (segmentEnd > segmentStart
+							&& target.regionMatches(segmentStart, pattern, 0,
+									segmentEnd - segmentStart)
+							&& doesMatchDirectoryExpectations(isDirectory, false))
+						return true;
+					else if (segmentEnd == -1
+							&& target.regionMatches(segmentStart, pattern, 0,
+									target.length() - segmentStart)
+							&& doesMatchDirectoryExpectations(isDirectory, true))
+						return true;
+
+					if (segmentEnd == -1 || segmentStart >= target.length())
+						// this was the last segment
+						break;
+
+					// next
+					segmentStart = segmentEnd + 1;
+					segmentEnd = target.indexOf('/', segmentStart);
+				}
+			}
+
+		} else {
+			matcher.append(target);
+			if (matcher.isMatch())
+				return true;
+
+			final String[] segments = target.split("/"); //$NON-NLS-1$
+			if (nameOnly) {
+				for (int idx = 0; idx < segments.length; idx++) {
+					final String segmentName = segments[idx];
+					// Iterate through each sub-directory
+					matcher.reset();
+					matcher.append(segmentName);
+					if (matcher.isMatch()
+							&& doesMatchDirectoryExpectations(isDirectory, idx,
+									segments.length))
+						return true;
+				}
+			} else {
+				// TODO: This is the slowest operation
+				// This matches e.g. "/src/ne?" to "/src/new/file.c"
+				matcher.reset();
+				for (int idx = 0; idx < segments.length; idx++) {
+					final String segmentName = segments[idx];
+					if (segmentName.length() > 0) {
+						matcher.append("/" + segmentName); //$NON-NLS-1$
+					}
+
+					if (matcher.isMatch()
+							&& doesMatchDirectoryExpectations(isDirectory, idx,
+									segments.length))
+						return true;
+				}
+			}
+		}
+
+		return false;
 	}
 }

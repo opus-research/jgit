@@ -46,7 +46,6 @@ import static java.util.Arrays.asList;
 import static org.hamcrest.CoreMatchers.hasItem;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -131,9 +130,8 @@ public class AttributesNodeWorkingTreeIteratorTest extends RepositoryTestCase {
 		assertIteration(F, "windows.file", null, asList(EOL_CRLF), null);
 		assertIteration(F, "windows.txt", asList(EOL_LF), asList(EOL_CRLF),
 				asList(CUSTOM_VALUE));
-
-		endWalk();
 	}
+
 
 	/**
 	 * Checks that if there is no .gitattributes file in the repository
@@ -156,8 +154,6 @@ public class AttributesNodeWorkingTreeIteratorTest extends RepositoryTestCase {
 
 		assertIteration(D, "level1/level2");
 		assertIteration(F, "level1/level2/l2.txt");
-
-		endWalk();
 	}
 
 	/**
@@ -183,8 +179,6 @@ public class AttributesNodeWorkingTreeIteratorTest extends RepositoryTestCase {
 
 		assertIteration(D, "level1/level2");
 		assertIteration(F, "level1/level2/l2.txt");
-
-		endWalk();
 	}
 
 	@Test
@@ -206,8 +200,6 @@ public class AttributesNodeWorkingTreeIteratorTest extends RepositoryTestCase {
 
 		assertIteration(D, "levelB");
 		assertIteration(F, "levelB/.gitattributes");
-
-		endWalk();
 	}
 
 	private void assertIteration(FileMode type, String pathName)
@@ -270,13 +262,9 @@ public class AttributesNodeWorkingTreeIteratorTest extends RepositoryTestCase {
 		writeTrashFile(name, data.toString());
 	}
 
-	private TreeWalk beginWalk() throws CorruptObjectException {
+	protected TreeWalk beginWalk() throws CorruptObjectException {
 		TreeWalk newWalk = new TreeWalk(db);
 		newWalk.addTree(new FileTreeIterator(db));
 		return newWalk;
-	}
-
-	private void endWalk() throws IOException {
-		assertFalse("Not all files tested", walk.next());
 	}
 }

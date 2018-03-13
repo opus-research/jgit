@@ -58,7 +58,6 @@ import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.EmptyTreeIterator;
-import org.eclipse.jgit.util.RawParseUtils;
 
 /**
  * Iterate a {@link DirCache} as part of a <code>TreeWalk</code>.
@@ -72,10 +71,6 @@ import org.eclipse.jgit.util.RawParseUtils;
  * @see org.eclipse.jgit.treewalk.TreeWalk
  */
 public class DirCacheIterator extends AbstractTreeIterator {
-	/** Byte array holding ".gitattributes" string */
-	private static final byte[] DOT_GIT_ATTRIBUTES_BYTES = Constants.DOT_GIT_ATTRIBUTES
-			.getBytes();
-
 	/** The cache this iterator was created to walk. */
 	protected final DirCache cache;
 
@@ -268,10 +263,12 @@ public class DirCacheIterator extends AbstractTreeIterator {
 		path = cep;
 		pathLen = cep.length;
 		currentSubtree = null;
-		// Checks if this entry is a .gitattributes file
-		if (RawParseUtils.match(path, pathOffset, DOT_GIT_ATTRIBUTES_BYTES) == path.length)
-			attributesNode = new LazyLoadingAttributesNode(
-					currentEntry.getObjectId());
+		String pathString = currentEntry.getPathString();
+		if (pathString != null) {
+			if (pathString.endsWith(Constants.DOT_GIT_ATTRIBUTES))
+				attributesNode = new LazyLoadingAttributesNode(
+						currentEntry.getObjectId());
+		}
 	}
 
 	/**
@@ -291,7 +288,6 @@ public class DirCacheIterator extends AbstractTreeIterator {
 	 *            {@link ObjectReader} used to parse the .gitattributes entry.
 	 * @return {@link AttributesNode} for the current entry.
 	 * @throws IOException
-	 * @since 3.7
 	 */
 	public AttributesNode getEntryAttributesNode(ObjectReader reader)
 			throws IOException {
@@ -304,6 +300,9 @@ public class DirCacheIterator extends AbstractTreeIterator {
 	/**
 	 * {@link AttributesNode} implementation that provides lazy loading
 	 * facilities.
+	 * 
+	 * @author <a href="mailto:arthur.daussy@obeo.fr">Arthur Daussy</a>
+	 *
 	 */
 	private static class LazyLoadingAttributesNode extends AttributesNode {
 		final ObjectId objectId;

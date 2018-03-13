@@ -40,7 +40,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 package org.eclipse.jgit.attributes;
+
 
 /**
  * Represents an attribute.
@@ -54,10 +56,8 @@ package org.eclipse.jgit.attributes;
  * class</li>
  * </ul>
  * </p>
- *
- * @since 3.7
  */
-public final class Attribute {
+public class Attribute {
 
 	/**
 	 * The attribute value state
@@ -81,27 +81,18 @@ public final class Attribute {
 	 * Creates a new instance
 	 *
 	 * @param key
-	 *            the attribute key. Should not be <code>null</code>.
+	 *            the attribute key
 	 * @param state
-	 *            the attribute state. It should be either {@link State#SET} or
-	 *            {@link State#UNSET}. In order to create a custom value
-	 *            attribute prefer the use of {@link #Attribute(String, String)}
-	 *            constructor.
+	 *            the attribute state
 	 */
 	public Attribute(String key, State state) {
 		this(key, state, null);
 	}
 
-	private Attribute(String key, State state, String value) {
-		if (key == null)
-			throw new NullPointerException(
-					"The key of an attribute should not be null"); //$NON-NLS-1$
-		if (state == null)
-			throw new NullPointerException(
-					"The state of an attribute should not be null"); //$NON-NLS-1$
 
+	private Attribute(String key, State state, String value) {
 		this.key = key;
-		this.state = state;
+		this.state = state != null ? state : State.CUSTOM;
 		this.value = value;
 	}
 
@@ -109,7 +100,7 @@ public final class Attribute {
 	 * Creates a new instance.
 	 *
 	 * @param key
-	 *            the attribute key. Should not be <code>null</code>.
+	 *            the attribute key
 	 * @param value
 	 *            the custom attribute value
 	 */
@@ -117,14 +108,20 @@ public final class Attribute {
 		this(key, State.CUSTOM, value);
 	}
 
+
 	@Override
 	public boolean equals(Object obj) {
 		if (this == obj)
 			return true;
-		if (!(obj instanceof Attribute))
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
 			return false;
 		Attribute other = (Attribute) obj;
-		if (!key.equals(other.key))
+		if (key == null) {
+			if (other.key != null)
+				return false;
+		} else if (!key.equals(other.key))
 			return false;
 		if (state != other.state)
 			return false;
@@ -137,7 +134,7 @@ public final class Attribute {
 	}
 
 	/**
-	 * @return the attribute key (never returns <code>null</code>)
+	 * @return the attribute key
 	 */
 	public String getKey() {
 		return key;
@@ -146,11 +143,12 @@ public final class Attribute {
 	/**
 	 * Returns the state.
 	 *
-	 * @return the state (never returns <code>null</code>)
+	 * @return the state
 	 */
 	public State getState() {
 		return state;
 	}
+
 
 	/**
 	 * @return the attribute value (may be <code>null</code>)
@@ -159,15 +157,17 @@ public final class Attribute {
 		return value;
 	}
 
+
 	@Override
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + key.hashCode();
-		result = prime * result + state.hashCode();
+		result = prime * result + ((key == null) ? 0 : key.hashCode());
+		result = prime * result + ((state == null) ? 0 : state.hashCode());
 		result = prime * result + ((value == null) ? 0 : value.hashCode());
 		return result;
 	}
+
 
 	@Override
 	public String toString() {

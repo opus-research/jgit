@@ -99,7 +99,6 @@ import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.revwalk.filter.RevFilter;
-import org.eclipse.jgit.submodule.SubmoduleWalk.IgnoreSubmoduleMode;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.FileUtils;
@@ -295,7 +294,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 								walk.parseCommit(repo.resolve(Constants.HEAD)),
 								upstreamCommit)) {
 					org.eclipse.jgit.api.Status status = Git.wrap(repo)
-							.status().setIgnoreSubmodules(IgnoreSubmoduleMode.ALL).call();
+							.status().call();
 					if (status.hasUncommittedChanges()) {
 						List<String> list = new ArrayList<String>();
 						list.addAll(status.getUncommittedChanges());
@@ -462,7 +461,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			String newMessage = interactiveHandler
 					.modifyCommitMessage(oldMessage);
 			newHead = new Git(repo).commit().setMessage(newMessage)
-					.setAmend(true).setNoVerify(true).call();
+					.setAmend(true).call();
 			return null;
 		case EDIT:
 			rebaseState.createFile(AMEND, commitToPick.name());
@@ -768,14 +767,15 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			}
 			retNewHead = new Git(repo).commit()
 					.setMessage(stripCommentLines(commitMessage))
-					.setAmend(true).setNoVerify(true).call();
+					.setAmend(true).call();
 			rebaseState.getFile(MESSAGE_SQUASH).delete();
 			rebaseState.getFile(MESSAGE_FIXUP).delete();
 
 		} else {
 			// Next step is either Squash or Fixup
-			retNewHead = new Git(repo).commit().setMessage(commitMessage)
-					.setAmend(true).setNoVerify(true).call();
+			retNewHead = new Git(repo).commit()
+					.setMessage(commitMessage).setAmend(true)
+					.call();
 		}
 		return retNewHead;
 	}

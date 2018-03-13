@@ -72,8 +72,8 @@ import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
-import org.eclipse.jgit.ignore.FastIgnoreRule;
 import org.eclipse.jgit.ignore.IgnoreNode;
+import org.eclipse.jgit.ignore.IgnoreRule;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig;
@@ -438,8 +438,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private static ByteBuffer filterClean(byte[] src, int n)
-			throws IOException {
+	private static ByteBuffer filterClean(byte[] src, int n) throws IOException {
 		InputStream in = new ByteArrayInputStream(src);
 		try {
 			return IO.readWholeStream(filterClean(in), n);
@@ -597,23 +596,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *             a relevant ignore rule file exists but cannot be read.
 	 */
 	protected boolean isEntryIgnored(final int pLen) throws IOException {
-		return isEntryIgnored(pLen, false);
-	}
-
-	/**
-	 * Determine if the entry path is ignored by an ignore rule. Consider
-	 * possible rule negation from child iterator.
-	 *
-	 * @param pLen
-	 *            the length of the path in the path buffer.
-	 * @param negatePrevious
-	 *            true if the previous matching iterator rule was negation
-	 * @return true if the entry is ignored by an ignore rule.
-	 * @throws IOException
-	 *             a relevant ignore rule file exists but cannot be read.
-	 */
-	private boolean isEntryIgnored(final int pLen, boolean negatePrevious)
-			throws IOException {
 		IgnoreNode rules = getIgnoreNode();
 		if (rules != null) {
 			// The ignore code wants path to start with a '/' if possible.
@@ -624,23 +606,17 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			if (0 < pOff)
 				pOff--;
 			String p = TreeWalk.pathOf(path, pOff, pLen);
-			switch (rules.isIgnored(p, FileMode.TREE.equals(mode),
-					negatePrevious)) {
+			switch (rules.isIgnored(p, FileMode.TREE.equals(mode))) {
 			case IGNORED:
 				return true;
 			case NOT_IGNORED:
 				return false;
 			case CHECK_PARENT:
-				negatePrevious = false;
-				break;
-			case CHECK_PARENT_NEGATE_FIRST_MATCH:
-				negatePrevious = true;
 				break;
 			}
 		}
 		if (parent instanceof WorkingTreeIterator)
-			return ((WorkingTreeIterator) parent).isEntryIgnored(pLen,
-					negatePrevious);
+			return ((WorkingTreeIterator) parent).isEntryIgnored(pLen);
 		return false;
 	}
 
@@ -656,7 +632,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 * @return {@link AttributesNode} for the current entry.
 	 * @throws IOException
 	 *             if an error is raised while parsing the .gitattributes file
-	 * @since 3.7
 	 */
 	public AttributesNode getEntryAttributesNode() throws IOException {
 		if (attributesNode instanceof PerDirectoryAttributesNode)
@@ -673,7 +648,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *         $GIT_DIR/info/attributes file.
 	 * @throws IOException
 	 *             if an error is raised while parsing the attributes file
-	 * @since 3.7
 	 */
 	public AttributesNode getInfoAttributesNode() throws IOException {
 		if (infoAttributeNode instanceof InfoAttributesNode)
@@ -684,14 +658,13 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	/**
 	 * Retrieves the {@link AttributesNode} that holds the information located
 	 * in system-wide file.
-	 *
+	 * 
 	 * @return the {@link AttributesNode} that holds the information located in
 	 *         system-wide file.
 	 * @throws IOException
 	 *             IOException if an error is raised while parsing the
 	 *             attributes file
 	 * @see CoreConfig#getAttributesFile()
-	 * @since 3.7
 	 */
 	public AttributesNode getGlobalAttributesNode() throws IOException {
 		if (globalAttributeNode instanceof GlobalAttributesNode)
@@ -767,8 +740,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		ptr = 0;
 		if (!eof())
 			parseEntry();
-		else if (pathLen == 0) // see bug 445363
-			pathLen = pathOffset;
 	}
 
 	/**
@@ -1075,7 +1046,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		return FS.detect().normalize(RawParseUtils.decode(cachedBytes));
 	}
 
-	private static String readContentAsNormalizedString(Entry entry) throws IOException {
+	private static String readContentAsNormalizedString(Entry entry)
+			throws IOException {
 		long length = entry.getLength();
 		byte[] content = new byte[(int) length];
 		InputStream is = entry.openInputStream();
@@ -1231,7 +1203,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		final Entry entry;
 
 		PerDirectoryIgnoreNode(Entry entry) {
-			super(Collections.<FastIgnoreRule> emptyList());
+			super(Collections.<IgnoreRule> emptyList());
 			this.entry = entry;
 		}
 
