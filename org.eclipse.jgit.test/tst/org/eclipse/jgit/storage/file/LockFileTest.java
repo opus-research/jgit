@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Robin Stocker <robin@nibor.org>
+ * Copyright (C) 2012, GitHub Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,75 +40,44 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.storage.file;
 
-package org.eclipse.jgit.lib;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
-import java.net.URISyntaxException;
-
-import org.eclipse.jgit.transport.RefSpec;
-import org.eclipse.jgit.transport.RemoteConfig;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.errors.LockFailedException;
+import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.junit.Test;
 
 /**
- * Branch section of a Git configuration file.
+ * Unit tests of {@link LockFile}
  */
-public class BranchConfig {
+public class LockFileTest extends RepositoryTestCase {
 
-	private final Config config;
-	private final String branchName;
+	@Test
+	public void lockFailedExceptionRecovery() throws Exception {
+		Git git = new Git(db);
+		writeTrashFile("file.txt", "content");
+		git.add().addFilepattern("file.txt").call();
+		RevCommit commit1 = git.commit().setMessage("create file").call();
 
-	/**
-	 * Create a new branch config, which will read configuration from config
-	 * about specified branch.
-	 *
-	 * @param config
-	 *            the config to read from
-	 * @param branchName
-	 *            the short branch name of the section to read
-	 */
-	public BranchConfig(final Config config, String branchName) {
-		this.config = config;
-		this.branchName = branchName;
-	}
+		assertNotNull(commit1);
+		writeTrashFile("file.txt", "content2");
+		git.add().addFilepattern("file.txt").call();
+		assertNotNull(git.commit().setMessage("edit file").call());
 
-	/**
-	 * @return the full remote-tracking branch name or <code>null</code> if it
-	 *         could not be determined
-	 */
-	public String getRemoteTrackingBranch() {
-		String remote = getRemote();
-		String mergeRef = getMergeBranch();
-		if (remote == null || mergeRef == null)
-			return null;
-
-		RemoteConfig remoteConfig;
+		assertTrue(new LockFile(db.getIndexFile(), db.getFS()).lock());
 		try {
-			remoteConfig = new RemoteConfig(config, remote);
-		} catch (URISyntaxException e) {
-			return null;
+			git.checkout().setName(commit1.name()).call();
+			fail("JGitInternalException not thrown");
+		} catch (JGitInternalException e) {
+			assertTrue(e.getCause() instanceof LockFailedException);
+			LockFile.unlock(((LockFailedException) e.getCause()).getFile());
+			git.checkout().setName(commit1.name()).call();
 		}
-		for (RefSpec refSpec : remoteConfig.getFetchRefSpecs()) {
-			if (refSpec.matchSource(mergeRef)) {
-				RefSpec expanded = refSpec.expandFromSource(mergeRef);
-				return expanded.getDestination();
-			}
-		}
-		return null;
-	}
-
-	private String getRemote() {
-		String remoteName = config.getString(
-				ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
-				ConfigConstants.CONFIG_KEY_REMOTE);
-		if (remoteName == null)
-			return Constants.DEFAULT_REMOTE_NAME;
-		else
-			return remoteName;
-	}
-
-	private String getMergeBranch() {
-		String mergeRef = config.getString(
-				ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
-				ConfigConstants.CONFIG_KEY_MERGE);
-		return mergeRef;
 	}
 }
