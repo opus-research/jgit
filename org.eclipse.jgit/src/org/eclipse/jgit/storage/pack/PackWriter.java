@@ -714,7 +714,6 @@ public class PackWriter {
 		if (!cachedPacks.isEmpty())
 			throw new IOException(JGitText.get().cachedPacksPreventsIndexCreation);
 
-		long writeStart = System.currentTimeMillis();
 		final List<ObjectToPack> list = sortByName();
 		final PackIndexWriter iw;
 		int indexVersion = config.getIndexVersion();
@@ -723,7 +722,6 @@ public class PackWriter {
 		else
 			iw = PackIndexWriter.createVersion(indexStream, indexVersion);
 		iw.write(list, packcsum);
-		stats.timeWriting += System.currentTimeMillis() - writeStart;
 	}
 
 	private List<ObjectToPack> sortByName() {
@@ -830,7 +828,6 @@ public class PackWriter {
 		stats.timeWriting = System.currentTimeMillis() - writeStart;
 		stats.totalBytes = out.length();
 		stats.reusedPacks = Collections.unmodifiableList(cachedPacks);
-		stats.depth = depth;
 
 		for (Statistics.ObjectType typeStat : stats.objectTypes) {
 			if (typeStat == null)
@@ -1873,8 +1870,6 @@ public class PackWriter {
 
 		Collection<CachedPack> reusedPacks;
 
-		int depth;
-
 		int deltaSearchNonEdgeObjects;
 
 		int deltasFound;
@@ -2017,16 +2012,6 @@ public class PackWriter {
 			return objectTypes[typeCode];
 		}
 
-		/** @return true if the resulting pack file was a shallow pack. */
-		public boolean isShallow() {
-			return depth > 0;
-		}
-
-		/** @return depth (in commits) the pack includes if shallow. */
-		public int getDepth() {
-			return depth;
-		}
-
 		/**
 		 * @return time in milliseconds spent enumerating the objects that need
 		 *         to be included in the output. This time includes any restarts
@@ -2073,15 +2058,6 @@ public class PackWriter {
 		 */
 		public long getTimeWriting() {
 			return timeWriting;
-		}
-
-		/** @return total time spent processing this pack. */
-		public long getTimeTotal() {
-			return timeCounting
-				+ timeSearchingForReuse
-				+ timeSearchingForSizes
-				+ timeCompressing
-				+ timeWriting;
 		}
 
 		/**
