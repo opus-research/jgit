@@ -280,7 +280,7 @@ public class DirCacheCheckout {
 		builder = dc.builder();
 
 		walk = new NameConflictTreeWalk(repo);
-		addTree(walk, mergeCommitTree);
+		walk.addTree(mergeCommitTree);
 		walk.addTree(new DirCacheBuildIterator(builder));
 		walk.addTree(workingTree);
 
