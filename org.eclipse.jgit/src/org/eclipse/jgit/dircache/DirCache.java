@@ -64,10 +64,10 @@ import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.LockFile;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectWriter;
+import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.storage.file.LockFile;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.MutableInteger;
 import org.eclipse.jgit.util.NB;
@@ -168,6 +168,8 @@ public class DirCache {
 	 *            repository the caller wants to read the default index of.
 	 * @return a cache representing the contents of the specified index file (if
 	 *         it exists) or an empty cache if the file does not exist.
+	 * @throws IllegalStateException
+	 *             if the repository is bare (lacks a working directory).
 	 * @throws IOException
 	 *             the index file is present but could not be read.
 	 * @throws CorruptObjectException
@@ -176,7 +178,7 @@ public class DirCache {
 	 */
 	public static DirCache read(final Repository db)
 			throws CorruptObjectException, IOException {
-		return read(new File(db.getDirectory(), "index"));
+		return read(db.getIndexFile());
 	}
 
 	/**
@@ -231,6 +233,8 @@ public class DirCache {
 	 *            repository the caller wants to read the default index of.
 	 * @return a cache representing the contents of the specified index file (if
 	 *         it exists) or an empty cache if the file does not exist.
+	 * @throws IllegalStateException
+	 *             if the repository is bare (lacks a working directory).
 	 * @throws IOException
 	 *             the index file is present but could not be read, or the lock
 	 *             could not be obtained.
@@ -240,7 +244,7 @@ public class DirCache {
 	 */
 	public static DirCache lock(final Repository db)
 			throws CorruptObjectException, IOException {
-		return lock(new File(db.getDirectory(), "index"));
+		return lock(db.getIndexFile());
 	}
 
 	/** Location of the current version of the index file. */
@@ -768,7 +772,9 @@ public class DirCache {
 	 * Write all index trees to the object store, returning the root tree.
 	 *
 	 * @param ow
-	 *            the writer to use when serializing to the store.
+	 *            the writer to use when serializing to the store. The caller is
+	 *            responsible for flushing the inserter before trying to use the
+	 *            returned tree identity.
 	 * @return identity for the root tree.
 	 * @throws UnmergedPathException
 	 *             one or more paths contain higher-order stages (stage > 0),
@@ -779,7 +785,7 @@ public class DirCache {
 	 * @throws IOException
 	 *             an unexpected error occurred writing to the object store.
 	 */
-	public ObjectId writeTree(final ObjectWriter ow)
+	public ObjectId writeTree(final ObjectInserter ow)
 			throws UnmergedPathException, IOException {
 		return getCacheTree(true).writeTree(sortedEntries, 0, 0, ow);
 	}
