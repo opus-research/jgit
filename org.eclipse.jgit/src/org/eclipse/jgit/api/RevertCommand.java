@@ -186,7 +186,6 @@ public class RevertCommand extends GitCommand<RevCommit> {
 							.setMessage(newMessage)
 							.setReflogComment("revert: " + shortMessage).call(); //$NON-NLS-1$
 					revertedRefs.add(src);
-					headCommit = newHead;
 				} else {
 					unmergedPaths = merger.getUnmergedPaths();
 					Map<String, MergeFailureReason> failingPaths = merger
