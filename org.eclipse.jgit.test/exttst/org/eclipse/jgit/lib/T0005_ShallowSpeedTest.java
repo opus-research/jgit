@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2007-2008, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,19 +44,48 @@
 
 package org.eclipse.jgit.lib;
 
-/**
- * This class passes information about a changed Git index to a
- * {@link RepositoryListener}
- *
- * Currently only a reference to the repository is passed.
- */
-public class IndexChangedEvent extends RepositoryChangedEvent {
-	IndexChangedEvent(final Repository repository) {
-		super(repository);
+import java.io.File;
+import java.io.IOException;
+
+import junit.textui.TestRunner;
+
+public class T0005_ShallowSpeedTest extends SpeedTestBase {
+
+	protected void setUp() throws Exception {
+		prepare(new String[] { "git", "rev-list", "365bbe0d0caaf2ba74d56556827babf0bc66965d" });
 	}
 
-	@Override
-	public String toString() {
-		return "IndexChangedEvent[" + getRepository() + "]";
+	public void testShallowHistoryScan() throws IOException {
+		long start = System.currentTimeMillis();
+		Repository db = new Repository(new File(kernelrepo));
+		Commit commit = db.mapCommit("365bbe0d0caaf2ba74d56556827babf0bc66965d");
+		int n = 1;
+		for (;;) {
+			ObjectId[] parents = commit.getParentIds();
+			if (parents.length == 0)
+				break;
+			ObjectId parentId = parents[0];
+			commit = db.mapCommit(parentId);
+			commit.getCommitId().name();
+			++n;
+		}
+		assertEquals(12275, n);
+		long stop = System.currentTimeMillis();
+		long time = stop - start;
+		System.out.println("native="+nativeTime);
+		System.out.println("jgit="+time);
+		// ~0.750s (hot cache), ok
+		/*
+native=1795
+jgit=722
+		 */
+		// native git seems to run SLOWER than jgit here, at roughly half the speed
+		// creating the git process is not the issue here, btw.
+		long factor10 = (nativeTime*150/time+50)/100;
+		assertEquals(3, factor10);
+	}
+
+	public static void main(String[] args) {
+		TestRunner.run(T0005_ShallowSpeedTest.class);
 	}
 }
