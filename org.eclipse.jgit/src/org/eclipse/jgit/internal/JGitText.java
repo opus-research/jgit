@@ -146,6 +146,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotReadCommit;
 	/***/ public String cannotReadFile;
 	/***/ public String cannotReadHEAD;
+	/***/ public String cannotReadIndex;
 	/***/ public String cannotReadObject;
 	/***/ public String cannotReadObjectsPath;
 	/***/ public String cannotReadTree;
@@ -287,6 +288,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String emptyPathNotPermitted;
 	/***/ public String emptyRef;
 	/***/ public String encryptionError;
+	/***/ public String encryptionOnlyPBE;
 	/***/ public String endOfFileInEscape;
 	/***/ public String entryNotFoundByPath;
 	/***/ public String enumValueNotSupported2;
