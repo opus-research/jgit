@@ -128,7 +128,8 @@ public class TagCommand extends GitCommand<Ref> {
 		RepositoryState state = repo.getRepositoryState();
 		processOptions(state);
 
-		try (RevWalk revWalk = new RevWalk(repo)) {
+		RevWalk revWalk = new RevWalk(repo);
+		try {
 			// if no id is set, we should attempt to use HEAD
 			if (id == null) {
 				ObjectId objectId = repo.resolve(Constants.HEAD + "^{commit}"); //$NON-NLS-1$
@@ -156,19 +157,24 @@ public class TagCommand extends GitCommand<Ref> {
 			newTag.setObjectId(id);
 
 			// write the tag object
-			try (ObjectInserter inserter = repo.newObjectInserter()) {
+			ObjectInserter inserter = repo.newObjectInserter();
+			try {
 				ObjectId tagId = inserter.insert(newTag);
 				inserter.flush();
 
 				String tag = newTag.getTag();
 				return updateTagRef(tagId, revWalk, tag, newTag.toString());
 
+			} finally {
+				inserter.release();
 			}
 
 		} catch (IOException e) {
 			throw new JGitInternalException(
 					JGitText.get().exceptionCaughtDuringExecutionOfTagCommand,
 					e);
+		} finally {
+			revWalk.release();
 		}
 	}
 
@@ -216,8 +222,9 @@ public class TagCommand extends GitCommand<Ref> {
 		if (tagger == null && annotated)
 			tagger = new PersonIdent(repo);
 		if (name == null || !Repository.isValidRefName(Constants.R_TAGS + name))
-			throw new InvalidTagNameException(MessageFormat.format(JGitText
-					.get().tagNameInvalid, name == null ? "<null>" : name));
+			throw new InvalidTagNameException(
+					MessageFormat.format(JGitText.get().tagNameInvalid,
+							name == null ? "<null>" : name)); //$NON-NLS-1$
 		if (signed)
 			throw new UnsupportedOperationException(
 					JGitText.get().signingNotSupportedOnTag);
