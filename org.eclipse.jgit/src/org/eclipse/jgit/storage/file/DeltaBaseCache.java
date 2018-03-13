@@ -54,36 +54,35 @@ class DeltaBaseCache {
 		return (((int) position) << 22) >>> 22;
 	}
 
-	private static volatile int defaultMaxByteCount;
+	private static int maxByteCount;
 
-	private final int maxByteCount;
+	private static final Slot[] cache;
 
-	private final Slot[] cache;
+	private static Slot lruHead;
 
-	private Slot lruHead;
+	private static Slot lruTail;
 
-	private Slot lruTail;
-
-	private int openByteCount;
+	private static int openByteCount;
 
 	static {
 		DEAD = new SoftReference<Entry>(null);
-		reconfigure(new WindowCacheConfig());
-	}
+		maxByteCount = new WindowCacheConfig().getDeltaBaseCacheLimit();
 
-	static void reconfigure(WindowCacheConfig cfg) {
-		defaultMaxByteCount = cfg.getDeltaBaseCacheLimit();
-	}
-
-	DeltaBaseCache() {
-		maxByteCount = defaultMaxByteCount;
 		cache = new Slot[CACHE_SZ];
+		for (int i = 0; i < CACHE_SZ; i++)
+			cache[i] = new Slot();
 	}
 
-	Entry get(final PackFile pack, final long position) {
-		Slot e = cache[hash(position)];
-		if (e == null)
-			return null;
+	static synchronized void reconfigure(final WindowCacheConfig cfg) {
+		final int dbLimit = cfg.getDeltaBaseCacheLimit();
+		if (maxByteCount != dbLimit) {
+			maxByteCount = dbLimit;
+			releaseMemory();
+		}
+	}
+
+	static synchronized Entry get(final PackFile pack, final long position) {
+		final Slot e = cache[hash(position)];
 		if (e.provider == pack && e.position == position) {
 			final Entry buf = e.data.get();
 			if (buf != null) {
@@ -94,18 +93,13 @@ class DeltaBaseCache {
 		return null;
 	}
 
-	void store(final PackFile pack, final long position,
+	static synchronized void store(final PackFile pack, final long position,
 			final byte[] data, final int objectType) {
 		if (data.length > maxByteCount)
 			return; // Too large to cache.
 
-		Slot e = cache[hash(position)];
-		if (e == null) {
-			e = new Slot();
-			cache[hash(position)] = e;
-		} else {
-			clearEntry(e);
-		}
+		final Slot e = cache[hash(position)];
+		clearEntry(e);
 
 		openByteCount += data.length;
 		releaseMemory();
@@ -117,7 +111,7 @@ class DeltaBaseCache {
 		moveToHead(e);
 	}
 
-	private void releaseMemory() {
+	private static void releaseMemory() {
 		while (openByteCount > maxByteCount && lruTail != null) {
 			final Slot currOldest = lruTail;
 			final Slot nextOldest = currOldest.lruPrev;
@@ -134,7 +128,16 @@ class DeltaBaseCache {
 		}
 	}
 
-	private void moveToHead(final Slot e) {
+	static synchronized void purge(final PackFile file) {
+		for (final Slot e : cache) {
+			if (e.provider == file) {
+				clearEntry(e);
+				unlink(e);
+			}
+		}
+	}
+
+	private static void moveToHead(final Slot e) {
 		unlink(e);
 		e.lruPrev = null;
 		e.lruNext = lruHead;
@@ -145,7 +148,7 @@ class DeltaBaseCache {
 		lruHead = e;
 	}
 
-	private void unlink(final Slot e) {
+	private static void unlink(final Slot e) {
 		final Slot prev = e.lruPrev;
 		final Slot next = e.lruNext;
 		if (prev != null)
@@ -154,11 +157,15 @@ class DeltaBaseCache {
 			next.lruPrev = prev;
 	}
 
-	private void clearEntry(final Slot e) {
+	private static void clearEntry(final Slot e) {
 		openByteCount -= e.sz;
 		e.provider = null;
 		e.data = DEAD;
 		e.sz = 0;
+	}
+
+	private DeltaBaseCache() {
+		throw new UnsupportedOperationException();
 	}
 
 	static class Entry {

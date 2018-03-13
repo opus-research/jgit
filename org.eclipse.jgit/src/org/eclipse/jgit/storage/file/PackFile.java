@@ -236,6 +236,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	 * Close the resources utilized by this repository
 	 */
 	public void close() {
+		DeltaBaseCache.purge(this);
 		WindowCache.purge(this);
 		synchronized (this) {
 			loadedIdx = null;
@@ -722,7 +723,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 					if (sz != delta.deltaSize)
 						break SEARCH;
 
-					DeltaBaseCache.Entry e = curs.getDeltaBaseCache().get(this, base);
+					DeltaBaseCache.Entry e = DeltaBaseCache.get(this, base);
 					if (e != null) {
 						type = e.type;
 						data = e.data;
@@ -740,7 +741,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 					if (sz != delta.deltaSize)
 						break SEARCH;
 
-					DeltaBaseCache.Entry e = curs.getDeltaBaseCache().get(this, base);
+					DeltaBaseCache.Entry e = DeltaBaseCache.get(this, base);
 					if (e != null) {
 						type = e.type;
 						data = e.data;
@@ -768,7 +769,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 				if (cached)
 					cached = false;
 				else if (delta.next == null)
-					curs.getDeltaBaseCache().store(this, delta.basePos, data, type);
+					DeltaBaseCache.store(this, delta.basePos, data, type);
 
 				pos = delta.deltaPos;
 
