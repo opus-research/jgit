@@ -74,7 +74,6 @@ import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.diff.RawTextComparator;
 import org.eclipse.jgit.diff.Sequence;
-import org.eclipse.jgit.diff.SubmoduleSequence;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuildIterator;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
@@ -99,7 +98,6 @@ import org.eclipse.jgit.treewalk.NameConflictTreeWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
-import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.TemporaryBuffer;
 
@@ -367,13 +365,8 @@ public class ResolveMerger extends ThreeWayMerger {
 		}
 		for (Map.Entry<String, DirCacheEntry> entry : toBeCheckedOut
 				.entrySet()) {
-			DirCacheEntry cacheEntry = entry.getValue();
-			if (cacheEntry.getFileMode() == FileMode.GITLINK) {
-				new File(entry.getKey()).mkdirs();
-			} else {
-				DirCacheCheckout.checkoutEntry(db, cacheEntry, reader);
-				modifiedFiles.add(entry.getKey());
-			}
+			DirCacheCheckout.checkoutEntry(db, entry.getValue(), reader);
+			modifiedFiles.add(entry.getKey());
 		}
 	}
 
@@ -648,40 +641,19 @@ public class ResolveMerger extends ThreeWayMerger {
 		}
 
 		if (nonTree(modeO) && nonTree(modeT)) {
-			boolean worktreeDirty = isWorktreeDirty(work, ourDce);
-			if (!attributes.canBeContentMerged() && worktreeDirty) {
-					return false;
-			}
+			// Check worktree before modifying files
+			if (isWorktreeDirty(work, ourDce))
+				return false;
 
-			boolean gitlinkConflict = isGitLink(modeO) || isGitLink(modeT);
 			// Don't attempt to resolve submodule link conflicts
-			if (gitlinkConflict || !attributes.canBeContentMerged()) {
+			if (isGitLink(modeO) || isGitLink(modeT)
+					|| !attributes.canBeContentMerged()) {
 				add(tw.getRawPath(), base, DirCacheEntry.STAGE_1, 0, 0);
 				add(tw.getRawPath(), ours, DirCacheEntry.STAGE_2, 0, 0);
 				add(tw.getRawPath(), theirs, DirCacheEntry.STAGE_3, 0, 0);
-
-				if (gitlinkConflict) {
-					MergeResult<SubmoduleSequence> result = new MergeResult<>(
-							Arrays.asList(
-									new SubmoduleSequence(base == null ? null : base.getEntryObjectId()),
-									new SubmoduleSequence(ours == null ? null : ours.getEntryObjectId()),
-									new SubmoduleSequence(theirs == null ? null : theirs.getEntryObjectId())
-							));
-					result.setContainsConflicts(true);
-					mergeResults.put(tw.getPathString(), result);
-					if (!ignoreConflicts) {
-						unmergedPaths.add(tw.getPathString());
-					}
-				} else {
-					// attribute merge issues are conflicts but not failures
-					unmergedPaths.add(tw.getPathString());
-				}
+				unmergedPaths.add(tw.getPathString());
 				return true;
 			}
-
-			// Check worktree before modifying files
-			if (worktreeDirty)
-				return false;
 
 			MergeResult<RawText> result = contentMerge(base, ours, theirs);
 			if (ignoreConflicts) {
