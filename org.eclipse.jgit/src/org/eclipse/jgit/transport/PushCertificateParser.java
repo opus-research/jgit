@@ -40,6 +40,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 package org.eclipse.jgit.transport;
 
 import static org.eclipse.jgit.transport.BaseReceivePack.parseCommand;
@@ -154,7 +155,7 @@ public class PushCertificateParser {
 			throws PackProtocolException, IOException {
 		PushCertificateParser parser = new PushCertificateParser();
 		StreamReader reader = new StreamReader(r);
-		parser.receiveHeader(reader);
+		parser.receiveHeader(reader, true);
 		String line;
 		try {
 			while (!(line = reader.read()).isEmpty()) {
@@ -203,13 +204,7 @@ public class PushCertificateParser {
 	private final NonceGenerator nonceGenerator;
 	private final List<ReceiveCommand> commands = new ArrayList<>();
 
-	/**
-	 * @param into
-	 *            destination repository for the push.
-	 * @param cfg
-	 *            configuration for signed push.
-	 */
-	public PushCertificateParser(Repository into, SignedPushConfig cfg) {
+	PushCertificateParser(Repository into, SignedPushConfig cfg) {
 		if (cfg != null) {
 			nonceSlopLimit = cfg.getCertNonceSlopLimit();
 			nonceGenerator = cfg.getNonceGenerator();
@@ -317,14 +312,11 @@ public class PushCertificateParser {
 	 */
 	public void receiveHeader(PacketLineIn pckIn, boolean stateless)
 			throws IOException {
-		receiveHeader(new PacketLineReader(pckIn));
-		nonceStatus = nonceGenerator != null
-				? nonceGenerator.verify(
-					receivedNonce, sentNonce(), db, stateless, nonceSlopLimit)
-				: NonceStatus.UNSOLICITED;
+		receiveHeader(new PacketLineReader(pckIn), stateless);
 	}
 
-	private void receiveHeader(StringReader reader) throws IOException {
+	private void receiveHeader(StringReader reader, boolean stateless)
+			throws IOException {
 		try {
 			try {
 				version = parseHeader(reader, VERSION);
@@ -350,6 +342,10 @@ public class PushCertificateParser {
 			} else {
 				receivedNonce = parseHeader(next, NONCE);
 			}
+			nonceStatus = nonceGenerator != null
+					? nonceGenerator.verify(
+						receivedNonce, sentNonce(), db, stateless, nonceSlopLimit)
+					: NonceStatus.UNSOLICITED;
 			// An empty line.
 			if (!reader.read().isEmpty()) {
 				throw new PackProtocolException(
