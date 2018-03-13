@@ -125,6 +125,7 @@ public class ConcurrentLinkedList<T> {
 
 		private ConcurrentNodeIterator(Node start) {
 			current = start;
+			marked = start;
 		}
 
 		public boolean hasNext() {

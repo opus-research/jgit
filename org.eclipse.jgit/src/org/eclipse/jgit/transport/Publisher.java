@@ -63,7 +63,6 @@ import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.PublisherSession.SessionGenerator;
-import org.eclipse.jgit.transport.resolver.RepositoryResolver;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.util.ConcurrentLinkedList;
@@ -155,8 +154,6 @@ public class Publisher {
 
 	private final PublisherReverseResolver repositoryNameLookup;
 
-	private final RepositoryResolver<PublisherClient> resolver;
-
 	private final ConcurrentLinkedList<PublisherPack> packStream;
 
 	private final ScheduledThreadPoolExecutor sessionDeleter;
@@ -169,13 +166,10 @@ public class Publisher {
 	 * Create a new Publisher to serve multiple repositories.
 	 *
 	 * @param repositoryNameLookup
-	 * @param resolver
-	 *            a RepositoryResolver to open repositories
 	 * @param packFactory
 	 * @param generator
 	 */
 	public Publisher(PublisherReverseResolver repositoryNameLookup,
-			RepositoryResolver<PublisherClient> resolver,
 			PublisherPackFactory packFactory, SessionGenerator generator) {
 		processor = new PublisherEventProcessor();
 		clientStates = new HashMap<String, PublisherSession>();
@@ -183,7 +177,6 @@ public class Publisher {
 		sessionDeleter = new ScheduledThreadPoolExecutor(1);
 		sessionLifetime = DEFAULT_SESSION_LIFETIME;
 		this.repositoryNameLookup = repositoryNameLookup;
-		this.resolver = resolver;
 		this.packFactory = packFactory;
 		this.generator = generator;
 	}
@@ -201,8 +194,11 @@ public class Publisher {
 	 * @param c
 	 * @return the persistent state for this connection, or null if a restart
 	 *         token was given but could not be recovered
+	 * @throws ServiceNotAuthorizedException
+	 * @throws ServiceNotEnabledException
 	 */
-	public synchronized PublisherSession connectClient(PublisherClient c) {
+	public synchronized PublisherSession connectClient(PublisherClient c)
+			throws ServiceNotAuthorizedException, ServiceNotEnabledException {
 		PublisherSession state;
 		if (c.getRestartToken() != null) {
 			if (!clientStates.containsKey(c.getRestartToken()))
@@ -225,10 +221,10 @@ public class Publisher {
 			e.printStackTrace();
 		} catch (ServiceNotAuthorizedException e) {
 			failedSyncing = true;
-			e.printStackTrace();
+			throw e;
 		} catch (ServiceNotEnabledException e) {
 			failedSyncing = true;
-			e.printStackTrace();
+			throw e;
 		} finally {
 			if (failedSyncing) {
 				state.disconnect();
@@ -347,7 +343,7 @@ public class Publisher {
 	public Repository getRepository(PublisherClient c, String name)
 			throws RepositoryNotFoundException, ServiceMayNotContinueException,
 			ServiceNotAuthorizedException, ServiceNotEnabledException {
-		return resolver.open(c, name);
+		return c.openRepository(name);
 	}
 
 	/** @return a new iterator starting at the tail of the stream */
