@@ -72,6 +72,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -1587,10 +1588,12 @@ public class UploadPack {
 		private final OutputStream rawOut;
 
 		private OutputStream out;
+		@Nullable
+		private ByteArrayOutputStream buffer;
 
 		ResponseBufferedOutputStream(OutputStream rawOut) {
 			this.rawOut = rawOut;
-			this.out = new ByteArrayOutputStream();
+			this.out = this.buffer = new ByteArrayOutputStream();
 		}
 
 		@Override
@@ -1619,8 +1622,9 @@ public class UploadPack {
 		}
 
 		void stopBuffering() throws IOException {
-			if (out != rawOut) {
-				((ByteArrayOutputStream) out).writeTo(rawOut);
+			if (buffer != null) {
+				buffer.writeTo(rawOut);
+				buffer = null;
 				out = rawOut;
 			}
 		}
