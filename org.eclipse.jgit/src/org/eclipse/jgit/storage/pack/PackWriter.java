@@ -139,8 +139,9 @@ public class PackWriter {
 	private static final int PACK_VERSION_GENERATED = 2;
 
 	@SuppressWarnings("unchecked")
-	private final BlockList<ObjectToPack> objectsLists[] = new BlockList[Constants.OBJ_TAG + 1];
+	private final List<ObjectToPack> objectsLists[] = new List[Constants.OBJ_TAG + 1];
 	{
+		objectsLists[0] = Collections.<ObjectToPack> emptyList();
 		objectsLists[Constants.OBJ_COMMIT] = new BlockList<ObjectToPack>();
 		objectsLists[Constants.OBJ_TREE] = new BlockList<ObjectToPack>();
 		objectsLists[Constants.OBJ_BLOB] = new BlockList<ObjectToPack>();
@@ -411,12 +412,8 @@ public class PackWriter {
 	public long getObjectCount() throws IOException {
 		if (stats.totalObjects == 0) {
 			long objCnt = 0;
-
-			objCnt += objectsLists[Constants.OBJ_COMMIT].size();
-			objCnt += objectsLists[Constants.OBJ_TREE].size();
-			objCnt += objectsLists[Constants.OBJ_BLOB].size();
-			objCnt += objectsLists[Constants.OBJ_TAG].size();
-
+			for (List<ObjectToPack> list : objectsLists)
+				objCnt += list.size();
 			for (CachedPack pack : cachedPacks)
 				objCnt += pack.getObjectCount();
 			return objCnt;
@@ -593,16 +590,11 @@ public class PackWriter {
 	private List<ObjectToPack> sortByName() {
 		if (sortedByName == null) {
 			int cnt = 0;
-			cnt += objectsLists[Constants.OBJ_COMMIT].size();
-			cnt += objectsLists[Constants.OBJ_TREE].size();
-			cnt += objectsLists[Constants.OBJ_BLOB].size();
-			cnt += objectsLists[Constants.OBJ_TAG].size();
-
+			for (List<ObjectToPack> list : objectsLists)
+				cnt += list.size();
 			sortedByName = new BlockList<ObjectToPack>(cnt);
-			sortedByName.addAll(objectsLists[Constants.OBJ_COMMIT]);
-			sortedByName.addAll(objectsLists[Constants.OBJ_TREE]);
-			sortedByName.addAll(objectsLists[Constants.OBJ_BLOB]);
-			sortedByName.addAll(objectsLists[Constants.OBJ_TAG]);
+			for (List<ObjectToPack> list : objectsLists)
+				sortedByName.addAll(list);
 			Collections.sort(sortedByName);
 		}
 		return sortedByName;
@@ -715,27 +707,18 @@ public class PackWriter {
 
 	private void searchForReuse(ProgressMonitor monitor) throws IOException {
 		int cnt = 0;
-		cnt += objectsLists[Constants.OBJ_COMMIT].size();
-		cnt += objectsLists[Constants.OBJ_TREE].size();
-		cnt += objectsLists[Constants.OBJ_BLOB].size();
-		cnt += objectsLists[Constants.OBJ_TAG].size();
-
+		for (List<ObjectToPack> list : objectsLists)
+			cnt += list.size();
 		long start = System.currentTimeMillis();
 		monitor.beginTask(JGitText.get().searchForReuse, cnt);
-		searchForReuse(monitor, objectsLists[Constants.OBJ_COMMIT]);
-		searchForReuse(monitor, objectsLists[Constants.OBJ_TREE]);
-		searchForReuse(monitor, objectsLists[Constants.OBJ_BLOB]);
-		searchForReuse(monitor, objectsLists[Constants.OBJ_TAG]);
+		for (List<ObjectToPack> list : objectsLists) {
+			pruneCurrentObjectList = false;
+			reuseSupport.selectObjectRepresentation(this, monitor, list);
+			if (pruneCurrentObjectList)
+				pruneEdgesFromObjectList(list);
+		}
 		monitor.endTask();
 		stats.timeSearchingForReuse = System.currentTimeMillis() - start;
-	}
-
-	private void searchForReuse(ProgressMonitor monitor, List<ObjectToPack> list)
-			throws IOException, MissingObjectException {
-		pruneCurrentObjectList = false;
-		reuseSupport.selectObjectRepresentation(this, monitor, list);
-		if (pruneCurrentObjectList)
-			pruneEdgesFromObjectList(list);
 	}
 
 	private void searchForDeltas(ProgressMonitor monitor)
@@ -1489,14 +1472,25 @@ public class PackWriter {
 		addObject(object, 0);
 	}
 
-	private void addObject(final RevObject object, final int pathHashCode) {
+	private void addObject(final RevObject object, final int pathHashCode)
+			throws IncorrectObjectTypeException {
 		final ObjectToPack otp;
 		if (reuseSupport != null)
 			otp = reuseSupport.newObjectToPack(object);
 		else
 			otp = new ObjectToPack(object);
 		otp.setPathHash(pathHashCode);
-		objectsLists[object.getType()].add(otp);
+
+		try {
+			objectsLists[object.getType()].add(otp);
+		} catch (ArrayIndexOutOfBoundsException x) {
+			throw new IncorrectObjectTypeException(object,
+					JGitText.get().incorrectObjectType_COMMITnorTREEnorBLOBnorTAG);
+		} catch (UnsupportedOperationException x) {
+			// index pointing to "dummy" empty list
+			throw new IncorrectObjectTypeException(object,
+					JGitText.get().incorrectObjectType_COMMITnorTREEnorBLOBnorTAG);
+		}
 		objectsMap.add(otp);
 	}
 
