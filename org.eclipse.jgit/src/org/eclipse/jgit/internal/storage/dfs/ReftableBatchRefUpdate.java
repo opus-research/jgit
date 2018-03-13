@@ -116,7 +116,7 @@ public class ReftableBatchRefUpdate extends BatchRefUpdate {
 		this.refdb = refdb;
 		this.odb = odb;
 		lock = refdb.getLock();
-		reftableConfig = refdb.getReftableConfig();
+		reftableConfig = new ReftableConfig(refdb.getRepository().getConfig());
 	}
 
 	@Override
