@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, David Ostrovsky <david@ostrovsky.org>
+ * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,45 +41,53 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.archive;
+package org.eclipse.jgit.util;
 
-import java.beans.Statement;
-import java.io.IOException;
-import java.text.MessageFormat;
-import java.util.Map;
+import java.io.File;
 
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.eclipse.jgit.archive.internal.ArchiveText;
-import org.eclipse.jgit.util.StringUtils;
 
 /**
- * Base format class
+ * FS implementaton for Java5
  *
- * @since 4.0
+ * @since 3.0
  */
-public class BaseFormat {
+public class FS_POSIX_Java5 extends FS_POSIX {
+	/**
+	 * Constructor
+	 */
+	public FS_POSIX_Java5() {
+		super();
+	}
 
 	/**
-	 * Apply options to archive output stream
+	 * Constructor
 	 *
-	 * @param s
-	 *            stream to apply options to
-	 * @param o
-	 *            options map
-	 * @return stream with option applied
-	 * @throws IOException
+	 * @param src
+	 *            instance whose attributes to copy
 	 */
-	protected ArchiveOutputStream applyFormatOptions(ArchiveOutputStream s,
-			Map<String, Object> o) throws IOException {
-		for (Map.Entry<String, Object> p : o.entrySet()) {
-			try {
-				new Statement(s, "set" + StringUtils.capitalize(p.getKey()), //$NON-NLS-1$
-						new Object[] { p.getValue() }).execute();
-			} catch (Exception e) {
-				throw new IOException(MessageFormat.format(
-						ArchiveText.get().cannotSetOption, p.getKey()), e);
-			}
-		}
-		return s;
+	public FS_POSIX_Java5(FS src) {
+		super(src);
+	}
+
+	@Override
+	public FS newInstance() {
+		return new FS_POSIX_Java5(this);
+	}
+
+	public boolean supportsExecute() {
+		return false;
+	}
+
+	public boolean canExecute(final File f) {
+		return false;
+	}
+
+	public boolean setExecute(final File f, final boolean canExec) {
+		return false;
+	}
+
+	@Override
+	public boolean retryFailedLockFileCommit() {
+		return false;
 	}
 }

@@ -130,20 +130,18 @@ public class PushCertificateParser extends PushCertificate {
 
 	/**
 	 * Receive a list of commands from the input encapsulated in a push
-	 * certificate. This method doesn't parse the first line "push-cert \NUL
-	 * &lt;capabilities&gt;", but assumes the first line including the
-	 * capabilities has already been handled by the caller.
+	 * certificate. This method doesn't deal with the first line "push-cert \NUL
+	 * <capabilities>", but assumes the first line including the capabilities
+	 * has already been dealt with.
 	 *
 	 * @param pckIn
 	 *            where we take the push certificate header from.
 	 * @param stateless
-	 *            affects nonce verification. When {@code stateless = true} the
-	 *            {@code NonceGenerator} will allow for some time skew caused by
-	 *            clients disconnected and reconnecting in the stateless smart
-	 *            HTTP protocol.
+	 *            If this server is run as a stateless server, such that it
+	 *            cannot store the sent push certificate and needs to validate
+	 *            what the client sends back.
+	 *
 	 * @throws IOException
-	 *             if the certificate from the client is badly malformed or the
-	 *             client disconnects before sending the entire certificate.
 	 */
 	public void receiveHeader(PacketLineIn pckIn, boolean stateless)
 			throws IOException {
@@ -158,7 +156,7 @@ public class PushCertificateParser extends PushCertificate {
 			pushee = parseNextLine(pckIn, PUSHEE);
 			receivedNonce = parseNextLine(pckIn, NONCE);
 			// an empty line
-			if (!pckIn.readString().isEmpty()) {
+			if (pckIn.readString() != "") { //$NON-NLS-1$
 				throw new IOException(MessageFormat.format(
 						JGitText.get().errorInvalidPushCert,
 						"expected empty line after header")); //$NON-NLS-1$

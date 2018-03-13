@@ -47,7 +47,6 @@ import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.compressors.xz.XZCompressorOutputStream;
@@ -58,8 +57,7 @@ import org.eclipse.jgit.lib.ObjectLoader;
 /**
  * Xz-compressed tar (tar.xz) format.
  */
-public final class TxzFormat extends BaseFormat implements
-		ArchiveCommand.Format<ArchiveOutputStream> {
+public final class TxzFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
 	private static final List<String> SUFFIXES = Collections
 			.unmodifiableList(Arrays.asList(".tar.xz", ".txz")); //$NON-NLS-1$ //$NON-NLS-2$
 
@@ -67,17 +65,8 @@ public final class TxzFormat extends BaseFormat implements
 
 	public ArchiveOutputStream createArchiveOutputStream(OutputStream s)
 			throws IOException {
-		return createArchiveOutputStream(s,
-				Collections.<String, Object> emptyMap());
-	}
-
-	/**
-	 * @since 4.0
-	 */
-	public ArchiveOutputStream createArchiveOutputStream(OutputStream s,
-			Map<String, Object> o) throws IOException {
 		XZCompressorOutputStream out = new XZCompressorOutputStream(s);
-		return tarFormat.createArchiveOutputStream(out, o);
+		return tarFormat.createArchiveOutputStream(out);
 	}
 
 	public void putEntry(ArchiveOutputStream out,
