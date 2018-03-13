@@ -53,7 +53,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
-import java.nio.file.StandardCopyOption;
 import java.text.MessageFormat;
 import java.text.ParseException;
 import java.util.ArrayList;
@@ -176,13 +175,17 @@ public class GC {
 	/**
 	 * Delete old pack files. What is 'old' is defined by specifying a set of
 	 * old pack files and a set of new pack files. Each pack file contained in
-	 * old pack files but not contained in new pack files will be deleted.
+	 * old pack files but not contained in new pack files will be deleted. If an
+	 * expirationDate is set then pack files which are younger than the
+	 * expirationDate will not be deleted.
 	 *
 	 * @param oldPacks
 	 * @param newPacks
+	 * @throws ParseException
 	 */
 	private void deleteOldPacks(Collection<PackFile> oldPacks,
-			Collection<PackFile> newPacks) {
+			Collection<PackFile> newPacks) throws ParseException {
+		long expireDate = getExpireDate();
 		oldPackLoop: for (PackFile oldPack : oldPacks) {
 			String oldName = oldPack.getPackName();
 			// check whether an old pack file is also among the list of new
@@ -191,7 +194,8 @@ public class GC {
 				if (oldName.equals(newPack.getPackName()))
 					continue oldPackLoop;
 
-			if (!oldPack.shouldBeKept()) {
+			if (!oldPack.shouldBeKept()
+					&& oldPack.getPackFile().lastModified() < expireDate) {
 				oldPack.close();
 				prunePack(oldName);
 			}
@@ -304,22 +308,7 @@ public class GC {
 	 */
 	public void prune(Set<ObjectId> objectsToKeep) throws IOException,
 			ParseException {
-		long expireDate = Long.MAX_VALUE;
-
-		if (expire == null && expireAgeMillis == -1) {
-			String pruneExpireStr = repo.getConfig().getString(
-					ConfigConstants.CONFIG_GC_SECTION, null,
-					ConfigConstants.CONFIG_KEY_PRUNEEXPIRE);
-			if (pruneExpireStr == null)
-				pruneExpireStr = PRUNE_EXPIRE_DEFAULT;
-			expire = GitDateParser.parse(pruneExpireStr, null, SystemReader
-					.getInstance().getLocale());
-			expireAgeMillis = -1;
-		}
-		if (expire != null)
-			expireDate = expire.getTime();
-		if (expireAgeMillis != -1)
-			expireDate = System.currentTimeMillis() - expireAgeMillis;
+		long expireDate = getExpireDate();
 
 		// Collect all loose objects which are old enough, not referenced from
 		// the index and not in objectsToKeep
@@ -434,6 +423,26 @@ public class GC {
 			f.delete();
 
 		repo.getObjectDatabase().close();
+	}
+
+	private long getExpireDate() throws ParseException {
+		long expireDate = Long.MAX_VALUE;
+
+		if (expire == null && expireAgeMillis == -1) {
+			String pruneExpireStr = repo.getConfig().getString(
+					ConfigConstants.CONFIG_GC_SECTION, null,
+					ConfigConstants.CONFIG_KEY_PRUNEEXPIRE);
+			if (pruneExpireStr == null)
+				pruneExpireStr = PRUNE_EXPIRE_DEFAULT;
+			expire = GitDateParser.parse(pruneExpireStr, null, SystemReader
+					.getInstance().getLocale());
+			expireAgeMillis = -1;
+		}
+		if (expire != null)
+			expireDate = expire.getTime();
+		if (expireAgeMillis != -1)
+			expireDate = System.currentTimeMillis() - expireAgeMillis;
+		return expireDate;
 	}
 
 	/**
@@ -560,7 +569,14 @@ public class GC {
 			if (rest != null)
 				ret.add(rest);
 		}
-		deleteOldPacks(toBeDeleted, ret);
+		try {
+			deleteOldPacks(toBeDeleted, ret);
+		} catch (ParseException e) {
+			// TODO: the exception has to be wrapped into an IOException because
+			// throwing the ParseException directly would break the API, instead
+			// we should throw a ConfigInvalidException
+			throw new IOException(e);
+		}
 		prunePacked();
 
 		lastPackedRefs = refsBefore;
@@ -770,32 +786,39 @@ public class GC {
 						break;
 					}
 			tmpPack.setReadOnly();
+			boolean delete = true;
+			try {
+				FileUtils.rename(tmpPack, realPack);
+				delete = false;
+				for (Map.Entry<PackExt, File> tmpEntry : tmpExts.entrySet()) {
+					File tmpExt = tmpEntry.getValue();
+					tmpExt.setReadOnly();
 
-			FileUtils.rename(tmpPack, realPack, StandardCopyOption.ATOMIC_MOVE);
-			for (Map.Entry<PackExt, File> tmpEntry : tmpExts.entrySet()) {
-				File tmpExt = tmpEntry.getValue();
-				tmpExt.setReadOnly();
-
-				File realExt = nameFor(id,
-						"." + tmpEntry.getKey().getExtension()); //$NON-NLS-1$
-				try {
-					FileUtils.rename(tmpExt, realExt,
-							StandardCopyOption.ATOMIC_MOVE);
-				} catch (IOException e) {
-					File newExt = new File(realExt.getParentFile(),
-							realExt.getName() + ".new"); //$NON-NLS-1$
+					File realExt = nameFor(
+							id, "." + tmpEntry.getKey().getExtension()); //$NON-NLS-1$
 					try {
-						FileUtils.rename(tmpExt, newExt,
-								StandardCopyOption.ATOMIC_MOVE);
-					} catch (IOException e2) {
-						newExt = tmpExt;
+						FileUtils.rename(tmpExt, realExt);
+					} catch (IOException e) {
+						File newExt = new File(realExt.getParentFile(),
+								realExt.getName() + ".new"); //$NON-NLS-1$
+						if (!tmpExt.renameTo(newExt))
+							newExt = tmpExt;
 						throw new IOException(MessageFormat.format(
 								JGitText.get().panicCantRenameIndexFile, newExt,
-								realExt), e2);
+								realExt));
+					}
+				}
+
+			} finally {
+				if (delete) {
+					if (tmpPack.exists())
+						tmpPack.delete();
+					for (File tmpExt : tmpExts.values()) {
+						if (tmpExt.exists())
+							tmpExt.delete();
 					}
 				}
 			}
-
 			return repo.getObjectDatabase().openPack(realPack);
 		} finally {
 			if (tmpPack != null && tmpPack.exists())

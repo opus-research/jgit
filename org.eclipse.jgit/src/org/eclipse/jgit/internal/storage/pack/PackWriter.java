@@ -114,6 +114,9 @@ import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.storage.pack.PackConfig;
+import org.eclipse.jgit.storage.pack.PackStatistics;
+import org.eclipse.jgit.transport.ObjectCountCallback;
+import org.eclipse.jgit.transport.WriteAbortedException;
 import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.TemporaryBuffer;
 
@@ -133,12 +136,14 @@ import org.eclipse.jgit.util.TemporaryBuffer;
  * order of objects in pack</li>
  * </ul>
  * <p>
- * Typical usage consists of creating instance intended for some pack,
- * configuring options, preparing the list of objects by calling
- * {@link #preparePack(Iterator)} or
- * {@link #preparePack(ProgressMonitor, Set, Set)}, and finally producing the
- * stream with
- * {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)}.
+ * Typical usage consists of creating an instance, configuring options,
+ * preparing the list of objects by calling {@link #preparePack(Iterator)} or
+ * {@link #preparePack(ProgressMonitor, Set, Set)}, and streaming with
+ * {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)}. If the
+ * pack is being stored as a file the matching index can be written out after
+ * writing the pack by {@link #writeIndex(OutputStream)}. An optional bitmap
+ * index can be made by calling {@link #prepareBitmapIndex(ProgressMonitor)}
+ * followed by {@link #writeBitmapIndex(OutputStream)}.
  * </p>
  * <p>
  * Class provide set of configurable options and {@link ProgressMonitor}
@@ -147,9 +152,10 @@ import org.eclipse.jgit.util.TemporaryBuffer;
  * relies only on deltas and objects reuse.
  * </p>
  * <p>
- * This class is not thread safe, it is intended to be used in one thread, with
- * one instance per created pack. Subsequent calls to writePack result in
- * undefined behavior.
+ * This class is not thread safe. It is intended to be used in one thread as a
+ * single pass to produce one pack. Invoking methods multiple times or out of
+ * order is not supported as internal data structures are destroyed during
+ * certain phases to save memory when packing large repositories.
  * </p>
  */
 public class PackWriter implements AutoCloseable {
@@ -212,7 +218,7 @@ public class PackWriter implements AutoCloseable {
 	}
 
 	@SuppressWarnings("unchecked")
-	private final BlockList<ObjectToPack> objectsLists[] = new BlockList[OBJ_TAG + 1];
+	private BlockList<ObjectToPack> objectsLists[] = new BlockList[OBJ_TAG + 1];
 	{
 		objectsLists[OBJ_COMMIT] = new BlockList<ObjectToPack>();
 		objectsLists[OBJ_TREE] = new BlockList<ObjectToPack>();
@@ -220,7 +226,7 @@ public class PackWriter implements AutoCloseable {
 		objectsLists[OBJ_TAG] = new BlockList<ObjectToPack>();
 	}
 
-	private final ObjectIdOwnerMap<ObjectToPack> objectsMap = new ObjectIdOwnerMap<ObjectToPack>();
+	private ObjectIdOwnerMap<ObjectToPack> objectsMap = new ObjectIdOwnerMap<ObjectToPack>();
 
 	// edge objects for thin packs
 	private List<ObjectToPack> edgeObjects = new BlockList<ObjectToPack>();
@@ -245,13 +251,13 @@ public class PackWriter implements AutoCloseable {
 
 	private final PackConfig config;
 
-	private final Statistics stats;
+	private final PackStatistics.Accumulator stats;
 
 	private final MutableState state;
 
 	private final WeakReference<PackWriter> selfRef;
 
-	private Statistics.ObjectType typeStats;
+	private PackStatistics.ObjectType.Accumulator typeStats;
 
 	private List<ObjectToPack> sortedByName;
 
@@ -288,6 +294,8 @@ public class PackWriter implements AutoCloseable {
 	private PackBitmapIndexBuilder writeBitmaps;
 
 	private CRC32 crc32;
+
+	private ObjectCountCallback callback;
 
 	/**
 	 * Create writer for specified repository.
@@ -352,10 +360,39 @@ public class PackWriter implements AutoCloseable {
 		deltaBaseAsOffset = config.isDeltaBaseAsOffset();
 		reuseDeltas = config.isReuseDeltas();
 		reuseValidate = true; // be paranoid by default
-		stats = new Statistics();
+		stats = new PackStatistics.Accumulator();
 		state = new MutableState();
 		selfRef = new WeakReference<PackWriter>(this);
 		instances.put(selfRef, Boolean.TRUE);
+	}
+
+	/**
+	 * Set the {@code ObjectCountCallback}.
+	 * <p>
+	 * It should be set before calling
+	 * {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)}.
+	 *
+	 * @param callback
+	 *            the callback to set
+	 *
+	 * @return this object for chaining.
+	 * @since 4.1
+	 */
+	public PackWriter setObjectCountCallback(ObjectCountCallback callback) {
+		this.callback = callback;
+		return this;
+	}
+
+	/**
+	 * Records the set of shallow commits in the client.
+	 *
+	 * @param clientShallowCommits
+	 *            the shallow commits in the client
+	 * @since 4.1
+	 */
+	public void setClientShallowCommits(Set<ObjectId> clientShallowCommits) {
+		stats.clientShallowCommits = Collections
+				.unmodifiableSet(new HashSet<ObjectId>(clientShallowCommits));
 	}
 
 	/**
@@ -571,12 +608,12 @@ public class PackWriter implements AutoCloseable {
 
 	/**
 	 * Returns the object ids in the pack file that was created by this writer.
-	 *
+	 * <p>
 	 * This method can only be invoked after
 	 * {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)} has
 	 * been invoked and completed successfully.
 	 *
-	 * @return number of objects in pack.
+	 * @return set of objects in pack.
 	 * @throws IOException
 	 *             a cached pack cannot supply its object ids.
 	 */
@@ -586,17 +623,20 @@ public class PackWriter implements AutoCloseable {
 			throw new IOException(
 					JGitText.get().cachedPacksPreventsListingObjects);
 
-		ObjectIdOwnerMap<ObjectIdOwnerMap.Entry> objs = new ObjectIdOwnerMap<
-				ObjectIdOwnerMap.Entry>();
+		if (writeBitmaps != null) {
+			return writeBitmaps.getObjectSet();
+		}
+
+		ObjectIdOwnerMap<ObjectIdOwnerMap.Entry> r = new ObjectIdOwnerMap<>();
 		for (BlockList<ObjectToPack> objList : objectsLists) {
 			if (objList != null) {
 				for (ObjectToPack otp : objList)
-					objs.add(new ObjectIdOwnerMap.Entry(otp) {
+					r.add(new ObjectIdOwnerMap.Entry(otp) {
 						// A new entry that copies the ObjectId
 					});
 			}
 		}
-		return objs;
+		return r;
 	}
 
 	/**
@@ -784,10 +824,11 @@ public class PackWriter implements AutoCloseable {
 	/**
 	 * Create an index file to match the pack file just written.
 	 * <p>
-	 * This method can only be invoked after
-	 * {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)} has
-	 * been invoked and completed successfully. Writing a corresponding index is
-	 * an optional feature that not all pack users may require.
+	 * Called after
+	 * {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)}.
+	 * <p>
+	 * Writing an index is only required for local pack storage. Packs sent on
+	 * the network do not need to create an index.
 	 *
 	 * @param indexStream
 	 *            output for the index data. Caller is responsible for closing
@@ -809,10 +850,7 @@ public class PackWriter implements AutoCloseable {
 	/**
 	 * Create a bitmap index file to match the pack file just written.
 	 * <p>
-	 * This method can only be invoked after
-	 * {@link #prepareBitmapIndex(ProgressMonitor)} has been invoked and
-	 * completed successfully. Writing a corresponding bitmap index is an
-	 * optional feature that not all pack users may require.
+	 * Called after {@link #prepareBitmapIndex(ProgressMonitor)}.
 	 *
 	 * @param bitmapIndexStream
 	 *            output for the bitmap index data. Caller is responsible for
@@ -886,14 +924,13 @@ public class PackWriter implements AutoCloseable {
 	/**
 	 * Write the prepared pack to the supplied stream.
 	 * <p>
-	 * At first, this method collects and sorts objects to pack, then deltas
-	 * search is performed if set up accordingly, finally pack stream is
-	 * written.
-	 * </p>
+	 * Called after {@link #preparePack(ProgressMonitor, ObjectWalk, Set, Set)}
+	 * or {@link #preparePack(ProgressMonitor, Set, Set)}.
+	 * <p>
+	 * Performs delta search if enabled and writes the pack stream.
 	 * <p>
 	 * All reused objects data checksum (Adler32/CRC32) is computed and
 	 * validated against existing checksum.
-	 * </p>
 	 *
 	 * @param compressMonitor
 	 *            progress monitor to report object compression work.
@@ -906,6 +943,9 @@ public class PackWriter implements AutoCloseable {
 	 *             an error occurred reading a local object's data to include in
 	 *             the pack, or writing compressed object data to the output
 	 *             stream.
+	 * @throws WriteAbortedException
+	 *             the write operation is aborted by {@link ObjectCountCallback}
+	 *             .
 	 */
 	public void writePack(ProgressMonitor compressMonitor,
 			ProgressMonitor writeMonitor, OutputStream packStream)
@@ -947,6 +987,8 @@ public class PackWriter implements AutoCloseable {
 
 		long objCnt = getObjectCount();
 		stats.totalObjects = objCnt;
+		if (callback != null)
+			callback.setObjectCount(objCnt);
 		beginPhase(PackingPhase.WRITING, writeMonitor, objCnt);
 		long writeStart = System.currentTimeMillis();
 		try {
@@ -955,7 +997,7 @@ public class PackWriter implements AutoCloseable {
 
 			writeObjects(out);
 			if (!edgeObjects.isEmpty() || !cachedPacks.isEmpty()) {
-				for (Statistics.ObjectType typeStat : stats.objectTypes) {
+				for (PackStatistics.ObjectType.Accumulator typeStat : stats.objectTypes) {
 					if (typeStat == null)
 						continue;
 					stats.thinPackBytes += typeStat.bytes;
@@ -976,7 +1018,7 @@ public class PackWriter implements AutoCloseable {
 			stats.timeWriting = System.currentTimeMillis() - writeStart;
 			stats.depth = depth;
 
-			for (Statistics.ObjectType typeStat : stats.objectTypes) {
+			for (PackStatistics.ObjectType.Accumulator typeStat : stats.objectTypes) {
 				if (typeStat == null)
 					continue;
 				typeStat.cntDeltas += typeStat.reusedDeltas;
@@ -987,30 +1029,22 @@ public class PackWriter implements AutoCloseable {
 		}
 
 		stats.totalBytes = out.length();
-		reader.release();
+		reader.close();
 		endPhase(writeMonitor);
 	}
 
 	/**
 	 * @return description of what this PackWriter did in order to create the
-	 *         final pack stream. The object is only available to callers after
-	 *         {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)}
+	 *         final pack stream. This should only be invoked after the calls to
+	 *         create the pack/index/bitmap have completed.
 	 */
-	public Statistics getStatistics() {
-		return stats;
+	public PackStatistics getStatistics() {
+		return new PackStatistics(stats);
 	}
 
 	/** @return snapshot of the current state of this PackWriter. */
 	public State getState() {
 		return state.snapshot();
-	}
-
-	/**
-	 * Release all resources used by this writer. Use {@link #close()} instead.
-	 */
-	@Deprecated
-	public void release() {
-		close();
 	}
 
 	/**
@@ -1599,6 +1633,7 @@ public class PackWriter implements AutoCloseable {
 				findObjectsToPackUsingBitmaps(bitmapWalker, want, have);
 				endPhase(countingMonitor);
 				stats.timeCounting = System.currentTimeMillis() - countingStart;
+				stats.bitmapIndexMisses = bitmapWalker.getCountOfBitmapIndexMisses();
 				return;
 			}
 		}
@@ -1771,6 +1806,7 @@ public class PackWriter implements AutoCloseable {
 			countingMonitor.update((int) pack.getObjectCount());
 		endPhase(countingMonitor);
 		stats.timeCounting = System.currentTimeMillis() - countingStart;
+		stats.bitmapIndexMisses = -1;
 	}
 
 	private void findObjectsToPackUsingBitmaps(
@@ -1939,14 +1975,17 @@ public class PackWriter implements AutoCloseable {
 	}
 
 	/**
-	 * Prepares the bitmaps to be written to the pack index. Bitmaps can be used
-	 * to speed up fetches and clones by storing the entire object graph at
-	 * selected commits.
-	 *
-	 * This method can only be invoked after
-	 * {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)} has
-	 * been invoked and completed successfully. Writing a corresponding bitmap
-	 * index is an optional feature that not all pack users may require.
+	 * Prepares the bitmaps to be written to the bitmap index file.
+	 * <p>
+	 * Bitmaps can be used to speed up fetches and clones by storing the entire
+	 * object graph at selected commits. Writing a bitmap index is an optional
+	 * feature that not all pack users may require.
+	 * <p>
+	 * Called after {@link #writeIndex(OutputStream)}.
+	 * <p>
+	 * To reduce memory internal state is cleared during this method, rendering
+	 * the PackWriter instance useless for anything further than a call to write
+	 * out the new bitmaps with {@link #writeBitmapIndex(OutputStream)}.
 	 *
 	 * @param pm
 	 *            progress monitor to report bitmap building work.
@@ -1962,11 +2001,17 @@ public class PackWriter implements AutoCloseable {
 		if (pm == null)
 			pm = NullProgressMonitor.INSTANCE;
 
-		writeBitmaps = new PackBitmapIndexBuilder(sortByName());
+		int numCommits = objectsLists[OBJ_COMMIT].size();
+		List<ObjectToPack> byName = sortByName();
+		sortedByName = null;
+		objectsLists = null;
+		objectsMap = null;
+		writeBitmaps = new PackBitmapIndexBuilder(byName);
+		byName = null;
+
 		PackWriterBitmapPreparer bitmapPreparer = new PackWriterBitmapPreparer(
 				reader, writeBitmaps, pm, stats.interestingObjects);
 
-		int numCommits = objectsLists[OBJ_COMMIT].size();
 		Collection<PackWriterBitmapPreparer.BitmapCommit> selectedCommits =
 				bitmapPreparer.doCommitSelection(numCommits);
 
@@ -2008,28 +2053,36 @@ public class PackWriter implements AutoCloseable {
 		return true;
 	}
 
-	/** Summary of how PackWriter created the pack. */
+	/**
+	 * Summary of how PackWriter created the pack.
+	 *
+	 * @deprecated Use {@link PackStatistics} instead.
+	 */
+	@Deprecated
 	public static class Statistics {
 		/** Statistics about a single class of object. */
 		public static class ObjectType {
-			long cntObjects;
+			// All requests are forwarded to this object.
+			private PackStatistics.ObjectType objectType;
 
-			long cntDeltas;
-
-			long reusedObjects;
-
-			long reusedDeltas;
-
-			long bytes;
-
-			long deltaBytes;
+			/**
+			 * Wraps an
+			 * {@link org.eclipse.jgit.storage.pack.PackStatistics.ObjectType}
+			 * instance to maintain backwards compatibility with existing API.
+			 *
+			 * @param type
+			 *            the wrapped instance
+			 */
+			public ObjectType(PackStatistics.ObjectType type) {
+				objectType = type;
+			}
 
 			/**
 			 * @return total number of objects output. This total includes the
 			 *         value of {@link #getDeltas()}.
 			 */
 			public long getObjects() {
-				return cntObjects;
+				return objectType.getObjects();
 			}
 
 			/**
@@ -2037,7 +2090,7 @@ public class PackWriter implements AutoCloseable {
 			 *         actual number of deltas if a cached pack was reused.
 			 */
 			public long getDeltas() {
-				return cntDeltas;
+				return objectType.getDeltas();
 			}
 
 			/**
@@ -2046,7 +2099,7 @@ public class PackWriter implements AutoCloseable {
 			 *         {@link #getReusedDeltas()}.
 			 */
 			public long getReusedObjects() {
-				return reusedObjects;
+				return objectType.getReusedObjects();
 			}
 
 			/**
@@ -2057,7 +2110,7 @@ public class PackWriter implements AutoCloseable {
 			 *         was reused.
 			 */
 			public long getReusedDeltas() {
-				return reusedDeltas;
+				return objectType.getReusedDeltas();
 			}
 
 			/**
@@ -2066,7 +2119,7 @@ public class PackWriter implements AutoCloseable {
 			 *         also includes all of {@link #getDeltaBytes()}.
 			 */
 			public long getBytes() {
-				return bytes;
+				return objectType.getBytes();
 			}
 
 			/**
@@ -2074,52 +2127,22 @@ public class PackWriter implements AutoCloseable {
 			 *         object headers for the delta objects.
 			 */
 			public long getDeltaBytes() {
-				return deltaBytes;
+				return objectType.getDeltaBytes();
 			}
 		}
 
-		Set<ObjectId> interestingObjects;
+		// All requests are forwarded to this object.
+		private PackStatistics statistics;
 
-		Set<ObjectId> uninterestingObjects;
-
-		Collection<CachedPack> reusedPacks;
-
-		int depth;
-
-		int deltaSearchNonEdgeObjects;
-
-		int deltasFound;
-
-		long totalObjects;
-
-		long totalDeltas;
-
-		long reusedObjects;
-
-		long reusedDeltas;
-
-		long totalBytes;
-
-		long thinPackBytes;
-
-		long timeCounting;
-
-		long timeSearchingForReuse;
-
-		long timeSearchingForSizes;
-
-		long timeCompressing;
-
-		long timeWriting;
-
-		ObjectType[] objectTypes;
-
-		{
-			objectTypes = new ObjectType[5];
-			objectTypes[OBJ_COMMIT] = new ObjectType();
-			objectTypes[OBJ_TREE] = new ObjectType();
-			objectTypes[OBJ_BLOB] = new ObjectType();
-			objectTypes[OBJ_TAG] = new ObjectType();
+		/**
+		 * Wraps a {@link PackStatistics} object to maintain backwards
+		 * compatibility with existing API.
+		 *
+		 * @param stats
+		 *            the wrapped PackStatitics object
+		 */
+		public Statistics(PackStatistics stats) {
+			statistics = stats;
 		}
 
 		/**
@@ -2128,7 +2151,7 @@ public class PackWriter implements AutoCloseable {
 		 *         test.
 		 */
 		public Set<ObjectId> getInterestingObjects() {
-			return interestingObjects;
+			return statistics.getInterestingObjects();
 		}
 
 		/**
@@ -2137,7 +2160,7 @@ public class PackWriter implements AutoCloseable {
 		 *         has these objects.
 		 */
 		public Set<ObjectId> getUninterestingObjects() {
-			return uninterestingObjects;
+			return statistics.getUninterestingObjects();
 		}
 
 		/**
@@ -2145,7 +2168,7 @@ public class PackWriter implements AutoCloseable {
 		 *         in the output, if any were selected for reuse.
 		 */
 		public Collection<CachedPack> getReusedPacks() {
-			return reusedPacks;
+			return statistics.getReusedPacks();
 		}
 
 		/**
@@ -2153,7 +2176,7 @@ public class PackWriter implements AutoCloseable {
 		 *         delta search process in order to find a potential delta base.
 		 */
 		public int getDeltaSearchNonEdgeObjects() {
-			return deltaSearchNonEdgeObjects;
+			return statistics.getDeltaSearchNonEdgeObjects();
 		}
 
 		/**
@@ -2162,7 +2185,7 @@ public class PackWriter implements AutoCloseable {
 		 *         {@link #getDeltaSearchNonEdgeObjects()}.
 		 */
 		public int getDeltasFound() {
-			return deltasFound;
+			return statistics.getDeltasFound();
 		}
 
 		/**
@@ -2170,7 +2193,18 @@ public class PackWriter implements AutoCloseable {
 		 *         of {@link #getTotalDeltas()}.
 		 */
 		public long getTotalObjects() {
-			return totalObjects;
+			return statistics.getTotalObjects();
+		}
+
+		/**
+		 * @return the count of objects that needed to be discovered through an
+		 *         object walk because they were not found in bitmap indices.
+		 *         Returns -1 if no bitmap indices were found.
+		 *
+		 * @since 4.0
+		 */
+		public long getBitmapIndexMisses() {
+			return statistics.getBitmapIndexMisses();
 		}
 
 		/**
@@ -2178,7 +2212,7 @@ public class PackWriter implements AutoCloseable {
 		 *         actual number of deltas if a cached pack was reused.
 		 */
 		public long getTotalDeltas() {
-			return totalDeltas;
+			return statistics.getTotalDeltas();
 		}
 
 		/**
@@ -2186,7 +2220,7 @@ public class PackWriter implements AutoCloseable {
 		 *         the output. This count includes {@link #getReusedDeltas()}.
 		 */
 		public long getReusedObjects() {
-			return reusedObjects;
+			return statistics.getReusedObjects();
 		}
 
 		/**
@@ -2196,7 +2230,7 @@ public class PackWriter implements AutoCloseable {
 		 *         actual number of reused deltas if a cached pack was reused.
 		 */
 		public long getReusedDeltas() {
-			return reusedDeltas;
+			return statistics.getReusedDeltas();
 		}
 
 		/**
@@ -2204,7 +2238,7 @@ public class PackWriter implements AutoCloseable {
 		 *         header, trailer, thin pack, and reused cached pack(s).
 		 */
 		public long getTotalBytes() {
-			return totalBytes;
+			return statistics.getTotalBytes();
 		}
 
 		/**
@@ -2216,7 +2250,7 @@ public class PackWriter implements AutoCloseable {
 		 *         pack header or trailer.
 		 */
 		public long getThinPackBytes() {
-			return thinPackBytes;
+			return statistics.getThinPackBytes();
 		}
 
 		/**
@@ -2225,17 +2259,17 @@ public class PackWriter implements AutoCloseable {
 		 * @return information about this type of object in the pack.
 		 */
 		public ObjectType byObjectType(int typeCode) {
-			return objectTypes[typeCode];
+			return new ObjectType(statistics.byObjectType(typeCode));
 		}
 
 		/** @return true if the resulting pack file was a shallow pack. */
 		public boolean isShallow() {
-			return depth > 0;
+			return statistics.isShallow();
 		}
 
 		/** @return depth (in commits) the pack includes if shallow. */
 		public int getDepth() {
-			return depth;
+			return statistics.getDepth();
 		}
 
 		/**
@@ -2244,7 +2278,7 @@ public class PackWriter implements AutoCloseable {
 		 *         that occur when a cached pack is selected for reuse.
 		 */
 		public long getTimeCounting() {
-			return timeCounting;
+			return statistics.getTimeCounting();
 		}
 
 		/**
@@ -2253,7 +2287,7 @@ public class PackWriter implements AutoCloseable {
 		 *         can be assumed to already have.
 		 */
 		public long getTimeSearchingForReuse() {
-			return timeSearchingForReuse;
+			return statistics.getTimeSearchingForReuse();
 		}
 
 		/**
@@ -2263,7 +2297,7 @@ public class PackWriter implements AutoCloseable {
 		 *         together and improve delta compression ratios.
 		 */
 		public long getTimeSearchingForSizes() {
-			return timeSearchingForSizes;
+			return statistics.getTimeSearchingForSizes();
 		}
 
 		/**
@@ -2273,7 +2307,7 @@ public class PackWriter implements AutoCloseable {
 		 *         delta compression.
 		 */
 		public long getTimeCompressing() {
-			return timeCompressing;
+			return statistics.getTimeCompressing();
 		}
 
 		/**
@@ -2283,16 +2317,12 @@ public class PackWriter implements AutoCloseable {
 		 *         value.
 		 */
 		public long getTimeWriting() {
-			return timeWriting;
+			return statistics.getTimeWriting();
 		}
 
 		/** @return total time spent processing this pack. */
 		public long getTimeTotal() {
-			return timeCounting
-				+ timeSearchingForReuse
-				+ timeSearchingForSizes
-				+ timeCompressing
-				+ timeWriting;
+			return statistics.getTimeTotal();
 		}
 
 		/**
@@ -2300,14 +2330,12 @@ public class PackWriter implements AutoCloseable {
 		 *         {@code getTotalBytes() / (getTimeWriting() / 1000.0)}.
 		 */
 		public double getTransferRate() {
-			return getTotalBytes() / (getTimeWriting() / 1000.0);
+			return statistics.getTransferRate();
 		}
 
 		/** @return formatted message string for display to clients. */
 		public String getMessage() {
-			return MessageFormat.format(JGitText.get().packWriterStatistics, //
-					Long.valueOf(totalObjects), Long.valueOf(totalDeltas), //
-					Long.valueOf(reusedObjects), Long.valueOf(reusedDeltas));
+			return statistics.getMessage();
 		}
 	}
 
@@ -2340,11 +2368,14 @@ public class PackWriter implements AutoCloseable {
 
 		State snapshot() {
 			long objCnt = 0;
-			objCnt += objectsLists[OBJ_COMMIT].size();
-			objCnt += objectsLists[OBJ_TREE].size();
-			objCnt += objectsLists[OBJ_BLOB].size();
-			objCnt += objectsLists[OBJ_TAG].size();
-			// Exclude CachedPacks.
+			BlockList<ObjectToPack>[] lists = objectsLists;
+			if (lists != null) {
+				objCnt += lists[OBJ_COMMIT].size();
+				objCnt += lists[OBJ_TREE].size();
+				objCnt += lists[OBJ_BLOB].size();
+				objCnt += lists[OBJ_TAG].size();
+				// Exclude CachedPacks.
+			}
 
 			long bytesUsed = OBJECT_TO_PACK_SIZE * objCnt;
 			PackingPhase curr = phase;

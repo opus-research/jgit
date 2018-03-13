@@ -238,7 +238,7 @@ public class FileUtils {
 	 * @throws AtomicMoveNotSupportedException
 	 *             if file cannot be moved as an atomic file system operation
 	 * @throws IOException
-	 * @since 4.0
+	 * @since 4.1
 	 */
 	public static void rename(final File src, final File dst,
 			CopyOption... options)
