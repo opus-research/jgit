@@ -892,17 +892,17 @@ public class RevWalk implements Iterable<RevCommit> {
 			};
 		}
 
-		final AsyncObjectLoaderQueue ldrItr = reader.open(need, reportMissing);
+		final AsyncObjectLoaderQueue<T> lItr = reader.open(need, reportMissing);
 		return new AsyncRevObjectQueue() {
 			public RevObject next() throws MissingObjectException,
 					IncorrectObjectTypeException, IOException {
 				if (objItr.hasNext())
 					return objItr.next();
-				if (!ldrItr.next())
+				if (!lItr.next())
 					return null;
 
-				ObjectId id = ldrItr.getObjectId();
-				ObjectLoader ldr = ldrItr.open();
+				ObjectId id = lItr.getObjectId();
+				ObjectLoader ldr = lItr.open();
 				RevObject r = objects.get(id);
 				if (r == null)
 					r = parseNew(id, ldr);
@@ -911,18 +911,18 @@ public class RevWalk implements Iterable<RevCommit> {
 					((RevCommit) r).parseCanonical(RevWalk.this, raw);
 				} else if (r instanceof RevTag) {
 					byte[] raw = ldr.getCachedBytes();
-					((RevCommit) r).parseCanonical(RevWalk.this, raw);
+					((RevTag) r).parseCanonical(RevWalk.this, raw);
 				} else
 					r.flags |= PARSED;
 				return r;
 			}
 
 			public boolean cancel(boolean mayInterruptIfRunning) {
-				return ldrItr.cancel(mayInterruptIfRunning);
+				return lItr.cancel(mayInterruptIfRunning);
 			}
 
 			public void release() {
-				ldrItr.release();
+				lItr.release();
 			}
 		};
 	}
