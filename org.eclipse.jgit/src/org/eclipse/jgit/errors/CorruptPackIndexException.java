@@ -55,15 +55,15 @@ public class CorruptPackIndexException extends Exception {
 
 	/** The error type of a corrupt index file. */
 	public enum ErrorType {
-		/** Offset doesn't match with pack file. */
+		/** Offset does not match with index in pack file. */
 		MISMATCH_OFFSET,
-		/** Crc doesn't match with the object data in pack file. */
+		/** CRC does not match with CRC of the object data in pack file. */
 		MISMATCH_CRC,
-		/** Crc doesn't present in index file. */
+		/** CRC does not present in index file. */
 		MISSING_CRC,
-		/** Object in pack doesn't present in index file. */
+		/** Object in pack does not present in index file. */
 		MISSING_OBJ,
-		/** Object in index file doesn't present in pack file. */
+		/** Object in index file does not present in pack file. */
 		UNKNOWN_OBJ,
 	}
 

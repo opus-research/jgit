@@ -68,7 +68,7 @@ import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.transport.PackParser;
 import org.eclipse.jgit.transport.PackedObjectInfo;
 
-/** A read only pack parser for object validity checking. */
+/** A read-only pack parser for object validity checking. */
 public class FsckPackParser extends PackParser {
 	private final CRC32 crc;
 
