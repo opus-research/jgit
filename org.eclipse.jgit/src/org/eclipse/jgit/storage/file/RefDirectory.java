@@ -537,7 +537,7 @@ public class RefDirectory extends RefDatabase {
 				throw new IOException(MessageFormat.format(
 					JGitText.get().cannotLockFile, packedRefsFile));
 			try {
-				PackedRefList cur = readPackedRefs();
+				PackedRefList cur = readPackedRefs(0, 0);
 				int idx = cur.find(name);
 				if (0 <= idx)
 					commitPackedRefs(lck, cur.remove(idx), packed);
@@ -679,19 +679,21 @@ public class RefDirectory extends RefDatabase {
 	}
 
 	private PackedRefList getPackedRefs() throws IOException {
+		long size = packedRefsFile.length();
+		long mtime = size != 0 ? packedRefsFile.lastModified() : 0;
+
 		final PackedRefList curList = packedRefs.get();
-		if (!curList.snapshot.isModified(packedRefsFile))
+		if (size == curList.lastSize && mtime == curList.lastModified)
 			return curList;
 
-		final PackedRefList newList = readPackedRefs();
+		final PackedRefList newList = readPackedRefs(size, mtime);
 		if (packedRefs.compareAndSet(curList, newList))
 			modCnt.incrementAndGet();
 		return newList;
 	}
 
-	private PackedRefList readPackedRefs()
+	private PackedRefList readPackedRefs(long size, long mtime)
 			throws IOException {
-		final FileSnapshot snapshot = FileSnapshot.save(packedRefsFile);
 		final BufferedReader br;
 		try {
 			br = new BufferedReader(new InputStreamReader(new FileInputStream(
@@ -701,7 +703,7 @@ public class RefDirectory extends RefDatabase {
 			return PackedRefList.NO_PACKED_REFS;
 		}
 		try {
-			return new PackedRefList(parsePackedRefs(br), snapshot);
+			return new PackedRefList(parsePackedRefs(br), size, mtime);
 		} finally {
 			br.close();
 		}
@@ -767,7 +769,7 @@ public class RefDirectory extends RefDatabase {
 			protected void writeFile(String name, byte[] content)
 					throws IOException {
 				lck.setFSync(true);
-				lck.setNeedSnapshot(true);
+				lck.setNeedStatInformation(true);
 				try {
 					lck.write(content);
 				} catch (IOException ioe) {
@@ -782,8 +784,8 @@ public class RefDirectory extends RefDatabase {
 				if (!lck.commit())
 					throw new ObjectWritingException(MessageFormat.format(JGitText.get().unableToWrite, name));
 
-				packedRefs.compareAndSet(oldPackedList, new PackedRefList(
-						refs, lck.getCommitSnapshot()));
+				packedRefs.compareAndSet(oldPackedList, new PackedRefList(refs,
+						content.length, lck.getCommitLastModified()));
 			}
 		}.writePackedRefs();
 	}
@@ -955,14 +957,19 @@ public class RefDirectory extends RefDatabase {
 	}
 
 	private static class PackedRefList extends RefList<Ref> {
-		static final PackedRefList NO_PACKED_REFS = new PackedRefList(
-				RefList.emptyList(), FileSnapshot.MISSING_FILE);
+		static final PackedRefList NO_PACKED_REFS = new PackedRefList(RefList
+				.emptyList(), 0, 0);
 
-		final FileSnapshot snapshot;
+		/** Last length of the packed-refs file when we read it. */
+		final long lastSize;
 
-		PackedRefList(RefList<Ref> src, FileSnapshot s) {
+		/** Last modified time of the packed-refs file when we read it. */
+		final long lastModified;
+
+		PackedRefList(RefList<Ref> src, long size, long mtime) {
 			super(src);
-			snapshot = s;
+			lastSize = size;
+			lastModified = mtime;
 		}
 	}
 
