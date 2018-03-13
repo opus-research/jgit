@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,29 +40,30 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-package org.eclipse.jgit.transport;
+package org.eclipse.jgit.api.errors;
 
 /**
- * Indicates UploadPack may not continue execution.
- *
- * @deprecated use {@link ServiceMayNotContinueException} instead.
+ * Exception thrown when applying a patch fails
+ * 
+ * @since 2.0
+ * 
  */
-@Deprecated
-public class UploadPackMayNotContinueException extends ServiceMayNotContinueException {
+public class PatchApplyException extends GitAPIException {
 	private static final long serialVersionUID = 1L;
 
-	/** Initialize with no message. */
-	public UploadPackMayNotContinueException() {
-		// Do not set a message.
+	/**
+	 * @param message
+	 * @param cause
+	 */
+	public PatchApplyException(String message, Throwable cause) {
+		super(message, cause);
 	}
 
 	/**
-	 * @param msg
-	 *            a message explaining why it cannot continue. This message may
-	 *            be shown to an end-user.
+	 * @param message
 	 */
-	public UploadPackMayNotContinueException(String msg) {
-		super(msg);
+	public PatchApplyException(String message) {
+		super(message);
 	}
+
 }

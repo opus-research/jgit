@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2011, 2012 IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,29 +40,34 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.api;
 
-package org.eclipse.jgit.transport;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * Indicates UploadPack may not continue execution.
- *
- * @deprecated use {@link ServiceMayNotContinueException} instead.
+ * Encapsulates the result of a {@link ApplyCommand}
  */
-@Deprecated
-public class UploadPackMayNotContinueException extends ServiceMayNotContinueException {
-	private static final long serialVersionUID = 1L;
+public class ApplyResult {
 
-	/** Initialize with no message. */
-	public UploadPackMayNotContinueException() {
-		// Do not set a message.
+	private List<File> updatedFiles = new ArrayList<File>();
+
+	/**
+	 * @param f
+	 *            an updated file
+	 * @return this instance
+	 */
+	public ApplyResult addUpdatedFile(File f) {
+		updatedFiles.add(f);
+		return this;
+
 	}
 
 	/**
-	 * @param msg
-	 *            a message explaining why it cannot continue. This message may
-	 *            be shown to an end-user.
+	 * @return updated files
 	 */
-	public UploadPackMayNotContinueException(String msg) {
-		super(msg);
+	public List<File> getUpdatedFiles() {
+		return updatedFiles;
 	}
 }
