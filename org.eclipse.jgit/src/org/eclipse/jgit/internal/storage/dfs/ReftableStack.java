@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, David Pursehouse <david.pursehouse@gmail.com>
+ * Copyright (C) 2017, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,53 +41,68 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.internal.storage.dfs;
 
-import org.eclipse.jgit.util.StringUtils;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
-/**
- * Submodule section of a Git configuration file.
- *
- * @since 4.7
- */
-public class SubmoduleConfig {
+import org.eclipse.jgit.internal.storage.reftable.Reftable;
+
+/** Tracks multiple open {@link Reftable} instances. */
+public class ReftableStack implements AutoCloseable {
+	/**
+	 * Opens a stack of tables for reading.
+	 *
+	 * @param ctx
+	 *            context to read the tables with. This {@code ctx} will be
+	 *            retained by the stack and each of the table readers.
+	 * @param tables
+	 *            the tables to open.
+	 * @return stack reference to close the tables.
+	 * @throws IOException
+	 *             a table could not be opened
+	 */
+	public static ReftableStack open(DfsReader ctx, List<DfsReftable> tables)
+			throws IOException {
+		ReftableStack stack = new ReftableStack(tables.size());
+		boolean close = true;
+		try {
+			for (DfsReftable t : tables) {
+				stack.tables.add(t.open(ctx));
+			}
+			close = false;
+			return stack;
+		} finally {
+			if (close) {
+				stack.close();
+			}
+		}
+	}
+
+	private final List<Reftable> tables;
+
+	private ReftableStack(int tableCnt) {
+		this.tables = new ArrayList<>(tableCnt);
+	}
 
 	/**
-	 * Config values for submodule.[name].fetchRecurseSubmodules.
+	 * @return unmodifiable list of tables, in the same order the files were
+	 *         passed to {@link #open(DfsReader, List)}.
 	 */
-	public enum FetchRecurseSubmodulesMode implements Config.ConfigEnum {
-		/** Unconditionally recurse into all populated submodules. */
-		YES("true"), //$NON-NLS-1$
+	public List<Reftable> readers() {
+		return Collections.unmodifiableList(tables);
+	}
 
-		/**
-		 * Only recurse into a populated submodule when the superproject
-		 * retrieves a commit that updates the submodule's reference to a commit
-		 * that isn't already in the local submodule clone.
-		 */
-		ON_DEMAND("on-demand"), //$NON-NLS-1$
-
-		/** Completely disable recursion. */
-		NO("false"); //$NON-NLS-1$
-
-		private final String configValue;
-
-		private FetchRecurseSubmodulesMode(String configValue) {
-			this.configValue = configValue;
-		}
-
-		@Override
-		public String toConfigValue() {
-			return configValue;
-		}
-
-		@Override
-		public boolean matchConfigValue(String s) {
-			if (StringUtils.isEmptyOrNull(s)) {
-				return false;
+	@Override
+	public void close() {
+		for (Reftable t : tables) {
+			try {
+				t.close();
+			} catch (IOException e) {
+				// Ignore close failures.
 			}
-			s = s.replace('-', '_');
-			return name().equalsIgnoreCase(s)
-					|| configValue.equalsIgnoreCase(s);
 		}
 	}
 }
