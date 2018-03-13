@@ -47,7 +47,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Set;
-import java.util.TreeSet;
 
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.lib.Repository;
@@ -63,8 +62,6 @@ import org.eclipse.jgit.util.FileUtils;
 public class CleanCommand extends GitCommand<Set<String>> {
 
 	private Set<String> paths = Collections.emptySet();
-
-	private boolean dryRun;
 
 	/**
 	 * @param repo
@@ -82,16 +79,15 @@ public class CleanCommand extends GitCommand<Set<String>> {
 	 * @return a set of strings representing each file cleaned.
 	 */
 	public Set<String> call() {
-		Set<String> files = new TreeSet<String>();
+		Set<String> files = Collections.emptySet();
 		try {
 			StatusCommand command = new StatusCommand(repo);
 			Status status = command.call();
-			for (String file : status.getUntracked()) {
-				if (paths.isEmpty() || paths.contains(file)) {
-					if (!dryRun)
-						FileUtils.delete(new File(repo.getWorkTree(), file));
-					files.add(file);
-				}
+			files = status.getUntracked();
+
+			for (String file : files) {
+				if (paths.isEmpty() || paths.contains(file))
+					FileUtils.delete(new File(repo.getWorkTree(), file));
 			}
 		} catch (IOException e) {
 			throw new JGitInternalException(e.getMessage(), e);
@@ -104,22 +100,9 @@ public class CleanCommand extends GitCommand<Set<String>> {
 	 *
 	 * @param paths
 	 *            the paths to set
-	 * @return {@code this}
 	 */
-	public CleanCommand setPaths(Set<String> paths) {
+	public void setPaths(Set<String> paths) {
 		this.paths = paths;
-		return this;
 	}
 
-	/**
-	 * If dryRun is set, the paths in question will not actually be deleted.
-	 * 
-	 * @param dryRun
-	 *            whether to do a dry run or not
-	 * @return {@code this}
-	 */
-	public CleanCommand setDryRun(boolean dryRun) {
-		this.dryRun = dryRun;
-		return this;
-	}
 }

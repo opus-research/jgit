@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,51 +40,58 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+package org.eclipse.jgit.storage.dht;
 
-import java.util.Collection;
+import org.eclipse.jgit.lib.Config;
 
-import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.storage.file.ReflogEntry;
-import org.junit.Before;
-import org.junit.Test;
+/** Configuration parameters for {@link ChunkCache}. */
+public class ChunkCacheConfig {
+	/** 1024 (number of bytes in one kibibyte/kilobyte) */
+	public static final int KiB = 1024;
 
-public class ReflogCommandTest extends RepositoryTestCase {
+	/** 1024 {@link #KiB} (number of bytes in one mebibyte/megabyte) */
+	public static final int MiB = 1024 * KiB;
 
-	private Git git;
+	private long chunkCacheLimit;
 
-	private RevCommit commit1, commit2;
-
-	private static final String FILE = "test.txt";
-
-	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
-
-		git = new Git(db);
-		// commit something
-		writeTrashFile(FILE, "Hello world");
-		git.add().addFilepattern(FILE).call();
-		commit1 = git.commit().setMessage("Initial commit").call();
-		git.rm().addFilepattern(FILE).call();
-		commit2 = git.commit().setMessage("Removed file").call();
-		git.notesAdd().setObjectId(commit1)
-				.setMessage("data").call();
+	/** Create a default configuration. */
+	public ChunkCacheConfig() {
+		setChunkCacheLimit(10 * MiB);
 	}
 
-	@Test
-	public void testReflog() throws Exception {
-		Collection<ReflogEntry> reflog = git.reflog().call();
-		assertTrue(reflog.size() == 2);
-		ReflogEntry[] reflogs = reflog.toArray(new ReflogEntry[reflog.size()]);
-		assertEquals(reflogs[1].getComment(), "commit: Initial commit");
-		assertEquals(reflogs[0].getNewId(), commit2.getId());
-		assertEquals(reflogs[0].getOldId(), commit1.getId());
+	/**
+	 * @return maximum number bytes of heap memory to dedicate to caching pack
+	 *         file data. If the limit is configured to 0, the chunk cache is
+	 *         disabled. <b>Default is 10 MB.</b>
+	 */
+	public long getChunkCacheLimit() {
+		return chunkCacheLimit;
 	}
 
+	/**
+	 * @param newLimit
+	 *            maximum number bytes of heap memory to dedicate to caching
+	 *            pack file data.
+	 * @return {@code this}
+	 */
+	public ChunkCacheConfig setChunkCacheLimit(final long newLimit) {
+		chunkCacheLimit = Math.max(0, newLimit);
+		return this;
+	}
+
+	/**
+	 * Update properties by setting fields from the configuration.
+	 * <p>
+	 * If a property is not defined in the configuration, then it is left
+	 * unmodified.
+	 *
+	 * @param rc
+	 *            configuration to read properties from.
+	 * @return {@code this}
+	 */
+	public ChunkCacheConfig fromConfig(final Config rc) {
+		setChunkCacheLimit(rc.getLong("core", "dht", "chunkCacheLimit", getChunkCacheLimit()));
+		return this;
+	}
 }
