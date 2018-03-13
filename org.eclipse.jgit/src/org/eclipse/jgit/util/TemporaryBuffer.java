@@ -291,11 +291,13 @@ public abstract class TemporaryBuffer extends OutputStream {
 		if (overflow != null) {
 			destroy();
 		}
-		if (blocks != null)
-			blocks.clear();
-		else
+		if (inCoreLimit < Block.SZ) {
+			blocks = new ArrayList<Block>(1);
+			blocks.add(new Block(inCoreLimit));
+		} else {
 			blocks = new ArrayList<Block>(initialBlocks);
-		blocks.add(new Block(Math.min(inCoreLimit, Block.SZ)));
+			blocks.add(new Block());
+		}
 	}
 
 	/**
@@ -538,7 +540,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 		 * @since 4.0
 		 */
 		public Heap(final int estimatedSize, final int limit) {
-			super(limit, estimatedSize);
+			super(estimatedSize, limit);
 		}
 
 		@Override
