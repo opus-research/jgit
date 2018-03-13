@@ -95,11 +95,7 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		return false;
 	}
 
-	/**
-	 * @param local
-	 * @param uri
-	 */
-	protected TransportGitSsh(final Repository local, final URIish uri) {
+	TransportGitSsh(final Repository local, final URIish uri) {
 		super(local, uri);
 	}
 
@@ -113,20 +109,13 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		return new SshPushConnection(newConnection());
 	}
 
-	/**
-	 * @return new connection
-	 */
-	protected Connection newConnection() {
+	private Connection newConnection() {
 		if (useExtConnection())
 			return new ExtConnection();
 		return new JschConnection();
 	}
 
-	/**
-	 * @param exe
-	 * @return full command
-	 */
-	protected String commandFor(final String exe) {
+	String commandFor(final String exe) {
 		String path = uri.getPath();
 		if (uri.getScheme() != null && uri.getPath().startsWith("/~"))
 			path = (uri.getPath().substring(1));
@@ -168,50 +157,20 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		return new NoRemoteRepositoryException(uri, why);
 	}
 
-	/**
-	 *
-	 *
-	 */
-	protected abstract class Connection {
-		/**
-		 * @param commandName
-		 * @throws TransportException
-		 */
-		protected abstract void exec(String commandName)
-				throws TransportException;
+	private abstract class Connection {
+		abstract void exec(String commandName) throws TransportException;
 
-		/**
-		 * @throws TransportException
-		 */
-		protected abstract void connect() throws TransportException;
+		abstract void connect() throws TransportException;
 
-		/**
-		 * @return InputStream
-		 * @throws IOException
-		 */
-		protected abstract InputStream getInputStream() throws IOException;
+		abstract InputStream getInputStream() throws IOException;
 
-		/**
-		 * @return OutputStream
-		 * @throws IOException
-		 */
-		protected abstract OutputStream getOutputStream() throws IOException;
+		abstract OutputStream getOutputStream() throws IOException;
 
-		/**
-		 * @return InputStream
-		 * @throws IOException
-		 */
-		protected abstract InputStream getErrorStream() throws IOException;
+		abstract InputStream getErrorStream() throws IOException;
 
-		/**
-		 * @return exit status
-		 */
-		protected abstract int getExitStatus();
+		abstract int getExitStatus();
 
-		/**
-		 *
-		 */
-		protected abstract void close();
+		abstract void close();
 	}
 
 	private class JschConnection extends Connection {
@@ -220,7 +179,7 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		private int exitStatus;
 
 		@Override
-		protected void exec(String commandName) throws TransportException {
+		void exec(String commandName) throws TransportException {
 			initSession();
 			try {
 				channel = (ChannelExec) sock.openChannel("exec");
@@ -231,7 +190,7 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		}
 
 		@Override
-		protected void connect() throws TransportException {
+		void connect() throws TransportException {
 			try {
 				channel.connect(getTimeout() > 0 ? getTimeout() * 1000 : 0);
 				if (!channel.isConnected())
@@ -242,12 +201,12 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		}
 
 		@Override
-		protected InputStream getInputStream() throws IOException {
+		InputStream getInputStream() throws IOException {
 			return channel.getInputStream();
 		}
 
 		@Override
-		protected OutputStream getOutputStream() throws IOException {
+		OutputStream getOutputStream() throws IOException {
 			// JSch won't let us interrupt writes when we use our InterruptTimer
 			// to break out of a long-running write operation. To work around
 			// that we spawn a background thread to shuttle data through a pipe,
@@ -281,17 +240,17 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		}
 
 		@Override
-		protected InputStream getErrorStream() throws IOException {
+		InputStream getErrorStream() throws IOException {
 			return channel.getErrStream();
 		}
 
 		@Override
-		protected int getExitStatus() {
+		int getExitStatus() {
 			return exitStatus;
 		}
 
 		@Override
-		protected void close() {
+		void close() {
 			if (channel != null) {
 				try {
 					exitStatus = channel.getExitStatus();
@@ -314,7 +273,7 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		private int exitStatus;
 
 		@Override
-		protected void exec(String commandName) throws TransportException {
+		void exec(String commandName) throws TransportException {
 			String ssh = SystemReader.getInstance().getenv("GIT_SSH");
 			boolean putty = ssh.toLowerCase().contains("plink");
 
@@ -347,32 +306,32 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		}
 
 		@Override
-		protected void connect() throws TransportException {
+		void connect() throws TransportException {
 			// Nothing to do, the process was already opened.
 		}
 
 		@Override
-		protected InputStream getInputStream() throws IOException {
+		InputStream getInputStream() throws IOException {
 			return proc.getInputStream();
 		}
 
 		@Override
-		protected OutputStream getOutputStream() throws IOException {
+		OutputStream getOutputStream() throws IOException {
 			return proc.getOutputStream();
 		}
 
 		@Override
-		protected InputStream getErrorStream() throws IOException {
+		InputStream getErrorStream() throws IOException {
 			return proc.getErrorStream();
 		}
 
 		@Override
-		protected int getExitStatus() {
+		int getExitStatus() {
 			return exitStatus;
 		}
 
 		@Override
-		protected void close() {
+		void close() {
 			if (proc != null) {
 				try {
 					try {
