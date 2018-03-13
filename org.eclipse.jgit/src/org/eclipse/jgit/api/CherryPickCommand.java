@@ -147,7 +147,7 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 							.setAuthor(srcCommit.getAuthorIdent()).call();
 					cherryPickedRefs.add(src);
 				} else {
-					if (merger.failed())
+					if (merger.failedAbnormally())
 						return new CherryPickResult(merger.getFailingPaths());
 
 					// merge conflicts

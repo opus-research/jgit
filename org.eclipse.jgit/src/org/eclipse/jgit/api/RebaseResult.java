@@ -109,9 +109,9 @@ public class RebaseResult {
 
 	/**
 	 * Create <code>RebaseResult</code> with status {@link Status#FAILED}
-	 *
+	 * 
 	 * @param failingPaths
-	 *            list of paths causing this rebase to fail
+	 *            list of paths causing this rebase to fail abnormally
 	 */
 	RebaseResult(Map<String, MergeFailureReason> failingPaths) {
 		mySatus = Status.FAILED;
@@ -135,7 +135,7 @@ public class RebaseResult {
 	}
 
 	/**
-	 * @return the list of paths causing this rebase to fail (see
+	 * @return the list of paths causing this rebase to fail abnormally (see
 	 *         {@link ResolveMerger#getFailingPaths()} for details) if status is
 	 *         {@link Status#FAILED}, otherwise <code>null</code>
 	 */
