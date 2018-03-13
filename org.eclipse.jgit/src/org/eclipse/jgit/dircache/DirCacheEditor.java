@@ -81,7 +81,6 @@ public class DirCacheEditor extends BaseDirCacheEditor {
 	};
 
 	private final List<PathEdit> edits;
-
 	private int editIdx;
 
 	/**
