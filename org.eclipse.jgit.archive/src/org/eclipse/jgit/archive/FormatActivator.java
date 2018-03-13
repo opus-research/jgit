@@ -71,7 +71,7 @@ public class FormatActivator implements BundleActivator {
 	/**
 	 * Cleans up after {@link #start(BundleContext)} by calling
 	 * {@link #stop(BundleContext)}.
-	 * 
+	 *
 	 * @param context
 	 *            unused
 	 */
