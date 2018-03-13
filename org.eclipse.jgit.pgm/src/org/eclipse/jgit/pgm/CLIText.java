@@ -75,7 +75,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String IPZillaPasswordPrompt;
 	/***/ public String alreadyOnBranch;
 	/***/ public String alreadyUpToDate;
-	/***/ public String archiveEntryModeIgnored;
 	/***/ public String authorInfo;
 	/***/ public String averageMSPerRead;
 	/***/ public String branchAlreadyExists;
@@ -221,7 +220,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String taggerInfo;
 	/***/ public String timeInMilliSeconds;
 	/***/ public String tooManyRefsGiven;
-	/***/ public String treeIsRequired;
 	/***/ public char[] unknownIoErrorStdout;
 	/***/ public String unknownMergeStrategy;
 	/***/ public String unmergedPaths;
