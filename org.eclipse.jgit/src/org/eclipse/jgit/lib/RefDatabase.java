@@ -316,7 +316,7 @@ public abstract class RefDatabase {
 	 * @since 4.1
 	 */
 	public Ref firstExactRef(String... refs) throws IOException {
-		for (String name: refs) {
+		for (String name : refs) {
 			Ref ref = exactRef(name);
 			if (ref != null) {
 				return ref;
