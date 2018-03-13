@@ -44,9 +44,6 @@ package org.eclipse.jgit.archive;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
 
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
@@ -59,10 +56,6 @@ import org.eclipse.jgit.lib.ObjectLoader;
  * PKWARE's ZIP format.
  */
 public class ZipFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
-	private static final List<String> SUFFIXES =
-			Collections.unmodifiableList(Arrays.asList(new String[] {
-				".zip" }));
-
 	public ArchiveOutputStream createArchiveOutputStream(OutputStream s) {
 		return new ZipArchiveOutputStream(s);
 	}
@@ -85,9 +78,5 @@ public class ZipFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
 		out.putArchiveEntry(entry);
 		loader.copyTo(out);
 		out.closeArchiveEntry();
-	}
-
-	public Iterable<String> suffixes() {
-		return SUFFIXES;
 	}
 }
