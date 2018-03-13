@@ -157,11 +157,8 @@ public class TreeWalk implements AutoCloseable {
 	public static TreeWalk forPath(final Repository db, final String path,
 			final AnyObjectId... trees) throws MissingObjectException,
 			IncorrectObjectTypeException, CorruptObjectException, IOException {
-		ObjectReader reader = db.newObjectReader();
-		try {
+		try (ObjectReader reader = db.newObjectReader()) {
 			return forPath(reader, path, trees);
-		} finally {
-			reader.close();
 		}
 	}
 
@@ -198,8 +195,6 @@ public class TreeWalk implements AutoCloseable {
 
 	private final ObjectReader reader;
 
-	private final boolean closeReader;
-
 	private final MutableObjectId idBuffer = new MutableObjectId();
 
 	private TreeFilter filter;
@@ -222,30 +217,22 @@ public class TreeWalk implements AutoCloseable {
 	 * Create a new tree walker for a given repository.
 	 *
 	 * @param repo
-	 *            the repository the walker will obtain data from. An
-	 *            ObjectReader will be created by the walker, and will be closed
-	 *            when the walker is closed.
+	 *            the repository the walker will obtain data from.
 	 */
 	public TreeWalk(final Repository repo) {
-		this(repo.newObjectReader(), true);
+		this(repo.newObjectReader());
 	}
 
 	/**
 	 * Create a new tree walker for a given repository.
 	 *
 	 * @param or
-	 *            the reader the walker will obtain tree data from. The reader
-	 *            is not closed when the walker is closed.
+	 *            the reader the walker will obtain tree data from.
 	 */
 	public TreeWalk(final ObjectReader or) {
-		this(or, false);
-	}
-
-	private TreeWalk(final ObjectReader or, final boolean closeReader) {
 		reader = or;
 		filter = TreeFilter.ALL;
 		trees = NO_TREES;
-		this.closeReader = closeReader;
 	}
 
 	/** @return the reader this walker is using to load objects. */
@@ -274,9 +261,7 @@ public class TreeWalk implements AutoCloseable {
 	 */
 	@Override
 	public void close() {
-		if (closeReader) {
-			reader.close();
-		}
+		reader.close();
 	}
 
 	/**
