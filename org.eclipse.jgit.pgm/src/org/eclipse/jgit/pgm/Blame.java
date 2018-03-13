@@ -157,7 +157,7 @@ class Blame extends TextBuiltin {
 			dateFmt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss ZZZZ"); //$NON-NLS-1$
 
 		BlameGenerator generator = new BlameGenerator(db, file);
-		RevFlag scanned = generator.newFlag("SCANNED");
+		RevFlag scanned = generator.newFlag("SCANNED"); //$NON-NLS-1$
 		reader = db.newObjectReader();
 		try {
 			generator.setTextComparator(comparator);
@@ -201,16 +201,14 @@ class Blame extends TextBuiltin {
 			int maxSourceLine = 1;
 			for (int line = begin; line < end; line++) {
 				RevCommit c = blame.getSourceCommit(line);
-				if (c.has(scanned))
-					continue;
-				c.add(scanned);
-
-				if (autoAbbrev)
-					abbrev = Math.max(abbrev, uniqueAbbrevLen(c));
-				authorWidth = Math.max(authorWidth, author(line).length());
-				dateWidth = Math.max(dateWidth, date(line).length());
-				pathWidth = Math.max(pathWidth, path(line).length());
-
+				if (c != null && !c.has(scanned)) {
+					c.add(scanned);
+					if (autoAbbrev)
+						abbrev = Math.max(abbrev, uniqueAbbrevLen(c));
+					authorWidth = Math.max(authorWidth, author(line).length());
+					dateWidth = Math.max(dateWidth, date(line).length());
+					pathWidth = Math.max(pathWidth, path(line).length());
+				}
 				while (line + 1 < end && blame.getSourceCommit(line + 1) == c)
 					line++;
 				maxSourceLine = Math.max(maxSourceLine, blame.getSourceLine(line));
