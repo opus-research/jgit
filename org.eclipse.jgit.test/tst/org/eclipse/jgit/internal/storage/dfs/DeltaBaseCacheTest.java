@@ -57,14 +57,13 @@ import org.junit.Test;
 public class DeltaBaseCacheTest {
 	private static final int SZ = 512;
 
-	private DfsStreamKey key;
+	private DfsPackKey key;
 	private DeltaBaseCache cache;
 	private TestRng rng;
 
 	@Before
 	public void setUp() {
-		DfsRepositoryDescription repo = new DfsRepositoryDescription("test");
-		key = DfsStreamKey.of(repo, "test.key");
+		key = new DfsPackKey();
 		cache = new DeltaBaseCache(SZ);
 		rng = new TestRng(getClass().getSimpleName());
 	}
