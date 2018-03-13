@@ -548,6 +548,53 @@ public class TreeWalkAttributeTest extends RepositoryTestCase {
 	}
 
 	/**
+	 * Checks the precedence on a hierarchy with multiple attributes.
+	 * <p>
+	 * In this test all file are present only in the working tree.
+	 * </p>
+	 *
+	 * @throws IOException
+	 * @throws GitAPIException
+	 * @throws NoFilepatternException
+	 */
+	@Test
+	public void testHierarchyWorktreeOnly()
+			throws IOException, NoFilepatternException, GitAPIException {
+		writeAttributesFile(".git/info/attributes", "*.global eol=crlf");
+		writeAttributesFile(".gitattributes", "*.local eol=lf");
+		writeAttributesFile("level1/.gitattributes", "*.local text");
+		writeAttributesFile("level1/level2/.gitattributes", "*.local -text");
+
+		writeTrashFile("l0.global", "");
+		writeTrashFile("l0.local", "");
+
+		writeTrashFile("level1/l1.global", "");
+		writeTrashFile("level1/l1.local", "");
+
+		writeTrashFile("level1/level2/l2.global", "");
+		writeTrashFile("level1/level2/l2.local", "");
+
+		beginWalk();
+
+		assertEntry(F, ".gitattributes");
+		assertEntry(F, "l0.global", asSet(EOL_CRLF));
+		assertEntry(F, "l0.local", asSet(EOL_LF));
+
+		assertEntry(D, "level1");
+		assertEntry(F, "level1/.gitattributes");
+		assertEntry(F, "level1/l1.global", asSet(EOL_CRLF));
+		assertEntry(F, "level1/l1.local", asSet(EOL_LF, TEXT_SET));
+
+		assertEntry(D, "level1/level2");
+		assertEntry(F, "level1/level2/.gitattributes");
+		assertEntry(F, "level1/level2/l2.global", asSet(EOL_CRLF));
+		assertEntry(F, "level1/level2/l2.local", asSet(EOL_LF, TEXT_UNSET));
+
+		endWalk();
+
+	}
+
+	/**
 	 * Checks that the list of attributes is an aggregation of all the
 	 * attributes from the attributes files hierarchy.
 	 *
