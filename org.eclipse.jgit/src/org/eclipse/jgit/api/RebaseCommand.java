@@ -44,7 +44,6 @@ package org.eclipse.jgit.api;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -64,7 +63,6 @@ import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
-import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.Constants;
@@ -187,7 +185,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			for (Step step : steps) {
 				if (step.action != Action.PICK)
 					continue;
-				popSteps(1);
 				Collection<ObjectId> ids = or.resolve(step.commit);
 				if (ids.size() != 1)
 					throw new JGitInternalException(
@@ -206,7 +203,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 						.call();
 				monitor.endTask();
 				if (newHead == null) {
-					return stop(commitToPick);
+					popSteps(stepsToPop);
+					return new RebaseResult(commitToPick);
 				}
 				stepsToPop++;
 			}
@@ -229,29 +227,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		}
 	}
 
-	private RebaseResult stop(RevCommit commitToPick) throws IOException {
-		StringBuilder sb = new StringBuilder(100);
-		sb.append("GIT_AUTHOR_NAME='");
-		sb.append(commitToPick.getAuthorIdent().getName());
-		sb.append("'\n");
-		sb.append("GIT_AUTHOR_EMAIL='");
-		sb.append(commitToPick.getAuthorIdent().getEmailAddress());
-		sb.append("'\n");
-		sb.append("GIT_AUTHOR_DATE='");
-		sb.append(commitToPick.getAuthorIdent().getWhen());
-		sb.append("'\n");
-		createFile(rebaseDir, "author-script", sb.toString());
-		createFile(rebaseDir, "message", commitToPick.getShortMessage());
-		ByteArrayOutputStream bos = new ByteArrayOutputStream();
-		DiffFormatter df = new DiffFormatter(bos);
-		df.setRepository(repo);
-		df.format(commitToPick.getParent(0), commitToPick);
-		createFile(rebaseDir, "patch", new String(bos.toByteArray(), "UTF-8"));
-		createFile(rebaseDir, "stopped-sha", repo.newObjectReader().abbreviate(
-				commitToPick).name());
-		return new RebaseResult(commitToPick);
-	}
-
 	/**
 	 * Removes the number of lines given in the parameter from the
 	 * <code>git-rebase-todo</code> file but preserves comments and other lines
@@ -263,15 +238,14 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	private void popSteps(int numSteps) throws IOException {
 		if (numSteps == 0)
 			return;
-		List<String> todoLines = new ArrayList<String>();
-		List<String> poppedLines = new ArrayList<String>();
-		File todoFile = new File(rebaseDir, "git-rebase-todo");
-		File doneFile = new File(rebaseDir, "done");
+		List<String> lines = new ArrayList<String>();
+		File file = new File(rebaseDir, "git-rebase-todo");
 		BufferedReader br = new BufferedReader(new InputStreamReader(
-				new FileInputStream(todoFile), "UTF-8"));
+				new FileInputStream(file), "UTF-8"));
+		int popped = 0;
 		try {
 			// check if the line starts with a action tag (pick, skip...)
-			while (poppedLines.size() < numSteps) {
+			while (popped < numSteps) {
 				String popCandidate = br.readLine();
 				if (popCandidate == null)
 					break;
@@ -282,43 +256,28 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 					pop = Action.parse(actionToken) != null;
 				}
 				if (pop)
-					poppedLines.add(popCandidate);
+					popped++;
 				else
-					todoLines.add(popCandidate);
+					lines.add(popCandidate);
 			}
 			String readLine = br.readLine();
 			while (readLine != null) {
-				todoLines.add(readLine);
+				lines.add(readLine);
 				readLine = br.readLine();
 			}
 		} finally {
 			br.close();
 		}
 
-		BufferedWriter todoWriter = new BufferedWriter(new OutputStreamWriter(
-				new FileOutputStream(todoFile), "UTF-8"));
+		BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(
+				new FileOutputStream(file), "UTF-8"));
 		try {
-			for (String writeLine : todoLines) {
-				todoWriter.write(writeLine);
-				todoWriter.newLine();
+			for (String writeLine : lines) {
+				bw.write(writeLine);
+				bw.newLine();
 			}
 		} finally {
-			todoWriter.close();
-		}
-
-		if (poppedLines.size() > 0) {
-			// append here
-			BufferedWriter doneWriter = new BufferedWriter(
-					new OutputStreamWriter(
-							new FileOutputStream(doneFile, true), "UTF-8"));
-			try {
-				for (String writeLine : poppedLines) {
-					doneWriter.write(writeLine);
-					doneWriter.newLine();
-				}
-			} finally {
-				doneWriter.close();
-			}
+			bw.close();
 		}
 	}
 
@@ -366,7 +325,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		createFile(rebaseDir, "head", headId.name());
 		createFile(rebaseDir, "head-name", headName);
 		createFile(rebaseDir, "onto", upstreamCommit.name());
-		createFile(rebaseDir, "interactive", "");
 		BufferedWriter fw = new BufferedWriter(new OutputStreamWriter(
 				new FileOutputStream(new File(rebaseDir, "git-rebase-todo")),
 				"UTF-8"));
@@ -438,7 +396,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		FileOutputStream fos = new FileOutputStream(file);
 		try {
 			fos.write(content.getBytes("UTF-8"));
-			fos.write('\n');
 		} finally {
 			fos.close();
 		}
@@ -477,8 +434,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				case NO_CHANGE:
 					break;
 				default:
-					throw new JGitInternalException(
-							JGitText.get().abortingRebaseFailed);
+					throw new IOException("Could not abort rebase");
 				}
 			}
 			// cleanup the files
@@ -501,12 +457,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	}
 
 	private String readFile(File directory, String fileName) throws IOException {
-		byte[] content = IO.readFully(new File(directory, fileName));
-		// strip off the last LF
-		int end = content.length;
-		while (0 < end && content[end - 1] == '\n')
-			end--;
-		return RawParseUtils.decode(content, 0, end);
+		return RawParseUtils
+				.decode(IO.readFully(new File(directory, fileName)));
 	}
 
 	private void checkoutCommit(RevCommit commit) throws IOException {

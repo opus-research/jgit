@@ -49,7 +49,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.Set;
 
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheIterator;
@@ -65,17 +64,15 @@ import org.eclipse.jgit.treewalk.filter.SkipWorkTreeFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 
 /**
- * Compares the index, a tree, and the working directory Ignored files are not
- * taken into account. The following information is retrieved:
- * <ul>
- * <li>added files</li>
- * <li>changed files</li>
- * <li>removed files</li>
- * <li>missing files</li>
- * <li>modified files</li>
- * <li>untracked files</li>
- * <li>files with assume-unchanged flag</li>
- * </ul>
+ * Compares the index, a tree, and the working directory
+ * Ignored files are not taken into account.
+ * The following information is retrieved:
+ * <li> added files
+ * <li> changed files
+ * <li> removed files
+ * <li> missing files
+ * <li> modified files
+ * <li> untracked files
  */
 public class IndexDiff {
 
@@ -93,19 +90,17 @@ public class IndexDiff {
 
 	private final WorkingTreeIterator initialWorkingTreeIterator;
 
-	private Set<String> added = new HashSet<String>();
+	private HashSet<String> added = new HashSet<String>();
 
-	private Set<String> changed = new HashSet<String>();
+	private HashSet<String> changed = new HashSet<String>();
 
-	private Set<String> removed = new HashSet<String>();
+	private HashSet<String> removed = new HashSet<String>();
 
-	private Set<String> missing = new HashSet<String>();
+	private HashSet<String> missing = new HashSet<String>();
 
-	private Set<String> modified = new HashSet<String>();
+	private HashSet<String> modified = new HashSet<String>();
 
-	private Set<String> untracked = new HashSet<String>();
-
-	private Set<String> assumeUnchanged = new HashSet<String>();
+	private HashSet<String> untracked = new HashSet<String>();
 
 	/**
 	 * Construct an IndexDiff
@@ -195,11 +190,6 @@ public class IndexDiff {
 					WorkingTreeIterator.class);
 			FileMode fileModeTree = treeWalk.getFileMode(TREE);
 
-			if (dirCacheIterator != null) {
-				if (dirCacheIterator.getDirCacheEntry().isAssumeValid())
-					assumeUnchanged.add(dirCacheIterator.getEntryPathString());
-			}
-
 			if (treeIterator != null) {
 				if (dirCacheIterator != null) {
 					if (!treeIterator.getEntryObjectId().equals(
@@ -253,49 +243,43 @@ public class IndexDiff {
 	/**
 	 * @return list of files added to the index, not in the tree
 	 */
-	public Set<String> getAdded() {
+	public HashSet<String> getAdded() {
 		return added;
 	}
 
 	/**
 	 * @return list of files changed from tree to index
 	 */
-	public Set<String> getChanged() {
+	public HashSet<String> getChanged() {
 		return changed;
 	}
 
 	/**
 	 * @return list of files removed from index, but in tree
 	 */
-	public Set<String> getRemoved() {
+	public HashSet<String> getRemoved() {
 		return removed;
 	}
 
 	/**
 	 * @return list of files in index, but not filesystem
 	 */
-	public Set<String> getMissing() {
+	public HashSet<String> getMissing() {
 		return missing;
 	}
 
 	/**
 	 * @return list of files on modified on disk relative to the index
 	 */
-	public Set<String> getModified() {
+	public HashSet<String> getModified() {
 		return modified;
 	}
 
 	/**
 	 * @return list of files on modified on disk relative to the index
 	 */
-	public Set<String> getUntracked() {
+	public HashSet<String> getUntracked() {
 		return untracked;
 	}
 
-	/**
-	 * @return list of files with the flag assume-unchanged
-	 */
-	public Set<String> getAssumeUnchanged() {
-		return assumeUnchanged;
-	}
 }
