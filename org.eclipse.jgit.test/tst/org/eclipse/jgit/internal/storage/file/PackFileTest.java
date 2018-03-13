@@ -284,12 +284,10 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 		assertNotNull("created loader", ol);
 		assertEquals(Constants.OBJ_BLOB, ol.getType());
 		assertEquals(data3.length, ol.getSize());
-		Boolean large = ol.isLarge();
+		assertTrue("is large", ol.isLarge());
 		try {
 			ol.getCachedBytes();
-                        if( large ) {
-				fail("Should have thrown LargeObjectException");
-			}
+			fail("Should have thrown LargeObjectException");
 		} catch (LargeObjectException tooBig) {
 			assertEquals(MessageFormat.format(
 					JGitText.get().largeObjectException, id3.name()), tooBig
