@@ -60,9 +60,6 @@ class Merge extends TextBuiltin {
 	@Option(name = "--strategy", aliases = { "-s" }, usage = "usage_mergeStrategy")
 	private String strategyName;
 
-	@Option(name = "--squash")
-	private boolean squash;
-
 	private MergeStrategy mergeStrategy = MergeStrategy.RESOLVE;
 
 	@Argument(required = true)
@@ -86,7 +83,7 @@ class Merge extends TextBuiltin {
 
 		Git git = new Git(db);
 		MergeResult result = git.merge().setStrategy(mergeStrategy)
-				.include(src).setSquash(squash).call();
+				.include(src).call();
 
 		switch (result.getMergeStatus()) {
 		case ALREADY_UP_TO_DATE:
@@ -94,10 +91,6 @@ class Merge extends TextBuiltin {
 			break;
 		case FAST_FORWARD:
 			outw.println(result.getMergeStatus().toString());
-			break;
-		case FAST_FORWARD_SQUASHED:
-			outw.println(result.getMergeStatus().toString());
-			outw.println(CLIText.get().mergeSquashFinished);
 			break;
 		case CONFLICTING:
 			for (String collidingPath : result.getConflicts().keySet())
@@ -119,11 +112,6 @@ class Merge extends TextBuiltin {
 					outw.println("        " + entry.getKey());
 					break;
 				}
-			break;
-		case MERGED_SQUASHED:
-			outw.println(MessageFormat.format(CLIText.get().mergeMadeBy,
-					mergeStrategy.getName()));
-			outw.println(CLIText.get().mergeSquashFinished);
 			break;
 		case MERGED:
 			outw.println(MessageFormat.format(CLIText.get().mergeMadeBy,
