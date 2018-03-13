@@ -48,15 +48,15 @@ public interface AdvertiseRefsHook {
 	 * A simple hook that advertises the default refs.
 	 * <p>
 	 * The method implementations do nothing to preserve the default behavior; see
-	 * {@link UploadPack#setAdvertisedRefs(java.util.Map)} and
-	 * {@link ReceivePack#setAdvertisedRefs(java.util.Map,java.util.Set)}.
+	 * {@link UploadSession#setAdvertisedRefs(java.util.Map)} and
+	 * {@link ReceiveSession#setAdvertisedRefs(java.util.Map,java.util.Set)}.
 	 */
 	public static final AdvertiseRefsHook DEFAULT = new AdvertiseRefsHook() {
-		public void advertiseRefs(UploadPack uploadPack) {
+		public void advertiseRefs(UploadSession uploadSession) {
 			// Do nothing.
 		}
 
-		public void advertiseRefs(ReceivePack receivePack) {
+		public void advertiseRefs(ReceiveSession receiveSession) {
 			// Do nothing.
 		}
 	};
@@ -64,24 +64,24 @@ public interface AdvertiseRefsHook {
 	/**
 	 * Advertise refs for upload-pack.
 	 *
-	 * @param uploadPack instance on which to call
-	 *            {@link UploadPack#setAdvertisedRefs(java.util.Map)}
+	 * @param uploadSession instance on which to call
+	 *            {@link UploadSession#setAdvertisedRefs(java.util.Map)}
 	 *            if necessary.
 	 * @throws ServiceMayNotContinueException
 	 *             abort; the message will be sent to the user.
 	 */
-	public void advertiseRefs(UploadPack uploadPack)
+	public void advertiseRefs(UploadSession uploadSession)
 			throws ServiceMayNotContinueException;
 
 	/**
 	 * Advertise refs for receive-pack.
 	 *
-	 * @param receivePack instance on which to call
-	 *            {@link ReceivePack#setAdvertisedRefs(java.util.Map,java.util.Set)}
+	 * @param receiveSession instance on which to call
+	 *            {@link ReceiveSession#setAdvertisedRefs(java.util.Map,java.util.Set)}
 	 *            if necessary.
 	 * @throws ServiceMayNotContinueException
 	 *             abort; the message will be sent to the user.
 	 */
-	public void advertiseRefs(ReceivePack receivePack)
+	public void advertiseRefs(ReceiveSession receiveSession)
 			throws ServiceMayNotContinueException;
 }
