@@ -180,7 +180,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String mostCommonlyUsedCommandsAre;
 	/***/ public String needApprovalToDestroyCurrentRepository;
 	/***/ public String noGitRepositoryConfigured;
-	/***/ public String noNamesFound;
 	/***/ public String noSuchFile;
 	/***/ public String noSuchRemoteRef;
 	/***/ public String noTREESectionInIndex;
