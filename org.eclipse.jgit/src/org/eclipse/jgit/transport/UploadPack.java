@@ -1413,6 +1413,7 @@ public class UploadPack {
 			}
 
 			pw.writePack(pm, NullProgressMonitor.INSTANCE, packOut);
+			statistics = pw.getStatistics();
 
 			if (msgOut != NullOutputStream.INSTANCE) {
 				String msg = pw.getStatistics().getMessage() + '\n';
@@ -1421,13 +1422,13 @@ public class UploadPack {
 			}
 
 		} finally {
-			statistics = pw.getStatistics();
-			if (statistics != null)
-				logger.onPackStatistics(statistics);
 			pw.release();
 		}
 
 		if (sideband)
 			pckOut.end();
+
+		if (statistics != null)
+			logger.onPackStatistics(statistics);
 	}
 }
