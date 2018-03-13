@@ -25,21 +25,16 @@ public class InstallLfsCommand implements Callable<Void>{
 
 		cfg.setBoolean(ConfigConstants.CONFIG_FILTER_SECTION, Constants.LFS,
 				ConfigConstants.CONFIG_KEY_USEJGITBUILTIN, true);
-		cfg.setString(ConfigConstants.CONFIG_FILTER_SECTION, Constants.LFS,
-				org.eclipse.jgit.lib.Constants.ATTR_FILTER_TYPE_SMUDGE,
-				"git-lfs smudge -- %f"); //$NON-NLS-1$
-		cfg.setString(ConfigConstants.CONFIG_FILTER_SECTION, Constants.LFS,
-				org.eclipse.jgit.lib.Constants.ATTR_FILTER_TYPE_CLEAN,
-				"git-lfs clean -- %f"); //$NON-NLS-1$
 		cfg.setBoolean(ConfigConstants.CONFIG_FILTER_SECTION, Constants.LFS,
 				ConfigConstants.CONFIG_KEY_REQUIRED, true);
 
-		// compatibility with native lfs
-		cfg.setString(ConfigConstants.CONFIG_FILTER_SECTION, Constants.LFS,
-				"process", //$NON-NLS-1$
-				"git-lfs filter-process"); //$NON-NLS-1$
-
 		cfg.save();
+
+		// try to run git lfs install, we really don't care if it is present
+		// and/or works here (yet).
+		FS.DETECTED.runProcess(FS.DETECTED.runInShell("git", //$NON-NLS-1$
+				new String[] { "lfs", "install" }), //$NON-NLS-1$ //$NON-NLS-2$
+				null, null, (String) null);
 
 		return null;
 	}
