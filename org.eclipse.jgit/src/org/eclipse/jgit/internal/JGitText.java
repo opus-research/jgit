@@ -1,7 +1,6 @@
 /*
  * Copyright (C) 2010, 2013 Sasa Zivkov <sasa.zivkov@sap.com>
  * Copyright (C) 2012, Research In Motion Limited
- * Copyright (C) 2013, Obeo
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -90,7 +89,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String bareRepositoryNoWorkdirAndIndex;
 	/***/ public String base64InputNotProperlyPadded;
 	/***/ public String baseLengthIncorrect;
-	/***/ public String binaryMergeDriverName;
 	/***/ public String bitmapMissingObject;
 	/***/ public String bitmapsMustBePrepared;
 	/***/ public String blameNotCommittedYet;
@@ -163,8 +161,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String connectionFailed;
 	/***/ public String connectionTimeOut;
 	/***/ public String contextMustBeNonNegative;
-	/***/ public String copyFailureDestinationIsDirectory;
-	/***/ public String copyFailureDestinationIsReadOnly;
 	/***/ public String corruptionDetectedReReadingAt;
 	/***/ public String corruptObjectBadStream;
 	/***/ public String corruptObjectBadStreamCorruptHeader;
@@ -544,7 +540,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String tagAlreadyExists;
 	/***/ public String tagNameInvalid;
 	/***/ public String tagOnRepoWithoutHEADCurrentlyNotSupported;
-	/***/ public String textMergeDriverName;
 	/***/ public String theFactoryMustNotBeNull;
 	/***/ public String timerAlreadyTerminated;
 	/***/ public String topologicalSortRequired;
