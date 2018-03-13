@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2009, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,33 +41,53 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.notes;
+package org.eclipse.jgit.diff;
 
-/** A note bucket that has been loaded into the process. */
-abstract class InMemoryNoteBucket extends NoteBucket {
+public class DiffTestDataGenerator {
 	/**
-	 * Number of leading digits that leads to this bucket in the note path.
+	 * Generate sequence of characters in ascending order. The first character
+	 * is a space. All subsequent characters have an ASCII code one greater then
+	 * the ASCII code of the preceding character. On exception: the character
+	 * following which follows '~' is again a ' '.
 	 *
-	 * This is counted in terms of hex digits, not raw bytes. Each bucket level
-	 * is typically 2 higher than its parent, placing about 256 items in each
-	 * level of the tree.
+	 * @param len
+	 *            length of the String to be returned
+	 * @return the sequence of characters as String
 	 */
-	final int prefixLen;
-
-	/**
-	 * Chain of non-note tree entries found at this path in the tree.
-	 *
-	 * During parsing of a note tree into the in-memory representation,
-	 * {@link NoteParser} keeps track of all non-note tree entries and stores
-	 * them here as a sorted linked list. That list can be merged back with the
-	 * note data that is held by the subclass, allowing the tree to be
-	 * recreated.
-	 */
-	NonNoteEntry nonNotes;
-
-	InMemoryNoteBucket(int prefixLen) {
-		this.prefixLen = prefixLen;
+	public static String generateSequence(int len) {
+		return generateSequence(len, 0, 0);
 	}
 
-	abstract InMemoryNoteBucket append(Note note);
+	/**
+	 * Generate sequence of characters similar to the one returned by
+	 * {@link #generateSequence(int)}. But this time in each chunk of
+	 * <skipPeriod> characters the last <skipLength> characters are left out. By
+	 * calling this method twice with two different prime skipPeriod values and
+	 * short skipLength values you create test data which is similar to what
+	 * programmers do to their source code - huge files with only few
+	 * insertions/deletions/changes.
+	 *
+	 * @param len
+	 *            length of the String to be returned
+	 * @param skipPeriod
+	 * @param skipLength
+	 * @return the sequence of characters as String
+	 */
+	public static String generateSequence(int len, int skipPeriod,
+			int skipLength) {
+		StringBuilder text = new StringBuilder(len);
+		int skipStart = skipPeriod - skipLength;
+		int skippedChars = 0;
+		int block = 0;
+		for (int i = 0; i - skippedChars < len; ++i) {
+			if ((i % skipPeriod) == 1)
+				text.append((char) (256 + block++));
+			else if (skipPeriod == 0 || i % skipPeriod < skipStart) {
+				text.append((char) (32 + i % 95));
+			} else {
+				skippedChars++;
+			}
+		}
+		return text.toString();
+	}
 }
