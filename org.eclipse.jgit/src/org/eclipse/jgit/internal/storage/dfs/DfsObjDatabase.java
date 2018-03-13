@@ -61,17 +61,7 @@ import org.eclipse.jgit.lib.ObjectReader;
 
 /** Manages objects stored in {@link DfsPackFile} on a storage system. */
 public abstract class DfsObjDatabase extends ObjectDatabase {
-	private static final PackList NO_PACKS = new PackList(new DfsPackFile[0]) {
-		@Override
-		boolean dirty() {
-			return true;
-		}
-
-		@Override
-		void markDirty() {
-			// Always dirty.
-		}
-	};
+	private static final PackList NO_PACKS = new PackList(new DfsPackFile[0]);
 
 	/** Sources for a pack file. */
 	public static enum PackSource {
@@ -183,11 +173,7 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 	 *             the pack list cannot be initialized.
 	 */
 	public DfsPackFile[] getPacks() throws IOException {
-		return getPackList().packs;
-	}
-
-	PackList getPackList() throws IOException {
-		return scanPacks(NO_PACKS);
+		return scanPacks(NO_PACKS).packs;
 	}
 
 	/** @return repository owning this object database. */
@@ -377,11 +363,11 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 			DfsPackFile[] packs = new DfsPackFile[1 + o.packs.length];
 			packs[0] = newPack;
 			System.arraycopy(o.packs, 0, packs, 1, o.packs.length);
-			n = new PackListImpl(packs);
+			n = new PackList(packs);
 		} while (!packList.compareAndSet(o, n));
 	}
 
-	PackList scanPacks(final PackList original) throws IOException {
+	private PackList scanPacks(final PackList original) throws IOException {
 		PackList o, n;
 		synchronized (packList) {
 			do {
@@ -422,10 +408,10 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		for (DfsPackFile p : forReuse.values())
 			p.close();
 		if (list.isEmpty())
-			return new PackListImpl(NO_PACKS.packs);
+			return new PackList(NO_PACKS.packs);
 		if (!foundNew)
 			return old;
-		return new PackListImpl(list.toArray(new DfsPackFile[list.size()]));
+		return new PackList(list.toArray(new DfsPackFile[list.size()]));
 	}
 
 	private static Map<DfsPackDescription, DfsPackFile> reuseMap(PackList old) {
@@ -460,25 +446,6 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		packList.set(NO_PACKS);
 	}
 
-	/**
-	 * Mark object database as dirty.
-	 * <p>
-	 * Used when the caller knows that new data might have been written to the
-	 * repository that could invalidate open readers, for example if refs are
-	 * newly scanned.
-	 */
-	protected void markDirty() {
-		packList.get().markDirty();
-	}
-
-	/**
-	 * @return latest modified timestamp of all currently scanned packs, in
-	 *         milliseconds since epoch.
-	 */
-	long lastModified() {
-		return packList.get().lastModified;
-	}
-
 	@Override
 	public void close() {
 		// PackList packs = packList.get();
@@ -489,41 +456,12 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		// p.close();
 	}
 
-	static abstract class PackList {
+	private static final class PackList {
 		/** All known packs, sorted. */
 		final DfsPackFile[] packs;
 
-		final long lastModified;
-
-		private PackList(final DfsPackFile[] packs) {
+		PackList(final DfsPackFile[] packs) {
 			this.packs = packs;
-			long max = Long.MIN_VALUE;
-			for (DfsPackFile pack : packs) {
-				max = Math.max(max, pack.getPackDescription().getLastModified());
-			}
-			this.lastModified = max;
-		}
-
-		abstract boolean dirty();
-
-		abstract void markDirty();
-	}
-
-	private static final class PackListImpl extends PackList {
-		private volatile boolean dirty;
-
-		PackListImpl(DfsPackFile[] packs) {
-			super(packs);
-		}
-
-		@Override
-		boolean dirty() {
-			return dirty;
-		}
-
-		@Override
-		void markDirty() {
-			dirty = true;
 		}
 	}
 }

@@ -283,14 +283,7 @@ public class InMemoryRepository extends DfsRepository {
 					if (performsAtomicTransactions() && isAtomic()) {
 						try {
 							lock.writeLock().lock();
-							List<ReceiveCommand> cmds = getCommands();
-							batch(cmds);
-							for (ReceiveCommand cmd : cmds) {
-								if (cmd.getResult() == ReceiveCommand.Result.OK) {
-									objdb.markDirty();
-									break;
-								}
-							}
+							batch(getCommands());
 						} finally {
 							lock.writeLock().unlock();
 						}
@@ -317,7 +310,6 @@ public class InMemoryRepository extends DfsRepository {
 			}
 			ids.sort();
 			sym.sort();
-			objdb.markDirty();
 			return new RefCache(ids.toRefList(), sym.toRefList());
 		}
 
@@ -393,15 +385,6 @@ public class InMemoryRepository extends DfsRepository {
 		@Override
 		protected boolean compareAndPut(Ref oldRef, Ref newRef)
 				throws IOException {
-			boolean ret = compareAndPutImpl(oldRef, newRef);
-			if (ret) {
-				objdb.markDirty();
-			}
-			return ret;
-		}
-
-		private boolean compareAndPutImpl(Ref oldRef, Ref newRef)
-				throws IOException {
 			try {
 				lock.writeLock().lock();
 				ObjectId id = newRef.getObjectId();
@@ -452,14 +435,6 @@ public class InMemoryRepository extends DfsRepository {
 
 		@Override
 		protected boolean compareAndRemove(Ref oldRef) throws IOException {
-			boolean ret = compareAndRemoveImpl(oldRef);
-			if (ret) {
-				objdb.markDirty();
-			}
-			return ret;
-		}
-
-		private boolean compareAndRemoveImpl(Ref oldRef) {
 			try {
 				lock.writeLock().lock();
 				String name = oldRef.getName();
