@@ -61,8 +61,8 @@ public abstract class LogCursor implements AutoCloseable {
 	/** @return name of the current reference. */
 	public abstract String getRefName();
 
-	/** @return time of reflog entry, microseconds since the epoch. */
-	public abstract long getReflogTimeUsec();
+	/** @return identifier of the transaction that created the log record. */
+	public abstract long getUpdateIndex();
 
 	/** @return current log entry. */
 	public abstract ReflogEntry getReflogEntry();
