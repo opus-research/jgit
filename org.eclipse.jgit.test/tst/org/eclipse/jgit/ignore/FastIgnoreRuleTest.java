@@ -391,8 +391,7 @@ public class FastIgnoreRuleTest {
 		assertMatched("/**/a/b", "c/d/a/b");
 		assertMatched("/**/**/a/b", "c/d/a/b");
 
-		assertMatched("a/**", "a/");
-		assertMatched("a/b/**", "a/b/");
+		assertMatched("a/b/**", "a/b");
 		assertMatched("a/b/**", "a/b/c");
 		assertMatched("a/b/**", "a/b/c/d/");
 		assertMatched("a/b/**/**", "a/b/c/d");
@@ -416,9 +415,6 @@ public class FastIgnoreRuleTest {
 
 	@Test
 	public void testWildmatchDoNotMatch() {
-		assertNotMatched("a/**", "a");
-		assertNotMatched("a/b/**", "a/b");
-		assertNotMatched("a/b/**/**", "a/b");
 		assertNotMatched("**/a/b", "a/c/b");
 		assertNotMatched("!/**/*.zip", "c/a/b.zip");
 		assertNotMatched("!**/*.zip", "c/a/b.zip");
