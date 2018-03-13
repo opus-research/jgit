@@ -269,7 +269,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String switchedToBranch;
 	/***/ public String tagAlreadyExists;
 	/***/ public String tagLabel;
-	/***/ public String tagNotFound;
 	/***/ public String taggerInfo;
 	/***/ public String timeInMilliSeconds;
 	/***/ public String tooManyRefsGiven;
