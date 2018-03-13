@@ -67,7 +67,6 @@ import org.eclipse.jgit.internal.storage.dfs.DfsRepository;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.util.IO;
 
 /** Common utility functions for servlets. */
 public final class ServletUtils {
@@ -151,7 +150,9 @@ public final class ServletUtils {
 		if (in == null)
 			return;
 		try {
-			IO.skipFully(in);
+			while (0 < in.skip(2048) || 0 <= in.read()) {
+				// Discard until EOF.
+			}
 		} catch (IOException err) {
 			// Discard IOException during read or skip.
 		} finally {

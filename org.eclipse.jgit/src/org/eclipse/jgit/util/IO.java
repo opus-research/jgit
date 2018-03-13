@@ -336,23 +336,6 @@ public class IO {
 	}
 
 	/**
-	 * Skip an entire input stream.
-	 * <p>
-	 * The input stream's position is moved forward to EOF, discarding them from
-	 * the input.
-	 *
-	 * @param fd
-	 *            the stream to skip bytes from.
-	 * @throws IOException
-	 *             there was an error reading from the stream.
-	 */
-	public static void skipFully(InputStream fd) throws IOException {
-		while (0 < fd.skip(2048) || 0 <= fd.read()) {
-			// Discard until EOF.
-		}
-	}
-
-	/**
 	 * Divides the given string into lines.
 	 *
 	 * @param s
@@ -361,7 +344,7 @@ public class IO {
 	 * @since 2.0
 	 */
 	public static List<String> readLines(final String s) {
-		List<String> l = new ArrayList<>();
+		List<String> l = new ArrayList<String>();
 		StringBuilder sb = new StringBuilder();
 		for (int i = 0; i < s.length(); i++) {
 			char c = s.charAt(i);

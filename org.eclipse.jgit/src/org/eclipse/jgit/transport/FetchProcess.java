@@ -88,18 +88,18 @@ class FetchProcess {
 	private final Collection<RefSpec> toFetch;
 
 	/** Set of refs we will actually wind up asking to obtain. */
-	private final HashMap<ObjectId, Ref> askFor = new HashMap<>();
+	private final HashMap<ObjectId, Ref> askFor = new HashMap<ObjectId, Ref>();
 
 	/** Objects we know we have locally. */
-	private final HashSet<ObjectId> have = new HashSet<>();
+	private final HashSet<ObjectId> have = new HashSet<ObjectId>();
 
 	/** Updates to local tracking branches (if any). */
-	private final ArrayList<TrackingRefUpdate> localUpdates = new ArrayList<>();
+	private final ArrayList<TrackingRefUpdate> localUpdates = new ArrayList<TrackingRefUpdate>();
 
 	/** Records to be recorded into FETCH_HEAD. */
-	private final ArrayList<FetchHeadRecord> fetchHeadUpdates = new ArrayList<>();
+	private final ArrayList<FetchHeadRecord> fetchHeadUpdates = new ArrayList<FetchHeadRecord>();
 
-	private final ArrayList<PackLock> packLocks = new ArrayList<>();
+	private final ArrayList<PackLock> packLocks = new ArrayList<PackLock>();
 
 	private FetchConnection conn;
 
@@ -137,7 +137,7 @@ class FetchProcess {
 		try {
 			result.setAdvertisedRefs(transport.getURI(), conn.getRefsMap());
 			result.peerUserAgent = conn.getPeerUserAgent();
-			final Set<Ref> matched = new HashSet<>();
+			final Set<Ref> matched = new HashSet<Ref>();
 			for (final RefSpec spec : toFetch) {
 				if (spec.getSource() == null)
 					throw new TransportException(MessageFormat.format(
@@ -275,11 +275,11 @@ class FetchProcess {
 		// We rebuild our askFor list using only the refs that the
 		// new connection has offered to us.
 		//
-		final HashMap<ObjectId, Ref> avail = new HashMap<>();
+		final HashMap<ObjectId, Ref> avail = new HashMap<ObjectId, Ref>();
 		for (final Ref r : conn.getRefs())
 			avail.put(r.getObjectId(), r);
 
-		final Collection<Ref> wants = new ArrayList<>(askFor.values());
+		final Collection<Ref> wants = new ArrayList<Ref>(askFor.values());
 		askFor.clear();
 		for (final Ref want : wants) {
 			final Ref newRef = avail.get(want.getObjectId());
@@ -369,7 +369,7 @@ class FetchProcess {
 	}
 
 	private Collection<Ref> expandAutoFollowTags() throws TransportException {
-		final Collection<Ref> additionalTags = new ArrayList<>();
+		final Collection<Ref> additionalTags = new ArrayList<Ref>();
 		final Map<String, Ref> haveRefs = localRefs();
 		for (final Ref r : conn.getRefs()) {
 			if (!isTag(r))

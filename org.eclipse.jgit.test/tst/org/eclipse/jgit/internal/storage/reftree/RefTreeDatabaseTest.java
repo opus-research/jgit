@@ -711,7 +711,6 @@ public class RefTreeDatabaseTest {
 			RefTreeDatabaseTest.this.refdb = refs;
 		}
 
-		@Override
 		public RefDatabase getRefDatabase() {
 			return refs;
 		}
