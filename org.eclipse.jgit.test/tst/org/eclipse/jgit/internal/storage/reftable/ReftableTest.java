@@ -97,10 +97,10 @@ public class ReftableTest {
 		try (RefCursor rc = t.allRefs()) {
 			assertFalse(rc.next());
 		}
-		try (RefCursor rc = t.seek(HEAD)) {
+		try (RefCursor rc = t.seekRef(HEAD)) {
 			assertFalse(rc.next());
 		}
-		try (RefCursor rc = t.seek(R_HEADS)) {
+		try (RefCursor rc = t.seekRef(R_HEADS)) {
 			assertFalse(rc.next());
 		}
 		try (LogCursor rc = t.allLogs()) {
@@ -114,7 +114,7 @@ public class ReftableTest {
 		try (RefCursor rc = t.allRefs()) {
 			assertFalse(rc.next());
 		}
-		try (RefCursor rc = t.seek(HEAD)) {
+		try (RefCursor rc = t.seekRef(HEAD)) {
 			assertFalse(rc.next());
 		}
 		try (LogCursor rc = t.allLogs()) {
@@ -189,7 +189,7 @@ public class ReftableTest {
 			assertFalse(rc.wasDeleted());
 			assertFalse(rc.next());
 		}
-		try (RefCursor rc = t.seek(MASTER)) {
+		try (RefCursor rc = t.seekRef(MASTER)) {
 			assertTrue(rc.next());
 			Ref act = rc.getRef();
 			assertNotNull(act);
@@ -223,7 +223,7 @@ public class ReftableTest {
 		Ref exp = sym(HEAD, MASTER);
 		byte[] table = write(exp);
 		assertEquals(
-				24 + 4 + 5 + 2 + HEAD.length() + 1 + 5 + MASTER.length() + 68,
+				24 + 4 + 5 + 2 + HEAD.length() + 1 + MASTER.length() + 68,
 				table.length);
 
 		ReftableReader t = read(table);
@@ -236,60 +236,6 @@ public class ReftableTest {
 			assertNotNull(act.getLeaf());
 			assertEquals(MASTER, act.getTarget().getName());
 			assertNull(act.getObjectId());
-		}
-	}
-
-	@Test
-	public void oneTextRef() throws IOException {
-		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-		ReftableWriter writer = new ReftableWriter().begin(buffer);
-		writer.writeText(
-				"MERGE_HEAD",
-				id(1).name() + '\n' + id(2).name() + '\n');
-		writer.finish();
-		byte[] table = buffer.toByteArray();
-
-		assertEquals(
-				24 + 4 + 5 + 2 + "MERGE_HEAD".length() + 1 + 82 + 68,
-				table.length);
-
-		ReftableReader t = read(table);
-		try (RefCursor rc = t.allRefs()) {
-			assertTrue(rc.next());
-			Ref act = rc.getRef();
-			assertNotNull(act);
-			assertFalse(act.isSymbolic());
-			assertEquals("MERGE_HEAD", act.getName());
-			assertEquals(id(1), act.getObjectId());
-			assertFalse(rc.next());
-		}
-	}
-
-	@Test
-	public void oneNonRefTextFile() throws IOException {
-		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-		ReftableWriter writer = new ReftableWriter().begin(buffer);
-		writer.writeText("SAVE", "content");
-		writer.finish();
-		byte[] table = buffer.toByteArray();
-
-		assertEquals(
-				24 + 4 + 5 + 2 + "SAVE".length() + 1 + "content".length() + 68,
-				table.length);
-
-		ReftableReader t = read(table);
-		assertFalse(t.hasRef("SAVE")); // behaves as deleted.
-
-		t.setIncludeDeletes(true);
-		try (RefCursor rc = t.allRefs()) {
-			assertTrue(rc.next());
-			Ref act = rc.getRef();
-			assertNotNull(act);
-			assertFalse(act.isSymbolic());
-			assertEquals(NEW, act.getStorage());
-			assertEquals("SAVE", act.getName());
-			assertNull(act.getObjectId());
-			assertFalse(rc.next());
 		}
 	}
 
@@ -322,10 +268,10 @@ public class ReftableTest {
 	public void seekNotFound() throws IOException {
 		Ref exp = ref(MASTER, 1);
 		ReftableReader t = read(write(exp));
-		try (RefCursor rc = t.seek("refs/heads/a")) {
+		try (RefCursor rc = t.seekRef("refs/heads/a")) {
 			assertFalse(rc.next());
 		}
-		try (RefCursor rc = t.seek("refs/heads/n")) {
+		try (RefCursor rc = t.seekRef("refs/heads/n")) {
 			assertFalse(rc.next());
 		}
 	}
@@ -334,10 +280,10 @@ public class ReftableTest {
 	public void namespaceNotFound() throws IOException {
 		Ref exp = ref(MASTER, 1);
 		ReftableReader t = read(write(exp));
-		try (RefCursor rc = t.seek("refs/changes/")) {
+		try (RefCursor rc = t.seekRef("refs/changes/")) {
 			assertFalse(rc.next());
 		}
-		try (RefCursor rc = t.seek("refs/tags/")) {
+		try (RefCursor rc = t.seekRef("refs/tags/")) {
 			assertFalse(rc.next());
 		}
 	}
@@ -349,12 +295,12 @@ public class ReftableTest {
 		Ref v1 = tag(V1_0, 3, 4);
 
 		ReftableReader t = read(write(master, next, v1));
-		try (RefCursor rc = t.seek("refs/tags/")) {
+		try (RefCursor rc = t.seekRef("refs/tags/")) {
 			assertTrue(rc.next());
 			assertEquals(V1_0, rc.getRef().getName());
 			assertFalse(rc.next());
 		}
-		try (RefCursor rc = t.seek("refs/heads/")) {
+		try (RefCursor rc = t.seekRef("refs/heads/")) {
 			assertTrue(rc.next());
 			assertEquals(MASTER, rc.getRef().getName());
 
@@ -404,7 +350,6 @@ public class ReftableTest {
 		byte[] table = write(refs);
 		assertEquals(0, stats.refIndexLevels());
 		assertEquals(0, stats.refIndexSize());
-		assertEquals(4, stats.refBlockCount());
 		assertEquals(table.length, stats.totalBytes());
 		assertScan(refs, read(table));
 	}
@@ -419,7 +364,6 @@ public class ReftableTest {
 
 		byte[] table = write(refs);
 		assertEquals(0, stats.refIndexLevels());
-		assertEquals(4, stats.refBlockCount());
 		assertSeek(refs, read(table));
 	}
 
@@ -479,57 +423,6 @@ public class ReftableTest {
 	}
 
 	@Test
-	public void withReflogChained() throws IOException {
-		Ref master = ref(MASTER, 3);
-		PersonIdent who = new PersonIdent("Log", "Ger", 1500079709, -8 * 60);
-		String msg = "test";
-
-		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-		ReftableWriter writer = new ReftableWriter()
-				.setMinUpdateIndex(1)
-				.setMaxUpdateIndex(3)
-				.begin(buffer);
-
-		writer.writeRef(master);
-		writer.writeLog(MASTER, 3, who, id(2), id(3), msg);
-		writer.writeLog(MASTER, 2, who, id(1), id(2), msg);
-		writer.writeLog(MASTER, 1, who, ObjectId.zeroId(), id(1), msg);
-
-		writer.finish();
-		byte[] table = buffer.toByteArray();
-		assertEquals(220, table.length);
-
-		ReftableReader t = read(table);
-		try (LogCursor lc = t.allLogs()) {
-			assertTrue(lc.next());
-			assertEquals(MASTER, lc.getRefName());
-			assertEquals(3, lc.getUpdateIndex());
-			assertEquals(id(2), lc.getReflogEntry().getOldId());
-			assertEquals(id(3), lc.getReflogEntry().getNewId());
-			assertEquals(who, lc.getReflogEntry().getWho());
-			assertEquals(msg, lc.getReflogEntry().getComment());
-
-			assertTrue(lc.next());
-			assertEquals(MASTER, lc.getRefName());
-			assertEquals(2, lc.getUpdateIndex());
-			assertEquals(id(1), lc.getReflogEntry().getOldId());
-			assertEquals(id(2), lc.getReflogEntry().getNewId());
-			assertEquals(who, lc.getReflogEntry().getWho());
-			assertEquals(msg, lc.getReflogEntry().getComment());
-
-			assertTrue(lc.next());
-			assertEquals(MASTER, lc.getRefName());
-			assertEquals(1, lc.getUpdateIndex());
-			assertEquals(ObjectId.zeroId(), lc.getReflogEntry().getOldId());
-			assertEquals(id(1), lc.getReflogEntry().getNewId());
-			assertEquals(who, lc.getReflogEntry().getWho());
-			assertEquals(msg, lc.getReflogEntry().getComment());
-
-			assertFalse(lc.next());
-		}
-	}
-
-	@Test
 	public void onlyReflog() throws IOException {
 		PersonIdent who = new PersonIdent("Log", "Ger", 1500079709, -8 * 60);
 		String msg = "test";
@@ -546,7 +439,6 @@ public class ReftableTest {
 		stats = writer.getStats();
 		assertEquals(170, table.length);
 		assertEquals(0, stats.refCount());
-		assertEquals(0, stats.refBlockCount());
 		assertEquals(0, stats.refBytes());
 		assertEquals(0, stats.refIndexLevels());
 
@@ -554,7 +446,7 @@ public class ReftableTest {
 		try (RefCursor rc = t.allRefs()) {
 			assertFalse(rc.next());
 		}
-		try (RefCursor rc = t.seek("refs/heads/")) {
+		try (RefCursor rc = t.seekRef("refs/heads/")) {
 			assertFalse(rc.next());
 		}
 		try (LogCursor lc = t.allLogs()) {
@@ -633,7 +525,6 @@ public class ReftableTest {
 		refs.add(ref("refs/heads/master", 100));
 
 		ReftableReader t = read(write(refs));
-		assertEquals(2, stats.refBlockCount());
 		assertEquals(0, stats.objIndexSize());
 
 		try (RefCursor rc = t.byObjectId(id(42))) {
@@ -718,7 +609,7 @@ public class ReftableTest {
 		table[table.length - 1] = 0x42;
 
 		try {
-			read(table).seek(HEAD);
+			read(table).seekRef(HEAD);
 			fail("expected IOException");
 		} catch (IOException e) {
 			assertEquals(JGitText.get().invalidReftableCRC, e.getMessage());
@@ -742,7 +633,7 @@ public class ReftableTest {
 	private static void assertSeek(List<Ref> refs, Reftable t)
 			throws IOException {
 		for (Ref exp : refs) {
-			try (RefCursor rc = t.seek(exp.getName())) {
+			try (RefCursor rc = t.seekRef(exp.getName())) {
 				assertTrue("has " + exp.getName(), rc.next());
 				Ref act = rc.getRef();
 				assertEquals(exp.getName(), act.getName());
