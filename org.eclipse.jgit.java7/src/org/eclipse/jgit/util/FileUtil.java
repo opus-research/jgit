@@ -41,7 +41,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.java7;
+package org.eclipse.jgit.util;
 
 import java.io.File;
 import java.io.IOException;
@@ -136,11 +136,6 @@ class FileUtil {
 		if (!isFile(path))
 			return false;
 		return path.setExecutable(executable);
-	}
-
-	public static void delete(File path) throws IOException {
-		Path nioPath = path.toPath();
-		Files.delete(nioPath);
 	}
 
 }

@@ -41,13 +41,12 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.java7;
+package org.eclipse.jgit.util;
 
 import java.io.File;
 import java.io.IOException;
 
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.internal.FS_POSIX;
 
 /**
  * FS implementation for Java7 on unix like systems
@@ -105,11 +104,6 @@ public class FS_POSIX_Java7 extends FS_POSIX {
 	@Override
 	public void setLastModified(File path, long time) throws IOException {
 		FileUtil.setLastModified(path, time);
-	}
-
-	@Override
-	public void delete(File path) throws IOException {
-		FileUtil.delete(path);
 	}
 
 	@Override

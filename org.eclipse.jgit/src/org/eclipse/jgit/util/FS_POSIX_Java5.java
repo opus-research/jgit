@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,97 +41,51 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.java7;
+package org.eclipse.jgit.util;
 
 import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.LinkOption;
-import java.nio.file.Path;
 
-import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.internal.FS_Win32_Cygwin;
 
 /**
- * FS for Java7 on Windows with Cygwin
+ * FS implementaton for Java5
  */
-public class FS_Win32_Java7Cygwin extends FS_Win32_Cygwin {
-
-	FS_Win32_Java7Cygwin(FS src) {
-		super(src);
+public class FS_POSIX_Java5 extends FS_POSIX {
+	/**
+	 * Constructor
+	 */
+	public FS_POSIX_Java5() {
+		super();
 	}
 
-	FS_Win32_Java7Cygwin() {
+	/**
+	 * Constructor
+	 *
+	 * @param src
+	 *            instance whose attributes to copy
+	 */
+	public FS_POSIX_Java5(FS src) {
+		super(src);
 	}
 
 	@Override
 	public FS newInstance() {
-		return new FS_Win32_Java7Cygwin(this);
+		return new FS_POSIX_Java5(this);
+	}
+
+	public boolean supportsExecute() {
+		return false;
+	}
+
+	public boolean canExecute(final File f) {
+		return false;
+	}
+
+	public boolean setExecute(final File f, final boolean canExec) {
+		return false;
 	}
 
 	@Override
-	public boolean supportsSymlinks() {
-		return true;
-	}
-
-	@Override
-	public boolean isSymLink(File path) throws IOException {
-		return FileUtil.isSymlink(path);
-	}
-
-	@Override
-	public long lastModified(File path) throws IOException {
-		return FileUtil.lastModified(path);
-	}
-
-	@Override
-	public void setLastModified(File path, long time) throws IOException {
-		FileUtil.setLastModified(path, time);
-	}
-
-	@Override
-	public void delete(File path) throws IOException {
-		FileUtil.delete(path);
-	}
-
-	@Override
-	public long length(File f) throws IOException {
-		return FileUtil.getLength(f);
-	}
-
-	@Override
-	public boolean exists(File path) {
-		return FileUtil.exists(path);
-	}
-
-	@Override
-	public boolean isDirectory(File path) {
-		return FileUtil.isDirectory(path);
-	}
-
-	@Override
-	public boolean isFile(File path) {
-		Path nioPath = path.toPath();
-		return Files.isRegularFile(nioPath, LinkOption.NOFOLLOW_LINKS);
-	}
-
-	@Override
-	public boolean isHidden(File path) throws IOException {
-		return FileUtil.isHidden(path);
-	}
-
-	@Override
-	public void setHidden(File path, boolean hidden) throws IOException {
-		FileUtil.setHidden(path, hidden);
-	}
-
-	@Override
-	public String readSymLink(File path) throws IOException {
-		return FileUtil.readSymlink(path);
-	}
-
-	@Override
-	public void createSymLink(File path, String target) throws IOException {
-		FileUtil.createSymLink(path, target);
+	public boolean retryFailedLockFileCommit() {
+		return false;
 	}
 }

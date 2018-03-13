@@ -41,7 +41,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.java7;
+package org.eclipse.jgit.util;
 
 import java.io.File;
 import java.io.IOException;
@@ -50,7 +50,6 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.internal.FS_Win32;
 
 /**
  * FS for Java7 on Windows
@@ -87,11 +86,6 @@ public class FS_Win32_Java7 extends FS_Win32 {
 	@Override
 	public void setLastModified(File path, long time) throws IOException {
 		FileUtil.setLastModified(path, time);
-	}
-
-	@Override
-	public void delete(File path) throws IOException {
-		FileUtil.delete(path);
 	}
 
 	@Override

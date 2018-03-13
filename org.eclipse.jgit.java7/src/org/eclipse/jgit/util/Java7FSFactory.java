@@ -41,70 +41,26 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.java7;
+package org.eclipse.jgit.util;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import java.io.File;
-import java.io.IOException;
-
-import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FileUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.eclipse.jgit.util.FS.FSFactory;
+import org.eclipse.jgit.util.SystemReader;
 
-public class FSTest {
-
-	private final File trash = new File(new File("target"), "trash");
-
-	@Before
-	public void setUp() throws Exception {
-		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY | FileUtils.SKIP_MISSING);
-		assertTrue(trash.mkdirs());
+/**
+ * A factory for creating FS instances on Java7
+ */
+public class Java7FSFactory extends FSFactory {
+	@Override
+	public FS detect(Boolean cygwinUsed) {
+		if (SystemReader.getInstance().isWindows()) {
+			if (cygwinUsed == null)
+				cygwinUsed = Boolean.valueOf(FS_Win32_Cygwin.isCygwin());
+			if (cygwinUsed.booleanValue())
+				return new FS_Win32_Java7Cygwin();
+			else
+				return new FS_Win32_Java7();
+		} else
+			return new FS_POSIX_Java7();
 	}
-
-	@After
-	public void tearDown() throws Exception {
-		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY);
-	}
-
-	/**
-	 * The old File methods traverses symbolic links and look at the targets. With
-	 * symbolic links we usually want to modify/look at the link. For some reason
-	 * the executable attribute seems to always look at the target, but for the
-	 * other attributes like lastModified, hidden and exists we must differ between
-	 * the link and the target.
-	 *
-	 * @throws IOException
-	 * @throws InterruptedException
-	 */
-	@Test
-	public void testSymlinkAttributes() throws IOException, InterruptedException {
-		FS fs = FS.DETECTED;
-		File link = new File(trash, "x");
-		fs.createSymLink(link, "y");
-		assertTrue(fs.exists(link));
-		String target = fs.readSymLink(link);
-		assertEquals("y", target);
-		assertTrue(fs.lastModified(link) > 0);
-		assertTrue(fs.exists(link));
-		assertFalse(fs.canExecute(link));
-		assertEquals(1, fs.length(link));
-
-		RepositoryTestCase.fsTick(link);
-		// Now create the link target
-		File targetFile = new File(trash, "y");
-		FileUtils.createNewFile(targetFile);
-		assertTrue(fs.exists(link));
-		assertTrue(fs.lastModified(link) > 0);
-		assertTrue(fs.lastModified(targetFile) > fs.lastModified(link));
-		assertFalse(fs.canExecute(link));
-		fs.setExecute(targetFile, true);
-		assertFalse(fs.canExecute(link));
-	}
-
 }

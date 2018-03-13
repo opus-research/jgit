@@ -50,16 +50,11 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
-import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.eclipse.jgit.errors.SymlinksNotSupportedException;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.util.internal.FS_POSIX_Java5;
-import org.eclipse.jgit.util.internal.FS_POSIX_Java6;
-import org.eclipse.jgit.util.internal.FS_Win32;
-import org.eclipse.jgit.util.internal.FS_Win32_Cygwin;
 
 /** Abstraction to support various file system operations not in Java. */
 public abstract class FS {
@@ -148,7 +143,7 @@ public abstract class FS {
 		if (factory == null) {
 			try {
 				Class<?> activatorClass = Class
-						.forName("org.eclipse.jgit.java7.Java7FSFactory"); //$NON-NLS-1$
+						.forName("org.eclipse.jgit.util.Java7FSFactory"); //$NON-NLS-1$
 				System.out.println("Found Java7");
 				factory = (FSFactory) activatorClass.newInstance();
 			} catch (ClassNotFoundException e) {
@@ -279,19 +274,6 @@ public abstract class FS {
 	 */
 	public long length(File path) throws IOException {
 		return path.length();
-	}
-
-	/**
-	 * Delete a file. Throws an exception if delete fails.
-	 * 
-	 * @param f
-	 * @throws IOException
-	 *             , this may be a Java7 subclass with detailed information
-	 */
-	public void delete(File f) throws IOException {
-		if (!f.delete())
-			throw new IOException(MessageFormat.format(
-					JGitText.get().deleteFileFailed, f.getAbsolutePath()));
 	}
 
 	/**
