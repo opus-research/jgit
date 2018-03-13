@@ -47,7 +47,6 @@ import java.io.File;
 import java.text.MessageFormat;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.UUID;
 
 import javax.servlet.Filter;
 import javax.servlet.FilterConfig;
@@ -60,20 +59,12 @@ import org.eclipse.jgit.http.server.glue.MetaFilter;
 import org.eclipse.jgit.http.server.glue.RegexGroupFilter;
 import org.eclipse.jgit.http.server.glue.ServletBinder;
 import org.eclipse.jgit.http.server.resolver.AsIsFileService;
-import org.eclipse.jgit.http.server.resolver.DefaultPublisherClientFactory;
 import org.eclipse.jgit.http.server.resolver.DefaultReceivePackFactory;
 import org.eclipse.jgit.http.server.resolver.DefaultUploadPackFactory;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.transport.Publisher;
-import org.eclipse.jgit.transport.PublisherBuffer;
-import org.eclipse.jgit.transport.PublisherClient;
-import org.eclipse.jgit.transport.PublisherPackFactory;
-import org.eclipse.jgit.transport.PublisherReverseResolver;
-import org.eclipse.jgit.transport.PublisherSession.SessionGenerator;
 import org.eclipse.jgit.transport.ReceivePack;
 import org.eclipse.jgit.transport.UploadPack;
 import org.eclipse.jgit.transport.resolver.FileResolver;
-import org.eclipse.jgit.transport.resolver.PublisherClientFactory;
 import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
 import org.eclipse.jgit.transport.resolver.RepositoryResolver;
 import org.eclipse.jgit.transport.resolver.UploadPackFactory;
@@ -86,24 +77,17 @@ import org.eclipse.jgit.util.StringUtils;
  * application to this filter. For a servlet version, see {@link GitServlet}.
  * <p>
  * Applications may wish to add additional repository action URLs to this
- * servlet by taking advantage of its extension from {@link MetaFilter}. Callers
- * may register their own URL suffix translations through
+ * servlet by taking advantage of its extension from {@link MetaFilter}.
+ * Callers may register their own URL suffix translations through
  * {@link #serve(String)}, or their regex translations through
  * {@link #serveRegex(String)}. Each translation should contain a complete
  * filter pipeline which ends with the HttpServlet that should handle the
  * requested action.
- * <p>
- * If publish-subscribe is enabled, subscribers are served through a single URL
- * endpoint (/git-publish-subscribe) that services all repositories. This means
- * that it is not possible to serve a repository named "git-publish-subscribe"
- * while publish-subscribe is enabled.
  */
 public class GitFilter extends MetaFilter {
 	private volatile boolean initialized;
 
 	private RepositoryResolver<HttpServletRequest> resolver;
-
-	private Publisher publisher;
 
 	private AsIsFileService asIs = new AsIsFileService();
 
@@ -111,14 +95,9 @@ public class GitFilter extends MetaFilter {
 
 	private ReceivePackFactory<HttpServletRequest> receivePackFactory = new DefaultReceivePackFactory();
 
-	private PublisherClientFactory<HttpServletRequest> publisherClientFactory = new DefaultPublisherClientFactory();
-
 	private final List<Filter> uploadPackFilters = new LinkedList<Filter>();
 
 	private final List<Filter> receivePackFilters = new LinkedList<Filter>();
-
-	private final List<Filter>
-			publisherClientFilters = new LinkedList<Filter>();
 
 	/**
 	 * New servlet that will load its base directory from {@code web.xml}.
@@ -199,37 +178,6 @@ public class GitFilter extends MetaFilter {
 		receivePackFilters.add(filter);
 	}
 
-	/**
-	 * @param f
-	 *            the factory to construct a {@link PublisherClient} for
-	 *            publish-subscribe.
-	 */
-	@SuppressWarnings("unchecked")
-	public void setPublisherClientFactory(PublisherClientFactory<HttpServletRequest> f) {
-		assertNotInitialized();
-		this.publisherClientFactory = f != null ? f : PublisherClientFactory.DISABLED;
-	}
-
-	/**
-	 * @param p
-	 *            the publisher instance to use.
-	 */
-	public void setPublisher(Publisher p) {
-		this.publisher = p;
-	}
-
-	/**
-	 * @param filter
-	 *            the filter to apply before any PublisherClient operations.
-	 *            Filter implementations my access the PublisherClient instance
-	 *            from the request attribute
-	 *            {@link ServletUtils#ATTRIBUTE_HANDLER}.
-	 */
-	public void addPublisherClientFilter(Filter filter) {
-		assertNotInitialized();
-		publisherClientFilters.add(filter);
-	}
-
 	private void assertNotInitialized() {
 		if (initialized)
 			throw new IllegalStateException(HttpServerText.get().alreadyInitializedByContainer);
@@ -245,18 +193,6 @@ public class GitFilter extends MetaFilter {
 			setRepositoryResolver(new FileResolver<HttpServletRequest>(root, exportAll));
 		}
 
-		if (publisher == null
-				&& publisherClientFactory != PublisherClientFactory.DISABLED) {
-			// Default publisher with 1 GiB max buffer
-			publisher = new Publisher(new PublisherReverseResolver(),
-				new PublisherPackFactory(new PublisherBuffer(1 << 30)),
-			new SessionGenerator() {
-				public String generate() {
-					return UUID.randomUUID().toString();
-				}
-			});
-		}
-
 		initialized = true;
 
 		if (uploadPackFactory != UploadPackFactory.DISABLED) {
@@ -269,24 +205,10 @@ public class GitFilter extends MetaFilter {
 
 		if (receivePackFactory != ReceivePackFactory.DISABLED) {
 			ServletBinder b = serve("*/" + GitSmartHttpTools.RECEIVE_PACK);
-			ReceivePackServlet.Factory receivePackServletFactory
-					= new ReceivePackServlet.Factory(receivePackFactory);
-			receivePackServletFactory.setPostReceiveHook(publisher.getHook());
-			b = b.through(receivePackServletFactory);
+			b = b.through(new ReceivePackServlet.Factory(receivePackFactory));
 			for (Filter f : receivePackFilters)
 				b = b.through(f);
 			b.with(new ReceivePackServlet());
-		}
-
-		if (publisherClientFactory != PublisherClientFactory.DISABLED) {
-			publisherClientFactory.setPublisher(publisher);
-			publisherClientFactory.setResolver(resolver);
-			ServletBinder b = serveRegex(
-					"^/" + GitSmartHttpTools.PUBLISH_SUBSCRIBE, true);
-			b = b.through(new PublisherServlet.Factory(publisherClientFactory));
-			for (Filter f : publisherClientFilters)
-				b = b.through(f);
-			b.with(new PublisherServlet());
 		}
 
 		ServletBinder refs = serve("*/" + Constants.INFO_REFS);
@@ -376,13 +298,11 @@ public class GitFilter extends MetaFilter {
 	}
 
 	@Override
-	protected ServletBinder register(ServletBinder binder, boolean isBare) {
+	protected ServletBinder register(ServletBinder binder) {
 		if (resolver == null)
-			throw new IllegalStateException(HttpServerText
-					.get().noResolverAvailable);
+			throw new IllegalStateException(HttpServerText.get().noResolverAvailable);
 		binder = binder.through(new NoCacheFilter());
-		if (!isBare)
-			binder = binder.through(new RepositoryFilter(resolver));
+		binder = binder.through(new RepositoryFilter(resolver));
 		return binder;
 	}
 }

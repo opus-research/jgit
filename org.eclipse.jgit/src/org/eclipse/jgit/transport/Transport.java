@@ -1212,11 +1212,12 @@ public abstract class Transport {
 	/**
 	 * Begins a new connection for subscribing to a remote repository.
 	 *
+	 * @param subscriber
 	 * @return a fresh connection to subscribe to the remote repository.
 	 * @throws NotSupportedException
 	 * @throws TransportException
 	 */
-	public SubscribeConnection openSubscribe()
+	public SubscribeConnection openSubscribe(Subscriber subscriber)
 			throws NotSupportedException, TransportException {
 		throw new NotSupportedException(JGitText.get().subscribeNotSupported);
 	}
