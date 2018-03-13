@@ -78,6 +78,9 @@ public abstract class TemporaryBuffer extends OutputStream {
 	 */
 	private int inCoreLimit;
 
+	/** Initial size of block list. */
+	private int initialBlocks;
+
 	/** If {@link #inCoreLimit} has been reached, remainder goes here. */
 	private OutputStream overflow;
 
@@ -107,9 +110,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 		if (estimatedSize > limit)
 			throw new IllegalArgumentException();
 		this.inCoreLimit = limit;
-		int initialBlocks = (estimatedSize - 1) / Block.SZ + 1;
-		blocks = new ArrayList<Block>(initialBlocks);
-		blocks.add(new Block(Math.min(limit, Block.SZ)));
+		this.initialBlocks = (estimatedSize - 1) / Block.SZ + 1;
 		reset();
 	}
 
@@ -290,8 +291,13 @@ public abstract class TemporaryBuffer extends OutputStream {
 		if (overflow != null) {
 			destroy();
 		}
-		blocks.clear();
-		blocks.add(new Block(Math.min(inCoreLimit, Block.SZ)));
+		if (inCoreLimit < Block.SZ) {
+			blocks = new ArrayList<Block>(1);
+			blocks.add(new Block(inCoreLimit));
+		} else {
+			blocks = new ArrayList<Block>(initialBlocks);
+			blocks.add(new Block());
+		}
 	}
 
 	/**
