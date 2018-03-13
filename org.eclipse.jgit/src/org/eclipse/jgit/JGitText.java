@@ -90,7 +90,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String bareRepositoryNoWorkdirAndIndex;
 	/***/ public String blobNotFound;
 	/***/ public String blobNotFoundForPath;
-	/***/ public String branchNameInvalid;
 	/***/ public String cannotBeCombined;
 	/***/ public String cannotCombineTreeFilterWithRevFilter;
 	/***/ public String cannotCommitOnARepoWithState;
@@ -100,7 +99,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotCreateConfig;
 	/***/ public String cannotCreateDirectory;
 	/***/ public String cannotCreateHEAD;
-	/***/ public String cannotDeleteCheckedOutBranch;
 	/***/ public String cannotDeleteFile;
 	/***/ public String cannotDeleteStaleTrackingRef2;
 	/***/ public String cannotDeleteStaleTrackingRef;
@@ -179,11 +177,8 @@ public class JGitText extends TranslationBundle {
 	/***/ public String couldNotURLEncodeToUTF8;
 	/***/ public String couldNotWriteFile;
 	/***/ public String countingObjects;
-	/***/ public String createBranchFailedUnknownReason;
-	/***/ public String createBranchUnexpectedResult;
 	/***/ public String creatingDeltasIsNotImplemented;
 	/***/ public String daemonAlreadyRunning;
-	/***/ public String deleteBranchUnexpectedResult;
 	/***/ public String deletingNotSupported;
 	/***/ public String destinationIsNotAWildcard;
 	/***/ public String detachedHeadDetected;
@@ -340,7 +335,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String notValid;
 	/***/ public String nothingToFetch;
 	/***/ public String nothingToPush;
-	/***/ public String notMergedExceptionMessage;
 	/***/ public String objectAtHasBadZlibStream;
 	/***/ public String objectAtPathDoesNotHaveId;
 	/***/ public String objectIsCorrupt;
@@ -381,8 +375,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String readTimedOut;
 	/***/ public String readingObjectsFromLocalRepositoryFailed;
 	/***/ public String receivingObjects;
-	/***/ public String refAlreadExists;
-	/***/ public String refNotResolved;
 	/***/ public String refUpdateReturnCodeWas;
 	/***/ public String reflogsNotYetSupportedByRevisionParser;
 	/***/ public String remoteConfigHasNoURIAssociated;
@@ -390,9 +382,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String remoteDoesNotSupportSmartHTTPPush;
 	/***/ public String remoteHungUpUnexpectedly;
 	/***/ public String remoteNameCantBeNull;
-	/***/ public String renameBranchFailedBecauseTag;
-	/***/ public String renameBranchFailedUnknownReason;
-	/***/ public String renameBranchUnexpectedResult;
 	/***/ public String renamesAlreadyFound;
 	/***/ public String renamesBreakingModifies;
 	/***/ public String renamesFindingByContent;
