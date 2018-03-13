@@ -49,7 +49,6 @@ package org.eclipse.jgit.pgm;
 
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.text.MessageFormat;
 
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -105,19 +104,16 @@ abstract class AbstractFetchCommand extends TextBuiltin {
 			else if (0 <= cr)
 				s = cr;
 			else {
-				writer.print(MessageFormat.format(CLIText.get().remoteMessage,
-						pkt));
+				writer.format(CLIText.get().remoteMessage, pkt);
 				writer.println();
 				break;
 			}
 
 			if (pkt.charAt(s) == '\r') {
-				writer.print(MessageFormat.format(CLIText.get().remoteMessage,
-						pkt.substring(0, s)));
+				writer.format(CLIText.get().remoteMessage, pkt.substring(0, s));
 				writer.print('\r');
 			} else {
-				writer.print(MessageFormat.format(CLIText.get().remoteMessage,
-						pkt.substring(0, s)));
+				writer.format(CLIText.get().remoteMessage, pkt.substring(0, s));
 				writer.println();
 			}
 

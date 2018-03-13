@@ -57,17 +57,10 @@ import org.eclipse.jgit.storage.pack.ObjectToPack;
 import org.eclipse.jgit.storage.pack.PackWriter;
 
 abstract class FileObjectDatabase extends ObjectDatabase {
-	static enum InsertLooseObjectResult {
-		INSERTED, EXISTS_PACKED, EXISTS_LOOSE, FAILURE;
-	}
-
 	@Override
 	public ObjectReader newReader() {
 		return new WindowCursor(this);
 	}
-
-	@Override
-	public abstract ObjectDirectoryInserter newInserter();
 
 	/**
 	 * Does the requested object exist in this database?
@@ -252,9 +245,6 @@ abstract class FileObjectDatabase extends ObjectDatabase {
 
 	abstract long getObjectSize2(WindowCursor curs, String objectName,
 			AnyObjectId objectId) throws IOException;
-
-	abstract InsertLooseObjectResult insertUnpackedObject(File tmp,
-			ObjectId id, boolean createDuplicate);
 
 	abstract FileObjectDatabase newCachedFileObjectDatabase();
 
