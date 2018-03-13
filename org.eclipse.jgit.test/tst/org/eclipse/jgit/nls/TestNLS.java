@@ -51,11 +51,8 @@ import java.util.Locale;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 
-import org.junit.Test;
+public class TestNLS {
 
-public class NLSTest {
-
-	@Test
 	public void testNLSLocale() {
 		NLS.setLocale(NLS.ROOT_LOCALE);
 		GermanTranslatedBundle bundle = GermanTranslatedBundle.get();
@@ -66,7 +63,6 @@ public class NLSTest {
 		assertEquals(Locale.GERMAN, bundle.effectiveLocale());
 	}
 
-	@Test
 	public void testJVMDefaultLocale() {
 		Locale.setDefault(NLS.ROOT_LOCALE);
 		NLS.useJVMDefaultLocale();
@@ -79,7 +75,6 @@ public class NLSTest {
 		assertEquals(Locale.GERMAN, bundle.effectiveLocale());
 	}
 
-	@Test
 	public void testThreadTranslationBundleInheritance() throws InterruptedException {
 
 		class T extends Thread {
@@ -105,7 +100,6 @@ public class NLSTest {
 		assertSame(mainThreadsBundle, t.bundle);
 	}
 
-	@Test
 	public void testParallelThreadsWithDifferentLocales() throws InterruptedException {
 
 		final CyclicBarrier barrier = new CyclicBarrier(2);
