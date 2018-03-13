@@ -706,9 +706,9 @@ public abstract class FS {
 		FS fs;
 
 		Attributes(FS fs, File file, boolean exists, boolean isDirectory,
-				boolean isExecutable, boolean isSymbolicLink,
-				boolean isRegularFile, long creationTime,
-				long lastModifiedTime, long length) {
+				boolean isExecutable,
+				boolean isSymbolicLink, boolean isRegularFile,
+				long creationTime, long lastModifiedTime) {
 			this.fs = fs;
 			this.file = file;
 			this.exists = exists;
@@ -718,7 +718,6 @@ public abstract class FS {
 			this.isRegularFile = isRegularFile;
 			this.creationTime = creationTime;
 			this.lastModifiedTime = lastModifiedTime;
-			this.length = length;
 		}
 
 		/**
@@ -774,6 +773,6 @@ public abstract class FS {
 		long lastModified = exists ? path.lastModified() : 0L;
 		long createTime = 0L;
 		return new Attributes(this, path, exists, isDirectory, canExecute,
-				isSymlink, isFile, createTime, lastModified, -1);
+				isSymlink, isFile, createTime, lastModified);
 	}
 }
