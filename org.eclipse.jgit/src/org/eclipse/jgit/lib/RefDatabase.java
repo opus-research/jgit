@@ -58,7 +58,7 @@ import java.util.Map;
 import org.eclipse.jgit.errors.ObjectWritingException;
 import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.IO;
+import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.RawParseUtils;
 
 class RefDatabase {
@@ -126,7 +126,7 @@ class RefDatabase {
 
 	/**
 	 * Create a command to update, create or delete a ref in this repository.
-	 *
+	 * 
 	 * @param name
 	 *            name of the ref the caller wants to modify.
 	 * @return an update command. The caller must finish populating this command
@@ -172,7 +172,7 @@ class RefDatabase {
 
 	/**
 	 * Writes a symref (e.g. HEAD) to disk
-	 *
+	 * 
 	 * @param name
 	 *            symref name
 	 * @param target
@@ -382,7 +382,7 @@ class RefDatabase {
 				return new Ref(Ref.Storage.LOOSE, origName, target, null);
 			if (!origName.equals(r.getName()))
 				r = new Ref(Ref.Storage.LOOSE_PACKED, origName, r.getName(), r.getObjectId(), r.getPeeledObjectId(), true);
-			return r;
+			return r; 
 		}
 
 		setModified();
@@ -502,7 +502,7 @@ class RefDatabase {
 
 	private static String readLine(final File file)
 			throws FileNotFoundException, IOException {
-		final byte[] buf = IO.readFully(file, 4096);
+		final byte[] buf = NB.readFully(file, 4096);
 		int n = buf.length;
 
 		// remove trailing whitespaces
