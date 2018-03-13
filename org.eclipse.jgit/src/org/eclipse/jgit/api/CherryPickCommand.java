@@ -310,12 +310,12 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 	/**
 	 * Allows cherry-picking changes without committing them.
 	 * <p>
-	 * NOTE: The behavior of cherry-pick is undefined if you pick multiple
+	 * NOTE: The behavior of cherry-pick is undefined, if you pick multiple
 	 * commits or if HEAD does not match the index state before cherry-picking.
 	 *
 	 * @param noCommit
-	 *            true to cherry-pick without committing, false to commit after
-	 *            each pick (default)
+	 *            true to cherry pick to the index and working copy without
+	 *            committing, false to commit after each pick (default)
 	 * @return {@code this}
 	 * @since 3.5
 	 */
