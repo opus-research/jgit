@@ -53,9 +53,8 @@ import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.OBJ_B
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.REF_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_1ID;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_2ID;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_LEN_SPECIFIED;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_TEXT;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_NONE;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_SYMREF;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_TYPE_MASK;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.reverseTime;
 import static org.eclipse.jgit.lib.Constants.OBJECT_ID_LENGTH;
@@ -179,10 +178,14 @@ class BlockReader {
 			return new ObjectIdRef.PeeledTag(PACKED, name, id1, id2);
 		}
 
-		case VALUE_SYMREF:
-			return new SymbolicRef(name, newRef(readValueString()));
+		case VALUE_TEXT: {
+			String val = readValueString();
+			if (val.startsWith("ref: ")) { //$NON-NLS-1$
+				return new SymbolicRef(name, newRef(val.substring(5)));
+			}
+			throw invalidBlock();
+		}
 
-		case VALUE_LEN_SPECIFIED:
 		default:
 			throw invalidBlock();
 		}
@@ -315,7 +318,7 @@ class BlockReader {
 
 		keysStart = ptr;
 		if (blockType != FILE_BLOCK_TYPE) {
-			restartCount = 1 + NB.decodeUInt16(buf, bufLen - 2);
+			restartCount = NB.decodeUInt16(buf, bufLen - 2);
 			restartIdx = bufLen - (restartCount * 4 + 2);
 			keysEnd = restartIdx;
 		} else {
@@ -452,8 +455,7 @@ class BlockReader {
 			case VALUE_2ID:
 				ptr += 2 * OBJECT_ID_LENGTH;
 				return;
-			case VALUE_SYMREF:
-			case VALUE_LEN_SPECIFIED:
+			case VALUE_TEXT:
 				skipString();
 				return;
 			}
