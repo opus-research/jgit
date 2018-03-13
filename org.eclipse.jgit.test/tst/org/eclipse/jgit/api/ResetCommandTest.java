@@ -65,7 +65,6 @@ import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -140,8 +139,8 @@ public class ResetCommandTest extends RepositoryTestCase {
 			AmbiguousObjectException, IOException, GitAPIException {
 		setupRepository();
 		ObjectId prevHead = db.resolve(Constants.HEAD);
-		assertSameAsHead(git.reset().setMode(ResetType.HARD)
-				.setRef(initialCommit.getName()).call());
+		git.reset().setMode(ResetType.HARD).setRef(initialCommit.getName())
+				.call();
 		// check if HEAD points to initial commit now
 		ObjectId head = db.resolve(Constants.HEAD);
 		assertEquals(initialCommit, head);
@@ -177,8 +176,8 @@ public class ResetCommandTest extends RepositoryTestCase {
 			AmbiguousObjectException, IOException, GitAPIException {
 		setupRepository();
 		ObjectId prevHead = db.resolve(Constants.HEAD);
-		assertSameAsHead(git.reset().setMode(ResetType.SOFT)
-				.setRef(initialCommit.getName()).call());
+		git.reset().setMode(ResetType.SOFT).setRef(initialCommit.getName())
+				.call();
 		// check if HEAD points to initial commit now
 		ObjectId head = db.resolve(Constants.HEAD);
 		assertEquals(initialCommit, head);
@@ -198,8 +197,8 @@ public class ResetCommandTest extends RepositoryTestCase {
 			AmbiguousObjectException, IOException, GitAPIException {
 		setupRepository();
 		ObjectId prevHead = db.resolve(Constants.HEAD);
-		assertSameAsHead(git.reset().setMode(ResetType.MIXED)
-				.setRef(initialCommit.getName()).call());
+		git.reset().setMode(ResetType.MIXED).setRef(initialCommit.getName())
+				.call();
 		// check if HEAD points to initial commit now
 		ObjectId head = db.resolve(Constants.HEAD);
 		assertEquals(initialCommit, head);
@@ -242,8 +241,7 @@ public class ResetCommandTest extends RepositoryTestCase {
 		assertTrue(bEntry.getLength() > 0);
 		assertTrue(bEntry.getLastModified() > 0);
 
-		assertSameAsHead(git.reset().setMode(ResetType.MIXED)
-				.setRef(commit2.getName()).call());
+		git.reset().setMode(ResetType.MIXED).setRef(commit2.getName()).call();
 
 		cache = db.readDirCache();
 
@@ -282,7 +280,7 @@ public class ResetCommandTest extends RepositoryTestCase {
 				+ "[a.txt, mode:100644, stage:3]",
 				indexState(0));
 
-		assertSameAsHead(git.reset().setMode(ResetType.MIXED).call());
+		git.reset().setMode(ResetType.MIXED).call();
 
 		assertEquals("[a.txt, mode:100644]" + "[b.txt, mode:100644]",
 				indexState(0));
@@ -300,8 +298,8 @@ public class ResetCommandTest extends RepositoryTestCase {
 
 		// 'a.txt' has already been modified in setupRepository
 		// 'notAddedToIndex.txt' has been added to repository
-		assertSameAsHead(git.reset().addPath(indexFile.getName())
-				.addPath(untrackedFile.getName()).call());
+		git.reset().addPath(indexFile.getName())
+				.addPath(untrackedFile.getName()).call();
 
 		DirCacheEntry postReset = DirCache.read(db.getIndexFile(), db.getFS())
 				.getEntry(indexFile.getName());
@@ -331,7 +329,7 @@ public class ResetCommandTest extends RepositoryTestCase {
 		git.add().addFilepattern(untrackedFile.getName()).call();
 
 		// 'dir/b.txt' has already been modified in setupRepository
-		assertSameAsHead(git.reset().addPath("dir").call());
+		git.reset().addPath("dir").call();
 
 		DirCacheEntry postReset = DirCache.read(db.getIndexFile(), db.getFS())
 				.getEntry("dir/b.txt");
@@ -360,9 +358,9 @@ public class ResetCommandTest extends RepositoryTestCase {
 		// 'a.txt' has already been modified in setupRepository
 		// 'notAddedToIndex.txt' has been added to repository
 		// reset to the inital commit
-		assertSameAsHead(git.reset().setRef(initialCommit.getName())
-				.addPath(indexFile.getName()).addPath(untrackedFile.getName())
-				.call());
+		git.reset().setRef(initialCommit.getName())
+				.addPath(indexFile.getName())
+				.addPath(untrackedFile.getName()).call();
 
 		// check that HEAD hasn't moved
 		ObjectId head = db.resolve(Constants.HEAD);
@@ -399,7 +397,7 @@ public class ResetCommandTest extends RepositoryTestCase {
 				+ "[b.txt, mode:100644]",
 				indexState(0));
 
-		assertSameAsHead(git.reset().addPath(file).call());
+		git.reset().addPath(file).call();
 
 		assertEquals("[a.txt, mode:100644]" + "[b.txt, mode:100644]",
 				indexState(0));
@@ -411,7 +409,7 @@ public class ResetCommandTest extends RepositoryTestCase {
 		writeTrashFile("a.txt", "content");
 		git.add().addFilepattern("a.txt").call();
 		// Should assume an empty tree, like in C Git 1.8.2
-		assertSameAsHead(git.reset().addPath("a.txt").call());
+		git.reset().addPath("a.txt").call();
 
 		DirCache cache = db.readDirCache();
 		DirCacheEntry aEntry = cache.getEntry("a.txt");
@@ -423,8 +421,7 @@ public class ResetCommandTest extends RepositoryTestCase {
 		git = new Git(db);
 		writeTrashFile("a.txt", "content");
 		git.add().addFilepattern("a.txt").call();
-		assertSameAsHead(
-				git.reset().setRef("doesnotexist").addPath("a.txt").call());
+		git.reset().setRef("doesnotexist").addPath("a.txt").call();
 	}
 
 	@Test
@@ -434,7 +431,7 @@ public class ResetCommandTest extends RepositoryTestCase {
 		git.add().addFilepattern("a.txt").call();
 		writeTrashFile("a.txt", "modified");
 		// should use default mode MIXED
-		assertSameAsHead(git.reset().call());
+		git.reset().call();
 
 		DirCache cache = db.readDirCache();
 		DirCacheEntry aEntry = cache.getEntry("a.txt");
@@ -455,7 +452,7 @@ public class ResetCommandTest extends RepositoryTestCase {
 
 		git.add().addFilepattern(untrackedFile.getName()).call();
 
-		assertSameAsHead(git.reset().setRef(tagName).setMode(HARD).call());
+		git.reset().setRef(tagName).setMode(HARD).call();
 
 		ObjectId head = db.resolve(Constants.HEAD);
 		assertEquals(secondCommit, head);
@@ -463,24 +460,24 @@ public class ResetCommandTest extends RepositoryTestCase {
 
 	@Test
 	public void testHardResetAfterSquashMerge() throws Exception {
-		git = new Git(db);
+		Git g = new Git(db);
 
 		writeTrashFile("file1", "file1");
-		git.add().addFilepattern("file1").call();
-		RevCommit first = git.commit().setMessage("initial commit").call();
+		g.add().addFilepattern("file1").call();
+		RevCommit first = g.commit().setMessage("initial commit").call();
 
 		assertTrue(new File(db.getWorkTree(), "file1").exists());
 		createBranch(first, "refs/heads/branch1");
 		checkoutBranch("refs/heads/branch1");
 
 		writeTrashFile("file2", "file2");
-		git.add().addFilepattern("file2").call();
-		git.commit().setMessage("second commit").call();
+		g.add().addFilepattern("file2").call();
+		g.commit().setMessage("second commit").call();
 		assertTrue(new File(db.getWorkTree(), "file2").exists());
 
 		checkoutBranch("refs/heads/master");
 
-		MergeResult result = git.merge()
+		MergeResult result = g.merge()
 				.include(db.exactRef("refs/heads/branch1"))
 				.setSquash(true)
 				.call();
@@ -489,8 +486,7 @@ public class ResetCommandTest extends RepositoryTestCase {
 				result.getMergeStatus());
 		assertNotNull(db.readSquashCommitMsg());
 
-		assertSameAsHead(git.reset().setMode(ResetType.HARD)
-				.setRef(first.getName()).call());
+		g.reset().setMode(ResetType.HARD).setRef(first.getName()).call();
 
 		assertNull(db.readSquashCommitMsg());
 	}
@@ -501,7 +497,7 @@ public class ResetCommandTest extends RepositoryTestCase {
 		File fileA = writeTrashFile("a.txt", "content");
 		git.add().addFilepattern("a.txt").call();
 		// Should assume an empty tree, like in C Git 1.8.2
-		assertSameAsHead(git.reset().setMode(ResetType.HARD).call());
+		git.reset().setMode(ResetType.HARD).call();
 
 		DirCache cache = db.readDirCache();
 		DirCacheEntry aEntry = cache.getEntry("a.txt");
@@ -562,14 +558,4 @@ public class ResetCommandTest extends RepositoryTestCase {
 		return dc.getEntry(path) != null;
 	}
 
-	/**
-	 * Asserts that a certain ref is similar to repos HEAD.
-	 * @param ref
-	 * @throws IOException
-	 */
-	private void assertSameAsHead(Ref ref) throws IOException {
-		Ref headRef = db.getRef(Constants.HEAD);
-		assertEquals(headRef.getName(), ref.getName());
-		assertEquals(headRef.getObjectId(), ref.getObjectId());
-	}
 }

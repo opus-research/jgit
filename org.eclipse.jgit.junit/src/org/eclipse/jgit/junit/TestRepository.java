@@ -822,7 +822,7 @@ public class TestRepository<R extends Repository> {
 					break;
 
 				final byte[] bin = db.open(o, o.getType()).getCachedBytes();
-				oc.checkCommit(o, bin);
+				oc.checkCommit(bin);
 				assertHash(o, bin);
 			}
 
@@ -832,7 +832,7 @@ public class TestRepository<R extends Repository> {
 					break;
 
 				final byte[] bin = db.open(o, o.getType()).getCachedBytes();
-				oc.check(o, o.getType(), bin);
+				oc.check(o.getType(), bin);
 				assertHash(o, bin);
 			}
 		}
@@ -866,7 +866,7 @@ public class TestRepository<R extends Repository> {
 				Set<ObjectId> all = new HashSet<ObjectId>();
 				for (Ref r : db.getAllRefs().values())
 					all.add(r.getObjectId());
-				pw.preparePack(m, all, PackWriter.NONE);
+				pw.preparePack(m, all, Collections.<ObjectId> emptySet());
 
 				final ObjectId name = pw.computeName();
 
@@ -905,7 +905,7 @@ public class TestRepository<R extends Repository> {
 
 	private void writeFile(final File p, final byte[] bin) throws IOException,
 			ObjectWritingException {
-		final LockFile lck = new LockFile(p);
+		final LockFile lck = new LockFile(p, db.getFS());
 		if (!lck.lock())
 			throw new ObjectWritingException("Can't write " + p);
 		try {
@@ -1155,7 +1155,8 @@ public class TestRepository<R extends Repository> {
 			return self;
 		}
 
-		private void insertChangeId(org.eclipse.jgit.lib.CommitBuilder c) {
+		private void insertChangeId(org.eclipse.jgit.lib.CommitBuilder c)
+				throws IOException {
 			if (changeId == null)
 				return;
 			int idx = ChangeIdUtil.indexOfChangeId(message, "\n");

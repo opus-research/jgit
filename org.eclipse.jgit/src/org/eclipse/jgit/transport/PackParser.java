@@ -1049,11 +1049,8 @@ public abstract class PackParser {
 			final byte[] data) throws IOException {
 		if (objCheck != null) {
 			try {
-				objCheck.check(id, type, data);
+				objCheck.check(type, data);
 			} catch (CorruptObjectException e) {
-				if (e.getErrorType() != null) {
-					throw e;
-				}
 				throw new CorruptObjectException(MessageFormat.format(
 						JGitText.get().invalidObject,
 						Constants.typeString(type),

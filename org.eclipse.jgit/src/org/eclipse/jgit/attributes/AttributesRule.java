@@ -109,11 +109,10 @@ public class AttributesRule {
 	private final String pattern;
 	private final List<Attribute> attributes;
 
-	private final boolean nameOnly;
+	private boolean nameOnly;
+	private boolean dirOnly;
 
-	private final boolean dirOnly;
-
-	private final IMatcher matcher;
+	private IMatcher matcher;
 
 	/**
 	 * Create a new attribute rule with the given pattern. Assumes that the
@@ -129,43 +128,38 @@ public class AttributesRule {
 	 */
 	public AttributesRule(String pattern, String attributes) {
 		this.attributes = parseAttributes(attributes);
+		nameOnly = false;
+		dirOnly = false;
 
 		if (pattern.endsWith("/")) { //$NON-NLS-1$
 			pattern = pattern.substring(0, pattern.length() - 1);
 			dirOnly = true;
-		} else {
-			dirOnly = false;
 		}
 
-		int slashIndex = pattern.indexOf('/');
+		boolean hasSlash = pattern.contains("/"); //$NON-NLS-1$
 
-		if (slashIndex < 0) {
+		if (!hasSlash)
 			nameOnly = true;
-		} else if (slashIndex == 0) {
-			nameOnly = false;
-		} else {
-			nameOnly = false;
+		else if (!pattern.startsWith("/")) { //$NON-NLS-1$
 			// Contains "/" but does not start with one
 			// Adding / to the start should not interfere with matching
 			pattern = "/" + pattern; //$NON-NLS-1$
 		}
 
-		IMatcher candidateMatcher = NO_MATCH;
 		try {
-			candidateMatcher = PathMatcher.createPathMatcher(pattern,
+			matcher = PathMatcher.createPathMatcher(pattern,
 					Character.valueOf(FastIgnoreRule.PATH_SEPARATOR), dirOnly);
 		} catch (InvalidPatternException e) {
-			// ignore: invalid patterns are silently ignored
+			matcher = NO_MATCH;
 		}
-		this.matcher = candidateMatcher;
+
 		this.pattern = pattern;
 	}
 
 	/**
 	 * @return True if the pattern should match directories only
-	 * @since 4.3
 	 */
-	public boolean isDirOnly() {
+	public boolean dirOnly() {
 		return dirOnly;
 	}
 

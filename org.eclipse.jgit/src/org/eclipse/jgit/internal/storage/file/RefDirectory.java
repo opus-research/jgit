@@ -73,7 +73,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.errors.InvalidObjectIdException;
 import org.eclipse.jgit.errors.LockFailedException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -588,7 +587,8 @@ public class RefDirectory extends RefDatabase {
 		// we don't miss an edit made externally.
 		final PackedRefList packed = getPackedRefs();
 		if (packed.contains(name)) {
-			LockFile lck = new LockFile(packedRefsFile);
+			LockFile lck = new LockFile(packedRefsFile,
+					update.getRepository().getFS());
 			if (!lck.lock())
 				throw new LockFailedException(packedRefsFile);
 			try {
@@ -638,7 +638,7 @@ public class RefDirectory extends RefDatabase {
 		FS fs = parent.getFS();
 
 		// Lock the packed refs file and read the content
-		LockFile lck = new LockFile(packedRefsFile);
+		LockFile lck = new LockFile(packedRefsFile, fs);
 		if (!lck.lock())
 			throw new IOException(MessageFormat.format(
 					JGitText.get().cannotLock, packedRefsFile));
@@ -669,7 +669,8 @@ public class RefDirectory extends RefDatabase {
 				File refFile = fileFor(refName);
 				if (!fs.exists(refFile))
 					continue;
-				LockFile rLck = new LockFile(refFile);
+				LockFile rLck = new LockFile(refFile,
+						parent.getFS());
 				if (!rLck.lock())
 					continue;
 				try {
@@ -714,20 +715,16 @@ public class RefDirectory extends RefDatabase {
 	 */
 	private Ref peeledPackedRef(Ref f)
 			throws MissingObjectException, IOException {
-		if (f.getStorage().isPacked() && f.isPeeled()) {
+		if (f.getStorage().isPacked() && f.isPeeled())
 			return f;
-		}
-		if (!f.isPeeled()) {
+		if (!f.isPeeled())
 			f = peel(f);
-		}
-		ObjectId peeledObjectId = f.getPeeledObjectId();
-		if (peeledObjectId != null) {
+		if (f.getPeeledObjectId() != null)
 			return new ObjectIdRef.PeeledTag(PACKED, f.getName(),
-					f.getObjectId(), peeledObjectId);
-		} else {
+					f.getObjectId(), f.getPeeledObjectId());
+		else
 			return new ObjectIdRef.PeeledNonTag(PACKED, f.getName(),
 					f.getObjectId());
-		}
 	}
 
 	void log(final RefUpdate update, final String msg, final boolean deref)
@@ -988,7 +985,7 @@ public class RefDirectory extends RefDatabase {
 		try {
 			id = ObjectId.fromString(buf, 0);
 			if (ref != null && !ref.isSymbolic()
-					&& id.equals(ref.getTarget().getObjectId())) {
+					&& ref.getTarget().getObjectId().equals(id)) {
 				assert(currentSnapshot != null);
 				currentSnapshot.setClean(otherSnapshot);
 				return ref;
@@ -1106,8 +1103,8 @@ public class RefDirectory extends RefDatabase {
 			implements LooseRef {
 		private final FileSnapshot snapShot;
 
-		LoosePeeledTag(FileSnapshot snapshot, @NonNull String refName,
-				@NonNull ObjectId id, @NonNull ObjectId p) {
+		LoosePeeledTag(FileSnapshot snapshot, String refName, ObjectId id,
+				ObjectId p) {
 			super(LOOSE, refName, id, p);
 			this.snapShot = snapshot;
 		}
@@ -1125,8 +1122,7 @@ public class RefDirectory extends RefDatabase {
 			implements LooseRef {
 		private final FileSnapshot snapShot;
 
-		LooseNonTag(FileSnapshot snapshot, @NonNull String refName,
-				@NonNull ObjectId id) {
+		LooseNonTag(FileSnapshot snapshot, String refName, ObjectId id) {
 			super(LOOSE, refName, id);
 			this.snapShot = snapshot;
 		}
@@ -1144,8 +1140,7 @@ public class RefDirectory extends RefDatabase {
 			implements LooseRef {
 		private FileSnapshot snapShot;
 
-		LooseUnpeeled(FileSnapshot snapShot, @NonNull String refName,
-				@NonNull ObjectId id) {
+		LooseUnpeeled(FileSnapshot snapShot, String refName, ObjectId id) {
 			super(LOOSE, refName, id);
 			this.snapShot = snapShot;
 		}
@@ -1154,24 +1149,13 @@ public class RefDirectory extends RefDatabase {
 			return snapShot;
 		}
 
-		@NonNull
-		@Override
-		public ObjectId getObjectId() {
-			ObjectId id = super.getObjectId();
-			assert id != null; // checked in constructor
-			return id;
-		}
-
 		public LooseRef peel(ObjectIdRef newLeaf) {
-			ObjectId peeledObjectId = newLeaf.getPeeledObjectId();
-			ObjectId objectId = getObjectId();
-			if (peeledObjectId != null) {
+			if (newLeaf.getPeeledObjectId() != null)
 				return new LoosePeeledTag(snapShot, getName(),
-						objectId, peeledObjectId);
-			} else {
+						getObjectId(), newLeaf.getPeeledObjectId());
+			else
 				return new LooseNonTag(snapShot, getName(),
-						objectId);
-			}
+						getObjectId());
 		}
 	}
 
@@ -1179,8 +1163,7 @@ public class RefDirectory extends RefDatabase {
 			LooseRef {
 		private final FileSnapshot snapShot;
 
-		LooseSymbolicRef(FileSnapshot snapshot, @NonNull String refName,
-				@NonNull Ref target) {
+		LooseSymbolicRef(FileSnapshot snapshot, String refName, Ref target) {
 			super(refName, target);
 			this.snapShot = snapshot;
 		}
