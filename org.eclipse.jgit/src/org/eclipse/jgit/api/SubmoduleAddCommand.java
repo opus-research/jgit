@@ -183,7 +183,9 @@ public class SubmoduleAddCommand extends
 		Repository subRepo = null;
 		try (Git git = clone.call()) {
 			subRepo = git.getRepository();
+			subRepo.incrementOpen();
 		}
+
 		// Save submodule URL to parent repository's config
 		StoredConfig config = repo.getConfig();
 		config.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
