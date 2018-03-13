@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009, Google Inc.
+ * Copyright (C) 2013, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,32 +41,45 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.transport;
+package org.eclipse.jgit.internal.storage.dfs;
 
-import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.Config.SectionParser;
+import java.io.ByteArrayOutputStream;
+import java.nio.ByteBuffer;
 
-/**
- * The standard "transfer", "fetch" and "receive" configuration parameters.
- */
-public class TransferConfig {
-	/** Key for {@link Config#get(SectionParser)}. */
-	public static final Config.SectionParser<TransferConfig> KEY = new SectionParser<TransferConfig>() {
-		public TransferConfig parse(final Config cfg) {
-			return new TransferConfig(cfg);
-		}
-	};
+class InMemoryOutputStream extends DfsOutputStream {
+	private final ByteArrayOutputStream dst = new ByteArrayOutputStream();
 
-	private final boolean fsckObjects;
+	private byte[] data;
 
-	private TransferConfig(final Config rc) {
-		fsckObjects = rc.getBoolean("receive", "fsckobjects", false); //$NON-NLS-1$ //$NON-NLS-2$
+	@Override
+	public void write(byte[] buf, int off, int len) {
+		data = null;
+		dst.write(buf, off, len);
 	}
 
-	/**
-	 * @return strictly verify received objects?
-	 */
-	public boolean isFsckObjects() {
-		return fsckObjects;
+	@Override
+	public int read(long position, ByteBuffer buf) {
+		byte[] d = getData();
+		int n = Math.min(buf.remaining(), d.length - (int) position);
+		if (n <= 0)
+			return -1;
+		buf.put(d, (int) position, n);
+		return n;
+	}
+
+	byte[] getData() {
+		if (data == null)
+			data = dst.toByteArray();
+		return data;
+	}
+
+	@Override
+	public void flush() {
+		// Default implementation does nothing;
+	}
+
+	@Override
+	public void close() {
+		flush();
 	}
 }
