@@ -49,7 +49,7 @@ import java.nio.ByteBuffer;
 
 /**
  * Output stream to create a file on the DFS.
- * 
+ *
  * @see DfsObjDatabase#writeFile(DfsPackDescription, String)
  */
 public abstract class DfsOutputStream extends OutputStream {

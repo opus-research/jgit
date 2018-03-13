@@ -126,7 +126,8 @@ public class InMemoryRepository extends DfsRepository {
 	}
 
 	private static class MemPack extends DfsPackDescription {
-		private Map<String, byte[]> fileMap = new HashMap<String, byte[]>();
+		private final Map<String, byte[]>
+				fileMap = new HashMap<String, byte[]>();
 
 		MemPack(String name, DfsRepositoryDescription repoDesc) {
 			super(repoDesc, name);
