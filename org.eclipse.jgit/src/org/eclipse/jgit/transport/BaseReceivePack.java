@@ -1075,25 +1075,17 @@ public abstract class BaseReceivePack {
 				throw new PackProtocolException(m);
 			}
 
-			final ReceiveCommand cmd = parseCommand(line);
-			if (cmd.getRefName().equals(Constants.HEAD)) {
+			final ObjectId oldId = ObjectId.fromString(line.substring(0, 40));
+			final ObjectId newId = ObjectId.fromString(line.substring(41, 81));
+			final String name = line.substring(82);
+			final ReceiveCommand cmd = new ReceiveCommand(oldId, newId, name);
+			if (name.equals(Constants.HEAD)) {
 				cmd.setResult(Result.REJECTED_CURRENT_BRANCH);
 			} else {
 				cmd.setRef(refs.get(cmd.getRefName()));
 			}
 			commands.add(cmd);
 		}
-	}
-
-	static ReceiveCommand parseCommand(String line) {
-		final ObjectId oldId = ObjectId.fromString(line.substring(0, 40));
-		final ObjectId newId = ObjectId.fromString(line.substring(41, 81));
-		String name = line.substring(82);
-		if (!name.isEmpty() && name.charAt(name.length() - 1) == '\n') {
-			name = name.substring(0, name.length() - 1);
-		}
-		final ReceiveCommand cmd = new ReceiveCommand(oldId, newId, name);
-		return cmd;
 	}
 
 	/** Enable capabilities based on a previously read capabilities line. */
