@@ -51,7 +51,7 @@ import org.eclipse.jgit.lfs.internal.LfsText;
 /**
  * Misc. constants used throughout JGit LFS extension.
  *
- * @since 4.1
+ * @since 4.2
  **/
 @SuppressWarnings("nls")
 public final class Constants {
