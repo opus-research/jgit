@@ -50,7 +50,7 @@
   <groupId>org.eclipse.jgit</groupId>
   <artifactId>org.eclipse.jgit-parent</artifactId>
   <packaging>pom</packaging>
-  <version>0.12.0-SNAPSHOT</version>
+  <version>1.0.0-SNAPSHOT</version>
 
   <name>JGit - Parent</name>
   <url>${jgit-url}</url>
@@ -152,7 +152,7 @@
       <plugins>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
-	  <artifactId>maven-jar-plugin</artifactId>
+          <artifactId>maven-jar-plugin</artifactId>
           <version>2.3</version>
           <configuration>
             <archive>
@@ -226,12 +226,37 @@
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>findbugs-maven-plugin</artifactId>
           <version>2.3.2-SNAPSHOT</version>
+          <configuration>
+            <findbugsXmlOutput>true</findbugsXmlOutput>
+            <failOnError>false</failOnError>
+          </configuration>
+          <executions>
+            <execution>
+              <goals>
+                <goal>check</goal>
+              </goals>
+            </execution>
+          </executions>
         </plugin>
 
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-pmd-plugin</artifactId>
           <version>2.5</version>
+          <configuration>
+            <sourceEncoding>utf-8</sourceEncoding>
+            <minimumTokens>100</minimumTokens>
+            <targetJdk>1.5</targetJdk>
+            <format>xml</format>
+            <failOnViolation>false</failOnViolation>
+          </configuration>
+          <executions>
+            <execution>
+              <goals>
+                <goal>cpd-check</goal>
+              </goals>
+            </execution>
+          </executions>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -254,7 +279,7 @@
             <id>translate-qualifier</id>
             <phase>generate-resources</phase>
             <configuration>
-	          <tasks unless="${translate-qualifier}">
+              <tasks unless="${translate-qualifier}">
                 <copy file="META-INF/MANIFEST.MF" tofile="${bundle-manifest}" overwrite="true"/>
                 <replace file="${bundle-manifest}">
                   <replacefilter token=".qualifier" value=".${maven.build.timestamp}"/>
@@ -361,19 +386,37 @@
         <module>org.eclipse.jgit.console</module>
       </modules>
     </profile>
+    <profile>
+      <id>static-checks</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>findbugs-maven-plugin</artifactId>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-pmd-plugin</artifactId>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
   </profiles>
 
   <modules>
     <module>org.eclipse.jgit</module>
+    <module>org.eclipse.jgit.storage.dht</module>
+    <module>org.eclipse.jgit.ant</module>
     <module>org.eclipse.jgit.ui</module>
     <module>org.eclipse.jgit.http.server</module>
     <module>org.eclipse.jgit.iplog</module>
     <module>org.eclipse.jgit.pgm</module>
     <module>org.eclipse.jgit.junit</module>
-	<module>org.eclipse.jgit.junit.http</module>
+    <module>org.eclipse.jgit.junit.http</module>
 
     <module>org.eclipse.jgit.test</module>
     <module>org.eclipse.jgit.http.test</module>
+    <module>org.eclipse.jgit.storage.dht.test</module>
   </modules>
 
 </project>
