@@ -229,12 +229,15 @@ public class ObjectWalkTest extends RevWalkTestCase {
 			Tree A_A = A.addTree("A");
 			Tree A_B = A.addTree("B");
 
-			try (final ObjectInserter inserter = db.newObjectInserter()) {
+			final ObjectInserter inserter = db.newObjectInserter();
+			try {
 				A_A.setId(inserter.insert(Constants.OBJ_TREE, A_A.format()));
 				A_B.setId(inserter.insert(Constants.OBJ_TREE, A_B.format()));
 				A.setId(inserter.insert(Constants.OBJ_TREE, A.format()));
 				root.setId(inserter.insert(Constants.OBJ_TREE, root.format()));
 				inserter.flush();
+			} finally {
+				inserter.release();
 			}
 
 			tree_root = rw.parseTree(root.getId());

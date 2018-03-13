@@ -127,8 +127,8 @@ public class NoteMapMergerTest extends RepositoryTestCase {
 	@Override
 	@After
 	public void tearDown() throws Exception {
-		reader.close();
-		inserter.close();
+		reader.release();
+		inserter.release();
 		super.tearDown();
 	}
 

@@ -384,10 +384,13 @@ public class IndexDiffTest extends RepositoryTestCase {
 	}
 
 	private ObjectId insertTree(Tree tree) throws IOException {
-		try (ObjectInserter oi = db.newObjectInserter()) {
+		ObjectInserter oi = db.newObjectInserter();
+		try {
 			ObjectId id = oi.insert(Constants.OBJ_TREE, tree.format());
 			oi.flush();
 			return id;
+		} finally {
+			oi.release();
 		}
 	}
 
