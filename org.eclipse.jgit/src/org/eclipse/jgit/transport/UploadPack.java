@@ -71,6 +71,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -718,7 +719,7 @@ public class UploadPack {
 	}
 
 	private void service() throws IOException {
-		boolean sendPack = false;
+		boolean sendPack;
 		// If it's a non-bidi request, we need to read the entire request before
 		// writing a response. Buffer the response until then.
 		try {
@@ -751,17 +752,6 @@ public class UploadPack {
 			if (!clientShallowCommits.isEmpty())
 				walk.assumeShallow(clientShallowCommits);
 			sendPack = negotiate();
-			if (sendPack && !biDirectionalPipe) {
-				// Ensure the request was fully consumed. Any remaining input must
-				// be a protocol error. If we aren't at EOF the implementation is broken.
-				int eof = rawIn.read();
-				if (0 <= eof) {
-					sendPack = false;
-					throw new CorruptObjectException(MessageFormat.format(
-							JGitText.get().expectedEOFReceived,
-							"\\x" + Integer.toHexString(eof))); //$NON-NLS-1$
-				}
-			}
 		} catch (ServiceMayNotContinueException err) {
 			if (!err.isOutput() && err.getMessage() != null) {
 				try {
@@ -788,11 +778,6 @@ public class UploadPack {
 			}
 			throw err;
 		} finally {
-			if (!sendPack && !biDirectionalPipe) {
-				while (0 < rawIn.skip(2048) || 0 <= rawIn.read()) {
-					// Discard until EOF.
-				}
-			}
 			rawOut.stopBuffering();
 		}
 
@@ -1260,7 +1245,7 @@ public class UploadPack {
 		@Override
 		public void checkWants(UploadPack up, List<ObjectId> wants)
 				throws PackProtocolException, IOException {
-			checkNotAdvertisedWants(up, wants,
+			checkNotAdvertisedWants(up.getRevWalk(), wants,
 					refIdSet(up.getAdvertisedRefs().values()));
 		}
 	}
@@ -1297,7 +1282,7 @@ public class UploadPack {
 		@Override
 		public void checkWants(UploadPack up, List<ObjectId> wants)
 				throws PackProtocolException, IOException {
-			checkNotAdvertisedWants(up, wants,
+			checkNotAdvertisedWants(up.getRevWalk(), wants,
 					refIdSet(up.getRepository().getRefDatabase().getRefs(ALL).values()));
 		}
 	}
@@ -1315,7 +1300,7 @@ public class UploadPack {
 		}
 	}
 
-	private static void checkNotAdvertisedWants(UploadPack up,
+	private static void checkNotAdvertisedWants(RevWalk walk,
 			List<ObjectId> notAdvertisedWants, Set<ObjectId> reachableFrom)
 			throws MissingObjectException, IncorrectObjectTypeException, IOException {
 		// Walk the requested commits back to the provided set of commits. If any
@@ -1324,34 +1309,32 @@ public class UploadPack {
 		// into an advertised branch it will be marked UNINTERESTING and no commits
 		// return.
 
-		try (RevWalk walk = new RevWalk(up.getRevWalk().getObjectReader())) {
-			AsyncRevObjectQueue q = walk.parseAny(notAdvertisedWants, true);
+		AsyncRevObjectQueue q = walk.parseAny(notAdvertisedWants, true);
+		try {
+			RevObject obj;
+			while ((obj = q.next()) != null) {
+				if (!(obj instanceof RevCommit))
+					throw new WantNotValidException(obj);
+				walk.markStart((RevCommit) obj);
+			}
+		} catch (MissingObjectException notFound) {
+			throw new WantNotValidException(notFound.getObjectId(), notFound);
+		} finally {
+			q.release();
+		}
+		for (ObjectId id : reachableFrom) {
 			try {
-				RevObject obj;
-				while ((obj = q.next()) != null) {
-					if (!(obj instanceof RevCommit))
-						throw new WantNotValidException(obj);
-					walk.markStart((RevCommit) obj);
-				}
-			} catch (MissingObjectException notFound) {
-				throw new WantNotValidException(notFound.getObjectId(),
-						notFound);
-			} finally {
-				q.release();
-			}
-			for (ObjectId id : reachableFrom) {
-				try {
-					walk.markUninteresting(walk.parseCommit(id));
-				} catch (IncorrectObjectTypeException notCommit) {
-					continue;
-				}
-			}
-
-			RevCommit bad = walk.next();
-			if (bad != null) {
-				throw new WantNotValidException(bad);
+				walk.markUninteresting(walk.parseCommit(id));
+			} catch (IncorrectObjectTypeException notCommit) {
+				continue;
 			}
 		}
+
+		RevCommit bad = walk.next();
+		if (bad != null) {
+			throw new WantNotValidException(bad);
+		}
+		walk.reset();
 	}
 
 	private void addCommonBase(final RevObject o) {
@@ -1407,6 +1390,17 @@ public class UploadPack {
 	private void sendPack() throws IOException {
 		final boolean sideband = options.contains(OPTION_SIDE_BAND)
 				|| options.contains(OPTION_SIDE_BAND_64K);
+
+		if (!biDirectionalPipe) {
+			// Ensure the request was fully consumed. Any remaining input must
+			// be a protocol error. If we aren't at EOF the implementation is broken.
+			int eof = rawIn.read();
+			if (0 <= eof)
+				throw new CorruptObjectException(MessageFormat.format(
+						JGitText.get().expectedEOFReceived,
+						"\\x" + Integer.toHexString(eof))); //$NON-NLS-1$
+		}
+
 		if (sideband) {
 			try {
 				sendPack(true);

@@ -47,7 +47,6 @@ import static java.util.stream.Collectors.toList;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.LOCK_FAILURE;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.NOT_ATTEMPTED;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.REJECTED_NONFASTFORWARD;
-import static org.eclipse.jgit.transport.ReceiveCommand.Result.REJECTED_OTHER_REASON;
 
 import java.io.IOException;
 import java.text.MessageFormat;
@@ -143,12 +142,6 @@ class PackedBatchRefUpdate extends BatchRefUpdate {
 			super.execute(walk, monitor, options);
 			return;
 		}
-		if (containsSymrefs(pending)) {
-			// packed-refs file cannot store symrefs
-			reject(pending.get(0), REJECTED_OTHER_REASON,
-					JGitText.get().atomicSymRefNotSupported, pending);
-			return;
-		}
 
 		// Required implementation details copied from super.execute.
 		if (!blockUntilTimestamps(MAX_WAIT)) {
@@ -201,8 +194,7 @@ class PackedBatchRefUpdate extends BatchRefUpdate {
 				return;
 			}
 			// commitPackedRefs removes lock file (by renaming over real file).
-			refdb.commitPackedRefs(packedRefsLock, newRefs, oldPackedList,
-					true);
+			refdb.commitPackedRefs(packedRefsLock, newRefs, oldPackedList);
 		} finally {
 			try {
 				unlockAll(locks);
@@ -214,15 +206,6 @@ class PackedBatchRefUpdate extends BatchRefUpdate {
 		refdb.fireRefsChanged();
 		pending.forEach(c -> c.setResult(ReceiveCommand.Result.OK));
 		writeReflog(pending);
-	}
-
-	private static boolean containsSymrefs(List<ReceiveCommand> commands) {
-		for (ReceiveCommand cmd : commands) {
-			if (cmd.getOldSymref() != null || cmd.getNewSymref() != null) {
-				return true;
-			}
-		}
-		return false;
 	}
 
 	private boolean checkConflictingNames(List<ReceiveCommand> commands)
@@ -422,6 +405,7 @@ class PackedBatchRefUpdate extends BatchRefUpdate {
 		if (ident == null) {
 			ident = new PersonIdent(refdb.getRepository());
 		}
+		ReflogWriter w = refdb.getLogWriter();
 		for (ReceiveCommand cmd : commands) {
 			// Assume any pending commands have already been executed atomically.
 			if (cmd.getResult() != ReceiveCommand.Result.OK) {
@@ -431,7 +415,7 @@ class PackedBatchRefUpdate extends BatchRefUpdate {
 
 			if (cmd.getType() == ReceiveCommand.Type.DELETE) {
 				try {
-					RefDirectory.delete(refdb.logFor(name), RefDirectory.levelsIn(name));
+					RefDirectory.delete(w.logFor(name), RefDirectory.levelsIn(name));
 				} catch (IOException e) {
 					// Ignore failures, see below.
 				}
@@ -451,8 +435,7 @@ class PackedBatchRefUpdate extends BatchRefUpdate {
 				}
 			}
 			try {
-				new ReflogWriter(refdb, isForceRefLog(cmd))
-						.log(name, cmd.getOldId(), cmd.getNewId(), ident, msg);
+				w.log(name, cmd.getOldId(), cmd.getNewId(), ident, msg);
 			} catch (IOException e) {
 				// Ignore failures, but continue attempting to write more reflogs.
 				//
@@ -526,12 +509,7 @@ class PackedBatchRefUpdate extends BatchRefUpdate {
 
 	private static void reject(ReceiveCommand cmd, ReceiveCommand.Result result,
 			List<ReceiveCommand> commands) {
-		reject(cmd, result, null, commands);
-	}
-
-	private static void reject(ReceiveCommand cmd, ReceiveCommand.Result result,
-			String why, List<ReceiveCommand> commands) {
-		cmd.setResult(result, why);
+		cmd.setResult(result);
 		for (ReceiveCommand c2 : commands) {
 			if (c2.getResult() == ReceiveCommand.Result.OK) {
 				// Undo OK status so ReceiveCommand#abort aborts it. Assumes this method
