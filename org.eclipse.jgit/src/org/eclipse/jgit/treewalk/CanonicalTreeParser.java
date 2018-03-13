@@ -374,7 +374,7 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 		pathLen = tmp;
 		nextPtr = ptr + Constants.OBJECT_ID_LENGTH;
 
-		// Checks if this entry is a .gitattributes file
+		// Check if this entry is a .gitattributes file
 		if (RawParseUtils.match(path, pathOffset,
 				Constants.DOT_GIT_ATTRIBUTES.getBytes()) == ATTRIBUTESLENGTH)
 			attributesNode = new LazyLoadingAttributesNode(
@@ -383,7 +383,7 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 	}
 
 	/**
-	 * Retrieves the {@link AttributesNode} for the current entry.
+	 * Retrieve the {@link AttributesNode} for the current entry.
 	 *
 	 * @param reader
 	 *            {@link ObjectReader} used to parse the .gitattributes entry.
@@ -401,7 +401,6 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 
 	/**
 	 * {@link AttributesNode} implementation that provides lazy loading
-	 * facilities.
 	 */
 	private static class LazyLoadingAttributesNode extends AttributesNode {
 		final ObjectId objectId;

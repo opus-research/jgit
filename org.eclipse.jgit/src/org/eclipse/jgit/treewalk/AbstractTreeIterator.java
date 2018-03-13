@@ -94,7 +94,7 @@ public abstract class AbstractTreeIterator {
 	AbstractTreeIterator matches;
 
 	/**
-	 * If there is a .gitattributes file present, the parsed rules from it.
+	 * Parsed rules of .gitattributes file if it exists.
 	 *
 	 * @since 4.2
 	 */
