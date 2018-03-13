@@ -132,7 +132,7 @@ class Push extends TextBuiltin {
 	}
 
 	private void printPushResult(final ObjectReader reader, final URIish uri,
-			final PushResult result) throws IOException {
+			final PushResult result) {
 		shownURI = false;
 		boolean everythingUpToDate = true;
 
@@ -160,15 +160,14 @@ class Push extends TextBuiltin {
 
 		AbstractFetchCommand.showRemoteMessages(result.getMessages());
 		if (everythingUpToDate)
-			outw.println(CLIText.get().everythingUpToDate);
+			out.println(CLIText.get().everythingUpToDate);
 	}
 
 	private void printRefUpdateResult(final ObjectReader reader,
-			final URIish uri, final PushResult result, final RemoteRefUpdate rru)
-			throws IOException {
+			final URIish uri, final PushResult result, final RemoteRefUpdate rru) {
 		if (!shownURI) {
 			shownURI = true;
-			outw.println(MessageFormat.format(CLIText.get().pushTo, uri));
+			out.println(MessageFormat.format(CLIText.get().pushTo, uri));
 		}
 
 		final String remoteName = rru.getRemoteName();
@@ -248,17 +247,16 @@ class Push extends TextBuiltin {
 	}
 
 	private void printUpdateLine(final char flag, final String summary,
-			final String srcRef, final String destRef, final String message)
-			throws IOException {
-		outw.format(" %c %-17s", flag, summary);
+			final String srcRef, final String destRef, final String message) {
+		out.format(" %c %-17s", flag, summary);
 
 		if (srcRef != null)
-			outw.format(" %s ->", abbreviateRef(srcRef, true));
-		outw.format(" %s", abbreviateRef(destRef, true));
+			out.format(" %s ->", abbreviateRef(srcRef, true));
+		out.format(" %s", abbreviateRef(destRef, true));
 
 		if (message != null)
-			outw.format(" (%s)", message);
+			out.format(" (%s)", message);
 
-		outw.println();
+		out.println();
 	}
 }
