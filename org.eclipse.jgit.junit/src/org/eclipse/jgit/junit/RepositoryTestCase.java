@@ -415,7 +415,6 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 		walk.release();
 		// update the HEAD
 		RefUpdate refUpdate = db.updateRef(Constants.HEAD);
-		refUpdate.setRefLogMessage("checkout: moving to " + branchName, false);
 		refUpdate.link(branchName);
 	}
 
@@ -497,10 +496,5 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 		entry.setObjectId(new ObjectInserter.Formatter().idFor(
 				Constants.OBJ_BLOB, Constants.encode(content)));
 		return entry;
-	}
-
-	public static void assertEqualsFile(File expected, File actual)
-			throws IOException {
-		assertEquals(expected.getCanonicalFile(), actual.getCanonicalFile());
 	}
 }

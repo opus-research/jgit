@@ -45,8 +45,6 @@
 
 package org.eclipse.jgit.pgm;
 
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
-
 import java.io.IOException;
 import java.util.Map;
 import java.util.SortedMap;
@@ -56,7 +54,6 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefComparator;
 import org.eclipse.jgit.util.RefMap;
 
-@Command(usage = "usage_ShowRef")
 class ShowRef extends TextBuiltin {
 	@Override
 	protected void run() throws Exception {
@@ -67,8 +64,8 @@ class ShowRef extends TextBuiltin {
 		}
 	}
 
-	private Iterable<Ref> getSortedRefs() throws Exception {
-		Map<String, Ref> all = db.getRefDatabase().getRefs(ALL);
+	private Iterable<Ref> getSortedRefs() {
+		Map<String, Ref> all = db.getAllRefs();
 		if (all instanceof RefMap
 				|| (all instanceof SortedMap && ((SortedMap) all).comparator() == null))
 			return all.values();

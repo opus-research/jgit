@@ -45,7 +45,6 @@ package org.eclipse.jgit.internal.storage.file;
 
 import static org.eclipse.jgit.internal.storage.pack.PackExt.BITMAP_INDEX;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.INDEX;
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -458,7 +457,7 @@ public class GC {
 	 * @throws IOException
 	 */
 	public void packRefs() throws IOException {
-		Collection<Ref> refs = repo.getRefDatabase().getRefs(ALL).values();
+		Collection<Ref> refs = repo.getAllRefs().values();
 		List<String> refsToBePacked = new ArrayList<String>(refs.size());
 		pm.beginTask(JGitText.get().packRefs, refs.size());
 		try {
@@ -575,7 +574,7 @@ public class GC {
 	 * @throws IOException
 	 */
 	private Map<String, Ref> getAllRefs() throws IOException {
-		Map<String, Ref> ret = repo.getRefDatabase().getRefs(ALL);
+		Map<String, Ref> ret = repo.getAllRefs();
 		for (Ref ref : repo.getRefDatabase().getAdditionalRefs())
 			ret.put(ref.getName(), ref);
 		return ret;
@@ -616,25 +615,26 @@ public class GC {
 
 			while (treeWalk.next()) {
 				ObjectId objectId = treeWalk.getObjectId(0);
-				switch (treeWalk.getRawMode(0) & FileMode.TYPE_MASK) {
-				case FileMode.TYPE_MISSING:
-				case FileMode.TYPE_GITLINK:
-					continue;
-				case FileMode.TYPE_TREE:
-				case FileMode.TYPE_FILE:
-				case FileMode.TYPE_SYMLINK:
-					ret.add(objectId);
-					continue;
-				default:
+			    switch (treeWalk.getRawMode(0) & FileMode.TYPE_MASK) {
+			      case FileMode.TYPE_MISSING:
+			      case FileMode.TYPE_GITLINK:
+			        continue;
+			      case FileMode.TYPE_TREE:
+			      case FileMode.TYPE_FILE:
+			      case FileMode.TYPE_SYMLINK:
+			        ret.add(objectId);
+			        continue;
+			      default:
 					throw new IOException(MessageFormat.format(
-							JGitText.get().corruptObjectInvalidMode3,
-							String.format("%o", //$NON-NLS-1$
-									Integer.valueOf(treeWalk.getRawMode(0))),
-							(objectId == null) ? "null" : objectId.name(), //$NON-NLS-1$
-							treeWalk.getPathString(), //
-							repo.getIndexFile()));
-				}
-			}
+							JGitText.get().corruptObjectInvalidMode3, String
+									.format("%o", Integer.valueOf(treeWalk //$NON-NLS-1$
+											.getRawMode(0)),
+											(objectId == null) ? "null" //$NON-NLS-1$
+													: objectId.name(), treeWalk
+											.getPathString(), repo
+											.getIndexFile())));
+			    }
+			  }
 			return ret;
 		} finally {
 			if (revWalk != null)
@@ -703,6 +703,7 @@ public class GC {
 			}
 
 			// write the packindex
+			@SuppressWarnings("resource")
 			FileChannel idxChannel = new FileOutputStream(tmpIdx).getChannel();
 			OutputStream idxStream = Channels.newOutputStream(idxChannel);
 			try {
