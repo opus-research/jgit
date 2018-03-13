@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2012, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,50 +41,65 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.pgm;
 
 import java.io.IOException;
+import java.text.MessageFormat;
+import java.util.List;
 
-import org.eclipse.jgit.errors.ConfigInvalidException;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.StoredConfig;
+import org.eclipse.jgit.transport.PubSubConfig;
+import org.eclipse.jgit.transport.PubSubConfig.Publisher;
+import org.eclipse.jgit.transport.PubSubConfig.Subscriber;
+import org.eclipse.jgit.transport.RemoteConfig;
+import org.eclipse.jgit.transport.URIish;
 
-/**
- * Persistent configuration that can be stored and loaded from a location.
- */
-public abstract class StoredConfig extends Config {
-	/** Create a configuration with no default fallback. */
-	public StoredConfig() {
-		super();
+import org.kohsuke.args4j.Argument;
+
+@Command(common = false, usage = "usage_SubscribeToRemoteRepository")
+class Subscribe extends TextBuiltin {
+	static final String DEFAULT_SUBSCRIBE_REF = "refs/heads/*";
+
+	@Argument(index = 0, metaVar = "metaVar_remoteName")
+	private String remote = Constants.DEFAULT_REMOTE_NAME;
+
+	@Override
+	protected void run() throws Exception {
+		StoredConfig dbconfig = db.getConfig();
+		RemoteConfig remoteConfig = new RemoteConfig(dbconfig, remote);
+		PubSubConfig pubsubConfig = SubscribeDaemon.getConfig();
+		List<URIish> uris = remoteConfig.getURIs();
+		if (uris.isEmpty()) {
+			out.println(MessageFormat.format(
+					CLIText.get().noRemoteUriSubscribe, remote));
+			return;
+		}
+		String uriRoot = PubSubConfig.getUriRoot(uris.get(0));
+		String dir = db.getDirectory().getAbsolutePath();
+
+		// Add new repository + remote to config
+		Publisher p = pubsubConfig.getPublisher(uriRoot);
+		if (p == null) {
+			p = new Publisher(uriRoot);
+			pubsubConfig.addPublisher(p);
+		}
+
+		Subscriber s = p.getSubscriber(remote, dir);
+
+		if (s == null)
+			p.addSubscriber(new Subscriber(p, remote, dir));
+
+		try {
+			SubscribeDaemon.updateConfig(pubsubConfig);
+		} catch (IOException e) {
+			out.println(MessageFormat.format(CLIText.get().cannotWrite,
+					SubscribeDaemon.getConfigFile()));
+			return;
+		}
+
+		out.println(MessageFormat.format(
+				CLIText.get().didSubscribe, remote, uriRoot));
+		// TODO(wetherbeei): reload the SubscribeDaemon
 	}
-
-	/**
-	 * Create an empty configuration with a fallback for missing keys.
-	 *
-	 * @param defaultConfig
-	 *            the base configuration to be consulted when a key is missing
-	 *            from this configuration instance.
-	 */
-	public StoredConfig(Config defaultConfig) {
-		super(defaultConfig);
-	}
-
-	/**
-	 * Load the configuration from the persistent store.
-	 * <p>
-	 * If the configuration does not exist, this configuration is cleared, and
-	 * thus behaves the same as though the backing store exists, but is empty.
-	 *
-	 * @throws IOException
-	 *             the configuration could not be read (but does exist).
-	 * @throws ConfigInvalidException
-	 *             the configuration is not properly formatted.
-	 */
-	public abstract void load() throws IOException, ConfigInvalidException;
-
-	/**
-	 * Save the configuration to the persistent store.
-	 *
-	 * @throws IOException
-	 *             the configuration could not be written.
-	 */
-	public abstract void save() throws IOException;
 }

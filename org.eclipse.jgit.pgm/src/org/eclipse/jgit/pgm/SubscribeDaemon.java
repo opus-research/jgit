@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2012, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,50 +41,55 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.pgm;
 
+import java.io.File;
 import java.io.IOException;
+import java.net.URISyntaxException;
 
 import org.eclipse.jgit.errors.ConfigInvalidException;
+import org.eclipse.jgit.storage.file.FileBasedConfig;
+import org.eclipse.jgit.transport.PubSubConfig;
+import org.eclipse.jgit.util.FS;
 
-/**
- * Persistent configuration that can be stored and loaded from a location.
- */
-public abstract class StoredConfig extends Config {
-	/** Create a configuration with no default fallback. */
-	public StoredConfig() {
-		super();
+@Command(common = false, usage = "usage_RunSubscribeDaemon")
+class SubscribeDaemon extends TextBuiltin {
+	/** Name of the pubsub config file */
+	public static String GLOBAL_PUBSUB_FILE = ".gitpubsub";
+
+	/** @return the pubsub config file */
+	public static File getConfigFile() {
+		return new File(FS.detect().userHome(), GLOBAL_PUBSUB_FILE);
 	}
 
 	/**
-	 * Create an empty configuration with a fallback for missing keys.
-	 *
-	 * @param defaultConfig
-	 *            the base configuration to be consulted when a key is missing
-	 *            from this configuration instance.
-	 */
-	public StoredConfig(Config defaultConfig) {
-		super(defaultConfig);
-	}
-
-	/**
-	 * Load the configuration from the persistent store.
-	 * <p>
-	 * If the configuration does not exist, this configuration is cleared, and
-	 * thus behaves the same as though the backing store exists, but is empty.
-	 *
-	 * @throws IOException
-	 *             the configuration could not be read (but does exist).
+	 * @return the config file for this user
 	 * @throws ConfigInvalidException
-	 *             the configuration is not properly formatted.
+	 * @throws IOException
+	 * @throws URISyntaxException
 	 */
-	public abstract void load() throws IOException, ConfigInvalidException;
+	public static PubSubConfig getConfig()
+			throws IOException, ConfigInvalidException, URISyntaxException {
+		File cfg = getConfigFile();
+		FileBasedConfig c = new FileBasedConfig(cfg, FS.detect());
+		c.load();
+		return new PubSubConfig(c);
+	}
 
 	/**
-	 * Save the configuration to the persistent store.
-	 *
+	 * @param pubsubConfig
 	 * @throws IOException
-	 *             the configuration could not be written.
 	 */
-	public abstract void save() throws IOException;
+	public static void updateConfig(PubSubConfig pubsubConfig)
+			throws IOException {
+		File cfg = getConfigFile();
+		FileBasedConfig c = new FileBasedConfig(cfg, FS.detect());
+		pubsubConfig.update(c);
+		c.save();
+	}
+
+	@Override
+	protected void run() throws Exception {
+		// TODO(wetherbeei): fill in daemon launch
+	}
 }
