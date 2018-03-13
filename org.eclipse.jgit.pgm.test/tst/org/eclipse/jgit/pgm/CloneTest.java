@@ -44,15 +44,18 @@ package org.eclipse.jgit.pgm;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.util.List;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.junit.JGitTestUtil;
+import org.eclipse.jgit.junit.MockSystemReader;
 import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.transport.URIish;
+import org.eclipse.jgit.util.SystemReader;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -111,22 +114,24 @@ public class CloneTest extends CLIRepositoryTestCase {
 	}
 
 	@Test
-	public void testCloneBare() throws Exception {
+	public void testCloneIntoCurrentDir() throws Exception {
 		createInitialCommit();
+		File target = createTempDirectory("target");
+
+		MockSystemReader sr = (MockSystemReader) SystemReader.getInstance();
+		sr.setProperty(Constants.OS_USER_DIR, target.getAbsolutePath());
 
 		File gitDir = db.getDirectory();
-		String sourcePath = gitDir.getAbsolutePath();
-		String targetPath = (new File(sourcePath)).getParentFile()
-				.getParentFile().getAbsolutePath()
-				+ "/target.git";
-		StringBuilder cmd = new StringBuilder("git clone --bare ")
-				.append(sourcePath + " " + targetPath);
+		String sourceURI = gitDir.toURI().toString();
+		String name = new URIish(sourceURI).getHumanishName();
+		StringBuilder cmd = new StringBuilder("git clone ").append(sourceURI);
 		String[] result = execute(cmd.toString());
 		assertArrayEquals(new String[] {
-				"Cloning into '" + targetPath + "'...", "", "" }, result);
-		Git git2 = Git.open(new File(targetPath));
+				"Cloning into '" + new File(target, name).getAbsolutePath()
+						+ "'...", "",
+				"" }, result);
+		Git git2 = Git.open(new File(target, name));
 		List<Ref> branches = git2.branchList().call();
 		assertEquals("expected 1 branch", 1, branches.size());
-		assertTrue("expected bare repository", git2.getRepository().isBare());
 	}
 }

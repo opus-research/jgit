@@ -52,6 +52,7 @@ import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.transport.URIish;
+import org.eclipse.jgit.util.SystemReader;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 
@@ -65,9 +66,6 @@ class Clone extends AbstractFetchCommand {
 
 	@Option(name = "--no-checkout", aliases = { "-n" }, usage = "usage_noCheckoutAfterClone")
 	private boolean noCheckout;
-
-	@Option(name = "--bare", usage = "usage_bareClone")
-	private boolean isBare;
 
 	@Argument(index = 0, required = true, metaVar = "metaVar_uriish")
 	private String sourceUri;
@@ -86,23 +84,26 @@ class Clone extends AbstractFetchCommand {
 			throw die(CLIText.get().conflictingUsageOf_git_dir_andArguments);
 
 		final URIish uri = new URIish(sourceUri);
+		File localNameF;
 		if (localName == null) {
 			try {
-				localName = uri.getHumanishName();
+				localNameF = new File(SystemReader.getInstance().getProperty(
+						Constants.OS_USER_DIR), uri.getHumanishName());
 			} catch (IllegalArgumentException e) {
 				throw die(MessageFormat.format(CLIText.get().cannotGuessLocalNameFrom, sourceUri));
 			}
-		}
+		} else
+			localNameF = new File(localName);
 
 		if (branch == null)
 			branch = Constants.HEAD;
 
 		CloneCommand command = Git.cloneRepository();
-		command.setURI(sourceUri).setRemote(remoteName).setBare(isBare)
+		command.setURI(sourceUri).setRemote(remoteName)
 				.setNoCheckout(noCheckout).setBranch(branch);
 
 		command.setGitDir(gitdir == null ? null : new File(gitdir));
-		command.setDirectory(localName == null ? null : new File(localName));
+		command.setDirectory(localNameF);
 		try {
 			db = command.call().getRepository();
 			outw.println(MessageFormat.format(CLIText.get().cloningInto,
