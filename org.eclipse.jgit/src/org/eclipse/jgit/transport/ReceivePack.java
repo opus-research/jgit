@@ -669,8 +669,8 @@ public class ReceivePack {
 				}
 
 				if (ref != null) {
-					// A well behaved client shouldn't have sent us an
-					// update command for a ref we advertised to it.
+					// A well behaved client shouldn't have sent us a
+					// create command for a ref we advertised to it.
 					//
 					cmd.setResult(Result.REJECTED_OTHER_REASON, "ref exists");
 					continue;
@@ -882,7 +882,7 @@ public class ReceivePack {
 			case REJECTED_MISSING_OBJECT:
 				if (cmd.getMessage() == null)
 					r.append("missing object(s)");
-				else if (cmd.getMessage().length() == 2 * Constants.OBJECT_ID_LENGTH)
+				else if (cmd.getMessage().length() == Constants.OBJECT_ID_STRING_LENGTH)
 					r.append("object " + cmd.getMessage() + " missing");
 				else
 					r.append(cmd.getMessage());

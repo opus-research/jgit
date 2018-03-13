@@ -137,7 +137,7 @@ public class GitIndex {
 	 */
 	public GitIndex(Repository db) {
 		this.db = db;
-		this.cacheFile = db.getIndexFile();
+		this.cacheFile = new File(db.getDirectory(), "index");
 	}
 
 	/**
