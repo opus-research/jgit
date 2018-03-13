@@ -81,7 +81,7 @@ public class BatchRefUpdate {
 	 * the same LAN should be under 5 seconds. 5 seconds is also not that long
 	 * for a large `git push` operation to complete.
 	 */
-	protected static final Duration MAX_WAIT = Duration.ofSeconds(5);
+	private static final Duration MAX_WAIT = Duration.ofSeconds(5);
 
 	private final RefDatabase refdb;
 
@@ -334,19 +334,6 @@ public class BatchRefUpdate {
 	}
 
 	/**
-	 * Set push options associated with this update.
-	 * <p>
-	 * Implementations must call this at the top of {@link #execute(RevWalk,
-	 * ProgressMonitor, List)}.
-	 *
-	 * @param options options passed to {@code execute}.
-	 * @since 4.9
-	 */
-	protected void setPushOptions(List<String> options) {
-		pushOptions = options;
-	}
-
-	/**
 	 * @return list of timestamps the batch must wait for.
 	 * @since 4.6
 	 */
@@ -412,7 +399,7 @@ public class BatchRefUpdate {
 		}
 
 		if (options != null) {
-			setPushOptions(options);
+			pushOptions = options;
 		}
 
 		monitor.beginTask(JGitText.get().updatingReferences, commands.size());
@@ -547,36 +534,17 @@ public class BatchRefUpdate {
 		return ref;
 	}
 
-	/**
-	 * Get all path prefixes of a ref name.
-	 *
-	 * @param name
-	 *            ref name.
-	 * @return path prefixes of the ref name. For {@code refs/heads/foo}, returns
-	 *         {@code refs} and {@code refs/heads}.
-	 * @since 4.9
-	 */
-	protected static Collection<String> getPrefixes(String name) {
+	static Collection<String> getPrefixes(String s) {
 		Collection<String> ret = new HashSet<>();
-		addPrefixesTo(name, ret);
+		addPrefixesTo(s, ret);
 		return ret;
 	}
 
-	/**
-	 * Add prefixes of a ref name to an existing collection.
-	 *
-	 * @param name
-	 *            ref name.
-	 * @param out
-	 *            path prefixes of the ref name. For {@code refs/heads/foo},
-	 *            returns {@code refs} and {@code refs/heads}.
-	 * @since 4.9
-	 */
-	protected static void addPrefixesTo(String name, Collection<String> out) {
-		int p1 = name.indexOf('/');
+	static void addPrefixesTo(String s, Collection<String> out) {
+		int p1 = s.indexOf('/');
 		while (p1 > 0) {
-			out.add(name.substring(0, p1));
-			p1 = name.indexOf('/', p1 + 1);
+			out.add(s.substring(0, p1));
+			p1 = s.indexOf('/', p1 + 1);
 		}
 	}
 
