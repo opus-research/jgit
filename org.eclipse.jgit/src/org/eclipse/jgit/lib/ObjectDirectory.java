@@ -88,8 +88,6 @@ public class ObjectDirectory extends ObjectDatabase {
 
 	private final File[] alternateObjectDir;
 
-	private final FS fs;
-
 	/**
 	 * Initialize a reference to an on-disk object directory.
 	 *
@@ -97,18 +95,14 @@ public class ObjectDirectory extends ObjectDatabase {
 	 *            the location of the <code>objects</code> directory.
 	 * @param alternateObjectDir
 	 *            a list of alternate object directories
-	 * @param fs
-	 *            the file system abstraction which will be necessary to
-	 *            perform certain file system operations.
 	 */
-	public ObjectDirectory(final File dir, File[] alternateObjectDir, FS fs) {
+	public ObjectDirectory(final File dir, File[] alternateObjectDir) {
 		objects = dir;
 		this.alternateObjectDir = alternateObjectDir;
 		infoDirectory = new File(objects, "info");
 		packDirectory = new File(objects, "pack");
 		alternatesFile = new File(infoDirectory, "alternates");
 		packList = new AtomicReference<PackList>(NO_PACKS);
-		this.fs = fs;
 	}
 
 	/**
@@ -491,17 +485,17 @@ public class ObjectDirectory extends ObjectDatabase {
 
 	private ObjectDatabase openAlternate(final String location)
 			throws IOException {
-		final File objdir = fs.resolve(objects, location);
+		final File objdir = FS.resolve(objects, location);
 		return openAlternate(objdir);
 	}
 
 	private ObjectDatabase openAlternate(File objdir) throws IOException {
 		final File parent = objdir.getParentFile();
-		if (FileKey.isGitRepository(parent, fs)) {
-			final Repository db = RepositoryCache.open(FileKey.exact(parent, fs));
+		if (FileKey.isGitRepository(parent)) {
+			final Repository db = RepositoryCache.open(FileKey.exact(parent));
 			return new AlternateRepositoryDatabase(db);
 		}
-		return new ObjectDirectory(objdir, null, fs);
+		return new ObjectDirectory(objdir, null);
 	}
 
 	private static final class PackList {

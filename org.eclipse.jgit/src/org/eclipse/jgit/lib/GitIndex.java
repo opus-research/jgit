@@ -71,6 +71,7 @@ import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.NotSupportedException;
+import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.RawParseUtils;
 
 /**
@@ -327,16 +328,16 @@ public class GitIndex {
 		}
 	}
 
-	private boolean File_canExecute(File f){
-		return db.getFS().canExecute(f);
+	static boolean File_canExecute( File f){
+		return FS.INSTANCE.canExecute(f);
 	}
 
-	private boolean File_setExecute(File f, boolean value) {
-		return db.getFS().setExecute(f, value);
+	static boolean File_setExecute(File f, boolean value) {
+		return FS.INSTANCE.setExecute(f, value);
 	}
 
-	private boolean File_hasExecute() {
-		return db.getFS().supportsExecute();
+	static boolean File_hasExecute() {
+		return FS.INSTANCE.supportsExecute();
 	}
 
 	static byte[] makeKey(File wd, File f) {
@@ -353,8 +354,7 @@ public class GitIndex {
 		if (filemode != null)
 			return filemode.booleanValue();
 		RepositoryConfig config = db.getConfig();
-		filemode = Boolean.valueOf(config.getBoolean("core", null, "filemode", true));
-		return filemode.booleanValue();
+		return config.getBoolean("core", null, "filemode", true);
 	}
 
 	/** An index entry */
