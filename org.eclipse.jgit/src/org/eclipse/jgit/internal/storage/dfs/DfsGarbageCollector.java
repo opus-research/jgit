@@ -91,7 +91,6 @@ public class DfsGarbageCollector {
 
 	private PackConfig packConfig;
 
-	private long coalesceLiveLimit = 500L << 30;
 	private long coalesceGarbageLimit = 50 << 20;
 
 	private Map<String, Ref> refsBefore;
@@ -134,32 +133,6 @@ public class DfsGarbageCollector {
 	 */
 	public DfsGarbageCollector setPackConfig(PackConfig newConfig) {
 		packConfig = newConfig;
-		return this;
-	}
-
-	/** @return packs larger than this limit will not be repacked. */
-	public long getCoalesceLiveLimit() {
-		return coalesceLiveLimit;
-	}
-
-	/**
-	 * Set the byte size limit for packs containing live objects to be repacked.
-	 * <p>
-	 * If a GC pack is larger than this limit it will be left alone by the
-	 * garbage collector. This avoids unnecessary disk IO reading and copying
-	 * objects from one pack to another.
-	 * <p>
-	 * If limit is set to 0 then coalesce is disabled. Each new GC pass will
-	 * write a new pack based on INSERT, RECEIVE and COMPACT sources only.
-	 * <p>
-	 * If limit is set to {@link Long#MAX_VALUE}, everything is coalesced.
-	 *
-	 * @param limit
-	 *            size in bytes.
-	 * @return {@code this}
-	 */
-	public DfsGarbageCollector setCoalesceLiveLimit(long limit) {
-		coalesceLiveLimit = limit;
 		return this;
 	}
 
@@ -264,23 +237,10 @@ public class DfsGarbageCollector {
 		List<DfsPackFile> out = new ArrayList<DfsPackFile>(packs.length);
 		for (DfsPackFile p : packs) {
 			DfsPackDescription d = p.getPackDescription();
-			switch (d.getPackSource()) {
-			case GC:
-				if (d.getFileSize(PackExt.PACK) < coalesceLiveLimit) {
-					out.add(p);
-				} else {
-					newPackObj.add(objectIdSet(p.getPackIndex(ctx)));
-				}
-				break;
-			case UNREACHABLE_GARBAGE:
-				if (d.getFileSize(PackExt.PACK) < coalesceGarbageLimit) {
-					out.add(p);
-				}
-				break;
-			default:
+			if (d.getPackSource() != UNREACHABLE_GARBAGE)
 				out.add(p);
-				break;
-			}
+			else if (d.getFileSize(PackExt.PACK) < coalesceGarbageLimit)
+				out.add(p);
 		}
 		return out;
 	}
@@ -314,9 +274,6 @@ public class DfsGarbageCollector {
 
 		PackWriter pw = newPackWriter();
 		try {
-			for (PackWriter.ObjectIdSet packedObjs : newPackObj) {
-				pw.excludeObjects(packedObjs);
-			}
 			pw.setTagTargets(tagTargets);
 			pw.preparePack(pm, allHeads, Collections.<ObjectId> emptySet());
 			if (0 < pw.getObjectCount())
@@ -452,13 +409,5 @@ public class DfsGarbageCollector {
 
 		DfsBlockCache.getInstance().getOrCreate(pack, null);
 		return pack;
-	}
-
-	private static PackWriter.ObjectIdSet objectIdSet(final PackIndex idx) {
-		return new PackWriter.ObjectIdSet() {
-			public boolean contains(AnyObjectId objectId) {
-				return idx.hasObject(objectId);
-			}
-		};
 	}
 }
