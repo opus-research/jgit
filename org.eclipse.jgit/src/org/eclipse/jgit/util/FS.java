@@ -505,10 +505,7 @@ public abstract class FS {
 		return p.value;
 	}
 
-	/**
-	 * @return the path to the Git executable.
-	 * @since 4.0
-	 */
+	/** @return the path to the Git executable. */
 	protected abstract File discoverGitExe();
 
 	/** @return the $prefix directory C Git would use. */
@@ -516,12 +513,6 @@ public abstract class FS {
 		return resolveGrandparentFile(discoverGitExe());
 	}
 
-	/**
-	 * @param grandchild
-	 * @return the parent directory of this file's parent directory or
-	 *         {@code null} in case there's no grandparent directory
-	 * @since 4.0
-	 */
 	protected static File resolveGrandparentFile(File grandchild) {
 		if (grandchild != null) {
 			File parent = grandchild.getParentFile();
