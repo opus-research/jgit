@@ -11,22 +11,21 @@ junit_tests(
     tags = ["lfs"],
     deps = [
         ":helpers",
+        "//lib:junit",
         "//org.eclipse.jgit:jgit",
         "//org.eclipse.jgit.junit:junit",
         "//org.eclipse.jgit.lfs:jgit-lfs",
-        "@hamcrest_core//jar",
-        "@hamcrest_library//jar",
-        "@junit//jar",
     ],
 )
 
 java_library(
     name = "helpers",
+    testonly = 1,
     srcs = glob(["src/**/*.java"]),
     deps = [
+        "//lib:junit",
         "//org.eclipse.jgit:jgit",
         "//org.eclipse.jgit.junit:junit",
         "//org.eclipse.jgit.lfs:jgit-lfs",
-        "@junit//jar",
     ],
 )

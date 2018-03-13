@@ -12,19 +12,17 @@ DEPS = [
     "//org.eclipse.jgit.junit.http:junit-http",
     "//org.eclipse.jgit.lfs:jgit-lfs",
     "//org.eclipse.jgit.lfs.server:jgit-lfs-server",
-    "@hamcrest_core//jar",
-    "@hamcrest_library//jar",
-    "@httpcore//jar",
-    "@httpclient//jar",
-    "@junit//jar",
-    "@jetty_http//jar",
-    "@jetty_io//jar",
-    "@jetty_server//jar",
-    "@jetty_servlet//jar",
-    "@jetty_security//jar",
-    "@jetty_util//jar",
-    "@servlet_api_3_1//jar",
-    "@commons_logging//jar",
+    "//lib:commons-logging",
+    "//lib:httpcore",
+    "//lib:httpclient",
+    "//lib:junit",
+    "//lib:jetty-http",
+    "//lib:jetty-io",
+    "//lib:jetty-server",
+    "//lib:jetty-servlet",
+    "//lib:jetty-security",
+    "//lib:jetty-util",
+    "//lib:servlet-api",
 ]
 
 junit_tests(
@@ -45,6 +43,7 @@ junit_tests(
 
 java_library(
     name = "helpers",
+    testonly = 1,
     srcs = TEST_BASE,
     deps = DEPS,
 )

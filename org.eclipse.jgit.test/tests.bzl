@@ -25,6 +25,10 @@ def tests(tests):
         '//org.eclipse.jgit.pgm:pgm',
         '//org.eclipse.jgit.ui:ui',
       ]
+    if src.endswith("WalkEncryptionTest.java"):
+      additional_deps = [
+        '//org.eclipse.jgit:insecure_cipher_factory',
+      ]
 
     junit_tests(
       name = name,

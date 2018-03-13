@@ -13,29 +13,28 @@ junit_tests(
     tags = ["pgm"],
     deps = [
         ":helpers",
+        "//lib:commons-compress",
+        "//lib:javaewah",
+        "//lib:junit",
+        "//lib:slf4j-api",
+        "//lib:slf4j-simple",
+        "//lib:xz",
         "//org.eclipse.jgit.archive:jgit-archive",
         "//org.eclipse.jgit:jgit",
         "//org.eclipse.jgit.junit:junit",
         "//org.eclipse.jgit.pgm:pgm",
-        "@commons_compress//jar",
-        "@hamcrest_core//jar",
-        "@hamcrest_library//jar",
-        "@javaewah//jar",
-        "@junit//jar",
-        "@log_api//jar",
-        "@slf4j_simple//jar",
-        "@tukaani_xz//jar",
     ],
 )
 
 java_library(
     name = "helpers",
+    testonly = 1,
     srcs = glob(["src/**/*.java"]),
     deps = [
+        "//lib:args4j",
+        "//lib:junit",
         "//org.eclipse.jgit:jgit",
         "//org.eclipse.jgit.junit:junit",
         "//org.eclipse.jgit.pgm:pgm",
-        "@args4j//jar",
-        "@junit//jar",
     ],
 )

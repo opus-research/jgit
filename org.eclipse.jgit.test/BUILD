@@ -1,4 +1,8 @@
 load(":tests.bzl", "tests")
+load(
+    "@com_googlesource_gerrit_bazlets//tools:genrule2.bzl",
+    "genrule2",
+)
 
 PKG = "tst/org/eclipse/jgit/"
 
@@ -29,23 +33,18 @@ DATA = [
 
 tests(glob(
     ["tst/**/*.java"],
-    exclude = HELPERS + DATA +
-    # TODO(davido): error prone rejects this compilation unit:
-    # [InsecureCryptoUsage] Insecure usage of a crypto API:
-    # the transformation is not a compile-time constant expression
-    [
-        "tst/org/eclipse/jgit/transport/WalkEncryptionTest.java",
-    ],
+    exclude = HELPERS + DATA
 ))
 
 java_library(
     name = "helpers",
+    testonly = 1,
     srcs = HELPERS,
     resources = DATA,
     deps = [
+        "//lib:junit",
         "//org.eclipse.jgit:jgit",
         "//org.eclipse.jgit.junit:junit",
-        "@junit//jar",
     ],
 )
 
@@ -54,9 +53,9 @@ java_import(
     jars = [":tst_rsrc_jar"],
 )
 
-genrule(
-    name = "tst_rsrc_jar",
-    srcs = glob(["tst-rsrc/**"]),
-    outs = ["tst_rsrc_jar.jar"],
-    cmd = "r=$$PWD && cd org.eclipse.jgit.test/tst-rsrc && zip -qr $$r/$@ .",
+genrule2(
+  name = 'tst_rsrc_jar',
+  cmd = 'o=$$PWD/$@ && tar cf - $(SRCS) | tar -C $$TMP --strip-components=2 -xf - && cd  $$TMP && zip -qr $$o .',
+  srcs = glob(['tst-rsrc/**']),
+  outs = ['tst_rsrc.jar',],
 )
