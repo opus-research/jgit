@@ -51,10 +51,10 @@ import static org.junit.Assert.fail;
 import java.io.File;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoHeadException;
+import org.eclipse.jgit.errors.CheckoutConflictException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
@@ -366,9 +366,8 @@ public class StashApplyCommandTest extends RepositoryTestCase {
 		try {
 			git.stashApply().call();
 			fail("Exception not thrown");
-		} catch (CheckoutConflictException e) {
-			assertEquals("[" + new File(trash, PATH) + "]", e
-					.getConflictingPaths().toString());
+		} catch (JGitInternalException e) {
+			assertTrue(e.getCause() instanceof CheckoutConflictException);
 		}
 	}
 
@@ -388,9 +387,8 @@ public class StashApplyCommandTest extends RepositoryTestCase {
 		try {
 			git.stashApply().call();
 			fail("Exception not thrown");
-		} catch (CheckoutConflictException e) {
-			assertEquals("[" + new File(trash, PATH) + "]", e
-					.getConflictingPaths().toString());
+		} catch (JGitInternalException e) {
+			assertTrue(e.getCause() instanceof CheckoutConflictException);
 		}
 	}
 
