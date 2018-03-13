@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Tomasz Zarna <tomasz.zarna@tasktop.com> and others.
+ * Copyright (C) 2016, David Pursehouse <david.pursehouse@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,34 +40,23 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm;
 
-import static org.junit.Assert.assertEquals;
+package org.eclipse.jgit.lfs.errors;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.lib.CLIRepositoryTestCase;
-import org.junit.Before;
-import org.junit.Test;
+/**
+ * Thrown when the user has hit a rate limit with the server.
+ *
+ * @since 4.5
+ *
+ */
+public class LfsRateLimitExceeded extends LfsException {
+	private static final long serialVersionUID = 1L;
 
-public class TagTest extends CLIRepositoryTestCase {
-	private Git git;
-
-	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
-		git = new Git(db);
-		git.commit().setMessage("initial commit").call();
-	}
-
-	@Test
-	public void testTagTwice() throws Exception {
-		git.tag().setName("test").call();
-		writeTrashFile("file", "content");
-		git.add().addFilepattern("file").call();
-		git.commit().setMessage("commit").call();
-
-		assertEquals("fatal: tag 'test' already exists",
-				executeUnchecked("git tag test")[0]);
+	/**
+	 * @param message
+	 *            error message, which may be shown to an end-user.
+	 */
+	public LfsRateLimitExceeded(String message) {
+		super(message);
 	}
 }
