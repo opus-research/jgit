@@ -99,6 +99,7 @@ import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevTree;
+import org.eclipse.jgit.storage.file.PackIndex;
 import org.eclipse.jgit.storage.file.PackIndexWriter;
 import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.TemporaryBuffer;
@@ -156,6 +157,10 @@ public class PackWriter {
 	private List<CachedPack> cachedPacks = new ArrayList<CachedPack>(2);
 
 	private Set<ObjectId> tagTargets = Collections.emptySet();
+
+	private PackIndex[] excludeInPacks;
+
+	private PackIndex excludeInPackLast;
 
 	private Deflater myDeflater;
 
@@ -426,6 +431,25 @@ public class PackWriter {
 	}
 
 	/**
+	 * Add a pack index whose contents should be excluded from the result.
+	 *
+	 * @param idx
+	 *            objects in this index will not be in the output pack.
+	 */
+	public void excludeObjects(PackIndex idx) {
+		if (excludeInPacks == null) {
+			excludeInPacks = new PackIndex[] { idx };
+			excludeInPackLast = idx;
+		} else {
+			int cnt = excludeInPacks.length;
+			PackIndex[] newList = new PackIndex[cnt + 1];
+			System.arraycopy(excludeInPacks, 0, newList, 0, cnt);
+			newList[cnt] = idx;
+			excludeInPacks = newList;
+		}
+	}
+
+	/**
 	 * Prepare the list of objects to be written to the pack stream.
 	 * <p>
 	 * Iterator <b>exactly</b> determines which objects are included in a pack
@@ -640,6 +664,9 @@ public class PackWriter {
 			compressMonitor = NullProgressMonitor.INSTANCE;
 		if (writeMonitor == null)
 			writeMonitor = NullProgressMonitor.INSTANCE;
+
+		excludeInPacks = null;
+		excludeInPackLast = null;
 
 		boolean needSearchForReuse = reuseSupport != null && (
 				   reuseDeltas
@@ -1256,7 +1283,7 @@ public class PackWriter {
 	}
 
 	private void findObjectsToPack(final ProgressMonitor countingMonitor,
-			final ObjectWalk walker, Collection<? extends ObjectId> want,
+			final ObjectWalk walker, final Collection<? extends ObjectId> want,
 			Collection<? extends ObjectId> have)
 			throws MissingObjectException, IOException,
 			IncorrectObjectTypeException {
@@ -1264,12 +1291,8 @@ public class PackWriter {
 		countingMonitor.beginTask(JGitText.get().countingObjects,
 				ProgressMonitor.UNKNOWN);
 
-		if (!(want instanceof Set<?>))
-			want = new HashSet<ObjectId>(want);
 		if (have == null)
 			have = Collections.emptySet();
-		else if (!(have instanceof Set<?>))
-			have = new HashSet<ObjectId>(have);
 
 		stats.interestingObjects = Collections.unmodifiableSet(new HashSet<ObjectId>(want));
 		stats.uninterestingObjects = Collections.unmodifiableSet(new HashSet<ObjectId>(have));
@@ -1383,6 +1406,8 @@ public class PackWriter {
 		BlockList<RevCommit> commits = new BlockList<RevCommit>();
 		RevCommit c;
 		while ((c = walker.next()) != null) {
+			if (exclude(c))
+				continue;
 			if (c.has(inCachedPack)) {
 				CachedPack pack = tipToPack.get(c);
 				if (includesAllTips(pack, include, walker)) {
@@ -1448,6 +1473,8 @@ public class PackWriter {
 			while ((o = walker.nextObject()) != null) {
 				if (o.has(RevFlag.UNINTERESTING))
 					continue;
+				if (exclude(o))
+					continue;
 
 				int pathHash = walker.getPathHashCode();
 				byte[] pathBuf = walker.getPathBuffer();
@@ -1460,6 +1487,8 @@ public class PackWriter {
 			RevObject o;
 			while ((o = walker.nextObject()) != null) {
 				if (o.has(RevFlag.UNINTERESTING))
+					continue;
+				if (exclude(o))
 					continue;
 				addObject(o, walker.getPathHashCode());
 				countingMonitor.update(1);
@@ -1532,7 +1561,8 @@ public class PackWriter {
 	 */
 	public void addObject(final RevObject object)
 			throws IncorrectObjectTypeException {
-		addObject(object, 0);
+		if (!exclude(object))
+			addObject(object, 0);
 	}
 
 	private void addObject(final RevObject object, final int pathHashCode) {
@@ -1544,6 +1574,20 @@ public class PackWriter {
 		otp.setPathHash(pathHashCode);
 		objectsLists[object.getType()].add(otp);
 		objectsMap.add(otp);
+	}
+
+	private boolean exclude(AnyObjectId objectId) {
+		if (excludeInPacks == null)
+			return false;
+		if (excludeInPackLast.hasObject(objectId))
+			return true;
+		for (PackIndex idx : excludeInPacks) {
+			if (idx.hasObject(objectId)) {
+				excludeInPackLast = idx;
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
