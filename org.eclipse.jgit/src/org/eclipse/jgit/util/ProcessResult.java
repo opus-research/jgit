@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Google Inc.
+ * Copyright (C) 2014 Obeo.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,41 +40,73 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.transport;
-
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.PushCertificate.NonceStatus;
+package org.eclipse.jgit.util;
 
 /**
- * A NonceGenerator is used to create a nonce to be sent out to the pusher who
- * will sign the nonce to prove it is not a replay attack on the push
- * certificate.
+ * Describes the result of running an external process.
+ *
+ * @since 3.7
  */
-public interface NonceGenerator {
+public class ProcessResult {
+	/**
+	 * Status of a process' execution.
+	 */
+	public static enum Status {
+		/**
+		 * The script was found and launched properly. It may still have exited
+		 * with a non-zero {@link #exitCode}.
+		 */
+		OK,
+
+		/** The script was not found on disk and thus could not be launched. */
+		NOT_PRESENT,
+
+		/**
+		 * The script was found but could not be launched since it was not
+		 * supported by the current {@link FS}.
+		 */
+		NOT_SUPPORTED;
+	}
+
+	/** The exit code of the process. */
+	private final int exitCode;
+
+	/** Status of the process' execution. */
+	private final Status status;
 
 	/**
-	 * @param seed
-	 *            The seed for the server which must be kept private.
-	 * @param db
-	 *            The repository which should be used to obtain a unique String
-	 *            such that the pusher cannot forge nonces by pushing to another
-	 *            repository at the same time as well and reusing the nonce.
-	 * @param timestamp
-	 * @return The nonce to be signed by the pusher
-	 * @throws IllegalStateException
+	 * Instantiates a process result with the given status and an exit code of
+	 * <code>-1</code>.
+	 *
+	 * @param status
+	 *            Status describing the execution of the external process.
 	 */
-	public String createNonce(String seed, final Repository db, long timestamp)
-			throws IllegalStateException;
+	public ProcessResult(Status status) {
+		this(-1, status);
+	}
 
 	/**
-	 * @param received
-	 * @param sent
-	 * @param seed
-	 * @param db
-	 * @param allowedSlope
-	 * @return a NonceStatus indicating the trustworthiness of the received
-	 *         nonce.
+	 * @param exitCode
+	 *            Exit code of the process.
+	 * @param status
+	 *            Status describing the execution of the external process.
 	 */
-	public NonceStatus verify(String received, String sent, String seed,
-			final Repository db, int allowedSlope);
+	public ProcessResult(int exitCode, Status status) {
+		this.exitCode = exitCode;
+		this.status = status;
+	}
+
+	/**
+	 * @return The exit code of the process.
+	 */
+	public int getExitCode() {
+		return exitCode;
+	}
+
+	/**
+	 * @return The status of the process' execution.
+	 */
+	public Status getStatus() {
+		return status;
+	}
 }

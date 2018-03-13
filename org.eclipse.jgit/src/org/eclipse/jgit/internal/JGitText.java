@@ -163,6 +163,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String commitMessageNotSpecified;
 	/***/ public String commitOnRepoWithoutHEADCurrentlyNotSupported;
 	/***/ public String commitAmendOnInitialNotPossible;
+	/***/ public String commitRejectedByHook;
 	/***/ public String compressingObjects;
 	/***/ public String connectionFailed;
 	/***/ public String connectionTimeOut;
@@ -247,12 +248,12 @@ public class JGitText extends TranslationBundle {
 	/***/ public String errorEncodingFromFile;
 	/***/ public String errorInBase64CodeReadingStream;
 	/***/ public String errorInPackedRefs;
-	/***/ public String errorInvalidPushCert;
 	/***/ public String errorInvalidProtocolWantedOldNewRef;
 	/***/ public String errorListing;
 	/***/ public String errorOccurredDuringUnpackingOnTheRemoteEnd;
 	/***/ public String errorReadingInfoRefs;
 	/***/ public String errorSymlinksNotSupported;
+	/***/ public String exceptionCaughtDuringExecutionOfHook;
 	/***/ public String exceptionCaughtDuringExecutionOfAddCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfArchiveCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfCherryPickCommand;
@@ -266,6 +267,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String exceptionCaughtDuringExecutionOfRevertCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfRmCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfTagCommand;
+	/***/ public String exceptionHookExecutionInterrupted;
 	/***/ public String exceptionOccurredDuringAddingOfOptionToALogCommand;
 	/***/ public String exceptionOccurredDuringReadingOfGIT_DIR;
 	/***/ public String exceptionWhileReadingPack;
@@ -452,6 +454,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String packRefs;
 	/***/ public String packSizeNotSetYet;
 	/***/ public String packTooLargeForIndexVersion1;
+	/***/ public String packWasDeleted;
 	/***/ public String packWriterStatistics;
 	/***/ public String panicCantRenameIndexFile;
 	/***/ public String patchApplyException;
