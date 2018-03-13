@@ -455,7 +455,6 @@ public class ReftableReader extends Reftable {
 		private final boolean prefix;
 
 		private Ref ref;
-		private long updateIndex;
 		BlockReader block;
 
 		RefCursorImpl(long scanEnd, byte[] match, boolean prefix) {
@@ -484,7 +483,6 @@ public class ReftableReader extends Reftable {
 					return false;
 				}
 
-				updateIndex = minUpdateIndex + block.readUpdateIndexDelta();
 				ref = block.readRef();
 				if (!includeDeletes && wasDeleted()) {
 					continue;
@@ -496,11 +494,6 @@ public class ReftableReader extends Reftable {
 		@Override
 		public Ref getRef() {
 			return ref;
-		}
-
-		@Override
-		public long getUpdateIndex() {
-			return updateIndex;
 		}
 
 		@Override
@@ -581,7 +574,6 @@ public class ReftableReader extends Reftable {
 		private final ObjectId match;
 
 		private Ref ref;
-		private long updateIndex;
 		private int listIdx;
 
 		private LongList blockPos;
@@ -655,7 +647,6 @@ public class ReftableReader extends Reftable {
 				}
 
 				block.parseKey();
-				updateIndex = minUpdateIndex + block.readUpdateIndexDelta();
 				ref = block.readRef();
 				ObjectId id = ref.getObjectId();
 				if (id != null && match.equals(id)
@@ -668,11 +659,6 @@ public class ReftableReader extends Reftable {
 		@Override
 		public Ref getRef() {
 			return ref;
-		}
-
-		@Override
-		public long getUpdateIndex() {
-			return updateIndex;
 		}
 
 		@Override
