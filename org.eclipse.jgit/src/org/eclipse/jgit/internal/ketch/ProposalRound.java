@@ -67,36 +67,28 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.ReceiveCommand;
 
-/** Aggregates and sends user {@link Proposal}s. */
+/** A {@link Round} that aggregates and sends user {@link Proposal}s. */
 class ProposalRound extends Round {
 	private final List<Proposal> todo;
 	private RefTree queuedTree;
 
-	ProposalRound(KetchLeader leader, LogId head, List<Proposal> todo) {
+	ProposalRound(KetchLeader leader, LogId head, List<Proposal> todo,
+			@Nullable RefTree tree) {
 		super(leader, head);
 		this.todo = todo;
-	}
-
-	void setTree(RefTree tree) {
 		this.queuedTree = tree;
 	}
 
 	void start() throws IOException {
-		RefTree tree = queuedTree;
-		queuedTree = null;
-
 		for (Proposal p : todo) {
 			p.notifyState(RUNNING);
 		}
-		begin(tree);
-	}
-
-	private void begin(@Nullable RefTree tree) throws IOException {
 		try {
+			ObjectId id;
 			try (Repository git = leader.openRepository()) {
-				insertProposals(git, tree);
+				id = insertProposals(git);
 			}
-			acceptAsync();
+			acceptAsync(id);
 		} catch (NoOp e) {
 			for (Proposal p : todo) {
 				p.success();
@@ -113,30 +105,34 @@ class ProposalRound extends Round {
 		}
 	}
 
-	private void insertProposals(Repository git, @Nullable RefTree tree)
+	private ObjectId insertProposals(Repository git)
 			throws IOException, NoOp {
+		ObjectId id;
 		try (ObjectInserter inserter = git.newObjectInserter()) {
 			// TODO(sop) Process signed push certificates.
 
-			if (tree != null && todo.size() == 1) {
-				insertSingleProposal(git, inserter, tree);
+			if (queuedTree != null && todo.size() == 1) {
+				id = insertSingleProposal(git, inserter);
 			} else {
-				if (tree != null) {
+				if (queuedTree != null) {
+					queuedTree = null;
 					leader.copyOnQueue = false;
 				}
-				insertMultiProposal(git, inserter);
+				id = insertMultiProposal(git, inserter);
 			}
 
 			stageCommands = makeStageList(git, inserter);
 			inserter.flush();
 		}
+		return id;
 	}
 
-	private void insertSingleProposal(Repository git, ObjectInserter inserter,
-			RefTree tree) throws IOException, NoOp {
+	private ObjectId insertSingleProposal(Repository git,
+			ObjectInserter inserter) throws IOException, NoOp {
 		// Fast path of tree passed in with only one proposal to run.
 		// Tree already has the proposal applied.
-		ObjectId treeId = tree.writeTree(inserter);
+		ObjectId treeId = queuedTree.writeTree(inserter);
+		queuedTree = null;
 		leader.copyOnQueue = false;
 
 		if (!ObjectId.zeroId().equals(acceptedOld)) {
@@ -157,10 +153,11 @@ class ProposalRound extends Round {
 		b.setCommitter(leader.getSystem().newCommitter());
 		b.setAuthor(p.getAuthor() != null ? p.getAuthor() : b.getCommitter());
 		b.setMessage(message(p));
-		setAcceptedNew(inserter.insert(b));
+		return inserter.insert(b);
 	}
 
-	private void insertMultiProposal(Repository git, ObjectInserter inserter)
+	private ObjectId insertMultiProposal(Repository git,
+			ObjectInserter inserter)
 			throws IOException, NoOp {
 		// The tree was not passed in, or there are multiple proposals
 		// each needing their own commit. Reset the tree to acceptedOld
@@ -207,7 +204,7 @@ class ProposalRound extends Round {
 		if (last.equals(acceptedOld)) {
 			throw new NoOp();
 		}
-		setAcceptedNew(last);
+		return last;
 	}
 
 	private String message(Proposal p) {
@@ -257,7 +254,7 @@ class ProposalRound extends Round {
 
 		Set<ObjectId> newObjs = new HashSet<>(byRef.values());
 		StageBuilder b = new StageBuilder(
-				leader.getSystem().getTxnNamespace(),
+				leader.getSystem().getTxnStage(),
 				acceptedNew);
 		return b.makeStageList(newObjs, git, inserter);
 	}

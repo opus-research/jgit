@@ -58,7 +58,11 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Attempts to elect this node as the leader. */
+/**
+ * A {@link Round} for a leaderless repository. Inserts a new "term" commit
+ * object that is used to guarantee election safety, preventing two replicas
+ * from thinking that they are the leader at the same time.
+ */
 class ElectionRound extends Round {
 	private static final Logger log = LoggerFactory.getLogger(ElectionRound.class);
 
@@ -70,12 +74,13 @@ class ElectionRound extends Round {
 
 	@Override
 	void start() throws IOException {
+		ObjectId id;
 		try (Repository git = leader.openRepository();
 				ObjectInserter inserter = git.newObjectInserter()) {
-			bumpTerm(git, inserter);
+			id = bumpTerm(git, inserter);
 			inserter.flush();
 		}
-		acceptAsync();
+		acceptAsync(id);
 	}
 
 	@Override
@@ -87,48 +92,48 @@ class ElectionRound extends Round {
 		return term;
 	}
 
-	private void bumpTerm(Repository git, ObjectInserter inserter)
+	private ObjectId bumpTerm(Repository git, ObjectInserter inserter)
 			throws IOException {
+		long newTerm;
 		CommitBuilder b = new CommitBuilder();
 		if (!ObjectId.zeroId().equals(acceptedOld)) {
 			try (RevWalk rw = new RevWalk(git)) {
 				RevCommit c = rw.parseCommit(acceptedOld);
 				b.setTreeId(c.getTree());
 				b.setParentId(acceptedOld);
-
-				List<String> footer = c.getFooterLines(TERM);
-				if (footer.isEmpty()) {
-					term = 1;
-				} else {
-					term = parseTerm(footer) + 1;
-				}
+				newTerm = parseTerm(c.getFooterLines(TERM)) + 1;
 			}
 		} else {
-			term = 1;
+			newTerm = 1;
 			b.setTreeId(inserter.insert(new TreeFormatter()));
 		}
 
-		StringBuilder m = new StringBuilder();
-		m.append(KetchConstants.TERM.getName())
-		 .append(": ") //$NON-NLS-1$
-		 .append(term);
+		StringBuilder msg = new StringBuilder();
+		msg.append(KetchConstants.TERM.getName())
+				.append(": ") //$NON-NLS-1$
+				.append(newTerm);
 
 		String tag = leader.getSystem().newLeaderTag();
 		if (tag != null && !tag.isEmpty()) {
-			m.append(' ').append(tag);
+			msg.append(' ').append(tag);
 		}
 
 		b.setAuthor(leader.getSystem().newCommitter());
 		b.setCommitter(b.getAuthor());
-		b.setMessage(m.toString());
+		b.setMessage(msg.toString());
 
 		if (log.isDebugEnabled()) {
 			log.debug("Trying to elect myself " + b.getMessage()); //$NON-NLS-1$
 		}
-		setAcceptedNew(inserter.insert(b));
+		term = newTerm;
+		return inserter.insert(b);
 	}
 
 	private static long parseTerm(List<String> footer) {
+		if (footer.isEmpty()) {
+			return 0;
+		}
+
 		String s = footer.get(0);
 		int p = s.indexOf(' ');
 		if (p > 0) {

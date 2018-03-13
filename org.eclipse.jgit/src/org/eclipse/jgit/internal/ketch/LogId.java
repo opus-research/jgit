@@ -46,23 +46,50 @@ package org.eclipse.jgit.internal.ketch;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 
-/** ObjectId extended with incrementing Ketch log position. */
+/**
+ * ObjectId extended with incrementing log position.
+ * <p>
+ * For any two LogId instances, A is an ancestor of C reachable through parent
+ * edges in the graph if {@code A.index < C.index}.
+ * <p>
+ * Index values are only valid within a single {@link KetchLeader} instance
+ * after it has won an election. {@link Round#acceptAsync(AnyObjectId)} bumps
+ * the index as each new round is constructed.
+ */
 class LogId extends ObjectId {
-	/**
-	 * Linear ordering of creation by {@link Round}.
-	 * <p>
-	 * For any two LogId instances, A is an ancestor of C reachable through
-	 * parent edges in the graph if {@code A.index < C.index}.
-	 * <p>
-	 * Index values are only valid within a single {@link KetchLeader} instance
-	 * after it has won an election. {@link Round#setAcceptedNew(AnyObjectId)}
-	 * bumps the index as each new round is constructed.
-	 */
-	final long index;
+	static LogId unknown(AnyObjectId id) {
+		return new LogId(id, 0);
+	}
 
-	LogId(AnyObjectId id, long index) {
+	private final long index;
+
+	private LogId(AnyObjectId id, long index) {
 		super(id);
 		this.index = index;
+	}
+
+	LogId nextId(AnyObjectId id) {
+		return new LogId(id, index + 1);
+	}
+
+	/**
+	 * Check if this log position committed before another log position.
+	 * <p>
+	 * Only valid for log positions in memory for the current leader.
+	 *
+	 * @param c
+	 *            other (more recent) log position.
+	 * @return true if this log position was before {@code c} or equal to c and
+	 *         therefore any agreement of {@code c} implies agreement on this
+	 *         log position.
+	 */
+	boolean isBefore(LogId c) {
+		return index <= c.index;
+	}
+
+	@SuppressWarnings("boxing")
+	String describeForLog() {
+		return String.format("%5d/%s", index, abbreviate(6).name()); //$NON-NLS-1$
 	}
 
 	@SuppressWarnings("boxing")

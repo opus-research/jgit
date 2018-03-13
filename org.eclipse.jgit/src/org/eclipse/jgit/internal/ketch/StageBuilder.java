@@ -43,7 +43,6 @@
 
 package org.eclipse.jgit.internal.ketch;
 
-import static org.eclipse.jgit.internal.ketch.KetchConstants.STAGE;
 import static org.eclipse.jgit.lib.FileMode.TYPE_GITLINK;
 
 import java.io.IOException;
@@ -67,7 +66,7 @@ import org.eclipse.jgit.treewalk.EmptyTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 
-/** Constructs a set of commands to stage content before commit. */
+/** Constructs a set of commands to stage content during a proposal. */
 public class StageBuilder {
 	/**
 	 * Acceptable number of references to send in a single stage transaction.
@@ -76,23 +75,22 @@ public class StageBuilder {
 	 * attempt to decrease the reference count using commit connectivity.
 	 */
 	private static final int SMALL_BATCH_SIZE = 5;
-	private static final byte[] PEEL = { '^', '{', '}' };
+	private static final byte[] PEEL = { ' ', '^' };
 
-	private final String txnNamespace;
+	private final String txnStage;
 	private final String txnId;
 
 	/**
 	 * Construct a stage builder for a transaction.
 	 *
-	 * @param txnNamespace
-	 *            namespace for transaction references. Will append
-	 *            {@code KetchConstants#STAGE} to form
-	 *            {@code "txnNamespace/stage/txnId.n"} style names.
+	 * @param txnStageNamespace
+	 *            namespace for transaction references to build
+	 *            {@code "txnStageNamespace/txnId.n"} style names.
 	 * @param txnId
 	 *            identifier used to name temporary staging refs.
 	 */
-	public StageBuilder(String txnNamespace, ObjectId txnId) {
-		this.txnNamespace = txnNamespace;
+	public StageBuilder(String txnStageNamespace, ObjectId txnId) {
+		this.txnStage = txnStageNamespace;
 		this.txnId = txnId.name();
 	}
 
@@ -106,7 +104,8 @@ public class StageBuilder {
 	 * object set as other replicas if there are rewinds or branch deletes.
 	 *
 	 * @param git
-	 *            source repository to read {@code oId} and {@code nId} from.
+	 *            source repository to read {@code oldTree} and {@code newTree}
+	 *            from.
 	 * @param oldTree
 	 *            accepted RefTree on the replica ({@code refs/txn/accepted}).
 	 *            Use {@link ObjectId#zeroId()} if the remote does not have any
@@ -117,8 +116,8 @@ public class StageBuilder {
 	 *         references on replicas anchoring new objects into the repository
 	 *         while a transaction gains consensus.
 	 * @throws IOException
-	 *             {@code git} cannot be accessed to compare {@code oId} and
-	 *             {@code nId} to build the object set.
+	 *             {@code git} cannot be accessed to compare {@code oldTree} and
+	 *             {@code newTree} to build the object set.
 	 */
 	public List<ReceiveCommand> makeStageList(Repository git, ObjectId oldTree,
 			ObjectId newTree) throws IOException {
@@ -137,7 +136,7 @@ public class StageBuilder {
 			Set<ObjectId> newObjs = new HashSet<>();
 			while (tw.next()) {
 				if (tw.getRawMode(1) == TYPE_GITLINK
-						&& !tw.isPathSuffix(PEEL, 3)) {
+						&& !tw.isPathSuffix(PEEL, 2)) {
 					newObjs.add(tw.getObjectId(1));
 				}
 			}
@@ -149,10 +148,10 @@ public class StageBuilder {
 	}
 
 	/**
-	 * Construct a set of commands to stage objects on replicas.
+	 * Construct a set of commands to stage objects on a replica.
 	 *
 	 * @param newObjs
-	 *            objects to send to the remote replicas.
+	 *            objects to send to a replica.
 	 * @param git
 	 *            local repository to read source objects from. Required to
 	 *            perform minification of {@code newObjs}.
@@ -192,17 +191,28 @@ public class StageBuilder {
 			return cmds;
 		}
 
+		// Commits is sorted most recent to least recent commit.
+		// Group batches of commits and build a chain.
 		// TODO(sop) Cluster by restricted graphs to support filtering.
-		CommitBuilder b = new CommitBuilder();
-		b.setAuthor(tmpAuthor(commits));
-		b.setCommitter(b.getAuthor());
-		for (int i = 0; i < commits.size();) {
-			int n = Math.min(commits.size() - i, 128);
-			b.setTreeId(commits.get(i).getTree());
-			b.setParentIds(commits.subList(i, i + n));
-			stage(cmds, inserter.insert(b));
-			i += n;
+		ObjectId tip = null;
+		for (int end = commits.size(); end > 0;) {
+			int start = Math.max(0, end - 128);
+			List<RevCommit> batch = commits.subList(start, end);
+			List<ObjectId> parents = new ArrayList<>(1 + batch.size());
+			if (tip != null) {
+				parents.add(tip);
+			}
+			parents.addAll(batch);
+
+			CommitBuilder b = new CommitBuilder();
+			b.setTreeId(batch.get(0).getTree());
+			b.setParentIds(parents);
+			b.setAuthor(tmpAuthor(batch));
+			b.setCommitter(b.getAuthor());
+			tip = inserter.insert(b);
+			end = start;
 		}
+		stage(cmds, tip);
 		return cmds;
 	}
 
@@ -212,7 +222,7 @@ public class StageBuilder {
 		for (int i = 0; i < commits.size();) {
 			t = Math.max(t, commits.get(i).getCommitTime());
 		}
-		String name = "tmp"; //$NON-NLS-1$
+		String name = "Ketch Stage"; //$NON-NLS-1$
 		String email = "tmp@tmp"; //$NON-NLS-1$
 		return new PersonIdent(name, email, t * 1000L, 0);
 	}
@@ -240,9 +250,9 @@ public class StageBuilder {
 	}
 
 	private void stage(List<ReceiveCommand> cmds, ObjectId id) {
-		int estLen = txnNamespace.length() + STAGE.length() + txnId.length();
-		StringBuilder n = new StringBuilder(estLen + 5);
-		n.append(txnNamespace).append(STAGE).append(txnId).append('.');
+		int estLen = txnStage.length() + txnId.length() + 5;
+		StringBuilder n = new StringBuilder(estLen);
+		n.append(txnStage).append(txnId).append('.');
 		n.append(Integer.toHexString(cmds.size()));
 		cmds.add(new ReceiveCommand(ObjectId.zeroId(), id, n.toString()));
 	}
