@@ -141,7 +141,9 @@ public class Strings {
 	private static boolean isComplexWildcard(String pattern) {
 		int idx1 = pattern.indexOf('[');
 		if (idx1 != -1) {
-			return true;
+			int idx2 = pattern.indexOf(']');
+			if (idx2 > idx1)
+				return true;
 		}
 		if (pattern.indexOf('?') != -1) {
 			return true;
@@ -155,7 +157,9 @@ public class Strings {
 					return false;
 				}
 				char nextChar = pattern.charAt(nextIdx);
-				if (escapedByBackslash(nextChar)) {
+				if (nextChar == '?' || nextChar == '*' || nextChar == '['
+				// required to match escaped backslashes '\\\\'
+						|| nextChar == '\\') {
 					return true;
 				} else {
 					return false;
@@ -163,10 +167,6 @@ public class Strings {
 			}
 		}
 		return false;
-	}
-
-	private static boolean escapedByBackslash(char nextChar) {
-		return nextChar == '?' || nextChar == '*' || nextChar == '[';
 	}
 
 	static PatternState checkWildCards(String pattern) {
@@ -247,7 +247,7 @@ public class Strings {
 		char[] charClass = new char[6];
 
 		for (int i = 0; i < pattern.length(); i++) {
-			final char c = pattern.charAt(i);
+			char c = pattern.charAt(i);
 			switch (c) {
 
 			case '*':
@@ -255,20 +255,6 @@ public class Strings {
 					sb.append(c);
 				else
 					sb.append('.').append(c);
-				break;
-
-			case '(': // fall-through
-			case ')': // fall-through
-			case '{': // fall-through
-			case '}': // fall-through
-			case '+': // fall-through
-			case '$': // fall-through
-			case '^': // fall-through
-			case '|':
-				if (seenEscape || in_brackets > 0)
-					sb.append(c);
-				else
-					sb.append('\\').append(c);
 				break;
 
 			case '.':
@@ -308,14 +294,6 @@ public class Strings {
 					char lookAhead = lookAhead(pattern, i);
 					if (lookAhead == ']' || lookAhead == '[')
 						ignoreLastBracket = true;
-				} else {
-					//
-					char lookAhead = lookAhead(pattern, i);
-					if (lookAhead != '\\' && lookAhead != '['
-							&& lookAhead != '?' && lookAhead != '*'
-							&& lookAhead != ' ' && lookBehind(sb) != '\\') {
-						break;
-					}
 				}
 				sb.append(c);
 				break;
@@ -451,32 +429,6 @@ public class Strings {
 				return JAVA_CHAR_CLASSES.get(i);
 		}
 		return null;
-	}
-
-	static String deleteBackslash(String s) {
-		if (s.indexOf('\\') < 0) {
-			return s;
-		}
-		StringBuilder sb = new StringBuilder(s.length());
-		for (int i = 0; i < s.length(); i++) {
-			char ch = s.charAt(i);
-			if (ch == '\\') {
-				if (i + 1 == s.length()) {
-					continue;
-				}
-				char next = s.charAt(i + 1);
-				if (next == '\\') {
-					sb.append(ch);
-					i++;
-					continue;
-				}
-				if (!escapedByBackslash(next)) {
-					continue;
-				}
-			}
-			sb.append(ch);
-		}
-		return sb.toString();
 	}
 
 }
