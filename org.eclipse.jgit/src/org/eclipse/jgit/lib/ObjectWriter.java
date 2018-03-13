@@ -53,11 +53,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.security.MessageDigest;
-import java.text.MessageFormat;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.ObjectWritingException;
 
 /**
@@ -149,8 +147,10 @@ public class ObjectWriter {
 			final ObjectId id = e.getId();
 
 			if (id == null)
-				throw new ObjectWritingException(MessageFormat.format(
-						JGitText.get().objectAtPathDoesNotHaveId, e.getFullName()));
+				throw new ObjectWritingException("Object at path \""
+						+ e.getFullName() + "\" does not have an id assigned."
+						+ "  All object ids must be assigned prior"
+						+ " to writing a tree.");
 
 			e.getMode().copyTo(o);
 			o.write(' ');
@@ -298,24 +298,6 @@ public class ObjectWriter {
 	public ObjectId computeBlobSha1(final long len, final InputStream is)
 			throws IOException {
 		return writeObject(Constants.OBJ_BLOB, len, is, false);
-	}
-
-	/**
-	 * Compute the SHA-1 of an object without actually creating an object in the
-	 * database
-	 *
-	 * @param type
-	 *            kind of object
-	 * @param len
-	 *            number of bytes to consume
-	 * @param is
-	 *            stream for read data from
-	 * @return SHA-1 of data combined with type information
-	 * @throws IOException
-	 */
-	public ObjectId computeObjectSha1(final int type, final long len, final InputStream is)
-			throws IOException {
-		return writeObject(type, len, is, false);
 	}
 
 	ObjectId writeObject(final int type, long len, final InputStream is,

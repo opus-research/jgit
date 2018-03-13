@@ -120,7 +120,7 @@ class ReceivePackServlet extends HttpServlet {
 			return;
 
 		} catch (IOException e) {
-			getServletContext().log(HttpServerText.get().internalErrorDuringReceivePack, e);
+			getServletContext().log("Internal error during receive-pack", e);
 			rsp.sendError(SC_INTERNAL_SERVER_ERROR);
 			return;
 		}

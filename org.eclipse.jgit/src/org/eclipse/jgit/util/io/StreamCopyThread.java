@@ -56,7 +56,7 @@ public class StreamCopyThread extends Thread {
 
 	private final OutputStream dst;
 
-	private volatile boolean done;
+	private volatile boolean doFlush;
 
 	/**
 	 * Create a thread to copy data from an input stream to an output stream.
@@ -82,26 +82,9 @@ public class StreamCopyThread extends Thread {
 	 * the request.
 	 */
 	public void flush() {
-		interrupt();
-	}
-
-	/**
-	 * Request that the thread terminate, and wait for it.
-	 * <p>
-	 * This method signals to the copy thread that it should stop as soon as
-	 * there is no more IO occurring.
-	 *
-	 * @throws InterruptedException
-	 *             the calling thread was interrupted.
-	 */
-	public void halt() throws InterruptedException {
-		for (;;) {
-			join(250 /* milliseconds */);
-			if (isAlive()) {
-				done = true;
-				interrupt();
-			} else
-				break;
+		if (!doFlush) {
+			doFlush = true;
+			interrupt();
 		}
 	}
 
@@ -109,42 +92,22 @@ public class StreamCopyThread extends Thread {
 	public void run() {
 		try {
 			final byte[] buf = new byte[BUFFER_SIZE];
-			int interruptCounter = 0;
 			for (;;) {
 				try {
-					if (interruptCounter > 0) {
+					if (doFlush) {
+						doFlush = false;
 						dst.flush();
-						interruptCounter--;
 					}
-
-					if (done)
-						break;
 
 					final int n;
 					try {
 						n = src.read(buf);
 					} catch (InterruptedIOException wakey) {
-						interruptCounter++;
 						continue;
 					}
 					if (n < 0)
 						break;
-
-					boolean writeInterrupted = false;
-					for (;;) {
-						try {
-							dst.write(buf, 0, n);
-						} catch (InterruptedIOException wakey) {
-							writeInterrupted = true;
-							continue;
-						}
-
-						// set interrupt status, which will be checked
-						// when we block in src.read
-						if (writeInterrupted)
-							interrupt();
-						break;
-					}
+					dst.write(buf, 0, n);
 				} catch (IOException e) {
 					break;
 				}

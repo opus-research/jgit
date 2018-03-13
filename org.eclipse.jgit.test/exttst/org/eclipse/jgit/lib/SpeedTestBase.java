@@ -1,5 +1,7 @@
 /*
- * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.om>
+ * Copyright (C) 2008, Google Inc.
+ * Copyright (C) 2007-2008, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,37 +42,75 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 package org.eclipse.jgit.lib;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.io.InputStream;
+
+import junit.framework.TestCase;
 
 /**
- * Test cases for ReadTree operations as implemented in WorkDirCheckout
+ * Base class for performance unit test.
  */
-public class WorkDirCheckout_ReadTreeTest extends ReadTreeTest {
-	private WorkDirCheckout wdc;
-	public void prescanTwoTrees(Tree head, Tree merge) throws IllegalStateException, IOException {
-		wdc = new WorkDirCheckout(db, db.getWorkDir(), head, db.getIndex(), merge);
-		wdc.prescanTwoTrees();
+public abstract class SpeedTestBase extends TestCase {
+
+	/**
+	 * The time used by native git as this is our reference.
+	 */
+	protected long nativeTime;
+
+	/**
+	 * Reference to the location of the Linux kernel repo.
+	 */
+	protected String kernelrepo;
+
+	/**
+	 * Prepare test by running a test against the Linux kernel repo first.
+	 *
+	 * @param refcmd
+	 *            git command to execute
+	 *
+	 * @throws Exception
+	 */
+	protected void prepare(String[] refcmd) throws Exception {
+		try {
+			BufferedReader bufferedReader = new BufferedReader(new FileReader("kernel.ref"));
+			try {
+				kernelrepo = bufferedReader.readLine();
+			} finally {
+				bufferedReader.close();
+			}
+			timeNativeGit(kernelrepo, refcmd);
+			nativeTime = timeNativeGit(kernelrepo, refcmd);
+		} catch (Exception e) {
+			System.out.println("Create a file named kernel.ref and put the path to the Linux kernels repository there");
+			throw e;
+		}
 	}
 
-	public void checkout() throws IOException {
-		wdc = new WorkDirCheckout(db, db.getWorkDir(), theHead, db.getIndex(), theMerge);
-		wdc.checkout();
-	}
-
-	public ArrayList<String> getRemoved() {
-		return wdc.getRemoved();
-	}
-
-	public HashMap<String, ObjectId> getUpdated() {
-		return wdc.updated;
-	}
-
-	public ArrayList<String> getConflicts() {
-		return wdc.getConflicts();
+	private static long timeNativeGit(String kernelrepo, String[] refcmd) throws IOException,
+			InterruptedException, Exception {
+		long start = System.currentTimeMillis();
+		Process p = Runtime.getRuntime().exec(refcmd, null, new File(kernelrepo,".."));
+		InputStream inputStream = p.getInputStream();
+		InputStream errorStream = p.getErrorStream();
+		byte[] buf=new byte[1024*1024];
+		for (;;)
+			if (inputStream.read(buf) < 0)
+				break;
+		if (p.waitFor()!=0) {
+			int c;
+			while ((c=errorStream.read())!=-1)
+				System.err.print((char)c);
+			throw new Exception("git log failed");
+		}
+		inputStream.close();
+		errorStream.close();
+		long stop = System.currentTimeMillis();
+		return stop - start;
 	}
 }
-

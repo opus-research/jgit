@@ -47,9 +47,6 @@ import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InterruptedIOException;
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.JGitText;
 
 /** InputStream with a configurable timeout. */
 public class TimeoutInputStream extends FilterInputStream {
@@ -83,7 +80,7 @@ public class TimeoutInputStream extends FilterInputStream {
 	 */
 	public void setTimeout(final int millis) {
 		if (millis < 0)
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidTimeout, millis));
+			throw new IllegalArgumentException("Invalid timeout: " + millis);
 		timeout = millis;
 	}
 
@@ -137,6 +134,6 @@ public class TimeoutInputStream extends FilterInputStream {
 	}
 
 	private static InterruptedIOException readTimedOut() {
-		return new InterruptedIOException(JGitText.get().readTimedOut);
+		return new InterruptedIOException("Read timed out");
 	}
 }

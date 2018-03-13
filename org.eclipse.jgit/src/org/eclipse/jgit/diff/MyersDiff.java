@@ -44,9 +44,6 @@
 
 package org.eclipse.jgit.diff;
 
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.util.IntList;
 import org.eclipse.jgit.util.LongList;
 
@@ -295,21 +292,21 @@ public class MyersDiff {
 			final int getIndex(int d, int k) {
 // TODO: remove
 if (((d + k - middleK) % 2) == 1)
-	throw new RuntimeException(MessageFormat.format(JGitText.get().unexpectedOddResult, d, k, middleK));
+	throw new RuntimeException("odd: " + d + " + " + k + " - " + middleK);
 				return (d + k - middleK) / 2;
 			}
 
 			final int getX(int d, int k) {
 // TODO: remove
 if (k < beginK || k > endK)
-	throw new RuntimeException(MessageFormat.format(JGitText.get().kNotInRange, k, beginK, endK));
+	throw new RuntimeException("k " + k + " not in " + beginK + " - " + endK);
 				return x.get(getIndex(d, k));
 			}
 
 			final long getSnake(int d, int k) {
 // TODO: remove
 if (k < beginK || k > endK)
-	throw new RuntimeException(MessageFormat.format(JGitText.get().kNotInRange, k, beginK, endK));
+	throw new RuntimeException("k " + k + " not in " + beginK + " - " + endK);
 				return snake.get(getIndex(d, k));
 			}
 
@@ -523,7 +520,7 @@ if (k < beginK || k > endK)
 	 */
 	public static void main(String[] args) {
 		if (args.length != 2) {
-			System.err.println(JGitText.get().need2Arguments);
+			System.err.println("Need 2 arguments");
 			System.exit(1);
 		}
 		try {

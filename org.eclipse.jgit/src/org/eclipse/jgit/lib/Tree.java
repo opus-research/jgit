@@ -46,9 +46,7 @@
 package org.eclipse.jgit.lib;
 
 import java.io.IOException;
-import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.EntryExistsException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -56,14 +54,7 @@ import org.eclipse.jgit.util.RawParseUtils;
 
 /**
  * A representation of a Git tree entry. A Tree is a directory in Git.
- *
- * @deprecated To look up information about a single path, use
- * {@link org.eclipse.jgit.treewalk.TreeWalk#forPath(Repository, String, org.eclipse.jgit.revwalk.RevTree)}.
- * To lookup information about multiple paths at once, use a
- * {@link org.eclipse.jgit.treewalk.TreeWalk} and obtain the current entry's
- * information from its getter methods.
  */
-@Deprecated
 public class Tree extends TreeEntry implements Treeish {
 	private static final TreeEntry[] EMPTY_TREE = {};
 
@@ -254,7 +245,7 @@ public class Tree extends TreeEntry implements Treeish {
 	 */
 	public void unload() {
 		if (isModified())
-			throw new IllegalStateException(JGitText.get().cannotUnloadAModifiedTree);
+			throw new IllegalStateException("Cannot unload a modified tree.");
 		contents = null;
 	}
 
@@ -564,14 +555,14 @@ public class Tree extends TreeEntry implements Treeish {
 		while (rawPtr < rawSize) {
 			int c = raw[rawPtr++];
 			if (c < '0' || c > '7')
-				throw new CorruptObjectException(getId(), JGitText.get().corruptObjectInvalidEntryMode);
+				throw new CorruptObjectException(getId(), "invalid entry mode");
 			int mode = c - '0';
 			for (;;) {
 				c = raw[rawPtr++];
 				if (' ' == c)
 					break;
 				else if (c < '0' || c > '7')
-					throw new CorruptObjectException(getId(), JGitText.get().corruptObjectInvalidMode);
+					throw new CorruptObjectException(getId(), "invalid mode");
 				mode <<= 3;
 				mode += c - '0';
 			}
@@ -598,8 +589,8 @@ public class Tree extends TreeEntry implements Treeish {
 			else if (FileMode.GITLINK.equals(mode))
 				ent = new GitlinkTreeEntry(this, id, name);
 			else
-				throw new CorruptObjectException(getId(), MessageFormat.format(
-						JGitText.get().corruptObjectInvalidMode2, Integer.toOctalString(mode)));
+				throw new CorruptObjectException(getId(), "Invalid mode: "
+						+ Integer.toOctalString(mode));
 			temp[nextIndex++] = ent;
 		}
 

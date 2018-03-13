@@ -45,7 +45,6 @@ package org.eclipse.jgit.patch;
 
 import junit.framework.TestCase;
 
-import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
@@ -154,7 +153,7 @@ public class FileHeaderTest extends TestCase {
 		assertParse(fh);
 
 		assertEquals("/dev/null", fh.getOldName());
-		assertSame(DiffEntry.DEV_NULL, fh.getOldName());
+		assertSame(FileHeader.DEV_NULL, fh.getOldName());
 		assertEquals("\u00c5ngstr\u00f6m", fh.getNewName());
 
 		assertSame(FileHeader.ChangeType.ADD, fh.getChangeType());
@@ -180,7 +179,7 @@ public class FileHeaderTest extends TestCase {
 
 		assertEquals("\u00c5ngstr\u00f6m", fh.getOldName());
 		assertEquals("/dev/null", fh.getNewName());
-		assertSame(DiffEntry.DEV_NULL, fh.getNewName());
+		assertSame(FileHeader.DEV_NULL, fh.getNewName());
 
 		assertSame(FileHeader.ChangeType.DELETE, fh.getChangeType());
 		assertSame(FileHeader.PatchType.UNIFIED, fh.getPatchType());

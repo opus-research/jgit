@@ -53,7 +53,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ProgressMonitor;
 
@@ -197,7 +196,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 	public byte[] toByteArray() throws IOException {
 		final long len = length();
 		if (Integer.MAX_VALUE < len)
-			throw new OutOfMemoryError(JGitText.get().lengthExceedsMaximumArraySize);
+			throw new OutOfMemoryError("Length exceeds maximum array size");
 		final byte[] out = new byte[(int) len];
 		int outPtr = 0;
 		for (final Block b : blocks) {
@@ -352,7 +351,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 
 			final long len = length();
 			if (Integer.MAX_VALUE < len)
-				throw new OutOfMemoryError(JGitText.get().lengthExceedsMaximumArraySize);
+				throw new OutOfMemoryError("Length exceeds maximum array size");
 			final byte[] out = new byte[(int) len];
 			final FileInputStream in = new FileInputStream(onDiskFile);
 			try {
@@ -420,7 +419,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 
 		@Override
 		protected OutputStream overflow() throws IOException {
-			throw new IOException(JGitText.get().inMemoryBufferLimitExceeded);
+			throw new IOException("In-memory buffer limit exceeded");
 		}
 	}
 

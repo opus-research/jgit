@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2007-2008, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,38 +42,53 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.iplog;
+package org.eclipse.jgit.lib;
 
-import org.eclipse.jgit.nls.NLS;
-import org.eclipse.jgit.nls.TranslationBundle;
+import java.io.File;
+import java.io.IOException;
 
-/**
- * Translation bundle for JGit IP Log
- */
-public class IpLogText extends TranslationBundle {
+import junit.textui.TestRunner;
 
-	/**
-	 * @return an instance of this translation bundle
-	 */
-	public static IpLogText get() {
-		return NLS.getBundleFor(IpLogText.class);
+public class T0006_DeepSpeedTest extends SpeedTestBase {
+
+	protected void setUp() throws Exception {
+		prepare(new String[] { "git", "rev-list", "365bbe0d0caaf2ba74d56556827babf0bc66965d","--","net/netfilter/nf_queue.c" });
 	}
 
-	/***/ public String CQString;
-	/***/ public String CSVParsingError;
-	/***/ public String cannotLock;
-	/***/ public String cannotSerializeXML;
-	/***/ public String cannotWrite;
-	/***/ public String committerString;
-	/***/ public String configurationFileInCommitHasNoProjectsDeclared;
-	/***/ public String configurationFileInCommitIsInvalid;
-	/***/ public String contributorString;
-	/***/ public String incorrectlyScanned;
-	/***/ public String invalidDate;
-	/***/ public String invalidURIFormat;
-	/***/ public String loginFailed;
-	/***/ public String pageTitleWas;
-	/***/ public String projectString;
-	/***/ public String queryFailed;
-	/***/ public String responseNotHTMLAsExpected;
+	public void testDeepHistoryScan() throws IOException {
+		long start = System.currentTimeMillis();
+		Repository db = new Repository(new File(kernelrepo));
+		Commit commit = db.mapCommit("365bbe0d0caaf2ba74d56556827babf0bc66965d");
+		int n = 1;
+		for (;;) {
+			ObjectId[] parents = commit.getParentIds();
+			if (parents.length == 0)
+				break;
+			ObjectId parentId = parents[0];
+			commit = db.mapCommit(parentId);
+			TreeEntry m = commit.getTree().findBlobMember("net/netfilter/nf_queue.c");
+			if (m != null)
+				commit.getCommitId().name();
+			++n;
+		}
+
+		assertEquals(12275, n);
+		long stop = System.currentTimeMillis();
+		long time = stop - start;
+		System.out.println("native="+nativeTime);
+		System.out.println("jgit="+time);
+		/*
+		native=1355
+		jgit=5449
+		 */
+		// This is not an exact factor, but we'd expect native git to perform this
+		// about 4 times quicker. If for some reason we find jgit to be faster than
+		// this the cause should be found and secured.
+		long factor = (time*110/nativeTime+50)/100;
+		assertEquals(4, factor);
+	}
+
+	public static void main(String[] args) {
+		TestRunner.run(T0006_DeepSpeedTest.class);
+	}
 }

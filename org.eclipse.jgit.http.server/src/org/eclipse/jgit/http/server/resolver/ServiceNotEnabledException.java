@@ -43,14 +43,12 @@
 
 package org.eclipse.jgit.http.server.resolver;
 
-import org.eclipse.jgit.http.server.HttpServerText;
-
 /** Indicates the request service is not enabled on a repository. */
 public class ServiceNotEnabledException extends Exception {
 	private static final long serialVersionUID = 1L;
 
 	/** Indicates the request service is not available. */
 	public ServiceNotEnabledException() {
-		super(HttpServerText.get().serviceNotEnabled);
+		super("Service not enabled");
 	}
 }

@@ -79,7 +79,7 @@ public class Git {
 	private final Repository repo;
 
 	/**
-	 * Constructs a new {@link Git} object which can interact with the specified
+	 * Constructs a new {@link Git} class which can interact with the specified
 	 * git repository. All command classes returned by methods of this class
 	 * will always interact with this git repository.
 	 *
@@ -94,7 +94,7 @@ public class Git {
 	}
 
 	/**
-	 * Returns a command object to execute a {@code Commit} command
+	 * Returns a command class to execute a {@code Commit} command
 	 *
 	 * @see <a
 	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-commit.html"
@@ -107,7 +107,7 @@ public class Git {
 	}
 
 	/**
-	 * Returns a command object to execute a {@code Log} command
+	 * Returns a command class to execute a {@code Log} command
 	 *
 	 * @see <a
 	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-log.html"
@@ -120,36 +120,9 @@ public class Git {
 	}
 
 	/**
-	 * Returns a command object to execute a {@code Merge} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-merge.html"
-	 *      >Git documentation about Merge</a>
-	 * @return a {@link MergeCommand} used to collect all optional parameters
-	 *         and to finally execute the {@code Merge} command
-	 */
-	public MergeCommand merge() {
-		return new MergeCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code Add} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-add.html"
-	 *      >Git documentation about Add</a>
-	 * @return a {@link AddCommand} used to collect all optional parameters
-	 *         and to finally execute the {@code Add} command
-	 */
-	public AddCommand add() {
-		return new AddCommand(repo);
-	}
-
-	/**
 	 * @return the git repository this class is interacting with
 	 */
 	public Repository getRepository() {
 		return repo;
 	}
-
 }

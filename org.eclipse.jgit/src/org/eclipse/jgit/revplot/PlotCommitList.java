@@ -43,12 +43,10 @@
 
 package org.eclipse.jgit.revplot;
 
-import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.TreeSet;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.revwalk.RevCommitList;
 import org.eclipse.jgit.revwalk.RevWalk;
 
@@ -85,7 +83,7 @@ public class PlotCommitList<L extends PlotLane> extends
 	@Override
 	public void source(final RevWalk w) {
 		if (!(w instanceof PlotWalk))
-			throw new ClassCastException(MessageFormat.format(JGitText.get().classCastNotA, PlotWalk.class.getName()));
+			throw new ClassCastException("Not a " + PlotWalk.class.getName());
 		super.source(w);
 	}
 
@@ -139,6 +137,7 @@ public class PlotCommitList<L extends PlotLane> extends
 				rObj.addPassingLane(c.lane);
 			}
 			currCommit.lane = c.lane;
+			currCommit.lane.parent = currCommit;
 		} else {
 			// More than one child, or our child is a merge.
 			// Use a different lane.
@@ -153,6 +152,7 @@ public class PlotCommitList<L extends PlotLane> extends
 			}
 
 			currCommit.lane = nextFreeLane();
+			currCommit.lane.parent = currCommit;
 			activeLanes.add(currCommit.lane);
 
 			int remaining = nChildren;

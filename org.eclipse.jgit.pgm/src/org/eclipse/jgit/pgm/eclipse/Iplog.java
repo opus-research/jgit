@@ -46,14 +46,12 @@ package org.eclipse.jgit.pgm.eclipse;
 import java.io.File;
 import java.io.OutputStream;
 import java.net.CookieHandler;
-import java.text.MessageFormat;
 
 import org.eclipse.jgit.iplog.IpLogGenerator;
 import org.eclipse.jgit.iplog.SimpleCookieManager;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.LockFile;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.pgm.CLIText;
 import org.eclipse.jgit.pgm.Command;
 import org.eclipse.jgit.pgm.TextBuiltin;
 import org.eclipse.jgit.revwalk.RevObject;
@@ -62,15 +60,15 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 
-@Command(name = "eclipse-iplog", common = false, usage = "usage_produceAnEclipseIPLog")
+@Command(name = "eclipse-iplog", common = false, usage = "Produce an Eclipse IP log")
 class Iplog extends TextBuiltin {
-	@Option(name = "--version", aliases = { "-r" }, metaVar = "metaVar_version", usage = "usage_symbolicVersionForTheProject")
+	@Option(name = "--version", aliases = { "-r" }, metaVar = "VERSION", usage = "Symbolic version for the project")
 	private String version;
 
-	@Option(name = "--output", aliases = { "-o" }, metaVar = "metaVar_file", usage = "usage_outputFile")
+	@Option(name = "--output", aliases = { "-o" }, metaVar = "FILE", usage = "Output file")
 	private File output;
 
-	@Argument(index = 0, metaVar = "metaVar_commitOrTag")
+	@Argument(index = 0, metaVar = "COMMIT|TAG")
 	private ObjectId commitId;
 
 	@Override
@@ -81,8 +79,8 @@ class Iplog extends TextBuiltin {
 		final IpLogGenerator log = new IpLogGenerator();
 
 		if (commitId == null) {
-			System.err.println(MessageFormat.format(
-				CLIText.get().warningNoCommitGivenOnCommandLine, Constants.HEAD));
+			System.err.println("warning: No commit given on command line,"
+					+ " assuming " + Constants.HEAD);
 			commitId = db.resolve(Constants.HEAD);
 		}
 
@@ -91,7 +89,7 @@ class Iplog extends TextBuiltin {
 		if (version == null && start instanceof RevTag)
 			version = ((RevTag) start).getTagName();
 		else if (version == null)
-			throw die(MessageFormat.format(CLIText.get().notATagVersionIsRequired, start.name()));
+			throw die(start.name() + " is not a tag, --version is required");
 
 		log.scan(db, rw.parseCommit(start), version);
 
@@ -100,7 +98,7 @@ class Iplog extends TextBuiltin {
 				output.getParentFile().mkdirs();
 			LockFile lf = new LockFile(output);
 			if (!lf.lock())
-				throw die(MessageFormat.format(CLIText.get().cannotLock, output));
+				throw die("Cannot lock " + output);
 			try {
 				OutputStream os = lf.getOutputStream();
 				try {
@@ -109,7 +107,7 @@ class Iplog extends TextBuiltin {
 					os.close();
 				}
 				if (!lf.commit())
-					throw die(MessageFormat.format(CLIText.get().cannotWrite, output));
+					throw die("Cannot write " + output);
 			} finally {
 				lf.unlock();
 			}

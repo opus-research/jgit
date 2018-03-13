@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
- * Copyright (C) 2008-2009, Johannes E. Schindelin <johannes.schindelin@gmx.de>
+ * Copyright (C) 2007-2008, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,70 +42,50 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.diff;
+package org.eclipse.jgit.lib;
 
-import static org.eclipse.jgit.util.RawCharUtil.trimLeadingWhitespace;
+import java.io.File;
+import java.io.IOException;
 
-/**
- * A version of {@link RawText} that ignores leading whitespace.
- */
-public class RawTextIgnoreLeadingWhitespace extends RawText {
-	/** Creates RawText that ignores only leading whitespace. */
-	@SuppressWarnings("hiding")
-	public static final Factory FACTORY = new Factory() {
-		public RawText create(byte[] input) {
-			return new RawTextIgnoreLeadingWhitespace(input);
-		}
-	};
+import junit.textui.TestRunner;
 
-	/**
-	 * Create a new sequence from an existing content byte array.
-	 * <p>
-	 * The entire array (indexes 0 through length-1) is used as the content.
-	 *
-	 * @param input
-	 *            the content array. The array is never modified, so passing
-	 *            through cached arrays is safe.
-	 */
-	public RawTextIgnoreLeadingWhitespace(byte[] input) {
-		super(input);
+public class T0005_ShallowSpeedTest extends SpeedTestBase {
+
+	protected void setUp() throws Exception {
+		prepare(new String[] { "git", "rev-list", "365bbe0d0caaf2ba74d56556827babf0bc66965d" });
 	}
 
-	@Override
-	public boolean equals(final int i, final Sequence other, final int j) {
-		return equals(this, i + 1, (RawText) other, j + 1);
+	public void testShallowHistoryScan() throws IOException {
+		long start = System.currentTimeMillis();
+		Repository db = new Repository(new File(kernelrepo));
+		Commit commit = db.mapCommit("365bbe0d0caaf2ba74d56556827babf0bc66965d");
+		int n = 1;
+		for (;;) {
+			ObjectId[] parents = commit.getParentIds();
+			if (parents.length == 0)
+				break;
+			ObjectId parentId = parents[0];
+			commit = db.mapCommit(parentId);
+			commit.getCommitId().name();
+			++n;
+		}
+		assertEquals(12275, n);
+		long stop = System.currentTimeMillis();
+		long time = stop - start;
+		System.out.println("native="+nativeTime);
+		System.out.println("jgit="+time);
+		// ~0.750s (hot cache), ok
+		/*
+native=1795
+jgit=722
+		 */
+		// native git seems to run SLOWER than jgit here, at roughly half the speed
+		// creating the git process is not the issue here, btw.
+		long factor10 = (nativeTime*150/time+50)/100;
+		assertEquals(3, factor10);
 	}
 
-	private static boolean equals(final RawText a, final int ai,
-			final RawText b, final int bi) {
-		if (a.hashes.get(ai) != b.hashes.get(bi))
-			return false;
-
-		int as = a.lines.get(ai);
-		int bs = b.lines.get(bi);
-		int ae = a.lines.get(ai + 1);
-		int be = b.lines.get(bi + 1);
-
-		as = trimLeadingWhitespace(a.content, as, ae);
-		bs = trimLeadingWhitespace(b.content, bs, be);
-
-		if (ae - as != be - bs)
-			return false;
-
-		while (as < ae) {
-			if (a.content[as++] != b.content[bs++])
-				return false;
-		}
-		return true;
-	}
-
-	@Override
-	protected int hashLine(final byte[] raw, int ptr, int end) {
-		int hash = 5381;
-		ptr = trimLeadingWhitespace(raw, ptr, end);
-		for (; ptr < end; ptr++) {
-			hash = (hash << 5) ^ (raw[ptr] & 0xff);
-		}
-		return hash;
+	public static void main(String[] args) {
+		TestRunner.run(T0005_ShallowSpeedTest.class);
 	}
 }

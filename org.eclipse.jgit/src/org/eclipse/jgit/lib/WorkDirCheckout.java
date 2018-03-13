@@ -49,11 +49,9 @@ package org.eclipse.jgit.lib;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CheckoutConflictException;
 import org.eclipse.jgit.lib.GitIndex.Entry;
 
@@ -62,11 +60,10 @@ import org.eclipse.jgit.lib.GitIndex.Entry;
  * with the index (actually a tree too).
  *
  * Three-way merges are no performed. See {@link #setFailOnConflict(boolean)}.
- *
- * @deprecated Use org.eclipse.jgit.dircache.DirCacheCheckout.
  */
-@Deprecated
 public class WorkDirCheckout {
+	Repository repo;
+
 	File root;
 
 	GitIndex index;
@@ -88,6 +85,7 @@ public class WorkDirCheckout {
 
 	WorkDirCheckout(Repository repo, File workDir,
 			GitIndex oldIndex, GitIndex newIndex) throws IOException {
+		this.repo = repo;
 		this.root = workDir;
 		this.index = oldIndex;
 		this.merge = repo.mapTree(newIndex.writeTree());
@@ -103,6 +101,7 @@ public class WorkDirCheckout {
 	 */
 	public WorkDirCheckout(Repository repo, File root,
 			GitIndex index, Tree merge) {
+		this.repo = repo;
 		this.root = root;
 		this.index = index;
 		this.merge = merge;
@@ -190,7 +189,7 @@ public class WorkDirCheckout {
 		for (String c : conflicts) {
 			File conflict = new File(root, c);
 			if (!conflict.delete())
-				throw new CheckoutConflictException(MessageFormat.format(JGitText.get().cannotDeleteFile, c));
+				throw new CheckoutConflictException("Cannot delete file: " + c);
 			removeEmptyParents(conflict);
 		}
 		for (String r : removed) {
@@ -264,7 +263,7 @@ public class WorkDirCheckout {
 			public void visitEntry(TreeEntry treeEntry, TreeEntry auxEntry,
 					Entry indexEntry, File file) throws IOException {
 				if (treeEntry instanceof Tree || auxEntry instanceof Tree) {
-					throw new IllegalArgumentException(JGitText.get().cantPassMeATree);
+					throw new IllegalArgumentException("Can't pass me a tree!");
 				}
 				processEntry(treeEntry, auxEntry, indexEntry);
 			}

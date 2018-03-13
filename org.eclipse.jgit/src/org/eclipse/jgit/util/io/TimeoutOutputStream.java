@@ -46,9 +46,6 @@ package org.eclipse.jgit.util.io;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.JGitText;
 
 /** OutputStream with a configurable timeout. */
 public class TimeoutOutputStream extends OutputStream {
@@ -84,7 +81,7 @@ public class TimeoutOutputStream extends OutputStream {
 	 */
 	public void setTimeout(final int millis) {
 		if (millis < 0)
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidTimeout, millis));
+			throw new IllegalArgumentException("Invalid timeout: " + millis);
 		timeout = millis;
 	}
 
@@ -150,6 +147,6 @@ public class TimeoutOutputStream extends OutputStream {
 	}
 
 	private static InterruptedIOException writeTimedOut() {
-		return new InterruptedIOException(JGitText.get().writeTimedOut);
+		return new InterruptedIOException("Write timed out");
 	}
 }

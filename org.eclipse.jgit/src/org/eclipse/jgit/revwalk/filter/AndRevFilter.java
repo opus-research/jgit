@@ -47,7 +47,6 @@ package org.eclipse.jgit.revwalk.filter;
 import java.io.IOException;
 import java.util.Collection;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -91,7 +90,7 @@ public abstract class AndRevFilter extends RevFilter {
 		if (list.length == 2)
 			return create(list[0], list[1]);
 		if (list.length < 2)
-			throw new IllegalArgumentException(JGitText.get().atLeastTwoFiltersNeeded);
+			throw new IllegalArgumentException("At least two filters needed.");
 		final RevFilter[] subfilters = new RevFilter[list.length];
 		System.arraycopy(list, 0, subfilters, 0, list.length);
 		return new List(subfilters);
@@ -107,7 +106,7 @@ public abstract class AndRevFilter extends RevFilter {
 	 */
 	public static RevFilter create(final Collection<RevFilter> list) {
 		if (list.size() < 2)
-			throw new IllegalArgumentException(JGitText.get().atLeastTwoFiltersNeeded);
+			throw new IllegalArgumentException("At least two filters needed.");
 		final RevFilter[] subfilters = new RevFilter[list.size()];
 		list.toArray(subfilters);
 		if (subfilters.length == 2)

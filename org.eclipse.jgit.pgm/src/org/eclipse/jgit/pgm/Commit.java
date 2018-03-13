@@ -49,15 +49,15 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.kohsuke.args4j.Option;
 
-@Command(common = true, usage = "usage_recordChangesToRepository")
+@Command(common = true, usage = "Record changes to the repository")
 class Commit extends TextBuiltin {
 	// I don't support setting the committer, because also the native git
 	// command doesn't allow this.
 
-	@Option(name = "--author", metaVar="metaVar_author", usage = "usage_CommitAuthor")
+	@Option(name = "--author", metaVar="author", usage = "Override the author name used in the commit. You can use the standard A U Thor <author@example.com> format.")
 	private String author;
 
-	@Option(name = "--message", aliases = { "-m" }, metaVar="metaVar_message", usage="usage_CommitMessage", required=true)
+	@Option(name = "--message", aliases = { "-m" }, metaVar="msg", usage="Use the given <msg> as the commit message", required=true)
 	private String message;
 
 	@Override
@@ -73,7 +73,7 @@ class Commit extends TextBuiltin {
 
 		String branchName;
 		if (!head.isSymbolic())
-			branchName = CLIText.get().branchDetachedHEAD;
+			branchName="detached HEAD";
 		else {
 			branchName = head.getTarget().getName();
 			if (branchName.startsWith(Constants.R_HEADS))
