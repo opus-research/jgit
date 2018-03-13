@@ -66,11 +66,7 @@ public class RebaseTodoLine {
 		/** Use commit, but stop for amending */
 		EDIT("edit", "e"),
 
-		/** Use commit, but meld into previous commit */
-		SQUASH("squash", "s"),
-
-		/** like "squash", but discard this commit's log message */
-		FIXUP("fixup", "f"),
+		// TODO: add SQUASH, FIXUP, etc.
 
 		/**
 		 * A comment in the file. Also blank lines (or lines containing only
