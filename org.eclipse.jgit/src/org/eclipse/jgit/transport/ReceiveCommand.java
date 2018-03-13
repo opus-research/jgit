@@ -456,6 +456,7 @@ public class ReceiveCommand {
 	 * #setForceRefLog(boolean)} was never called.
 	 * @since 4.9
 	 */
+	@Nullable
 	public Boolean isForceRefLog() {
 		return forceRefLog;
 	}
