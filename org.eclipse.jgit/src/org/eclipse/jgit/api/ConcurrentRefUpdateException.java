@@ -37,11 +37,14 @@
  */
 package org.eclipse.jgit.api;
 
+import java.text.MessageFormat;
+
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 
 /**
- * Exception thrown when a command want's to update a ref but failed because
+ * Exception thrown when a command wants to update a ref but failed because
  * another process is accessing (or even also updating) the ref.
  *
  * @see RefUpdate.Result#LOCK_FAILURE
@@ -53,16 +56,16 @@ public class ConcurrentRefUpdateException extends GitAPIException {
 
 	ConcurrentRefUpdateException(String message, Ref ref,
 			RefUpdate.Result rc, Throwable cause) {
-		super((rc == null) ? message : message
-				+ ". RefUpdate return code was: " + rc, cause);
+		super((rc == null) ? message : message + ". "
+				+ MessageFormat.format(JGitText.get().refUpdateReturnCodeWas, rc), cause);
 		this.rc = rc;
 		this.ref = ref;
 	}
 
 	ConcurrentRefUpdateException(String message, Ref ref,
 			RefUpdate.Result rc) {
-		super((rc == null) ? message : message
-				+ ". RefUpdate return code was: " + rc);
+		super((rc == null) ? message : message + ". "
+				+ MessageFormat.format(JGitText.get().refUpdateReturnCodeWas, rc));
 		this.rc = rc;
 		this.ref = ref;
 	}

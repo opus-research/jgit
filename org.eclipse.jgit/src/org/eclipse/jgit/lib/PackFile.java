@@ -52,6 +52,7 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel.MapMode;
+import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
@@ -60,10 +61,10 @@ import java.util.zip.CRC32;
 import java.util.zip.CheckedOutputStream;
 import java.util.zip.DataFormatException;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.PackInvalidException;
 import org.eclipse.jgit.errors.PackMismatchException;
-import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.RawParseUtils;
 
@@ -87,6 +88,9 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	final int hash;
 
 	private RandomAccessFile fd;
+
+	/** Serializes reads performed against {@link #fd}. */
+	private final Object readLock = new Object();
 
 	long length;
 
@@ -135,7 +139,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 				if (packChecksum == null)
 					packChecksum = idx.packChecksum;
 				else if (!Arrays.equals(packChecksum, idx.packChecksum))
-					throw new PackMismatchException("Pack checksum mismatch");
+					throw new PackMismatchException(JGitText.get().packChecksumMismatch);
 
 				loadedIdx = idx;
 			} catch (IOException e) {
@@ -261,7 +265,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			final WindowCursor curs) throws DataFormatException, IOException {
 		final byte[] dstbuf = new byte[totalSize];
 		if (curs.inflate(this, position, dstbuf, 0) != totalSize)
-			throw new EOFException("Short compressed stream at " + position);
+			throw new EOFException(MessageFormat.format(JGitText.get().shortCompressedStreamAt, position));
 		return dstbuf;
 	}
 
@@ -269,13 +273,13 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			final OutputStream out, final byte buf[], final WindowCursor curs)
 			throws IOException {
 		final long objectOffset = loader.objectOffset;
-		final long dataOffset = loader.dataOffset;
-		final int cnt = (int) (findEndOffset(objectOffset) - dataOffset);
+		final long dataOffset = objectOffset + loader.headerSize;
+		final long sz = findEndOffset(objectOffset) - dataOffset;
 		final PackIndex idx = idx();
 
 		if (idx.hasCRC32Support()) {
 			final CRC32 crc = new CRC32();
-			int headerCnt = (int) (dataOffset - objectOffset);
+			int headerCnt = loader.headerSize;
 			while (headerCnt > 0) {
 				final int toRead = Math.min(headerCnt, buf.length);
 				readFully(objectOffset, buf, 0, toRead, curs);
@@ -283,25 +287,25 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 				headerCnt -= toRead;
 			}
 			final CheckedOutputStream crcOut = new CheckedOutputStream(out, crc);
-			copyToStream(dataOffset, buf, cnt, crcOut, curs);
+			copyToStream(dataOffset, buf, sz, crcOut, curs);
 			final long computed = crc.getValue();
 
 			final ObjectId id = findObjectForOffset(objectOffset);
 			final long expected = idx.findCRC32(id);
 			if (computed != expected)
-				throw new CorruptObjectException("Object at " + dataOffset
-						+ " in " + getPackFile() + " has bad zlib stream");
+				throw new CorruptObjectException(MessageFormat.format(
+						JGitText.get().objectAtHasBadZlibStream, objectOffset, getPackFile()));
 		} else {
 			try {
 				curs.inflateVerify(this, dataOffset);
 			} catch (DataFormatException dfe) {
 				final CorruptObjectException coe;
-				coe = new CorruptObjectException("Object at " + dataOffset
-						+ " in " + getPackFile() + " has bad zlib stream");
+				coe = new CorruptObjectException(MessageFormat.format(
+						JGitText.get().objectAtHasBadZlibStream, objectOffset, getPackFile()));
 				coe.initCause(dfe);
 				throw coe;
 			}
-			copyToStream(dataOffset, buf, cnt, out, curs);
+			copyToStream(dataOffset, buf, sz, out, curs);
 		}
 	}
 
@@ -362,9 +366,11 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		try {
 			if (invalid)
 				throw new PackInvalidException(packFile);
-			fd = new RandomAccessFile(packFile, "r");
-			length = fd.length();
-			onOpenPack();
+			synchronized (readLock) {
+				fd = new RandomAccessFile(packFile, "r");
+				length = fd.length();
+				onOpenPack();
+			}
 		} catch (IOException ioe) {
 			openFail();
 			throw ioe;
@@ -385,80 +391,87 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	}
 
 	private void doClose() {
-		if (fd != null) {
-			try {
-				fd.close();
-			} catch (IOException err) {
-				// Ignore a close event. We had it open only for reading.
-				// There should not be errors related to network buffers
-				// not flushed, etc.
+		synchronized (readLock) {
+			if (fd != null) {
+				try {
+					fd.close();
+				} catch (IOException err) {
+					// Ignore a close event. We had it open only for reading.
+					// There should not be errors related to network buffers
+					// not flushed, etc.
+				}
+				fd = null;
 			}
-			fd = null;
 		}
 	}
 
 	ByteArrayWindow read(final long pos, int size) throws IOException {
-		if (length < pos + size)
-			size = (int) (length - pos);
-		final byte[] buf = new byte[size];
-		IO.readFully(fd.getChannel(), pos, buf, 0, size);
-		return new ByteArrayWindow(this, pos, buf);
+		synchronized (readLock) {
+			if (length < pos + size)
+				size = (int) (length - pos);
+			final byte[] buf = new byte[size];
+			fd.seek(pos);
+			fd.readFully(buf, 0, size);
+			return new ByteArrayWindow(this, pos, buf);
+		}
 	}
 
 	ByteWindow mmap(final long pos, int size) throws IOException {
-		if (length < pos + size)
-			size = (int) (length - pos);
+		synchronized (readLock) {
+			if (length < pos + size)
+				size = (int) (length - pos);
 
-		MappedByteBuffer map;
-		try {
-			map = fd.getChannel().map(MapMode.READ_ONLY, pos, size);
-		} catch (IOException ioe1) {
-			// The most likely reason this failed is the JVM has run out
-			// of virtual memory. We need to discard quickly, and try to
-			// force the GC to finalize and release any existing mappings.
-			//
-			System.gc();
-			System.runFinalization();
-			map = fd.getChannel().map(MapMode.READ_ONLY, pos, size);
+			MappedByteBuffer map;
+			try {
+				map = fd.getChannel().map(MapMode.READ_ONLY, pos, size);
+			} catch (IOException ioe1) {
+				// The most likely reason this failed is the JVM has run out
+				// of virtual memory. We need to discard quickly, and try to
+				// force the GC to finalize and release any existing mappings.
+				//
+				System.gc();
+				System.runFinalization();
+				map = fd.getChannel().map(MapMode.READ_ONLY, pos, size);
+			}
+
+			if (map.hasArray())
+				return new ByteArrayWindow(this, pos, map.array());
+			return new ByteBufferWindow(this, pos, map);
 		}
-
-		if (map.hasArray())
-			return new ByteArrayWindow(this, pos, map.array());
-		return new ByteBufferWindow(this, pos, map);
 	}
 
 	private void onOpenPack() throws IOException {
 		final PackIndex idx = idx();
 		final byte[] buf = new byte[20];
 
-		IO.readFully(fd.getChannel(), 0, buf, 0, 12);
+		fd.seek(0);
+		fd.readFully(buf, 0, 12);
 		if (RawParseUtils.match(buf, 0, Constants.PACK_SIGNATURE) != 4)
-			throw new IOException("Not a PACK file.");
+			throw new IOException(JGitText.get().notAPACKFile);
 		final long vers = NB.decodeUInt32(buf, 4);
 		final long packCnt = NB.decodeUInt32(buf, 8);
 		if (vers != 2 && vers != 3)
-			throw new IOException("Unsupported pack version " + vers + ".");
+			throw new IOException(MessageFormat.format(JGitText.get().unsupportedPackVersion, vers));
 
 		if (packCnt != idx.getObjectCount())
-			throw new PackMismatchException("Pack object count mismatch:"
-					+ " pack " + packCnt
-					+ " index " + idx.getObjectCount()
-					+ ": " + getPackFile());
+			throw new PackMismatchException(MessageFormat.format(
+					JGitText.get().packObjectCountMismatch, packCnt, idx.getObjectCount(), getPackFile()));
 
-		IO.readFully(fd.getChannel(), length - 20, buf, 0, 20);
+		fd.seek(length - 20);
+		fd.read(buf, 0, 20);
 		if (!Arrays.equals(buf, packChecksum))
-			throw new PackMismatchException("Pack checksum mismatch:"
-					+ " pack " + ObjectId.fromRaw(buf).name()
-					+ " index " + ObjectId.fromRaw(idx.packChecksum).name()
-					+ ": " + getPackFile());
+			throw new PackMismatchException(MessageFormat.format(
+					JGitText.get().packObjectCountMismatch
+					, ObjectId.fromRaw(buf).name()
+					, ObjectId.fromRaw(idx.packChecksum).name()
+					, getPackFile()));
 	}
 
 	private PackedObjectLoader reader(final WindowCursor curs,
 			final long objOffset) throws IOException {
-		long pos = objOffset;
 		int p = 0;
 		final byte[] ib = curs.tempId;
-		readFully(pos, ib, 0, 20, curs);
+		readFully(objOffset, ib, 0, 20, curs);
 		int c = ib[p++] & 0xff;
 		final int typeCode = (c >> 4) & 7;
 		long dataSize = c & 15;
@@ -468,19 +481,16 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			dataSize += (c & 0x7f) << shift;
 			shift += 7;
 		}
-		pos += p;
 
 		switch (typeCode) {
 		case Constants.OBJ_COMMIT:
 		case Constants.OBJ_TREE:
 		case Constants.OBJ_BLOB:
 		case Constants.OBJ_TAG:
-			return new WholePackedObjectLoader(this, pos, objOffset, typeCode,
+			return new WholePackedObjectLoader(this, objOffset, p, typeCode,
 					(int) dataSize);
 
 		case Constants.OBJ_OFS_DELTA: {
-			readFully(pos, ib, 0, 20, curs);
-			p = 0;
 			c = ib[p++] & 0xff;
 			long ofs = c & 127;
 			while ((c & 128) != 0) {
@@ -489,16 +499,16 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 				ofs <<= 7;
 				ofs += (c & 127);
 			}
-			return new DeltaOfsPackedObjectLoader(this, pos + p, objOffset,
+			return new DeltaOfsPackedObjectLoader(this, objOffset, p,
 					(int) dataSize, objOffset - ofs);
 		}
 		case Constants.OBJ_REF_DELTA: {
-			readFully(pos, ib, 0, 20, curs);
-			return new DeltaRefPackedObjectLoader(this, pos + ib.length,
-					objOffset, (int) dataSize, ObjectId.fromRaw(ib));
+			readFully(objOffset + p, ib, 0, 20, curs);
+			return new DeltaRefPackedObjectLoader(this, objOffset, p + 20,
+					(int) dataSize, ObjectId.fromRaw(ib));
 		}
 		default:
-			throw new IOException("Unknown object type " + typeCode + ".");
+			throw new IOException(MessageFormat.format(JGitText.get().unknownObjectType, typeCode));
 		}
 	}
 

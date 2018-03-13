@@ -47,8 +47,10 @@
 package org.eclipse.jgit.lib;
 
 import java.io.IOException;
+import java.text.MessageFormat;
 import java.util.zip.DataFormatException;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 
 /** Reader for a deltified object stored in a pack file. */
@@ -57,9 +59,9 @@ abstract class DeltaPackedObjectLoader extends PackedObjectLoader {
 
 	private final int deltaSize;
 
-	DeltaPackedObjectLoader(final PackFile pr, final long dataOffset,
-			final long objectOffset, final int deltaSz) {
-		super(pr, dataOffset, objectOffset);
+	DeltaPackedObjectLoader(final PackFile pr, final long objectOffset,
+			final int headerSize, final int deltaSz) {
+		super(pr, objectOffset, headerSize);
 		objectType = -1;
 		deltaSize = deltaSz;
 	}
@@ -71,7 +73,7 @@ abstract class DeltaPackedObjectLoader extends PackedObjectLoader {
 		}
 
 		if (objectType != OBJ_COMMIT) {
-			final UnpackedObjectCache.Entry cache = pack.readCache(dataOffset);
+			UnpackedObjectCache.Entry cache = pack.readCache(objectOffset);
 			if (cache != null) {
 				curs.release();
 				objectType = cache.type;
@@ -84,17 +86,17 @@ abstract class DeltaPackedObjectLoader extends PackedObjectLoader {
 		try {
 			final PackedObjectLoader baseLoader = getBaseLoader(curs);
 			baseLoader.materialize(curs);
-			cachedBytes = BinaryDelta.apply(baseLoader.getCachedBytes(),
-					pack.decompress(dataOffset, deltaSize, curs));
+			cachedBytes = BinaryDelta.apply(baseLoader.getCachedBytes(), pack
+					.decompress(objectOffset + headerSize, deltaSize, curs));
 			curs.release();
 			objectType = baseLoader.getType();
 			objectSize = cachedBytes.length;
 			if (objectType != OBJ_COMMIT)
-				pack.saveCache(dataOffset, cachedBytes, objectType);
+				pack.saveCache(objectOffset, cachedBytes, objectType);
 		} catch (DataFormatException dfe) {
 			final CorruptObjectException coe;
-			coe = new CorruptObjectException("Object at " + dataOffset + " in "
-					+ pack.getPackFile() + " has bad zlib stream");
+			coe = new CorruptObjectException(MessageFormat.format(JGitText.get().objectAtHasBadZlibStream,
+					objectOffset, pack.getPackFile()));
 			coe.initCause(dfe);
 			throw coe;
 		}

@@ -51,8 +51,9 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
+import java.text.MessageFormat;
+
+import org.eclipse.jgit.JGitText;
 
 /**
  * Input/Output utilities
@@ -95,7 +96,7 @@ public class IO {
 		try {
 			final long sz = in.getChannel().size();
 			if (sz > max)
-				throw new IOException("File is too large: " + path);
+				throw new IOException(MessageFormat.format(JGitText.get().fileIsTooLarge, path));
 			final byte[] buf = new byte[(int) sz];
 			IO.readFully(in, buf, 0, buf.length);
 			return buf;
@@ -129,37 +130,7 @@ public class IO {
 		while (len > 0) {
 			final int r = fd.read(dst, off, len);
 			if (r <= 0)
-				throw new EOFException("Short read of block.");
-			off += r;
-			len -= r;
-		}
-	}
-
-	/**
-	 * Read the entire byte array into memory, or throw an exception.
-	 *
-	 * @param fd
-	 *            file to read the data from.
-	 * @param pos
-	 *            position to read from the file at.
-	 * @param dst
-	 *            buffer that must be fully populated, [off, off+len).
-	 * @param off
-	 *            position within the buffer to start writing to.
-	 * @param len
-	 *            number of bytes that must be read.
-	 * @throws EOFException
-	 *             the stream ended before dst was fully populated.
-	 * @throws IOException
-	 *             there was an error reading from the stream.
-	 */
-	public static void readFully(final FileChannel fd, long pos,
-			final byte[] dst, int off, int len) throws IOException {
-		while (len > 0) {
-			final int r = fd.read(ByteBuffer.wrap(dst, off, len), pos);
-			if (r <= 0)
-				throw new EOFException("Short read of block.");
-			pos += r;
+				throw new EOFException(JGitText.get().shortReadOfBlock);
 			off += r;
 			len -= r;
 		}
@@ -187,7 +158,7 @@ public class IO {
 		while (toSkip > 0) {
 			final long r = fd.skip(toSkip);
 			if (r <= 0)
-				throw new EOFException("Short skip of block");
+				throw new EOFException(JGitText.get().shortSkipOfBlock);
 			toSkip -= r;
 		}
 	}

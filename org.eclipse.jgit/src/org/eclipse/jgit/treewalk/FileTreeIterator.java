@@ -64,7 +64,16 @@ import org.eclipse.jgit.util.FS;
  * specified working directory as part of a {@link TreeWalk}.
  */
 public class FileTreeIterator extends WorkingTreeIterator {
-	private final File directory;
+	/**
+	 * the starting directory. This directory should correspond to
+	 *            the root of the repository.
+	 */
+	protected final File directory;
+	/**
+	 *  the file system abstraction which will be necessary to
+	 *            perform certain file system operations.
+	 */
+	protected final FS fs;
 
 	/**
 	 * Create a new iterator to traverse the given directory and its children.
@@ -72,9 +81,13 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 * @param root
 	 *            the starting directory. This directory should correspond to
 	 *            the root of the repository.
+	 * @param fs
+	 *            the file system abstraction which will be necessary to
+	 *            perform certain file system operations.
 	 */
-	public FileTreeIterator(final File root) {
+	public FileTreeIterator(final File root, FS fs) {
 		directory = root;
+		this.fs = fs;
 		init(entries());
 	}
 
@@ -83,29 +96,37 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 *
 	 * @param p
 	 *            the parent iterator we were created from.
+	 * @param fs
+	 *            the file system abstraction which will be necessary to
+	 *            perform certain file system operations.
 	 * @param root
 	 *            the subdirectory. This should be a directory contained within
 	 *            the parent directory.
 	 */
-	protected FileTreeIterator(final FileTreeIterator p, final File root) {
+	protected FileTreeIterator(final FileTreeIterator p, final File root, FS fs) {
 		super(p);
 		directory = root;
+		this.fs = fs;
 		init(entries());
 	}
 
 	@Override
 	public AbstractTreeIterator createSubtreeIterator(final Repository repo)
 			throws IncorrectObjectTypeException, IOException {
-		return new FileTreeIterator(this, ((FileEntry) current()).file);
+		return new FileTreeIterator(this, ((FileEntry) current()).file, fs);
 	}
 
 	private Entry[] entries() {
+		gitIgnoreTimeStamp = 0l;
 		final File[] all = directory.listFiles();
 		if (all == null)
 			return EOF;
 		final Entry[] r = new Entry[all.length];
-		for (int i = 0; i < r.length; i++)
-			r[i] = new FileEntry(all[i]);
+		for (int i = 0; i < r.length; i++) {
+			r[i] = new FileEntry(all[i], fs);
+			if (all[i].getName().equals(Constants.DOT_GIT_IGNORE))
+				gitIgnoreTimeStamp = r[i].getLastModified();
+		}
 		return r;
 	}
 
@@ -121,7 +142,7 @@ public class FileTreeIterator extends WorkingTreeIterator {
 
 		private long lastModified;
 
-		FileEntry(final File f) {
+		FileEntry(final File f, FS fs) {
 			file = f;
 
 			if (f.isDirectory()) {
@@ -129,7 +150,7 @@ public class FileTreeIterator extends WorkingTreeIterator {
 					mode = FileMode.GITLINK;
 				else
 					mode = FileMode.TREE;
-			} else if (FS.INSTANCE.canExecute(file))
+			} else if (fs.canExecute(file))
 				mode = FileMode.EXECUTABLE_FILE;
 			else
 				mode = FileMode.REGULAR_FILE;
@@ -172,5 +193,13 @@ public class FileTreeIterator extends WorkingTreeIterator {
 		public File getFile() {
 			return file;
 		}
+	}
+
+	/**
+	 * @return
+	 * 			  The root directory of this iterator
+	 */
+	public File getDirectory() {
+		return directory;
 	}
 }
