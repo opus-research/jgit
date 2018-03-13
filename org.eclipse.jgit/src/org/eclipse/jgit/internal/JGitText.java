@@ -333,7 +333,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidTimeout;
 	/***/ public String invalidURL;
 	/***/ public String invalidWildcards;
-	/***/ public String invalidRefSpec;
 	/***/ public String invalidWindowSize;
 	/***/ public String isAStaticFlagAndHasNorevWalkInstance;
 	/***/ public String JRELacksMD5Implementation;
