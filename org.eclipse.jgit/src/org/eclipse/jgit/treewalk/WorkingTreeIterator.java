@@ -668,8 +668,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		ptr = 0;
 		if (!eof())
 			parseEntry();
-		else if (pathLen == 0) // see bug 445363
-			pathLen = pathOffset;
 	}
 
 	/**
