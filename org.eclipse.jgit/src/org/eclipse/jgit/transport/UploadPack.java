@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.transport.BasePackFetchConnection.MultiAck;
-
 import java.io.BufferedOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
@@ -70,6 +68,7 @@ import org.eclipse.jgit.revwalk.RevFlagSet;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 import org.eclipse.jgit.util.io.InterruptTimer;
 import org.eclipse.jgit.util.io.TimeoutInputStream;
 import org.eclipse.jgit.util.io.TimeoutOutputStream;
@@ -81,8 +80,6 @@ public class UploadPack {
 	static final String OPTION_INCLUDE_TAG = BasePackFetchConnection.OPTION_INCLUDE_TAG;
 
 	static final String OPTION_MULTI_ACK = BasePackFetchConnection.OPTION_MULTI_ACK;
-
-	static final String OPTION_MULTI_ACK_DETAILED = BasePackFetchConnection.OPTION_MULTI_ACK_DETAILED;
 
 	static final String OPTION_THIN_PACK = BasePackFetchConnection.OPTION_THIN_PACK;
 
@@ -104,15 +101,10 @@ public class UploadPack {
 	private int timeout;
 
 	/**
-	 * Is the client connection a bi-directional socket or pipe?
+	 * Should we start by advertising our refs to the client?
 	 * <p>
-	 * If true, this class assumes it can perform multiple read and write cycles
-	 * with the client over the input and output streams. This matches the
-	 * functionality available with a standard TCP/IP connection, or a local
-	 * operating system or in-memory pipe.
-	 * <p>
-	 * If false, this class runs in a read everything then output results mode,
-	 * making it suitable for single round-trip systems RPCs such as HTTP.
+	 * If false this class runs in a read everything then output results mode,
+	 * making it suitable for single call RPCs like HTTP.
 	 */
 	private boolean biDirectionalPipe = true;
 
@@ -159,7 +151,7 @@ public class UploadPack {
 
 	private final RevFlagSet SAVE;
 
-	private MultiAck multiAck = MultiAck.OFF;
+	private boolean multiAck;
 
 	/**
 	 * Create a new pack upload for an open repository.
@@ -282,7 +274,7 @@ public class UploadPack {
 
 	private void service() throws IOException {
 		if (biDirectionalPipe)
-			sendAdvertisedRefs();
+			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
 		else {
 			refs = db.getAllRefs();
 			for (Ref r : refs.values()) {
@@ -297,22 +289,22 @@ public class UploadPack {
 		recvWants();
 		if (wantAll.isEmpty())
 			return;
-
-		if (options.contains(OPTION_MULTI_ACK_DETAILED))
-			multiAck = MultiAck.DETAILED;
-		else if (options.contains(OPTION_MULTI_ACK))
-			multiAck = MultiAck.CONTINUE;
-		else
-			multiAck = MultiAck.OFF;
-
+		multiAck = options.contains(OPTION_MULTI_ACK);
 		if (negotiate())
 			sendPack();
 	}
 
-	private void sendAdvertisedRefs() throws IOException {
-		final RefAdvertiser adv = new RefAdvertiser(pckOut, walk, ADVERTISED);
+	/**
+	 * Generate an advertisement of available refs and capabilities.
+	 *
+	 * @param adv
+	 *            the advertisement formatter.
+	 * @throws IOException
+	 *             the formatter failed to write an advertisement.
+	 */
+	public void sendAdvertisedRefs(final RefAdvertiser adv) throws IOException {
+		adv.init(walk, ADVERTISED);
 		adv.advertiseCapability(OPTION_INCLUDE_TAG);
-		adv.advertiseCapability(OPTION_MULTI_ACK_DETAILED);
 		adv.advertiseCapability(OPTION_MULTI_ACK);
 		adv.advertiseCapability(OPTION_OFS_DELTA);
 		adv.advertiseCapability(OPTION_SIDE_BAND);
@@ -322,7 +314,7 @@ public class UploadPack {
 		adv.setDerefTags(true);
 		refs = db.getAllRefs();
 		adv.send(refs.values());
-		pckOut.end();
+		adv.end();
 	}
 
 	private void recvWants() throws IOException {
@@ -393,7 +385,7 @@ public class UploadPack {
 			}
 
 			if (line == PacketLineIn.END) {
-				if (commonBase.isEmpty() || multiAck != MultiAck.OFF)
+				if (commonBase.isEmpty() || multiAck)
 					pckOut.writeString("NAK\n");
 				pckOut.flush();
 				if (!biDirectionalPipe)
@@ -404,39 +396,23 @@ public class UploadPack {
 				if (matchHave(id)) {
 					// Both sides have the same object; let the client know.
 					//
-					last = id;
-					switch (multiAck) {
-					case OFF:
-						if (commonBase.size() == 1)
-							pckOut.writeString("ACK " + id.name() + "\n");
-						break;
-					case CONTINUE:
+					if (multiAck) {
+						last = id;
 						pckOut.writeString("ACK " + id.name() + " continue\n");
-						break;
-					case DETAILED:
-						pckOut.writeString("ACK " + id.name() + " common\n");
-						break;
-					}
-				} else if (okToGiveUp()) {
+					} else if (commonBase.size() == 1)
+						pckOut.writeString("ACK " + id.name() + "\n");
+				} else {
 					// They have this object; we don't.
 					//
-					switch (multiAck) {
-					case OFF:
-						break;
-					case CONTINUE:
+					if (multiAck && okToGiveUp())
 						pckOut.writeString("ACK " + id.name() + " continue\n");
-						break;
-					case DETAILED:
-						pckOut.writeString("ACK " + id.name() + " ready\n");
-						break;
-					}
 				}
 
 			} else if (line.equals("done")) {
 				if (commonBase.isEmpty())
 					pckOut.writeString("NAK\n");
 
-				else if (multiAck != MultiAck.OFF)
+				else if (multiAck)
 					pckOut.writeString("ACK " + last.name() + "\n");
 
 				return true;

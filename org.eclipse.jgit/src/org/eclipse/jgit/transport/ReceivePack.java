@@ -76,6 +76,7 @@ import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.ReceiveCommand.Result;
+import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 import org.eclipse.jgit.util.io.InterruptTimer;
 import org.eclipse.jgit.util.io.TimeoutInputStream;
 import org.eclipse.jgit.util.io.TimeoutOutputStream;
@@ -97,15 +98,10 @@ public class ReceivePack {
 	private final RevWalk walk;
 
 	/**
-	 * Is the client connection a bi-directional socket or pipe?
+	 * Should we start by advertising our refs to the client?
 	 * <p>
-	 * If true, this class assumes it can perform multiple read and write cycles
-	 * with the client over the input and output streams. This matches the
-	 * functionality available with a standard TCP/IP connection, or a local
-	 * operating system or in-memory pipe.
-	 * <p>
-	 * If false, this class runs in a read everything then output results mode,
-	 * making it suitable for single round-trip systems RPCs such as HTTP.
+	 * If false this class runs in a read everything then output results mode,
+	 * making it suitable for single call RPCs like HTTP.
 	 */
 	private boolean biDirectionalPipe = true;
 
@@ -519,7 +515,7 @@ public class ReceivePack {
 
 	private void service() throws IOException {
 		if (biDirectionalPipe)
-			sendAdvertisedRefs();
+			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
 		else
 			refs = db.getAllRefs();
 		recvCommands();
@@ -574,9 +570,17 @@ public class ReceivePack {
 		}
 	}
 
-	private void sendAdvertisedRefs() throws IOException {
+	/**
+	 * Generate an advertisement of available refs and capabilities.
+	 *
+	 * @param adv
+	 *            the advertisement formatter.
+	 * @throws IOException
+	 *             the formatter failed to write an advertisement.
+	 */
+	public void sendAdvertisedRefs(final RefAdvertiser adv) throws IOException {
 		final RevFlag advertised = walk.newFlag("ADVERTISED");
-		final RefAdvertiser adv = new RefAdvertiser(pckOut, walk, advertised);
+		adv.init(walk, advertised);
 		adv.advertiseCapability(CAPABILITY_DELETE_REFS);
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
 		if (allowOfsDelta)
@@ -589,7 +593,7 @@ public class ReceivePack {
 		adv.includeAdditionalHaves();
 		if (adv.isEmpty())
 			adv.advertiseId(ObjectId.zeroId(), "capabilities^{}");
-		pckOut.end();
+		adv.end();
 	}
 
 	private void recvCommands() throws IOException {
@@ -710,8 +714,8 @@ public class ReceivePack {
 				}
 
 				if (ref != null) {
-					// A well behaved client shouldn't have sent us a
-					// create command for a ref we advertised to it.
+					// A well behaved client shouldn't have sent us an
+					// update command for a ref we advertised to it.
 					//
 					cmd.setResult(Result.REJECTED_OTHER_REASON, "ref exists");
 					continue;
@@ -923,7 +927,7 @@ public class ReceivePack {
 			case REJECTED_MISSING_OBJECT:
 				if (cmd.getMessage() == null)
 					r.append("missing object(s)");
-				else if (cmd.getMessage().length() == Constants.OBJECT_ID_STRING_LENGTH)
+				else if (cmd.getMessage().length() == 2 * Constants.OBJECT_ID_LENGTH)
 					r.append("object " + cmd.getMessage() + " missing");
 				else
 					r.append(cmd.getMessage());
