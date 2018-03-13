@@ -69,31 +69,16 @@ public class ZipFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
 	public void putEntry(ArchiveOutputStream out,
 			String path, FileMode mode, ObjectLoader loader)
 			throws IOException {
-		// ZipArchiveEntry detects directories by checking
-		// for '/' at the end of the filename.
-		if (path.endsWith("/") != FileMode.TREE.equals(mode)) {
-			throw new IllegalArgumentException(
-					"ZipFormat.putEntry: path " //$NON-NLS-1$
-					+ path + " does not match mode " //$NON-NLS-1$
-					+ mode);
-		}
 		final ZipArchiveEntry entry = new ZipArchiveEntry(path);
-		if (FileMode.TREE.equals(mode)) {
-			out.putArchiveEntry(entry);
-			out.closeArchiveEntry();
-			return;
-		}
 
-		if (FileMode.REGULAR_FILE.equals(mode)) {
+		if (mode == FileMode.REGULAR_FILE) {
 			// ok
 		} else if (mode == FileMode.EXECUTABLE_FILE
 				|| mode == FileMode.SYMLINK) {
 			entry.setUnixMode(mode.getBits());
 		} else {
-			// Unsupported mode (e.g., GITLINK).
-			throw new IllegalArgumentException(
-					"ZipFormat.putEntry: Unsupported mode " //$NON-NLS-1$
-					+ mode);
+			// TODO(jrn): Let the caller know the tree contained
+			// an entry with unsupported mode (e.g., a submodule).
 		}
 		entry.setSize(loader.getSize());
 		out.putArchiveEntry(entry);
