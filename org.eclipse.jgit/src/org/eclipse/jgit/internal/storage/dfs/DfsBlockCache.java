@@ -135,9 +135,6 @@ public final class DfsBlockCache {
 	/** Maximum number of bytes the cache should hold. */
 	private final long maxBytes;
 
-	/** Maximum ratio of the cache filled by a single pack during copying. */
-	private final long maxStreamThroughCache;
-
 	/**
 	 * Suggested block size to read from pack files in.
 	 * <p>
@@ -194,7 +191,6 @@ public final class DfsBlockCache {
 			eb = tableSize;
 
 		maxBytes = cfg.getBlockLimit();
-		maxStreamThroughCache = (long) (maxBytes * cfg.getStreamRatio());
 		blockSize = cfg.getBlockSize();
 		blockSizeShift = Integer.numberOfTrailingZeros(blockSize);
 
@@ -208,10 +204,6 @@ public final class DfsBlockCache {
 
 		statHit = new AtomicLong();
 		statMiss = new AtomicLong();
-	}
-
-	boolean copyThroughCache(long length) {
-		return length <= maxStreamThroughCache;
 	}
 
 	/** @return total number of bytes in the cache. */
