@@ -74,9 +74,9 @@ public class PackBitmapIndexBuilder extends BasePackBitmapIndex {
 	private final EWAHCompressedBitmap blobs;
 	private final EWAHCompressedBitmap tags;
 	private final BlockList<PositionEntry> byOffset;
-	final BlockList<StoredBitmap>
+	private final BlockList<StoredBitmap>
 			byAddOrder = new BlockList<StoredBitmap>();
-	final ObjectIdOwnerMap<PositionEntry>
+	private final ObjectIdOwnerMap<PositionEntry>
 			positionEntries = new ObjectIdOwnerMap<PositionEntry>();
 
 	/**
@@ -330,7 +330,7 @@ public class PackBitmapIndexBuilder extends BasePackBitmapIndex {
 		private final int xorOffset;
 		private final int flags;
 
-		StoredEntry(long objectId, EWAHCompressedBitmap bitmap,
+		private StoredEntry(long objectId, EWAHCompressedBitmap bitmap,
 				int xorOffset, int flags) {
 			this.objectId = objectId;
 			this.bitmap = bitmap;
@@ -360,11 +360,11 @@ public class PackBitmapIndexBuilder extends BasePackBitmapIndex {
 	}
 
 	private static final class PositionEntry extends ObjectIdOwnerMap.Entry {
-		final int namePosition;
+		private final int namePosition;
 
-		int offsetPosition;
+		private int offsetPosition;
 
-		PositionEntry(AnyObjectId objectId, int namePosition) {
+		private PositionEntry(AnyObjectId objectId, int namePosition) {
 			super(objectId);
 			this.namePosition = namePosition;
 		}

@@ -110,7 +110,7 @@ public abstract class FS {
 		}
 	}
 
-	final static Logger LOG = LoggerFactory.getLogger(FS.class);
+	private final static Logger LOG = LoggerFactory.getLogger(FS.class);
 
 	/** The auto-detected implementation selected for this operating system and JRE. */
 	public static final FS DETECTED = detect();
@@ -490,9 +490,9 @@ public abstract class FS {
 		private final String desc;
 		private final String dir;
 		private final boolean debug = LOG.isDebugEnabled();
-		final AtomicBoolean fail = new AtomicBoolean();
+		private final AtomicBoolean fail = new AtomicBoolean();
 
-		GobblerThread(Process p, String[] command, File dir) {
+		private GobblerThread(Process p, String[] command, File dir) {
 			this.p = p;
 			if (debug) {
 				this.desc = Arrays.asList(command).toString();

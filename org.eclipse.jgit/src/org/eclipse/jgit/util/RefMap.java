@@ -78,10 +78,10 @@ public class RefMap extends AbstractMap<String, Ref> {
 	 * All reference names in this map must start with this prefix. If the
 	 * prefix is not the empty string, it must end with a '/'.
 	 */
-	final String prefix;
+	private final String prefix;
 
 	/** Immutable collection of the packed references at construction time. */
-	RefList<Ref> packed;
+	private RefList<Ref> packed;
 
 	/**
 	 * Immutable collection of the loose references at construction time.
@@ -91,7 +91,7 @@ public class RefMap extends AbstractMap<String, Ref> {
 	 * are typically unresolved, so they only tell us who their target is, but
 	 * not the current value of the target.
 	 */
-	RefList<Ref> loose;
+	private RefList<Ref> loose;
 
 	/**
 	 * Immutable collection of resolved symbolic references.
@@ -101,11 +101,11 @@ public class RefMap extends AbstractMap<String, Ref> {
 	 * from {@link #loose}. Every entry in this list must be matched by an entry
 	 * in {@code loose}, otherwise it might be omitted by the map.
 	 */
-	RefList<Ref> resolved;
+	private RefList<Ref> resolved;
 
-	int size;
+	private int size;
 
-	boolean sizeIsValid;
+	private boolean sizeIsValid;
 
 	private Set<Entry<String, Ref>> entrySet;
 
@@ -280,7 +280,7 @@ public class RefMap extends AbstractMap<String, Ref> {
 		return name;
 	}
 
-	String toMapKey(Ref ref) {
+	private String toMapKey(Ref ref) {
 		String name = ref.getName();
 		if (0 < prefix.length())
 			name = name.substring(prefix.length());
