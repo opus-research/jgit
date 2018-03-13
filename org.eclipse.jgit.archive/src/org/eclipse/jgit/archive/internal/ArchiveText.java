@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Google Inc.
+ * Copyright (C) 2013, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,42 +40,24 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.archive;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+package org.eclipse.jgit.archive.internal;
 
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
-import org.eclipse.jgit.api.ArchiveCommand;
-import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectLoader;
+import org.eclipse.jgit.nls.NLS;
+import org.eclipse.jgit.nls.TranslationBundle;
 
 /**
- * gzip-compressed tarball (tar.gz) format.
+ * Translation bundle for archivers
  */
-public class TgzFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
-	private static final List<String> SUFFIXES = Collections
-			.unmodifiableList(Arrays.asList(".tar.gz", ".tgz")); //$NON-NLS-1$ //$NON-NLS-2$
-
-	private final ArchiveCommand.Format<ArchiveOutputStream> tarFormat = new TarFormat();
-
-	public ArchiveOutputStream createArchiveOutputStream(OutputStream s)
-			throws IOException {
-		GzipCompressorOutputStream out = new GzipCompressorOutputStream(s);
-		return tarFormat.createArchiveOutputStream(out);
+public class ArchiveText extends TranslationBundle {
+	/**
+	 * @return an instance of this translation bundle
+	 */
+	public static ArchiveText get() {
+		return NLS.getBundleFor(ArchiveText.class);
 	}
 
-	public void putEntry(ArchiveOutputStream out,
-			String path, FileMode mode, ObjectLoader loader)
-			throws IOException {
-		tarFormat.putEntry(out, path, mode, loader);
-	}
-
-	public Iterable<String> suffixes() {
-		return SUFFIXES;
-	}
+	// @formatter:off
+	/***/ public String pathDoesNotMatchMode;
+	/***/ public String unsupportedMode;
 }
