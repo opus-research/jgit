@@ -550,7 +550,29 @@ public abstract class PackParser {
 			}
 
 			if (deltaCount > 0) {
-				processDeltas(resolving);
+				if (resolving instanceof BatchingProgressMonitor) {
+					((BatchingProgressMonitor) resolving).setDelayStart(
+							1000,
+							TimeUnit.MILLISECONDS);
+				}
+				resolving.beginTask(JGitText.get().resolvingDeltas, deltaCount);
+				resolveDeltas(resolving);
+				if (entryCount < expectedObjectCount) {
+					if (!isAllowThin()) {
+						throw new IOException(MessageFormat.format(
+								JGitText.get().packHasUnresolvedDeltas,
+								Long.valueOf(expectedObjectCount - entryCount)));
+					}
+
+					resolveDeltasWithExternalBases(resolving);
+
+					if (entryCount < expectedObjectCount) {
+						throw new IOException(MessageFormat.format(
+								JGitText.get().packHasUnresolvedDeltas,
+								Long.valueOf(expectedObjectCount - entryCount)));
+					}
+				}
+				resolving.endTask();
 			}
 
 			packDigest = null;
@@ -571,31 +593,6 @@ public abstract class PackParser {
 			}
 		}
 		return null; // By default there is no locking.
-	}
-
-	private void processDeltas(ProgressMonitor resolving) throws IOException {
-		if (resolving instanceof BatchingProgressMonitor) {
-			((BatchingProgressMonitor) resolving).setDelayStart(1000,
-					TimeUnit.MILLISECONDS);
-		}
-		resolving.beginTask(JGitText.get().resolvingDeltas, deltaCount);
-		resolveDeltas(resolving);
-		if (entryCount < expectedObjectCount) {
-			if (!isAllowThin()) {
-				throw new IOException(MessageFormat.format(
-						JGitText.get().packHasUnresolvedDeltas,
-						Long.valueOf(expectedObjectCount - entryCount)));
-			}
-
-			resolveDeltasWithExternalBases(resolving);
-
-			if (entryCount < expectedObjectCount) {
-				throw new IOException(MessageFormat.format(
-						JGitText.get().packHasUnresolvedDeltas,
-						Long.valueOf(expectedObjectCount - entryCount)));
-			}
-		}
-		resolving.endTask();
 	}
 
 	private void resolveDeltas(final ProgressMonitor progress)
@@ -687,7 +684,6 @@ public abstract class PackParser {
 			PackedObjectInfo oe;
 			oe = newInfo(tempObjectId, visit.delta, visit.parent.id);
 			oe.setOffset(visit.delta.position);
-			oe.setType(type);
 			onInflatedObjectData(oe, type, visit.data);
 			addObjectAndTrack(oe);
 			visit.id = oe;
@@ -858,9 +854,10 @@ public abstract class PackParser {
 			visit.id = baseId;
 			final int typeCode = ldr.getType();
 			final PackedObjectInfo oe = newInfo(baseId, null, null);
-			oe.setType(typeCode);
+
 			if (onAppendBase(typeCode, visit.data, oe))
 				entries[entryCount++] = oe;
+
 			visit.nextChild = firstChildOf(oe);
 			resolveDeltas(visit.next(), typeCode,
 					new ObjectTypeAndSize(), progress);
@@ -1062,7 +1059,6 @@ public abstract class PackParser {
 
 		PackedObjectInfo obj = newInfo(tempObjectId, null, null);
 		obj.setOffset(pos);
-		obj.setType(type);
 		onEndWholeObject(obj);
 		if (data != null)
 			onInflatedObjectData(obj, type, data);
@@ -1073,21 +1069,8 @@ public abstract class PackParser {
 		}
 	}
 
-	/**
-	 * Verify the integrity of the object.
-	 *
-	 * @param id
-	 *            identity of the object to be checked.
-	 * @param type
-	 *            the type of the object.
-	 * @param data
-	 *            raw content of the object.
-	 * @throws CorruptObjectException
-	 * @since 4.9
-	 *
-	 */
-	protected void verifySafeObject(final AnyObjectId id, final int type,
-			final byte[] data) throws CorruptObjectException {
+	private void verifySafeObject(final AnyObjectId id, final int type,
+			final byte[] data) throws IOException {
 		if (objCheck != null) {
 			try {
 				objCheck.check(id, type, data);
@@ -1095,11 +1078,11 @@ public abstract class PackParser {
 				if (e.getErrorType() != null) {
 					throw e;
 				}
-				throw new CorruptObjectException(
-						MessageFormat.format(JGitText.get().invalidObject,
-								Constants.typeString(type), id.name(),
-								e.getMessage()),
-						e);
+				throw new CorruptObjectException(MessageFormat.format(
+						JGitText.get().invalidObject,
+						Constants.typeString(type),
+						id.name(),
+						e.getMessage()), e);
 			}
 		}
 	}
