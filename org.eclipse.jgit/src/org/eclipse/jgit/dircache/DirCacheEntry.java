@@ -258,7 +258,6 @@ public class DirCacheEntry {
 	 *             or DirCache file.  Or if {@code stage} is outside of the
 	 *             range 0..3, inclusive.
 	 */
-	@SuppressWarnings("boxing")
 	public DirCacheEntry(final byte[] newPath, final int stage) {
 		if (!isValidPath(newPath))
 			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidPath
@@ -560,7 +559,6 @@ public class DirCacheEntry {
 	 *             if the size exceeds the 2 GiB barrier imposed by current file
 	 *             format limitations.
 	 */
-	@SuppressWarnings("boxing")
 	public void setLength(final long sz) {
 		if (Integer.MAX_VALUE <= sz)
 			throw new IllegalArgumentException(MessageFormat.format(JGitText
@@ -634,21 +632,17 @@ public class DirCacheEntry {
 	/**
 	 * Copy the ObjectId and other meta fields from an existing entry.
 	 * <p>
-	 * This method copies everything except the path and stage from one entry to
-	 * another, supporting renaming.
+	 * This method copies everything except the path from one entry to another,
+	 * supporting renaming.
 	 *
 	 * @param src
 	 *            the entry to copy ObjectId and meta fields from.
 	 */
 	public void copyMetaData(final DirCacheEntry src) {
-		int origflags = NB.decodeUInt16(info, infoOffset + P_FLAGS);
-		int newflags = NB.decodeUInt16(src.info, src.infoOffset + P_FLAGS);
+		final int pLen = NB.decodeUInt16(info, infoOffset + P_FLAGS) & NAME_MASK;
 		System.arraycopy(src.info, src.infoOffset, info, infoOffset, INFO_LEN);
-		final int pLen = origflags & NAME_MASK;
-		final int SHIFTED_STAGE_MASK = 0x3 << 12;
-		final int pStageShifted = origflags & SHIFTED_STAGE_MASK;
-		NB.encodeInt16(info, infoOffset + P_FLAGS, pStageShifted | pLen
-				| (newflags & ~NAME_MASK & ~SHIFTED_STAGE_MASK));
+		NB.encodeInt16(info, infoOffset + P_FLAGS, pLen
+				| NB.decodeUInt16(info, infoOffset + P_FLAGS) & ~NAME_MASK);
 	}
 
 	/**
