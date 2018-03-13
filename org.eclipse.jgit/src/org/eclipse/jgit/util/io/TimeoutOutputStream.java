@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, 2013 Google Inc.
+ * Copyright (C) 2009, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -150,8 +150,7 @@ public class TimeoutOutputStream extends OutputStream {
 		myTimer.end();
 	}
 
-	private InterruptedIOException writeTimedOut() {
-		return new InterruptedIOException(MessageFormat.format(
-				JGitText.get().writeTimedOut, Integer.valueOf(timeout)));
+	private static InterruptedIOException writeTimedOut() {
+		return new InterruptedIOException(JGitText.get().writeTimedOut);
 	}
 }

@@ -196,9 +196,6 @@ public class ConfigConstants {
 	/** The "ff" key */
 	public static final String CONFIG_KEY_FF = "ff";
 
-	/**
-	 * The "checkstat" key
-	 * @since 3.0
-	 */
+	/** The "checkstat" key */
 	public static final String CONFIG_KEY_CHECKSTAT = "checkstat";
 }
