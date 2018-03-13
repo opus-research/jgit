@@ -128,6 +128,16 @@ public class ReceivePackAdvertiseRefsHookTest extends LocalDiskRepositoryTestCas
 		d.update(R_PRIVATE, P);
 	}
 
+	@Override
+	@After
+	public void tearDown() throws Exception {
+		if (src != null)
+			src.close();
+		if (dst != null)
+			dst.close();
+		super.tearDown();
+	}
+
 	@Test
 	public void testFilterHidesPrivate() throws Exception {
 		Map<String, Ref> refs;
