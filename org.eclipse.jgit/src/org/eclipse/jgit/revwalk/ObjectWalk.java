@@ -52,11 +52,11 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
@@ -351,8 +351,7 @@ public class ObjectWalk extends RevWalk {
 				default:
 					throw new CorruptObjectException(MessageFormat.format(
 							JGitText.get().corruptObjectInvalidMode3,
-							String.format("%o", Integer.valueOf(mode)), //$NON-NLS-1$
-							idBuffer.name(),
+							String.format("%o", mode), idBuffer.name(),
 							RawParseUtils.decode(buf, tv.namePtr, tv.nameEnd),
 							tv.obj));
 				}
@@ -703,10 +702,9 @@ public class ObjectWalk extends RevWalk {
 
 			default:
 				idBuffer.fromRaw(raw, ptr);
-				throw new CorruptObjectException(MessageFormat.format(
-						JGitText.get().corruptObjectInvalidMode3,
-						String.format("%o", Integer.valueOf(mode)), //$NON-NLS-1$
-						idBuffer.name(), "", tree)); //$NON-NLS-1$
+				throw new CorruptObjectException(MessageFormat.format(JGitText
+						.get().corruptObjectInvalidMode3, String.format("%o",
+						mode), idBuffer.name(), "", tree));
 			}
 			ptr += ID_SZ;
 		}

@@ -44,7 +44,6 @@ package org.eclipse.jgit.api;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -53,15 +52,13 @@ import java.util.Set;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
-import org.eclipse.jgit.errors.NoWorkTreeException;
-import org.eclipse.jgit.junit.RepositoryTestCase;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.junit.Test;
 
 public class StatusCommandTest extends RepositoryTestCase {
 
 	@Test
-	public void testEmptyStatus() throws NoWorkTreeException,
-			GitAPIException {
+	public void testEmptyStatus() throws IOException {
 		Git git = new Git(db);
 
 		Status stat = git.status().call();
@@ -126,10 +123,6 @@ public class StatusCommandTest extends RepositoryTestCase {
 		assertEquals(set("a"), stat.getUntracked());
 		git.commit().setMessage("t").call();
 
-		writeTrashFile("sub/a", "sub-file");
-		stat = git.status().call();
-		assertEquals(1, stat.getUntrackedFolders().size());
-		assertTrue(stat.getUntrackedFolders().contains("sub"));
 	}
 
 	public static Set<String> set(String... elements) {

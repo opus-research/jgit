@@ -47,8 +47,8 @@ package org.eclipse.jgit.lib;
 import java.io.IOException;
 import java.text.MessageFormat;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -178,8 +178,6 @@ public abstract class RefUpdate {
 	 */
 	private boolean detachingSymbolicRef;
 
-	private boolean checkConflicting = true;
-
 	/**
 	 * Construct a new update operation for the reference.
 	 * <p>
@@ -192,7 +190,7 @@ public abstract class RefUpdate {
 	protected RefUpdate(final Ref ref) {
 		this.ref = ref;
 		oldValue = ref.getObjectId();
-		refLogMessage = ""; //$NON-NLS-1$
+		refLogMessage = "";
 	}
 
 	/** @return the reference database this update modifies. */
@@ -374,7 +372,7 @@ public abstract class RefUpdate {
 		if (msg == null && !appendStatus)
 			disableRefLog();
 		else if (msg == null && appendStatus) {
-			refLogMessage = ""; //$NON-NLS-1$
+			refLogMessage = "";
 			refLogIncludeResult = true;
 		} else {
 			refLogMessage = msg;
@@ -566,7 +564,7 @@ public abstract class RefUpdate {
 	public Result link(String target) throws IOException {
 		if (!target.startsWith(Constants.R_REFS))
 			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().illegalArgumentNotA, Constants.R_REFS));
-		if (checkConflicting && getRefDatabase().isNameConflicting(getName()))
+		if (getRefDatabase().isNameConflicting(getName()))
 			return Result.LOCK_FAILURE;
 		try {
 			if (!tryLock(false))
@@ -600,8 +598,7 @@ public abstract class RefUpdate {
 		RevObject newObj;
 		RevObject oldObj;
 
-		// don't make expensive conflict check if this is an existing Ref
-		if (oldValue == null && checkConflicting && getRefDatabase().isNameConflicting(getName()))
+		if (getRefDatabase().isNameConflicting(getName()))
 			return Result.LOCK_FAILURE;
 		try {
 			if (!tryLock(true))
@@ -631,16 +628,6 @@ public abstract class RefUpdate {
 		} finally {
 			unlock();
 		}
-	}
-
-	/**
-	 * Enable/disable the check for conflicting ref names. By default conflicts
-	 * are checked explicitly.
-	 *
-	 * @param check
-	 */
-	public void setCheckConflicting(boolean check) {
-		checkConflicting = check;
 	}
 
 	private static RevObject safeParse(final RevWalk rw, final AnyObjectId id)

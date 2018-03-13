@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2009, Google Inc.
- * Copyright (C) 2012, Research In Motion Limited
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -119,6 +118,6 @@ public abstract class ThreeWayMerger extends Merger {
 	protected AbstractTreeIterator mergeBase() throws IOException {
 		if (baseTree != null)
 			return openTree(baseTree);
-		return mergeBase(sourceCommits[0], sourceCommits[1]);
+		return mergeBase(0, 1);
 	}
 }

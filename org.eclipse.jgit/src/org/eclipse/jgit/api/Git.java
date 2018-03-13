@@ -54,8 +54,7 @@ import org.eclipse.jgit.util.FS;
 /**
  * Offers a "GitPorcelain"-like API to interact with a git repository.
  * <p>
- * The GitPorcelain commands are described in the <a href=
- * "http://www.kernel.org/pub/software/scm/git/docs/git.html#_high_level_commands_porcelain"
+ * The GitPorcelain commands are described in the <a href="http://www.kernel.org/pub/software/scm/git/docs/git.html#_high_level_commands_porcelain"
  * >Git Documentation</a>.
  * <p>
  * This class only offers methods to construct so-called command classes. Each
@@ -110,7 +109,9 @@ public class Git {
 		RepositoryCache.FileKey key;
 
 		key = RepositoryCache.FileKey.lenient(dir, fs);
-		return wrap(new RepositoryBuilder().setFS(fs).setGitDir(key.getFile())
+		return wrap(new RepositoryBuilder()
+				.setFS(fs)
+				.setGitDir(key.getFile())
 				.setMustExist(true).build());
 	}
 
@@ -265,8 +266,8 @@ public class Git {
 	 * @see <a
 	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-add.html"
 	 *      >Git documentation about Add</a>
-	 * @return a {@link AddCommand} used to collect all optional parameters and
-	 *         to finally execute the {@code Add} command
+	 * @return a {@link AddCommand} used to collect all optional parameters
+	 *         and to finally execute the {@code Add} command
 	 */
 	public AddCommand add() {
 		return new AddCommand(repo);
@@ -278,8 +279,8 @@ public class Git {
 	 * @see <a
 	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-tag.html"
 	 *      >Git documentation about Tag</a>
-	 * @return a {@link TagCommand} used to collect all optional parameters and
-	 *         to finally execute the {@code Tag} command
+	 * @return a {@link TagCommand} used to collect all optional parameters
+	 *         and to finally execute the {@code Tag} command
 	 */
 	public TagCommand tag() {
 		return new TagCommand(repo);
@@ -330,8 +331,8 @@ public class Git {
 	 * @see <a
 	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-revert.html"
 	 *      >Git documentation about reverting changes</a>
-	 * @return a {@link RevertCommand} used to collect all optional parameters
-	 *         and to finally execute the {@code cherry-pick} command
+	 * @return a {@link RevertCommand} used to collect all optional
+	 *         parameters and to finally execute the {@code cherry-pick} command
 	 */
 	public RevertCommand revert() {
 		return new RevertCommand(repo);
@@ -505,7 +506,7 @@ public class Git {
 
 	/**
 	 * Returns a command object used to delete tags
-	 *
+	 * 
 	 * @return a {@link DeleteTagCommand}
 	 */
 	public DeleteTagCommand tagDelete() {
@@ -561,85 +562,6 @@ public class Git {
 	 */
 	public SubmoduleUpdateCommand submoduleUpdate() {
 		return new SubmoduleUpdateCommand(repo);
-	}
-
-	/**
-	 * Returns a command object used to list stashed commits
-	 *
-	 * @return a {@link StashListCommand}
-	 */
-	public StashListCommand stashList() {
-		return new StashListCommand(repo);
-	}
-
-	/**
-	 * Returns a command object used to create a stashed commit
-	 *
-	 * @return a {@link StashCreateCommand}
-	 * @since 2.0
-	 */
-	public StashCreateCommand stashCreate() {
-		return new StashCreateCommand(repo);
-	}
-
-	/**
-	 * Returns a command object used to apply a stashed commit
-	 *
-	 * @return a {@link StashApplyCommand}
-	 * @since 2.0
-	 */
-	public StashApplyCommand stashApply() {
-		return new StashApplyCommand(repo);
-	}
-
-	/**
-	 * Returns a command object used to drop a stashed commit
-	 *
-	 * @return a {@link StashDropCommand}
-	 * @since 2.0
-	 */
-	public StashDropCommand stashDrop() {
-		return new StashDropCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code apply} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-apply.html"
-	 *      >Git documentation about apply</a>
-	 *
-	 * @return a {@link ApplyCommand} used to collect all optional parameters
-	 *         and to finally execute the {@code apply} command
-	 * @since 2.0
-	 */
-	public ApplyCommand apply() {
-		return new ApplyCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code gc} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-gc.html"
-	 *      >Git documentation about gc</a>
-	 *
-	 * @return a {@link GarbageCollectCommand} used to collect all optional
-	 *         parameters and to finally execute the {@code gc} command
-	 * @since 2.2
-	 */
-	public GarbageCollectCommand gc() {
-		return new GarbageCollectCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to find human-readable names of revisions.
-	 *
-	 * @return a {@link NameRevCommand}.
-	 * @since 3.0
-	 */
-	public NameRevCommand nameRev() {
-		return new NameRevCommand(repo);
 	}
 
 	/**
