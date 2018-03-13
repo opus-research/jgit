@@ -410,7 +410,7 @@ class PackWriterBitmapPreparer {
 
 			BitmapBuilder bitmap = commitBitmapIndex.newBitmapBuilder();
 			bitmap.or(reuse);
-			bitmap.addObject(rc, Constants.OBJ_COMMIT);
+			bitmap.add(rc, Constants.OBJ_COMMIT);
 			tipCommitBitmaps.add(new BitmapBuilderEntry(rc, bitmap));
 		}
 
@@ -429,7 +429,7 @@ class PackWriterBitmapPreparer {
 					continue;
 				}
 				for (RevCommit c : rc.getParents()) {
-					bitmap.addObject(c, Constants.OBJ_COMMIT);
+					bitmap.add(c, Constants.OBJ_COMMIT);
 				}
 			}
 			pm.update(1);

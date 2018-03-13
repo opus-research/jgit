@@ -129,7 +129,7 @@ final class PackWriterBitmapWalker {
 
 			RevObject ro;
 			while ((ro = walker.nextObject()) != null) {
-				bitmapResult.addObject(ro, ro.getType());
+				bitmapResult.add(ro, ro.getType());
 				pm.update(1);
 			}
 		}
