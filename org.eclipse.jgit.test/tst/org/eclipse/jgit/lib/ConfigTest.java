@@ -856,12 +856,8 @@ public class ConfigTest {
 		assertEquals("bar", parsed.getString("other", null, "more"));
 	}
 
-	private static String pathToString(File file) {
-		final String path = file.getPath();
-		if (SystemReader.getInstance().isWindows()) {
-			return path.replace('\\', '/');
-		}
-		return path;
+	private static String pathToString(File more) {
+		return more.toPath().toString().replace(File.separatorChar, '/');
 	}
 
 	private static void assertReadLong(long exp) throws ConfigInvalidException {
@@ -973,57 +969,5 @@ public class ConfigTest {
 	public void testTimeUnitNegative() throws ConfigInvalidException {
 		expectedEx.expect(IllegalArgumentException.class);
 		parseTime("-1", MILLISECONDS);
-	}
-
-	@Test
-	public void testEscapeSpacesOnly() throws ConfigInvalidException {
-		assertEquals("", Config.escapeValue(""));
-		assertEquals("\" \"", Config.escapeValue(" "));
-		assertEquals("\"  \"", Config.escapeValue("  "));
-
-		assertParseRoundTrip(" ");
-		assertParseRoundTrip("  ");
-	}
-
-	@Test
-	public void testEscapeLeadingSpace() throws ConfigInvalidException {
-		assertEquals("x", Config.escapeValue("x"));
-		assertEquals("\" x\"", Config.escapeValue(" x"));
-		assertEquals("\"  x\"", Config.escapeValue("  x"));
-
-		assertParseRoundTrip("x");
-		assertParseRoundTrip(" x");
-		assertParseRoundTrip("  x");
-	}
-
-	@Test
-	public void testEscapeTrailingSpace() throws ConfigInvalidException {
-		assertEquals("x", Config.escapeValue("x"));
-		assertEquals("\"x  \"", Config.escapeValue("x  "));
-		assertEquals("x\" \"", Config.escapeValue("x "));
-
-		assertParseRoundTrip("x");
-		assertParseRoundTrip("x ");
-		assertParseRoundTrip("x  ");
-	}
-
-	@Test
-	public void testEscapeLeadingAndTrailingSpace()
-			throws ConfigInvalidException {
-		assertEquals("\" x \"", Config.escapeValue(" x "));
-		assertEquals("\"  x \"", Config.escapeValue("  x "));
-		assertEquals("\" x  \"", Config.escapeValue(" x  "));
-		assertEquals("\"  x  \"", Config.escapeValue("  x  "));
-
-		assertParseRoundTrip(" x ");
-		assertParseRoundTrip(" x  ");
-		assertParseRoundTrip("  x ");
-		assertParseRoundTrip("  x  ");
-	}
-
-	private static void assertParseRoundTrip(String value)
-			throws ConfigInvalidException {
-		Config c = parse("[foo]\nbar = " + Config.escapeValue(value));
-		assertEquals(value, c.getString("foo", null, "bar"));
 	}
 }
