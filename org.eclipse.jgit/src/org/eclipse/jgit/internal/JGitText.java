@@ -81,6 +81,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String atLeastTwoFiltersNeeded;
 	/***/ public String atomicPushNotSupported;
 	/***/ public String atomicRefUpdatesNotSupported;
+	/***/ public String atomicSymRefNotSupported;
 	/***/ public String authenticationNotSupported;
 	/***/ public String badBase64InputCharacterAt;
 	/***/ public String badEntryDelimiter;

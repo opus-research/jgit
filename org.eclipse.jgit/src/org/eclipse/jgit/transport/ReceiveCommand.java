@@ -212,14 +212,14 @@ public class ReceiveCommand {
 	 * @param oldId
 	 *            expected oldId. May be {@code zeroId} to create.
 	 * @param newTarget
-	 *            new target, must begin with {@code "refs/"}.
+	 *            new target; must begin with {@code "refs/"}.
 	 * @param name
 	 *            name of the reference to make symbolic.
 	 * @return command instance.
 	 * @since 4.9
 	 */
-	public static ReceiveCommand link(final ObjectId oldId,
-			final @NonNull String newTarget, final @NonNull String name) {
+	public static ReceiveCommand link(ObjectId oldId, @NonNull String newTarget,
+			@NonNull String name) {
 		return new ReceiveCommand(oldId, newTarget, name);
 	}
 
@@ -229,14 +229,14 @@ public class ReceiveCommand {
 	 * @param oldTarget
 	 *            expected old target. May be null to create.
 	 * @param newTarget
-	 *            new target, must begin with {@code "refs/"}.
+	 *            new target; must begin with {@code "refs/"}.
 	 * @param name
 	 *            name of the reference to make symbolic.
 	 * @return command instance.
 	 * @since 4.9
 	 */
-	public static ReceiveCommand link(final @Nullable String oldTarget,
-			final @NonNull String newTarget, final @NonNull String name) {
+	public static ReceiveCommand link(@Nullable String oldTarget,
+			@NonNull String newTarget, @NonNull String name) {
 		return new ReceiveCommand(oldTarget, newTarget, name);
 	}
 
@@ -252,8 +252,8 @@ public class ReceiveCommand {
 	 * @return command instance.
 	 * @since 4.9
 	 */
-	public static ReceiveCommand unlink(final String oldTarget,
-			final ObjectId newId, final @NonNull String name) {
+	public static ReceiveCommand unlink(String oldTarget, ObjectId newId,
+			@NonNull String name) {
 		return new ReceiveCommand(oldTarget, newId, name);
 	}
 
@@ -300,16 +300,13 @@ public class ReceiveCommand {
 	public ReceiveCommand(final ObjectId oldId, final ObjectId newId,
 			final String name) {
 		if (oldId == null) {
-			throw new IllegalArgumentException(
-					JGitText.get().oldIdMustNotBeNull);
+			throw new IllegalArgumentException(JGitText.get().oldIdMustNotBeNull);
 		}
 		if (newId == null) {
-			throw new IllegalArgumentException(
-					JGitText.get().newIdMustNotBeNull);
+			throw new IllegalArgumentException(JGitText.get().newIdMustNotBeNull);
 		}
 		if (name == null || name.isEmpty()) {
-			throw new IllegalArgumentException(
-					JGitText.get().nameMustNotBeNullOrEmpty);
+			throw new IllegalArgumentException(JGitText.get().nameMustNotBeNullOrEmpty);
 		}
 		this.oldId = oldId;
 		this.oldSymref = null;
@@ -346,16 +343,13 @@ public class ReceiveCommand {
 	public ReceiveCommand(final ObjectId oldId, final ObjectId newId,
 			final String name, final Type type) {
 		if (oldId == null) {
-			throw new IllegalArgumentException(
-					JGitText.get().oldIdMustNotBeNull);
+			throw new IllegalArgumentException(JGitText.get().oldIdMustNotBeNull);
 		}
 		if (newId == null) {
-			throw new IllegalArgumentException(
-					JGitText.get().newIdMustNotBeNull);
+			throw new IllegalArgumentException(JGitText.get().newIdMustNotBeNull);
 		}
 		if (name == null || name.isEmpty()) {
-			throw new IllegalArgumentException(
-					JGitText.get().nameMustNotBeNullOrEmpty);
+			throw new IllegalArgumentException(JGitText.get().nameMustNotBeNullOrEmpty);
 		}
 		this.oldId = oldId;
 		this.oldSymref = null;
@@ -384,8 +378,7 @@ public class ReceiveCommand {
 			}
 			break;
 		default:
-			throw new IllegalStateException(
-					JGitText.get().enumValueNotSupported0);
+			throw new IllegalStateException(JGitText.get().enumValueNotSupported0);
 		}
 		this.type = type;
 	}
@@ -403,8 +396,7 @@ public class ReceiveCommand {
 	 *            name of the reference to make symbolic.
 	 * @since 4.9
 	 */
-	protected ReceiveCommand(final ObjectId oldId, final String newSymref,
-			final String name) {
+	protected ReceiveCommand(ObjectId oldId, String newSymref, String name) {
 		if (oldId == null) {
 			throw new IllegalArgumentException(
 					JGitText.get().oldIdMustNotBeNull);
@@ -441,8 +433,7 @@ public class ReceiveCommand {
 	 *            name of the reference to convert from symbolic.
 	 * @since 4.9
 	 */
-	protected ReceiveCommand(final String oldSymref, final ObjectId newId,
-			final String name) {
+	protected ReceiveCommand(String oldSymref, ObjectId newId, String name) {
 		if (newId == null) {
 			throw new IllegalArgumentException(
 					JGitText.get().newIdMustNotBeNull);
@@ -478,8 +469,7 @@ public class ReceiveCommand {
 	 *            name of the reference to make symbolic.
 	 * @since 4.9
 	 */
-	protected ReceiveCommand(final @Nullable String oldTarget,
-			final String newTarget, final String name) {
+	protected ReceiveCommand(@Nullable String oldTarget, String newTarget, String name) {
 		if (name == null || name.isEmpty()) {
 			throw new IllegalArgumentException(
 					JGitText.get().nameMustNotBeNullOrEmpty);
@@ -831,8 +821,8 @@ public class ReceiveCommand {
 	}
 
 	void reject(IOException err) {
-		setResult(Result.REJECTED_OTHER_REASON, MessageFormat
-				.format(JGitText.get().lockError, err.getMessage()));
+		setResult(Result.REJECTED_OTHER_REASON, MessageFormat.format(
+						JGitText.get().lockError, err.getMessage()));
 	}
 
 	@SuppressWarnings("nls")
