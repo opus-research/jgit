@@ -55,6 +55,8 @@ import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.errors.NotSupportedException;
+import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefComparator;
@@ -114,10 +116,10 @@ class Clone extends AbstractFetchCommand {
 		dstcfg.save();
 		db = dst;
 
-		outw.print(MessageFormat.format(
+		out.print(MessageFormat.format(
 				CLIText.get().initializedEmptyGitRepositoryIn, gitdir));
-		outw.println();
-		outw.flush();
+		out.println();
+		out.flush();
 
 		saveRemote(uri);
 		final FetchResult r = runFetch();
@@ -137,7 +139,8 @@ class Clone extends AbstractFetchCommand {
 		dstcfg.save();
 	}
 
-	private FetchResult runFetch() throws URISyntaxException, IOException {
+	private FetchResult runFetch() throws NotSupportedException,
+			URISyntaxException, TransportException {
 		final Transport tn = Transport.open(db, remoteName);
 		final FetchResult r;
 		try {

@@ -198,16 +198,16 @@ class Show extends TextBuiltin {
 					break;
 
 				case Constants.OBJ_TREE:
-					outw.print("tree ");
-					outw.print(objectName);
-					outw.println();
-					outw.println();
+					out.print("tree ");
+					out.print(objectName);
+					out.println();
+					out.println();
 					show((RevTree) obj);
 					break;
 
 				case Constants.OBJ_BLOB:
 					db.open(obj, obj.getType()).copyTo(System.out);
-					outw.flush();
+					System.out.flush();
 					break;
 
 				default:
@@ -223,32 +223,32 @@ class Show extends TextBuiltin {
 		}
 	}
 
-	private void show(RevTag tag) throws IOException {
-		outw.print(CLIText.get().tagLabel);
-		outw.print(" ");
-		outw.print(tag.getTagName());
-		outw.println();
+	private void show(RevTag tag) {
+		out.print(CLIText.get().tagLabel);
+		out.print(" ");
+		out.print(tag.getTagName());
+		out.println();
 
 		final PersonIdent tagger = tag.getTaggerIdent();
 		if (tagger != null) {
-			outw.println(MessageFormat.format(CLIText.get().taggerInfo,
+			out.println(MessageFormat.format(CLIText.get().taggerInfo,
 					tagger.getName(), tagger.getEmailAddress()));
 
 			final TimeZone taggerTZ = tagger.getTimeZone();
 			fmt.setTimeZone(taggerTZ != null ? taggerTZ : myTZ);
-			outw.println(MessageFormat.format(CLIText.get().dateInfo,
+			out.println(MessageFormat.format(CLIText.get().dateInfo,
 					fmt.format(tagger.getWhen())));
 		}
 
-		outw.println();
+		out.println();
 		final String[] lines = tag.getFullMessage().split("\n");
 		for (final String s : lines) {
-			outw.print("    ");
-			outw.print(s);
-			outw.println();
+			out.print("    ");
+			out.print(s);
+			out.println();
 		}
 
-		outw.println();
+		out.println();
 	}
 
 	private void show(RevTree obj) throws MissingObjectException,
@@ -258,45 +258,45 @@ class Show extends TextBuiltin {
 		walk.addTree(obj);
 
 		while (walk.next()) {
-			outw.print(walk.getPathString());
+			out.print(walk.getPathString());
 			final FileMode mode = walk.getFileMode(0);
 			if (mode == FileMode.TREE)
-				outw.print("/");
-			outw.println();
+				out.print('/');
+			out.println();
 		}
 	}
 
 	private void show(RevWalk rw, final RevCommit c) throws Exception {
 		char[] outbuffer = new char[Constants.OBJECT_ID_LENGTH * 2];
 
-		outw.print(CLIText.get().commitLabel);
-		outw.print(" ");
-		c.getId().copyTo(outbuffer, outw);
-		outw.println();
+		out.print(CLIText.get().commitLabel);
+		out.print(" ");
+		c.getId().copyTo(outbuffer, out);
+		out.println();
 
 		final PersonIdent author = c.getAuthorIdent();
-		outw.println(MessageFormat.format(CLIText.get().authorInfo,
+		out.println(MessageFormat.format(CLIText.get().authorInfo,
 				author.getName(), author.getEmailAddress()));
 
 		final TimeZone authorTZ = author.getTimeZone();
 		fmt.setTimeZone(authorTZ != null ? authorTZ : myTZ);
-		outw.println(MessageFormat.format(CLIText.get().dateInfo,
+		out.println(MessageFormat.format(CLIText.get().dateInfo,
 				fmt.format(author.getWhen())));
 
-		outw.println();
+		out.println();
 		final String[] lines = c.getFullMessage().split("\n");
 		for (final String s : lines) {
-			outw.print("    ");
-			outw.print(s);
-			outw.println();
+			out.print("    ");
+			out.print(s);
+			out.println();
 		}
 
-		outw.println();
+		out.println();
 		if (c.getParentCount() == 1) {
 			rw.parseHeaders(c.getParent(0));
 			showDiff(c);
 		}
-		outw.flush();
+		out.flush();
 	}
 
 	private void showDiff(RevCommit c) throws IOException {
@@ -304,12 +304,12 @@ class Show extends TextBuiltin {
 		final RevTree b = c.getTree();
 
 		if (showNameAndStatusOnly)
-			Diff.nameStatus(outw, diffFmt.scan(a, b));
+			Diff.nameStatus(out, diffFmt.scan(a, b));
 		else {
-			outw.flush();
+			out.flush();
 			diffFmt.format(a, b);
 			diffFmt.flush();
 		}
-		outw.println();
+		out.println();
 	}
 }
