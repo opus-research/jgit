@@ -56,25 +56,23 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.List;
 import java.util.TreeSet;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.MergeResult;
 import org.eclipse.jgit.api.MergeResult.MergeStatus;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.diff.DiffEntry;
-import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEditor;
-import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.junit.RepositoryTestCase;
+import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
 import org.eclipse.jgit.lib.IndexDiff.StageState;
 import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.util.IO;
 import org.junit.Test;
@@ -119,42 +117,6 @@ public class IndexDiffTest extends RepositoryTestCase {
 		assertEquals(0, diff.getModified().size());
 		assertEquals(0, diff.getRemoved().size());
 		assertEquals(Collections.EMPTY_SET, diff.getUntrackedFolders());
-	}
-
-	@Test
-	public void testAdded2() throws IOException {
-		writeTrashFile("f", "");
-		writeTrashFile("d/f", "");
-		DirCache index = db.lockDirCache();
-		DirCacheEditor editor = index.editor();
-		editor.add(add(db, trash, "f"));
-		editor.commit();
-		FileTreeIterator iterator = new FileTreeIterator(db);
-		IndexDiff diff = new IndexDiff(db, (ObjectId) null, iterator);
-		diff.diff();
-		assertEquals(1, diff.getAdded().size());
-		assertTrue(diff.getAdded().contains("f"));
-		assertEquals(0, diff.getChanged().size());
-		assertEquals(0, diff.getModified().size());
-		assertEquals(0, diff.getRemoved().size());
-		assertEquals(1, diff.getUntrackedFolders().size());
-		assertTrue(diff.getUntrackedFolders().contains("d"));
-	}
-
-	@Test
-	public void testAdded3() throws IOException {
-		writeTrashFile("f", "");
-		writeTrashFile("d/f", "");
-		DirCache index = db.lockDirCache();
-		DirCacheEditor editor = index.editor();
-		editor.add(add(db, trash, "f"));
-		editor.commit();
-		DiffFormatter diffFormatter = new DiffFormatter(System.out);
-		diffFormatter.setRepository(db);
-		DirCacheIterator oldTree = new DirCacheIterator(db.readDirCache());
-		FileTreeIterator newTree = new FileTreeIterator(db);
-		List<DiffEntry> scan = diffFormatter.scan(oldTree, newTree);
-		assertEquals(0, scan.size());
 	}
 
 	@Test
@@ -614,6 +576,35 @@ public class IndexDiffTest extends RepositoryTestCase {
 		assertFalse(StageState.BOTH_ADDED.hasBase());
 		assertTrue(StageState.BOTH_ADDED.hasOurs());
 		assertTrue(StageState.BOTH_ADDED.hasTheirs());
+	}
+
+	@Test
+	public void testAutoCRLFInput() throws Exception {
+		Git git = new Git(db);
+		FileBasedConfig config = db.getConfig();
+
+		// Make sure core.autocrlf is false before adding
+		config.setEnum(ConfigConstants.CONFIG_CORE_SECTION, null,
+				ConfigConstants.CONFIG_KEY_AUTOCRLF, AutoCRLF.FALSE);
+		config.save();
+
+		// File is already in repository with CRLF
+		writeTrashFile("crlf.txt", "this\r\ncontains\r\ncrlf\r\n");
+		git.add().addFilepattern("crlf.txt").call();
+		git.commit().setMessage("Add crlf.txt").call();
+
+		// Now set core.autocrlf to input
+		config.setEnum(ConfigConstants.CONFIG_CORE_SECTION, null,
+				ConfigConstants.CONFIG_KEY_AUTOCRLF, AutoCRLF.INPUT);
+		config.save();
+
+		FileTreeIterator iterator = new FileTreeIterator(db);
+		IndexDiff diff = new IndexDiff(db, Constants.HEAD, iterator);
+		diff.diff();
+
+		assertTrue(
+				"Expected no modified files, but there were: "
+						+ diff.getModified(), diff.getModified().isEmpty());
 	}
 
 	private void verifyStageState(StageState expected, int... stages)
