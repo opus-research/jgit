@@ -715,7 +715,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	}
 
 	private static final Comparator<Entry> ENTRY_CMP = new Comparator<Entry>() {
-		@Override
 		public int compare(Entry a, Entry b) {
 			return Paths.compare(
 					a.encodedName, 0, a.encodedNameLen, a.getMode().getBits(),
@@ -1155,7 +1154,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				b.get(encodedName = new byte[encodedNameLen]);
 		}
 
-		@Override
 		public String toString() {
 			return getMode().toString() + " " + getName(); //$NON-NLS-1$
 		}

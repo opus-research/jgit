@@ -76,7 +76,6 @@ public class StashListCommand extends GitCommand<Collection<RevCommit>> {
 		super(repo);
 	}
 
-	@Override
 	public Collection<RevCommit> call() throws GitAPIException,
 			InvalidRefNameException {
 		checkCallable();

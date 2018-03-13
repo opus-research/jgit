@@ -84,14 +84,12 @@ import org.kohsuke.args4j.Option;
 class DiffAlgorithms extends TextBuiltin {
 
 	final Algorithm myers = new Algorithm() {
-		@Override
 		DiffAlgorithm create() {
 			return MyersDiff.INSTANCE;
 		}
 	};
 
 	final Algorithm histogram = new Algorithm() {
-		@Override
 		DiffAlgorithm create() {
 			HistogramDiff d = new HistogramDiff();
 			d.setFallbackAlgorithm(null);
@@ -100,7 +98,6 @@ class DiffAlgorithms extends TextBuiltin {
 	};
 
 	final Algorithm histogram_myers = new Algorithm() {
-		@Override
 		DiffAlgorithm create() {
 			HistogramDiff d = new HistogramDiff();
 			d.setFallbackAlgorithm(MyersDiff.INSTANCE);
@@ -237,7 +234,6 @@ class DiffAlgorithms extends TextBuiltin {
 		}
 
 		Collections.sort(all, new Comparator<Test>() {
-			@Override
 			public int compare(Test a, Test b) {
 				int result = Long.signum(a.runningTimeNanos - b.runningTimeNanos);
 				if (result == 0) {

@@ -134,14 +134,12 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 		dest = w;
 	}
 
-	@Override
 	public void push(final ProgressMonitor monitor,
 			final Map<String, RemoteRefUpdate> refUpdates)
 			throws TransportException {
 		push(monitor, refUpdates, null);
 	}
 
-	@Override
 	public void push(final ProgressMonitor monitor,
 			final Map<String, RemoteRefUpdate> refUpdates, OutputStream out)
 			throws TransportException {

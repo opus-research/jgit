@@ -108,7 +108,6 @@ public class SubmoduleSyncCommand extends GitCommand<Map<String, String>> {
 			return null;
 	}
 
-	@Override
 	public Map<String, String> call() throws GitAPIException {
 		checkCallable();
 

@@ -77,7 +77,6 @@ public class SetAdditionalHeadersTest extends HttpTestCase {
 	private RevCommit A, B;
 
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();

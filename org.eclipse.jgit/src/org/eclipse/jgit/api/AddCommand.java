@@ -134,7 +134,6 @@ public class AddCommand extends GitCommand<DirCache> {
 	 *
 	 * @return the DirCache after Add
 	 */
-	@Override
 	public DirCache call() throws GitAPIException, NoFilepatternException {
 
 		if (filepatterns.isEmpty())
