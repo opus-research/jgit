@@ -48,7 +48,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -179,7 +178,7 @@ public class RebaseTodoFile {
 			switch (tokenCount) {
 			case 0:
 				String actionToken = new String(buf, tokenBegin, nextSpace
-						- tokenBegin - 1, StandardCharsets.UTF_8);
+						- tokenBegin - 1);
 				tokenBegin = nextSpace;
 				action = RebaseTodoLine.Action.parse(actionToken);
 				if (action == null)
@@ -188,7 +187,7 @@ public class RebaseTodoFile {
 			case 1:
 				nextSpace = RawParseUtils.next(buf, tokenBegin, ' ');
 				String commitToken = new String(buf, tokenBegin, nextSpace
-						- tokenBegin - 1, StandardCharsets.UTF_8);
+						- tokenBegin - 1);
 				tokenBegin = nextSpace;
 				commit = AbbreviatedObjectId.fromString(commitToken);
 				break;
