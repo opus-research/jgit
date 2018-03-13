@@ -410,7 +410,7 @@ public abstract class FS {
 	 * @return the one-line output of the command
 	 */
 	protected static String readPipe(File dir, String[] command, String encoding) {
-		readPipe(dir, command, encoding, null);
+		return readPipe(dir, command, encoding, null);
 	}
 
 	/**
