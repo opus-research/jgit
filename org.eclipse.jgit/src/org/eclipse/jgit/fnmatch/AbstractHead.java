@@ -46,8 +46,6 @@ package org.eclipse.jgit.fnmatch;
 
 import java.util.List;
 
-import org.eclipse.jgit.JGitText;
-
 abstract class AbstractHead implements Head {
 	private List<Head> newHeads = null;
 
@@ -66,7 +64,7 @@ abstract class AbstractHead implements Head {
 	 */
 	public final void setNewHeads(List<Head> newHeads) {
 		if (this.newHeads != null)
-			throw new IllegalStateException(JGitText.get().propertyIsAlreadyNonNull);
+			throw new IllegalStateException("Property is already non null");
 		this.newHeads = newHeads;
 	}
 

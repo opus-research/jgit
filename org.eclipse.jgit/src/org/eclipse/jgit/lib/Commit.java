@@ -49,9 +49,7 @@ import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.charset.Charset;
-import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 
@@ -281,18 +279,18 @@ public class Commit implements Treeish {
 				DataInputStream br = new DataInputStream(new ByteArrayInputStream(raw));
 				String n = br.readLine();
 				if (n == null || !n.startsWith("tree ")) {
-					throw new CorruptObjectException(commitId, JGitText.get().corruptObjectNotree);
+					throw new CorruptObjectException(commitId, "no tree");
 				}
 				while ((n = br.readLine()) != null && n.startsWith("parent ")) {
 					// empty body
 				}
 				if (n == null || !n.startsWith("author ")) {
-					throw new CorruptObjectException(commitId, JGitText.get().corruptObjectNoAuthor);
+					throw new CorruptObjectException(commitId, "no author");
 				}
 				String rawAuthor = n.substring("author ".length());
 				n = br.readLine();
 				if (n == null || !n.startsWith("committer ")) {
-					throw new CorruptObjectException(commitId, JGitText.get().corruptObjectNoCommitter);
+					throw new CorruptObjectException(commitId, "no committer");
 				}
 				String rawCommitter = n.substring("committer ".length());
 				n = br.readLine();
@@ -300,8 +298,8 @@ public class Commit implements Treeish {
 					encoding = Charset.forName(n.substring("encoding ".length()));
 				else
 					if (n == null || !n.equals("")) {
-						throw new CorruptObjectException(commitId, MessageFormat.format(
-								JGitText.get().corruptObjectMalformedHeader, n));
+						throw new CorruptObjectException(commitId,
+								"malformed header:"+n);
 				}
 				byte[] readBuf = new byte[br.available()]; // in-memory stream so this is all bytes left
 				br.read(readBuf);
@@ -338,7 +336,7 @@ public class Commit implements Treeish {
 	 */
 	public void commit() throws IOException {
 		if (getCommitId() != null)
-			throw new IllegalStateException(MessageFormat.format(JGitText.get().commitAlreadyExists, getCommitId()));
+			throw new IllegalStateException("exists " + getCommitId());
 		setCommitId(new ObjectWriter(objdb).writeCommit(this));
 	}
 

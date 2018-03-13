@@ -51,8 +51,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.eclipse.jgit.JGitText;
-
 /**
  * Least frequently used cache for objects specified by PackFile positions.
  * <p>
@@ -158,9 +156,9 @@ abstract class OffsetCache<V, R extends OffsetCache.Ref<V>> {
 	 */
 	OffsetCache(final int tSize, final int lockCount) {
 		if (tSize < 1)
-			throw new IllegalArgumentException(JGitText.get().tSizeMustBeGreaterOrEqual1);
+			throw new IllegalArgumentException("tSize must be >= 1");
 		if (lockCount < 1)
-			throw new IllegalArgumentException(JGitText.get().lockCountMustBeGreaterOrEqual1);
+			throw new IllegalArgumentException("lockCount must be >= 1");
 
 		queue = new ReferenceQueue<V>();
 		tableSize = tSize;

@@ -122,7 +122,7 @@ class UploadPackServlet extends HttpServlet {
 			return;
 
 		} catch (IOException e) {
-			getServletContext().log(HttpServerText.get().internalErrorDuringUploadPack, e);
+			getServletContext().log("Internal error during upload-pack", e);
 			rsp.reset();
 			rsp.sendError(SC_INTERNAL_SERVER_ERROR);
 			return;

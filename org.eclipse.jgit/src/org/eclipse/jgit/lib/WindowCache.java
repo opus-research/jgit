@@ -49,8 +49,6 @@ import java.lang.ref.ReferenceQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.eclipse.jgit.JGitText;
-
 /**
  * Caches slices of a {@link PackFile} in memory for faster read access.
  * <p>
@@ -62,9 +60,9 @@ import org.eclipse.jgit.JGitText;
 public class WindowCache extends OffsetCache<ByteWindow, WindowCache.WindowRef> {
 	private static final int bits(int newSize) {
 		if (newSize < 4096)
-			throw new IllegalArgumentException(JGitText.get().invalidWindowSize);
+			throw new IllegalArgumentException("Invalid window size");
 		if (Integer.bitCount(newSize) != 1)
-			throw new IllegalArgumentException(JGitText.get().windowSizeMustBePowerOf2);
+			throw new IllegalArgumentException("Window size must be power of 2");
 		return Integer.numberOfTrailingZeros(newSize);
 	}
 
@@ -173,9 +171,9 @@ public class WindowCache extends OffsetCache<ByteWindow, WindowCache.WindowRef> 
 		openBytes = new AtomicLong();
 
 		if (maxFiles < 1)
-			throw new IllegalArgumentException(JGitText.get().openFilesMustBeAtLeast1);
+			throw new IllegalArgumentException("Open files must be >= 1");
 		if (maxBytes < windowSize)
-			throw new IllegalArgumentException(JGitText.get().windowSizeMustBeLesserThanLimit);
+			throw new IllegalArgumentException("Window size must be < limit");
 	}
 
 	int getOpenFiles() {
@@ -244,9 +242,9 @@ public class WindowCache extends OffsetCache<ByteWindow, WindowCache.WindowRef> 
 		final int wsz = cfg.getPackedGitWindowSize();
 		final long limit = cfg.getPackedGitLimit();
 		if (wsz <= 0)
-			throw new IllegalArgumentException(JGitText.get().invalidWindowSize);
+			throw new IllegalArgumentException("Invalid window size");
 		if (limit < wsz)
-			throw new IllegalArgumentException(JGitText.get().windowSizeMustBeLesserThanLimit);
+			throw new IllegalArgumentException("Window size must be < limit");
 		return (int) Math.min(5 * (limit / wsz) / 2, 2000000000);
 	}
 

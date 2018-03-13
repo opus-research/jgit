@@ -65,7 +65,6 @@ import java.net.MalformedURLException;
 import java.net.Proxy;
 import java.net.ProxySelector;
 import java.net.URL;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
@@ -74,7 +73,6 @@ import java.util.TreeMap;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.PackProtocolException;
@@ -172,7 +170,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			baseUrl = new URL(uriString);
 			objectsUrl = new URL(baseUrl, "objects/");
 		} catch (MalformedURLException e) {
-			throw new NotSupportedException(MessageFormat.format(JGitText.get().invalidURL, uri), e);
+			throw new NotSupportedException("Invalid URL " + uri, e);
 		}
 		http = local.getConfig().get(HTTP_KEY);
 		proxySelector = ProxySelector.getDefault();
@@ -218,7 +216,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		} catch (TransportException err) {
 			throw err;
 		} catch (IOException err) {
-			throw new TransportException(uri, JGitText.get().errorReadingInfoRefs, err);
+			throw new TransportException(uri, "error reading info/refs", err);
 		}
 	}
 
@@ -267,8 +265,8 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				break;
 
 			default:
-				throw new TransportException(uri, MessageFormat.format(
-						JGitText.get().cannotReadHEAD, status, conn.getResponseMessage()));
+				throw new TransportException(uri, "cannot read HEAD: " + status
+						+ " " + conn.getResponseMessage());
 			}
 		}
 
@@ -294,11 +292,11 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 					return new SmartHttpPushConnection(in);
 
 				} else if (!useSmartHttp) {
-					final String msg = JGitText.get().smartHTTPPushDisabled;
+					final String msg = "smart HTTP push disabled";
 					throw new NotSupportedException(msg);
 
 				} else {
-					final String msg = JGitText.get().remoteDoesNotSupportSmartHTTPPush;
+					final String msg = "remote does not support smart HTTP push";
 					throw new NotSupportedException(msg);
 				}
 			} finally {
@@ -309,7 +307,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		} catch (TransportException err) {
 			throw err;
 		} catch (IOException err) {
-			throw new TransportException(uri, JGitText.get().errorReadingInfoRefs, err);
+			throw new TransportException(uri, "error reading info/refs", err);
 		}
 	}
 
@@ -337,7 +335,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 			u = new URL(b.toString());
 		} catch (MalformedURLException e) {
-			throw new NotSupportedException(MessageFormat.format(JGitText.get().invalidURL, uri), e);
+			throw new NotSupportedException("Invalid URL " + uri, e);
 		}
 
 		try {
@@ -354,10 +352,10 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				return conn;
 
 			case HttpURLConnection.HTTP_NOT_FOUND:
-				throw new NoRemoteRepositoryException(uri, MessageFormat.format(JGitText.get().URLNotFound, u));
+				throw new NoRemoteRepositoryException(uri, u + " not found");
 
 			case HttpURLConnection.HTTP_FORBIDDEN:
-				throw new TransportException(uri, MessageFormat.format(JGitText.get().serviceNotPermitted, service));
+				throw new TransportException(uri, service + " not permitted");
 
 			default:
 				String err = status + " " + conn.getResponseMessage();
@@ -368,7 +366,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		} catch (TransportException e) {
 			throw e;
 		} catch (IOException e) {
-			throw new TransportException(uri, MessageFormat.format(JGitText.get().cannotOpen, service), e);
+			throw new TransportException(uri, "cannot open " + service, e);
 		}
 	}
 
@@ -391,7 +389,8 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 	}
 
 	IOException wrongContentType(String expType, String actType) {
-		final String why = MessageFormat.format(JGitText.get().expectedReceivedContentType, expType, actType);
+		final String why = "expected Content-Type " + expType
+				+ "; received Content-Type " + actType;
 		return new TransportException(uri, why);
 	}
 
@@ -411,8 +410,9 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		final byte[] magic = new byte[5];
 		IO.readFully(in, magic, 0, magic.length);
 		if (magic[4] != '#') {
-			throw new TransportException(uri, MessageFormat.format(
-					JGitText.get().expectedPktLineWithService, RawParseUtils.decode(magic)));
+			throw new TransportException(uri, "expected pkt-line with"
+					+ " '# service=', got '" + RawParseUtils.decode(magic)
+					+ "'");
 		}
 
 		final PacketLineIn pckIn = new PacketLineIn(new UnionInputStream(
@@ -420,8 +420,8 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		final String exp = "# service=" + service;
 		final String act = pckIn.readString();
 		if (!exp.equals(act)) {
-			throw new TransportException(uri, MessageFormat.format(
-					JGitText.get().expectedGot, exp, act));
+			throw new TransportException(uri, "expected '" + exp + "', got '"
+					+ act + "'");
 		}
 
 		while (pckIn.readString() != PacketLineIn.END) {
@@ -546,15 +546,16 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 
 		private PackProtocolException outOfOrderAdvertisement(final String n) {
-			return new PackProtocolException(MessageFormat.format(JGitText.get().advertisementOfCameBefore, n, n));
+			return new PackProtocolException("advertisement of " + n
+					+ "^{} came before " + n);
 		}
 
 		private PackProtocolException invalidAdvertisement(final String n) {
-			return new PackProtocolException(MessageFormat.format(JGitText.get().invalidAdvertisementOf, n));
+			return new PackProtocolException("invalid advertisement of " + n);
 		}
 
 		private PackProtocolException duplicateAdvertisement(final String n) {
-			return new PackProtocolException(MessageFormat.format(JGitText.get().duplicateAdvertisementsOf, n));
+			return new PackProtocolException("duplicate advertisements of " + n);
 		}
 
 		@Override
@@ -666,8 +667,9 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				// our request buffer. Send with a Content-Length header.
 				//
 				if (out.length() == 0) {
-					throw new TransportException(uri,
-							JGitText.get().startingReadStageWithoutWrittenRequestDataPendingIsNotSupported);
+					throw new TransportException(uri, "Starting read stage"
+							+ " without written request data pending"
+							+ " is not supported");
 				}
 
 				// Try to compress the content, but only if that is smaller.

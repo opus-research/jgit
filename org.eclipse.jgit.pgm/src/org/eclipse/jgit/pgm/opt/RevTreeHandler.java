@@ -45,7 +45,6 @@
 package org.eclipse.jgit.pgm.opt;
 
 import java.io.IOException;
-import java.text.MessageFormat;
 
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
@@ -56,7 +55,6 @@ import org.kohsuke.args4j.spi.Setter;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.pgm.CLIText;
 import org.eclipse.jgit.revwalk.RevTree;
 
 /**
@@ -92,18 +90,18 @@ public class RevTreeHandler extends OptionHandler<RevTree> {
 			throw new CmdLineException(e.getMessage());
 		}
 		if (id == null)
-			throw new CmdLineException(MessageFormat.format(CLIText.get().notATree, name));
+			throw new CmdLineException(name + " is not a tree");
 
 		final RevTree c;
 		try {
 			c = clp.getRevWalk().parseTree(id);
 		} catch (MissingObjectException e) {
-			throw new CmdLineException(MessageFormat.format(CLIText.get().notATree, name));
+			throw new CmdLineException(name + " is not a tree");
 		} catch (IncorrectObjectTypeException e) {
-			throw new CmdLineException(MessageFormat.format(CLIText.get().notATree, name));
+			throw new CmdLineException(name + " is not a tree");
 		} catch (IOException e) {
-			throw new CmdLineException(MessageFormat.format(CLIText.get().cannotRead, name
-				+ ": " + e.getMessage()));
+			throw new CmdLineException("cannot read " + name + ": "
+					+ e.getMessage());
 		}
 		setter.addValue(c);
 		return 1;
@@ -111,6 +109,6 @@ public class RevTreeHandler extends OptionHandler<RevTree> {
 
 	@Override
 	public String getDefaultMetaVariable() {
-		return CLIText.get().metaVar_treeish;
+		return "tree-ish";
 	}
 }

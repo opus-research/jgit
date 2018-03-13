@@ -48,9 +48,7 @@ import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.ObjectWritingException;
 
@@ -137,18 +135,18 @@ public class Tag {
 						new ByteArrayInputStream(raw)));
 				String n = br.readLine();
 				if (n == null || !n.startsWith("object ")) {
-					throw new CorruptObjectException(tagId, JGitText.get().corruptObjectNoObject);
+					throw new CorruptObjectException(tagId, "no object");
 				}
 				objId = ObjectId.fromString(n.substring(7));
 				n = br.readLine();
 				if (n == null || !n.startsWith("type ")) {
-					throw new CorruptObjectException(tagId, JGitText.get().corruptObjectNoType);
+					throw new CorruptObjectException(tagId, "no type");
 				}
 				type = n.substring("type ".length());
 				n = br.readLine();
 
 				if (n == null || !n.startsWith("tag ")) {
-					throw new CorruptObjectException(tagId, JGitText.get().corruptObjectNoTagName);
+					throw new CorruptObjectException(tagId, "no tag name");
 				}
 				tag = n.substring("tag ".length());
 				n = br.readLine();
@@ -156,13 +154,13 @@ public class Tag {
 				// We should see a "tagger" header here, but some repos have tags
 				// without it.
 				if (n == null)
-					throw new CorruptObjectException(tagId, JGitText.get().corruptObjectNoTaggerHeader);
+					throw new CorruptObjectException(tagId, "no tagger header");
 
 				if (n.length()>0)
 					if (n.startsWith("tagger "))
 						tagger = new PersonIdent(n.substring("tagger ".length()));
 					else
-						throw new CorruptObjectException(tagId, JGitText.get().corruptObjectNoTaggerBadHeader);
+						throw new CorruptObjectException(tagId, "no tagger/bad header");
 
 				// Message should start with an empty line, but
 				StringBuilder tempMessage = new StringBuilder();
@@ -198,7 +196,7 @@ public class Tag {
 	 */
 	public void tag() throws IOException {
 		if (getTagId() != null)
-			throw new IllegalStateException(MessageFormat.format(JGitText.get().illegalStateExists, getTagId()));
+			throw new IllegalStateException("exists " + getTagId());
 		final ObjectId id;
 		final RefUpdate ru;
 
@@ -214,7 +212,7 @@ public class Tag {
 		ru.setNewObjectId(id);
 		ru.setRefLogMessage("tagged " + getTag(), false);
 		if (ru.forceUpdate() == RefUpdate.Result.LOCK_FAILURE)
-			throw new ObjectWritingException(MessageFormat.format(JGitText.get().unableToLockTag, getTag()));
+			throw new ObjectWritingException("Unable to lock tag " + getTag());
 	}
 
 	public String toString() {

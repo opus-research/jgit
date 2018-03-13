@@ -48,9 +48,6 @@ import static org.eclipse.jgit.util.RawParseUtils.match;
 import static org.eclipse.jgit.util.RawParseUtils.nextLF;
 import static org.eclipse.jgit.util.RawParseUtils.parseBase10;
 
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.util.MutableInteger;
 
@@ -126,8 +123,7 @@ public class ObjectChecker {
 			checkBlob(raw);
 			break;
 		default:
-			throw new CorruptObjectException(MessageFormat.format(
-					JGitText.get().corruptObjectInvalidType2, objType));
+			throw new CorruptObjectException("Invalid object type: " + objType);
 		}
 	}
 

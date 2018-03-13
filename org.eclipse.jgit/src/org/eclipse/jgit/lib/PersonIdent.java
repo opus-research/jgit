@@ -45,13 +45,11 @@
 
 package org.eclipse.jgit.lib;
 
-import java.text.MessageFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 import java.util.TimeZone;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.util.SystemReader;
 
 /**
@@ -199,13 +197,13 @@ public class PersonIdent {
 	public PersonIdent(final String in) {
 		final int lt = in.indexOf('<');
 		if (lt == -1) {
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().malformedpersonIdentString, in));
+			throw new IllegalArgumentException("Malformed PersonIdent string"
+					+ " (no < was found): " + in);
 		}
 		final int gt = in.indexOf('>', lt);
 		if (gt == -1) {
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().malformedpersonIdentString, in));
+			throw new IllegalArgumentException("Malformed PersonIdent string"
+					+ " (no > was found): " + in);
 		}
 		final int sp = in.indexOf(' ', gt + 2);
 		if (sp == -1) {
