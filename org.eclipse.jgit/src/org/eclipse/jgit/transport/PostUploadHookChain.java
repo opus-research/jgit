@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2011, GitHub Inc.
- * and other copyright owners as documented in the project's IP log.
+ * Copyright (C) 2015, Google Inc.
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -40,65 +39,52 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.errors;
 
-import java.io.File;
-import java.io.IOException;
-import java.text.MessageFormat;
+package org.eclipse.jgit.transport;
 
-import org.eclipse.jgit.internal.JGitText;
+import java.util.List;
+
+import org.eclipse.jgit.storage.pack.PackStatistics;
 
 /**
- * An exception occurring when a file cannot be locked
+ * {@link PostUploadHook} that delegates to a list of other hooks.
+ * <p>
+ * Hooks are run in the order passed to the constructor.
+ *
+ * @since 4.1
  */
-public class LockFailedException extends IOException {
-	private static final long serialVersionUID = 1L;
-
-	private File file;
+public class PostUploadHookChain implements PostUploadHook {
+	private final PostUploadHook[] hooks;
+	private final int count;
 
 	/**
-	 * @param file
-	 *            file that could not be locked
-	 * @param message
-	 *            exception message
-	 * @param cause
-	 *            cause, for later retrieval by {@link Throwable#getCause()}
-	 * @since 4.1
+	 * Create a new hook chaining the given hooks together.
+	 *
+	 * @param hooks
+	 *            hooks to execute, in order.
+	 * @return a new chain of the given hooks.
 	 */
-	public LockFailedException(File file, String message, Throwable cause) {
-		super(message, cause);
-		this.file = file;
+	public static PostUploadHook newChain(List<? extends PostUploadHook> hooks) {
+		PostUploadHook[] newHooks = new PostUploadHook[hooks.size()];
+		int i = 0;
+		for (PostUploadHook hook : hooks)
+			if (hook != PostUploadHook.NULL)
+				newHooks[i++] = hook;
+		if (i == 0)
+			return PostUploadHook.NULL;
+		else if (i == 1)
+			return newHooks[0];
+		else
+			return new PostUploadHookChain(newHooks, i);
 	}
 
-	/**
-	 * Construct a CannotLockException for the given file and message
-	 *
-	 * @param file
-	 *            file that could not be locked
-	 * @param message
-	 *            exception message
-	 */
-	public LockFailedException(File file, String message) {
-		super(message);
-		this.file = file;
+	public void onPostUpload(PackStatistics stats) {
+		for (int i = 0; i < count; i++)
+			hooks[i].onPostUpload(stats);
 	}
 
-	/**
-	 * Construct a CannotLockException for the given file
-	 *
-	 * @param file
-	 *            file that could not be locked
-	 */
-	public LockFailedException(File file) {
-		this(file, MessageFormat.format(JGitText.get().cannotLock, file));
-	}
-
-	/**
-	 * Get the file that could not be locked
-	 *
-	 * @return file
-	 */
-	public File getFile() {
-		return file;
+	private PostUploadHookChain(PostUploadHook[] hooks, int count) {
+		this.hooks = hooks;
+		this.count = count;
 	}
 }

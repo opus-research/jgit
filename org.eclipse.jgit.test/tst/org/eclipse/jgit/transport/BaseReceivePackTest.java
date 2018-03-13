@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
- * and other copyright owners as documented in the project's IP log.
+ * Copyright (C) 2015, Google Inc.
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -14,17 +13,17 @@
  * conditions are met:
  *
  * - Redistributions of source code must retain the above copyright
- *   notice, this list of conditions and the following disclaimer.
+ *	 notice, this list of conditions and the following disclaimer.
  *
  * - Redistributions in binary form must reproduce the above
- *   copyright notice, this list of conditions and the following
- *   disclaimer in the documentation and/or other materials provided
- *   with the distribution.
+ *	 copyright notice, this list of conditions and the following
+ *	 disclaimer in the documentation and/or other materials provided
+ *	 with the distribution.
  *
  * - Neither the name of the Eclipse Foundation, Inc. nor the
- *   names of its contributors may be used to endorse or promote
- *   products derived from this software without specific prior
- *   written permission.
+ *	 names of its contributors may be used to endorse or promote
+ *	 products derived from this software without specific prior
+ *	 written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
  * CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
@@ -41,39 +40,31 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.transport.resolver;
+package org.eclipse.jgit.transport;
 
-import org.eclipse.jgit.internal.JGitText;
+import static org.junit.Assert.assertEquals;
 
-/**
- * Indicates that the requested service requires authentication that
- * the current user has not provided.
- * <p>
- * This corresponds to response code
- * {@code HttpServletResponse.SC_UNAUTHORIZED}.
- */
-public class ServiceNotAuthorizedException extends Exception {
-	private static final long serialVersionUID = 1L;
+import org.eclipse.jgit.lib.ObjectId;
+import org.junit.Test;
 
-	/**
-	 * @param message
-	 * @param cause
-	 * @since 4.1
-	 */
-	public ServiceNotAuthorizedException(String message, Throwable cause) {
-		super(message, cause);
+/** Tests for base receive-pack utilities. */
+public class BaseReceivePackTest {
+	@Test
+	public void chomp() {
+		assertEquals("foo", BaseReceivePack.chomp("foo"));
+		assertEquals("foo", BaseReceivePack.chomp("foo\n"));
+		assertEquals("foo\n", BaseReceivePack.chomp("foo\n\n"));
 	}
 
-	/**
-	 * @param message
-	 * @since 4.1
-	 */
-	public ServiceNotAuthorizedException(String message) {
-		super(message);
-	}
-
-	/** Indicates that the requested service requires authentication. */
-	public ServiceNotAuthorizedException() {
-		super(JGitText.get().unauthorized);
+	@Test
+	public void parseCommand() {
+		String input = "0000000000000000000000000000000000000000"
+				+ " deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+				+ " refs/heads/master";
+		ReceiveCommand cmd = BaseReceivePack.parseCommand(input);
+		assertEquals(ObjectId.zeroId(), cmd.getOldId());
+		assertEquals("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+				cmd.getNewId().name());
+		assertEquals("refs/heads/master", cmd.getRefName());
 	}
 }

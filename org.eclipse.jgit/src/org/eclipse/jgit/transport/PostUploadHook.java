@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2011, GitHub Inc.
- * and other copyright owners as documented in the project's IP log.
+ * Copyright (C) 2015, Google Inc.
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -40,65 +39,36 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.errors;
 
-import java.io.File;
-import java.io.IOException;
-import java.text.MessageFormat;
+package org.eclipse.jgit.transport;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.internal.storage.pack.PackWriter;
+import org.eclipse.jgit.storage.pack.PackStatistics;
 
 /**
- * An exception occurring when a file cannot be locked
+ * Hook invoked by {@link UploadPack} after the pack has been uploaded.
+ * <p>
+ * Implementors of the interface are responsible for associating the current
+ * thread to a particular connection, if they need to also include connection
+ * information. One method is to use a {@link java.lang.ThreadLocal} to remember
+ * the connection information before invoking UploadPack.
+ *
+ * @since 4.1
  */
-public class LockFailedException extends IOException {
-	private static final long serialVersionUID = 1L;
-
-	private File file;
-
-	/**
-	 * @param file
-	 *            file that could not be locked
-	 * @param message
-	 *            exception message
-	 * @param cause
-	 *            cause, for later retrieval by {@link Throwable#getCause()}
-	 * @since 4.1
-	 */
-	public LockFailedException(File file, String message, Throwable cause) {
-		super(message, cause);
-		this.file = file;
-	}
+public interface PostUploadHook {
+	/** A simple no-op hook. */
+	public static final PostUploadHook NULL = new PostUploadHook() {
+		public void onPostUpload(PackStatistics stats) {
+			// Do nothing.
+		}
+	};
 
 	/**
-	 * Construct a CannotLockException for the given file and message
+	 * Notifies the hook that a pack has been sent.
 	 *
-	 * @param file
-	 *            file that could not be locked
-	 * @param message
-	 *            exception message
+	 * @param stats
+	 *            the statistics gathered by {@link PackWriter} for the uploaded
+	 *            pack
 	 */
-	public LockFailedException(File file, String message) {
-		super(message);
-		this.file = file;
-	}
-
-	/**
-	 * Construct a CannotLockException for the given file
-	 *
-	 * @param file
-	 *            file that could not be locked
-	 */
-	public LockFailedException(File file) {
-		this(file, MessageFormat.format(JGitText.get().cannotLock, file));
-	}
-
-	/**
-	 * Get the file that could not be locked
-	 *
-	 * @return file
-	 */
-	public File getFile() {
-		return file;
-	}
+	public void onPostUpload(PackStatistics stats);
 }
