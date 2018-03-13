@@ -76,7 +76,6 @@ import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig.HideDotFiles;
 import org.eclipse.jgit.lib.CoreConfig.SymLinks;
-import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
@@ -631,8 +630,7 @@ public class FileRepository extends Repository {
 		gc.setPackConfig(new PackConfig(this));
 		gc.setProgressMonitor(monitor);
 		gc.setAuto(true);
-		gc.setBackground(
-				monitor instanceof NullProgressMonitor && shouldAutoDetach());
+		gc.setBackground(shouldAutoDetach());
 		try {
 			gc.gc();
 		} catch (ParseException | IOException e) {

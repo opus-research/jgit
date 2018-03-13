@@ -73,7 +73,7 @@ class GcLog {
 
 	private Instant gcLogExpire;
 
-	private static final String LOG_EXPIRY_DEFAULT = "1.day"; //$NON-NLS-1$
+	private static final String LOG_EXPIRY_DEFAULT = "1.day.ago"; //$NON-NLS-1$
 
 	private boolean nonEmpty = false;
 
@@ -106,7 +106,7 @@ class GcLog {
 	private boolean autoGcBlockedByOldLockFile(boolean background) {
 		try {
 			FileTime lastModified = Files.getLastModifiedTime(logFile.toPath());
-			if (lastModified.toInstant().compareTo(getLogExpiry()) < 0) {
+			if (lastModified.toInstant().compareTo(getLogExpiry()) > 0) {
 				// There is an existing log file, which is too recent to ignore
 				if (!background) {
 					try (BufferedReader reader = Files
@@ -134,7 +134,7 @@ class GcLog {
 	 *
 	 * @param background
 	 *            If true, and if gc.log already exists, unlock and return false
-	 * @return true if we hold the lock
+	 * @return {@code true} if we hold the lock
 	 */
 	boolean lock(boolean background) {
 		try {
@@ -156,13 +156,6 @@ class GcLog {
 	 */
 	void unlock() {
 		lock.unlock();
-	}
-
-	/**
-	 * Delete any existing gc.log file
-	 */
-	void cleanUp() {
-		logFile.delete();
 	}
 
 	/**
