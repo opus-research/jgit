@@ -51,7 +51,6 @@ import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_REPORT_
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_SIDE_BAND_64K;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_AGENT;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_DATA;
-import static org.eclipse.jgit.transport.SideBandOutputStream.CH_ERROR;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_PROGRESS;
 import static org.eclipse.jgit.transport.SideBandOutputStream.MAX_BUF;
 
@@ -216,7 +215,6 @@ public abstract class BaseReceivePack {
 
 	/** Optional message output stream. */
 	protected OutputStream msgOut;
-	private SideBandOutputStream errOut;
 
 	/** Packet line input stream around {@link #rawIn}. */
 	protected PacketLineIn pckIn;
@@ -881,19 +879,6 @@ public abstract class BaseReceivePack {
 		}
 	}
 
-	private void fatalError(String msg) {
-		if (errOut != null) {
-			try {
-				errOut.write(Constants.encode(msg));
-				errOut.flush();
-			} catch (IOException e) {
-				// do not fail
-			}
-		} else {
-			sendError(msg);
-		}
-	}
-
 	/**
 	 * Send a message to the client, if it supports receiving them.
 	 * <p>
@@ -1092,7 +1077,7 @@ public abstract class BaseReceivePack {
 	 */
 	protected void recvCommands() throws IOException {
 		PushCertificateParser certParser = getPushCertificateParser();
-		boolean readCapabilities = true;
+		boolean firstPkt = true;
 		try {
 			for (;;) {
 				String line;
@@ -1112,12 +1097,12 @@ public abstract class BaseReceivePack {
 					continue;
 				}
 
-				if (readCapabilities) {
+				if (firstPkt) {
+					firstPkt = false;
 					FirstLine firstLine = new FirstLine(line);
 					enabledCapabilities = firstLine.getCapabilities();
-					readCapabilities = false;
-					enableCapabilities();
 					line = firstLine.getLine();
+					enableCapabilities();
 
 					if (line.equals(GitProtocolConstants.OPTION_PUSH_CERT)) {
 						certParser.receiveHeader(pckIn, !isBiDirectionalPipe());
@@ -1142,28 +1127,20 @@ public abstract class BaseReceivePack {
 				}
 			}
 			pushCert = certParser.build();
-		} catch (PackProtocolException e) {
-			pckIn.discardUntilEnd();
-			fatalError(e.getMessage());
+		} catch (PackProtocolException | InvalidObjectIdException e) {
+			sendError(e.getMessage());
 			throw e;
 		}
 	}
 
 	static ReceiveCommand parseCommand(String line) throws PackProtocolException {
-          if (line == null || line.length() < 83) {
+		if (line == null || line.length() < 83) {
 			throw new PackProtocolException(
 					JGitText.get().errorInvalidProtocolWantedOldNewRef);
 		}
-		String oldStr = line.substring(0, 40);
-		String newStr = line.substring(41, 81);
-		ObjectId oldId, newId;
-		try {
-			oldId = ObjectId.fromString(oldStr);
-			newId = ObjectId.fromString(newStr);
-		} catch (InvalidObjectIdException e) {
-			throw new PackProtocolException(
-					JGitText.get().errorInvalidProtocolWantedOldNewRef, e);
-		}
+
+		ObjectId oldId = ObjectId.fromString(line.substring(0, 40));
+		ObjectId newId = ObjectId.fromString(line.substring(41, 81));
 		String name = line.substring(82);
 		if (!Repository.isValidRefName(name)) {
 			throw new PackProtocolException(
@@ -1181,7 +1158,6 @@ public abstract class BaseReceivePack {
 
 			rawOut = new SideBandOutputStream(CH_DATA, MAX_BUF, out);
 			msgOut = new SideBandOutputStream(CH_PROGRESS, MAX_BUF, out);
-			errOut = new SideBandOutputStream(CH_ERROR, MAX_BUF, out);
 
 			pckOut = new PacketLineOut(rawOut);
 			pckOut.setFlushOnEnd(false);
