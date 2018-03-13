@@ -86,7 +86,6 @@ public class ConfigTest {
 		final Config c = parse("[foo]\nbar\n");
 		assertTrue(c.getBoolean("foo", null, "bar", false));
 		assertEquals("", c.getString("foo", null, "bar"));
-		assertEquals("", c.get("foo", null, "bar"));
 	}
 
 	@Test
@@ -103,8 +102,8 @@ public class ConfigTest {
 	@Test
 	public void test003_PutRemote() {
 		final Config c = new Config();
-		c.set("sec", "ext", "name", "value");
-		c.set("sec", "ext", "name2", "value2");
+		c.setString("sec", "ext", "name", "value");
+		c.setString("sec", "ext", "name2", "value2");
 		final String expText = "[sec \"ext\"]\n\tname = value\n\tname2 = value2\n";
 		assertEquals(expText, c.toText());
 	}
@@ -112,7 +111,7 @@ public class ConfigTest {
 	@Test
 	public void test004_PutGetSimple() {
 		Config c = new Config();
-		c.set("my", null, "somename", "false");
+		c.setString("my", null, "somename", "false");
 		assertEquals("false", c.getString("my", null, "somename"));
 		assertEquals("[my]\n\tsomename = false\n", c.toText());
 	}
@@ -189,8 +188,8 @@ public class ConfigTest {
 		// first clear environment variables since they would override
 		// configuration files
 		mockSystemReader.clearProperties();
-		userGitConfig.set("user", null, "name", "global username");
-		userGitConfig.set("user", null, "email", "author@globalemail");
+		userGitConfig.setString("user", null, "name", "global username");
+		userGitConfig.setString("user", null, "email", "author@globalemail");
 		authorName = localConfig.get(UserConfig.KEY).getAuthorName();
 		authorEmail = localConfig.get(UserConfig.KEY).getAuthorEmail();
 		assertEquals("global username", authorName);
@@ -199,8 +198,8 @@ public class ConfigTest {
 		assertFalse(localConfig.get(UserConfig.KEY).isAuthorEmailImplicit());
 
 		// the values are defined in the local configuration
-		localConfig.set("user", null, "name", "local username");
-		localConfig.set("user", null, "email", "author@localemail");
+		localConfig.setString("user", null, "name", "local username");
+		localConfig.setString("user", null, "email", "author@localemail");
 		authorName = localConfig.get(UserConfig.KEY).getAuthorName();
 		authorEmail = localConfig.get(UserConfig.KEY).getAuthorEmail();
 		assertEquals("local username", authorName);
@@ -220,8 +219,8 @@ public class ConfigTest {
 				"git author name");
 		mockSystemReader.setProperty(Constants.GIT_AUTHOR_EMAIL_KEY,
 				"author@email");
-		localConfig.set("user", null, "name", "local username");
-		localConfig.set("user", null, "email", "author@localemail");
+		localConfig.setString("user", null, "name", "local username");
+		localConfig.setString("user", null, "email", "author@localemail");
 		authorName = localConfig.get(UserConfig.KEY).getAuthorName();
 		authorEmail = localConfig.get(UserConfig.KEY).getAuthorEmail();
 		assertEquals("git author name", authorName);
@@ -236,8 +235,8 @@ public class ConfigTest {
 		final Config localConfig = new Config(mockSystemReader.openUserConfig(
 				null, FS.DETECTED));
 
-		localConfig.set("user", null, "name", "foo<bar");
-		localConfig.set("user", null, "email", "baz>\nqux@example.com");
+		localConfig.setString("user", null, "name", "foo<bar");
+		localConfig.setString("user", null, "email", "baz>\nqux@example.com");
 
 		UserConfig userConfig = localConfig.get(UserConfig.KEY);
 		assertEquals("foobar", userConfig.getAuthorName());
@@ -652,19 +651,19 @@ public class ConfigTest {
 		String result;
 
 		Config config = new Config();
-		config.set("testsection", "testsubsection", "testname",
+		config.setString("testsection", "testsubsection", "testname",
 				"testvalue");
 
 		result = MessageFormat.format(resultPattern, "testsubsection");
 		assertEquals(result, config.toText());
 		config.clear();
 
-		config.set("testsection", "#quotable", "testname", "testvalue");
+		config.setString("testsection", "#quotable", "testname", "testvalue");
 		result = MessageFormat.format(resultPattern, "#quotable");
 		assertEquals(result, config.toText());
 		config.clear();
 
-		config.set("testsection", "with\"quote", "testname", "testvalue");
+		config.setString("testsection", "with\"quote", "testname", "testvalue");
 		result = MessageFormat.format(resultPattern, "with\\\"quote");
 		assertEquals(result, config.toText());
 	}
@@ -681,8 +680,8 @@ public class ConfigTest {
 	@Test
 	public void testExplicitlySetEmptyString() throws Exception {
 		Config c = new Config();
-		c.set("a", null, "x", "0");
-		c.set("a", null, "y", "");
+		c.setString("a", null, "x", "0");
+		c.setString("a", null, "y", "");
 
 		assertEquals("0", c.getString("a", null, "x"));
 		assertEquals(0, c.getInt("a", null, "x", 1));
@@ -696,7 +695,6 @@ public class ConfigTest {
 		}
 
 		assertNull(c.getString("a", null, "z"));
-		assertNull(c.get("a", null, "z"));
 		assertArrayEquals(new String[]{}, c.getStringList("a", null, "z"));
 	}
 
@@ -711,7 +709,6 @@ public class ConfigTest {
 
 		assertNull(c.getString("a", null, "y"));
 		assertArrayEquals(new String[]{null}, c.getStringList("a", null, "y"));
-		assertEquals("", c.get("a", null, "y"));
 		try {
 			c.getInt("a", null, "y", 1);
 		} catch (IllegalArgumentException e) {
@@ -719,7 +716,6 @@ public class ConfigTest {
 		}
 
 		assertNull(c.getString("a", null, "z"));
-		assertNull(c.get("a", null, "z"));
 		assertArrayEquals(new String[]{}, c.getStringList("a", null, "z"));
 	}
 
@@ -737,12 +733,10 @@ public class ConfigTest {
 		assertNull(c.getString("a", null, "x"));
 		assertArrayEquals(new String[]{null},
 				c.getStringList("a", null, "x"));
-		assertEquals("", c.get("a", null, "x"));
 		c = parse(text + "\n");
 		assertNull(c.getString("a", null, "x"));
 		assertArrayEquals(new String[]{null},
 				c.getStringList("a", null, "x"));
-		assertEquals("", c.get("a", null, "x"));
 	}
 
 	private static void assertReadLong(long exp) throws ConfigInvalidException {
