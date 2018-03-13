@@ -58,11 +58,11 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CompoundException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.TransportException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -638,8 +638,10 @@ class WalkFetchConnection extends BaseFetchConnection {
 
 		ObjectId act = inserter.insert(type, raw);
 		if (!AnyObjectId.equals(id, act)) {
-			throw new TransportException(MessageFormat.format(JGitText.get().incorrectHashFor
-					, id.name(), act.name(), Constants.typeString(type), compressed.length));
+			throw new TransportException(MessageFormat.format(
+					JGitText.get().incorrectHashFor, id.name(), act.name(),
+					Constants.typeString(type),
+					Integer.valueOf(compressed.length)));
 		}
 		inserter.flush();
 	}
@@ -856,17 +858,16 @@ class WalkFetchConnection extends BaseFetchConnection {
 		}
 
 		void downloadPack(final ProgressMonitor monitor) throws IOException {
-			final WalkRemoteObjectDatabase.FileStream s;
-			final IndexPack ip;
-
-			s = connection.open("pack/" + packName);
-			ip = IndexPack.create(local, s.in);
-			ip.setFixThin(false);
-			ip.setObjectChecker(objCheck);
-			ip.index(monitor);
-			final PackLock keep = ip.renameAndOpenPack(lockMessage);
-			if (keep != null)
-				packLocks.add(keep);
+			String name = "pack/" + packName;
+			WalkRemoteObjectDatabase.FileStream s = connection.open(name);
+			PackParser parser = inserter.newPackParser(s.in);
+			parser.setAllowThin(false);
+			parser.setObjectChecker(objCheck);
+			parser.setLockMessage(lockMessage);
+			PackLock lock = parser.parse(monitor);
+			if (lock != null)
+				packLocks.add(lock);
+			inserter.flush();
 		}
 	}
 }

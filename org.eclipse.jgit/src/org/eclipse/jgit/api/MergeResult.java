@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010, Stefan Lay <stefan.lay@sap.com>
- * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2010-2012, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -47,12 +47,13 @@ import java.text.MessageFormat;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.merge.MergeChunk;
 import org.eclipse.jgit.merge.MergeChunk.ConflictState;
 import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.merge.ResolveMerger;
+import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
 
 /**
  * Encapsulates the result of a {@link MergeCommand}.
@@ -69,37 +70,105 @@ public class MergeResult {
 			public String toString() {
 				return "Fast-forward";
 			}
+
+			@Override
+			public boolean isSuccessful() {
+				return true;
+			}
+		},
+		/**
+		 * @since 2.0
+		 */
+		FAST_FORWARD_SQUASHED {
+			@Override
+			public String toString() {
+				return "Fast-forward-squashed";
+			}
+
+			@Override
+			public boolean isSuccessful() {
+				return true;
+			}
 		},
 		/** */
 		ALREADY_UP_TO_DATE {
+			@Override
 			public String toString() {
 				return "Already-up-to-date";
+			}
+
+			@Override
+			public boolean isSuccessful() {
+				return true;
 			}
 		},
 		/** */
 		FAILED {
+			@Override
 			public String toString() {
 				return "Failed";
+			}
+
+			@Override
+			public boolean isSuccessful() {
+				return false;
 			}
 		},
 		/** */
 		MERGED {
+			@Override
 			public String toString() {
 				return "Merged";
+			}
+
+			@Override
+			public boolean isSuccessful() {
+				return true;
+			}
+		},
+		/**
+		 * @since 2.0
+		 */
+		MERGED_SQUASHED {
+			@Override
+			public String toString() {
+				return "Merged-squashed";
+			}
+
+			@Override
+			public boolean isSuccessful() {
+				return true;
 			}
 		},
 		/** */
 		CONFLICTING {
+			@Override
 			public String toString() {
 				return "Conflicting";
+			}
+
+			@Override
+			public boolean isSuccessful() {
+				return false;
 			}
 		},
 		/** */
 		NOT_SUPPORTED {
+			@Override
 			public String toString() {
 				return "Not-yet-supported";
 			}
-		}
+
+			@Override
+			public boolean isSuccessful() {
+				return false;
+			}
+		};
+
+		/**
+		 * @return whether the status indicates a successful result
+		 */
+		public abstract boolean isSuccessful();
 	}
 
 	private ObjectId[] mergedCommits;
@@ -116,6 +185,8 @@ public class MergeResult {
 
 	private MergeStrategy mergeStrategy;
 
+	private Map<String, MergeFailureReason> failingPaths;
+
 	/**
 	 * @param newHead
 	 *            the object the head points at after the merge
@@ -130,13 +201,16 @@ public class MergeResult {
 	 * @param mergeStrategy
 	 *            the used {@link MergeStrategy}
 	 * @param lowLevelResults
-	 *            merge results as returned by {@link ResolveMerger#getMergeResults()}
+	 *            merge results as returned by
+	 *            {@link ResolveMerger#getMergeResults()}
+	 * @since 2.0
 	 */
 	public MergeResult(ObjectId newHead, ObjectId base,
 			ObjectId[] mergedCommits, MergeStatus mergeStatus,
-			Map<String, org.eclipse.jgit.merge.MergeResult<?>> lowLevelResults,
-			MergeStrategy mergeStrategy) {
-		this(newHead, base, mergedCommits, mergeStatus, mergeStrategy, lowLevelResults, null);
+			MergeStrategy mergeStrategy,
+			Map<String, org.eclipse.jgit.merge.MergeResult<?>> lowLevelResults) {
+		this(newHead, base, mergedCommits, mergeStatus, mergeStrategy,
+				lowLevelResults, null);
 	}
 
 	/**
@@ -162,12 +236,44 @@ public class MergeResult {
 			MergeStrategy mergeStrategy,
 			Map<String, org.eclipse.jgit.merge.MergeResult<?>> lowLevelResults,
 			String description) {
+		this(newHead, base, mergedCommits, mergeStatus, mergeStrategy,
+				lowLevelResults, null, description);
+	}
+
+	/**
+	 * @param newHead
+	 *            the object the head points at after the merge
+	 * @param base
+	 *            the common base which was used to produce a content-merge. May
+	 *            be <code>null</code> if the merge-result was produced without
+	 *            computing a common base
+	 * @param mergedCommits
+	 *            all the commits which have been merged together
+	 * @param mergeStatus
+	 *            the status the merge resulted in
+	 * @param mergeStrategy
+	 *            the used {@link MergeStrategy}
+	 * @param lowLevelResults
+	 *            merge results as returned by
+	 *            {@link ResolveMerger#getMergeResults()}
+	 * @param failingPaths
+	 *            list of paths causing this merge to fail as returned by
+	 *            {@link ResolveMerger#getFailingPaths()}
+	 * @param description
+	 *            a user friendly description of the merge result
+	 */
+	public MergeResult(ObjectId newHead, ObjectId base,
+			ObjectId[] mergedCommits, MergeStatus mergeStatus,
+			MergeStrategy mergeStrategy,
+			Map<String, org.eclipse.jgit.merge.MergeResult<?>> lowLevelResults,
+			Map<String, MergeFailureReason> failingPaths, String description) {
 		this.newHead = newHead;
 		this.mergedCommits = mergedCommits;
 		this.base = base;
 		this.mergeStatus = mergeStatus;
 		this.mergeStrategy = mergeStrategy;
 		this.description = description;
+		this.failingPaths = failingPaths;
 		if (lowLevelResults != null)
 			for (Map.Entry<String, org.eclipse.jgit.merge.MergeResult<?>> result : lowLevelResults
 					.entrySet())
@@ -245,6 +351,8 @@ public class MergeResult {
 	 * @param lowLevelResult
 	 */
 	public void addConflict(String path, org.eclipse.jgit.merge.MergeResult<?> lowLevelResult) {
+		if (!lowLevelResult.containsConflicts())
+			return;
 		if (conflicts == null)
 			conflicts = new HashMap<String, int[][]>();
 		int nrOfConflicts = 0;
@@ -311,9 +419,20 @@ public class MergeResult {
 	 * 	}
 	 * }</pre>
 	 *
-	 * @return the conflicts or <code>null</code> if no conflict occured
+	 * @return the conflicts or <code>null</code> if no conflict occurred
 	 */
 	public Map<String, int[][]> getConflicts() {
 		return conflicts;
+	}
+
+	/**
+	 * Returns a list of paths causing this merge to fail as returned by
+	 * {@link ResolveMerger#getFailingPaths()}
+	 *
+	 * @return the list of paths causing this merge to fail or <code>null</code>
+	 *         if no failure occurred
+	 */
+	public Map<String, MergeFailureReason> getFailingPaths() {
+		return failingPaths;
 	}
 }

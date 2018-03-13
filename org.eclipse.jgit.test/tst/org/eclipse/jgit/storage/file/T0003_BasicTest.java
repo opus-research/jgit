@@ -59,10 +59,10 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
@@ -81,6 +81,7 @@ import org.eclipse.jgit.lib.TreeFormatter;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.util.FileUtils;
 import org.junit.Test;
 
 public class T0003_BasicTest extends SampleDataRepositoryTestCase {
@@ -88,6 +89,7 @@ public class T0003_BasicTest extends SampleDataRepositoryTestCase {
 	@Test
 	public void test001_Initalize() {
 		final File gitdir = new File(trash, Constants.DOT_GIT);
+		final File hooks = new File(gitdir, "hooks");
 		final File objects = new File(gitdir, "objects");
 		final File objects_pack = new File(objects, "pack");
 		final File objects_info = new File(objects, "info");
@@ -97,6 +99,7 @@ public class T0003_BasicTest extends SampleDataRepositoryTestCase {
 		final File HEAD = new File(gitdir, "HEAD");
 
 		assertTrue("Exists " + trash, trash.isDirectory());
+		assertTrue("Exists " + hooks, hooks.isDirectory());
 		assertTrue("Exists " + objects, objects.isDirectory());
 		assertTrue("Exists " + objects_pack, objects_pack.isDirectory());
 		assertTrue("Exists " + objects_info, objects_info.isDirectory());
@@ -202,7 +205,7 @@ public class T0003_BasicTest extends SampleDataRepositoryTestCase {
 			throws IOException {
 		File repo1Parent = new File(trash.getParentFile(), "r1");
 		File workdir = new File(trash.getParentFile(), "rw");
-		workdir.mkdir();
+		FileUtils.mkdir(workdir);
 		FileRepository repo1initial = new FileRepository(new File(repo1Parent,
 				Constants.DOT_GIT));
 		repo1initial.create();
@@ -231,7 +234,7 @@ public class T0003_BasicTest extends SampleDataRepositoryTestCase {
 			throws IOException {
 		File repo1Parent = new File(trash.getParentFile(), "r1");
 		File workdir = new File(trash.getParentFile(), "rw");
-		workdir.mkdir();
+		FileUtils.mkdir(workdir);
 		FileRepository repo1initial = new FileRepository(new File(repo1Parent,
 				Constants.DOT_GIT));
 		repo1initial.create();
@@ -323,7 +326,7 @@ public class T0003_BasicTest extends SampleDataRepositoryTestCase {
 	@Test
 	public void test006_ReadUglyConfig() throws IOException,
 			ConfigInvalidException {
-		final File cfg = new File(db.getDirectory(), "config");
+		final File cfg = new File(db.getDirectory(), Constants.CONFIG);
 		final FileBasedConfig c = new FileBasedConfig(cfg, db.getFS());
 		final String configStr = "  [core];comment\n\tfilemode = yes\n"
 				+ "[user]\n"
@@ -358,7 +361,7 @@ public class T0003_BasicTest extends SampleDataRepositoryTestCase {
 
 	@Test
 	public void test008_FailOnWrongVersion() throws IOException {
-		final File cfg = new File(db.getDirectory(), "config");
+		final File cfg = new File(db.getDirectory(), Constants.CONFIG);
 		final String badvers = "ihopethisisneveraversion";
 		final String configStr = "[core]\n" + "\trepositoryFormatVersion="
 				+ badvers + "\n";
@@ -367,9 +370,8 @@ public class T0003_BasicTest extends SampleDataRepositoryTestCase {
 		try {
 			new FileRepository(db.getDirectory());
 			fail("incorrectly opened a bad repository");
-		} catch (IOException ioe) {
-			assertTrue(ioe.getMessage().indexOf("format") > 0);
-			assertTrue(ioe.getMessage().indexOf(badvers) > 0);
+		} catch (IllegalArgumentException ioe) {
+			assertNotNull(ioe.getMessage());
 		}
 	}
 

@@ -62,7 +62,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.dircache.DirCacheIterator;
@@ -70,6 +69,7 @@ import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ConfigConstants;
@@ -275,6 +275,16 @@ public class DiffFormatter {
 	}
 
 	/**
+	 * Get the prefix applied in front of old file paths.
+	 *
+	 * @return the prefix
+	 * @since 2.0
+	 */
+	public String getOldPrefix() {
+		return this.oldPrefix;
+	}
+
+	/**
 	 * Set the prefix applied in front of new file paths.
 	 *
 	 * @param prefix
@@ -285,6 +295,16 @@ public class DiffFormatter {
 	 */
 	public void setNewPrefix(String prefix) {
 		newPrefix = prefix;
+	}
+
+	/**
+	 * Get the prefix applied in front of new file paths.
+	 * 
+	 * @return the prefix
+	 * @since 2.0
+	 */
+	public String getNewPrefix() {
+		return this.newPrefix;
 	}
 
 	/** @return true if rename detection is enabled. */
@@ -581,7 +601,9 @@ public class DiffFormatter {
 	}
 
 	/**
-	 * Format a patch script from a list of difference entries.
+	 * Format a patch script from a list of difference entries. Requires
+	 * {@link #scan(AbstractTreeIterator, AbstractTreeIterator)} to have been
+	 * called first.
 	 *
 	 * @param entries
 	 *            entries describing the affected files.
@@ -941,7 +963,7 @@ public class DiffFormatter {
 		if (entry.getMode(side).getObjectType() != Constants.OBJ_BLOB)
 			return EMPTY;
 
-		if (isBinary(entry.getPath(side)))
+		if (isBinary())
 			return BINARY;
 
 		AbbreviatedObjectId id = entry.getId(side);
@@ -982,7 +1004,7 @@ public class DiffFormatter {
 		}
 	}
 
-	private boolean isBinary(String path) {
+	private boolean isBinary() {
 		return false;
 	}
 
@@ -1061,20 +1083,36 @@ public class DiffFormatter {
 		}
 
 		if (!ent.getOldId().equals(ent.getNewId())) {
-			o.write(encodeASCII("index " //
-					+ format(ent.getOldId()) //
-					+ ".." //
-					+ format(ent.getNewId())));
-			if (oldMode.equals(newMode)) {
-				o.write(' ');
-				newMode.copyTo(o);
-			}
-			o.write('\n');
+			formatIndexLine(o, ent);
 		}
+	}
+
+	/**
+	 * @param o
+	 *            the stream the formatter will write line data to
+	 * @param ent
+	 *            the DiffEntry to create the FileHeader for
+	 * @throws IOException
+	 *             writing to the supplied stream failed.
+	 */
+	protected void formatIndexLine(OutputStream o, DiffEntry ent)
+			throws IOException {
+		o.write(encodeASCII("index " //
+				+ format(ent.getOldId()) //
+				+ ".." //
+				+ format(ent.getNewId())));
+		if (ent.getOldMode().equals(ent.getNewMode())) {
+			o.write(' ');
+			ent.getNewMode().copyTo(o);
+		}
+		o.write('\n');
 	}
 
 	private void formatOldNewPaths(ByteArrayOutputStream o, DiffEntry ent)
 			throws IOException {
+		if (ent.oldId.equals(ent.newId))
+			return;
+
 		final String oldp;
 		final String newp;
 

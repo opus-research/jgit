@@ -75,16 +75,16 @@ public class ConfigTest {
 	@Test
 	public void test001_ReadBareKey() throws ConfigInvalidException {
 		final Config c = parse("[foo]\nbar\n");
-		assertEquals(true, c.getBoolean("foo", null, "bar", false));
+		assertTrue(c.getBoolean("foo", null, "bar", false));
 		assertEquals("", c.getString("foo", null, "bar"));
 	}
 
 	@Test
 	public void test002_ReadWithSubsection() throws ConfigInvalidException {
 		final Config c = parse("[foo \"zip\"]\nbar\n[foo \"zap\"]\nbar=false\nn=3\n");
-		assertEquals(true, c.getBoolean("foo", "zip", "bar", false));
+		assertTrue(c.getBoolean("foo", "zip", "bar", false));
 		assertEquals("", c.getString("foo","zip", "bar"));
-		assertEquals(false, c.getBoolean("foo", "zap", "bar", true));
+		assertFalse(c.getBoolean("foo", "zap", "bar", true));
 		assertEquals("false", c.getString("foo", "zap", "bar"));
 		assertEquals(3, c.getInt("foo", "zap", "n", 4));
 		assertEquals(4, c.getInt("foo", "zap","m", 4));
@@ -126,7 +126,7 @@ public class ConfigTest {
 	@Test
 	public void test006_readCaseInsensitive() throws ConfigInvalidException {
 		final Config c = parse("[Foo]\nBar\n");
-		assertEquals(true, c.getBoolean("foo", null, "bar", false));
+		assertTrue(c.getBoolean("foo", null, "bar", false));
 		assertEquals("", c.getString("foo", null, "bar"));
 	}
 
@@ -148,17 +148,21 @@ public class ConfigTest {
 		authorEmail = localConfig.get(UserConfig.KEY).getAuthorEmail();
 		assertEquals(Constants.UNKNOWN_USER_DEFAULT, authorName);
 		assertEquals(Constants.UNKNOWN_USER_DEFAULT + "@" + hostname, authorEmail);
+		assertTrue(localConfig.get(UserConfig.KEY).isAuthorNameImplicit());
+		assertTrue(localConfig.get(UserConfig.KEY).isAuthorEmailImplicit());
 
 		// the system user name is defined
 		mockSystemReader.setProperty(Constants.OS_USER_NAME_KEY, "os user name");
 		localConfig.uncache(UserConfig.KEY);
 		authorName = localConfig.get(UserConfig.KEY).getAuthorName();
 		assertEquals("os user name", authorName);
+		assertTrue(localConfig.get(UserConfig.KEY).isAuthorNameImplicit());
 
 		if (hostname != null && hostname.length() != 0) {
 			authorEmail = localConfig.get(UserConfig.KEY).getAuthorEmail();
 			assertEquals("os user name@" + hostname, authorEmail);
 		}
+		assertTrue(localConfig.get(UserConfig.KEY).isAuthorEmailImplicit());
 
 		// the git environment variables are defined
 		mockSystemReader.setProperty(Constants.GIT_AUTHOR_NAME_KEY, "git author name");
@@ -168,6 +172,8 @@ public class ConfigTest {
 		authorEmail = localConfig.get(UserConfig.KEY).getAuthorEmail();
 		assertEquals("git author name", authorName);
 		assertEquals("author@email", authorEmail);
+		assertFalse(localConfig.get(UserConfig.KEY).isAuthorNameImplicit());
+		assertFalse(localConfig.get(UserConfig.KEY).isAuthorEmailImplicit());
 
 		// the values are defined in the global configuration
 		userGitConfig.setString("user", null, "name", "global username");
@@ -176,6 +182,8 @@ public class ConfigTest {
 		authorEmail = localConfig.get(UserConfig.KEY).getAuthorEmail();
 		assertEquals("global username", authorName);
 		assertEquals("author@globalemail", authorEmail);
+		assertFalse(localConfig.get(UserConfig.KEY).isAuthorNameImplicit());
+		assertFalse(localConfig.get(UserConfig.KEY).isAuthorEmailImplicit());
 
 		// the values are defined in the local configuration
 		localConfig.setString("user", null, "name", "local username");
@@ -184,11 +192,15 @@ public class ConfigTest {
 		authorEmail = localConfig.get(UserConfig.KEY).getAuthorEmail();
 		assertEquals("local username", authorName);
 		assertEquals("author@localemail", authorEmail);
+		assertFalse(localConfig.get(UserConfig.KEY).isAuthorNameImplicit());
+		assertFalse(localConfig.get(UserConfig.KEY).isAuthorEmailImplicit());
 
 		authorName = localConfig.get(UserConfig.KEY).getCommitterName();
 		authorEmail = localConfig.get(UserConfig.KEY).getCommitterEmail();
 		assertEquals("local username", authorName);
 		assertEquals("author@localemail", authorEmail);
+		assertFalse(localConfig.get(UserConfig.KEY).isCommitterNameImplicit());
+		assertFalse(localConfig.get(UserConfig.KEY).isCommitterEmailImplicit());
 	}
 
 	@Test
@@ -402,9 +414,9 @@ public class ConfigTest {
 				names.contains("repositoryformatversion"));
 
 		Iterator<String> itr = names.iterator();
-		assertEquals("repositoryFormatVersion", itr.next());
 		assertEquals("filemode", itr.next());
 		assertEquals("logAllRefUpdates", itr.next());
+		assertEquals("repositoryFormatVersion", itr.next());
 		assertFalse(itr.hasNext());
 	}
 

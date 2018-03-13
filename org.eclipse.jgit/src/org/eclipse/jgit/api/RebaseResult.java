@@ -42,6 +42,10 @@
  */
 package org.eclipse.jgit.api;
 
+import java.util.Map;
+
+import org.eclipse.jgit.merge.ResolveMerger;
+import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
 import org.eclipse.jgit.revwalk.RevCommit;
 
 /**
@@ -55,43 +59,128 @@ public class RebaseResult {
 		/**
 		 * Rebase was successful, HEAD points to the new commit
 		 */
-		OK,
+		OK {
+			@Override
+			public boolean isSuccessful() {
+				return true;
+			}
+		},
 		/**
 		 * Aborted; the original HEAD was restored
 		 */
-		ABORTED,
+		ABORTED {
+			@Override
+			public boolean isSuccessful() {
+				return false;
+			}
+		},
 		/**
 		 * Stopped due to a conflict; must either abort or resolve or skip
 		 */
-		STOPPED,
+		STOPPED {
+			@Override
+			public boolean isSuccessful() {
+				return false;
+			}
+		},
+		/**
+		 * Failed; the original HEAD was restored
+		 */
+		FAILED {
+			@Override
+			public boolean isSuccessful() {
+				return false;
+			}
+		},
 		/**
 		 * Already up-to-date
 		 */
-		UP_TO_DATE;
+		UP_TO_DATE {
+			@Override
+			public boolean isSuccessful() {
+				return true;
+			}
+		},
+		/**
+		 * Fast-forward, HEAD points to the new commit
+		 */
+		FAST_FORWARD {
+			@Override
+			public boolean isSuccessful() {
+				return true;
+			}
+		},
+
+		/**
+		 * Continue with nothing left to commit (possibly want skip).
+		 *
+		 * @since 2.0
+		 */
+		NOTHING_TO_COMMIT {
+			@Override
+			public boolean isSuccessful() {
+				return false;
+			}
+		};
+
+		/**
+		 * @return whether the status indicates a successful result
+		 */
+		public abstract boolean isSuccessful();
 	}
+
+	static final RebaseResult OK_RESULT = new RebaseResult(Status.OK);
+
+	static final RebaseResult ABORTED_RESULT = new RebaseResult(Status.ABORTED);
 
 	static final RebaseResult UP_TO_DATE_RESULT = new RebaseResult(
 			Status.UP_TO_DATE);
 
-	private final Status mySatus;
+	static final RebaseResult FAST_FORWARD_RESULT = new RebaseResult(
+			Status.FAST_FORWARD);
+
+	static final RebaseResult NOTHING_TO_COMMIT_RESULT = new RebaseResult(
+			Status.NOTHING_TO_COMMIT);
+
+	private final Status status;
 
 	private final RevCommit currentCommit;
 
-	RebaseResult(Status status) {
-		this.mySatus = status;
+	private Map<String, MergeFailureReason> failingPaths;
+
+	private RebaseResult(Status status) {
+		this.status = status;
 		currentCommit = null;
 	}
 
+	/**
+	 * Create <code>RebaseResult</code> with status {@link Status#STOPPED}
+	 *
+	 * @param commit
+	 *            current commit
+	 */
 	RebaseResult(RevCommit commit) {
-		this.mySatus = Status.STOPPED;
+		status = Status.STOPPED;
 		currentCommit = commit;
+	}
+
+	/**
+	 * Create <code>RebaseResult</code> with status {@link Status#FAILED}
+	 *
+	 * @param failingPaths
+	 *            list of paths causing this rebase to fail
+	 */
+	RebaseResult(Map<String, MergeFailureReason> failingPaths) {
+		status = Status.FAILED;
+		currentCommit = null;
+		this.failingPaths = failingPaths;
 	}
 
 	/**
 	 * @return the overall status
 	 */
 	public Status getStatus() {
-		return mySatus;
+		return status;
 	}
 
 	/**
@@ -100,5 +189,14 @@ public class RebaseResult {
 	 */
 	public RevCommit getCurrentCommit() {
 		return currentCommit;
+	}
+
+	/**
+	 * @return the list of paths causing this rebase to fail (see
+	 *         {@link ResolveMerger#getFailingPaths()} for details) if status is
+	 *         {@link Status#FAILED}, otherwise <code>null</code>
+	 */
+	public Map<String, MergeFailureReason> getFailingPaths() {
+		return failingPaths;
 	}
 }

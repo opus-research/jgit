@@ -1,6 +1,7 @@
             == Java GIT ==
 
-This package is licensed under the BSD.
+This package is licensed under the EDL (Eclipse Distribution
+License).
 
   org.eclipse.jgit/
 
@@ -9,7 +10,7 @@ This package is licensed under the BSD.
     to exercise the library.  The library provides functions to
     read and write a GIT formatted repository.
 
-    All portions of jgit are covered by the BSD.  Absolutely no GPL,
+    All portions of jgit are covered by the EDL. Absolutely no GPL,
     LGPL or EPL contributions are accepted within this package.
 
   org.eclipse.jgit.test/
@@ -30,9 +31,22 @@ This package is licensed under the BSD.
   have no information about other vendors. Please report your findings
   if you try.
 
-- CRLF conversion is never performed. On Windows you should thereforc
-  make sure your projects and workspaces are configured to save files
-  with Unix (LF) line endings.
+- CRLF conversion is performed depending on the core.autocrlf setting,
+  however Git for Windows by default stores that setting during
+  installation in the "system wide" configuration file. If Git is not
+  installed, use the global or repository configuration for the
+  core.autocrlf setting.
+
+- The system wide configuration file is located relative to where C
+  Git is installed. Make sure Git can be found via the PATH
+  environment variable. When installing Git for Windows check the "Run
+  Git from the Windows Command Prompt" option. There are other options
+  like the jgit.gitprefix system propety or Eclipse settings that can
+  be used for pointing out where C Git is installed. Modifying PATH is
+  the recommended option if C Git is installed.
+
+- We try to use the same notation of $HOME as C Git does. On Windows
+  this is often not same value as the user.home system property.
 
             == Package Features                ==
 

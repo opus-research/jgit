@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2011, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -46,6 +47,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -54,15 +56,21 @@ import java.io.FileInputStream;
 import java.io.IOException;
 
 import org.eclipse.jgit.api.CheckoutResult.Status;
-import org.eclipse.jgit.api.errors.InvalidRefNameException;
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
+import org.eclipse.jgit.dircache.DirCache;
+import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
+import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.transport.RefSpec;
+import org.eclipse.jgit.transport.RemoteConfig;
+import org.eclipse.jgit.transport.URIish;
 import org.eclipse.jgit.util.FileUtils;
 import org.junit.Before;
 import org.junit.Test;
@@ -96,44 +104,30 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testSimpleCheckout() {
-		try {
-			git.checkout().setName("test").call();
-		} catch (Exception e) {
-			fail(e.getMessage());
-		}
+	public void testSimpleCheckout() throws Exception {
+		git.checkout().setName("test").call();
 	}
 
 	@Test
-	public void testCheckout() {
-		try {
-			git.checkout().setName("test").call();
-			assertEquals("[Test.txt, mode:100644, content:Some change]",
-					indexState(CONTENT));
-			Ref result = git.checkout().setName("master").call();
-			assertEquals("[Test.txt, mode:100644, content:Hello world]",
-					indexState(CONTENT));
-			assertEquals("refs/heads/master", result.getName());
-			assertEquals("refs/heads/master", git.getRepository()
-					.getFullBranch());
-		} catch (Exception e) {
-			fail(e.getMessage());
-		}
+	public void testCheckout() throws Exception {
+		git.checkout().setName("test").call();
+		assertEquals("[Test.txt, mode:100644, content:Some change]",
+				indexState(CONTENT));
+		Ref result = git.checkout().setName("master").call();
+		assertEquals("[Test.txt, mode:100644, content:Hello world]",
+				indexState(CONTENT));
+		assertEquals("refs/heads/master", result.getName());
+		assertEquals("refs/heads/master", git.getRepository().getFullBranch());
 	}
 
 	@Test
-	public void testCreateBranchOnCheckout() throws IOException {
-		try {
-			git.checkout().setCreateBranch(true).setName("test2").call();
-		} catch (Exception e) {
-			fail(e.getMessage());
-		}
+	public void testCreateBranchOnCheckout() throws Exception {
+		git.checkout().setCreateBranch(true).setName("test2").call();
 		assertNotNull(db.getRef("test2"));
 	}
 
 	@Test
-	public void testCheckoutToNonExistingBranch() throws JGitInternalException,
-			RefAlreadyExistsException, InvalidRefNameException {
+	public void testCheckoutToNonExistingBranch() throws GitAPIException {
 		try {
 			git.checkout().setName("badbranch").call();
 			fail("Should have failed");
@@ -193,16 +187,102 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testCheckoutCommit() {
-		try {
-			Ref result = git.checkout().setName(initialCommit.name()).call();
-			assertEquals("[Test.txt, mode:100644, content:Hello world]",
-					indexState(CONTENT));
-			assertNull(result);
-			assertEquals(initialCommit.name(), git.getRepository()
-					.getFullBranch());
-		} catch (Exception e) {
-			fail(e.getMessage());
-		}
+	public void testCheckoutCommit() throws Exception {
+		Ref result = git.checkout().setName(initialCommit.name()).call();
+		assertEquals("[Test.txt, mode:100644, content:Hello world]",
+				indexState(CONTENT));
+		assertNull(result);
+		assertEquals(initialCommit.name(), git.getRepository().getFullBranch());
+	}
+
+	@Test
+	public void testCheckoutRemoteTrackingWithoutLocalBranch() throws Exception {
+		// create second repository
+		Repository db2 = createWorkRepository();
+		Git git2 = new Git(db2);
+
+		// setup the second repository to fetch from the first repository
+		final StoredConfig config = db2.getConfig();
+		RemoteConfig remoteConfig = new RemoteConfig(config, "origin");
+		URIish uri = new URIish(db.getDirectory().toURI().toURL());
+		remoteConfig.addURI(uri);
+		remoteConfig.update(config);
+		config.save();
+
+		// fetch from first repository
+		RefSpec spec = new RefSpec("+refs/heads/*:refs/remotes/origin/*");
+		git2.fetch().setRemote("origin").setRefSpecs(spec).call();
+		// checkout remote tracking branch in second repository
+		// (no local branches exist yet in second repository)
+		git2.checkout().setName("remotes/origin/test").call();
+		assertEquals("[Test.txt, mode:100644, content:Some change]",
+				indexState(db2, CONTENT));
+	}
+
+	@Test
+	public void testCheckoutOfFileWithInexistentParentDir() throws Exception {
+		File a = writeTrashFile("dir/a.txt", "A");
+		writeTrashFile("dir/b.txt", "A");
+		git.add().addFilepattern("dir/a.txt").addFilepattern("dir/b.txt")
+				.call();
+		git.commit().setMessage("Added dir").call();
+
+		File dir = new File(db.getWorkTree(), "dir");
+		FileUtils.delete(dir, FileUtils.RECURSIVE);
+
+		git.checkout().addPath("dir/a.txt").call();
+		assertTrue(a.exists());
+	}
+
+	@Test
+	public void testDetachedHeadOnCheckout() throws JGitInternalException,
+			IOException, GitAPIException {
+		CheckoutCommand co = git.checkout();
+		co.setName("master").call();
+
+		String commitId = db.getRef(Constants.MASTER).getObjectId().name();
+		co = git.checkout();
+		co.setName(commitId).call();
+
+		Ref head = db.getRef(Constants.HEAD);
+		assertFalse(head.isSymbolic());
+		assertSame(head, head.getTarget());
+	}
+
+	@Test
+	public void testUpdateSmudgedEntries() throws Exception {
+		git.branchCreate().setName("test2").call();
+		RefUpdate rup = db.updateRef(Constants.HEAD);
+		rup.link("refs/heads/test2");
+
+		File file = new File(db.getWorkTree(), "Test.txt");
+		long size = file.length();
+		long mTime = file.lastModified() - 5000L;
+		assertTrue(file.setLastModified(mTime));
+
+		DirCache cache = DirCache.lock(db.getIndexFile(), db.getFS());
+		DirCacheEntry entry = cache.getEntry("Test.txt");
+		assertNotNull(entry);
+		entry.setLength(0);
+		entry.setLastModified(0);
+		cache.write();
+		assertTrue(cache.commit());
+
+		cache = DirCache.read(db.getIndexFile(), db.getFS());
+		entry = cache.getEntry("Test.txt");
+		assertNotNull(entry);
+		assertEquals(0, entry.getLength());
+		assertEquals(0, entry.getLastModified());
+
+		db.getIndexFile().setLastModified(
+				db.getIndexFile().lastModified() - 5000);
+
+		assertNotNull(git.checkout().setName("test").call());
+
+		cache = DirCache.read(db.getIndexFile(), db.getFS());
+		entry = cache.getEntry("Test.txt");
+		assertNotNull(entry);
+		assertEquals(size, entry.getLength());
+		assertEquals(mTime, entry.getLastModified());
 	}
 }

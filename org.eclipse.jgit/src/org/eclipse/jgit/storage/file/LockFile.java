@@ -56,10 +56,12 @@ import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.errors.LockFailedException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.util.FS;
+import org.eclipse.jgit.util.FileUtils;
 
 /**
  * Git style file locking and replacement.
@@ -73,6 +75,37 @@ import org.eclipse.jgit.util.FS;
  */
 public class LockFile {
 	static final String SUFFIX = ".lock"; //$NON-NLS-1$
+
+	/**
+	 * Unlock the given file.
+	 * <p>
+	 * This method can be used for recovering from a thrown
+	 * {@link LockFailedException} . This method does not validate that the lock
+	 * is or is not currently held before attempting to unlock it.
+	 *
+	 * @param file
+	 * @return true if unlocked, false if unlocking failed
+	 */
+	public static boolean unlock(final File file) {
+		final File lockFile = getLockFile(file);
+		final int flags = FileUtils.RETRY | FileUtils.SKIP_MISSING;
+		try {
+			FileUtils.delete(lockFile, flags);
+		} catch (IOException ignored) {
+			// Ignore and return whether lock file still exists
+		}
+		return !lockFile.exists();
+	}
+
+	/**
+	 * Get the lock file corresponding to the given file.
+	 *
+	 * @param file
+	 * @return lock file
+	 */
+	static File getLockFile(File file) {
+		return new File(file.getParentFile(), file.getName() + SUFFIX);
+	}
 
 	/** Filter to skip over active lock files when listing a directory. */
 	static final FilenameFilter FILTER = new FilenameFilter() {
@@ -106,9 +139,9 @@ public class LockFile {
 	 *            the file system abstraction which will be necessary to perform
 	 *            certain file system operations.
 	 */
-	public LockFile(final File f, FS fs) {
+	public LockFile(final File f, final FS fs) {
 		ref = f;
-		lck = new File(ref.getParentFile(), ref.getName() + SUFFIX);
+		lck = getLockFile(ref);
 		this.fs = fs;
 	}
 
@@ -122,7 +155,7 @@ public class LockFile {
 	 *             does not hold the lock.
 	 */
 	public boolean lock() throws IOException {
-		lck.getParentFile().mkdirs();
+		FileUtils.mkdirs(lck.getParentFile(), true);
 		if (lck.createNewFile()) {
 			haveLck = true;
 			try {
@@ -367,9 +400,9 @@ public class LockFile {
 	/**
 	 * Wait until the lock file information differs from the old file.
 	 * <p>
-	 * This method tests both the length and the last modification date. If both
-	 * are the same, this method sleeps until it can force the new lock file's
-	 * modification date to be later than the target file.
+	 * This method tests the last modification date. If both are the same, this
+	 * method sleeps until it can force the new lock file's modification date to
+	 * be later than the target file.
 	 *
 	 * @throws InterruptedException
 	 *             the thread was interrupted before the last modified date of
@@ -377,14 +410,12 @@ public class LockFile {
 	 *             the target file.
 	 */
 	public void waitForStatChange() throws InterruptedException {
-		if (ref.length() == lck.length()) {
-			long otime = ref.lastModified();
-			long ntime = lck.lastModified();
-			while (otime == ntime) {
-				Thread.sleep(25 /* milliseconds */);
-				lck.setLastModified(System.currentTimeMillis());
-				ntime = lck.lastModified();
-			}
+		FileSnapshot o = FileSnapshot.save(ref);
+		FileSnapshot n = FileSnapshot.save(lck);
+		while (o.equals(n)) {
+			Thread.sleep(25 /* milliseconds */);
+			lck.setLastModified(System.currentTimeMillis());
+			n = FileSnapshot.save(lck);
 		}
 	}
 
@@ -473,6 +504,16 @@ public class LockFile {
 	}
 
 	/**
+	 * Update the commit snapshot {@link #getCommitSnapshot()} before commit.
+	 * <p>
+	 * This may be necessary if you need time stamp before commit occurs, e.g
+	 * while writing the index.
+	 */
+	public void createCommitSnapshot() {
+		saveStatInformation();
+	}
+
+	/**
 	 * Unlock this file and abort this change.
 	 * <p>
 	 * The temporary file (if created) is deleted before returning.
@@ -489,7 +530,11 @@ public class LockFile {
 
 		if (haveLck) {
 			haveLck = false;
-			lck.delete();
+			try {
+				FileUtils.delete(lck, FileUtils.RETRY);
+			} catch (IOException e) {
+				// couldn't delete the file even after retry.
+			}
 		}
 	}
 

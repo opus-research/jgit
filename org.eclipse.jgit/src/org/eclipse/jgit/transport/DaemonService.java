@@ -49,6 +49,8 @@ import java.io.IOException;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.Config.SectionParser;
+import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
+import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
 /** A service exposed by {@link Daemon} over anonymous <code>git://</code>. */
 public abstract class DaemonService {
@@ -125,9 +127,19 @@ public abstract class DaemonService {
 	}
 
 	void execute(final DaemonClient client, final String commandLine)
-			throws IOException {
+			throws IOException, ServiceNotEnabledException,
+			ServiceNotAuthorizedException {
 		final String name = commandLine.substring(command.length() + 1);
-		final Repository db = client.getDaemon().openRepository(name);
+		Repository db;
+		try {
+			db = client.getDaemon().openRepository(client, name);
+		} catch (ServiceMayNotContinueException e) {
+			// An error when opening the repo means the client is expecting a ref
+			// advertisement, so use that style of error.
+			PacketLineOut pktOut = new PacketLineOut(client.getOutputStream());
+			pktOut.writeString("ERR " + e.getMessage() + "\n");
+			db = null;
+		}
 		if (db == null)
 			return;
 		try {
@@ -145,5 +157,6 @@ public abstract class DaemonService {
 	}
 
 	abstract void execute(DaemonClient client, Repository db)
-			throws IOException;
+			throws IOException, ServiceNotEnabledException,
+			ServiceNotAuthorizedException;
 }

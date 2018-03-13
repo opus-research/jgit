@@ -52,14 +52,14 @@ import java.text.MessageFormat;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.events.ConfigChangedEvent;
 import org.eclipse.jgit.events.ConfigChangedListener;
+import org.eclipse.jgit.events.IndexChangedEvent;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.BaseRepositoryBuilder;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.GraftsDatabase;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefDatabase;
@@ -106,7 +106,7 @@ public class FileRepository extends Repository {
 
 	private final ObjectDirectory objectDatabase;
 
-	private final FileGraftsDataBase graftsDb;
+	private FileSnapshot snapshot;
 
 	/**
 	 * Construct a representation of a Git repository.
@@ -160,8 +160,8 @@ public class FileRepository extends Repository {
 		systemConfig = SystemReader.getInstance().openSystemConfig(null, getFS());
 		userConfig = SystemReader.getInstance().openUserConfig(systemConfig,
 				getFS());
-		repoConfig = new FileBasedConfig(userConfig, //
-				getFS().resolve(getDirectory(), "config"), //
+		repoConfig = new FileBasedConfig(userConfig, getFS().resolve(
+				getDirectory(), Constants.CONFIG),
 				getFS());
 
 		loadSystemConfig();
@@ -181,17 +181,17 @@ public class FileRepository extends Repository {
 				getFS());
 
 		if (objectDatabase.exists()) {
-			final String repositoryFormatVersion = getConfig().getString(
+			final long repositoryFormatVersion = getConfig().getLong(
 					ConfigConstants.CONFIG_CORE_SECTION, null,
-					ConfigConstants.CONFIG_KEY_REPO_FORMAT_VERSION);
-			if (!"0".equals(repositoryFormatVersion)) {
+					ConfigConstants.CONFIG_KEY_REPO_FORMAT_VERSION, 0);
+			if (repositoryFormatVersion > 0)
 				throw new IOException(MessageFormat.format(
 						JGitText.get().unknownRepositoryFormat2,
-						repositoryFormatVersion));
-			}
+						Long.valueOf(repositoryFormatVersion)));
 		}
 
-		graftsDb = new FileGraftsDataBase(getGraftsFile());
+		if (!isBare())
+			snapshot = FileSnapshot.save(getIndexFile());
 	}
 
 	private void loadSystemConfig() throws IOException {
@@ -244,11 +244,12 @@ public class FileRepository extends Repository {
 			throw new IllegalStateException(MessageFormat.format(
 					JGitText.get().repositoryAlreadyExists, getDirectory()));
 		}
-		getDirectory().mkdirs();
+		FileUtils.mkdirs(getDirectory(), true);
 		refs.create();
 		objectDatabase.create();
 
-		new File(getDirectory(), "branches").mkdir();
+		FileUtils.mkdir(new File(getDirectory(), "branches"));
+		FileUtils.mkdir(new File(getDirectory(), "hooks"));
 
 		RefUpdate head = updateRef(Constants.HEAD);
 		head.disableRefLog();
@@ -279,8 +280,6 @@ public class FileRepository extends Repository {
 					ConfigConstants.CONFIG_KEY_BARE, true);
 		cfg.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
 				ConfigConstants.CONFIG_KEY_LOGALLREFUPDATES, !bare);
-		cfg.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_AUTOCRLF, false);
 		cfg.save();
 	}
 
@@ -348,8 +347,12 @@ public class FileRepository extends Repository {
 				Repository repo;
 
 				repo = ((AlternateRepository) d).repository;
-				for (Ref ref : repo.getAllRefs().values())
-					r.add(ref.getObjectId());
+				for (Ref ref : repo.getAllRefs().values()) {
+					if (ref.getObjectId() != null)
+						r.add(ref.getObjectId());
+					if (ref.getPeeledObjectId() != null)
+						r.add(ref.getPeeledObjectId());
+				}
 				r.addAll(repo.getAdditionalHaves());
 			}
 		}
@@ -371,15 +374,30 @@ public class FileRepository extends Repository {
 		objectDatabase.openPack(pack, idx);
 	}
 
-	/**
-	 * Force a scan for changed refs.
-	 *
-	 * @throws IOException
-	 */
+	@Override
 	public void scanForRepoChanges() throws IOException {
 		getAllRefs(); // This will look for changes to refs
-		if (!isBare())
-			getIndex(); // This will detect changes in the index
+		detectIndexChanges();
+	}
+
+	/**
+	 * Detect index changes.
+	 */
+	private void detectIndexChanges() {
+		if (isBare())
+			return;
+
+		File indexFile = getIndexFile();
+		if (snapshot == null)
+			snapshot = FileSnapshot.save(indexFile);
+		else if (snapshot.isModified(indexFile))
+			notifyIndexChanged();
+	}
+
+	@Override
+	public void notifyIndexChanged() {
+		snapshot = FileSnapshot.save(getIndexFile());
+		fireEvent(new IndexChangedEvent());
 	}
 
 	/**
@@ -393,16 +411,5 @@ public class FileRepository extends Repository {
 		if (ref != null)
 			return new ReflogReader(this, ref.getName());
 		return null;
-	}
-
-	public GraftsDatabase getGraftsDatabase() {
-		return graftsDb;
-	}
-
-	/**
-	 * @return the grafts file
-	 */
-	public File getGraftsFile() {
-		return new File(getDirectory(), "info/grafts");
 	}
 }

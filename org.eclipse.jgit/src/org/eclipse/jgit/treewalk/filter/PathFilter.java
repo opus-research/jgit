@@ -44,7 +44,7 @@
 
 package org.eclipse.jgit.treewalk.filter;
 
-import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.treewalk.TreeWalk;
 
@@ -115,5 +115,15 @@ public class PathFilter extends TreeFilter {
 
 	public String toString() {
 		return "PATH(\"" + pathStr + "\")";
+	}
+
+	/**
+	 * @param walker
+	 *            The walk to check against.
+	 * @return {@code true} if the path length of this filter matches the length
+	 *         of the current path of the supplied TreeWalk.
+	 */
+	public boolean isDone(final TreeWalk walker) {
+		return pathRaw.length == walker.getPathLength();
 	}
 }

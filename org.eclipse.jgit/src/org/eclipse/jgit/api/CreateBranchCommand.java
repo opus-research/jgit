@@ -46,20 +46,21 @@ package org.eclipse.jgit.api;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
+import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.StoredConfig;
-import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 
@@ -119,15 +120,18 @@ public class CreateBranchCommand extends GitCommand<Ref> {
 	 *             invalid
 	 * @return the newly created branch
 	 */
-	public Ref call() throws JGitInternalException, RefAlreadyExistsException,
+	public Ref call() throws GitAPIException, RefAlreadyExistsException,
 			RefNotFoundException, InvalidRefNameException {
 		checkCallable();
 		processOptions();
+		RevWalk revWalk = new RevWalk(repo);
 		try {
-			boolean exists = repo.getRef(name) != null;
+			Ref refToCheck = repo.getRef(name);
+			boolean exists = refToCheck != null
+					&& refToCheck.getName().startsWith(Constants.R_HEADS);
 			if (!force && exists)
 				throw new RefAlreadyExistsException(MessageFormat.format(
-						JGitText.get().refAlreadExists, name));
+						JGitText.get().refAlreadyExists, name));
 
 			ObjectId startAt = getStartPoint();
 			String startPointFullName = null;
@@ -146,7 +150,7 @@ public class CreateBranchCommand extends GitCommand<Ref> {
 				if (startCommit != null)
 					baseCommit = startCommit.getShortMessage();
 				else {
-					RevCommit commit = new RevWalk(repo).parseCommit(repo
+					RevCommit commit = revWalk.parseCommit(repo
 							.resolve(startPoint));
 					baseCommit = commit.getShortMessage();
 				}
@@ -165,6 +169,7 @@ public class CreateBranchCommand extends GitCommand<Ref> {
 				else
 					refLogMessage = "branch: Created from branch " + baseBranch;
 			} else {
+				startAt = revWalk.peel(revWalk.parseAny(startAt));
 				if (exists)
 					refLogMessage = "branch: Reset start-point to tag "
 							+ startPointFullName;
@@ -266,6 +271,8 @@ public class CreateBranchCommand extends GitCommand<Ref> {
 			return result;
 		} catch (IOException ioe) {
 			throw new JGitInternalException(ioe.getMessage(), ioe);
+		} finally {
+			revWalk.release();
 		}
 	}
 
