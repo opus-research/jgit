@@ -68,7 +68,6 @@ import org.eclipse.jgit.errors.TranslationStringMissingException;
  * </pre>
  */
 public class NLS {
-	static final Locale ROOT_LOCALE = new Locale("", "", "");
 
 	private static final InheritableThreadLocal<NLS> local = new InheritableThreadLocal<NLS>() {
 		protected NLS initialValue() {
