@@ -51,12 +51,13 @@ import static org.eclipse.jgit.transport.SideBandOutputStream.CH_DATA;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_PROGRESS;
 import static org.eclipse.jgit.transport.SideBandOutputStream.MAX_BUF;
 
+import java.io.BufferedWriter;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-import java.io.Writer;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -127,9 +128,6 @@ public class ReceivePack {
 	/** Identity to record action as within the reflog. */
 	private PersonIdent refLogIdent;
 
-	/** Filter used while advertising the refs to the client. */
-	private RefFilter refFilter;
-
 	/** Hook to validate the update commands before execution. */
 	private PreReceiveHook preReceive;
 
@@ -152,7 +150,7 @@ public class ReceivePack {
 
 	private PacketLineOut pckOut;
 
-	private Writer msgs;
+	private PrintWriter msgs;
 
 	/** The refs we advertised as existing at the start of the connection. */
 	private Map<String, Ref> refs;
@@ -191,7 +189,6 @@ public class ReceivePack {
 		allowDeletes = cfg.allowDeletes;
 		allowNonFastForwards = cfg.allowNonFastForwards;
 		allowOfsDelta = cfg.allowOfsDelta;
-		refFilter = RefFilter.DEFAULT;
 		preReceive = PreReceiveHook.NULL;
 		postReceive = PostReceiveHook.NULL;
 	}
@@ -343,26 +340,6 @@ public class ReceivePack {
 		refLogIdent = pi;
 	}
 
-	/** @return the filter used while advertising the refs to the client */
-	public RefFilter getRefFilter() {
-		return refFilter;
-	}
-
-	/**
-	 * Set the filter used while advertising the refs to the client.
-	 * <p>
-	 * Only refs allowed by this filter will be shown to the client.
-	 * Clients may still attempt to create or update a reference hidden
-	 * by the configured {@link RefFilter}. These attempts should be
-	 * rejected by a matching {@link PreReceiveHook}.
-	 *
-	 * @param refFilter
-	 *            the filter; may be null to show all refs.
-	 */
-	public void setRefFilter(final RefFilter refFilter) {
-		this.refFilter = refFilter != null ? refFilter : RefFilter.DEFAULT;
-	}
-
 	/** @return get the hook invoked before updates occur. */
 	public PreReceiveHook getPreReceiveHook() {
 		return preReceive;
@@ -444,12 +421,7 @@ public class ReceivePack {
 	 *            string must not end with an LF, and must not contain an LF.
 	 */
 	public void sendError(final String what) {
-		try {
-			if (msgs != null)
-				msgs.write("error: " + what + "\n");
-		} catch (IOException e) {
-			// Ignore write failures.
-		}
+		sendMessage("error", what);
 	}
 
 	/**
@@ -463,12 +435,12 @@ public class ReceivePack {
 	 *            string must not end with an LF, and must not contain an LF.
 	 */
 	public void sendMessage(final String what) {
-		try {
-			if (msgs != null)
-				msgs.write(what + "\n");
-		} catch (IOException e) {
-			// Ignore write failures.
-		}
+		sendMessage("remote", what);
+	}
+
+	private void sendMessage(final String type, final String what) {
+		if (msgs != null)
+			msgs.println(type + ": " + what);
 	}
 
 	/**
@@ -508,8 +480,16 @@ public class ReceivePack {
 
 			pckIn = new PacketLineIn(rawIn);
 			pckOut = new PacketLineOut(rawOut);
-			if (messages != null)
-				msgs = new OutputStreamWriter(messages, Constants.CHARSET);
+			if (messages != null) {
+				msgs = new PrintWriter(new BufferedWriter(
+						new OutputStreamWriter(messages, Constants.CHARSET),
+						8192)) {
+					@Override
+					public void println() {
+						print('\n');
+					}
+				};
+			}
 
 			enabledCapablities = new HashSet<String>();
 			commands = new ArrayList<ReceiveCommand>();
@@ -517,19 +497,8 @@ public class ReceivePack {
 			service();
 		} finally {
 			try {
-				if (pckOut != null)
-					pckOut.flush();
-				if (msgs != null)
+				if (msgs != null) {
 					msgs.flush();
-
-				if (sideBand) {
-					// If we are using side band, we need to send a final
-					// flush-pkt to tell the remote peer the side band is
-					// complete and it should stop decoding. We need to
-					// use the original output stream as rawOut is now the
-					// side band data channel.
-					//
-					new PacketLineOut(output).end();
 				}
 			} finally {
 				unlockPack();
@@ -557,7 +526,7 @@ public class ReceivePack {
 		if (biDirectionalPipe)
 			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
 		else
-			refs = refFilter.filter(db.getAllRefs());
+			refs = db.getAllRefs();
 		recvCommands();
 		if (!commands.isEmpty()) {
 			enableCapabilities();
@@ -593,12 +562,22 @@ public class ReceivePack {
 			} else if (msgs != null) {
 				sendStatusReport(false, new Reporter() {
 					void sendString(final String s) throws IOException {
-						msgs.write(s + "\n");
+						msgs.println(s);
 					}
 				});
 			}
 
 			postReceive.onPostReceive(this, filterCommands(Result.OK));
+
+			if (msgs != null)
+				msgs.flush();
+			if (sideBand) {
+				// If side band is enabled this stream is actually band #1.
+				// Closing it will send a flush-pkt indicating the side-band
+				// data segment is over.  But the stream itself remains open.
+				//
+				rawOut.close();
+			}
 		}
 	}
 
@@ -625,7 +604,7 @@ public class ReceivePack {
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
 		if (allowOfsDelta)
 			adv.advertiseCapability(CAPABILITY_OFS_DELTA);
-		refs = refFilter.filter(db.getAllRefs());
+		refs = db.getAllRefs();
 		final Ref head = refs.remove(Constants.HEAD);
 		adv.send(refs);
 		if (head != null && !head.isSymbolic())
@@ -686,8 +665,9 @@ public class ReceivePack {
 
 			rawOut = new SideBandOutputStream(CH_DATA, MAX_BUF, out);
 			pckOut = new PacketLineOut(rawOut);
-			msgs = new OutputStreamWriter(new SideBandOutputStream(CH_PROGRESS,
-					MAX_BUF, out), Constants.CHARSET);
+			msgs = new PrintWriter(new OutputStreamWriter(
+					new SideBandOutputStream(CH_PROGRESS, MAX_BUF, out),
+					Constants.CHARSET));
 		}
 	}
 
