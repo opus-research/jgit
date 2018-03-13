@@ -683,17 +683,6 @@
           </plugin>
         </plugins>
       </build>
-      <reporting>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-javadoc-plugin</artifactId>
-            <configuration>
-              <additionalparam>-Xdoclint:-missing</additionalparam>
-            </configuration>
-          </plugin>
-        </plugins>
-      </reporting>
     </profile>
     <profile>
       <id>static-checks</id>
