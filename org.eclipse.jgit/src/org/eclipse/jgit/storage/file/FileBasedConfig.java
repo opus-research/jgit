@@ -68,8 +68,8 @@ import org.eclipse.jgit.util.RawParseUtils;
  */
 public class FileBasedConfig extends StoredConfig {
 	private final File configFile;
+	private volatile long lastModified;
 	private final FS fs;
-	private volatile FileSnapshot snapshot;
 
 	/**
 	 * Create a configuration with no default fallback.
@@ -99,7 +99,6 @@ public class FileBasedConfig extends StoredConfig {
 		super(base);
 		configFile = cfgLocation;
 		this.fs = fs;
-		this.snapshot = FileSnapshot.DIRTY;
 	}
 
 	@Override
@@ -126,7 +125,7 @@ public class FileBasedConfig extends StoredConfig {
 	 */
 	@Override
 	public void load() throws IOException, ConfigInvalidException {
-		snapshot = FileSnapshot.save(getFile());
+		lastModified = getFile().lastModified();
 		try {
 			fromText(RawParseUtils.decode(IO.readFully(getFile())));
 		} catch (FileNotFoundException noFile) {
@@ -158,14 +157,14 @@ public class FileBasedConfig extends StoredConfig {
 		if (!lf.lock())
 			throw new IOException(MessageFormat.format(JGitText.get().cannotLockFile, getFile()));
 		try {
-			lf.setNeedSnapshot(true);
+			lf.setNeedStatInformation(true);
 			lf.write(out);
 			if (!lf.commit())
 				throw new IOException(MessageFormat.format(JGitText.get().cannotCommitWriteTo, getFile()));
 		} finally {
 			lf.unlock();
 		}
-		snapshot = lf.getCommitSnapshot();
+		lastModified = lf.getCommitLastModified();
 		// notify the listeners
 		fireConfigChangedEvent();
 	}
@@ -180,6 +179,6 @@ public class FileBasedConfig extends StoredConfig {
 	 * than the file on disk
 	 */
 	public boolean isOutdated() {
-		return snapshot.isModified(getFile());
+		return getFile().lastModified() != lastModified;
 	}
 }
