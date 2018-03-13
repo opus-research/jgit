@@ -449,9 +449,8 @@ class PackWriterBitmapPreparer {
 		List<BitmapBuilderEntry> orderedTipCommitBitmaps = new ArrayList<>(
 				tipCommitBitmaps.size());
 		while (!tipCommitBitmaps.isEmpty()) {
-			BitmapBuilderEntry largest =
-					Collections.max(tipCommitBitmaps, ORDER_BY_DESCENDING_CARDINALITY);
-			tipCommitBitmaps.remove(largest);
+			Collections.sort(tipCommitBitmaps, ORDER_BY_DESCENDING_CARDINALITY);
+			BitmapBuilderEntry largest = tipCommitBitmaps.remove(0);
 			orderedTipCommitBitmaps.add(largest);
 
 			// Update the remaining paths, by removing the objects from
