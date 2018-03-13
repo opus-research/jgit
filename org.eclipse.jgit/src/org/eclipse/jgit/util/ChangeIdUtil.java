@@ -161,9 +161,10 @@ public class ChangeIdUtil {
 	 */
 	public static String insertId(String message, ObjectId changeId,
 			boolean replaceExisting) {
-		if (message.indexOf(CHANGE_ID) > 0) {
+		int indexOfChangeId = indexOfChangeId(message, "\n");
+		if (indexOfChangeId > 0) {
 			if (replaceExisting) {
-				int i = message.indexOf(CHANGE_ID) + 10;
+				int i = indexOfChangeId + 10;
 				while (message.charAt(i) == ' ')
 					i++;
 				String oldId = message.length() == (i + 40) ?
@@ -202,6 +203,24 @@ public class ChangeIdUtil {
 		return ret.toString();
 	}
 
+	/**
+	 * @param message
+	 * @param delimiter
+	 * @return the index of the ChangeId footer in the message, or -1 if no
+	 *         ChangeId footer available
+	 */
+	public static int indexOfChangeId(String message, String delimiter) {
+		String[] lines = message.split(delimiter); //$NON-NLS-1$
+		int footerFirstLine = findFirstFooterLine(lines);
+		if (footerFirstLine == lines.length)
+			return -1;
+
+		int indexOfFooter = 0;
+		for (int i = 0; i < footerFirstLine; ++i) {
+			indexOfFooter += lines[i].length() + delimiter.length();
+		}
+		return message.indexOf(CHANGE_ID, indexOfFooter);
+	}
 	/**
 	 * Find the index of the first line of the footer paragraph, or lines.length
 	 * if no footer is available
