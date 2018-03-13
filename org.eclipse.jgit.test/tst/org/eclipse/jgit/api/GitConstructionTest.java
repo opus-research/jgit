@@ -68,8 +68,7 @@ public class GitConstructionTest extends RepositoryTestCase {
 		git.commit().setMessage("Initial commit").call();
 
 		bareRepo = Git.cloneRepository().setBare(true)
-				.setURI(db.getDirectory().toURI().toString())
-				.setDirectory(createUniqueTestGitDir(true)).call()
+				.setURI(db.getDirectory().toURI().toString()).call()
 				.getRepository();
 	}
 
