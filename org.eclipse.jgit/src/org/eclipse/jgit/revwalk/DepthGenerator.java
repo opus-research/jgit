@@ -165,8 +165,7 @@ class DepthGenerator extends Generator {
 						&& ((p.flags & UNINTERESTING) != 0)
 						&& (BOUNDARY != null)
 						&& !p.has(BOUNDARY)) {
-					if (BOUNDARY != null)
-						p.add(BOUNDARY);
+					p.add(BOUNDARY);
 					add = true;
 				}
 
