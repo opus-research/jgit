@@ -117,10 +117,13 @@ public class ReceivePack extends BaseReceivePack {
 	 * the normal {@link #recvCommands()} flow.
 	 *
 	 * @param options
-	 *            the list of options supplied by the client.
+	 *            the list of options supplied by the client. The
+	 *            {@code ReceivePack} instance takes ownership of this list.
+	 *            Callers are encouraged to first create a copy if the list may
+	 *            be modified later.
 	 * @since 4.5
 	 */
-	public void setPushOptions(List<String> options) {
+	public void setPushOptions(@Nullable List<String> options) {
 		usePushOptions = options != null;
 		pushOptions = options;
 	}
@@ -217,17 +220,14 @@ public class ReceivePack extends BaseReceivePack {
 		super.enableCapabilities();
 	}
 
-	@Override
-	void readPostCommands(PacketLineIn in) throws IOException {
-		if (usePushOptions) {
-			pushOptions = new ArrayList<>(4);
-			for (;;) {
-				String option = in.readString();
-				if (option == PacketLineIn.END) {
-					break;
-				}
-				pushOptions.add(option);
+	private void readPushOptions() throws IOException {
+		pushOptions = new ArrayList<>(4);
+		for (;;) {
+			String option = pckIn.readString();
+			if (option == PacketLineIn.END) {
+				break;
 			}
+			pushOptions.add(option);
 		}
 	}
 
@@ -241,6 +241,10 @@ public class ReceivePack extends BaseReceivePack {
 			return;
 		recvCommands();
 		if (hasCommands()) {
+			if (usePushOptions) {
+				readPushOptions();
+			}
+
 			Throwable unpackError = null;
 			if (needPack()) {
 				try {
