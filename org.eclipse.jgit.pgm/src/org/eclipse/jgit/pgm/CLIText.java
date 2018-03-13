@@ -133,10 +133,8 @@ public class CLIText extends TranslationBundle {
 	/***/ public String jgitVersion;
 	/***/ public String lineFormat;
 	/***/ public String listeningOn;
-	/***/ public String mergeCheckoutConflict;
 	/***/ public String mergeConflict;
 	/***/ public String mergeFailed;
-	/***/ public String mergeCheckoutFailed;
 	/***/ public String mergeMadeBy;
 	/***/ public String mergedSquashed;
 	/***/ public String mergeWentWellStoppedBeforeCommitting;
