@@ -325,8 +325,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		}
 	}
 
-	private RevCommit checkoutCurrentHead() throws IOException,
-			NoHeadException, JGitInternalException {
+	private RevCommit checkoutCurrentHead() throws IOException, NoHeadException {
 		ObjectId headTree = repo.resolve(Constants.HEAD + "^{tree}");
 		if (headTree == null)
 			throw new NoHeadException(
@@ -628,10 +627,9 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	 * @return the new head, or null
 	 * @throws IOException
 	 * @throws GitAPIException
-	 * @throws JGitInternalException
 	 */
 	public RevCommit tryFastForward(RevCommit newCommit) throws IOException,
-			JGitInternalException, GitAPIException {
+			GitAPIException {
 		Ref head = repo.getRef(Constants.HEAD);
 		if (head == null || head.getObjectId() == null)
 			throw new RefNotFoundException(MessageFormat.format(
@@ -654,8 +652,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	}
 
 	private RevCommit tryFastForward(String headName, RevCommit oldCommit,
-			RevCommit newCommit) throws IOException, JGitInternalException,
-			GitAPIException {
+			RevCommit newCommit) throws IOException, GitAPIException {
 		boolean tryRebase = false;
 		for (RevCommit parentCommit : newCommit.getParents())
 			if (parentCommit.equals(oldCommit))
