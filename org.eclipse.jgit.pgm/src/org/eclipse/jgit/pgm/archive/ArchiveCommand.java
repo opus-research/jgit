@@ -43,6 +43,7 @@
 package org.eclipse.jgit.pgm.archive;
 
 import java.lang.String;
+import java.lang.System;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.EnumMap;
@@ -117,6 +118,12 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 				throws IOException;
 	}
 
+	private static void warnArchiveEntryModeIgnored(String name) {
+		System.err.println(MessageFormat.format( //
+				CLIText.get().archiveEntryModeIgnored, //
+				name));
+	}
+
 	private static final Map<Format, Archiver> formats;
 
 	static {
@@ -137,8 +144,7 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 						|| mode == FileMode.SYMLINK) {
 					entry.setUnixMode(mode.getBits());
 				} else {
-					// TODO(jrn): Let the caller know the tree contained
-					// an entry with unsupported mode (e.g., a submodule).
+					warnArchiveEntryModeIgnored(path);
 				}
 				entry.setSize(loader.getSize());
 				out.putArchiveEntry(entry);
@@ -166,12 +172,10 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 
 				final TarArchiveEntry entry = new TarArchiveEntry(path);
 				if (mode == FileMode.REGULAR_FILE ||
-				    mode == FileMode.EXECUTABLE_FILE) {
+				    mode == FileMode.EXECUTABLE_FILE)
 					entry.setMode(mode.getBits());
-				} else {
-					// TODO(jrn): Let the caller know the tree contained
-					// an entry with unsupported mode (e.g., a submodule).
-				}
+				else
+					warnArchiveEntryModeIgnored(path);
 				entry.setSize(loader.getSize());
 				out.putArchiveEntry(entry);
 				loader.copyTo(out);
@@ -194,7 +198,7 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	}
 
 	/**
-	 * Release any resources used by this ArchiveCommand.
+	 * Release any resources used by the internal ObjectReader.
 	 * <p>
 	 * This does not close the output stream set with setOutputStream, which
 	 * belongs to the caller.
@@ -235,8 +239,6 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 			// TODO(jrn): Throw finer-grained errors.
 			throw new JGitInternalException(
 					CLIText.get().exceptionCaughtDuringExecutionOfArchiveCommand, e);
-		} finally {
-			reader.release();
 		}
 
 		return out;
@@ -248,12 +250,8 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	 * @return this
 	 */
 	public ArchiveCommand setTree(ObjectId tree) throws IOException {
-		final RevWalk rw = new RevWalk(repo);
-		try {
-			walk.reset(rw.parseTree(tree));
-		} finally {
-			rw.release();
-		}
+		final RevWalk rw = new RevWalk(walk.getObjectReader());
+		walk.reset(rw.parseTree(tree));
 		return this;
 	}
 
