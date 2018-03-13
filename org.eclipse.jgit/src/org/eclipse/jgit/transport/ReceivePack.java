@@ -43,14 +43,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.transport.BasePackPushConnection.CAPABILITY_DELETE_REFS;
-import static org.eclipse.jgit.transport.BasePackPushConnection.CAPABILITY_OFS_DELTA;
-import static org.eclipse.jgit.transport.BasePackPushConnection.CAPABILITY_REPORT_STATUS;
-import static org.eclipse.jgit.transport.BasePackPushConnection.CAPABILITY_SIDE_BAND_64K;
-import static org.eclipse.jgit.transport.SideBandOutputStream.CH_DATA;
-import static org.eclipse.jgit.transport.SideBandOutputStream.CH_PROGRESS;
-import static org.eclipse.jgit.transport.SideBandOutputStream.MAX_BUF;
-
 import java.io.BufferedWriter;
 import java.io.EOFException;
 import java.io.IOException;
@@ -92,6 +84,12 @@ import org.eclipse.jgit.util.io.TimeoutOutputStream;
  * Implements the server side of a push connection, receiving objects.
  */
 public class ReceivePack {
+	static final String CAPABILITY_REPORT_STATUS = BasePackPushConnection.CAPABILITY_REPORT_STATUS;
+
+	static final String CAPABILITY_DELETE_REFS = BasePackPushConnection.CAPABILITY_DELETE_REFS;
+
+	static final String CAPABILITY_OFS_DELTA = BasePackPushConnection.CAPABILITY_OFS_DELTA;
+
 	/** Database we write the stored objects into. */
 	private final Repository db;
 
@@ -127,6 +125,9 @@ public class ReceivePack {
 
 	/** Identity to record action as within the reflog. */
 	private PersonIdent refLogIdent;
+
+	/** Filter used while advertising the refs to the client. */
+	private RefFilter refFilter;
 
 	/** Hook to validate the update commands before execution. */
 	private PreReceiveHook preReceive;
@@ -164,11 +165,8 @@ public class ReceivePack {
 	/** An exception caught while unpacking and fsck'ing the objects. */
 	private Throwable unpackError;
 
-	/** If {@link BasePackPushConnection#CAPABILITY_REPORT_STATUS} is enabled. */
+	/** if {@link #enabledCapablities} has {@link #CAPABILITY_REPORT_STATUS} */
 	private boolean reportStatus;
-
-	/** If {@link BasePackPushConnection#CAPABILITY_SIDE_BAND_64K} is enabled. */
-	private boolean sideBand;
 
 	/** Lock around the received pack file, while updating refs. */
 	private PackLock packLock;
@@ -189,6 +187,7 @@ public class ReceivePack {
 		allowDeletes = cfg.allowDeletes;
 		allowNonFastForwards = cfg.allowNonFastForwards;
 		allowOfsDelta = cfg.allowOfsDelta;
+		refFilter = RefFilter.DEFAULT;
 		preReceive = PreReceiveHook.NULL;
 		postReceive = PostReceiveHook.NULL;
 	}
@@ -338,6 +337,26 @@ public class ReceivePack {
 	 */
 	public void setRefLogIdent(final PersonIdent pi) {
 		refLogIdent = pi;
+	}
+
+	/** @return the filter used while advertising the refs to the client */
+	public RefFilter getRefFilter() {
+		return refFilter;
+	}
+
+	/**
+	 * Set the filter used while advertising the refs to the client.
+	 * <p>
+	 * Only refs allowed by this filter will be shown to the client.
+	 * Clients may still attempt to create or update a reference hidden
+	 * by the configured {@link RefFilter}. These attempts should be
+	 * rejected by a matching {@link PreReceiveHook}.
+	 *
+	 * @param refFilter
+	 *            the filter; may be null to show all refs.
+	 */
+	public void setRefFilter(final RefFilter refFilter) {
+		this.refFilter = refFilter != null ? refFilter : RefFilter.DEFAULT;
 	}
 
 	/** @return get the hook invoked before updates occur. */
@@ -526,7 +545,7 @@ public class ReceivePack {
 		if (biDirectionalPipe)
 			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
 		else
-			refs = db.getAllRefs();
+			refs = refFilter.filter(db.getAllRefs());
 		recvCommands();
 		if (!commands.isEmpty()) {
 			enableCapabilities();
@@ -565,19 +584,10 @@ public class ReceivePack {
 						msgs.println(s);
 					}
 				});
+				msgs.flush();
 			}
 
 			postReceive.onPostReceive(this, filterCommands(Result.OK));
-
-			if (msgs != null)
-				msgs.flush();
-			if (sideBand) {
-				// If side band is enabled this stream is actually band #1.
-				// Closing it will send a flush-pkt indicating the side-band
-				// data segment is over.  But the stream itself remains open.
-				//
-				rawOut.close();
-			}
 		}
 	}
 
@@ -599,12 +609,11 @@ public class ReceivePack {
 	public void sendAdvertisedRefs(final RefAdvertiser adv) throws IOException {
 		final RevFlag advertised = walk.newFlag("ADVERTISED");
 		adv.init(walk, advertised);
-		adv.advertiseCapability(CAPABILITY_SIDE_BAND_64K);
 		adv.advertiseCapability(CAPABILITY_DELETE_REFS);
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
 		if (allowOfsDelta)
 			adv.advertiseCapability(CAPABILITY_OFS_DELTA);
-		refs = db.getAllRefs();
+		refs = refFilter.filter(db.getAllRefs());
 		final Ref head = refs.remove(Constants.HEAD);
 		adv.send(refs);
 		if (head != null && !head.isSymbolic())
@@ -658,17 +667,6 @@ public class ReceivePack {
 
 	private void enableCapabilities() {
 		reportStatus = enabledCapablities.contains(CAPABILITY_REPORT_STATUS);
-
-		sideBand = enabledCapablities.contains(CAPABILITY_SIDE_BAND_64K);
-		if (sideBand) {
-			OutputStream out = rawOut;
-
-			rawOut = new SideBandOutputStream(CH_DATA, MAX_BUF, out);
-			pckOut = new PacketLineOut(rawOut);
-			msgs = new PrintWriter(new OutputStreamWriter(
-					new SideBandOutputStream(CH_PROGRESS, MAX_BUF, out),
-					Constants.CHARSET));
-		}
 	}
 
 	private boolean needPack() {
