@@ -41,45 +41,34 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.http.test.util;
+package org.eclipse.jgit.http.server.glue;
 
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import java.io.IOException;
 
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletContext;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
-public class MockServletConfig implements ServletConfig {
-	private final Map<String, String> parameters = new HashMap<String, String>();
+/** Sends a fixed status code to the client. */
+public class ErrorServlet extends HttpServlet {
+	private static final long serialVersionUID = 1L;
 
-	public void setInitParameter(String name, String value) {
-		parameters.put(name, value);
+	private final int status;
+
+	/**
+	 * Sends a specific status code.
+	 *
+	 * @param status
+	 *            the HTTP status code to always send.
+	 */
+	public ErrorServlet(final int status) {
+		this.status = status;
 	}
 
-	public String getInitParameter(String name) {
-		return parameters.get(name);
-	}
-
-	public Enumeration getInitParameterNames() {
-		final Iterator<String> i = parameters.keySet().iterator();
-		return new Enumeration<String>() {
-			public boolean hasMoreElements() {
-				return i.hasNext();
-			}
-
-			public String nextElement() {
-				return i.next();
-			}
-		};
-	}
-
-	public String getServletName() {
-		return "MOCK_SERVLET";
-	}
-
-	public ServletContext getServletContext() {
-		return null;
+	@Override
+	protected void doGet(HttpServletRequest req, HttpServletResponse rsp)
+			throws ServletException, IOException {
+		rsp.sendError(status);
 	}
 }

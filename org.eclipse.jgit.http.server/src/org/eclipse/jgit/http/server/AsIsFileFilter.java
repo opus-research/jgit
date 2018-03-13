@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2009-2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,31 +41,53 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.http.test.util;
+package org.eclipse.jgit.http.server;
 
-import java.util.ArrayList;
-import java.util.List;
+import static javax.servlet.http.HttpServletResponse.SC_FORBIDDEN;
+import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
+import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
 
-import org.eclipse.jetty.server.Request;
-import org.eclipse.jetty.server.RequestLog;
-import org.eclipse.jetty.server.Response;
-import org.eclipse.jetty.util.component.AbstractLifeCycle;
+import java.io.IOException;
 
-/** Logs request made through {@link AppServer}. */
-class TestRequestLog extends AbstractLifeCycle implements RequestLog {
-	private final List<AccessEvent> events = new ArrayList<AccessEvent>();
+import javax.servlet.Filter;
+import javax.servlet.FilterChain;
+import javax.servlet.FilterConfig;
+import javax.servlet.ServletException;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
-	/** Reset the log back to its original empty state. */
-	synchronized void clear() {
-		events.clear();
+import org.eclipse.jgit.http.server.resolver.AsIsFileService;
+import org.eclipse.jgit.http.server.resolver.ServiceNotAuthorizedException;
+import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
+import org.eclipse.jgit.lib.Repository;
+
+class AsIsFileFilter implements Filter {
+	private final AsIsFileService asIs;
+
+	AsIsFileFilter(final AsIsFileService getAnyFile) {
+		this.asIs = getAnyFile;
 	}
 
-	/** @return all of the events made since the last clear. */
-	synchronized List<AccessEvent> getEvents() {
-		return events;
+	public void init(FilterConfig config) throws ServletException {
+		// Do nothing.
 	}
 
-	public synchronized void log(Request request, Response response) {
-		events.add(new AccessEvent(request, response));
+	public void destroy() {
+		// Do nothing.
+	}
+
+	public void doFilter(ServletRequest request, ServletResponse response,
+			FilterChain chain) throws IOException, ServletException {
+		try {
+			final Repository db = getRepository(request);
+			asIs.access((HttpServletRequest) request, db);
+			chain.doFilter(request, response);
+		} catch (ServiceNotAuthorizedException e) {
+			((HttpServletResponse) response).sendError(SC_UNAUTHORIZED);
+		} catch (ServiceNotEnabledException e) {
+			((HttpServletResponse) response).sendError(SC_FORBIDDEN);
+		}
 	}
 }
