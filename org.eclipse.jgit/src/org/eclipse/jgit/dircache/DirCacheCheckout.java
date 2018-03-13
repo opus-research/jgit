@@ -44,13 +44,9 @@ package org.eclipse.jgit.dircache;
 
 import static org.eclipse.jgit.treewalk.TreeWalk.OperationType.CHECKOUT_OP;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.file.StandardCopyOption;
 import java.text.MessageFormat;
@@ -69,9 +65,7 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.IndexWriteException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.events.WorkingTreeModifiedEvent;
-import org.eclipse.jgit.ignore.FastIgnoreRule;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
 import org.eclipse.jgit.lib.CoreConfig.EolStreamType;
@@ -83,7 +77,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.EmptyTreeIterator;
@@ -165,8 +158,6 @@ public class DirCacheCheckout {
 
 	private boolean performingCheckout;
 
-	private final ArrayList<FastIgnoreRule> sparseRules;
-
 	/**
 	 * @return a list of updated paths and smudgeFilterCommands
 	 */
@@ -226,7 +217,6 @@ public class DirCacheCheckout {
 		this.mergeCommitTree = mergeCommitTree;
 		this.workingTree = workingTree;
 		this.emptyDirCache = (dc == null) || (dc.getEntryCount() == 0);
-		this.sparseRules = new ArrayList<>();
 	}
 
 	/**
@@ -483,8 +473,6 @@ public class DirCacheCheckout {
 	private boolean doCheckout() throws CorruptObjectException, IOException,
 			MissingObjectException, IncorrectObjectTypeException,
 			CheckoutConflictException, IndexWriteException {
-		loadSparseCheckoutRules();
-
 		toBeDeleted.clear();
 		try (ObjectReader objectReader = repo.getObjectDatabase().newReader()) {
 			if (headCommitTree != null)
@@ -1151,13 +1139,8 @@ public class DirCacheCheckout {
 	}
 
 	private void keep(DirCacheEntry e) {
-		if (e != null && !FileMode.TREE.equals(e.getFileMode())) {
-			if (skipSparse(e)) {
-				e.setSkipWorkTree(true);
-				removed.add(e.getPathString());
-			}
+		if (e != null && !FileMode.TREE.equals(e.getFileMode()))
 			builder.add(e);
-		}
 	}
 
 	private void remove(String path) {
@@ -1167,20 +1150,13 @@ public class DirCacheCheckout {
 	private void update(String path, ObjectId mId, FileMode mode)
 			throws IOException {
 		if (!FileMode.TREE.equals(mode)) {
-			DirCacheEntry entry = new DirCacheEntry(path,
-					DirCacheEntry.STAGE_0);
-			entry.setFileMode(mode);
+			updated.put(path, new CheckoutMetadata(
+					walk.getEolStreamType(CHECKOUT_OP),
+					walk.getFilterCommand(Constants.ATTR_FILTER_TYPE_SMUDGE)));
 
-			if (skipSparse(entry)) {
-				entry.setSkipWorkTree(true);
-				removed.add(path);
-			} else {
-				updated.put(path, new CheckoutMetadata(
-						walk.getEolStreamType(CHECKOUT_OP),
-						walk.getFilterCommand(Constants.ATTR_FILTER_TYPE_SMUDGE)));
-			}
+			DirCacheEntry entry = new DirCacheEntry(path, DirCacheEntry.STAGE_0);
 			entry.setObjectId(mId);
-
+			entry.setFileMode(mode);
 			builder.add(entry);
 		}
 	}
@@ -1544,75 +1520,4 @@ public class DirCacheCheckout {
 			throw i;
 		}
 	}
-
-	/**
-	 * Check the sparse-checkout rules to see if the path should be checked out.
-	 *
-	 * @param entry
-	 *            The Index entry to test the sparse checkout rules against.
-	 * @return indicates if path should be checked out
-	 * @since 4.10
-	 */
-	private boolean skipSparse(DirCacheEntry entry) {
-		if (sparseRules.isEmpty()) {
-			return false;
-		}
-
-		boolean skip = sparseRules.isEmpty() ? false : true;
-		final boolean isDirectory = FileMode.TREE.equals(entry.getFileMode());
-
-		for (int i = sparseRules.size() - 1; i >= 0; i--) {
-			// rules are processed in reverse order as the later rules take
-			// precedence.
-			final FastIgnoreRule sparseRule = sparseRules.get(i);
-
-			if (sparseRule.isMatch(entry.getPathString(), isDirectory)) {
-				skip = !sparseRule.getResult();
-				break;
-			}
-		}
-
-		return skip;
-	}
-
-	/**
-	 * Loads the sparse-checkout files rules into
-	 * {@link DirCacheCheckout#sparseRules} if the repository is
-	 * configured with the 'core.sparsecheckout' set to 'true'.
-	 *
-	 * @throws FileNotFoundException
-	 * @throws IOException
-	 */
-	private void loadSparseCheckoutRules()
-			throws FileNotFoundException, IOException {
-		StoredConfig rc = repo.getConfig();
-		final boolean isSparseCheckout = rc.getBoolean(
-				ConfigConstants.CONFIG_CORE_SECTION,
-				ConfigConstants.CONFIG_KEY_SPARSECHECKOUT, false);
-
-		final File file = repo.getSparseCheckoutFile();
-
-		if (!isSparseCheckout || !FS.DETECTED.exists(file)) {
-			return;
-		}
-
-		if (isSparseCheckout && FS.DETECTED.exists(file)) {
-			try (FileInputStream in = new FileInputStream(file);
-					BufferedReader br = new BufferedReader(
-							new InputStreamReader(in, Constants.CHARSET))) {
-				String line;
-
-				while ((line = br.readLine()) != null) {
-					if (line.length() > 0 && !line.startsWith("#")) { //$NON-NLS-1$
-						FastIgnoreRule rule = new FastIgnoreRule(line.trim());
-
-						if (!rule.isEmpty()) {
-							sparseRules.add(rule);
-						}
-					}
-				}
-			}
-		}
-	}
-
 }
