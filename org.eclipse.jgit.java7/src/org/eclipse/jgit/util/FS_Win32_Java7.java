@@ -45,8 +45,6 @@ package org.eclipse.jgit.util;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 
 /**
  * FS for Java7 on Windows
@@ -123,16 +121,5 @@ public class FS_Win32_Java7 extends FS_Win32 {
 	@Override
 	public void createSymLink(File path, String target) throws IOException {
 		FileUtil.createSymLink(path, target);
-	}
-
-	@Override
-	public PathMatcher getPathMatcher(String globPattern) {
-		return new PathMatcher_Java7(globPattern);
-	}
-
-	@Override
-	public void copyFile(File sourceFile, File destFile) throws IOException {
-		Files.copy(sourceFile.toPath(), destFile.toPath(),
-				StandardCopyOption.REPLACE_EXISTING);
 	}
 }
