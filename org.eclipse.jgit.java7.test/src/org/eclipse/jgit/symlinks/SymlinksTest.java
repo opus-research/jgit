@@ -68,7 +68,7 @@ public class SymlinksTest extends RepositoryTestCase {
 	 * Steps: 1.Add file 'a' 2.Commit 3.Create branch '1' 4.Replace file 'a' by
 	 * symlink 'a' 5.Commit 6.Checkout branch '1'
 	 *
-	 * The working tree should contains 'a' with FileMode.REGULAR_FILE after the
+	 * The working tree should contain 'a' with FileMode.REGULAR_FILE after the
 	 * checkout.
 	 *
 	 * @throws Exception
@@ -101,7 +101,7 @@ public class SymlinksTest extends RepositoryTestCase {
 	 * Steps: 1.Add symlink 'a' 2.Commit 3.Create branch '1' 4.Replace symlink
 	 * 'a' by file 'a' 5.Commit 6.Checkout branch '1'
 	 *
-	 * The working tree should contains 'a' with FileMode.SYMLINK after the
+	 * The working tree should contain 'a' with FileMode.SYMLINK after the
 	 * checkout.
 	 *
 	 * @throws Exception
@@ -134,7 +134,7 @@ public class SymlinksTest extends RepositoryTestCase {
 	 * Steps: 1.Add folder 'a' 2.Commit 3.Create branch '1' 4.Replace folder 'a'
 	 * by symlink 'a' 5.Commit 6.Checkout branch '1'
 	 *
-	 * The working tree should contains 'a' with FileMode.TREE after the
+	 * The working tree should contain 'a' with FileMode.TREE after the
 	 * checkout.
 	 *
 	 * @throws Exception
@@ -168,7 +168,7 @@ public class SymlinksTest extends RepositoryTestCase {
 	 * Steps: 1.Add symlink 'a' 2.Commit 3.Create branch '1' 4.Replace symlink
 	 * 'a' by folder 'a' 5.Commit 6.Checkout branch '1'
 	 *
-	 * The working tree should contains 'a' with FileMode.SYMLINK after the
+	 * The working tree should contain 'a' with FileMode.SYMLINK after the
 	 * checkout.
 	 *
 	 * @throws Exception
@@ -202,7 +202,7 @@ public class SymlinksTest extends RepositoryTestCase {
 	 * Steps: 1.Add file 'b' 2.Commit 3.Create branch '1' 4.Add symlink 'a'
 	 * 5.Commit 6.Checkout branch '1'
 	 *
-	 * The working tree should not contains 'a' -> FileMode.MISSING after the
+	 * The working tree should not contain 'a' -> FileMode.MISSING after the
 	 * checkout.
 	 *
 	 * @throws Exception
@@ -233,7 +233,7 @@ public class SymlinksTest extends RepositoryTestCase {
 	 * Steps: 1.Add symlink 'a' 2.Commit 3.Create branch '1' 4.Delete symlink
 	 * 'a' 5.Commit 6.Checkout branch '1'
 	 *
-	 * The working tree should contains 'a' with FileMode.SYMLINK after the
+	 * The working tree should contain 'a' with FileMode.SYMLINK after the
 	 * checkout.
 	 *
 	 * @throws Exception
@@ -259,79 +259,5 @@ public class SymlinksTest extends RepositoryTestCase {
 		assertEquals(1, scan.size());
 		assertEquals(FileMode.MISSING, scan.get(0).getNewMode());
 		assertEquals(FileMode.SYMLINK, scan.get(0).getOldMode());
-	}
-
-	@Test
-	public void createSymlinkAfterTarget() throws Exception {
-		Git git = new Git(db);
-		writeTrashFile("a", "start");
-		git.add().addFilepattern("a").call();
-		RevCommit base = git.commit().setMessage("init").call();
-		writeTrashFile("target", "someData");
-		FileUtils.createSymLink(new File(db.getWorkTree(), "link"), "target");
-		git.add().addFilepattern("target").addFilepattern("link").call();
-		git.commit().setMessage("add target").call();
-		assertEquals(4, db.getWorkTree().list().length); // self-check
-		git.checkout().setName(base.name()).call();
-		assertEquals(2, db.getWorkTree().list().length); // self-check
-		git.checkout().setName("master").call();
-		assertEquals(4, db.getWorkTree().list().length);
-		String data = read(new File(db.getWorkTree(), "target"));
-		assertEquals(8, new File(db.getWorkTree(), "target").length());
-		assertEquals("someData", data);
-		data = read(new File(db.getWorkTree(), "link"));
-		assertEquals("target",
-				FileUtils.readSymLink(new File(db.getWorkTree(), "link")));
-		;
-		assertEquals("someData", data);
-	}
-
-	@Test
-	public void createFileSymlinkBeforeTarget() throws Exception {
-		Git git = new Git(db);
-		writeTrashFile("a", "start");
-		git.add().addFilepattern("a").call();
-		RevCommit base = git.commit().setMessage("init").call();
-		writeTrashFile("target", "someData");
-		FileUtils.createSymLink(new File(db.getWorkTree(), "tlink"), "target");
-		git.add().addFilepattern("target").addFilepattern("tlink").call();
-		git.commit().setMessage("add target").call();
-		assertEquals(4, db.getWorkTree().list().length); // self-check
-		git.checkout().setName(base.name()).call();
-		assertEquals(2, db.getWorkTree().list().length); // self-check
-		git.checkout().setName("master").call();
-		assertEquals(4, db.getWorkTree().list().length);
-		String data = read(new File(db.getWorkTree(), "target"));
-		assertEquals(8, new File(db.getWorkTree(), "target").length());
-		assertEquals("someData", data);
-		data = read(new File(db.getWorkTree(), "tlink"));
-		assertEquals("target",
-				FileUtils.readSymLink(new File(db.getWorkTree(), "tlink")));
-		assertEquals("someData", data);
-	}
-
-	@Test
-	public void createDirSymlinkBeforeTarget() throws Exception {
-		Git git = new Git(db);
-		writeTrashFile("a", "start");
-		git.add().addFilepattern("a").call();
-		RevCommit base = git.commit().setMessage("init").call();
-		FileUtils.createSymLink(new File(db.getWorkTree(), "link"), "target");
-		FileUtils.mkdir(new File(db.getWorkTree(), "target"));
-		writeTrashFile("target/file", "someData");
-		git.add().addFilepattern("target").addFilepattern("link").call();
-		git.commit().setMessage("add target").call();
-		assertEquals(4, db.getWorkTree().list().length); // self-check
-		git.checkout().setName(base.name()).call();
-		assertEquals(2, db.getWorkTree().list().length); // self-check
-		git.checkout().setName("master").call();
-		assertEquals(4, db.getWorkTree().list().length);
-		String data = read(new File(db.getWorkTree(), "target/file"));
-		assertEquals(8, new File(db.getWorkTree(), "target/file").length());
-		assertEquals("someData", data);
-		data = read(new File(db.getWorkTree(), "link/file"));
-		assertEquals("target",
-				FileUtils.readSymLink(new File(db.getWorkTree(), "link")));
-		assertEquals("someData", data);
 	}
 }
