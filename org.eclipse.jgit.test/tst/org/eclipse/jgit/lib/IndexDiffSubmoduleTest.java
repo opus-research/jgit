@@ -90,7 +90,9 @@ public class IndexDiffSubmoduleTest extends RepositoryTestCase {
 				.setPath("modules/submodule")
 				.setURI(submoduleStandalone.getDirectory().toURI().toString())
 				.call();
+		submoduleStandalone.close();
 		submodule_trash = submodule_db.getWorkTree();
+		addRepoToClose(submodule_db);
 		writeTrashFile("fileInRoot", "root");
 		Git rootGit = Git.wrap(db);
 		rootGit.add().addFilepattern("fileInRoot").call();
