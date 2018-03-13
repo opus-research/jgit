@@ -55,6 +55,7 @@ import java.io.IOException;
 import java.text.MessageFormat;
 import java.text.ParseException;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
@@ -342,7 +343,7 @@ public class FileRepository extends Repository {
 		if (symLinks != null)
 			cfg.setString(ConfigConstants.CONFIG_CORE_SECTION, null,
 					ConfigConstants.CONFIG_KEY_SYMLINKS, symLinks.name()
-							.toLowerCase());
+							.toLowerCase(Locale.ROOT));
 		cfg.setInt(ConfigConstants.CONFIG_CORE_SECTION, null,
 				ConfigConstants.CONFIG_KEY_REPO_FORMAT_VERSION, 0);
 		cfg.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
@@ -489,7 +490,7 @@ public class FileRepository extends Repository {
 	 */
 	@Override
 	public Set<ObjectId> getAdditionalHaves() {
-		HashSet<ObjectId> r = new HashSet<ObjectId>();
+		HashSet<ObjectId> r = new HashSet<>();
 		for (AlternateHandle d : objectDatabase.myAlternates()) {
 			if (d instanceof AlternateRepository) {
 				Repository repo;
@@ -618,12 +619,18 @@ public class FileRepository extends Repository {
 
 	}
 
+	private boolean shouldAutoDetach() {
+		return getConfig().getBoolean(ConfigConstants.CONFIG_GC_SECTION,
+				ConfigConstants.CONFIG_KEY_AUTODETACH, true);
+	}
+
 	@Override
 	public void autoGC(ProgressMonitor monitor) {
 		GC gc = new GC(this);
 		gc.setPackConfig(new PackConfig(this));
 		gc.setProgressMonitor(monitor);
 		gc.setAuto(true);
+		gc.setBackground(shouldAutoDetach());
 		try {
 			gc.gc();
 		} catch (ParseException | IOException e) {

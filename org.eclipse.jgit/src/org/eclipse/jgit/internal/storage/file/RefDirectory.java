@@ -80,7 +80,6 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.ObjectWritingException;
 import org.eclipse.jgit.events.RefsChangedEvent;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
@@ -154,10 +153,10 @@ public class RefDirectory extends RefDatabase {
 	 * converted into resolved references during a get operation, ensuring the
 	 * live value is always returned.
 	 */
-	private final AtomicReference<RefList<LooseRef>> looseRefs = new AtomicReference<RefList<LooseRef>>();
+	private final AtomicReference<RefList<LooseRef>> looseRefs = new AtomicReference<>();
 
 	/** Immutable sorted list of packed references. */
-	final AtomicReference<PackedRefList> packedRefs = new AtomicReference<PackedRefList>();
+	final AtomicReference<PackedRefList> packedRefs = new AtomicReference<>();
 
 	/**
 	 * Number of modifications made to this database.
@@ -195,6 +194,7 @@ public class RefDirectory extends RefDatabase {
 		return logWriter;
 	}
 
+	@Override
 	public void create() throws IOException {
 		FileUtils.mkdir(refsDir);
 		FileUtils.mkdir(new File(refsDir, R_HEADS.substring(R_REFS.length())));
@@ -352,7 +352,7 @@ public class RefDirectory extends RefDatabase {
 
 	@Override
 	public List<Ref> getAdditionalRefs() throws IOException {
-		List<Ref> ret = new LinkedList<Ref>();
+		List<Ref> ret = new LinkedList<>();
 		for (String name : additionalRefsNames) {
 			Ref r = getRef(name);
 			if (r != null)
@@ -371,7 +371,7 @@ public class RefDirectory extends RefDatabase {
 
 		private int curIdx;
 
-		final RefList.Builder<Ref> symbolic = new RefList.Builder<Ref>(4);
+		final RefList.Builder<Ref> symbolic = new RefList.Builder<>(4);
 
 		RefList.Builder<LooseRef> newLoose;
 
@@ -535,6 +535,7 @@ public class RefDirectory extends RefDatabase {
 		fireRefsChanged();
 	}
 
+	@Override
 	public RefDirectoryUpdate newUpdate(String name, boolean detach)
 			throws IOException {
 		boolean detachingSymbolicRef = false;
@@ -766,20 +767,14 @@ public class RefDirectory extends RefDatabase {
 	}
 
 	private PackedRefList getPackedRefs() throws IOException {
-		boolean trustFolderStat = getRepository().getConfig().getBoolean(
-				ConfigConstants.CONFIG_CORE_SECTION,
-				ConfigConstants.CONFIG_KEY_TRUSTFOLDERSTAT, true);
-
 		final PackedRefList curList = packedRefs.get();
-		if (trustFolderStat && !curList.snapshot.isModified(packedRefsFile)) {
+		if (!curList.snapshot.isModified(packedRefsFile))
 			return curList;
-		}
 
 		final PackedRefList newList = readPackedRefs();
 		if (packedRefs.compareAndSet(curList, newList)
-				&& !curList.id.equals(newList.id)) {
+				&& !curList.id.equals(newList.id))
 			modCnt.incrementAndGet();
-		}
 		return newList;
 	}
 
@@ -805,7 +800,8 @@ public class RefDirectory extends RefDatabase {
 				return new PackedRefList(parsePackedRefs(br), snapshot,
 						ObjectId.fromRaw(digest.digest()));
 			} catch (IOException e) {
-				if (FileUtils.isStaleFileHandle(e) && retries < maxStaleRetries) {
+				if (FileUtils.isStaleFileHandleInCausalChain(e)
+						&& retries < maxStaleRetries) {
 					if (LOG.isDebugEnabled()) {
 						LOG.debug(MessageFormat.format(
 								JGitText.get().packedRefsHandleIsStale,
@@ -823,7 +819,7 @@ public class RefDirectory extends RefDatabase {
 
 	private RefList<Ref> parsePackedRefs(final BufferedReader br)
 			throws IOException {
-		RefList.Builder<Ref> all = new RefList.Builder<Ref>();
+		RefList.Builder<Ref> all = new RefList.Builder<>();
 		Ref last = null;
 		boolean peeled = false;
 		boolean needSort = false;
@@ -1132,10 +1128,12 @@ public class RefDirectory extends RefDatabase {
 			this.snapShot = snapshot;
 		}
 
+		@Override
 		public FileSnapshot getSnapShot() {
 			return snapShot;
 		}
 
+		@Override
 		public LooseRef peel(ObjectIdRef newLeaf) {
 			return this;
 		}
@@ -1151,10 +1149,12 @@ public class RefDirectory extends RefDatabase {
 			this.snapShot = snapshot;
 		}
 
+		@Override
 		public FileSnapshot getSnapShot() {
 			return snapShot;
 		}
 
+		@Override
 		public LooseRef peel(ObjectIdRef newLeaf) {
 			return this;
 		}
@@ -1170,6 +1170,7 @@ public class RefDirectory extends RefDatabase {
 			this.snapShot = snapShot;
 		}
 
+		@Override
 		public FileSnapshot getSnapShot() {
 			return snapShot;
 		}
@@ -1182,6 +1183,7 @@ public class RefDirectory extends RefDatabase {
 			return id;
 		}
 
+		@Override
 		public LooseRef peel(ObjectIdRef newLeaf) {
 			ObjectId peeledObjectId = newLeaf.getPeeledObjectId();
 			ObjectId objectId = getObjectId();
@@ -1205,10 +1207,12 @@ public class RefDirectory extends RefDatabase {
 			this.snapShot = snapshot;
 		}
 
+		@Override
 		public FileSnapshot getSnapShot() {
 			return snapShot;
 		}
 
+		@Override
 		public LooseRef peel(ObjectIdRef newLeaf) {
 			// We should never try to peel the symbolic references.
 			throw new UnsupportedOperationException();

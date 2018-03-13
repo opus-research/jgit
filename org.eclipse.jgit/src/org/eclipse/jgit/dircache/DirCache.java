@@ -111,6 +111,7 @@ public class DirCache {
 	private static final byte[] NO_CHECKSUM = {};
 
 	static final Comparator<DirCacheEntry> ENT_CMP = new Comparator<DirCacheEntry>() {
+		@Override
 		public int compare(final DirCacheEntry o1, final DirCacheEntry o2) {
 			final int cr = cmp(o1, o2);
 			if (cr != 0)
@@ -992,7 +993,7 @@ public class DirCache {
 	 * @throws IOException
 	 */
 	private void updateSmudgedEntries() throws IOException {
-		List<String> paths = new ArrayList<String>(128);
+		List<String> paths = new ArrayList<>(128);
 		try (TreeWalk walk = new TreeWalk(repository)) {
 			walk.setOperationType(OperationType.CHECKIN_OP);
 			for (int i = 0; i < entryCnt; i++)
