@@ -95,7 +95,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String blobNotFound;
 	/***/ public String blobNotFoundForPath;
 	/***/ public String branchNameInvalid;
-	/***/ public String cachedPacksPreventsIndexCreation;
 	/***/ public String cannotBeCombined;
 	/***/ public String cannotCombineTreeFilterWithRevFilter;
 	/***/ public String cannotCommitOnARepoWithState;
@@ -390,7 +389,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String packfileCorruptionDetected;
 	/***/ public String packfileIsTruncated;
 	/***/ public String packingCancelledDuringObjectsWriting;
-	/***/ public String packWriterStatistics;
 	/***/ public String pathIsNotInWorkingDir;
 	/***/ public String peeledLineBeforeRef;
 	/***/ public String peerDidNotSupplyACompleteObjectGraph;
