@@ -52,7 +52,6 @@ import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -98,12 +97,9 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 			git.checkout().setName("test").call();
 			assertEquals("[Test.txt, mode:100644, content:Some change]",
 					indexState(CONTENT));
-			Ref result = git.checkout().setName("master").call();
+			git.checkout().setName("master").call();
 			assertEquals("[Test.txt, mode:100644, content:Hello world]",
 					indexState(CONTENT));
-			assertEquals("refs/heads/master", result.getName());
-			assertEquals("refs/heads/master", git.getRepository()
-					.getFullBranch());
 		} catch (Exception e) {
 			fail(e.getMessage());
 		}
@@ -173,19 +169,6 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 			assertTrue(co.getResult().getUndeletedList().contains("Test.txt"));
 		} finally {
 			fis.close();
-		}
-	}
-
-	public void testCheckoutCommit() {
-		try {
-			Ref result = git.checkout().setName(initialCommit.name()).call();
-			assertEquals("[Test.txt, mode:100644, content:Hello world]",
-					indexState(CONTENT));
-			assertNull(result);
-			assertEquals(initialCommit.name(), git.getRepository()
-					.getFullBranch());
-		} catch (Exception e) {
-			fail(e.getMessage());
 		}
 	}
 }
