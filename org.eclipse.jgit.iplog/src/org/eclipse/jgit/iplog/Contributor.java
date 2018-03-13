@@ -66,7 +66,6 @@ class Contributor {
 	private final List<SingleContribution> contributions = new ArrayList<SingleContribution>();
 
 	/**
-	 * @param id
 	 * @param name
 	 */
 	Contributor(String id, String name) {
