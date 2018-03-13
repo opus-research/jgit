@@ -203,15 +203,6 @@ public class PushCertificate {
 	 * @since 4.1
 	 */
 	public String toText() {
-		return toStringBuilder().toString();
-	}
-
-	/** @return original text payload plus signature. */
-	public String toTextWithSignature() {
-		return toStringBuilder().append(signature).toString();
-	}
-
-	private StringBuilder toStringBuilder() {
 		StringBuilder sb = new StringBuilder()
 				.append(VERSION).append(' ').append(version).append('\n')
 				.append(PUSHER).append(' ').append(getPusher())
@@ -224,7 +215,7 @@ public class PushCertificate {
 				.append(' ').append(cmd.getNewId().name())
 				.append(' ').append(cmd.getRefName()).append('\n');
 		}
-		return sb;
+		return sb.toString();
 	}
 
 	@Override
@@ -265,6 +256,6 @@ public class PushCertificate {
 	@Override
 	public String toString() {
 		return getClass().getSimpleName() + '['
-				 + toTextWithSignature() + ']';
+				 + toText() + signature + ']';
 	}
 }
