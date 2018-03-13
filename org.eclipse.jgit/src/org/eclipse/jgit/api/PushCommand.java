@@ -77,10 +77,6 @@ import org.eclipse.jgit.transport.Transport;
  */
 public class PushCommand extends GitCommand<Iterable<PushResult>> {
 
-	/** The default RefSpec */
-	public static final RefSpec DEFAULT_PUSH_REF_SPEC = new RefSpec(
-			"refs/heads/*:refs/heads/*"); //$NON-NLS-1$
-
 	private String remote = Constants.DEFAULT_REMOTE_NAME;
 
 	private final List<RefSpec> refSpecs;
@@ -129,14 +125,9 @@ public class PushCommand extends GitCommand<Iterable<PushResult>> {
 
 		try {
 			if (refSpecs.isEmpty()) {
-				RemoteConfig config = new RemoteConfig(repo.getConfig(),
-						getRemote());
-				refSpecs.addAll(config.getPushRefSpecs());
-			}
-			if (refSpecs.isEmpty()) {
 				Ref head = repo.getRef(Constants.HEAD);
 				if (head != null && head.isSymbolic())
-					refSpecs.add(DEFAULT_PUSH_REF_SPEC);
+					refSpecs.add(new RefSpec(head.getLeaf().getName()));
 			}
 
 			if (force) {
