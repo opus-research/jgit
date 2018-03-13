@@ -57,16 +57,16 @@ import org.junit.Test;
 
 public class RepoCommandTest extends RepositoryTestCase {
 
-	private Git remoteGit;
+	private Repository remoteDb;
 
 	public void setUp() throws Exception {
 		super.setUp();
 
-		Repository remoteDb = createWorkRepository();
-		remoteGit = new Git(remoteDb);
+		remoteDb = createWorkRepository();
+		Git git = new Git(remoteDb);
 		JGitTestUtil.writeTrashFile(remoteDb, "hello.txt", "world");
-		remoteGit.add().addFilepattern("hello.txt").call();
-		remoteGit.commit().setMessage("Initial commit").call();
+		git.add().addFilepattern("hello.txt").call();
+		git.commit().setMessage("Initial commit").call();
 	}
 
 	@Test
@@ -81,7 +81,7 @@ public class RepoCommandTest extends RepositoryTestCase {
 		writeTrashFile("manifest.xml", xmlContent.toString());
 		RepoCommand command = new RepoCommand(db);
 		command.setPath(db.getWorkTree().getAbsolutePath() + "/manifest.xml")
-			.setURI(remoteGit.getRepository().getDirectory().toURI().toString())
+			.setURI(remoteDb.getDirectory().toURI().toString())
 			.call();
 		File hello = new File(db.getWorkTree(), "foo/hello.txt");
 		assertTrue("submodule was checked out", hello.exists());
