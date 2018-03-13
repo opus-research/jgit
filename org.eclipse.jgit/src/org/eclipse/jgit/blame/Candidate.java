@@ -52,7 +52,9 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 
 /**
@@ -107,6 +109,30 @@ class Candidate {
 	Candidate(RevCommit commit, PathFilter path) {
 		sourceCommit = commit;
 		sourcePath = path;
+	}
+
+	int getParentCount() {
+		return sourceCommit.getParentCount();
+	}
+
+	RevCommit getParent(int idx) {
+		return sourceCommit.getParent(idx);
+	}
+
+	Candidate getNextCandidate(int idx) {
+		return null;
+	}
+
+	void add(RevFlag flag) {
+		sourceCommit.add(flag);
+	}
+
+	int getTime() {
+		return sourceCommit.getCommitTime();
+	}
+
+	PersonIdent getAuthor() {
+		return sourceCommit.getAuthorIdent();
 	}
 
 	Candidate copy(RevCommit commit) {
@@ -254,5 +280,46 @@ class Candidate {
 			r.append(" regions:").append(regionList);
 		r.append("]");
 		return r.toString();
+	}
+
+	static class BlobCandidate extends Candidate {
+		String description;
+
+		Candidate parent;
+
+		BlobCandidate(String name, PathFilter path) {
+			super(null, path);
+			description = name;
+		}
+
+		@Override
+		int getParentCount() {
+			return parent != null ? 1 : 0;
+		}
+
+		@Override
+		RevCommit getParent(int idx) {
+			return null;
+		}
+
+		@Override
+		Candidate getNextCandidate(int idx) {
+			return parent;
+		}
+
+		@Override
+		void add(RevFlag flag) {
+			// Do nothing, sourceCommit is null.
+		}
+
+		@Override
+		int getTime() {
+			return Integer.MAX_VALUE;
+		}
+
+		@Override
+		PersonIdent getAuthor() {
+			return new PersonIdent(description, null);
+		}
 	}
 }

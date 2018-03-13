@@ -48,6 +48,7 @@ import static org.junit.Assert.assertTrue;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.blame.BlameGenerator;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.junit.Test;
@@ -70,6 +71,7 @@ public class BlameGeneratorTest extends RepositoryTestCase {
 
 		BlameGenerator generator = new BlameGenerator(db, "file.txt");
 		try {
+			generator.push(null, db.resolve(Constants.HEAD));
 			assertEquals(3, generator.getResultContents().size());
 
 			assertTrue(generator.next());
@@ -118,6 +120,7 @@ public class BlameGeneratorTest extends RepositoryTestCase {
 
 		BlameGenerator generator = new BlameGenerator(db, "file.txt");
 		try {
+			generator.push(null, db.resolve(Constants.HEAD));
 			assertEquals(3, generator.getResultContents().size());
 
 			assertTrue(generator.next());
