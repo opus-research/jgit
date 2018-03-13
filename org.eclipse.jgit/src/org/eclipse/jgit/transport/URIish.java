@@ -4,7 +4,6 @@
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>
  * Copyright (C) 2013, Robin Stocker <robin@nibor.org>
- * Copyright (C) 2015, Patrick Steinhardt <ps@pks.im>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -135,11 +134,11 @@ public class URIish implements Serializable {
 			+ OPT_USER_PWD_P //
 			+ HOST_P //
 			+ OPT_PORT_P //
-			+ "(" // open a group capturing the user-home-dir-part //$NON-NLS-1$
-			+ (USER_HOME_P + "?") //$NON-NLS-1$
-			+ "[\\\\/])" //$NON-NLS-1$
+			+ "(" // open a catpuring group the the user-home-dir part //$NON-NLS-1$
+			+ (USER_HOME_P + "?") // //$NON-NLS-1$
+			+ "[\\\\/])" // //$NON-NLS-1$
 			+ ")?" // close the optional group containing hostname //$NON-NLS-1$
-			+ "(.+)?" //$NON-NLS-1$
+			+ "(.+)?" // //$NON-NLS-1$
 			+ "$"); //$NON-NLS-1$
 
 	/**
@@ -691,10 +690,6 @@ public class URIish implements Serializable {
 	 * <td><code>/path/to/repo/</code></td>
 	 * </tr>
 	 * <tr>
-	 * <td><code>localhost</code></td>
-	 * <td><code>ssh://localhost/</code></td>
-	 * </tr>
-	 * <tr>
 	 * <td><code>/path//to</code></td>
 	 * <td>an empty string</td>
 	 * </tr>
@@ -708,12 +703,9 @@ public class URIish implements Serializable {
 	 * @see #getPath
 	 */
 	public String getHumanishName() throws IllegalArgumentException {
-		String s = getPath();
-		if ("/".equals(s)) //$NON-NLS-1$
-			s = getHost();
-		if ("".equals(s) || s == null) //$NON-NLS-1$
+		if ("".equals(getPath()) || getPath() == null) //$NON-NLS-1$
 			throw new IllegalArgumentException();
-
+		String s = getPath();
 		String[] elements;
 		if ("file".equals(scheme) || LOCAL_FILE.matcher(s).matches()) //$NON-NLS-1$
 			elements = s.split("[\\" + File.separatorChar + "/]"); //$NON-NLS-1$ //$NON-NLS-2$
