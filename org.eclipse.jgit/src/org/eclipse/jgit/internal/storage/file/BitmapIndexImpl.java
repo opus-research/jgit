@@ -93,6 +93,17 @@ public class BitmapIndexImpl implements BitmapIndex {
 		return new CompressedBitmap(compressed);
 	}
 
+	public CompressedBitmap toBitmap(PackBitmapIndex i,
+			EWAHCompressedBitmap b) {
+		if (i != packIndex) {
+			throw new IllegalArgumentException();
+		}
+		if (b == null) {
+			return null;
+		}
+		return new CompressedBitmap(b);
+	}
+
 	@Override
 	public CompressedBitmapBuilder newBitmapBuilder() {
 		return new CompressedBitmapBuilder();
@@ -222,12 +233,6 @@ public class BitmapIndexImpl implements BitmapIndex {
 		public boolean contains(AnyObjectId objectId) {
 			int position = findPosition(objectId);
 			return 0 <= position && bitset.contains(position);
-		}
-
-		@Override
-		public BitmapBuilder set(AnyObjectId objectId, int type) {
-			bitset.set(addObject(objectId, type));
-			return this;
 		}
 
 		@Override
