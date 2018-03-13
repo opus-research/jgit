@@ -128,11 +128,11 @@ class RefDirectoryUpdate extends RefUpdate {
 	private String toResultString(final Result status) {
 		switch (status) {
 		case FORCED:
-			return "forced-update"; //$NON-NLS-1$
+			return "forced-update";
 		case FAST_FORWARD:
-			return "fast forward"; //$NON-NLS-1$
+			return "fast forward";
 		case NEW:
-			return "created"; //$NON-NLS-1$
+			return "created";
 		default:
 			return null;
 		}
