@@ -64,7 +64,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.eclipse.jgit.attributes.AttributeManager;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.CorruptObjectException;
@@ -76,7 +75,6 @@ import org.eclipse.jgit.events.IndexChangedEvent;
 import org.eclipse.jgit.events.IndexChangedListener;
 import org.eclipse.jgit.events.ListenerList;
 import org.eclipse.jgit.events.RepositoryEvent;
-import org.eclipse.jgit.ignore.IgnoreManager;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -126,18 +124,6 @@ public abstract class Repository implements AutoCloseable {
 	private final File indexFile;
 
 	/**
-	 * The manager for the cascaded .gitignore inside the workFile tree and the
-	 * git configs
-	 */
-	private final IgnoreManager ignoreManager;
-
-	/**
-	 * The manager for the cascaded .gitattributes inside the workFile tree the
-	 * git configs
-	 */
-	private final AttributeManager attributeManager;
-
-	/**
 	 * Initialize a new repository instance.
 	 *
 	 * @param options
@@ -148,10 +134,6 @@ public abstract class Repository implements AutoCloseable {
 		fs = options.getFS();
 		workTree = options.getWorkTree();
 		indexFile = options.getIndexFile();
-		ignoreManager = new IgnoreManager(workTree, fs);
-		ignoreManager.initFromRepository(this);
-		attributeManager = new AttributeManager(workTree, fs);
-		attributeManager.initFromRepository(this);
 	}
 
 	/** @return listeners observing only events on this repository. */
@@ -1263,22 +1245,6 @@ public abstract class Repository implements AutoCloseable {
 		if (isBare())
 			throw new NoWorkTreeException();
 		return workTree;
-	}
-
-	/**
-	 * @return the {@link AttributeManager} that manages the .gitattributes
-	 *         files in the {@link #getWorkTree()}
-	 */
-	public AttributeManager getAttributeManager() {
-		return attributeManager;
-	}
-
-	/**
-	 * @return the {@link IgnoreManager} that manages the .gitattributes files
-	 *         in the {@link #getWorkTree()}
-	 */
-	public IgnoreManager getIgnoreManager() {
-		return ignoreManager;
 	}
 
 	/**
