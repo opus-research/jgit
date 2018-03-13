@@ -70,8 +70,6 @@ public class WorkingTreeOptions {
 
 	private final HideDotFiles hideDotFiles;
 
-	private boolean dirNoGitLinks;
-
 	private WorkingTreeOptions(final Config rc) {
 		fileMode = rc.getBoolean(ConfigConstants.CONFIG_CORE_SECTION,
 				ConfigConstants.CONFIG_KEY_FILEMODE, true);
@@ -84,9 +82,6 @@ public class WorkingTreeOptions {
 		hideDotFiles = rc.getEnum(ConfigConstants.CONFIG_CORE_SECTION, null,
 				ConfigConstants.CONFIG_KEY_HIDEDOTFILES,
 				HideDotFiles.DOTGITONLY);
-		dirNoGitLinks = rc.getBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_DIRNOGITLINKS,
-				false);
 	}
 
 	/** @return true if the execute bit on working files should be trusted. */
@@ -121,16 +116,5 @@ public class WorkingTreeOptions {
 	 */
 	public HideDotFiles getHideDotFiles() {
 		return hideDotFiles;
-	}
-
-	/**
-	 * TODO DOCSTRINGS
-	 * @param dirNoGitLinks
-	 */
-	public void setDirNoGitLinks(boolean dirNoGitLinks) {
-		this.dirNoGitLinks = dirNoGitLinks;
-	}
-	public boolean isDirNoGitLinks() {
-		return dirNoGitLinks;
 	}
 }

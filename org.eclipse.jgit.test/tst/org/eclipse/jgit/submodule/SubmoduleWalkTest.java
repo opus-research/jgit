@@ -65,7 +65,6 @@ import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
-import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.Config;
@@ -99,13 +98,6 @@ public class SubmoduleWalkTest extends RepositoryTestCase {
 		assertFalse(gen.next());
 		assertNull(gen.getPath());
 		assertEquals(ObjectId.zeroId(), gen.getObjectId());
-	}
-
-	@Test
-	public void bareRepositoryWithNoSubmodules() throws IOException {
-		FileRepository bareRepo = createBareRepository();
-		boolean result = SubmoduleWalk.containsGitModulesFile(bareRepo);
-		assertFalse(result);
 	}
 
 	@Test

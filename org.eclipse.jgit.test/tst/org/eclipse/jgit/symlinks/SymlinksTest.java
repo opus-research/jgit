@@ -51,7 +51,6 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.FileTreeIterator.FileEntry;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 import org.junit.Before;
@@ -87,15 +86,13 @@ public class SymlinksTest extends RepositoryTestCase {
 		git.add().addFilepattern("a").call();
 		git.commit().setMessage("add symlink a").call();
 
-		WorkingTreeOptions options = db.getConfig().get(WorkingTreeOptions.KEY);
-
-		FileEntry entry = new FileTreeIterator.FileEntry(options,
-				new File(db.getWorkTree(), "a"), db.getFS());
+		FileEntry entry = new FileTreeIterator.FileEntry(new File(
+				db.getWorkTree(), "a"), db.getFS());
 		assertEquals(FileMode.SYMLINK, entry.getMode());
 
 		git.checkout().setName(branch_1.getName()).call();
 
-		entry = new FileTreeIterator.FileEntry(options, new File(db.getWorkTree(), "a"),
+		entry = new FileTreeIterator.FileEntry(new File(db.getWorkTree(), "a"),
 				db.getFS());
 		assertEquals(FileMode.REGULAR_FILE, entry.getMode());
 	}
@@ -122,15 +119,13 @@ public class SymlinksTest extends RepositoryTestCase {
 		git.add().addFilepattern("a").call();
 		git.commit().setMessage("add file a").call();
 
-		WorkingTreeOptions options = db.getConfig().get(WorkingTreeOptions.KEY);
-
-		FileEntry entry = new FileTreeIterator.FileEntry(options, new File(
+		FileEntry entry = new FileTreeIterator.FileEntry(new File(
 				db.getWorkTree(), "a"), db.getFS());
 		assertEquals(FileMode.REGULAR_FILE, entry.getMode());
 
 		git.checkout().setName(branch_1.getName()).call();
 
-		entry = new FileTreeIterator.FileEntry(options, new File(db.getWorkTree(), "a"),
+		entry = new FileTreeIterator.FileEntry(new File(db.getWorkTree(), "a"),
 				db.getFS());
 		assertEquals(FileMode.SYMLINK, entry.getMode());
 	}
@@ -158,15 +153,13 @@ public class SymlinksTest extends RepositoryTestCase {
 		git.add().addFilepattern("a").call();
 		git.commit().setMessage("add symlink a").call();
 
-		WorkingTreeOptions options = db.getConfig().get(WorkingTreeOptions.KEY);
-
-		FileEntry entry = new FileTreeIterator.FileEntry(options,
-				new File(db.getWorkTree(), "a"), db.getFS());
+		FileEntry entry = new FileTreeIterator.FileEntry(new File(
+				db.getWorkTree(), "a"), db.getFS());
 		assertEquals(FileMode.SYMLINK, entry.getMode());
 
 		git.checkout().setName(branch_1.getName()).call();
 
-		entry = new FileTreeIterator.FileEntry(options, new File(db.getWorkTree(), "a"),
+		entry = new FileTreeIterator.FileEntry(new File(db.getWorkTree(), "a"),
 				db.getFS());
 		assertEquals(FileMode.TREE, entry.getMode());
 	}
@@ -194,15 +187,13 @@ public class SymlinksTest extends RepositoryTestCase {
 		git.add().addFilepattern("a").call();
 		git.commit().setMessage("add folder a").call();
 
-		WorkingTreeOptions options = db.getConfig().get(WorkingTreeOptions.KEY);
-
-		FileEntry entry = new FileTreeIterator.FileEntry(options,
-				new File(db.getWorkTree(), "a"), db.getFS());
+		FileEntry entry = new FileTreeIterator.FileEntry(new File(
+				db.getWorkTree(), "a"), db.getFS());
 		assertEquals(FileMode.TREE, entry.getMode());
 
 		git.checkout().setName(branch_1.getName()).call();
 
-		entry = new FileTreeIterator.FileEntry(options, new File(db.getWorkTree(), "a"),
+		entry = new FileTreeIterator.FileEntry(new File(db.getWorkTree(), "a"),
 				db.getFS());
 		assertEquals(FileMode.SYMLINK, entry.getMode());
 	}
