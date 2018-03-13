@@ -806,19 +806,22 @@ public abstract class Repository implements AutoCloseable {
 
 	/** Increment the use counter by one, requiring a matched {@link #close()}. */
 	public void incrementOpen() {
-		synchronized (useCnt) {
-			useCnt.incrementAndGet();
-		}
+		useCnt.incrementAndGet();
 	}
 
 	/** Decrement the use count, and maybe close resources. */
 	public void close() {
-		synchronized (useCnt) {
-			if (isClosed() || useCnt.decrementAndGet() > 0) {
-				return;
+		for (;;) {
+			int v = useCnt.intValue();
+			if (v == 0) {
+				break;
+			} else if (useCnt.compareAndSet(v, v - 1)) {
+				if (v == 1) {
+					doClose();
+				}
+				break;
 			}
 		}
-		doClose();
 	}
 
 	/**
@@ -827,19 +830,6 @@ public abstract class Repository implements AutoCloseable {
 	 */
 	public boolean isClosed() {
 		return useCnt.get() == 0;
-	}
-
-	/**
-	 * Forcibly close all opened object and ref databases, independently of the
-	 * use count. The use count will be set to zero.
-	 *
-	 * @since 4.2
-	 */
-	public void closeForcibly() {
-		synchronized (useCnt) {
-			useCnt.set(0);
-		}
-		doClose();
 	}
 
 	/**
