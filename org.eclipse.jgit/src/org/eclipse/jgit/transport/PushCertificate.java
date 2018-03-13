@@ -71,12 +71,9 @@ public class PushCertificate {
 		BAD,
 		/** Nonce is required, but was not sent by client. */
 		MISSING,
-		/**
-		 * Received nonce matches sent nonce, or is valid within the accepted slop
-		 * window.
-		 */
+		/** Received nonce is valid. */
 		OK,
-		/** Received nonce is valid, but outside the accepted slop window. */
+		/** Received nonce is valid and within the accepted slop window. */
 		SLOP
 	}
 
