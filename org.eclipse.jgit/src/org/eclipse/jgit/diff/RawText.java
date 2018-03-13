@@ -308,6 +308,7 @@ public class RawText extends Sequence {
 	 *   the ObjectLoader for the blob
 	 * @param threshold
 	 *   if the blob is larger than this size, it is always assumed to be binary.
+	 * @since 4.10
 	 * @return the RawText representing the blob.
 	 * @throws BinaryBlobException if the blob contains binary data.
 	 */

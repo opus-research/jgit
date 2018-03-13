@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012, IBM Corporation and others.
+ * Copyright (C) 2017 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -45,6 +45,8 @@ package org.eclipse.jgit.errors;
 /**
  * BinaryBlobException is used to signal that binary data was found
  * in a context that requires text (eg. for generating textual diffs).
+ *
+ * @since 4.10
  */
 public class BinaryBlobException extends Exception {
 	private static final long serialVersionUID = 1L;
