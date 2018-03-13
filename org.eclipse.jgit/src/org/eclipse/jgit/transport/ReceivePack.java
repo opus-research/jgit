@@ -126,9 +126,6 @@ public class ReceivePack {
 	/** Identity to record action as within the reflog. */
 	private PersonIdent refLogIdent;
 
-	/** Filter used while advertising the refs to the client. */
-	private RefFilter refFilter;
-
 	/** Hook to validate the update commands before execution. */
 	private PreReceiveHook preReceive;
 
@@ -153,8 +150,6 @@ public class ReceivePack {
 
 	private PrintWriter msgs;
 
-	private IndexPack ip;
-
 	/** The refs we advertised as existing at the start of the connection. */
 	private Map<String, Ref> refs;
 
@@ -173,10 +168,6 @@ public class ReceivePack {
 	/** Lock around the received pack file, while updating refs. */
 	private PackLock packLock;
 
-	private boolean needNewObjectIds;
-
-	private boolean needBaseObjectIds;
-
 	/**
 	 * Create a new pack receive for an open repository.
 	 *
@@ -193,7 +184,6 @@ public class ReceivePack {
 		allowDeletes = cfg.allowDeletes;
 		allowNonFastForwards = cfg.allowNonFastForwards;
 		allowOfsDelta = cfg.allowOfsDelta;
-		refFilter = RefFilter.DEFAULT;
 		preReceive = PreReceiveHook.NULL;
 		postReceive = PostReceiveHook.NULL;
 	}
@@ -240,45 +230,6 @@ public class ReceivePack {
 	/** @return all refs which were advertised to the client. */
 	public final Map<String, Ref> getAdvertisedRefs() {
 		return refs;
-	}
-
-	/**
-	 * Configure this receive pack instance to keep track of the objects assumed
-	 * for delta bases.
-	 * <p>
-	 * By default a receive pack doesn't save the objects that were used as
-	 * delta bases. Setting this flag to {@code true} will allow the caller to
-	 * use {@link #getBaseObjectIds()} to retrieve that list.
-	 *
-	 * @param b {@code true} to enable keeping track of delta bases.
-	 */
-	public void setNeedBaseObjectIds(boolean b) {
-		this.needBaseObjectIds = b;
-	}
-
-	/**
-	 *  @return the set of objects the incoming pack assumed for delta purposes
-	 */
-	public final Set<ObjectId> getBaseObjectIds() {
-		return ip.getBaseObjectIds();
-	}
-
-	/**
-	 * Configure this receive pack instance to keep track of new objects.
-	 * <p>
-	 * By default a receive pack doesn't save the new objects that were created
-	 * when it was instantiated. Setting this flag to {@code true} allows the
-	 * caller to use {@link #getNewObjectIds()} to retrieve that list.
-	 *
-	 * @param b {@code true} to enable keeping track of new objects.
-	 */
-	public void setNeedNewObjectIds(boolean b) {
-		this.needNewObjectIds = b;
-	}
-
-	/** @return the new objects that were sent by the user */
-	public final Set<ObjectId> getNewObjectIds() {
-		return ip.getNewObjectIds();
 	}
 
 	/**
@@ -382,26 +333,6 @@ public class ReceivePack {
 	 */
 	public void setRefLogIdent(final PersonIdent pi) {
 		refLogIdent = pi;
-	}
-
-	/** @return the filter used while advertising the refs to the client */
-	public RefFilter getRefFilter() {
-		return refFilter;
-	}
-
-	/**
-	 * Set the filter used while advertising the refs to the client.
-	 * <p>
-	 * Only refs allowed by this filter will be shown to the client.
-	 * Clients may still attempt to create or update a reference hidden
-	 * by the configured {@link RefFilter}. These attempts should be
-	 * rejected by a matching {@link PreReceiveHook}.
-	 *
-	 * @param refFilter
-	 *            the filter; may be null to show all refs.
-	 */
-	public void setRefFilter(final RefFilter refFilter) {
-		this.refFilter = refFilter != null ? refFilter : RefFilter.DEFAULT;
 	}
 
 	/** @return get the hook invoked before updates occur. */
@@ -590,7 +521,7 @@ public class ReceivePack {
 		if (biDirectionalPipe)
 			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
 		else
-			refs = refFilter.filter(db.getAllRefs());
+			refs = db.getAllRefs();
 		recvCommands();
 		if (!commands.isEmpty()) {
 			enableCapabilities();
@@ -658,7 +589,7 @@ public class ReceivePack {
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
 		if (allowOfsDelta)
 			adv.advertiseCapability(CAPABILITY_OFS_DELTA);
-		refs = refFilter.filter(db.getAllRefs());
+		refs = db.getAllRefs();
 		final Ref head = refs.remove(Constants.HEAD);
 		adv.send(refs);
 		if (head != null && !head.isSymbolic())
@@ -730,10 +661,8 @@ public class ReceivePack {
 		if (timeoutIn != null)
 			timeoutIn.setTimeout(10 * timeout * 1000);
 
-		ip = IndexPack.create(db, rawIn);
+		final IndexPack ip = IndexPack.create(db, rawIn);
 		ip.setFixThin(true);
-		ip.setNeedNewObjectIds(needNewObjectIds);
-		ip.setNeedBaseObjectIds(needBaseObjectIds);
 		ip.setObjectChecking(isCheckReceivedObjects());
 		ip.index(NullProgressMonitor.INSTANCE);
 
