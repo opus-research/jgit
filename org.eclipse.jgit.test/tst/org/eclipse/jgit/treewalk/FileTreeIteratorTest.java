@@ -51,10 +51,8 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.io.IOException;
 import java.security.MessageDigest;
-import java.util.Collections;
 
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.attributes.Attribute;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.dircache.DirCacheEditor;
@@ -144,6 +142,43 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 				db.getConfig().get(WorkingTreeOptions.KEY));
 		assertTrue(fti.first());
 		assertTrue(fti.eof());
+	}
+
+	@Test
+	public void testEmptyIteratorOnEmptyDirectory() throws Exception {
+		String nonExistingFileName = "not-existing-file";
+		final File r = new File(trash, nonExistingFileName);
+		assertFalse(r.exists());
+		FileUtils.mkdir(r);
+
+		final FileTreeIterator parent = new FileTreeIterator(db);
+
+		while (!parent.getEntryPathString().equals(nonExistingFileName))
+			parent.next(1);
+
+		final FileTreeIterator childIter = new FileTreeIterator(parent, r,
+				db.getFS());
+		assertTrue(childIter.first());
+		assertTrue(childIter.eof());
+
+		String parentPath = parent.getEntryPathString();
+		assertEquals(nonExistingFileName, parentPath);
+
+		// must be "not-existing-file/", but getEntryPathString() was broken by
+		// 445363 too
+		String childPath = childIter.getEntryPathString();
+
+		// in bug 445363 the iterator wrote garbage to the parent "path" field
+		EmptyTreeIterator e = childIter.createEmptyTreeIterator();
+		assertNotNull(e);
+
+		// check if parent path is not overridden by empty iterator (bug 445363)
+		// due bug 445363 this was "/ot-existing-file" instead of
+		// "not-existing-file"
+		assertEquals(parentPath, parent.getEntryPathString());
+		assertEquals(parentPath + "/", childPath);
+		assertEquals(parentPath + "/", childIter.getEntryPathString());
+		assertEquals(childPath + "/", e.getEntryPathString());
 	}
 
 	@Test
@@ -256,8 +291,7 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 		// Modify previously committed DirCacheEntry and write it back to disk
 		DirCacheEntry dce = db.readDirCache().getEntry("symlink");
 		dce.setFileMode(FileMode.SYMLINK);
-		DirCacheCheckout.checkoutEntry(db, f, dce,
-				Collections.<Attribute> emptySet());
+		DirCacheCheckout.checkoutEntry(db, f, dce);
 
 		FileTreeIterator fti = new FileTreeIterator(trash, db.getFS(), db
 				.getConfig().get(WorkingTreeOptions.KEY));

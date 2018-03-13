@@ -1,7 +1,6 @@
 /*
  * Copyright (C) 2008-2009, Google Inc.
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
- * Copyright (C) 2014, Obeo
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -226,6 +225,11 @@ public class TreeWalk {
 
 	AbstractTreeIterator currentHead;
 
+	/** Cached attribute for the current entry */
+	private Set<Attribute> checkinAttrs = null;
+
+	/** Cached attribute for the current entry */
+	private Set<Attribute> checkoutAttrs = null;
 	/**
 	 * Create a new tree walker for a given repository.
 	 *
@@ -356,6 +360,7 @@ public class TreeWalk {
 
 	/** Reset this walker so new tree iterators can be added to it. */
 	public void reset() {
+		resetCachedAttributes();
 		trees = NO_TREES;
 		advance = false;
 		depth = 0;
@@ -399,6 +404,7 @@ public class TreeWalk {
 
 		advance = false;
 		depth = 0;
+		resetCachedAttributes();
 	}
 
 	/**
@@ -448,6 +454,7 @@ public class TreeWalk {
 		trees = r;
 		advance = false;
 		depth = 0;
+		resetCachedAttributes();
 	}
 
 	/**
@@ -507,9 +514,7 @@ public class TreeWalk {
 		newTrees[n] = p;
 		p.matches = null;
 		p.matchShift = 0;
-		// Sets the treeWalk here to avoid breaking any API.
-		if (p instanceof WorkingTreeIterator)
-			((WorkingTreeIterator) p).setTreeWalk(this);
+
 		trees = newTrees;
 		return n;
 	}
@@ -546,6 +551,7 @@ public class TreeWalk {
 	public boolean next() throws MissingObjectException,
 			IncorrectObjectTypeException, CorruptObjectException, IOException {
 		try {
+			resetCachedAttributes();
 			if (advance) {
 				advance = false;
 				postChildren = false;
@@ -915,6 +921,7 @@ public class TreeWalk {
 	 */
 	public void enterSubtree() throws MissingObjectException,
 			IncorrectObjectTypeException, CorruptObjectException, IOException {
+		resetCachedAttributes();
 		final AbstractTreeIterator ch = currentHead;
 		final AbstractTreeIterator[] tmp = new AbstractTreeIterator[trees.length];
 		for (int i = 0; i < trees.length; i++) {
@@ -1011,6 +1018,8 @@ public class TreeWalk {
 
 	/**
 	 * Type of operation you want to retrieve the git attributes for.
+	 *
+	 * @since 3.6
 	 */
 	public static enum OperationType {
 		/**
@@ -1022,18 +1031,6 @@ public class TreeWalk {
 		 * Represents a checkin operation (for example an add operation)
 		 */
 		CHECKIN_OP
-	}
-
-	/**
-	 * @return <code>true</code> if the treewalk can retrieve the set of
-	 *         attributes for the current head entry.
-	 * @see TreeWalk#getAttributes(OperationType)
-	 * @since 3.6
-	 */
-	public boolean canGetAttributes() {
-		// The correct set of attributes can not be computed without
-		// AttributeNodeProvider
-		return getTree(AttributeNodeProvider.class) != null;
 	}
 
 	/**
@@ -1064,7 +1061,7 @@ public class TreeWalk {
 	 * In order to have a correct list of attributes for the current entry, this
 	 * {@link TreeWalk} requires to have at least a {@link WorkingTreeIterator}
 	 * and a {@link DirCacheIterator} set up. The {@link WorkingTreeIterator} is
-	 * used to retreives the attributes from the info attributes file, the
+	 * used to retrieves the attributes from the info attributes file, the
 	 * global attributes file and the local version of the .gitattributes files.
 	 * The {@link DirCacheIterator} is used to retrieve the .gitattributes files
 	 * stored in the index.
@@ -1072,10 +1069,14 @@ public class TreeWalk {
 	 *
 	 * @param operationType
 	 *            Type of operation you want to retrieve the git attributes for.
-	 * @return a {@link Set} of {@link Attribute}s that match the current
-	 *         entry.
+	 * @return a {@link Set} of {@link Attribute}s that match the current entry.
+	 * @since 3.6
 	 */
 	public Set<Attribute> getAttributes(OperationType operationType) {
+		Set<Attribute> cachedAttributes = getCachedAttribute(operationType);
+		if (cachedAttributes != null)
+			return cachedAttributes;
+
 		AttributeNodeProvider workingTreeAttributeNodeProvider = getTree(AttributeNodeProvider.class);
 		if (workingTreeAttributeNodeProvider == null) {
 			// The work tree should have a AttributeNodeProvider to be able to
@@ -1131,12 +1132,47 @@ public class TreeWalk {
 		} catch (IOException e) {
 			throw new JGitInternalException("Error while parsing attributes", e); //$NON-NLS-1$
 		}
-
+		final Set<Attribute> result;
 		if (attributes.isEmpty()) {
-			return Collections.<Attribute> emptySet();
+			result = Collections.<Attribute> emptySet();
 		} else {
-			return new HashSet<Attribute>(attributes.values());
+			result = new HashSet<Attribute>(attributes.values());
 		}
+
+		setCachedAttribute(operationType, result);
+
+		return result;
+	}
+
+	private Set<Attribute> getCachedAttribute(OperationType type) {
+		switch (type) {
+		case CHECKIN_OP:
+			return checkinAttrs;
+		case CHECKOUT_OP:
+			return checkoutAttrs;
+		default:
+			throw new IllegalStateException("No cache for operation type " //$NON-NLS-1$
+					+ type);
+		}
+	}
+
+	private void setCachedAttribute(OperationType type, Set<Attribute> attrs) {
+		switch (type) {
+		case CHECKIN_OP:
+			checkinAttrs = attrs;
+			break;
+		case CHECKOUT_OP:
+			checkoutAttrs = attrs;
+			break;
+		default:
+			throw new IllegalStateException("No cache for operation type " //$NON-NLS-1$
+					+ type);
+		}
+	}
+
+	private void resetCachedAttributes() {
+		checkoutAttrs = null;
+		checkinAttrs = null;
 	}
 
 	/**
@@ -1246,5 +1282,4 @@ public class TreeWalk {
 
 		return attributesNode;
 	}
-
 }

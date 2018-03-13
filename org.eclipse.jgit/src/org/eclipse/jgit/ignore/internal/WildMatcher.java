@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014, Arthur Daussy <arthur.daussy@obeo.fr>
+ * Copyright (C) 2014, Andrey Loskutov <loskutov@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,45 +40,36 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.treewalk;
-
-import java.io.IOException;
-
-import org.eclipse.jgit.attributes.AttributesNode;
-import org.eclipse.jgit.lib.CoreConfig;
+package org.eclipse.jgit.ignore.internal;
 
 /**
- * An internal interface use to retrieve {@link AttributesNode}s.
+ * Wildmatch matcher for "double star" (<code>**</code>) pattern only. This
+ * matcher matches any path.
  * <p>
- * Implementor of this interface should be able to retrieve the global
- * {@link AttributesNode} and the info {@link AttributesNode}
- * </p>
+ * This class is immutable and thread safe.
  *
+ * @since 3.6
  */
-interface AttributeNodeProvider {
+public final class WildMatcher extends AbstractMatcher {
 
-	/**
-	 * Retrieves the {@link AttributesNode} that holds the information located
-	 * in $GIT_DIR/info/attributes file.
-	 *
-	 * @return the {@link AttributesNode} that holds the information located in
-	 *         $GIT_DIR/info/attributes file.
-	 * @throws IOException
-	 *             if an error is raised while parsing the attributes file
-	 */
-	public AttributesNode getInfoAttributesNode() throws IOException;
+	static final String WILDMATCH = "**"; //$NON-NLS-1$
 
-	/**
-	 * Retrieves the {@link AttributesNode} that holds the information located
-	 * in system-wide file.
-	 *
-	 * @return the {@link AttributesNode} that holds the information located in
-	 *         system-wide file.
-	 * @throws IOException
-	 *             IOException if an error is raised while parsing the
-	 *             attributes file
-	 * @see CoreConfig#getAttributesFile()
-	 */
-	public AttributesNode getGlobalAttributesNode() throws IOException;
+	// double star for the beginning of pattern
+	static final String WILDMATCH2 = "/**"; //$NON-NLS-1$
+
+	static final WildMatcher INSTANCE = new WildMatcher();
+
+	private WildMatcher() {
+		super(WILDMATCH, false);
+	}
+
+	public final boolean matches(String path, boolean assumeDirectory) {
+		return true;
+	}
+
+	public final boolean matches(String segment, int startIncl, int endExcl,
+			boolean assumeDirectory) {
+		return true;
+	}
 
 }

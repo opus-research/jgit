@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014, Arthur Daussy <arthur.daussy@obeo.fr>
+ * Copyright (C) 2014, Andrey Loskutov <loskutov@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,45 +40,55 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.treewalk;
-
-import java.io.IOException;
-
-import org.eclipse.jgit.attributes.AttributesNode;
-import org.eclipse.jgit.lib.CoreConfig;
+package org.eclipse.jgit.ignore.internal;
 
 /**
- * An internal interface use to retrieve {@link AttributesNode}s.
- * <p>
- * Implementor of this interface should be able to retrieve the global
- * {@link AttributesNode} and the info {@link AttributesNode}
- * </p>
+ * Generic string matcher
  *
+ * @since 3.6
  */
-interface AttributeNodeProvider {
+public interface IMatcher {
 
 	/**
-	 * Retrieves the {@link AttributesNode} that holds the information located
-	 * in $GIT_DIR/info/attributes file.
-	 *
-	 * @return the {@link AttributesNode} that holds the information located in
-	 *         $GIT_DIR/info/attributes file.
-	 * @throws IOException
-	 *             if an error is raised while parsing the attributes file
+	 * Matcher that does not match any pattern.
 	 */
-	public AttributesNode getInfoAttributesNode() throws IOException;
+	public static final IMatcher NO_MATCH = new IMatcher() {
+		public boolean matches(String path, boolean assumeDirectory) {
+			return false;
+		}
+
+		public boolean matches(String segment, int startIncl, int endExcl,
+				boolean assumeDirectory) {
+			return false;
+		}
+	};
 
 	/**
-	 * Retrieves the {@link AttributesNode} that holds the information located
-	 * in system-wide file.
+	 * Matches entire given string
 	 *
-	 * @return the {@link AttributesNode} that holds the information located in
-	 *         system-wide file.
-	 * @throws IOException
-	 *             IOException if an error is raised while parsing the
-	 *             attributes file
-	 * @see CoreConfig#getAttributesFile()
+	 * @param path
+	 *            string which is not null, but might be empty
+	 * @param assumeDirectory
+	 *            true to assume this path as directory (even if it doesn't end
+	 *            with a slash)
+	 * @return true if this matcher pattern matches given string
 	 */
-	public AttributesNode getGlobalAttributesNode() throws IOException;
+	boolean matches(String path, boolean assumeDirectory);
 
+	/**
+	 * Matches only part of given string
+	 *
+	 * @param segment
+	 *            string which is not null, but might be empty
+	 * @param startIncl
+	 *            start index, inclusive
+	 * @param endExcl
+	 *            end index, exclusive
+	 * @param assumeDirectory
+	 *            true to assume this path as directory (even if it doesn't end
+	 *            with a slash)
+	 * @return true if this matcher pattern matches given string
+	 */
+	boolean matches(String segment, int startIncl, int endExcl,
+			boolean assumeDirectory);
 }

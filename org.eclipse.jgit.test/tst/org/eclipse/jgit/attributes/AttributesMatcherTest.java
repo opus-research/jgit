@@ -42,16 +42,19 @@
  */
 package org.eclipse.jgit.attributes;
 
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
 
 /**
- * Tests ignore pattern matches
+ * Tests git attributes pattern matches
+ * <p>
+ * Inspired by {@link org.eclipse.jgit.ignore.IgnoreMatcherTest}
+ * </p>
  */
 public class AttributesMatcherTest {
 
@@ -322,6 +325,27 @@ public class AttributesMatcherTest {
 		assertEquals(r.getPattern(), "pattern");
 
 		r = new AttributesRule("pattern", "attribute1 -attribute2");
+		assertTrue(r.isNameOnly());
+		assertFalse(r.dirOnly());
+		assertNotNull(r.getAttributes());
+		assertEquals(r.getAttributes().size(), 2);
+		assertEquals(r.getPattern(), "pattern");
+
+		r = new AttributesRule("pattern", "attribute1 \t-attribute2 \t");
+		assertTrue(r.isNameOnly());
+		assertFalse(r.dirOnly());
+		assertNotNull(r.getAttributes());
+		assertEquals(r.getAttributes().size(), 2);
+		assertEquals(r.getPattern(), "pattern");
+
+		r = new AttributesRule("pattern", "attribute1\t-attribute2\t");
+		assertTrue(r.isNameOnly());
+		assertFalse(r.dirOnly());
+		assertNotNull(r.getAttributes());
+		assertEquals(r.getAttributes().size(), 2);
+		assertEquals(r.getPattern(), "pattern");
+
+		r = new AttributesRule("pattern", "attribute1\t -attribute2\t ");
 		assertTrue(r.isNameOnly());
 		assertFalse(r.dirOnly());
 		assertNotNull(r.getAttributes());

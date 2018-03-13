@@ -45,6 +45,7 @@ package org.eclipse.jgit.attributes;
 import static org.eclipse.jgit.treewalk.TreeWalk.OperationType.CHECKIN_OP;
 import static org.eclipse.jgit.treewalk.TreeWalk.OperationType.CHECKOUT_OP;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
@@ -122,16 +123,15 @@ public class TreeWalkAttributeTest extends RepositoryTestCase {
 	public void setUp() throws Exception {
 		super.setUp();
 		git = new Git(db);
-
 	}
 
 	@Override
 	@After
 	public void tearDown() throws Exception {
 		super.tearDown();
-		if(customAttributeFile != null)
+		if (customAttributeFile != null)
 			customAttributeFile.delete();
-	};
+	}
 
 	/**
 	 * Checks that the attributes are computed correctly depending on the
@@ -184,11 +184,11 @@ public class TreeWalkAttributeTest extends RepositoryTestCase {
 
 		assertEntry(D, "level1/level2");
 		assertEntry(F, "level1/level2/.gitattributes");
-		assertEntry(
-				F,
-				"level1/level2/l2.txt",
+		assertEntry(F, "level1/level2/l2.txt",
 				asSet(EOL_LF, CUSTOM_INFO, CUSTOM2_SET, TEXT_UNSET, DELTA_SET),
 				asSet(EOL_LF, CUSTOM_ROOT, CUSTOM2_SET, TEXT_SET, DELTA_UNSET));
+
+		endWalk();
 	}
 
 	/**
@@ -242,6 +242,8 @@ public class TreeWalkAttributeTest extends RepositoryTestCase {
 		assertEntry(F, "level1/level2/l2.txt",
 
 		asSet(CUSTOM_ROOT, TEXT_SET, DELTA_UNSET));
+
+		endWalk();
 	}
 
 	/**
@@ -285,6 +287,8 @@ public class TreeWalkAttributeTest extends RepositoryTestCase {
 
 		assertEntry(F, "windows.file", asSet(EOL_CRLF));
 		assertEntry(F, "windows.txt", asSet(EOL_CRLF));
+
+		endWalk();
 	}
 
 	/**
@@ -308,6 +312,8 @@ public class TreeWalkAttributeTest extends RepositoryTestCase {
 
 		assertEntry(D, "level1/level2");
 		assertEntry(F, "level1/level2/l2.txt");
+
+		endWalk();
 	}
 
 	/**
@@ -333,6 +339,8 @@ public class TreeWalkAttributeTest extends RepositoryTestCase {
 
 		assertEntry(D, "level1/level2");
 		assertEntry(F, "level1/level2/l2.txt");
+
+		endWalk();
 	}
 
 	@Test
@@ -354,6 +362,8 @@ public class TreeWalkAttributeTest extends RepositoryTestCase {
 
 		assertEntry(D, "levelB");
 		assertEntry(F, "levelB/.gitattributes");
+
+		endWalk();
 	}
 
 	/**
@@ -382,6 +392,8 @@ public class TreeWalkAttributeTest extends RepositoryTestCase {
 		assertEntry(D, "level1/level2");
 		assertEntry(F, "level1/level2/.gitattributes");
 		assertEntry(F, "level1/level2/file.txt", asSet(CUSTOM_INFO));
+
+		endWalk();
 	}
 
 	/**
@@ -410,6 +422,8 @@ public class TreeWalkAttributeTest extends RepositoryTestCase {
 		assertEntry(D, "level1/level2");
 		assertEntry(F, "level1/level2/.gitattributes");
 		assertEntry(F, "level1/level2/file.txt", asSet(CUSTOM_CURRENT));
+
+		endWalk();
 	}
 
 	/**
@@ -434,6 +448,8 @@ public class TreeWalkAttributeTest extends RepositoryTestCase {
 
 		assertEntry(D, "level1/level2");
 		assertEntry(F, "level1/level2/file.txt", asSet(CUSTOM_PARENT));
+
+		endWalk();
 	}
 
 	/**
@@ -456,6 +472,8 @@ public class TreeWalkAttributeTest extends RepositoryTestCase {
 
 		assertEntry(D, "level1/level2");
 		assertEntry(F, "level1/level2/file.txt", asSet(CUSTOM_ROOT));
+
+		endWalk();
 	}
 
 	/**
@@ -475,6 +493,8 @@ public class TreeWalkAttributeTest extends RepositoryTestCase {
 
 		assertEntry(D, "level1/level2");
 		assertEntry(F, "level1/level2/file.txt", asSet(CUSTOM_GLOBAL));
+
+		endWalk();
 	}
 
 	/**
@@ -522,6 +542,8 @@ public class TreeWalkAttributeTest extends RepositoryTestCase {
 		assertEntry(F, "level1/level2/l2.global", asSet(EOL_CRLF));
 		assertEntry(F, "level1/level2/l2.local", asSet(EOL_LF, TEXT_UNSET));
 
+		endWalk();
+
 	}
 
 	/**
@@ -562,6 +584,8 @@ public class TreeWalkAttributeTest extends RepositoryTestCase {
 				asSet(EOL_CRLF, CUSTOM_ROOT, TEXT_SET, DELTA_UNSET,
 						CUSTOM2_UNSET));
 
+		endWalk();
+
 	}
 
 	/**
@@ -593,6 +617,8 @@ public class TreeWalkAttributeTest extends RepositoryTestCase {
 
 		assertEntry(F, "l0.txt",
 				asSet(TEXT_UNSET, EOL_CRLF, DELTA_UNSET, CUSTOM_INFO));
+
+		endWalk();
 	}
 
 	/**
@@ -613,6 +639,8 @@ public class TreeWalkAttributeTest extends RepositoryTestCase {
 
 		assertEntry(F, "l0.txt",
 				asSet(TEXT_UNSET, EOL_CRLF, DELTA_UNSET, CUSTOM_INFO));
+
+		endWalk();
 	}
 
 	private void beginWalk() throws NoWorkTreeException, IOException {
@@ -676,7 +704,6 @@ public class TreeWalkAttributeTest extends RepositoryTestCase {
 			walk.enterSubtree();
 	}
 
-
 	private File writeAttributesFile(String name, String... rules)
 			throws IOException {
 		StringBuilder data = new StringBuilder();
@@ -714,5 +741,9 @@ public class TreeWalkAttributeTest extends RepositoryTestCase {
 		for (Attribute attr : attrs)
 			result.add(attr);
 		return result;
+	}
+
+	private void endWalk() throws IOException {
+		assertFalse("Not all files tested", walk.next());
 	}
 }

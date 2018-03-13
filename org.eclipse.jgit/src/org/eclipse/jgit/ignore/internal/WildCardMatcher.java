@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014, Arthur Daussy <arthur.daussy@obeo.fr>
+ * Copyright (C) 2014, Andrey Loskutov <loskutov@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,45 +40,35 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.treewalk;
+package org.eclipse.jgit.ignore.internal;
 
-import java.io.IOException;
+import static org.eclipse.jgit.ignore.internal.Strings.convertGlob;
 
-import org.eclipse.jgit.attributes.AttributesNode;
-import org.eclipse.jgit.lib.CoreConfig;
+import java.util.regex.Pattern;
+
+import org.eclipse.jgit.errors.InvalidPatternException;
 
 /**
- * An internal interface use to retrieve {@link AttributesNode}s.
+ * Matcher built from path segments containing wildcards. This matcher converts
+ * glob wildcards to Java {@link Pattern}'s.
  * <p>
- * Implementor of this interface should be able to retrieve the global
- * {@link AttributesNode} and the info {@link AttributesNode}
- * </p>
+ * This class is immutable and thread safe.
  *
+ * @since 3.6
  */
-interface AttributeNodeProvider {
+public class WildCardMatcher extends NameMatcher {
 
-	/**
-	 * Retrieves the {@link AttributesNode} that holds the information located
-	 * in $GIT_DIR/info/attributes file.
-	 *
-	 * @return the {@link AttributesNode} that holds the information located in
-	 *         $GIT_DIR/info/attributes file.
-	 * @throws IOException
-	 *             if an error is raised while parsing the attributes file
-	 */
-	public AttributesNode getInfoAttributesNode() throws IOException;
+	final Pattern p;
 
-	/**
-	 * Retrieves the {@link AttributesNode} that holds the information located
-	 * in system-wide file.
-	 *
-	 * @return the {@link AttributesNode} that holds the information located in
-	 *         system-wide file.
-	 * @throws IOException
-	 *             IOException if an error is raised while parsing the
-	 *             attributes file
-	 * @see CoreConfig#getAttributesFile()
-	 */
-	public AttributesNode getGlobalAttributesNode() throws IOException;
+	WildCardMatcher(String pattern, Character pathSeparator, boolean dirOnly)
+			throws InvalidPatternException {
+		super(pattern, pathSeparator, dirOnly);
+		p = convertGlob(subPattern);
+	}
 
+	@Override
+	public boolean matches(String segment, int startIncl, int endExcl,
+			boolean assumeDirectory) {
+		return p.matcher(segment.substring(startIncl, endExcl)).matches();
+	}
 }

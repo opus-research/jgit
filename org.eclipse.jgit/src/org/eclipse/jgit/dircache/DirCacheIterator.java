@@ -46,6 +46,7 @@ package org.eclipse.jgit.dircache;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.Collections;
 
 import org.eclipse.jgit.attributes.AttributesNode;
@@ -71,6 +72,10 @@ import org.eclipse.jgit.treewalk.EmptyTreeIterator;
  * @see org.eclipse.jgit.treewalk.TreeWalk
  */
 public class DirCacheIterator extends AbstractTreeIterator {
+	/** Byte array holding ".gitattributes" string */
+	private static final byte[] DOT_GIT_ATTRIBUTES_BYTES = Constants.DOT_GIT_ATTRIBUTES
+			.getBytes();
+
 	/** The cache this iterator was created to walk. */
 	protected final DirCache cache;
 
@@ -263,12 +268,12 @@ public class DirCacheIterator extends AbstractTreeIterator {
 		path = cep;
 		pathLen = cep.length;
 		currentSubtree = null;
-		String pathString = currentEntry.getPathString();
-		if (pathString != null) {
-			if (pathString.endsWith(Constants.DOT_GIT_ATTRIBUTES))
-				attributesNode = new LazyLoadingAttributesNode(
-						currentEntry.getObjectId());
-		}
+		// Checks if this entry is a .gitattributes file
+		byte[] entryName = new byte[pathLen - pathOffset];
+		System.arraycopy(path, pathOffset, entryName, 0, pathLen - pathOffset);
+		if (Arrays.equals(entryName, DOT_GIT_ATTRIBUTES_BYTES))
+			attributesNode = new LazyLoadingAttributesNode(
+					currentEntry.getObjectId());
 	}
 
 	/**
@@ -300,7 +305,7 @@ public class DirCacheIterator extends AbstractTreeIterator {
 	/**
 	 * {@link AttributesNode} implementation that provides lazy loading
 	 * facilities.
-	 * 
+	 *
 	 * @author <a href="mailto:arthur.daussy@obeo.fr">Arthur Daussy</a>
 	 *
 	 */

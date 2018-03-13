@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014, Arthur Daussy <arthur.daussy@obeo.fr>
+ * Copyright (C) 2014, Andrey Loskutov <loskutov@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,58 +40,35 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.attributes;
+package org.eclipse.jgit.ignore;
 
-import java.util.Set;
+import static org.junit.Assert.*;
 
-import org.eclipse.jgit.attributes.Attribute.State;
+import org.eclipse.jgit.ignore.FastIgnoreRule;
+import org.junit.Test;
 
-/**
- * Util class to handle attributes.
- *
- * @author <a href="mailto:arthur.daussy@obeo.fr">Arthur Daussy</a>
- *
- */
-public class Attributes {
+public class BasicRuleTest {
 
-	private static final String IDENT_ATTR_NAME = "ident"; //$NON-NLS-1$
-
-	private static Attribute IDENT_SET = new Attribute(IDENT_ATTR_NAME,
-			State.SET);
-
-	private static Attribute IDENT_UNSET = new Attribute(IDENT_ATTR_NAME,
-			State.UNSET);
-
-	Attributes() {
-	}
-
-	/**
-	 * Checks that the list contains the ident attribute with a
-	 * {@link State#SET} value.
-	 *
-	 * @param attributes
-	 *            list of attributes to checks (can be <code>null</code>).
-	 * @return <code>true</code> if the list contains the ident attribute with a
-	 *         {@link State#SET} value, <code>false</code> otherwise.
-	 * @since 3.6
-	 */
-	public static boolean hasIdentSet(Set<Attribute> attributes) {
-		return attributes != null && attributes.contains(IDENT_SET);
-	}
-
-	/**
-	 * Returns <code>true</code> if the list contains an "ident" attribute.
-	 *
-	 * @param attributes
-	 * @return <code>true</code> if the list constains an "ident" attribute,
-	 *         <code>false</code> otherwise.
-	 * @since 3.6
-	 */
-	public static boolean hasIdent(Set<Attribute> attributes) {
-		if (attributes == null)
-			return false;
-		return attributes.contains(IDENT_UNSET)
-				|| attributes.contains(IDENT_SET);
+	@Test
+	public void test() {
+		FastIgnoreRule rule1 = new FastIgnoreRule("/hello/[a]/");
+		FastIgnoreRule rule2 = new FastIgnoreRule("/hello/[a]/");
+		FastIgnoreRule rule3 = new FastIgnoreRule("!/hello/[a]/");
+		FastIgnoreRule rule4 = new FastIgnoreRule("/hello/[a]");
+		assertTrue(rule1.dirOnly());
+		assertTrue(rule3.dirOnly());
+		assertFalse(rule4.dirOnly());
+		assertFalse(rule1.getNegation());
+		assertTrue(rule3.getNegation());
+		assertNotEquals(rule1, null);
+		assertEquals(rule1, rule1);
+		assertEquals(rule1, rule2);
+		assertNotEquals(rule1, rule3);
+		assertNotEquals(rule1, rule4);
+		assertEquals(rule1.hashCode(), rule2.hashCode());
+		assertNotEquals(rule1.hashCode(), rule3.hashCode());
+		assertEquals(rule1.toString(), rule2.toString());
+		assertNotEquals(rule1.toString(), rule3.toString());
 	}
 
 }

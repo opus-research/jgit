@@ -56,8 +56,10 @@ package org.eclipse.jgit.attributes;
  * class</li>
  * </ul>
  * </p>
+ *
+ * @since 3.6
  */
-public class Attribute {
+public final class Attribute {
 
 	/**
 	 * The attribute value state
@@ -81,7 +83,7 @@ public class Attribute {
 	 * Creates a new instance
 	 *
 	 * @param key
-	 *            the attribute key
+	 *            the attribute key. Should not be <code>null</code>.
 	 * @param state
 	 *            the attribute state
 	 */
@@ -91,6 +93,9 @@ public class Attribute {
 
 
 	private Attribute(String key, State state, String value) {
+		if (key == null)
+			throw new NullPointerException(
+					"The key of an attribute should not be null"); //$NON-NLS-1$
 		this.key = key;
 		this.state = state != null ? state : State.CUSTOM;
 		this.value = value;
@@ -113,15 +118,10 @@ public class Attribute {
 	public boolean equals(Object obj) {
 		if (this == obj)
 			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
+		if (!(obj instanceof Attribute))
 			return false;
 		Attribute other = (Attribute) obj;
-		if (key == null) {
-			if (other.key != null)
-				return false;
-		} else if (!key.equals(other.key))
+		if (!key.equals(other.key))
 			return false;
 		if (state != other.state)
 			return false;
@@ -134,7 +134,7 @@ public class Attribute {
 	}
 
 	/**
-	 * @return the attribute key
+	 * @return the attribute key (never returns <code>null</code>)
 	 */
 	public String getKey() {
 		return key;
@@ -143,7 +143,7 @@ public class Attribute {
 	/**
 	 * Returns the state.
 	 *
-	 * @return the state
+	 * @return the state (never returns <code>null</code>)
 	 */
 	public State getState() {
 		return state;
@@ -162,8 +162,8 @@ public class Attribute {
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + ((key == null) ? 0 : key.hashCode());
-		result = prime * result + ((state == null) ? 0 : state.hashCode());
+		result = prime * result + key.hashCode();
+		result = prime * result + state.hashCode();
 		result = prime * result + ((value == null) ? 0 : value.hashCode());
 		return result;
 	}

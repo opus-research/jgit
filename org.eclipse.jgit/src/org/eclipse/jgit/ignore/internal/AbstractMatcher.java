@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014, Arthur Daussy <arthur.daussy@obeo.fr>
+ * Copyright (C) 2014, Andrey Loskutov <loskutov@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,45 +40,49 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.treewalk;
-
-import java.io.IOException;
-
-import org.eclipse.jgit.attributes.AttributesNode;
-import org.eclipse.jgit.lib.CoreConfig;
+package org.eclipse.jgit.ignore.internal;
 
 /**
- * An internal interface use to retrieve {@link AttributesNode}s.
+ * Base class for default methods as {@link #toString()} and such.
  * <p>
- * Implementor of this interface should be able to retrieve the global
- * {@link AttributesNode} and the info {@link AttributesNode}
- * </p>
+ * This class is immutable and thread safe.
  *
+ * @since 3.6
  */
-interface AttributeNodeProvider {
+public abstract class AbstractMatcher implements IMatcher {
+
+	final boolean dirOnly;
+
+	final String pattern;
 
 	/**
-	 * Retrieves the {@link AttributesNode} that holds the information located
-	 * in $GIT_DIR/info/attributes file.
-	 *
-	 * @return the {@link AttributesNode} that holds the information located in
-	 *         $GIT_DIR/info/attributes file.
-	 * @throws IOException
-	 *             if an error is raised while parsing the attributes file
+	 * @param pattern
+	 *            string to parse
+	 * @param dirOnly
+	 *            true if this matcher should match only directories
 	 */
-	public AttributesNode getInfoAttributesNode() throws IOException;
+	AbstractMatcher(String pattern, boolean dirOnly) {
+		this.pattern = pattern;
+		this.dirOnly = dirOnly;
+	}
 
-	/**
-	 * Retrieves the {@link AttributesNode} that holds the information located
-	 * in system-wide file.
-	 *
-	 * @return the {@link AttributesNode} that holds the information located in
-	 *         system-wide file.
-	 * @throws IOException
-	 *             IOException if an error is raised while parsing the
-	 *             attributes file
-	 * @see CoreConfig#getAttributesFile()
-	 */
-	public AttributesNode getGlobalAttributesNode() throws IOException;
+	@Override
+	public String toString() {
+		return pattern;
+	}
 
+	@Override
+	public int hashCode() {
+		return pattern.hashCode();
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!(obj instanceof AbstractMatcher))
+			return false;
+		AbstractMatcher other = (AbstractMatcher) obj;
+		return dirOnly == other.dirOnly && pattern.equals(other.pattern);
+	}
 }
