@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 Ericsson
+ * Copyright (C) 2017, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,43 +41,65 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.file;
+package org.eclipse.jgit.internal.revwalk;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import org.eclipse.jgit.lib.BitmapIndex.Bitmap;
+import org.eclipse.jgit.lib.BitmapIndex.BitmapBuilder;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.revwalk.filter.RevFilter;
+import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevFlag;
 
-import java.io.File;
+/**
+ * A RevFilter that adds the visited commits to {@code bitmap} as a side
+ * effect.
+ * <p>
+ * When the walk hits a commit that is part of {@code bitmap}'s
+ * BitmapIndex, that entire bitmap is ORed into {@code bitmap} and the
+ * commit and its parents are marked as SEEN so that the walk does not
+ * have to visit its ancestors.  This ensures the walk is very short if
+ * there is good bitmap coverage.
+ */
+public class AddToBitmapFilter extends RevFilter {
+	private final BitmapBuilder bitmap;
 
-import org.junit.Before;
-import org.junit.Test;
-
-public class GcTemporaryFilesTest extends GcTestCase {
-	private static final String TEMP_IDX = "gc_1234567890.idx_tmp";
-
-	private static final String TEMP_PACK = "gc_1234567890.pack_tmp";
-
-	private File packDir;
-
-	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
-		packDir = repo.getObjectDatabase().getPackDirectory();
+	/**
+	 * Create a filter that adds visited commits to the given bitmap.
+	 *
+	 * @param bitmap bitmap to write visited commits to
+	 */
+	public AddToBitmapFilter(BitmapBuilder bitmap) {
+		this.bitmap = bitmap;
 	}
 
-	@Test
-	public void temporaryPacksAndIdxAreDeleted() throws Exception {
-		File tempIndex = new File(packDir, TEMP_IDX);
-		File tempPack = new File(packDir, TEMP_PACK);
-		if (!packDir.exists() || !packDir.isDirectory()) {
-			assertTrue(packDir.mkdirs());
+	@Override
+	public final boolean include(RevWalk walker, RevCommit cmit) {
+		Bitmap visitedBitmap;
+
+		if (bitmap.contains(cmit)) {
+			// already included
+		} else if ((visitedBitmap = bitmap.getBitmapIndex()
+				.getBitmap(cmit)) != null) {
+			bitmap.or(visitedBitmap);
+		} else {
+			bitmap.addObject(cmit, Constants.OBJ_COMMIT);
+			return true;
 		}
-		assertTrue(tempPack.createNewFile());
-		assertTrue(tempIndex.createNewFile());
-		assertTrue(tempIndex.exists());
-		assertTrue(tempPack.exists());
-		gc.gc();
-		assertFalse(tempIndex.exists());
-		assertFalse(tempPack.exists());
+
+		for (RevCommit p : cmit.getParents()) {
+			p.add(RevFlag.SEEN);
+		}
+		return false;
+	}
+
+	@Override
+	public final RevFilter clone() {
+		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public final boolean requiresCommitBody() {
+		return false;
 	}
 }
