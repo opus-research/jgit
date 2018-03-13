@@ -54,9 +54,6 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.text.MessageFormat;
 
@@ -66,8 +63,6 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Git style file locking and replacement.
@@ -80,8 +75,6 @@ import org.slf4j.LoggerFactory;
  * name.
  */
 public class LockFile {
-	private final static Logger LOG = LoggerFactory.getLogger(LockFile.class);
-
 	static final String SUFFIX = ".lock"; //$NON-NLS-1$
 
 	/**
@@ -175,7 +168,7 @@ public class LockFile {
 	 */
 	public boolean lock() throws IOException {
 		FileUtils.mkdirs(lck.getParentFile(), true);
-		if (FS.DETECTED.createNewFile(lck)) {
+		if (lck.createNewFile()) {
 			haveLck = true;
 			try {
 				os = new FileOutputStream(lck);
