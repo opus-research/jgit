@@ -79,7 +79,6 @@ import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
-import org.junit.Assume;
 import org.junit.Test;
 
 public class DirCacheCheckoutTest extends RepositoryTestCase {
@@ -926,7 +925,6 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 
 	@Test
 	public void testCheckoutChangeLinkToEmptyDir() throws Exception {
-		Assume.assumeTrue(FS.DETECTED.supportsSymlinks());
 		String fname = "was_file";
 		Git git = Git.wrap(db);
 
@@ -963,7 +961,6 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 
 	@Test
 	public void testCheckoutChangeLinkToEmptyDirs() throws Exception {
-		Assume.assumeTrue(FS.DETECTED.supportsSymlinks());
 		String fname = "was_file";
 		Git git = Git.wrap(db);
 
@@ -1002,7 +999,6 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 
 	@Test
 	public void testCheckoutChangeLinkToNonEmptyDirs() throws Exception {
-		Assume.assumeTrue(FS.DETECTED.supportsSymlinks());
 		String fname = "file";
 		Git git = Git.wrap(db);
 
@@ -1047,7 +1043,6 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 	@Test
 	public void testCheckoutChangeLinkToNonEmptyDirsAndNewIndexEntry()
 			throws Exception {
-		Assume.assumeTrue(FS.DETECTED.supportsSymlinks());
 		String fname = "file";
 		Git git = Git.wrap(db);
 
@@ -1369,7 +1364,6 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 	@Test
 	public void testOverwriteUntrackedLinkModeChange()
 			throws Exception {
-		Assume.assumeTrue(FS.DETECTED.supportsSymlinks());
 		String fname = "file.txt";
 		Git git = Git.wrap(db);
 
