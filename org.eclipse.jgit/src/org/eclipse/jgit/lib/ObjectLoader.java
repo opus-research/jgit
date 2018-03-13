@@ -169,14 +169,14 @@ public abstract class ObjectLoader {
 				final long sz = in.getSize();
 				byte[] tmp = new byte[1024];
 				long copied = 0;
-				while (copied < sz) {
+				for (;;) {
 					int n = in.read(tmp);
 					if (n < 0)
-						throw new EOFException();
+						break;
 					out.write(tmp, 0, n);
 					copied += n;
 				}
-				if (0 <= in.read())
+				if (copied != sz)
 					throw new EOFException();
 			} finally {
 				in.close();
