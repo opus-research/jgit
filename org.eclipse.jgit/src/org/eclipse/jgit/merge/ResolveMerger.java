@@ -51,7 +51,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -379,27 +378,12 @@ public class ResolveMerger extends ThreeWayMerger {
 		if (isIndexDirty())
 			return false;
 
-		if (nonTree(modeO) && tw.idEqual(T_OURS, T_THEIRS)) {
-			// OURS and THEIRS have equal content. Check the file mode
-			if (modeO == modeT) {
-				// content and mode of OURS and THEIRS are equal: it doesn't
-				// matter
-				// which one we choose. OURS is chosen.
-				add(tw.getRawPath(), ours, DirCacheEntry.STAGE_0);
-				// no checkout needed!
-				return true;
-			} else {
-				// same content but different mode on OURS and THEIRS. Report a
-				// conflict
-				add(tw.getRawPath(), base, DirCacheEntry.STAGE_1);
-				add(tw.getRawPath(), ours, DirCacheEntry.STAGE_2);
-				add(tw.getRawPath(), theirs, DirCacheEntry.STAGE_3);
-				unmergedPaths.add(tw.getPathString());
-				mergeResults.put(tw.getPathString(), new MergeResult<RawText>(
-						Collections.<RawText> emptyList()));
-				// no checkout needed!
-				return true;
-			}
+		if (nonTree(modeO) && modeO == modeT && tw.idEqual(T_OURS, T_THEIRS)) {
+			// OURS and THEIRS are equal: it doesn't matter which one we choose.
+			// OURS is chosen.
+			add(tw.getRawPath(), ours, DirCacheEntry.STAGE_0);
+			// no checkout needed!
+			return true;
 		}
 
 		if (nonTree(modeO) && modeB == modeT && tw.idEqual(T_BASE, T_THEIRS)) {
@@ -598,7 +582,7 @@ public class ResolveMerger extends ThreeWayMerger {
 			// no conflict occurred, the file will contain fully merged content.
 			// the index will be populated with the new merged version
 			DirCacheEntry dce = new DirCacheEntry(tw.getPathString());
-			dce.setFileMode(getFileMode());
+			dce.setFileMode(tw.getFileMode(0));
 			dce.setLastModified(of.lastModified());
 			dce.setLength((int) of.length());
 			InputStream is = new FileInputStream(of);
@@ -613,25 +597,6 @@ public class ResolveMerger extends ThreeWayMerger {
 			builder.add(dce);
 			return true;
 		}
-	}
-
-	/**
-	 * Determine the file mode for newly created content. Copy it from the BASE,
-	 * OURS or THEIRS.
-	 * 
-	 * @return the fileMode for new content
-	 */
-	private FileMode getFileMode() {
-		FileMode mode = tw.getFileMode(0);
-		if (mode == FileMode.MISSING) {
-			mode = tw.getFileMode(1);
-			if (mode == FileMode.MISSING) {
-				mode = tw.getFileMode(2);
-				if (mode == FileMode.MISSING)
-					mode = FileMode.REGULAR_FILE;
-			}
-		}
-		return mode;
 	}
 
 	private static RawText getRawText(ObjectId id, Repository db)
