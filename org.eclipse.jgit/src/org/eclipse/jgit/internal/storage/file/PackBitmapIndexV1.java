@@ -60,7 +60,8 @@ import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
 
 /**
- * Support for the pack bitmap index v1 format.
+ * Support for the pack bitmap index v1 format, which contains experimental
+ * support for bitmaps.
  *
  * @see PackBitmapIndex
  */

@@ -80,16 +80,14 @@ class AsIsFileFilter implements Filter {
 
 	public void doFilter(ServletRequest request, ServletResponse response,
 			FilterChain chain) throws IOException, ServletException {
-		HttpServletRequest req = (HttpServletRequest) request;
-		HttpServletResponse res = (HttpServletResponse) response;
 		try {
 			final Repository db = getRepository(request);
-			asIs.access(req, db);
+			asIs.access((HttpServletRequest) request, db);
 			chain.doFilter(request, response);
 		} catch (ServiceNotAuthorizedException e) {
-			res.sendError(SC_UNAUTHORIZED, e.getMessage());
+			((HttpServletResponse) response).sendError(SC_UNAUTHORIZED);
 		} catch (ServiceNotEnabledException e) {
-			res.sendError(SC_FORBIDDEN, e.getMessage());
+			((HttpServletResponse) response).sendError(SC_FORBIDDEN);
 		}
 	}
 }
