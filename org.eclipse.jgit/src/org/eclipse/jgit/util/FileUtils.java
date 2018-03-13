@@ -84,6 +84,14 @@ public class FileUtils {
 	public static final int IGNORE_ERRORS = 8;
 
 	/**
+	 * Option to only delete empty directories. This option can be combined with
+	 * {@link #RECURSIVE}
+	 *
+	 * @since 3.0
+	 */
+	public static final int EMPTY_DIRECTORIES_ONLY = 16;
+
+	/**
 	 * Delete file or empty folder
 	 *
 	 * @param f
@@ -126,7 +134,22 @@ public class FileUtils {
 					delete(c, options);
 			}
 		}
-		if (!f.delete()) {
+
+		boolean delete = false;
+		if ((options & EMPTY_DIRECTORIES_ONLY) != 0) {
+			if (f.isDirectory()) {
+				delete = true;
+			} else {
+				if ((options & IGNORE_ERRORS) == 0)
+					throw new IOException(MessageFormat.format(
+							JGitText.get().deleteFileFailed,
+							f.getAbsolutePath()));
+			}
+		} else {
+			delete = true;
+		}
+
+		if (delete && !f.delete()) {
 			if ((options & RETRY) != 0 && f.exists()) {
 				for (int i = 1; i < 10; i++) {
 					try {
@@ -142,6 +165,56 @@ public class FileUtils {
 				throw new IOException(MessageFormat.format(
 						JGitText.get().deleteFileFailed, f.getAbsolutePath()));
 		}
+	}
+
+	/**
+	 * Rename a file or folder. If the rename fails and if we are running on a
+	 * filesystem where it makes sense to repeat a failing rename then repeat
+	 * the rename operation up to 9 times with 100ms sleep time between two
+	 * calls. Furthermore if the destination exists and is directory hierarchy
+	 * with only directories in it, the whole directory hierarchy will be
+	 * deleted. If the target represents a non-empty directory structure, empty
+	 * subdirectories within that structure may or may not be deleted even if
+	 * the method fails. Furthermore if the destination exists and is a file
+	 * then the file will be deleted and then the rename is retried.
+	 * <p>
+	 * This operation is <em>not</me> atomic.
+	 *
+	 * @see FS#retryFailedLockFileCommit()
+	 * @param src
+	 *            the old {@code File}
+	 * @param dst
+	 *            the new {@code File}
+	 * @throws IOException
+	 *             if the rename has failed
+	 * @since 3.0
+	 */
+	public static void rename(final File src, final File dst)
+			throws IOException {
+		int attempts = FS.DETECTED.retryFailedLockFileCommit() ? 10 : 1;
+		while (--attempts >= 0) {
+			if (src.renameTo(dst))
+				return;
+			try {
+				if (!dst.delete())
+					delete(dst, EMPTY_DIRECTORIES_ONLY | RECURSIVE);
+				// On *nix there is no try, you do or do not
+				if (src.renameTo(dst))
+					return;
+			} catch (IOException e) {
+				// ignore and continue retry
+			}
+			try {
+				Thread.sleep(100);
+			} catch (InterruptedException e) {
+				throw new IOException(MessageFormat.format(
+						JGitText.get().renameFileFailed, src.getAbsolutePath(),
+						dst.getAbsolutePath()));
+			}
+		}
+		throw new IOException(MessageFormat.format(
+				JGitText.get().renameFileFailed, src.getAbsolutePath(),
+				dst.getAbsolutePath()));
 	}
 
 	/**
