@@ -287,7 +287,7 @@ class SimilarityRenameDetector {
 		return mNext;
 	}
 
-	static int nameScore(String a, String b) {
+	private int nameScore(String a, String b) {
 	    int aDirLen = a.lastIndexOf("/") + 1;
 	    int bDirLen = b.lastIndexOf("/") + 1;
 
@@ -349,15 +349,15 @@ class SimilarityRenameDetector {
 		return (int) (value >>> SCORE_SHIFT);
 	}
 
-	static int srcFile(long value) {
+	private static int srcFile(long value) {
 		return decodeFile(((int) (value >>> BITS_PER_INDEX)) & INDEX_MASK);
 	}
 
-	static int dstFile(long value) {
+	private static int dstFile(long value) {
 		return decodeFile(((int) value) & INDEX_MASK);
 	}
 
-	static long encode(int score, int srcIdx, int dstIdx) {
+	private static long encode(int score, int srcIdx, int dstIdx) {
 		return (((long) score) << SCORE_SHIFT) //
 				| (encodeFile(srcIdx) << BITS_PER_INDEX) //
 				| encodeFile(dstIdx);
