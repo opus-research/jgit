@@ -272,11 +272,14 @@ public class DfsGarbageCollector {
 		if (allHeads.isEmpty())
 			return;
 
-		try (PackWriter pw = newPackWriter()) {
+		PackWriter pw = newPackWriter();
+		try {
 			pw.setTagTargets(tagTargets);
 			pw.preparePack(pm, allHeads, Collections.<ObjectId> emptySet());
 			if (0 < pw.getObjectCount())
 				writePack(GC, pw, pm);
+		} finally {
+			pw.release();
 		}
 	}
 
@@ -284,12 +287,15 @@ public class DfsGarbageCollector {
 		if (nonHeads.isEmpty())
 			return;
 
-		try (PackWriter pw = newPackWriter()) {
+		PackWriter pw = newPackWriter();
+		try {
 			for (PackWriter.ObjectIdSet packedObjs : newPackObj)
 				pw.excludeObjects(packedObjs);
 			pw.preparePack(pm, nonHeads, allHeads);
 			if (0 < pw.getObjectCount())
 				writePack(GC, pw, pm);
+		} finally {
+			pw.release();
 		}
 	}
 
@@ -301,10 +307,11 @@ public class DfsGarbageCollector {
 		cfg.setDeltaCompress(false);
 		cfg.setBuildBitmaps(false);
 
-		try (PackWriter pw = new PackWriter(cfg, ctx);
-				RevWalk pool = new RevWalk(ctx)) {
-			pw.setDeltaBaseAsOffset(true);
-			pw.setReuseDeltaCommits(true);
+		PackWriter pw = new PackWriter(cfg, ctx);
+		pw.setDeltaBaseAsOffset(true);
+		pw.setReuseDeltaCommits(true);
+		try {
+			RevWalk pool = new RevWalk(ctx);
 			pm.beginTask("Finding garbage", objectsBefore());
 			for (DfsPackFile oldPack : packsBefore) {
 				PackIndex oldIdx = oldPack.getPackIndex(ctx);
@@ -321,6 +328,8 @@ public class DfsGarbageCollector {
 			pm.endTask();
 			if (0 < pw.getObjectCount())
 				writePack(UNREACHABLE_GARBAGE, pw, pm);
+		} finally {
+			pw.release();
 		}
 	}
 
