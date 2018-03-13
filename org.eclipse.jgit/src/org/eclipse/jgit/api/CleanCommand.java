@@ -53,7 +53,6 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 
 /**
@@ -101,12 +100,11 @@ public class CleanCommand extends GitCommand<Set<String>> {
 			Set<String> untrackedAndIgnoredDirs = new TreeSet<String>(
 					status.getUntrackedFolders());
 
-			FS fs = getRepository().getFS();
 			for (String p : status.getIgnoredNotInIndex()) {
 				File f = new File(repo.getWorkTree(), p);
-				if (fs.isFile(f) || fs.isSymLink(f)) {
+				if (f.isFile()) {
 					untrackedAndIgnoredFiles.add(p);
-				} else if (fs.isDirectory(f)) {
+				} else if (f.isDirectory()) {
 					untrackedAndIgnoredDirs.add(p);
 				}
 			}

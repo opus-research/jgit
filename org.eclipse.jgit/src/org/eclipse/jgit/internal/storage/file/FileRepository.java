@@ -59,12 +59,11 @@ import org.eclipse.jgit.events.ConfigChangedEvent;
 import org.eclipse.jgit.events.ConfigChangedListener;
 import org.eclipse.jgit.events.IndexChangedEvent;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.file.FileObjectDatabase.AlternateHandle;
-import org.eclipse.jgit.internal.storage.file.FileObjectDatabase.AlternateRepository;
+import org.eclipse.jgit.internal.storage.file.ObjectDirectory.AlternateHandle;
+import org.eclipse.jgit.internal.storage.file.ObjectDirectory.AlternateRepository;
 import org.eclipse.jgit.lib.BaseRepositoryBuilder;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.CoreConfig.SymLinks;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefDatabase;
@@ -294,21 +293,6 @@ public class FileRepository extends Repository {
 			fileMode = false;
 		}
 
-		SymLinks symLinks = SymLinks.FALSE;
-		if (getFS().supportsSymlinks()) {
-			File tmp = new File(getDirectory(), "tmplink"); //$NON-NLS-1$
-			try {
-				getFS().createSymLink(tmp, "target"); //$NON-NLS-1$
-				symLinks = null;
-				FileUtils.delete(tmp);
-			} catch (IOException e) {
-				// Normally a java.nio.file.FileSystemException
-			}
-		}
-		if (symLinks != null)
-			cfg.setString(ConfigConstants.CONFIG_CORE_SECTION, null,
-					ConfigConstants.CONFIG_KEY_SYMLINKS, symLinks.name()
-							.toLowerCase());
 		cfg.setInt(ConfigConstants.CONFIG_CORE_SECTION, null,
 				ConfigConstants.CONFIG_KEY_REPO_FORMAT_VERSION, 0);
 		cfg.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
@@ -384,7 +368,7 @@ public class FileRepository extends Repository {
 	 */
 	public Set<ObjectId> getAdditionalHaves() {
 		HashSet<ObjectId> r = new HashSet<ObjectId>();
-		for (AlternateHandle d : objectDatabase. myAlternates()) {
+		for (AlternateHandle d : objectDatabase.myAlternates()) {
 			if (d instanceof AlternateRepository) {
 				Repository repo;
 
