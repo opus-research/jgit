@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2007-2008, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -45,16 +45,16 @@
 package org.eclipse.jgit.lib;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
-import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.lib.GitIndex.Entry;
 import org.eclipse.jgit.util.FS;
 
-public class T0007_GitIndexTest extends LocalDiskRepositoryTestCase {
+public class T0007_Index extends RepositoryTestCase {
 
 	static boolean canrungitstatus;
 	static {
@@ -106,17 +106,6 @@ public class T0007_GitIndexTest extends LocalDiskRepositoryTestCase {
 		synchronized (t2) {
 			return ret;
 		}
-	}
-
-	private Repository db;
-
-	private File trash;
-
-	@Override
-	protected void setUp() throws Exception {
-		super.setUp();
-		db = createWorkRepository();
-		trash = db.getWorkDir();
 	}
 
 	public void testCreateEmptyIndex() throws Exception {
@@ -328,9 +317,9 @@ public class T0007_GitIndexTest extends LocalDiskRepositoryTestCase {
 				"c696abc3ab8e091c665f49d00eb8919690b3aec3")));
 
 		index2.checkout(trash);
-		assertEquals("data:a/b", read(aslashb));
-		assertEquals("data:a:b", read(acolonb));
-		assertEquals("data:a.b", read(adotb));
+		assertEquals("data:a/b", content(aslashb));
+		assertEquals("data:a:b", content(acolonb));
+		assertEquals("data:a.b", content(adotb));
 
 		if (canrungitstatus)
 			assertEquals(0, system(trash, "git status"));
@@ -447,14 +436,20 @@ public class T0007_GitIndexTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
+	private String content(File f) throws IOException {
+		byte[] buf = new byte[(int) f.length()];
+		FileInputStream is = new FileInputStream(f);
+		try {
+			int read = is.read(buf);
+			assertEquals(f.length(), read);
+			return new String(buf, 0);
+		} finally {
+			is.close();
+		}
+	}
+
 	private void delete(File f) throws IOException {
 		if (!f.delete())
 			throw new IOException("Failed to delete f");
-	}
-
-	private File writeTrashFile(String name, String body) throws IOException {
-		final File path = new File(trash, name);
-		write(path, body);
-		return path;
 	}
 }
