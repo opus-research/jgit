@@ -58,8 +58,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
-import org.eclipse.jgit.annotations.Nullable;
-import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -325,11 +323,9 @@ public class BatchRefUpdate {
 	/**
 	 * Gets the list of option strings associated with this update.
 	 *
-	 * @return push options that were passed to {@link #execute}; prior to calling
-	 *         {@link #execute}, always returns null.
+	 * @return pushOptions
 	 * @since 4.5
 	 */
-	@Nullable
 	public List<String> getPushOptions() {
 		return pushOptions;
 	}
@@ -411,11 +407,6 @@ public class BatchRefUpdate {
 		for (ReceiveCommand cmd : commands) {
 			try {
 				if (cmd.getResult() == NOT_ATTEMPTED) {
-					if (isMissing(walk, cmd.getOldId())
-							|| isMissing(walk, cmd.getNewId())) {
-						cmd.setResult(ReceiveCommand.Result.REJECTED_MISSING_OBJECT);
-						continue;
-					}
 					cmd.updateType(walk);
 					switch (cmd.getType()) {
 					case CREATE:
@@ -485,19 +476,6 @@ public class BatchRefUpdate {
 			}
 		}
 		monitor.endTask();
-	}
-
-	private static boolean isMissing(RevWalk walk, ObjectId id)
-			throws IOException {
-		if (id.equals(ObjectId.zeroId())) {
-			return false; // Explicit add or delete is not missing.
-		}
-		try {
-			walk.parseAny(id);
-			return false;
-		} catch (MissingObjectException e) {
-			return true;
-		}
 	}
 
 	/**
