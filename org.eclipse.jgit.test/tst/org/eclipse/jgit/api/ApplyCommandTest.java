@@ -112,14 +112,6 @@ public class ApplyCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testAddA1Sub() throws Exception {
-		ApplyResult result = init("A1_sub", false, false);
-		assertEquals(1, result.getUpdatedFiles().size());
-		assertEquals(new File(db.getWorkTree(), "sub/A1"), result
-				.getUpdatedFiles().get(0));
-	}
-
-	@Test
 	public void testDeleteD() throws Exception {
 		ApplyResult result = init("D", true, false);
 		assertEquals(1, result.getUpdatedFiles().size());
@@ -178,17 +170,7 @@ public class ApplyCommandTest extends RepositoryTestCase {
 				b.getString(0, b.size(), false));
 	}
 
-	@Test
-	public void testModifyNL1() throws Exception {
-		ApplyResult result = init("NL1");
-		assertEquals(1, result.getUpdatedFiles().size());
-		assertEquals(new File(db.getWorkTree(), "NL1"), result
-				.getUpdatedFiles().get(0));
-		checkFile(new File(db.getWorkTree(), "NL1"),
-				b.getString(0, b.size(), false));
-	}
-
-	private static byte[] readFile(final String patchFile) throws IOException {
+	private byte[] readFile(final String patchFile) throws IOException {
 		final InputStream in = DiffFormatterReflowTest.class
 				.getResourceAsStream(patchFile);
 		if (in == null) {

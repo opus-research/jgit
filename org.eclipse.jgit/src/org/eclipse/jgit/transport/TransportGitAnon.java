@@ -151,10 +151,10 @@ class TransportGitAnon extends TcpTransport implements PackTransport {
 		cmd.append(' ');
 		cmd.append(uri.getPath());
 		cmd.append('\0');
-		cmd.append("host="); //$NON-NLS-1$
+		cmd.append("host=");
 		cmd.append(uri.getHost());
 		if (uri.getPort() > 0 && uri.getPort() != GIT_PORT) {
-			cmd.append(":"); //$NON-NLS-1$
+			cmd.append(":");
 			cmd.append(uri.getPort());
 		}
 		cmd.append('\0');
@@ -176,7 +176,7 @@ class TransportGitAnon extends TcpTransport implements PackTransport {
 				sOut = new SafeBufferedOutputStream(sOut);
 
 				init(sIn, sOut);
-				service("git-upload-pack", pckOut); //$NON-NLS-1$
+				service("git-upload-pack", pckOut);
 			} catch (IOException err) {
 				close();
 				throw new TransportException(uri,
@@ -215,7 +215,7 @@ class TransportGitAnon extends TcpTransport implements PackTransport {
 				sOut = new SafeBufferedOutputStream(sOut);
 
 				init(sIn, sOut);
-				service("git-receive-pack", pckOut); //$NON-NLS-1$
+				service("git-receive-pack", pckOut);
 			} catch (IOException err) {
 				close();
 				throw new TransportException(uri,

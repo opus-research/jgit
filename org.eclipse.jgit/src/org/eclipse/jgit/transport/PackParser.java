@@ -135,11 +135,11 @@ public abstract class PackParser {
 
 	private boolean allowThin;
 
+	private boolean checkObjectCollisions;
+
 	private boolean needBaseObjectIds;
 
 	private boolean checkEofAfterPackFooter;
-
-	private boolean expectDataAfterPackFooter;
 
 	private long objectCount;
 
@@ -204,6 +204,7 @@ public abstract class PackParser {
 		objectDigest = Constants.newMessageDigest();
 		tempObjectId = new MutableObjectId();
 		packDigest = Constants.newMessageDigest();
+		checkObjectCollisions = true;
 	}
 
 	/** @return true if a thin pack (missing base objects) is permitted. */
@@ -222,6 +223,35 @@ public abstract class PackParser {
 	 */
 	public void setAllowThin(final boolean allow) {
 		allowThin = allow;
+	}
+
+	/** @return if true received objects are verified to prevent collisions. */
+	public boolean isCheckObjectCollisions() {
+		return checkObjectCollisions;
+	}
+
+	/**
+	 * Enable checking for collisions with existing objects.
+	 * <p>
+	 * By default PackParser looks for each received object in the repository.
+	 * If the object already exists, the existing object is compared
+	 * byte-for-byte with the newly received copy to ensure they are identical.
+	 * The receive is aborted with an exception if any byte differs. This check
+	 * is necessary to prevent an evil attacker from supplying a replacement
+	 * object into this repository in the event that a discovery enabling SHA-1
+	 * collisions is made.
+	 * <p>
+	 * This check may be very costly to perform, and some repositories may have
+	 * other ways to segregate newly received object data. The check is enabled
+	 * by default, but can be explicitly disabled if the implementation can
+	 * provide the same guarantee, or is willing to accept the risks associated
+	 * with bypassing the check.
+	 *
+	 * @param check
+	 *            true to enable collision checking (strongly encouraged).
+	 */
+	public void setCheckObjectCollisions(boolean check) {
+		checkObjectCollisions = check;
 	}
 
 	/**
@@ -273,21 +303,6 @@ public abstract class PackParser {
 	 */
 	public void setCheckEofAfterPackFooter(boolean b) {
 		checkEofAfterPackFooter = b;
-	}
-
-	/** @return true if there is data expected after the pack footer. */
-	public boolean isExpectDataAfterPackFooter() {
-		return expectDataAfterPackFooter;
-	}
-
-	/**
-	 * @param e
-	 *            true if there is additional data in InputStream after pack.
-	 *            This requires the InputStream to support the mark and reset
-	 *            functions.
-	 */
-	public void setExpectDataAfterPackFooter(boolean e) {
-		expectDataAfterPackFooter = e;
 	}
 
 	/** @return the new objects that were sent by the user */
@@ -491,17 +506,17 @@ public abstract class PackParser {
 				resolveDeltas(resolving);
 				if (entryCount < objectCount) {
 					if (!isAllowThin()) {
-						throw new IOException(MessageFormat.format(
-								JGitText.get().packHasUnresolvedDeltas,
-								Long.valueOf(objectCount - entryCount)));
+						throw new IOException(MessageFormat.format(JGitText
+								.get().packHasUnresolvedDeltas,
+								(objectCount - entryCount)));
 					}
 
 					resolveDeltasWithExternalBases(resolving);
 
 					if (entryCount < objectCount) {
-						throw new IOException(MessageFormat.format(
-								JGitText.get().packHasUnresolvedDeltas,
-								Long.valueOf(objectCount - entryCount)));
+						throw new IOException(MessageFormat.format(JGitText
+								.get().packHasUnresolvedDeltas,
+								(objectCount - entryCount)));
 					}
 				}
 				resolving.endTask();
@@ -558,14 +573,13 @@ public abstract class PackParser {
 			break;
 		default:
 			throw new IOException(MessageFormat.format(
-					JGitText.get().unknownObjectType,
-					Integer.valueOf(info.type)));
+					JGitText.get().unknownObjectType, info.type));
 		}
 
 		if (!checkCRC(oe.getCRC())) {
 			throw new IOException(MessageFormat.format(
-					JGitText.get().corruptionDetectedReReadingAt,
-					Long.valueOf(oe.getOffset())));
+					JGitText.get().corruptionDetectedReReadingAt, oe
+							.getOffset()));
 		}
 
 		resolveDeltas(visit.next(), info.type, info, progress);
@@ -584,8 +598,7 @@ public abstract class PackParser {
 
 			default:
 				throw new IOException(MessageFormat.format(
-						JGitText.get().unknownObjectType,
-						Integer.valueOf(info.type)));
+						JGitText.get().unknownObjectType, info.type));
 			}
 
 			byte[] delta = inflateAndReturn(Source.DATABASE, info.size);
@@ -597,7 +610,7 @@ public abstract class PackParser {
 			if (!checkCRC(visit.delta.crc))
 				throw new IOException(MessageFormat.format(
 						JGitText.get().corruptionDetectedReReadingAt,
-						Long.valueOf(visit.delta.position)));
+						visit.delta.position));
 
 			objectDigest.update(Constants.encodedTypeString(type));
 			objectDigest.update((byte) ' ');
@@ -636,8 +649,7 @@ public abstract class PackParser {
 
 			default:
 				throw new IOException(MessageFormat.format(
-						JGitText.get().unknownObjectType,
-						Integer.valueOf(typeCode)));
+						JGitText.get().unknownObjectType, typeCode));
 			}
 	}
 
@@ -701,8 +713,7 @@ public abstract class PackParser {
 
 		default:
 			throw new IOException(MessageFormat.format(
-					JGitText.get().unknownObjectType,
-					Integer.valueOf(info.type)));
+					JGitText.get().unknownObjectType, info.type));
 		}
 		return info;
 	}
@@ -811,13 +822,6 @@ public abstract class PackParser {
 	}
 
 	private void readPackHeader() throws IOException {
-		if (expectDataAfterPackFooter) {
-			if (!in.markSupported())
-				throw new IOException(
-						JGitText.get().inputStreamMustSupportMark);
-			in.mark(buf.length);
-		}
-
 		final int hdrln = Constants.PACK_SIGNATURE.length + 4 + 4;
 		final int p = fill(Source.INPUT, hdrln);
 		for (int k = 0; k < Constants.PACK_SIGNATURE.length; k++)
@@ -827,7 +831,7 @@ public abstract class PackParser {
 		final long vers = NB.decodeUInt32(buf, p + 4);
 		if (vers != 2 && vers != 3)
 			throw new IOException(MessageFormat.format(
-					JGitText.get().unsupportedPackVersion, Long.valueOf(vers)));
+					JGitText.get().unsupportedPackVersion, vers));
 		objectCount = NB.decodeUInt32(buf, p + 8);
 		use(hdrln);
 
@@ -843,19 +847,23 @@ public abstract class PackParser {
 		System.arraycopy(buf, c, srcHash, 0, 20);
 		use(20);
 
-		if (bAvail != 0 && !expectDataAfterPackFooter)
+		// The input stream should be at EOF at this point. We do not support
+		// yielding back any remaining buffered data after the pack footer, so
+		// protocols that embed a pack stream are required to either end their
+		// stream with the pack, or embed the pack with a framing system like
+		// the SideBandInputStream does.
+
+		if (bAvail != 0)
 			throw new CorruptObjectException(MessageFormat.format(
 					JGitText.get().expectedEOFReceived,
-					"\\x" + Integer.toHexString(buf[bOffset] & 0xff))); //$NON-NLS-1$
+					"\\x" + Integer.toHexString(buf[bOffset] & 0xff)));
+
 		if (isCheckEofAfterPackFooter()) {
 			int eof = in.read();
 			if (0 <= eof)
 				throw new CorruptObjectException(MessageFormat.format(
 						JGitText.get().expectedEOFReceived,
-						"\\x" + Integer.toHexString(eof))); //$NON-NLS-1$
-		} else if (bAvail > 0 && expectDataAfterPackFooter) {
-			in.reset();
-			IO.skipFully(in, bOffset);
+						"\\x" + Integer.toHexString(eof)));
 		}
 
 		if (!Arrays.equals(actHash, srcHash))
@@ -944,9 +952,8 @@ public abstract class PackParser {
 		}
 
 		default:
-			throw new IOException(
-					MessageFormat.format(JGitText.get().unknownObjectType,
-							Integer.valueOf(typeCode)));
+			throw new IOException(MessageFormat.format(
+					JGitText.get().unknownObjectType, typeCode));
 		}
 	}
 
@@ -972,7 +979,8 @@ public abstract class PackParser {
 			}
 			inf.close();
 			tempObjectId.fromRaw(objectDigest.digest(), 0);
-			checkContentLater = readCurs.has(tempObjectId);
+			checkContentLater = isCheckObjectCollisions()
+					&& readCurs.has(tempObjectId);
 			data = null;
 
 		} else {
@@ -1004,17 +1012,19 @@ public abstract class PackParser {
 			}
 		}
 
-		try {
-			final ObjectLoader ldr = readCurs.open(id, type);
-			final byte[] existingData = ldr.getCachedBytes(data.length);
-			if (!Arrays.equals(data, existingData)) {
-				throw new IOException(MessageFormat.format(
-						JGitText.get().collisionOn, id.name()));
+		if (isCheckObjectCollisions()) {
+			try {
+				final ObjectLoader ldr = readCurs.open(id, type);
+				final byte[] existingData = ldr.getCachedBytes(data.length);
+				if (!Arrays.equals(data, existingData)) {
+					throw new IOException(MessageFormat.format(
+							JGitText.get().collisionOn, id.name()));
+				}
+			} catch (MissingObjectException notLocal) {
+				// This is OK, we don't have a copy of the object locally
+				// but the API throws when we try to read it as usually its
+				// an error to read something that doesn't exist.
 			}
-		} catch (MissingObjectException notLocal) {
-			// This is OK, we don't have a copy of the object locally
-			// but the API throws when we try to read it as usually its
-			// an error to read something that doesn't exist.
 		}
 	}
 
@@ -1028,8 +1038,7 @@ public abstract class PackParser {
 
 			if (info.type != Constants.OBJ_BLOB)
 				throw new IOException(MessageFormat.format(
-						JGitText.get().unknownObjectType,
-						Integer.valueOf(info.type)));
+						JGitText.get().unknownObjectType, info.type));
 
 			ObjectStream cur = readCurs.open(obj, info.type).openStream();
 			try {
@@ -1127,14 +1136,7 @@ public abstract class PackParser {
 	private void sync() throws IOException {
 		packDigest.update(buf, 0, bOffset);
 		onStoreStream(buf, 0, bOffset);
-		if (expectDataAfterPackFooter) {
-			if (bAvail > 0) {
-				in.reset();
-				IO.skipFully(in, bOffset);
-				bAvail = 0;
-			}
-			in.mark(buf.length);
-		} else if (bAvail > 0)
+		if (bAvail > 0)
 			System.arraycopy(buf, bOffset, buf, 0, bAvail);
 		bBase += bOffset;
 		bOffset = 0;

@@ -333,7 +333,6 @@ public class TreeFormatter {
 		}
 	}
 
-	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
 		byte[] raw = toByteArray();

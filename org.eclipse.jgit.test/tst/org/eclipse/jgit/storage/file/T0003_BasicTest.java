@@ -84,7 +84,6 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.util.FileUtils;
 import org.junit.Test;
 
-@SuppressWarnings("deprecation")
 public class T0003_BasicTest extends SampleDataRepositoryTestCase {
 
 	@Test
@@ -400,7 +399,7 @@ public class T0003_BasicTest extends SampleDataRepositoryTestCase {
 		try {
 			assertEquals(0x78, xis.readUInt8());
 			assertEquals(0x9c, xis.readUInt8());
-			assertEquals(0, 0x789c % 31);
+			assertTrue(0x789c % 31 == 0);
 		} finally {
 			xis.close();
 		}

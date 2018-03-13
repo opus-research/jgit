@@ -94,8 +94,7 @@ public class EolCanonicalizingInputStreamTest {
 		test(asBytes("1\r\n2\r\n3\0"), asBytes("1\n2\n3\0"), false);
 	}
 
-	private static void test(byte[] input, byte[] expected,
-			boolean detectBinary) throws IOException {
+	private void test(byte[] input, byte[] expected, boolean detectBinary) throws IOException {
 		final InputStream bis1 = new ByteArrayInputStream(input);
 		final InputStream cis1 = new EolCanonicalizingInputStream(bis1, detectBinary);
 		int index1 = 0;
@@ -122,9 +121,7 @@ public class EolCanonicalizingInputStreamTest {
 			}
 
 			assertEquals(expected.length, read);
-			cis2.close();
 		}
-		cis1.close();
 	}
 
 	private static byte[] asBytes(String in) {

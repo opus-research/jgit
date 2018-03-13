@@ -49,14 +49,10 @@ import java.util.List;
 import java.util.Map;
 
 import org.eclipse.jgit.api.MergeResult.MergeStatus;
-import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.MultipleParentsNotAllowedException;
+import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoHeadException;
-import org.eclipse.jgit.api.errors.NoMessageException;
-import org.eclipse.jgit.api.errors.UnmergedPathsException;
-import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
@@ -66,7 +62,6 @@ import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.merge.MergeMessageFormatter;
 import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.merge.ResolveMerger;
 import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
@@ -86,8 +81,6 @@ import org.eclipse.jgit.treewalk.FileTreeIterator;
  */
 public class RevertCommand extends GitCommand<RevCommit> {
 	private List<Ref> commits = new LinkedList<Ref>();
-
-	private String ourCommitName = null;
 
 	private List<Ref> revertedRefs = new LinkedList<Ref>();
 
@@ -112,15 +105,8 @@ public class RevertCommand extends GitCommand<RevCommit> {
 	 *         returned. If a failure occurred during revert <code>null</code>
 	 *         is returned. The list of successfully reverted {@link Ref}'s can
 	 *         be obtained by calling {@link #getRevertedRefs()}
-	 * @throws GitAPIException
-	 * @throws WrongRepositoryStateException
-	 * @throws ConcurrentRefUpdateException
-	 * @throws UnmergedPathsException
-	 * @throws NoMessageException
 	 */
-	public RevCommit call() throws NoMessageException, UnmergedPathsException,
-			ConcurrentRefUpdateException, WrongRepositoryStateException,
-			GitAPIException {
+	public RevCommit call() throws GitAPIException {
 		RevCommit newHead = null;
 		checkCallable();
 
@@ -146,31 +132,18 @@ public class RevertCommand extends GitCommand<RevCommit> {
 				RevCommit srcCommit = revWalk.parseCommit(srcObjectId);
 
 				// get the parent of the commit to revert
-				if (srcCommit.getParentCount() != 1)
+				if (srcCommit.getParentCount() != 1) {
 					throw new MultipleParentsNotAllowedException(
-							MessageFormat.format(
-									JGitText.get().canOnlyRevertCommitsWithOneParent,
-									srcCommit.name(),
-									Integer.valueOf(srcCommit.getParentCount())));
-
+							JGitText.get().canOnlyRevertCommitsWithOneParent);
+				}
 				RevCommit srcParent = srcCommit.getParent(0);
 				revWalk.parseHeaders(srcParent);
-
-				String ourName = calculateOurName(headRef);
-				String revertName = srcCommit.getId().abbreviate(7).name()
-						+ " " + srcCommit.getShortMessage(); //$NON-NLS-1$
 
 				ResolveMerger merger = (ResolveMerger) MergeStrategy.RESOLVE
 						.newMerger(repo);
 				merger.setWorkingTreeIterator(new FileTreeIterator(repo));
 				merger.setBase(srcCommit.getTree());
-				merger.setCommitNames(new String[] { "BASE", ourName, revertName }); //$NON-NLS-1$ //$NON-NLS-2$
 
-				String shortMessage = "Revert \"" + srcCommit.getShortMessage() //$NON-NLS-1$
-						+ "\""; //$NON-NLS-1$
-				String newMessage = shortMessage + "\n\n"
-						+ "This reverts commit " + srcCommit.getId().getName() //$NON-NLS-1$
-						+ ".\n"; //$NON-NLS-1$
 				if (merger.merge(headCommit, srcParent)) {
 					if (AnyObjectId.equals(headCommit.getTree().getId(), merger
 							.getResultTreeId()))
@@ -180,9 +153,13 @@ public class RevertCommand extends GitCommand<RevCommit> {
 							merger.getResultTreeId());
 					dco.setFailOnConflict(true);
 					dco.checkout();
+					String shortMessage = "Revert \"" + srcCommit.getShortMessage() + "\"";
+					String newMessage = shortMessage + "\n\n"
+							+ "This reverts commit "
+							+ srcCommit.getId().getName() + ".\n";
 					newHead = new Git(getRepository()).commit()
 							.setMessage(newMessage)
-							.setReflogComment("revert: " + shortMessage).call(); //$NON-NLS-1$
+							.setReflogComment("revert: " + shortMessage).call();
 					revertedRefs.add(src);
 				} else {
 					unmergedPaths = merger.getUnmergedPaths();
@@ -195,20 +172,6 @@ public class RevertCommand extends GitCommand<RevCommit> {
 										srcParent.getId() },
 								MergeStatus.FAILED, MergeStrategy.RESOLVE,
 								merger.getMergeResults(), failingPaths, null);
-					else
-						failingResult = new MergeResult(null,
-								merger.getBaseCommit(0, 1),
-								new ObjectId[] { headCommit.getId(),
-										srcParent.getId() },
-								MergeStatus.CONFLICTING, MergeStrategy.RESOLVE,
-								merger.getMergeResults(), failingPaths, null);
-					if (!merger.failed() && !unmergedPaths.isEmpty()) {
-						String message = new MergeMessageFormatter()
-						.formatWithConflicts(newMessage,
-								merger.getUnmergedPaths());
-						repo.writeRevertHead(srcCommit.getId());
-						repo.writeMergeCommitMsg(message);
-					}
 					return null;
 				}
 			}
@@ -254,26 +217,6 @@ public class RevertCommand extends GitCommand<RevCommit> {
 	public RevertCommand include(String name, AnyObjectId commit) {
 		return include(new ObjectIdRef.Unpeeled(Storage.LOOSE, name,
 				commit.copy()));
-	}
-
-	/**
-	 * @param ourCommitName
-	 *            the name that should be used in the "OURS" place for conflict
-	 *            markers
-	 * @return {@code this}
-	 */
-	public RevertCommand setOurCommitName(String ourCommitName) {
-		this.ourCommitName = ourCommitName;
-		return this;
-	}
-
-	private String calculateOurName(Ref headRef) {
-		if (ourCommitName != null)
-			return ourCommitName;
-
-		String targetRefName = headRef.getTarget().getName();
-		String headName = Repository.shortenRefName(targetRefName);
-		return headName;
 	}
 
 	/**

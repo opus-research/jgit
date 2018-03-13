@@ -132,7 +132,6 @@ public final class StringUtils {
 	 *            second string to compare.
 	 * @return negative, zero or positive if a sorts before, is equal to, or
 	 *         sorts after b.
-	 * @since 2.0
 	 */
 	public static int compareIgnoreCase(String a, String b) {
 		for (int i = 0; i < a.length() && i < b.length(); i++) {
@@ -155,7 +154,6 @@ public final class StringUtils {
 	 *            second string to compare.
 	 * @return negative, zero or positive if a sorts before, is equal to, or
 	 *         sorts after b.
-	 * @since 2.0
 	 */
 	public static int compareWithCase(String a, String b) {
 		for (int i = 0; i < a.length() && i < b.length(); i++) {
@@ -208,15 +206,15 @@ public final class StringUtils {
 		if (stringValue == null)
 			return null;
 
-		if (equalsIgnoreCase("yes", stringValue) //$NON-NLS-1$
-				|| equalsIgnoreCase("true", stringValue) //$NON-NLS-1$
-				|| equalsIgnoreCase("1", stringValue) //$NON-NLS-1$
-				|| equalsIgnoreCase("on", stringValue)) //$NON-NLS-1$
+		if (equalsIgnoreCase("yes", stringValue)
+				|| equalsIgnoreCase("true", stringValue)
+				|| equalsIgnoreCase("1", stringValue)
+				|| equalsIgnoreCase("on", stringValue))
 			return Boolean.TRUE;
-		else if (equalsIgnoreCase("no", stringValue) //$NON-NLS-1$
-				|| equalsIgnoreCase("false", stringValue) //$NON-NLS-1$
-				|| equalsIgnoreCase("0", stringValue) //$NON-NLS-1$
-				|| equalsIgnoreCase("off", stringValue)) //$NON-NLS-1$
+		else if (equalsIgnoreCase("no", stringValue)
+				|| equalsIgnoreCase("false", stringValue)
+				|| equalsIgnoreCase("0", stringValue)
+				|| equalsIgnoreCase("off", stringValue))
 			return Boolean.FALSE;
 		else
 			return null;

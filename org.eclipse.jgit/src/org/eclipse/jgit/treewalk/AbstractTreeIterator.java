@@ -651,7 +651,6 @@ public abstract class AbstractTreeIterator {
 	 * JGit internal API for use by {@link DirCacheCheckout}
 	 *
 	 * @return start of name component part within {@link #getEntryPathBuffer()}
-	 * @since 2.0
 	 */
 	public int getNameOffset() {
 		return pathOffset;
@@ -670,11 +669,5 @@ public abstract class AbstractTreeIterator {
 	 */
 	public void getName(byte[] buffer, int offset) {
 		System.arraycopy(path, pathOffset, buffer, offset, pathLen - pathOffset);
-	}
-
-	@SuppressWarnings("nls")
-	@Override
-	public String toString() {
-		return getClass().getSimpleName() + "[" + getEntryPathString() + "]"; //$NON-NLS-1$
 	}
 }

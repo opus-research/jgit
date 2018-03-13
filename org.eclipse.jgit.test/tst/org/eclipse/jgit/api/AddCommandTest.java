@@ -52,7 +52,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
@@ -73,7 +72,7 @@ import org.junit.Test;
 public class AddCommandTest extends RepositoryTestCase {
 
 	@Test
-	public void testAddNothing() throws GitAPIException {
+	public void testAddNothing() {
 		Git git = new Git(db);
 
 		try {
@@ -86,7 +85,7 @@ public class AddCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testAddNonExistingSingleFile() throws GitAPIException {
+	public void testAddNonExistingSingleFile() throws NoFilepatternException {
 		Git git = new Git(db);
 
 		DirCache dc = git.add().addFilepattern("a.txt").call();
@@ -95,7 +94,7 @@ public class AddCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testAddExistingSingleFile() throws IOException, GitAPIException {
+	public void testAddExistingSingleFile() throws IOException, NoFilepatternException {
 		File file = new File(db.getWorkTree(), "a.txt");
 		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
@@ -113,7 +112,7 @@ public class AddCommandTest extends RepositoryTestCase {
 
 	@Test
 	public void testAddExistingSingleSmallFileWithNewLine() throws IOException,
-			GitAPIException {
+			NoFilepatternException {
 		File file = new File(db.getWorkTree(), "a.txt");
 		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
@@ -137,7 +136,7 @@ public class AddCommandTest extends RepositoryTestCase {
 
 	@Test
 	public void testAddExistingSingleMediumSizeFileWithNewLine()
-			throws IOException, GitAPIException {
+			throws IOException, NoFilepatternException {
 		File file = new File(db.getWorkTree(), "a.txt");
 		FileUtils.createNewFile(file);
 		StringBuilder data = new StringBuilder();
@@ -166,7 +165,7 @@ public class AddCommandTest extends RepositoryTestCase {
 
 	@Test
 	public void testAddExistingSingleBinaryFile() throws IOException,
-			GitAPIException {
+			NoFilepatternException {
 		File file = new File(db.getWorkTree(), "a.txt");
 		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
@@ -189,8 +188,7 @@ public class AddCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testAddExistingSingleFileInSubDir() throws IOException,
-			GitAPIException {
+	public void testAddExistingSingleFileInSubDir() throws IOException, NoFilepatternException {
 		FileUtils.mkdir(new File(db.getWorkTree(), "sub"));
 		File file = new File(db.getWorkTree(), "sub/a.txt");
 		FileUtils.createNewFile(file);
@@ -208,8 +206,7 @@ public class AddCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testAddExistingSingleFileTwice() throws IOException,
-			GitAPIException {
+	public void testAddExistingSingleFileTwice() throws IOException, NoFilepatternException {
 		File file = new File(db.getWorkTree(), "a.txt");
 		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
@@ -631,11 +628,6 @@ public class AddCommandTest extends RepositoryTestCase {
 			public boolean canExecute(File f) {
 				return true;
 			}
-
-			@Override
-			public boolean isCaseSensitive() {
-				return false;
-			}
 		};
 
 		Git git = Git.open(db.getDirectory(), executableFs);
@@ -676,11 +668,6 @@ public class AddCommandTest extends RepositoryTestCase {
 			public boolean canExecute(File f) {
 				return false;
 			}
-
-			@Override
-			public boolean isCaseSensitive() {
-				return false;
-			}
 		};
 
 		config = db.getConfig();
@@ -697,7 +684,7 @@ public class AddCommandTest extends RepositoryTestCase {
 		assertEquals(FileMode.EXECUTABLE_FILE, walk.getFileMode(0));
 	}
 
-	private static DirCacheEntry addEntryToBuilder(String path, File file,
+	private DirCacheEntry addEntryToBuilder(String path, File file,
 			ObjectInserter newObjectInserter, DirCacheBuilder builder, int stage)
 			throws IOException {
 		FileInputStream inputStream = new FileInputStream(file);

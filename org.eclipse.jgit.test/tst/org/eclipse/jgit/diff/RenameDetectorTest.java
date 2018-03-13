@@ -55,7 +55,6 @@ import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.junit.Before;
 import org.junit.Test;
@@ -68,13 +67,13 @@ public class RenameDetectorTest extends RepositoryTestCase {
 
 	private RenameDetector rd;
 
-	private TestRepository<Repository> testDb;
+	private TestRepository testDb;
 
 	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		testDb = new TestRepository<Repository>(db);
+		testDb = new TestRepository(db);
 		rd = new RenameDetector(db);
 	}
 
