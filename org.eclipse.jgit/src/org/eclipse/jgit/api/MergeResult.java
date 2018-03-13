@@ -169,9 +169,8 @@ public class MergeResult {
 		this.mergeStrategy = mergeStrategy;
 		this.description = description;
 		if (lowLevelResults != null)
-			for (Map.Entry<String, org.eclipse.jgit.merge.MergeResult<?>> result : lowLevelResults
-					.entrySet())
-				addConflict(result.getKey(), result.getValue());
+			for (String path : lowLevelResults.keySet())
+				addConflict(path, lowLevelResults.get(path));
 	}
 
 	/**
