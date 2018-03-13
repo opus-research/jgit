@@ -257,10 +257,6 @@ class LfsStore extends TextBuiltin {
 				return repository;
 			}
 
-			@Override
-			protected boolean accept(LfsRequest request, String path) {
-				return true;
-			}
 		};
 		app.addServlet(new ServletHolder(protocol), PROTOCOL_PATH);
 

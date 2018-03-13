@@ -83,6 +83,7 @@ import org.eclipse.jgit.util.FileUtils;
 import org.junit.After;
 import org.junit.Before;
 
+@SuppressWarnings("restriction")
 public abstract class LfsServerTest {
 
 	private static final long timeout = /* 10 sec */ 10 * 1000;
