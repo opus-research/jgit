@@ -106,7 +106,6 @@ public class DfsInserter extends ObjectInserter {
 	DfsPackDescription packDsc;
 	PackStream packOut;
 	private boolean rollback;
-	private boolean checkExisting = true;
 
 	/**
 	 * Initialize a new inserter.
@@ -116,15 +115,6 @@ public class DfsInserter extends ObjectInserter {
 	 */
 	protected DfsInserter(DfsObjDatabase db) {
 		this.db = db;
-	}
-
-	/**
-	 * @param check
-	 *     if false, will write out possibly-duplicate objects without first
-	 *     checking whether they exist in the repo; default is true.
-	 */
-	public void checkExisting(boolean check) {
-		checkExisting = check;
 	}
 
 	void setCompressionLevel(int compression) {
@@ -148,7 +138,7 @@ public class DfsInserter extends ObjectInserter {
 		if (objectMap != null && objectMap.contains(id))
 			return id;
 		// Ignore unreachable (garbage) objects here.
-		if (checkExisting && db.has(id, true))
+		if (db.has(id, true))
 			return id;
 
 		long offset = beginObject(type, len);
