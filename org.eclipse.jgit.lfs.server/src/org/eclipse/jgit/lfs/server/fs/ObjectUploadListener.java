@@ -42,8 +42,6 @@
  */
 package org.eclipse.jgit.lfs.server.fs;
 
-import static org.apache.http.HttpStatus.SC_OK;
-
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -146,7 +144,7 @@ class ObjectUploadListener implements ReadListener {
 			channel.close();
 			// TODO check if status 200 is ok for PUT request, HTTP foresees 204
 			// for successful PUT without response body
-			response.setStatus(SC_OK);
+			response.setStatus(HttpServletResponse.SC_OK);
 		} finally {
 			context.complete();
 		}
