@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
+ * Copyright (C) 2011, Robin Stocker <robin@nibor.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,102 +41,56 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.util.io;
+package org.eclipse.jgit.revwalk;
 
 import java.io.IOException;
-import java.io.InputStream;
 
-import org.eclipse.jgit.diff.RawText;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
 
 /**
- * An input stream which canonicalizes EOLs bytes on the fly to '\n', unless the
- * first 8000 bytes indicate the stream is binary.
- *
- * Note: Make sure to apply this InputStream only to text files!
+ * Utility methods for {@link RevWalk}.
  */
-public class EolCanonicalizingInputStream extends InputStream {
-	private final byte[] single = new byte[1];
+public final class RevWalkUtils {
 
-	private final byte[] buf = new byte[8096];
-
-	private final InputStream in;
-
-	private int cnt;
-
-	private int ptr;
-
-	private boolean isBinary;
-
-	private boolean modeDetected;
+	private RevWalkUtils() {
+		// Utility class
+	}
 
 	/**
-	 * Creates a new InputStream, wrapping the specified stream
+	 * Count the number of commits that are reachable from <code>start</code>
+	 * until a commit that is reachable from <code>end</code> is encountered. In
+	 * other words, count the number of commits that are in <code>start</code>,
+	 * but not in <code>end</code>.
+	 * <p>
+	 * Note that this method calls {@link RevWalk#reset()} at the beginning.
+	 * Also note that the existing rev filter on the walk is left as-is, so be
+	 * sure to set the right rev filter before calling this method.
 	 *
-	 * @param in
-	 *            raw input stream
+	 * @param walk
+	 *            the rev walk to use
+	 * @param start
+	 *            the commit to start counting from
+	 * @param end
+	 *            the commit where counting should end, or null if counting
+	 *            should be done until there are no more commits
+	 *
+	 * @return the number of commits
+	 * @throws MissingObjectException
+	 * @throws IncorrectObjectTypeException
+	 * @throws IOException
 	 */
-	public EolCanonicalizingInputStream(InputStream in) {
-		this.in = in;
-	}
+	public static int count(final RevWalk walk, final RevCommit start,
+			final RevCommit end) throws MissingObjectException,
+			IncorrectObjectTypeException, IOException {
+		walk.reset();
+		walk.markStart(start);
+		if (end != null)
+			walk.markUninteresting(end);
 
-	@Override
-	public int read() throws IOException {
-		final int read = read(single, 0, 1);
-		return read == 1 ? single[0] & 0xff : -1;
-	}
-
-	@Override
-	public int read(byte[] bs, int off, int len) throws IOException {
-		if (len == 0)
-			return 0;
-
-		if (cnt == -1)
-			return -1;
-
-		final int startOff = off;
-		final int end = off + len;
-
-		while (off < end) {
-			if (ptr == cnt && !fillBuffer()) {
-				break;
-			}
-
-			byte b = buf[ptr++];
-			if (isBinary || b != '\r') {
-				// Logic for binary files ends here
-				bs[off++] = b;
-				continue;
-			}
-
-			if (ptr == cnt && !fillBuffer()) {
-				bs[off++] = '\r';
-				break;
-			}
-
-			if (buf[ptr] == '\n') {
-				bs[off++] = '\n';
-				ptr++;
-			} else
-				bs[off++] = '\r';
-		}
-
-		return startOff == off ? -1 : off - startOff;
-	}
-
-	@Override
-	public void close() throws IOException {
-		in.close();
-	}
-
-	private boolean fillBuffer() throws IOException {
-		cnt = in.read(buf, 0, buf.length);
-		if (cnt < 1)
-			return false;
-		if (!modeDetected) {
-			isBinary = RawText.isBinary(buf, cnt);
-			modeDetected = true;
-		}
-		ptr = 0;
-		return true;
+		int count = 0;
+		for (RevCommit c = walk.next(); c != null; c = walk.next())
+			count++;
+		return count;
 	}
 }
