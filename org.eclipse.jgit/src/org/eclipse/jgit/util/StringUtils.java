@@ -44,8 +44,9 @@
 package org.eclipse.jgit.util;
 
 import java.text.MessageFormat;
+import java.util.Collection;
 
-import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.internal.JGitText;
 
 /** Miscellaneous string comparison utility methods. */
 public final class StringUtils {
@@ -120,15 +121,54 @@ public final class StringUtils {
 	}
 
 	/**
-	 * Parse a string as a standard Git boolean value.
+	 * Compare two strings, ignoring case.
 	 * <p>
-	 * The terms {@code yes}, {@code true}, {@code 1}, {@code on} can all be
-	 * used to mean {@code true}.
+	 * This method does not honor the JVM locale, but instead always behaves as
+	 * though it is in the US-ASCII locale.
+	 *
+	 * @param a
+	 *            first string to compare.
+	 * @param b
+	 *            second string to compare.
+	 * @return negative, zero or positive if a sorts before, is equal to, or
+	 *         sorts after b.
+	 * @since 2.0
+	 */
+	public static int compareIgnoreCase(String a, String b) {
+		for (int i = 0; i < a.length() && i < b.length(); i++) {
+			int d = toLowerCase(a.charAt(i)) - toLowerCase(b.charAt(i));
+			if (d != 0)
+				return d;
+		}
+		return a.length() - b.length();
+	}
+
+	/**
+	 * Compare two strings, honoring case.
 	 * <p>
-	 * The terms {@code no}, {@code false}, {@code 0}, {@code off} can all be
-	 * used to mean {@code false}.
-	 * <p>
-	 * Comparisons ignore case, via {@link #equalsIgnoreCase(String, String)}.
+	 * This method does not honor the JVM locale, but instead always behaves as
+	 * though it is in the US-ASCII locale.
+	 *
+	 * @param a
+	 *            first string to compare.
+	 * @param b
+	 *            second string to compare.
+	 * @return negative, zero or positive if a sorts before, is equal to, or
+	 *         sorts after b.
+	 * @since 2.0
+	 */
+	public static int compareWithCase(String a, String b) {
+		for (int i = 0; i < a.length() && i < b.length(); i++) {
+			int d = a.charAt(i) - b.charAt(i);
+			if (d != 0)
+				return d;
+		}
+		return a.length() - b.length();
+	}
+
+	/**
+	 * Parse a string as a standard Git boolean value. See
+	 * {@link #toBooleanOrNull(String)}.
 	 *
 	 * @param stringValue
 	 *            the string to parse.
@@ -141,24 +181,102 @@ public final class StringUtils {
 		if (stringValue == null)
 			throw new NullPointerException(JGitText.get().expectedBooleanStringValue);
 
-		if (equalsIgnoreCase("yes", stringValue)
-				|| equalsIgnoreCase("true", stringValue)
-				|| equalsIgnoreCase("1", stringValue)
-				|| equalsIgnoreCase("on", stringValue)) {
-			return true;
-
-		} else if (equalsIgnoreCase("no", stringValue)
-				|| equalsIgnoreCase("false", stringValue)
-				|| equalsIgnoreCase("0", stringValue)
-				|| equalsIgnoreCase("off", stringValue)) {
-			return false;
-
-		} else {
+		final Boolean bool = toBooleanOrNull(stringValue);
+		if (bool == null)
 			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().notABoolean, stringValue));
+
+		return bool.booleanValue();
+	}
+
+	/**
+	 * Parse a string as a standard Git boolean value.
+	 * <p>
+	 * The terms {@code yes}, {@code true}, {@code 1}, {@code on} can all be
+	 * used to mean {@code true}.
+	 * <p>
+	 * The terms {@code no}, {@code false}, {@code 0}, {@code off} can all be
+	 * used to mean {@code false}.
+	 * <p>
+	 * Comparisons ignore case, via {@link #equalsIgnoreCase(String, String)}.
+	 *
+	 * @param stringValue
+	 *            the string to parse.
+	 * @return the boolean interpretation of {@code value} or null in case the
+	 *         string does not represent a boolean value
+	 */
+	public static Boolean toBooleanOrNull(final String stringValue) {
+		if (stringValue == null)
+			return null;
+
+		if (equalsIgnoreCase("yes", stringValue) //$NON-NLS-1$
+				|| equalsIgnoreCase("true", stringValue) //$NON-NLS-1$
+				|| equalsIgnoreCase("1", stringValue) //$NON-NLS-1$
+				|| equalsIgnoreCase("on", stringValue)) //$NON-NLS-1$
+			return Boolean.TRUE;
+		else if (equalsIgnoreCase("no", stringValue) //$NON-NLS-1$
+				|| equalsIgnoreCase("false", stringValue) //$NON-NLS-1$
+				|| equalsIgnoreCase("0", stringValue) //$NON-NLS-1$
+				|| equalsIgnoreCase("off", stringValue)) //$NON-NLS-1$
+			return Boolean.FALSE;
+		else
+			return null;
+	}
+
+	/**
+	 * Join a collection of Strings together using the specified separator.
+	 *
+	 * @param parts
+	 *            Strings to join
+	 * @param separator
+	 *            used to join
+	 * @return a String with all the joined parts
+	 */
+	public static String join(Collection<String> parts, String separator) {
+		return StringUtils.join(parts, separator, separator);
+	}
+
+	/**
+	 * Join a collection of Strings together using the specified separator and a
+	 * lastSeparator which is used for joining the second last and the last
+	 * part.
+	 *
+	 * @param parts
+	 *            Strings to join
+	 * @param separator
+	 *            separator used to join all but the two last elements
+	 * @param lastSeparator
+	 *            separator to use for joining the last two elements
+	 * @return a String with all the joined parts
+	 */
+	public static String join(Collection<String> parts, String separator,
+			String lastSeparator) {
+		StringBuilder sb = new StringBuilder();
+		int i = 0;
+		int lastIndex = parts.size() - 1;
+		for (String part : parts) {
+			sb.append(part);
+			if (i == lastIndex - 1) {
+				sb.append(lastSeparator);
+			} else if (i != lastIndex) {
+				sb.append(separator);
+			}
+			i++;
 		}
+		return sb.toString();
 	}
 
 	private StringUtils() {
 		// Do not create instances
+	}
+
+	/**
+	 * Test if a string is empty or null.
+	 *
+	 * @param stringValue
+	 *            the string to check
+	 * @return <code>true</code> if the string is <code>null</code> or empty
+	 */
+	public static boolean isEmptyOrNull(String stringValue) {
+		return stringValue == null || stringValue.length() == 0;
 	}
 }

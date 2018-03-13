@@ -49,15 +49,26 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.PackProtocolException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 
-class PacketLineIn {
-	static final String END = new String("") /* must not string pool */;
+/**
+ * Read Git style pkt-line formatting from an input stream.
+ * <p>
+ * This class is not thread safe and may issue multiple reads to the underlying
+ * stream for each method call made.
+ * <p>
+ * This class performs no buffering on its own. This makes it suitable to
+ * interleave reads performed by this class with reads performed directly
+ * against the underlying InputStream.
+ */
+public class PacketLineIn {
+	/** Magic return from {@link #readString()} when a flush packet is found. */
+	public static final String END = new StringBuilder(0).toString(); 	/* must not string pool */
 
 	static enum AckNackResult {
 		/** NAK */
@@ -76,7 +87,13 @@ class PacketLineIn {
 
 	private final byte[] lineBuffer;
 
-	PacketLineIn(final InputStream i) {
+	/**
+	 * Create a new packet line reader.
+	 *
+	 * @param i
+	 *            the input stream to consume.
+	 */
+	public PacketLineIn(final InputStream i) {
 		in = i;
 		lineBuffer = new byte[SideBandOutputStream.SMALL_BUF];
 	}
@@ -85,41 +102,70 @@ class PacketLineIn {
 		final String line = readString();
 		if (line.length() == 0)
 			throw new PackProtocolException(JGitText.get().expectedACKNAKFoundEOF);
-		if ("NAK".equals(line))
+		if ("NAK".equals(line)) //$NON-NLS-1$
 			return AckNackResult.NAK;
-		if (line.startsWith("ACK ")) {
+		if (line.startsWith("ACK ")) { //$NON-NLS-1$
 			returnedId.fromString(line.substring(4, 44));
 			if (line.length() == 44)
 				return AckNackResult.ACK;
 
 			final String arg = line.substring(44);
-			if (arg.equals(" continue"))
+			if (arg.equals(" continue")) //$NON-NLS-1$
 				return AckNackResult.ACK_CONTINUE;
-			else if (arg.equals(" common"))
+			else if (arg.equals(" common")) //$NON-NLS-1$
 				return AckNackResult.ACK_COMMON;
-			else if (arg.equals(" ready"))
+			else if (arg.equals(" ready")) //$NON-NLS-1$
 				return AckNackResult.ACK_READY;
 		}
+		if (line.startsWith("ERR ")) //$NON-NLS-1$
+			throw new PackProtocolException(line.substring(4));
 		throw new PackProtocolException(MessageFormat.format(JGitText.get().expectedACKNAKGot, line));
 	}
 
-	String readString() throws IOException {
+	/**
+	 * Read a single UTF-8 encoded string packet from the input stream.
+	 * <p>
+	 * If the string ends with an LF, it will be removed before returning the
+	 * value to the caller. If this automatic trimming behavior is not desired,
+	 * use {@link #readStringRaw()} instead.
+	 *
+	 * @return the string. {@link #END} if the string was the magic flush
+	 *         packet.
+	 * @throws IOException
+	 *             the stream cannot be read.
+	 */
+	public String readString() throws IOException {
 		int len = readLength();
 		if (len == 0)
 			return END;
 
 		len -= 4; // length header (4 bytes)
 		if (len == 0)
-			return "";
+			return ""; //$NON-NLS-1$
 
-		final byte[] raw = new byte[len];
+		byte[] raw;
+		if (len <= lineBuffer.length)
+			raw = lineBuffer;
+		else
+			raw = new byte[len];
+
 		IO.readFully(in, raw, 0, len);
 		if (raw[len - 1] == '\n')
 			len--;
 		return RawParseUtils.decode(Constants.CHARSET, raw, 0, len);
 	}
 
-	String readStringRaw() throws IOException {
+	/**
+	 * Read a single UTF-8 encoded string packet from the input stream.
+	 * <p>
+	 * Unlike {@link #readString()} a trailing LF will be retained.
+	 *
+	 * @return the string. {@link #END} if the string was the magic flush
+	 *         packet.
+	 * @throws IOException
+	 *             the stream cannot be read.
+	 */
+	public String readStringRaw() throws IOException {
 		int len = readLength();
 		if (len == 0)
 			return END;
@@ -145,7 +191,7 @@ class PacketLineIn {
 			return len;
 		} catch (ArrayIndexOutOfBoundsException err) {
 			throw new IOException(MessageFormat.format(JGitText.get().invalidPacketLineHeader,
-					"" + (char) lineBuffer[0] + (char) lineBuffer[1]
+					"" + (char) lineBuffer[0] + (char) lineBuffer[1] //$NON-NLS-1$
 					+ (char) lineBuffer[2] + (char) lineBuffer[3]));
 		}
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2010-2012 Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,17 +42,23 @@
  */
 package org.eclipse.jgit.lib;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 
+import org.junit.Test;
+
 public class MergeHeadMsgTest extends RepositoryTestCase {
 	private static final String mergeMsg = "merge a and b";
 
 	private static final String sampleId = "1c6db447abdbb291b25f07be38ea0b1bf94947c5";
 
+	@Test
 	public void testReadWriteMergeHeads() throws IOException {
 		assertEquals(db.readMergeHeads(), null);
 		db.writeMergeHeads(Arrays.asList(ObjectId.zeroId(),
@@ -72,7 +78,7 @@ public class MergeHeadMsgTest extends RepositoryTestCase {
 		assertEquals(db.readMergeHeads().size(), 2);
 		assertEquals(db.readMergeHeads().get(0), ObjectId.zeroId());
 		assertEquals(db.readMergeHeads().get(1), ObjectId.fromString(sampleId));
-		db.writeMergeHeads(Collections.EMPTY_LIST);
+		db.writeMergeHeads(Collections.<ObjectId> emptyList());
 		assertEquals(read(new File(db.getDirectory(), "MERGE_HEAD")), "");
 		assertEquals(db.readMergeHeads(), null);
 		fos = new FileOutputStream(new File(db.getDirectory(),
@@ -86,6 +92,7 @@ public class MergeHeadMsgTest extends RepositoryTestCase {
 		assertEquals(db.readMergeHeads().get(0), ObjectId.fromString(sampleId));
 	}
 
+	@Test
 	public void testReadWriteMergeMsg() throws IOException {
 		assertEquals(db.readMergeCommitMsg(), null);
 		assertFalse(new File(db.getDirectory(), "MERGE_MSG").exists());

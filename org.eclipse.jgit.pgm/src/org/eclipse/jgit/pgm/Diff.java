@@ -45,14 +45,18 @@
 
 package org.eclipse.jgit.pgm;
 
+import static java.lang.Integer.valueOf;
 import static org.eclipse.jgit.lib.Constants.HEAD;
 import static org.eclipse.jgit.lib.Constants.OBJECT_ID_STRING_LENGTH;
 
 import java.io.BufferedOutputStream;
-import java.io.PrintWriter;
+import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
+import org.eclipse.jgit.diff.DiffAlgorithm;
+import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.diff.RawTextComparator;
@@ -60,19 +64,20 @@ import org.eclipse.jgit.diff.RenameDetector;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.pgm.opt.PathTreeFilterHandler;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
+import org.eclipse.jgit.util.io.ThrowingPrintWriter;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 
 @Command(common = true, usage = "usage_ShowDiffs")
 class Diff extends TextBuiltin {
-	private final DiffFormatter diffFmt = new DiffFormatter( //
-			new BufferedOutputStream(System.out));
+	private DiffFormatter diffFmt;
 
 	@Argument(index = 0, metaVar = "metaVar_treeish")
 	private AbstractTreeIterator oldTree;
@@ -96,6 +101,11 @@ class Diff extends TextBuiltin {
 	@Option(name = "--no-renames", usage = "usage_noRenames")
 	void noRenames(@SuppressWarnings("unused") boolean on) {
 		detectRenames = Boolean.FALSE;
+	}
+
+	@Option(name = "--algorithm", metaVar = "metaVar_diffAlg", usage = "usage_diffAlgorithm")
+	void setAlgorithm(SupportedAlgorithm s) {
+		diffFmt.setDiffAlgorithm(DiffAlgorithm.getAlgorithm(s));
 	}
 
 	@Option(name = "-l", usage = "usage_renameLimit")
@@ -151,11 +161,17 @@ class Diff extends TextBuiltin {
 
 	@Option(name = "--no-prefix", usage = "usage_noPrefix")
 	void noPrefix(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setOldPrefix("");
-		diffFmt.setNewPrefix("");
+		diffFmt.setOldPrefix(""); //$NON-NLS-1$
+		diffFmt.setNewPrefix(""); //$NON-NLS-1$
 	}
 
 	// END -- Options shared with Log
+
+	@Override
+	protected void init(final Repository repository, final String gitDir) {
+		super.init(repository, gitDir);
+		diffFmt = new DiffFormatter(new BufferedOutputStream(outs));
+	}
 
 	@Override
 	protected void run() throws Exception {
@@ -163,7 +179,7 @@ class Diff extends TextBuiltin {
 		try {
 			if (cached) {
 				if (oldTree == null) {
-					ObjectId head = db.resolve(HEAD + "^{tree}");
+					ObjectId head = db.resolve(HEAD + "^{tree}"); //$NON-NLS-1$
 					if (head == null)
 						die(MessageFormat.format(CLIText.get().notATree, HEAD));
 					CanonicalTreeParser p = new CanonicalTreeParser();
@@ -182,7 +198,9 @@ class Diff extends TextBuiltin {
 			} else if (newTree == null)
 				newTree = new FileTreeIterator(db);
 
-			diffFmt.setProgressMonitor(new TextProgressMonitor());
+			TextProgressMonitor pm = new TextProgressMonitor();
+			pm.setDelayStart(2, TimeUnit.SECONDS);
+			diffFmt.setProgressMonitor(pm);
 			diffFmt.setPathFilter(pathFilter);
 			if (detectRenames != null)
 				diffFmt.setDetectRenames(detectRenames.booleanValue());
@@ -192,8 +210,8 @@ class Diff extends TextBuiltin {
 			}
 
 			if (showNameAndStatusOnly) {
-				nameStatus(out, diffFmt.scan(oldTree, newTree));
-				out.flush();
+				nameStatus(outw, diffFmt.scan(oldTree, newTree));
+				outw.flush();
 
 			} else {
 				diffFmt.format(oldTree, newTree);
@@ -204,25 +222,26 @@ class Diff extends TextBuiltin {
 		}
 	}
 
-	static void nameStatus(PrintWriter out, List<DiffEntry> files) {
+	static void nameStatus(ThrowingPrintWriter out, List<DiffEntry> files)
+			throws IOException {
 		for (DiffEntry ent : files) {
 			switch (ent.getChangeType()) {
 			case ADD:
-				out.println("A\t" + ent.getNewPath());
+				out.println("A\t" + ent.getNewPath()); //$NON-NLS-1$
 				break;
 			case DELETE:
-				out.println("D\t" + ent.getOldPath());
+				out.println("D\t" + ent.getOldPath()); //$NON-NLS-1$
 				break;
 			case MODIFY:
-				out.println("M\t" + ent.getNewPath());
+				out.println("M\t" + ent.getNewPath()); //$NON-NLS-1$
 				break;
 			case COPY:
-				out.format("C%1$03d\t%2$s\t%3$s", ent.getScore(), //
+				out.format("C%1$03d\t%2$s\t%3$s", valueOf(ent.getScore()), // //$NON-NLS-1$
 						ent.getOldPath(), ent.getNewPath());
 				out.println();
 				break;
 			case RENAME:
-				out.format("R%1$03d\t%2$s\t%3$s", ent.getScore(), //
+				out.format("R%1$03d\t%2$s\t%3$s", valueOf(ent.getScore()), // //$NON-NLS-1$
 						ent.getOldPath(), ent.getNewPath());
 				out.println();
 				break;

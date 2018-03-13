@@ -82,12 +82,17 @@ public class NotRevFilter extends RevFilter {
 	}
 
 	@Override
+	public boolean requiresCommitBody() {
+		return a.requiresCommitBody();
+	}
+
+	@Override
 	public RevFilter clone() {
 		return new NotRevFilter(a.clone());
 	}
 
 	@Override
 	public String toString() {
-		return "NOT " + a.toString();
+		return "NOT " + a.toString(); //$NON-NLS-1$
 	}
 }

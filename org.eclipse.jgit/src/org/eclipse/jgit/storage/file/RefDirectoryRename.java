@@ -53,6 +53,7 @@ import org.eclipse.jgit.lib.RefRename;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.util.FileUtils;
 
 /**
  * Rename any reference stored by {@link RefDirectory}.
@@ -175,15 +176,15 @@ class RefDirectoryRename extends RefRename {
 			try {
 				refdb.delete(tmp);
 			} catch (IOException err) {
-				refdb.fileFor(tmp.getName()).delete();
+				FileUtils.delete(refdb.fileFor(tmp.getName()));
 			}
 			rw.release();
 		}
 	}
 
 	private boolean renameLog(RefUpdate src, RefUpdate dst) {
-		File srcLog = refdb.logFor(src.getName());
-		File dstLog = refdb.logFor(dst.getName());
+		File srcLog = refdb.getLogWriter().logFor(src.getName());
+		File dstLog = refdb.getLogWriter().logFor(dst.getName());
 
 		if (!srcLog.exists())
 			return true;

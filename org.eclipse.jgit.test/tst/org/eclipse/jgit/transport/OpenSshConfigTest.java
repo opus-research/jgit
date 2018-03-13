@@ -43,13 +43,23 @@
 
 package org.eclipse.jgit.transport;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.transport.OpenSshConfig.Host;
+import org.eclipse.jgit.util.FileUtils;
+import org.junit.Before;
+import org.junit.Test;
 
 public class OpenSshConfigTest extends RepositoryTestCase {
 	private File home;
@@ -58,14 +68,15 @@ public class OpenSshConfigTest extends RepositoryTestCase {
 
 	private OpenSshConfig osc;
 
+	@Before
 	public void setUp() throws Exception {
 		super.setUp();
 
 		home = new File(trash, "home");
-		home.mkdir();
+		FileUtils.mkdir(home);
 
-		configFile = new File(new File(home, ".ssh"), "config");
-		configFile.getParentFile().mkdir();
+		configFile = new File(new File(home, ".ssh"), Constants.CONFIG);
+		FileUtils.mkdir(configFile.getParentFile());
 
 		System.setProperty("user.name", "jex_junit");
 		osc = new OpenSshConfig(home, configFile);
@@ -78,6 +89,7 @@ public class OpenSshConfigTest extends RepositoryTestCase {
 		fw.close();
 	}
 
+	@Test
 	public void testNoConfig() {
 		final Host h = osc.lookup("repo.or.cz");
 		assertNotNull(h);
@@ -87,6 +99,7 @@ public class OpenSshConfigTest extends RepositoryTestCase {
 		assertNull(h.getIdentityFile());
 	}
 
+	@Test
 	public void testSeparatorParsing() throws Exception {
 		config("Host\tfirst\n" +
 		       "\tHostName\tfirst.tld\n" +
@@ -111,6 +124,7 @@ public class OpenSshConfigTest extends RepositoryTestCase {
 		assertEquals("last.tld", osc.lookup("last").getHostName());
 	}
 
+	@Test
 	public void testQuoteParsing() throws Exception {
 		config("Host \"good\"\n" +
 			" HostName=\"good.tld\"\n" +
@@ -137,6 +151,7 @@ public class OpenSshConfigTest extends RepositoryTestCase {
 		assertEquals("bad.tld\"", osc.lookup("bad").getHostName());
 	}
 
+	@Test
 	public void testAlias_DoesNotMatch() throws Exception {
 		config("Host orcz\n" + "\tHostName repo.or.cz\n");
 		final Host h = osc.lookup("repo.or.cz");
@@ -147,6 +162,7 @@ public class OpenSshConfigTest extends RepositoryTestCase {
 		assertNull(h.getIdentityFile());
 	}
 
+	@Test
 	public void testAlias_OptionsSet() throws Exception {
 		config("Host orcz\n" + "\tHostName repo.or.cz\n" + "\tPort 2222\n"
 				+ "\tUser jex\n" + "\tIdentityFile .ssh/id_jex\n"
@@ -159,6 +175,7 @@ public class OpenSshConfigTest extends RepositoryTestCase {
 		assertEquals(new File(home, ".ssh/id_jex"), h.getIdentityFile());
 	}
 
+	@Test
 	public void testAlias_OptionsKeywordCaseInsensitive() throws Exception {
 		config("hOsT orcz\n" + "\thOsTnAmE repo.or.cz\n" + "\tPORT 2222\n"
 				+ "\tuser jex\n" + "\tidentityfile .ssh/id_jex\n"
@@ -171,6 +188,7 @@ public class OpenSshConfigTest extends RepositoryTestCase {
 		assertEquals(new File(home, ".ssh/id_jex"), h.getIdentityFile());
 	}
 
+	@Test
 	public void testAlias_OptionsInherit() throws Exception {
 		config("Host orcz\n" + "\tHostName repo.or.cz\n" + "\n" + "Host *\n"
 				+ "\tHostName not.a.host.example.com\n" + "\tPort 2222\n"
@@ -184,12 +202,14 @@ public class OpenSshConfigTest extends RepositoryTestCase {
 		assertEquals(new File(home, ".ssh/id_jex"), h.getIdentityFile());
 	}
 
+	@Test
 	public void testAlias_PreferredAuthenticationsDefault() throws Exception {
 		final Host h = osc.lookup("orcz");
 		assertNotNull(h);
 		assertNull(h.getPreferredAuthentications());
 	}
 
+	@Test
 	public void testAlias_PreferredAuthentications() throws Exception {
 		config("Host orcz\n" + "\tPreferredAuthentications publickey\n");
 		final Host h = osc.lookup("orcz");
@@ -197,6 +217,7 @@ public class OpenSshConfigTest extends RepositoryTestCase {
 		assertEquals("publickey", h.getPreferredAuthentications());
 	}
 
+	@Test
 	public void testAlias_InheritPreferredAuthentications() throws Exception {
 		config("Host orcz\n" + "\tHostName repo.or.cz\n" + "\n" + "Host *\n"
 				+ "\tPreferredAuthentications publickey, hostbased\n");
@@ -205,24 +226,27 @@ public class OpenSshConfigTest extends RepositoryTestCase {
 		assertEquals("publickey,hostbased", h.getPreferredAuthentications());
 	}
 
+	@Test
 	public void testAlias_BatchModeDefault() throws Exception {
 		final Host h = osc.lookup("orcz");
 		assertNotNull(h);
-		assertEquals(false, h.isBatchMode());
+		assertFalse(h.isBatchMode());
 	}
 
+	@Test
 	public void testAlias_BatchModeYes() throws Exception {
 		config("Host orcz\n" + "\tBatchMode yes\n");
 		final Host h = osc.lookup("orcz");
 		assertNotNull(h);
-		assertEquals(true, h.isBatchMode());
+		assertTrue(h.isBatchMode());
 	}
 
+	@Test
 	public void testAlias_InheritBatchMode() throws Exception {
 		config("Host orcz\n" + "\tHostName repo.or.cz\n" + "\n" + "Host *\n"
 				+ "\tBatchMode yes\n");
 		final Host h = osc.lookup("orcz");
 		assertNotNull(h);
-		assertEquals(true, h.isBatchMode());
+		assertTrue(h.isBatchMode());
 	}
 }

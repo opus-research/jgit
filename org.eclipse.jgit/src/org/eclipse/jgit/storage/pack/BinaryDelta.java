@@ -44,7 +44,7 @@
 
 package org.eclipse.jgit.storage.pack;
 
-import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.util.QuotedString;
 import org.eclipse.jgit.util.RawParseUtils;
 
@@ -70,7 +70,7 @@ public class BinaryDelta {
 		int c, shift = 0;
 		do {
 			c = delta[p++] & 0xff;
-			baseLen |= (c & 0x7f) << shift;
+			baseLen |= ((long) (c & 0x7f)) << shift;
 			shift += 7;
 		} while ((c & 0x80) != 0);
 		return baseLen;
@@ -97,7 +97,7 @@ public class BinaryDelta {
 		int shift = 0;
 		do {
 			c = delta[p++] & 0xff;
-			resLen |= (c & 0x7f) << shift;
+			resLen |= ((long) (c & 0x7f)) << shift;
 			shift += 7;
 		} while ((c & 0x80) != 0);
 		return resLen;
@@ -115,6 +115,25 @@ public class BinaryDelta {
 	 * @return patched base
 	 */
 	public static final byte[] apply(final byte[] base, final byte[] delta) {
+		return apply(base, delta, null);
+	}
+
+	/**
+	 * Apply the changes defined by delta to the data in base, yielding a new
+	 * array of bytes.
+	 *
+	 * @param base
+	 *            some byte representing an object of some kind.
+	 * @param delta
+	 *            a git pack delta defining the transform from one version to
+	 *            another.
+	 * @param result
+	 *            array to store the result into. If null the result will be
+	 *            allocated and returned.
+	 * @return either {@code result}, or the result array allocated.
+	 */
+	public static final byte[] apply(final byte[] base, final byte[] delta,
+			byte[] result) {
 		int deltaPtr = 0;
 
 		// Length of the base object (a variable length int).
@@ -123,7 +142,7 @@ public class BinaryDelta {
 		int c, shift = 0;
 		do {
 			c = delta[deltaPtr++] & 0xff;
-			baseLen |= (c & 0x7f) << shift;
+			baseLen |= ((long) (c & 0x7f)) << shift;
 			shift += 7;
 		} while ((c & 0x80) != 0);
 		if (base.length != baseLen)
@@ -136,11 +155,16 @@ public class BinaryDelta {
 		shift = 0;
 		do {
 			c = delta[deltaPtr++] & 0xff;
-			resLen |= (c & 0x7f) << shift;
+			resLen |= ((long) (c & 0x7f)) << shift;
 			shift += 7;
 		} while ((c & 0x80) != 0);
 
-		final byte[] result = new byte[resLen];
+		if (result == null)
+			result = new byte[resLen];
+		else if (result.length != resLen)
+			throw new IllegalArgumentException(
+					JGitText.get().resultLengthIncorrect);
+
 		int resultPtr = 0;
 		while (deltaPtr < delta.length) {
 			final int cmd = delta[deltaPtr++] & 0xff;
@@ -219,7 +243,7 @@ public class BinaryDelta {
 		int c, shift = 0;
 		do {
 			c = delta[deltaPtr++] & 0xff;
-			baseLen |= (c & 0x7f) << shift;
+			baseLen |= ((long) (c & 0x7f)) << shift;
 			shift += 7;
 		} while ((c & 0x80) != 0);
 
@@ -227,12 +251,12 @@ public class BinaryDelta {
 		shift = 0;
 		do {
 			c = delta[deltaPtr++] & 0xff;
-			resLen |= (c & 0x7f) << shift;
+			resLen |= ((long) (c & 0x7f)) << shift;
 			shift += 7;
 		} while ((c & 0x80) != 0);
 
 		if (includeHeader)
-			r.append("DELTA( BASE=" + baseLen + " RESULT=" + resLen + " )\n");
+			r.append("DELTA( BASE=" + baseLen + " RESULT=" + resLen + " )\n"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
 
 		while (deltaPtr < delta.length) {
 			final int cmd = delta[deltaPtr++] & 0xff;
@@ -261,16 +285,16 @@ public class BinaryDelta {
 				if (copySize == 0)
 					copySize = 0x10000;
 
-				r.append("  COPY  (" + copyOffset + ", " + copySize + ")\n");
+				r.append("  COPY  (" + copyOffset + ", " + copySize + ")\n"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
 
 			} else if (cmd != 0) {
 				// Anything else the data is literal within the delta
 				// itself.
 				//
-				r.append("  INSERT(");
+				r.append("  INSERT("); //$NON-NLS-1$
 				r.append(QuotedString.GIT_PATH.quote(RawParseUtils.decode(
 						delta, deltaPtr, deltaPtr + cmd)));
-				r.append(")\n");
+				r.append(")\n"); //$NON-NLS-1$
 				deltaPtr += cmd;
 			} else {
 				// cmd == 0 has been reserved for future encoding but

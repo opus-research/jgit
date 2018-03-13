@@ -82,32 +82,32 @@ public class IgnoreRule {
 	private void setup() {
 		int startIndex = 0;
 		int endIndex = pattern.length();
-		if (pattern.startsWith("!")) {
+		if (pattern.startsWith("!")) { //$NON-NLS-1$
 			startIndex++;
 			negation = true;
 		}
 
-		if (pattern.endsWith("/")) {
+		if (pattern.endsWith("/")) { //$NON-NLS-1$
 			endIndex --;
 			dirOnly = true;
 		}
-		boolean hasSlash = pattern.contains("/");
 
 		pattern = pattern.substring(startIndex, endIndex);
+		boolean hasSlash = pattern.contains("/"); //$NON-NLS-1$
 
 		if (!hasSlash)
 			nameOnly = true;
-		else if (!pattern.startsWith("/")) {
+		else if (!pattern.startsWith("/")) { //$NON-NLS-1$
 			//Contains "/" but does not start with one
 			//Adding / to the start should not interfere with matching
-			pattern = "/" + pattern;
+			pattern = "/" + pattern; //$NON-NLS-1$
 		}
 
-		if (pattern.contains("*") || pattern.contains("?") || pattern.contains("[")) {
+		if (pattern.contains("*") || pattern.contains("?") || pattern.contains("[")) { //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
 			try {
-				matcher = new FileNameMatcher(pattern, new Character('/'));
+				matcher = new FileNameMatcher(pattern, Character.valueOf('/'));
 			} catch (InvalidPatternException e) {
-				e.printStackTrace();
+				// Ignore pattern exceptions
 			}
 		}
 	}
@@ -164,8 +164,8 @@ public class IgnoreRule {
 	 * 			  the target is ignored. Call {@link IgnoreRule#getResult() getResult()} for the result.
 	 */
 	public boolean isMatch(String target, boolean isDirectory) {
-		if (!target.startsWith("/"))
-			target = "/" + target;
+		if (!target.startsWith("/")) //$NON-NLS-1$
+			target = "/" + target; //$NON-NLS-1$
 
 		if (matcher == null) {
 			if (target.equals(pattern)) {
@@ -183,13 +183,16 @@ public class IgnoreRule {
 			 * "/src/new" to /src/newfile" but allows "/src/new" to match
 			 * "/src/new/newfile", as is the git standard
 			 */
-			if ((target).startsWith(pattern + "/"))
+			if ((target).startsWith(pattern + "/")) //$NON-NLS-1$
 				return true;
 
 			if (nameOnly) {
 				//Iterate through each sub-name
-				for (String folderName : target.split("/")) {
-					if (folderName.equals(pattern))
+				final String[] segments = target.split("/"); //$NON-NLS-1$
+				for (int idx = 0; idx < segments.length; idx++) {
+					final String segmentName = segments[idx];
+					if (segmentName.equals(pattern) &&
+							doesMatchDirectoryExpectations(isDirectory, idx, segments.length))
 						return true;
 				}
 			}
@@ -199,23 +202,29 @@ public class IgnoreRule {
 			if (matcher.isMatch())
 				return true;
 
+			final String[] segments = target.split("/"); //$NON-NLS-1$
 			if (nameOnly) {
-				for (String folderName : target.split("/")) {
+				for (int idx = 0; idx < segments.length; idx++) {
+					final String segmentName = segments[idx];
 					//Iterate through each sub-directory
 					matcher.reset();
-					matcher.append(folderName);
-					if (matcher.isMatch())
+					matcher.append(segmentName);
+					if (matcher.isMatch() &&
+							doesMatchDirectoryExpectations(isDirectory, idx, segments.length))
 						return true;
 				}
 			} else {
 				//TODO: This is the slowest operation
 				//This matches e.g. "/src/ne?" to "/src/new/file.c"
 				matcher.reset();
-				for (String folderName : target.split("/")) {
-					if (folderName.length() > 0)
-						matcher.append("/" + folderName);
+				for (int idx = 0; idx < segments.length; idx++) {
+					final String segmentName = segments[idx];
+					if (segmentName.length() > 0) {
+						matcher.append("/" + segmentName); //$NON-NLS-1$
+					}
 
-					if (matcher.isMatch())
+					if (matcher.isMatch() &&
+							doesMatchDirectoryExpectations(isDirectory, idx, segments.length))
 						return true;
 				}
 			}
@@ -234,5 +243,15 @@ public class IgnoreRule {
 	 */
 	public boolean getResult() {
 		return !negation;
+	}
+
+	private boolean doesMatchDirectoryExpectations(boolean isDirectory, int segmentIdx, int segmentLength) {
+		// The segment we are checking is a directory, expectations are met.
+		if (segmentIdx < segmentLength - 1) {
+			return true;
+		}
+
+		// We are checking the last part of the segment for which isDirectory has to be considered.
+		return !dirOnly || isDirectory;
 	}
 }

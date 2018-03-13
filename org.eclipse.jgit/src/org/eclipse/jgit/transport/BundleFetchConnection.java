@@ -60,14 +60,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.MissingBundlePrerequisiteException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.TransportException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
+import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -96,7 +98,7 @@ class BundleFetchConnection extends BaseFetchConnection {
 
 	BundleFetchConnection(Transport transportBundle, final InputStream src) throws TransportException {
 		transport = transportBundle;
-		bin = new BufferedInputStream(src, IndexPack.BUFFER_SIZE);
+		bin = new BufferedInputStream(src);
 		try {
 			switch (readSignature()) {
 			case 2:
@@ -179,9 +181,17 @@ class BundleFetchConnection extends BaseFetchConnection {
 			throws TransportException {
 		verifyPrerequisites();
 		try {
-			final IndexPack ip = newIndexPack();
-			ip.index(monitor);
-			packLock = ip.renameAndOpenPack(lockMessage);
+			ObjectInserter ins = transport.local.newObjectInserter();
+			try {
+				PackParser parser = ins.newPackParser(bin);
+				parser.setAllowThin(true);
+				parser.setObjectChecking(transport.isCheckFetchedObjects());
+				parser.setLockMessage(lockMessage);
+				packLock = parser.parse(NullProgressMonitor.INSTANCE);
+				ins.flush();
+			} finally {
+				ins.release();
+			}
 		} catch (IOException err) {
 			close();
 			throw new TransportException(transport.uri, err.getMessage(), err);
@@ -201,21 +211,14 @@ class BundleFetchConnection extends BaseFetchConnection {
 		return Collections.<PackLock> emptyList();
 	}
 
-	private IndexPack newIndexPack() throws IOException {
-		final IndexPack ip = IndexPack.create(transport.local, bin);
-		ip.setFixThin(true);
-		ip.setObjectChecking(transport.isCheckFetchedObjects());
-		return ip;
-	}
-
 	private void verifyPrerequisites() throws TransportException {
 		if (prereqs.isEmpty())
 			return;
 
 		final RevWalk rw = new RevWalk(transport.local);
 		try {
-			final RevFlag PREREQ = rw.newFlag("PREREQ");
-			final RevFlag SEEN = rw.newFlag("SEEN");
+			final RevFlag PREREQ = rw.newFlag("PREREQ"); //$NON-NLS-1$
+			final RevFlag SEEN = rw.newFlag("SEEN"); //$NON-NLS-1$
 
 			final Map<ObjectId, String> missing = new HashMap<ObjectId, String>();
 			final List<RevObject> commits = new ArrayList<RevObject>();

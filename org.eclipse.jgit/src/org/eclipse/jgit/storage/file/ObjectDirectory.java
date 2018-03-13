@@ -61,8 +61,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.PackMismatchException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Config;
@@ -72,9 +72,13 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.RepositoryCache;
 import org.eclipse.jgit.lib.RepositoryCache.FileKey;
+import org.eclipse.jgit.storage.pack.CachedPack;
 import org.eclipse.jgit.storage.pack.ObjectToPack;
 import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.util.FS;
+import org.eclipse.jgit.util.FileUtils;
+import org.eclipse.jgit.util.IO;
+import org.eclipse.jgit.util.RawParseUtils;
 
 /**
  * Traditional file system based {@link ObjectDatabase}.
@@ -95,7 +99,8 @@ import org.eclipse.jgit.util.FS;
  * considered.
  */
 public class ObjectDirectory extends FileObjectDatabase {
-	private static final PackList NO_PACKS = new PackList(-1, -1, new PackFile[0]);
+	private static final PackList NO_PACKS = new PackList(
+			FileSnapshot.DIRTY, new PackFile[0]);
 
 	/** Maximum number of candidates offered as resolutions of abbreviation. */
 	private static final int RESOLVE_ABBREV_LIMIT = 256;
@@ -110,13 +115,23 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	private final File alternatesFile;
 
+	private final File cachedPacksFile;
+
 	private final AtomicReference<PackList> packList;
+
+	private final AtomicReference<CachedPackList> cachedPacks;
 
 	private final FS fs;
 
 	private final AtomicReference<AlternateHandle[]> alternates;
 
 	private final UnpackedObjectCache unpackedObjectCache;
+
+	private final File shallowFile;
+
+	private FileSnapshot shallowFileSnapshot = FileSnapshot.DIRTY;
+
+	private Set<ObjectId> shallowCommitsIds;
 
 	/**
 	 * Initialize a reference to an on-disk object directory.
@@ -130,19 +145,25 @@ public class ObjectDirectory extends FileObjectDatabase {
 	 * @param fs
 	 *            the file system abstraction which will be necessary to perform
 	 *            certain file system operations.
+	 * @param shallowFile
+	 *            file which contains IDs of shallow commits, null if shallow
+	 *            commits handling should be turned off
 	 * @throws IOException
 	 *             an alternate object cannot be opened.
 	 */
 	public ObjectDirectory(final Config cfg, final File dir,
-			File[] alternatePaths, FS fs) throws IOException {
+			File[] alternatePaths, FS fs, File shallowFile) throws IOException {
 		config = cfg;
 		objects = dir;
-		infoDirectory = new File(objects, "info");
-		packDirectory = new File(objects, "pack");
-		alternatesFile = new File(infoDirectory, "alternates");
+		infoDirectory = new File(objects, "info"); //$NON-NLS-1$
+		packDirectory = new File(objects, "pack"); //$NON-NLS-1$
+		alternatesFile = new File(infoDirectory, "alternates"); //$NON-NLS-1$
+		cachedPacksFile = new File(infoDirectory, "cached-packs"); //$NON-NLS-1$
 		packList = new AtomicReference<PackList>(NO_PACKS);
+		cachedPacks = new AtomicReference<CachedPackList>();
 		unpackedObjectCache = new UnpackedObjectCache();
 		this.fs = fs;
+		this.shallowFile = shallowFile;
 
 		alternates = new AtomicReference<AlternateHandle[]>();
 		if (alternatePaths != null) {
@@ -169,9 +190,9 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	@Override
 	public void create() throws IOException {
-		objects.mkdirs();
-		infoDirectory.mkdir();
-		packDirectory.mkdir();
+		FileUtils.mkdirs(objects);
+		FileUtils.mkdir(infoDirectory);
+		FileUtils.mkdir(packDirectory);
 	}
 
 	@Override
@@ -204,14 +225,9 @@ public class ObjectDirectory extends FileObjectDatabase {
 	 *            identity of the loose object to map to the directory.
 	 * @return location of the object, if it were to exist as a loose object.
 	 */
+	@Override
 	public File fileFor(final AnyObjectId objectId) {
-		return fileFor(objectId.name());
-	}
-
-	private File fileFor(final String objectName) {
-		final String d = objectName.substring(0, 2);
-		final String f = objectName.substring(2);
-		return new File(new File(objects, d), f);
+		return super.fileFor(objectId);
 	}
 
 	/**
@@ -222,8 +238,88 @@ public class ObjectDirectory extends FileObjectDatabase {
 	 *         history of the repository.
 	 */
 	public Collection<PackFile> getPacks() {
-		final PackFile[] packs = packList.get().packs;
+		PackList list = packList.get();
+		if (list == NO_PACKS)
+			list = scanPacks(list);
+		PackFile[] packs = list.packs;
 		return Collections.unmodifiableCollection(Arrays.asList(packs));
+	}
+
+	@Override
+	Collection<? extends CachedPack> getCachedPacks() throws IOException {
+		CachedPackList list = cachedPacks.get();
+		if (list == null || list.snapshot.isModified(cachedPacksFile))
+			list = scanCachedPacks(list);
+
+		Collection<CachedPack> result = list.getCachedPacks();
+		boolean resultIsCopy = false;
+
+		for (AlternateHandle h : myAlternates()) {
+			Collection<CachedPack> altPacks = h.getCachedPacks();
+			if (altPacks.isEmpty())
+				continue;
+
+			if (result.isEmpty()) {
+				result = altPacks;
+				continue;
+			}
+
+			if (!resultIsCopy) {
+				result = new ArrayList<CachedPack>(result);
+				resultIsCopy = true;
+			}
+			result.addAll(altPacks);
+		}
+		return result;
+	}
+
+	private CachedPackList scanCachedPacks(CachedPackList old)
+			throws IOException {
+		FileSnapshot s = FileSnapshot.save(cachedPacksFile);
+		byte[] buf;
+		try {
+			buf = IO.readFully(cachedPacksFile);
+		} catch (FileNotFoundException e) {
+			buf = new byte[0];
+		}
+
+		if (old != null && old.snapshot.equals(s)
+				&& Arrays.equals(old.raw, buf)) {
+			old.snapshot.setClean(s);
+			return old;
+		}
+
+		ArrayList<LocalCachedPack> list = new ArrayList<LocalCachedPack>(4);
+		Set<ObjectId> tips = new HashSet<ObjectId>();
+		int ptr = 0;
+		while (ptr < buf.length) {
+			if (buf[ptr] == '#' || buf[ptr] == '\n') {
+				ptr = RawParseUtils.nextLF(buf, ptr);
+				continue;
+			}
+
+			if (buf[ptr] == '+') {
+				tips.add(ObjectId.fromString(buf, ptr + 2));
+				ptr = RawParseUtils.nextLF(buf, ptr + 2);
+				continue;
+			}
+
+			List<String> names = new ArrayList<String>(4);
+			while (ptr < buf.length && buf[ptr] == 'P') {
+				int end = RawParseUtils.nextLF(buf, ptr);
+				if (buf[end - 1] == '\n')
+					end--;
+				names.add(RawParseUtils.decode(buf, ptr + 2, end));
+				ptr = RawParseUtils.nextLF(buf, end);
+			}
+
+			if (!tips.isEmpty() && !names.isEmpty()) {
+				list.add(new LocalCachedPack(this, tips, names));
+				tips = new HashSet<ObjectId>();
+			}
+		}
+		list.trimToSize();
+		return new CachedPackList(s, Collections.unmodifiableList(list), buf);
 	}
 
 	/**
@@ -231,31 +327,25 @@ public class ObjectDirectory extends FileObjectDatabase {
 	 *
 	 * @param pack
 	 *            path of the pack file to open.
-	 * @param idx
-	 *            path of the corresponding index file.
+	 * @return the pack that was opened and added to the database.
 	 * @throws IOException
 	 *             index file could not be opened, read, or is not recognized as
 	 *             a Git pack file index.
 	 */
-	public void openPack(final File pack, final File idx) throws IOException {
+	public PackFile openPack(final File pack)
+			throws IOException {
 		final String p = pack.getName();
-		final String i = idx.getName();
-
-		if (p.length() != 50 || !p.startsWith("pack-") || !p.endsWith(".pack"))
+		if (p.length() != 50 || !p.startsWith("pack-") || !p.endsWith(".pack")) //$NON-NLS-1$
 			throw new IOException(MessageFormat.format(JGitText.get().notAValidPack, pack));
 
-		if (i.length() != 49 || !i.startsWith("pack-") || !i.endsWith(".idx"))
-			throw new IOException(MessageFormat.format(JGitText.get().notAValidPack, idx));
-
-		if (!p.substring(0, 45).equals(i.substring(0, 45)))
-			throw new IOException(MessageFormat.format(JGitText.get().packDoesNotMatchIndex, pack));
-
-		insertPack(new PackFile(idx, pack));
+		PackFile res = new PackFile(pack);
+		insertPack(res);
+		return res;
 	}
 
 	@Override
 	public String toString() {
-		return "ObjectDirectory[" + getDirectory() + "]";
+		return "ObjectDirectory[" + getDirectory() + "]"; //$NON-NLS-1$
 	}
 
 	boolean hasObject1(final AnyObjectId objectId) {
@@ -456,19 +546,17 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	@Override
 	InsertLooseObjectResult insertUnpackedObject(File tmp, ObjectId id,
-			boolean createDuplicate) {
+			boolean createDuplicate) throws IOException {
 		// If the object is already in the repository, remove temporary file.
 		//
 		if (unpackedObjectCache.isUnpacked(id)) {
-			tmp.delete();
+			FileUtils.delete(tmp);
 			return InsertLooseObjectResult.EXISTS_LOOSE;
 		}
 		if (!createDuplicate && has(id)) {
-			tmp.delete();
+			FileUtils.delete(tmp);
 			return InsertLooseObjectResult.EXISTS_PACKED;
 		}
-
-		tmp.setReadOnly();
 
 		final File dst = fileFor(id);
 		if (dst.exists()) {
@@ -476,10 +564,11 @@ public class ObjectDirectory extends FileObjectDatabase {
 			// that already exists. We can't be sure renameTo() would
 			// fail on all platforms if dst exists, so we check first.
 			//
-			tmp.delete();
+			FileUtils.delete(tmp);
 			return InsertLooseObjectResult.EXISTS_LOOSE;
 		}
 		if (tmp.renameTo(dst)) {
+			dst.setReadOnly();
 			unpackedObjectCache.add(id);
 			return InsertLooseObjectResult.INSERTED;
 		}
@@ -488,14 +577,15 @@ public class ObjectDirectory extends FileObjectDatabase {
 		// directories are always lazily created. Note that we
 		// try the rename first as the directory likely does exist.
 		//
-		dst.getParentFile().mkdir();
+		FileUtils.mkdir(dst.getParentFile(), true);
 		if (tmp.renameTo(dst)) {
+			dst.setReadOnly();
 			unpackedObjectCache.add(id);
 			return InsertLooseObjectResult.INSERTED;
 		}
 
 		if (!createDuplicate && has(id)) {
-			tmp.delete();
+			FileUtils.delete(tmp);
 			return InsertLooseObjectResult.EXISTS_PACKED;
 		}
 
@@ -504,15 +594,48 @@ public class ObjectDirectory extends FileObjectDatabase {
 		// either. We really don't know what went wrong, so
 		// fail.
 		//
-		tmp.delete();
+		FileUtils.delete(tmp);
 		return InsertLooseObjectResult.FAILURE;
 	}
 
 	boolean tryAgain1() {
 		final PackList old = packList.get();
-		if (old.tryAgain(packDirectory.lastModified()))
+		if (old.snapshot.isModified(packDirectory))
 			return old != scanPacks(old);
 		return false;
+	}
+
+	Config getConfig() {
+		return config;
+	}
+
+	@Override
+	FS getFS() {
+		return fs;
+	}
+
+	@Override
+	Set<ObjectId> getShallowCommits() throws IOException {
+		if (shallowFile == null || !shallowFile.isFile())
+			return Collections.emptySet();
+
+		if (shallowFileSnapshot == null
+				|| shallowFileSnapshot.isModified(shallowFile)) {
+			shallowCommitsIds = new HashSet<ObjectId>();
+
+			final BufferedReader reader = open(shallowFile);
+			try {
+				String line;
+				while ((line = reader.readLine()) != null)
+					shallowCommitsIds.add(ObjectId.fromString(line));
+			} finally {
+				reader.close();
+			}
+
+			shallowFileSnapshot = FileSnapshot.save(shallowFile);
+		}
+
+		return shallowCommitsIds;
 	}
 
 	private void insertPack(final PackFile pf) {
@@ -536,7 +659,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 			final PackFile[] newList = new PackFile[1 + oldList.length];
 			newList[0] = pf;
 			System.arraycopy(oldList, 0, newList, 1, oldList.length);
-			n = new PackList(o.lastRead, o.lastModified, newList);
+			n = new PackList(o.snapshot, newList);
 		} while (!packList.compareAndSet(o, n));
 	}
 
@@ -553,7 +676,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 			final PackFile[] newList = new PackFile[oldList.length - 1];
 			System.arraycopy(oldList, 0, newList, 0, j);
 			System.arraycopy(oldList, j + 1, newList, j, newList.length - j);
-			n = new PackList(o.lastRead, o.lastModified, newList);
+			n = new PackList(o.snapshot, newList);
 		} while (!packList.compareAndSet(o, n));
 		deadPack.close();
 	}
@@ -587,19 +710,18 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	private PackList scanPacksImpl(final PackList old) {
 		final Map<String, PackFile> forReuse = reuseMap(old);
-		final long lastRead = System.currentTimeMillis();
-		final long lastModified = packDirectory.lastModified();
+		final FileSnapshot snapshot = FileSnapshot.save(packDirectory);
 		final Set<String> names = listPackDirectory();
 		final List<PackFile> list = new ArrayList<PackFile>(names.size() >> 2);
 		boolean foundNew = false;
 		for (final String indexName : names) {
 			// Must match "pack-[0-9a-f]{40}.idx" to be an index.
 			//
-			if (indexName.length() != 49 || !indexName.endsWith(".idx"))
+			if (indexName.length() != 49 || !indexName.endsWith(".idx")) //$NON-NLS-1$
 				continue;
 
 			final String base = indexName.substring(0, indexName.length() - 4);
-			final String packName = base + ".pack";
+			final String packName = base + ".pack"; //$NON-NLS-1$
 			if (!names.contains(packName)) {
 				// Sometimes C Git's HTTP fetch transport leaves a
 				// .idx file behind and does not download the .pack.
@@ -615,8 +737,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 			}
 
 			final File packFile = new File(packDirectory, packName);
-			final File idxFile = new File(packDirectory, indexName);
-			list.add(new PackFile(idxFile, packFile));
+			list.add(new PackFile(packFile));
 			foundNew = true;
 		}
 
@@ -625,19 +746,21 @@ public class ObjectDirectory extends FileObjectDatabase {
 		// the same as the set we were given. Instead of building a new object
 		// return the same collection.
 		//
-		if (!foundNew && lastModified == old.lastModified && forReuse.isEmpty())
-			return old.updateLastRead(lastRead);
+		if (!foundNew && forReuse.isEmpty() && snapshot.equals(old.snapshot)) {
+			old.snapshot.setClean(snapshot);
+			return old;
+		}
 
 		for (final PackFile p : forReuse.values()) {
 			p.close();
 		}
 
 		if (list.isEmpty())
-			return new PackList(lastRead, lastModified, NO_PACKS.packs);
+			return new PackList(snapshot, NO_PACKS.packs);
 
 		final PackFile[] r = list.toArray(new PackFile[list.size()]);
 		Arrays.sort(r, PackFile.SORT);
-		return new PackList(lastRead, lastModified, r);
+		return new PackList(snapshot, r);
 	}
 
 	private static Map<String, PackFile> reuseMap(final PackList old) {
@@ -672,7 +795,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 			return Collections.emptySet();
 		final Set<String> nameSet = new HashSet<String>(nameList.length << 1);
 		for (final String name : nameList) {
-			if (name.startsWith("pack-"))
+			if (name.startsWith("pack-")) //$NON-NLS-1$
 				nameSet.add(name);
 		}
 		return nameSet;
@@ -729,67 +852,40 @@ public class ObjectDirectory extends FileObjectDatabase {
 			return new AlternateRepository(db);
 		}
 
-		ObjectDirectory db = new ObjectDirectory(config, objdir, null, fs);
+		ObjectDirectory db = new ObjectDirectory(config, objdir, null, fs, null);
 		return new AlternateHandle(db);
 	}
 
 	private static final class PackList {
-		/** Last wall-clock time the directory was read. */
-		volatile long lastRead;
-
-		/** Last modification time of {@link ObjectDirectory#packDirectory}. */
-		final long lastModified;
+		/** State just before reading the pack directory. */
+		final FileSnapshot snapshot;
 
 		/** All known packs, sorted by {@link PackFile#SORT}. */
 		final PackFile[] packs;
 
-		private boolean cannotBeRacilyClean;
-
-		PackList(final long lastRead, final long lastModified,
-				final PackFile[] packs) {
-			this.lastRead = lastRead;
-			this.lastModified = lastModified;
+		PackList(final FileSnapshot monitor, final PackFile[] packs) {
+			this.snapshot = monitor;
 			this.packs = packs;
-			this.cannotBeRacilyClean = notRacyClean(lastRead);
+		}
+	}
+
+	private static final class CachedPackList {
+		final FileSnapshot snapshot;
+
+		final Collection<LocalCachedPack> packs;
+
+		final byte[] raw;
+
+		CachedPackList(FileSnapshot sn, List<LocalCachedPack> list, byte[] buf) {
+			snapshot = sn;
+			packs = list;
+			raw = buf;
 		}
 
-		private boolean notRacyClean(final long read) {
-			return read - lastModified > 2 * 60 * 1000L;
-		}
-
-		PackList updateLastRead(final long now) {
-			if (notRacyClean(now))
-				cannotBeRacilyClean = true;
-			lastRead = now;
-			return this;
-		}
-
-		boolean tryAgain(final long currLastModified) {
-			// Any difference indicates the directory was modified.
-			//
-			if (lastModified != currLastModified)
-				return true;
-
-			// We have already determined the last read was far enough
-			// after the last modification that any new modifications
-			// are certain to change the last modified time.
-			//
-			if (cannotBeRacilyClean)
-				return false;
-
-			if (notRacyClean(lastRead)) {
-				// Our last read should have marked cannotBeRacilyClean,
-				// but this thread may not have seen the change. The read
-				// of the volatile field lastRead should have fixed that.
-				//
-				return false;
-			}
-
-			// We last read this directory too close to its last observed
-			// modification time. We may have missed a modification. Scan
-			// the directory again, to ensure we still see the same state.
-			//
-			return true;
+		@SuppressWarnings("unchecked")
+		Collection<CachedPack> getCachedPacks() {
+			Collection p = packs;
+			return p;
 		}
 	}
 
