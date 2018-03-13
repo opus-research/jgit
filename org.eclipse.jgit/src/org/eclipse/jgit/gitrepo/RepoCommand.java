@@ -264,11 +264,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	}
 
 	/**
-	 * Set base URI of the paths inside the XML. This is typically the name of
-	 * the directory holding the manifest repository, eg. for
-	 * https://android.googlesource.com/platform/manifest, this should be
-	 * /platform (if you would run this on android.googleplex.com)
-	 * or https://android.googlesource.com/platform elsewhere.
+	 * Set base URI of the pathes inside the XML
 	 *
 	 * @param uri
 	 * @return this command
@@ -452,11 +448,9 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	public RevCommit call() throws GitAPIException {
 		try {
 			checkCallable();
-
-			if (uri == null || uri.length() == 0) {
+			if (uri == null || uri.length() == 0)
 				throw new IllegalArgumentException(
-					JGitText.get().uriNotConfigured);
-			}
+						JGitText.get().uriNotConfigured);
 			if (inputStream == null) {
 				if (manifestPath == null || manifestPath.length() == 0)
 					throw new IllegalArgumentException(
