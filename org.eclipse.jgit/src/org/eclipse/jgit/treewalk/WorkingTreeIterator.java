@@ -61,7 +61,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
@@ -70,13 +69,14 @@ import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.ignore.IgnoreNode;
 import org.eclipse.jgit.ignore.IgnoreRule;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig;
 import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryBuilder;
+import org.eclipse.jgit.submodule.SubmoduleWalk;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.io.EolCanonicalizingInputStream;
@@ -280,18 +280,16 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 * @return non-null submodule id
 	 */
 	protected byte[] idSubmodule(File directory, Entry e) {
-		final String gitDirPath = e.getName() + "/" + Constants.DOT_GIT;
-		final File submoduleGitDir = new File(directory, gitDirPath);
-		if (!submoduleGitDir.isDirectory())
-			return zeroid;
 		final Repository submoduleRepo;
 		try {
-			FS fs = repository != null ? repository.getFS() : FS.DETECTED;
-			submoduleRepo = new RepositoryBuilder().setGitDir(submoduleGitDir)
-					.setMustExist(true).setFS(fs).build();
+			submoduleRepo = SubmoduleWalk.getSubmoduleRepository(directory,
+					e.getName());
 		} catch (IOException exception) {
 			return zeroid;
 		}
+		if (submoduleRepo == null)
+			return zeroid;
+
 		final ObjectId head;
 		try {
 			head = submoduleRepo.resolve(Constants.HEAD);
@@ -404,7 +402,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	}
 
 	private InputStream filterClean(InputStream in) throws IOException {
-		return new EolCanonicalizingInputStream(in);
+		return new EolCanonicalizingInputStream(in, true);
 	}
 
 	/**
@@ -502,7 +500,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		InputStream rawis = current().openInputStream();
 		InputStream is;
 		if (getOptions().getAutoCRLF() != AutoCRLF.FALSE)
-			is = new EolCanonicalizingInputStream(rawis);
+			is = new EolCanonicalizingInputStream(rawis, true);
 		else
 			is = rawis;
 		return is;

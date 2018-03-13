@@ -49,7 +49,6 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
@@ -64,6 +63,7 @@ import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.UnmergedPathException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -351,12 +351,9 @@ public class CommitCommand extends GitCommand<RevCommit> {
 					if (objectExists) {
 						dcEntry.setObjectId(fTree.getEntryObjectId());
 					} else {
-						if (FileMode.GITLINK.equals(dcEntry.getFileMode())) {
-							// Do not check the content of submodule entries
-							// Use the old entry information instead.
-							dcEntry.copyMetaData(index.getEntry(dcEntry
-									.getPathString()));
-						} else {
+						if (FileMode.GITLINK.equals(dcEntry.getFileMode()))
+							dcEntry.setObjectId(fTree.getEntryObjectId());
+						else {
 							// insert object
 							if (inserter == null)
 								inserter = repo.newObjectInserter();
