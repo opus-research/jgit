@@ -68,11 +68,10 @@ import org.eclipse.jgit.util.NB;
 public class ReftableReader implements AutoCloseable {
 	private final BlockSource src;
 
-	/** Size of the reftable, minus its footer block. */
+	/** Size of the reftable, minus index and footer. */
 	private long size;
 	private int blockSize;
-	private int indexSize;
-	private boolean shouldReadFooter = true;
+	private int indexSize = -1;
 
 	private BlockReader index;
 	private BlockReader block;
@@ -90,101 +89,55 @@ public class ReftableReader implements AutoCloseable {
 	}
 
 	/**
-	 * Manually specify the block size used by {@link ReftableWriter}.
-	 * <p>
-	 * If not known, the block size will be automatically discovered from the
-	 * reftable by reading and verifying the file trailer. Manually setting the
-	 * block size may allow the reader to avoid reading the file footer.
-	 *
-	 * @param bs
-	 *            writer's block size in bytes.
-	 * @return {@code this}
-	 */
-	public ReftableReader setBlockSize(int bs) {
-		this.blockSize = bs;
-		return this;
-	}
-
-	/**
-	 * Manually specify the index size created by {@link ReftableWriter}.
-	 * <p>
-	 * If not known, the index size will be automatically discovered from the
-	 * reftable by reading and verifying the file trailer. Manually setting the
-	 * index size may allow the reader to avoid reading the file footer.
-	 *
-	 * @param sz
-	 *            index size in bytes.
-	 * @return {@code this}
-	 */
-	public ReftableReader setIndexSize(int sz) {
-		this.indexSize = sz;
-		this.shouldReadFooter = false;
-		return this;
-	}
-
-	/**
 	 * Seek to the first reference in the file, to iterate in order.
 	 *
-	 * @return {@code this}
 	 * @throws IOException
 	 *             cannot read the reftree file.
 	 */
-	public ReftableReader seekToFirstRef() throws IOException {
+	public void seekToFirstRef() throws IOException {
 		if (blockSize == 0) {
 			readFileHeader();
 		}
-		initFileSize();
-
-		src.adviseSequentialRead(0, size - indexSize);
+		src.adviseSequentialRead(0, size());
 		block = readBlock(0);
 		seeking = null;
 		ref = null;
-		return this;
 	}
 
 	/**
 	 * Seek either to a reference, or a reference subtree.
 	 * <p>
-	 * If {@code name} ends with {@code "/"} the method will seek to the subtree
-	 * of all references starting with {@code name} as a prefix.
+	 * If {@code refName} ends with {@code "/"} the method will seek to the
+	 * subtree of all references starting with {@code refName} as a prefix.
 	 * <p>
-	 * Otherwise, only {@code name} will be found, if present.
+	 * Otherwise, only {@code refName} will be found, if present.
 	 *
-	 * @param name
+	 * @param refName
 	 *            reference name or subtree to find.
-	 * @return {@code this}
 	 * @throws IOException
 	 *             cannot read the reftree file.
 	 */
-	public ReftableReader seek(String name) throws IOException {
-		byte[] nameBin = name.getBytes(UTF_8);
-		if (nameBin[nameBin.length - 1] == '/') {
-			nameBin = Arrays.copyOf(nameBin, nameBin.length + 1);
-			nameBin[nameBin.length - 1] = '\1';
+	public void seek(String refName) throws IOException {
+		byte[] name = refName.getBytes(UTF_8);
+		if (name[name.length - 1] == '/') {
+			name = Arrays.copyOf(name, name.length + 1);
+			name[name.length - 1] = '\1';
 		}
 
-		initFileSize();
-		if (blockSize == 0) {
-			readFileFooter();
-		}
-		initIndex();
-
-		seeking = name;
+		seeking = refName;
 		ref = null;
 
-		if (index == null) {
-			return search(nameBin, 0, blocks());
+		if (initIndex()) {
+			int blockIdx = index.seek(name) <= 0
+					? index.readIndexBlock()
+					: (blockCount() - 1);
+			block = readBlock(((long) blockIdx) * blockSize);
+			block.seek(name);
 		}
-
-		int blockIdx = index.seek(nameBin) <= 0
-				? index.readIndexBlock()
-				: blocks() - 1;
-		block = readBlock(((long) blockIdx) * blockSize);
-		block.seek(nameBin);
-		return this;
+		binarySearch(name, 0, blockCount());
 	}
 
-	private ReftableReader search(byte[] name, int low, int end)
+	private void binarySearch(byte[] name, int low, int end)
 			throws IOException {
 		do {
 			int mid = (low + end) >>> 1;
@@ -201,7 +154,6 @@ public class ReftableReader implements AutoCloseable {
 				low = mid + 1;
 			}
 		} while (low < end);
-		return this;
 	}
 
 	/**
@@ -213,13 +165,14 @@ public class ReftableReader implements AutoCloseable {
 	 */
 	public boolean next() throws IOException {
 		if (!block.isRefBlock()) {
+			ref = null;
 			return false;
 		} else if (block.next()) {
 			return tryNext();
 		}
 
 		long p = block.position() + blockSize;
-		if (p < (size - indexSize)) {
+		if (p < size()) {
 			block = readBlock(p);
 			if (block.isRefBlock() && block.next()) {
 				return tryNext();
@@ -232,11 +185,10 @@ public class ReftableReader implements AutoCloseable {
 	private boolean tryNext() throws IOException {
 		ref = block.readRef();
 		if (seeking != null) {
-			if (seeking.endsWith("/")) { //$NON-NLS-1$
-				return ref.getName().startsWith(seeking);
-			} else {
-				return ref.getName().equals(seeking);
-			}
+			String name = ref.getName();
+			return seeking.endsWith("/") //$NON-NLS-1$
+					? name.startsWith(seeking)
+					: name.equals(seeking);
 		}
 		return true;
 	}
@@ -247,13 +199,12 @@ public class ReftableReader implements AutoCloseable {
 	}
 
 	private void readFileHeader() throws IOException {
-		byte[] hdr = readHeaderOrFooter(0, FILE_HEADER_LEN);
-		blockSize = NB.decodeInt32(hdr, 4) & 0xffffff;
+		readHeaderOrFooter(0, FILE_HEADER_LEN);
 	}
 
 	private void readFileFooter() throws IOException {
 		int ftrLen = FILE_FOOTER_LEN;
-		byte[] ftr = readHeaderOrFooter(size, ftrLen);
+		byte[] ftr = readHeaderOrFooter(src.size() - ftrLen, ftrLen);
 
 		CRC32 crc = new CRC32();
 		crc.update(ftr, 0, ftrLen - 4);
@@ -261,9 +212,8 @@ public class ReftableReader implements AutoCloseable {
 			throw new IOException(JGitText.get().invalidReftableCRC);
 		}
 
-		blockSize = NB.decodeInt32(ftr, 4) & 0xffffff;
 		indexSize = NB.decodeInt32(ftr, 8);
-		shouldReadFooter = false;
+		size = src.size() - (indexSize + FILE_FOOTER_LEN);
 	}
 
 	private byte[] readHeaderOrFooter(long pos, int len) throws IOException {
@@ -286,34 +236,29 @@ public class ReftableReader implements AutoCloseable {
 					JGitText.get().unsupportedReftableVersion,
 					Integer.valueOf(version)));
 		}
+		if (blockSize == 0) {
+			blockSize = v & 0xffffff;
+		}
 		return tmp;
 	}
 
-	private void initFileSize() throws IOException {
-		if (size == 0) {
-			size = src.size() - FILE_FOOTER_LEN;
+	private boolean initIndex() throws IOException {
+		if (blockSize == 0 || indexSize < 0) {
+			readFileFooter();
 		}
-	}
-
-	private void initIndex() throws IOException {
-		if (index == null) {
-			if (shouldReadFooter && indexSize == 0) {
-				readFileFooter();
-			}
-			if (indexSize > 0) {
-				index = new BlockReader();
-				index.readFrom(src, size - indexSize, indexSize);
-				index.verifyIndex();
-			}
+		if (index == null && indexSize > 0) {
+			index = new BlockReader();
+			index.readFrom(src, size(), indexSize);
+			index.verifyIndex();
 		}
+		return index != null;
 	}
 
 	private BlockReader readBlock(long position) throws IOException {
-		long end = size - indexSize;
+		long end = size();
 		int sz = blockSize;
 		if (position + sz > end) {
-			// Last block of the file can omit padding.
-			sz = (int) (end - position);
+			sz = (int) (end - position); // last block may omit padding.
 		}
 
 		BlockReader b = new BlockReader();
@@ -321,13 +266,17 @@ public class ReftableReader implements AutoCloseable {
 		return b;
 	}
 
-	private int blocks() {
-		long end = size - indexSize;
+	private int blockCount() throws IOException {
+		long end = size();
 		int blocks = (int) (end / blockSize);
-		if (end % blockSize != 0) {
-			blocks++;
+		return end % blockSize == 0 ? blocks : (blocks + 1);
+	}
+
+	private long size() throws IOException {
+		if (size == 0) {
+			size = src.size() - FILE_FOOTER_LEN; // assume no index
 		}
-		return blocks;
+		return size;
 	}
 
 	@Override
