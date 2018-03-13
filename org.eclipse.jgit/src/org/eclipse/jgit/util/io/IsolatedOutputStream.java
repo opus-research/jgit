@@ -46,16 +46,14 @@ package org.eclipse.jgit.util.io;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.eclipse.jgit.internal.JGitText;
@@ -75,7 +73,6 @@ import org.eclipse.jgit.internal.JGitText;
 public class IsolatedOutputStream extends OutputStream {
 	private final OutputStream dst;
 	private final ExecutorService copier;
-	private Future<Void> pending;
 
 	/**
 	 * Wraps an OutputStream.
@@ -86,7 +83,7 @@ public class IsolatedOutputStream extends OutputStream {
 	public IsolatedOutputStream(OutputStream out) {
 		dst = out;
 		copier = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS,
-				new ArrayBlockingQueue<Runnable>(1), new NamedThreadFactory());
+				new SynchronousQueue<Runnable>(), new NamedThreadFactory());
 	}
 
 	@Override
@@ -123,72 +120,22 @@ public class IsolatedOutputStream extends OutputStream {
 	public void close() throws IOException {
 		if (!copier.isShutdown()) {
 			try {
-				if (pending == null || tryCleanClose()) {
-					cleanClose();
-				} else {
-					dirtyClose();
-				}
+				/*
+				 * If a prior write or flush stalled and the caller broke out of
+				 * the wait with an interrupt, they could be trying to close a
+				 * stream that is still in-use. execute throws an IOException
+				 * due to the thread still being busy, and dst will leak.
+				 */
+				execute(new Callable<Void>() {
+					@Override
+					public Void call() throws IOException {
+						dst.close();
+						return null;
+					}
+				});
 			} finally {
 				copier.shutdown();
 			}
-		}
-	}
-
-	private boolean tryCleanClose() {
-		/*
-		 * If the caller stopped waiting for a prior write or flush, they could
-		 * be trying to close a stream that is still in-use. Check if the prior
-		 * operation ended in a predictable way.
-		 */
-		try {
-			pending.get(0, TimeUnit.MILLISECONDS);
-			pending = null;
-			return true;
-		} catch (TimeoutException | InterruptedException e) {
-			return false;
-		} catch (ExecutionException e) {
-			pending = null;
-			return true;
-		}
-	}
-
-	private void cleanClose() throws IOException {
-		execute(new Callable<Void>() {
-			@Override
-			public Void call() throws IOException {
-				dst.close();
-				return null;
-			}
-		});
-	}
-
-	private void dirtyClose() throws IOException {
-		/*
-		 * Interrupt any still pending write or flush operation. This may cause
-		 * massive failures inside of the stream, but its going to be closed as
-		 * the next step.
-		 */
-		pending.cancel(true);
-
-		Future<Void> close;
-		try {
-			close = copier.submit(new Callable<Void>() {
-				@Override
-				public Void call() throws IOException {
-					dst.close();
-					return null;
-				}
-			});
-		} catch (RejectedExecutionException e) {
-			throw new IOException(e);
-		}
-		try {
-			close.get(200, TimeUnit.MILLISECONDS);
-		} catch (InterruptedException | TimeoutException e) {
-			close.cancel(true);
-			throw new IOException(e);
-		} catch (ExecutionException e) {
-			throw new IOException(e.getCause());
 		}
 	}
 
@@ -199,24 +146,12 @@ public class IsolatedOutputStream extends OutputStream {
 	}
 
 	private void execute(Callable<Void> task) throws IOException {
-		if (pending != null) {
-			// Check (and rethrow) any prior failed operation.
-			checkedGet(pending);
-		}
 		try {
-			pending = copier.submit(task);
-		} catch (RejectedExecutionException e) {
-			throw new IOException(e);
-		}
-		checkedGet(pending);
-		pending = null;
-	}
-
-	private static void checkedGet(Future<Void> future) throws IOException {
-		try {
-			future.get();
+			copier.submit(task).get();
 		} catch (InterruptedException e) {
 			throw interrupted(e);
+		} catch (RejectedExecutionException e) {
+			throw new IOException(e);
 		} catch (ExecutionException e) {
 			throw new IOException(e.getCause());
 		}
