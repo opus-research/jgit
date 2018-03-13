@@ -80,7 +80,6 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
-import org.eclipse.jgit.util.BuiltinCommand;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FS.ExecutionResult;
 import org.eclipse.jgit.util.FileUtils;
@@ -281,8 +280,9 @@ public class DirCacheCheckout {
 
 		addTree(walk, headCommitTree);
 		addTree(walk, mergeCommitTree);
-		walk.addTree(new DirCacheBuildIterator(builder));
+		int dciPos = walk.addTree(new DirCacheBuildIterator(builder));
 		walk.addTree(workingTree);
+		workingTree.setDirCacheIterator(walk, dciPos);
 
 		while (walk.next()) {
 			processEntry(walk.getTree(0, CanonicalTreeParser.class),
@@ -321,8 +321,9 @@ public class DirCacheCheckout {
 
 		walk = new NameConflictTreeWalk(repo);
 		addTree(walk, mergeCommitTree);
-		walk.addTree(new DirCacheBuildIterator(builder));
+		int dciPos = walk.addTree(new DirCacheBuildIterator(builder));
 		walk.addTree(workingTree);
+		workingTree.setDirCacheIterator(walk, dciPos);
 
 		while (walk.next()) {
 			processEntry(walk.getTree(0, CanonicalTreeParser.class),
@@ -353,8 +354,16 @@ public class DirCacheCheckout {
 				// The index entry is missing
 				if (f != null && !FileMode.TREE.equals(f.getEntryFileMode())
 						&& !f.isEntryIgnored()) {
-					// don't overwrite an untracked and not ignored file
-					conflicts.add(walk.getPathString());
+					if (failOnConflict) {
+						// don't overwrite an untracked and not ignored file
+						conflicts.add(walk.getPathString());
+					} else {
+						// failOnConflict is false. Putting something to conflicts
+						// would mean we delete it. Instead we want the mergeCommit
+						// content to be checked out.
+						update(m.getEntryPathString(), m.getEntryObjectId(),
+								m.getEntryFileMode());
+					}
 				} else
 					update(m.getEntryPathString(), m.getEntryObjectId(),
 						m.getEntryFileMode());
@@ -389,6 +398,9 @@ public class DirCacheCheckout {
 			if (f != null) {
 				// There is a file/folder for that path in the working tree
 				if (walk.isDirectoryFileConflict()) {
+					// We put it in conflicts. Even if failOnConflict is false
+					// this would cause the path to be deleted. Thats exactly what
+					// we want in this situation
 					conflicts.add(walk.getPathString());
 				} else {
 					// No file/folder conflict exists. All entries are files or
@@ -1094,8 +1106,10 @@ public class DirCacheCheckout {
 	private boolean isModifiedSubtree_IndexWorkingtree(String path)
 			throws CorruptObjectException, IOException {
 		try (NameConflictTreeWalk tw = new NameConflictTreeWalk(repo)) {
-			tw.addTree(new DirCacheIterator(dc));
-			tw.addTree(new FileTreeIterator(repo));
+			int dciPos = tw.addTree(new DirCacheIterator(dc));
+			FileTreeIterator fti = new FileTreeIterator(repo);
+			tw.addTree(fti);
+			fti.setDirCacheIterator(tw, dciPos);
 			tw.setRecursive(true);
 			tw.setFilter(PathFilter.create(path));
 			DirCacheIterator dcIt;
@@ -1265,47 +1279,45 @@ public class DirCacheCheckout {
 		} else {
 			nonNullEolStreamType = EolStreamType.DIRECT;
 		}
-		try (OutputStream channel = EolStreamTypeUtil.wrapOutputStream(
-				new FileOutputStream(tmpFile), nonNullEolStreamType)) {
-			if (checkoutMetadata.smudgeFilterCommand != null) {
-				if (repo
-						.isRegistered(checkoutMetadata.smudgeFilterCommand)) {
-					BuiltinCommand command = repo.getCommand(
-							checkoutMetadata.smudgeFilterCommand, repo,
-							ol.openStream(), channel);
-					command.run();
-				} else {
-					ProcessBuilder filterProcessBuilder = fs.runInShell(
-							checkoutMetadata.smudgeFilterCommand, new String[0]);
-					filterProcessBuilder.directory(repo.getWorkTree());
-					filterProcessBuilder.environment().put(Constants.GIT_DIR_KEY,
-							repo.getDirectory().getAbsolutePath());
-					ExecutionResult result;
-					int rc;
-					try {
-						// TODO: wire correctly with AUTOCRLF
-						result = fs.execute(filterProcessBuilder, ol.openStream());
-						rc = result.getRc();
-						if (rc == 0) {
-							result.getStdout().writeTo(channel,
-									NullProgressMonitor.INSTANCE);
-						}
-					} catch (IOException | InterruptedException e) {
-						throw new IOException(new FilterFailedException(e,
-								checkoutMetadata.smudgeFilterCommand,
-								entry.getPathString()));
-					}
-					if (rc != 0) {
-						throw new IOException(new FilterFailedException(rc,
-								checkoutMetadata.smudgeFilterCommand,
-								entry.getPathString(),
-								result.getStdout().toByteArray(MAX_EXCEPTION_TEXT_SIZE),
-								RawParseUtils.decode(result.getStderr()
-										.toByteArray(MAX_EXCEPTION_TEXT_SIZE))));
-					}
+		OutputStream channel = EolStreamTypeUtil.wrapOutputStream(
+				new FileOutputStream(tmpFile), nonNullEolStreamType);
+		if (checkoutMetadata.smudgeFilterCommand != null) {
+			ProcessBuilder filterProcessBuilder = fs.runInShell(
+					checkoutMetadata.smudgeFilterCommand, new String[0]);
+			filterProcessBuilder.directory(repo.getWorkTree());
+			filterProcessBuilder.environment().put(Constants.GIT_DIR_KEY,
+					repo.getDirectory().getAbsolutePath());
+			ExecutionResult result;
+			int rc;
+			try {
+				// TODO: wire correctly with AUTOCRLF
+				result = fs.execute(filterProcessBuilder, ol.openStream());
+				rc = result.getRc();
+				if (rc == 0) {
+					result.getStdout().writeTo(channel,
+							NullProgressMonitor.INSTANCE);
 				}
-			} else {
+			} catch (IOException | InterruptedException e) {
+				throw new IOException(new FilterFailedException(e,
+						checkoutMetadata.smudgeFilterCommand,
+						entry.getPathString()));
+
+			} finally {
+				channel.close();
+			}
+			if (rc != 0) {
+				throw new IOException(new FilterFailedException(rc,
+						checkoutMetadata.smudgeFilterCommand,
+						entry.getPathString(),
+						result.getStdout().toByteArray(MAX_EXCEPTION_TEXT_SIZE),
+						RawParseUtils.decode(result.getStderr()
+								.toByteArray(MAX_EXCEPTION_TEXT_SIZE))));
+			}
+		} else {
+			try {
 				ol.copyTo(channel);
+			} finally {
+				channel.close();
 			}
 		}
 		// The entry needs to correspond to the on-disk filesize. If the content
