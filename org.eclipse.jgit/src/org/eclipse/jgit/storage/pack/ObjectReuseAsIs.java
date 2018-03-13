@@ -49,9 +49,10 @@ import java.util.List;
 
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
+import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.BitmapIndex.BitmapBuilder;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
-import org.eclipse.jgit.revwalk.RevObject;
 
 /**
  * Extension of {@link ObjectReader} that supports reusing objects in packs.
@@ -71,13 +72,13 @@ public interface ObjectReuseAsIs {
 	 * object state, such as to remember what file and offset contains the
 	 * object's pack encoded data.
 	 *
-	 * @param obj
-	 *            identity of the object that will be packed. The object's
-	 *            parsed status is undefined here. Implementers must not rely on
-	 *            the object being parsed.
+	 * @param objectId
+	 *            the id of the object that will be packed.
+	 * @param type
+	 *            the Git type of the object that will be packed.
 	 * @return a new instance for this object.
 	 */
-	public ObjectToPack newObjectToPack(RevObject obj);
+	public ObjectToPack newObjectToPack(AnyObjectId objectId, int type);
 
 	/**
 	 * Select the best object representation for a packer.
@@ -232,4 +233,22 @@ public interface ObjectReuseAsIs {
 	 */
 	public abstract void copyPackAsIs(PackOutputStream out, CachedPack pack,
 			boolean validate) throws IOException;
+
+	/**
+	 * Obtain the available cached packs that match the bitmap and update
+	 * the bitmap by removing the items that are in the CachedPack.
+	 * <p>
+	 * A cached pack has known starting points and may be sent entirely as-is,
+	 * with almost no effort on the sender's part.
+	 *
+	 * @param needBitmap
+	 *            the bitmap that contains all of the objects the client wants.
+	 * @return the available cached packs.
+	 * @throws IOException
+	 *             the cached packs cannot be listed from the repository.
+	 *             Callers may choose to ignore this and continue as-if there
+	 *             were no cached packs.
+	 */
+	public Collection<CachedPack> getCachedPacksAndUpdate(
+			BitmapBuilder needBitmap) throws IOException;
 }
