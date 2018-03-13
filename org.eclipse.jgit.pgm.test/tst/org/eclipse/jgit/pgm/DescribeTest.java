@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008, Google Inc.
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2013, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,28 +40,60 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.pgm;
 
-package org.eclipse.jgit.pgm.debug;
+import static org.junit.Assert.assertArrayEquals;
 
-import static java.lang.Long.valueOf;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.junit.Before;
+import org.junit.Test;
 
-import java.text.MessageFormat;
+public class DescribeTest extends CLIRepositoryTestCase {
 
-import org.eclipse.jgit.pgm.Command;
-import org.eclipse.jgit.pgm.TextBuiltin;
-import org.eclipse.jgit.pgm.internal.CLIText;
+	private Git git;
 
-@Command(usage = "usage_ReadDirCache")
-class ReadDirCache extends TextBuiltin {
 	@Override
-	protected void run() throws Exception {
-		final int cnt = 100;
-		final long start = System.currentTimeMillis();
-		for (int i = 0; i < cnt; i++)
-			db.readDirCache();
-		final long end = System.currentTimeMillis();
-		outw.print(" "); //$NON-NLS-1$
-		outw.println(MessageFormat.format(CLIText.get().averageMSPerRead,
-				valueOf((end - start) / cnt)));
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		git = new Git(db);
+	}
+
+	private void initialCommitAndTag() throws Exception {
+		git.commit().setMessage("initial commit").call();
+		git.tag().setName("v1.0").call();
+	}
+
+	@Test
+	public void testNoHead() throws Exception {
+		assertArrayEquals(
+				new String[] { "fatal: No names found, cannot describe anything." },
+				execute("git describe"));
+	}
+
+	@Test
+	public void testHeadNoTag() throws Exception {
+		git.commit().setMessage("initial commit").call();
+		assertArrayEquals(
+				new String[] { "fatal: No names found, cannot describe anything." },
+				execute("git describe"));
+	}
+
+	@Test
+	public void testDescribeTag() throws Exception {
+		initialCommitAndTag();
+		assertArrayEquals(new String[] { "v1.0", "" },
+				execute("git describe HEAD"));
+	}
+
+	@Test
+	public void testDescribeCommit() throws Exception {
+		initialCommitAndTag();
+		writeTrashFile("greeting", "Hello, world!");
+		git.add().addFilepattern("greeting").call();
+		git.commit().setMessage("2nd commit").call();
+		assertArrayEquals(new String[] { "v1.0-1-g56f6ceb", "" },
+				execute("git describe"));
 	}
 }

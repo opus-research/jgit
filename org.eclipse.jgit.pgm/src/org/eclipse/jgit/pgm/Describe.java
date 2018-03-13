@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008, Google Inc.
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2013, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,28 +40,36 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.pgm;
 
-package org.eclipse.jgit.pgm.debug;
-
-import static java.lang.Long.valueOf;
-
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.pgm.Command;
-import org.eclipse.jgit.pgm.TextBuiltin;
+import org.eclipse.jgit.api.DescribeCommand;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.RefNotFoundException;
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.pgm.internal.CLIText;
+import org.kohsuke.args4j.Argument;
 
-@Command(usage = "usage_ReadDirCache")
-class ReadDirCache extends TextBuiltin {
+@Command(common = true, usage = "usage_Describe")
+class Describe extends TextBuiltin {
+
+	@Argument(index = 0, metaVar = "metaVar_treeish")
+	private ObjectId tree;
+
 	@Override
 	protected void run() throws Exception {
-		final int cnt = 100;
-		final long start = System.currentTimeMillis();
-		for (int i = 0; i < cnt; i++)
-			db.readDirCache();
-		final long end = System.currentTimeMillis();
-		outw.print(" "); //$NON-NLS-1$
-		outw.println(MessageFormat.format(CLIText.get().averageMSPerRead,
-				valueOf((end - start) / cnt)));
+		DescribeCommand cmd = new Git(db).describe();
+		if (tree != null)
+			cmd.setTarget(tree);
+		String result = null;
+		try {
+			result = cmd.call();
+		} catch (RefNotFoundException e) {
+			throw die(CLIText.get().noNamesFound, e);
+		}
+		if (result == null)
+			throw die(CLIText.get().noNamesFound);
+
+		outw.println(result);
 	}
+
 }
