@@ -568,8 +568,6 @@ public class IndexDiffFilterTest extends RepositoryTestCase {
 
 	private void deleteFolderAndCommit() throws Exception {
 		deleteFolder();
-		// since git doesn't keep track of empty folders, this commit will be
-		// empty
 		commitRm(FOLDER);
 	}
 
@@ -585,12 +583,12 @@ public class IndexDiffFilterTest extends RepositoryTestCase {
 
 	private RevCommit commitAdd() throws Exception {
 		git.add().addFilepattern(".").call();
-		return git.commit().setMessage("commit").setAllowEmpty(true).call();
+		return git.commit().setMessage("commit").call();
 	}
 
 	private RevCommit commitRm(String path) throws Exception {
 		git.rm().addFilepattern(path).call();
-		return git.commit().setMessage("commit").setAllowEmpty(true).call();
+		return git.commit().setMessage("commit").call();
 	}
 
 	private TreeWalk createTreeWalk(RevCommit commit) throws Exception {
