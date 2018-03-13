@@ -431,6 +431,7 @@ public class DiffFormatter {
 		assertHaveRepository();
 
 		TreeWalk walk = new TreeWalk(reader);
+		walk.reset();
 		walk.addTree(a);
 		walk.addTree(b);
 		walk.setRecursive(true);
