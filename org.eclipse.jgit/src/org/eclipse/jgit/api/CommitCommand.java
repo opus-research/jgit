@@ -42,8 +42,10 @@
  */
 package org.eclipse.jgit.api;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintStream;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -56,6 +58,7 @@ import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.api.errors.NoMessageException;
+import org.eclipse.jgit.api.errors.RejectCommitException;
 import org.eclipse.jgit.api.errors.UnmergedPathsException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.dircache.DirCache;
@@ -123,10 +126,19 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	private String reflogComment;
 
 	/**
+	 * Setting this option bypasses the {@link Hook#PRE_COMMIT pre-commit} and
+	 * {@link Hook#COMMIT_MSG commit-msg} hooks.
+	 */
+	private boolean noVerify;
+
+	private PrintStream hookOutRedirect;
+
+	/**
 	 * @param repo
 	 */
 	protected CommitCommand(Repository repo) {
 		super(repo);
+		hookOutRedirect = System.out;
 	}
 
 	/**
@@ -147,11 +159,14 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 *             else
 	 * @throws WrongRepositoryStateException
 	 *             when repository is not in the right state for committing
+	 * @throws RejectCommitException
+	 *             if there are either pre-commit or commit-msg hooks present in
+	 *             the repository and at least one of them rejects the commit.
 	 */
 	public RevCommit call() throws GitAPIException, NoHeadException,
 			NoMessageException, UnmergedPathsException,
-			ConcurrentRefUpdateException,
-			WrongRepositoryStateException {
+			ConcurrentRefUpdateException, WrongRepositoryStateException,
+			RejectCommitException {
 		checkCallable();
 		Collections.sort(only);
 
@@ -163,6 +178,23 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				throw new WrongRepositoryStateException(MessageFormat.format(
 						JGitText.get().cannotCommitOnARepoWithState,
 						state.name()));
+
+			if (!noVerify) {
+				final ByteArrayOutputStream errorByteArray = new ByteArrayOutputStream();
+				final PrintStream hookErrRedirect = new PrintStream(
+						errorByteArray);
+				ProcessResult preCommitHookResult = FS.DETECTED.runIfPresent(
+						repo, Hook.PRE_COMMIT, new String[0], hookOutRedirect,
+						hookErrRedirect, null);
+				if (preCommitHookResult.getStatus() == ProcessResult.Status.OK
+						&& preCommitHookResult.getExitCode() != 0) {
+					String errorMessage = MessageFormat.format(
+							JGitText.get().commitRejectedByHook, Hook.PRE_COMMIT.getName(),
+							errorByteArray.toString());
+					throw new RejectCommitException(errorMessage);
+				}
+			}
+
 			processOptions(state, rw);
 
 			if (all && !repo.isBare() && repo.getWorkTree() != null) {
@@ -200,7 +232,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				}
 
 			// lock the index
-			RevCommit revCommit = null;
 			DirCache index = repo.lockDirCache();
 			try {
 				if (!only.isEmpty())
@@ -227,7 +258,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 					ObjectId commitId = odi.insert(commit);
 					odi.flush();
 
-					revCommit = rw.parseCommit(commitId);
+					RevCommit revCommit = rw.parseCommit(commitId);
 					RefUpdate ru = repo.updateRef(Constants.HEAD);
 					ru.setNewObjectId(commitId);
 					if (reflogComment != null) {
@@ -262,7 +293,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 							repo.writeMergeCommitMsg(null);
 							repo.writeRevertHead(null);
 						}
-						break;
+						return revCommit;
 					}
 					case REJECTED:
 					case LOCK_FAILURE:
@@ -280,17 +311,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 			} finally {
 				index.unlock();
 			}
-
-			ProcessResult postCommitHookResult = FS.DETECTED.runIfPresent(repo,
-					Hook.POST_COMMIT, new String[0]);
-			if (postCommitHookResult.getStatus() == ProcessResult.Status.OK
-					&& postCommitHookResult.getExitCode() != 0) {
-				// TODO do we wish to log? If so, how? The post-commit hook
-				// cannot reject a commit, but the user might want to be told
-				// his hook failed...
-			}
-
-			return revCommit;
 		} catch (UnmergedPathException e) {
 			throw new UnmergedPathsException(e);
 		} catch (IOException e) {
@@ -748,4 +768,36 @@ public class CommitCommand extends GitCommand<RevCommit> {
 		return this;
 	}
 
+	/**
+	 * Sets the {@link #noVerify} option on this commit command.
+	 * <p>
+	 * Both the {@link Hook#PRE_COMMIT pre-commit} and {@link Hook#COMMIT_MSG
+	 * commit-msg} hooks can block a commit by their return value; setting this
+	 * option to <code>true</code> will bypass these two hooks.
+	 * </p>
+	 *
+	 * @param noVerify
+	 *            Whether this commit should be verified by the pre-commit and
+	 *            commit-msg hooks.
+	 * @return {@code this}
+	 * @since 3.7
+	 */
+	public CommitCommand setNoVerify(boolean noVerify) {
+		this.noVerify = noVerify;
+		return this;
+	}
+
+	/**
+	 * Set the output stream for hook scripts executed by this command. If not
+	 * set it defaults to {@code System.out}.
+	 *
+	 * @param hookStdOut
+	 *            the output stream for hook scripts executed by this command
+	 * @return {@code this}
+	 * @since 3.7
+	 */
+	public CommitCommand setHookOutputStream(PrintStream hookStdOut) {
+		this.hookOutRedirect = hookStdOut;
+		return this;
+	}
 }

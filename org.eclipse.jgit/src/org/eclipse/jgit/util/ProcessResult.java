@@ -45,7 +45,7 @@ package org.eclipse.jgit.util;
 /**
  * Describes the result of running an external process.
  *
- * @since 3.6
+ * @since 3.7
  */
 public class ProcessResult {
 	/**
@@ -53,16 +53,16 @@ public class ProcessResult {
 	 */
 	public static enum Status {
 		/**
-		 * The process was found and launched properly. It may still have exited
+		 * The script was found and launched properly. It may still have exited
 		 * with a non-zero {@link #exitCode}.
 		 */
 		OK,
 
-		/** The process was not found on disk and thus could not be launched. */
+		/** The script was not found on disk and thus could not be launched. */
 		NOT_PRESENT,
 
 		/**
-		 * The process was found but could not be launched since it was not
+		 * The script was found but could not be launched since it was not
 		 * supported by the current {@link FS}.
 		 */
 		NOT_SUPPORTED;
