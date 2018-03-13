@@ -49,23 +49,18 @@ import static org.eclipse.jgit.transport.ReceiveCommand.Result.REJECTED_OTHER_RE
 
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 
-import org.eclipse.jgit.annotations.Nullable;
-import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.PushCertificate;
 import org.eclipse.jgit.transport.ReceiveCommand;
-import org.eclipse.jgit.util.time.ProposedTimestamp;
 
 /**
  * Batch of reference updates to be applied to a repository.
@@ -74,19 +69,6 @@ import org.eclipse.jgit.util.time.ProposedTimestamp;
  * server is making changes to more than one reference at a time.
  */
 public class BatchRefUpdate {
-	/**
-	 * Maximum delay the calling thread will tolerate while waiting for a
-	 * {@code MonotonicClock} to resolve associated {@link ProposedTimestamp}s.
-	 * <p>
-	 * A default of 5 seconds was chosen by guessing. A common assumption is
-	 * clock skew between machines on the same LAN using an NTP server also on
-	 * the same LAN should be under 5 seconds. 5 seconds is also not that long
-	 * for a large `git push` operation to complete.
-	 *
-	 * @since 4.9
-	 */
-	protected static final Duration MAX_WAIT = Duration.ofSeconds(5);
-
 	private final RefDatabase refdb;
 
 	/** Commands to apply during this batch. */
@@ -113,9 +95,6 @@ public class BatchRefUpdate {
 	/** Push options associated with this update. */
 	private List<String> pushOptions;
 
-	/** Associated timestamps that should be blocked on before update. */
-	private List<ProposedTimestamp> timestamps;
-
 	/**
 	 * Initialize a new batch update.
 	 *
@@ -124,7 +103,7 @@ public class BatchRefUpdate {
 	 */
 	protected BatchRefUpdate(RefDatabase refdb) {
 		this.refdb = refdb;
-		this.commands = new ArrayList<>();
+		this.commands = new ArrayList<ReceiveCommand>();
 		this.atomic = refdb.performsAtomicTransactions();
 	}
 
@@ -177,36 +156,25 @@ public class BatchRefUpdate {
 	 * @return message the caller wants to include in the reflog; null if the
 	 *         update should not be logged.
 	 */
-	@Nullable
 	public String getRefLogMessage() {
 		return refLogMessage;
 	}
 
-	/**
-	 * Check whether the reflog message should include the result of the update,
-	 * such as fast-forward or force-update.
-	 * <p>
-	 * Describes the default for commands in this batch that do not override it
-	 * with {@link ReceiveCommand#setRefLogMessage(String, boolean)}.
-	 *
-	 * @return true if the message should include the result.
-	 */
+	/** @return {@code true} if the ref log message should show the result. */
 	public boolean isRefLogIncludingResult() {
 		return refLogIncludeResult;
 	}
 
 	/**
 	 * Set the message to include in the reflog.
-	 * <p>
-	 * Describes the default for commands in this batch that do not override it
-	 * with {@link ReceiveCommand#setRefLogMessage(String, boolean)}.
 	 *
 	 * @param msg
-	 *            the message to describe this change. If null and appendStatus is
-	 *            false, the reflog will not be updated.
+	 *            the message to describe this change. It may be null if
+	 *            appendStatus is null in order not to append to the reflog
 	 * @param appendStatus
 	 *            true if the status of the ref change (fast-forward or
-	 *            forced-update) should be appended to the user supplied message.
+	 *            forced-update) should be appended to the user supplied
+	 *            message.
 	 * @return {@code this}.
 	 */
 	public BatchRefUpdate setRefLogMessage(String msg, boolean appendStatus) {
@@ -224,8 +192,6 @@ public class BatchRefUpdate {
 
 	/**
 	 * Don't record this update in the ref's associated reflog.
-	 * <p>
-	 * Equivalent to {@code setRefLogMessage(null, false)}.
 	 *
 	 * @return {@code this}.
 	 */
@@ -235,11 +201,7 @@ public class BatchRefUpdate {
 		return this;
 	}
 
-	/**
-	 * Check whether log has been disabled by {@link #disableRefLog()}.
-	 *
-	 * @return true if disabled.
-	 */
+	/** @return true if log has been disabled by {@link #disableRefLog()}. */
 	public boolean isRefLogDisabled() {
 		return refLogMessage == null;
 	}
@@ -344,52 +306,11 @@ public class BatchRefUpdate {
 	/**
 	 * Gets the list of option strings associated with this update.
 	 *
-	 * @return push options that were passed to {@link #execute}; prior to calling
-	 *         {@link #execute}, always returns null.
+	 * @return pushOptions
 	 * @since 4.5
 	 */
-	@Nullable
 	public List<String> getPushOptions() {
 		return pushOptions;
-	}
-
-	/**
-	 * Set push options associated with this update.
-	 * <p>
-	 * Implementations must call this at the top of {@link #execute(RevWalk,
-	 * ProgressMonitor, List)}.
-	 *
-	 * @param options options passed to {@code execute}.
-	 * @since 4.9
-	 */
-	protected void setPushOptions(List<String> options) {
-		pushOptions = options;
-	}
-
-	/**
-	 * @return list of timestamps the batch must wait for.
-	 * @since 4.6
-	 */
-	public List<ProposedTimestamp> getProposedTimestamps() {
-		if (timestamps != null) {
-			return Collections.unmodifiableList(timestamps);
-		}
-		return Collections.emptyList();
-	}
-
-	/**
-	 * Request the batch to wait for the affected timestamps to resolve.
-	 *
-	 * @param ts
-	 * @return {@code this}.
-	 * @since 4.6
-	 */
-	public BatchRefUpdate addProposedTimestamp(ProposedTimestamp ts) {
-		if (timestamps == null) {
-			timestamps = new ArrayList<>(4);
-		}
-		timestamps.add(ts);
-		return this;
 	}
 
 	/**
@@ -427,27 +348,19 @@ public class BatchRefUpdate {
 			}
 			return;
 		}
-		if (!blockUntilTimestamps(MAX_WAIT)) {
-			return;
-		}
 
 		if (options != null) {
-			setPushOptions(options);
+			pushOptions = options;
 		}
 
 		monitor.beginTask(JGitText.get().updatingReferences, commands.size());
-		List<ReceiveCommand> commands2 = new ArrayList<>(
+		List<ReceiveCommand> commands2 = new ArrayList<ReceiveCommand>(
 				commands.size());
 		// First delete refs. This may free the name space for some of the
 		// updates.
 		for (ReceiveCommand cmd : commands) {
 			try {
 				if (cmd.getResult() == NOT_ATTEMPTED) {
-					if (isMissing(walk, cmd.getOldId())
-							|| isMissing(walk, cmd.getNewId())) {
-						cmd.setResult(ReceiveCommand.Result.REJECTED_MISSING_OBJECT);
-						continue;
-					}
 					cmd.updateType(walk);
 					switch (cmd.getType()) {
 					case CREATE:
@@ -472,7 +385,7 @@ public class BatchRefUpdate {
 		}
 		if (!commands2.isEmpty()) {
 			// What part of the name space is already taken
-			Collection<String> takenNames = new HashSet<>(refdb.getRefs(
+			Collection<String> takenNames = new HashSet<String>(refdb.getRefs(
 					RefDatabase.ALL).keySet());
 			Collection<String> takenPrefixes = getTakenPrefixes(takenNames);
 
@@ -503,7 +416,7 @@ public class BatchRefUpdate {
 								break SWITCH;
 							}
 							ru.setCheckConflicting(false);
-							takenPrefixes.addAll(getPrefixes(cmd.getRefName()));
+							addRefToPrefixes(takenPrefixes, cmd.getRefName());
 							takenNames.add(cmd.getRefName());
 							cmd.setResult(ru.update(walk));
 						}
@@ -517,46 +430,6 @@ public class BatchRefUpdate {
 			}
 		}
 		monitor.endTask();
-	}
-
-	private static boolean isMissing(RevWalk walk, ObjectId id)
-			throws IOException {
-		if (id.equals(ObjectId.zeroId())) {
-			return false; // Explicit add or delete is not missing.
-		}
-		try {
-			walk.parseAny(id);
-			return false;
-		} catch (MissingObjectException e) {
-			return true;
-		}
-	}
-
-	/**
-	 * Wait for timestamps to be in the past, aborting commands on timeout.
-	 *
-	 * @param maxWait
-	 *            maximum amount of time to wait for timestamps to resolve.
-	 * @return true if timestamps were successfully waited for; false if
-	 *         commands were aborted.
-	 * @since 4.6
-	 */
-	protected boolean blockUntilTimestamps(Duration maxWait) {
-		if (timestamps == null) {
-			return true;
-		}
-		try {
-			ProposedTimestamp.blockUntil(timestamps, maxWait);
-			return true;
-		} catch (TimeoutException | InterruptedException e) {
-			String msg = JGitText.get().timeIsUncertain;
-			for (ReceiveCommand c : commands) {
-				if (c.getResult() == NOT_ATTEMPTED) {
-					c.setResult(REJECTED_OTHER_REASON, msg);
-				}
-			}
-			return false;
-		}
 	}
 
 	/**
@@ -577,45 +450,29 @@ public class BatchRefUpdate {
 		execute(walk, monitor, null);
 	}
 
-	private static Collection<String> getTakenPrefixes(Collection<String> names) {
-		Collection<String> ref = new HashSet<>();
-		for (String name : names) {
-			addPrefixesTo(name, ref);
-		}
+	private static Collection<String> getTakenPrefixes(
+			final Collection<String> names) {
+		Collection<String> ref = new HashSet<String>();
+		for (String name : names)
+			ref.addAll(getPrefixes(name));
 		return ref;
 	}
 
-	/**
-	 * Get all path prefixes of a ref name.
-	 *
-	 * @param name
-	 *            ref name.
-	 * @return path prefixes of the ref name. For {@code refs/heads/foo}, returns
-	 *         {@code refs} and {@code refs/heads}.
-	 * @since 4.9
-	 */
-	protected static Collection<String> getPrefixes(String name) {
-		Collection<String> ret = new HashSet<>();
-		addPrefixesTo(name, ret);
-		return ret;
+	private static void addRefToPrefixes(Collection<String> prefixes,
+			String name) {
+		for (String prefix : getPrefixes(name)) {
+			prefixes.add(prefix);
+		}
 	}
 
-	/**
-	 * Add prefixes of a ref name to an existing collection.
-	 *
-	 * @param name
-	 *            ref name.
-	 * @param out
-	 *            path prefixes of the ref name. For {@code refs/heads/foo},
-	 *            returns {@code refs} and {@code refs/heads}.
-	 * @since 4.9
-	 */
-	protected static void addPrefixesTo(String name, Collection<String> out) {
-		int p1 = name.indexOf('/');
+	static Collection<String> getPrefixes(String s) {
+		Collection<String> ret = new HashSet<String>();
+		int p1 = s.indexOf('/');
 		while (p1 > 0) {
-			out.add(name.substring(0, p1));
-			p1 = name.indexOf('/', p1 + 1);
+			ret.add(s.substring(0, p1));
+			p1 = s.indexOf('/', p1 + 1);
 		}
+		return ret;
 	}
 
 	/**
@@ -630,11 +487,11 @@ public class BatchRefUpdate {
 	 */
 	protected RefUpdate newUpdate(ReceiveCommand cmd) throws IOException {
 		RefUpdate ru = refdb.newUpdate(cmd.getRefName(), false);
-		if (isRefLogDisabled(cmd)) {
+		if (isRefLogDisabled())
 			ru.disableRefLog();
-		} else {
+		else {
 			ru.setRefLogIdent(refLogIdent);
-			ru.setRefLogMessage(getRefLogMessage(cmd), isRefLogIncludingResult(cmd));
+			ru.setRefLogMessage(refLogMessage, refLogIncludeResult);
 		}
 		ru.setPushCertificate(pushCert);
 		switch (cmd.getType()) {
@@ -653,47 +510,6 @@ public class BatchRefUpdate {
 			ru.setNewObjectId(cmd.getNewId());
 			return ru;
 		}
-	}
-
-	/**
-	 * Check whether reflog is disabled for a command.
-	 *
-	 * @param cmd
-	 *            specific command.
-	 * @return whether the reflog is disabled, taking into account the state from
-	 *         this instance as well as overrides in the given command.
-	 * @since 4.9
-	 */
-	protected boolean isRefLogDisabled(ReceiveCommand cmd) {
-		return cmd.hasCustomRefLog() ? cmd.isRefLogDisabled() : isRefLogDisabled();
-	}
-
-	/**
-	 * Get reflog message for a command.
-	 *
-	 * @param cmd
-	 *            specific command.
-	 * @return reflog message, taking into account the state from this instance as
-	 *         well as overrides in the given command.
-	 * @since 4.9
-	 */
-	protected String getRefLogMessage(ReceiveCommand cmd) {
-		return cmd.hasCustomRefLog() ? cmd.getRefLogMessage() : getRefLogMessage();
-	}
-
-	/**
-	 * Check whether the reflog message for a command should include the result.
-	 *
-	 * @param cmd
-	 *            specific command.
-	 * @return whether the reflog message should show the result, taking into
-	 *         account the state from this instance as well as overrides in the
-	 *         given command.
-	 * @since 4.9
-	 */
-	protected boolean isRefLogIncludingResult(ReceiveCommand cmd) {
-		return cmd.hasCustomRefLog()
-				? cmd.isRefLogIncludingResult() : isRefLogIncludingResult();
 	}
 
 	@Override

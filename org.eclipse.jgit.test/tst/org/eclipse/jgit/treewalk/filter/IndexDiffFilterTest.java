@@ -89,7 +89,6 @@ public class IndexDiffFilterTest extends RepositoryTestCase {
 
 	private Git git;
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();

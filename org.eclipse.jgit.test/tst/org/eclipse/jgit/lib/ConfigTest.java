@@ -139,7 +139,7 @@ public class ConfigTest {
 	@Test
 	public void test005_PutGetStringList() {
 		Config c = new Config();
-		final LinkedList<String> values = new LinkedList<>();
+		final LinkedList<String> values = new LinkedList<String>();
 		values.add("value1");
 		values.add("value2");
 		c.setStringList("my", null, "somename", values);
