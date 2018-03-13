@@ -280,9 +280,9 @@ public class BlameResult {
 	 * Compute until the entire range has been populated.
 	 *
 	 * @param start
-	 *            first index to examine (inclusive).
+	 *            first index to examine.
 	 * @param end
-	 *            end index (exclusive).
+	 *            last index to examine.
 	 * @throws IOException
 	 *             the repository cannot be read.
 	 */
