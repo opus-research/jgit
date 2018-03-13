@@ -43,54 +43,31 @@
 
 package org.eclipse.jgit.internal.ketch;
 
-import java.util.Map;
-import java.util.Set;
-
-import org.eclipse.jgit.annotations.Nullable;
+import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
 
-/** A fetch request to obtain objects from a replica, and its result. */
-public class ReplicaFetchRequest {
-	private final Set<String> wantRefs;
-	private final Set<ObjectId> wantObjects;
-	private Map<String, Ref> refs;
-
+/** ObjectId extended with incrementing Ketch log position. */
+class LogId extends ObjectId {
 	/**
-	 * Construct a new fetch request for a replica.
-	 *
-	 * @param wantRefs
-	 *            named references to be fetched.
-	 * @param wantObjects
-	 *            specific objects to be fetched.
+	 * Linear ordering of creation by {@link Round}.
+	 * <p>
+	 * For any two LogId instances, A is an ancestor of C reachable through
+	 * parent edges in the graph if {@code A.index < C.index}.
+	 * <p>
+	 * Index values are only valid within a single {@link KetchLeader} instance
+	 * after it has won an election. {@link Round#setAcceptedNew(AnyObjectId)}
+	 * bumps the index as each new round is constructed.
 	 */
-	public ReplicaFetchRequest(Set<String> wantRefs,
-			Set<ObjectId> wantObjects) {
-		this.wantRefs = wantRefs;
-		this.wantObjects = wantObjects;
+	final long index;
+
+	LogId(AnyObjectId id, long index) {
+		super(id);
+		this.index = index;
 	}
 
-	/** @return references to be fetched. */
-	public Set<String> getWantRefs() {
-		return wantRefs;
-	}
-
-	/** @return objects to be fetched. */
-	public Set<ObjectId> getWantObjects() {
-		return wantObjects;
-	}
-
-	/** @return remote references, usually from the advertisement. */
-	@Nullable
-	public Map<String, Ref> getRefs() {
-		return refs;
-	}
-
-	/**
-	 * @param refs
-	 *            references observed from the replica.
-	 */
-	public void setRefs(Map<String, Ref> refs) {
-		this.refs = refs;
+	@SuppressWarnings("boxing")
+	@Override
+	public String toString() {
+		return String.format("LogId[%d %s]", index, name()); //$NON-NLS-1$
 	}
 }

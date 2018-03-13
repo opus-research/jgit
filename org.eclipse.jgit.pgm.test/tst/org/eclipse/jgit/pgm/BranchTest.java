@@ -63,9 +63,7 @@ public class BranchTest extends CLIRepositoryTestCase {
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-		try (Git git = new Git(db)) {
-			git.commit().setMessage("initial commit").call();
-		}
+		new Git(db).commit().setMessage("initial commit").call();
 	}
 
 	@Test
@@ -97,15 +95,13 @@ public class BranchTest extends CLIRepositoryTestCase {
 
 	@Test
 	public void testListContains() throws Exception {
-		try (Git git = new Git(db)) {
-			git.branchCreate().setName("initial").call();
-			RevCommit second = git.commit().setMessage("second commit")
-					.call();
-			assertEquals(toString("  initial", "* master"),
-					toString(execute("git branch --contains 6fd41be")));
-			assertEquals("* master",
-					toString(execute("git branch --contains " + second.name())));
-		}
+		new Git(db).branchCreate().setName("initial").call();
+		RevCommit second = new Git(db).commit().setMessage("second commit")
+				.call();
+		assertEquals(toString("  initial", "* master"),
+				toString(execute("git branch --contains 6fd41be")));
+		assertEquals("* master",
+				toString(execute("git branch --contains " + second.name())));
 	}
 
 	@Test

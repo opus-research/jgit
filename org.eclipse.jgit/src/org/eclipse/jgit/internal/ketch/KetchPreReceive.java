@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Google Inc.
+ * Copyright (C) 2015, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -62,7 +62,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * PreReceiveHook for handling push traffic in a Ketch system.
+ * PreReceiveHook handling push traffic in a Ketch system.
  * <p>
  * Install an instance on {@link ReceivePack} to capture the commands and other
  * connection state and relay them through the {@link KetchLeader}, allowing the
@@ -95,7 +95,7 @@ public class KetchPreReceive implements PreReceiveHook {
 				.setPushCertificate(rp.getPushCertificate())
 				.setAuthor(rp.getRefLogIdent())
 				.setMessage("push"); //$NON-NLS-1$
-			leader.queueProposal(proposal);
+			leader.executeAsync(proposal);
 			if (proposal.isDone()) {
 				// This failed fast, e.g. conflict or bad precondition.
 				return;

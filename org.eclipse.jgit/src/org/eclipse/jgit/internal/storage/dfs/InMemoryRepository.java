@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.eclipse.jgit.lib.BatchRefUpdate;
 import org.eclipse.jgit.lib.ObjectId;
@@ -311,7 +312,7 @@ public class InMemoryRepository extends DfsRepository {
 			try (RevWalk rw = new RevWalk(getRepository())) {
 				for (ReceiveCommand c : cmds) {
 					if (c.getResult() != ReceiveCommand.Result.NOT_ATTEMPTED) {
-						ReceiveCommand.abort(cmds);
+						reject(cmds);
 						return;
 					}
 
@@ -323,7 +324,7 @@ public class InMemoryRepository extends DfsRepository {
 							}
 						} catch (IOException e) {
 							c.setResult(ReceiveCommand.Result.REJECTED_MISSING_OBJECT);
-							ReceiveCommand.abort(cmds);
+							reject(cmds);
 							return;
 						}
 					}
@@ -336,7 +337,7 @@ public class InMemoryRepository extends DfsRepository {
 				if (r == null) {
 					if (c.getType() != ReceiveCommand.Type.CREATE) {
 						c.setResult(ReceiveCommand.Result.LOCK_FAILURE);
-						ReceiveCommand.abort(cmds);
+						reject(cmds);
 						return;
 					}
 				} else {
@@ -344,7 +345,7 @@ public class InMemoryRepository extends DfsRepository {
 					if (r.isSymbolic() || objectId == null
 							|| !objectId.equals(c.getOldId())) {
 						c.setResult(ReceiveCommand.Result.LOCK_FAILURE);
-						ReceiveCommand.abort(cmds);
+						reject(cmds);
 						return;
 					}
 				}
@@ -371,6 +372,15 @@ public class InMemoryRepository extends DfsRepository {
 				c.setResult(ReceiveCommand.Result.OK);
 			}
 			clearCache();
+		}
+
+		private void reject(List<ReceiveCommand> cmds) {
+			for (ReceiveCommand c : cmds) {
+				if (c.getResult() == ReceiveCommand.Result.NOT_ATTEMPTED) {
+					c.setResult(ReceiveCommand.Result.REJECTED_OTHER_REASON,
+							JGitText.get().transactionAborted);
+				}
+			}
 		}
 
 		@Override
