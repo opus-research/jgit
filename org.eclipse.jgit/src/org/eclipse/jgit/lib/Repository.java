@@ -117,8 +117,6 @@ public abstract class Repository {
 	/** If not bare, the index file caching the working file states. */
 	private final File indexFile;
 
-	private DirCache dc;
-
 	/**
 	 * Initialize a new repository instance.
 	 *
@@ -925,11 +923,7 @@ public abstract class Repository {
 	 */
 	public DirCache readDirCache() throws NoWorkTreeException,
 			CorruptObjectException, IOException {
-		if (dc == null)
-			dc = DirCache.read(getIndexFile(), getFS());
-		else
-			dc.read();
-		return dc;
+		return DirCache.read(getIndexFile(), getFS());
 	}
 
 	/**
