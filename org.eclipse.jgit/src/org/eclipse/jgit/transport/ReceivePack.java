@@ -123,13 +123,10 @@ public class ReceivePack extends BaseReceivePack {
 	 * the normal {@link #recvCommands()} flow.
 	 *
 	 * @param options
-	 *            the list of options supplied by the client. The
-	 *            {@code ReceivePack} instance takes ownership of this list.
-	 *            Callers are encouraged to first create a copy if the list may
-	 *            be modified later.
+	 *            the list of options supplied by the client.
 	 * @since 4.5
 	 */
-	public void setPushOptions(@Nullable List<String> options) {
+	public void setPushOptions(List<String> options) {
 		usePushOptions = options != null;
 		pushOptions = options;
 	}
