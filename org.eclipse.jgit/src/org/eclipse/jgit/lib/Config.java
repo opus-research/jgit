@@ -393,8 +393,6 @@ public class Config {
 		for (T e : all) {
 			if (StringUtils.equalsIgnoreCase(e.name(), n))
 				return e;
-			else if (StringUtils.equalsIgnoreCase(e.toString(), n))
-				return e;
 			else if (StringUtils.equalsIgnoreCase(e.name(), "TRUE"))
 				trueState = e;
 			else if (StringUtils.equalsIgnoreCase(e.name(), "FALSE"))
@@ -723,8 +721,6 @@ public class Config {
 	public <T extends Enum<?>> void setEnum(final String section,
 			final String subsection, final String name, final T value) {
 		String n = value.name().toLowerCase().replace('_', ' ');
-		if (!value.name().equals(value.toString()))
-			n = value.toString(); // use overridden toString()
 		setString(section, subsection, name, n);
 	}
 
