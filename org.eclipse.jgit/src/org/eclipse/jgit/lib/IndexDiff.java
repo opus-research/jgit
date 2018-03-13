@@ -52,13 +52,7 @@ import org.eclipse.jgit.lib.GitIndex.Entry;
 
 /**
  * Compares the Index, a Tree, and the working directory
- *
- * @deprecated Use {@link org.eclipse.jgit.treewalk.TreeWalk} instead, with at
- * least the {@link org.eclipse.jgit.dircache.DirCacheIterator} and
- * {@link org.eclipse.jgit.treewalk.FileTreeIterator} iterators, and setting
- * the filter {@link org.eclipse.jgit.treewalk.filter.TreeFilter#ANY_DIFF}.
  */
-@Deprecated
 public class IndexDiff {
 	private GitIndex index;
 	private Tree tree;
@@ -95,7 +89,7 @@ public class IndexDiff {
 	 * @throws IOException
 	 */
 	public boolean diff() throws IOException {
-		final File root = index.getRepository().getWorkTree();
+		final File root = index.getRepository().getWorkDir();
 		new IndexTreeWalker(index, tree, root, new AbstractIndexTreeVisitor() {
 			public void visitEntry(TreeEntry treeEntry, Entry indexEntry, File file) {
 				if (treeEntry == null) {

@@ -44,10 +44,10 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 
 /**
- * Exception thrown when a command wants to update a ref but failed because
+ * Exception thrown when a command want's to update a ref but failed because
  * another process is accessing (or even also updating) the ref.
  *
- * @see org.eclipse.jgit.lib.RefUpdate.Result#LOCK_FAILURE
+ * @see RefUpdate.Result#LOCK_FAILURE
  */
 public class ConcurrentRefUpdateException extends GitAPIException {
 	private static final long serialVersionUID = 1L;

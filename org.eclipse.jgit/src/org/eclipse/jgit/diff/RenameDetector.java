@@ -45,7 +45,6 @@ package org.eclipse.jgit.diff;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -55,10 +54,8 @@ import java.util.List;
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.NullProgressMonitor;
-import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Repository;
 
@@ -100,7 +97,7 @@ public class RenameDetector {
 		}
 	};
 
-	private List<DiffEntry> entries = new ArrayList<DiffEntry>();
+	private final List<DiffEntry> entries = new ArrayList<DiffEntry>();
 
 	private List<DiffEntry> deleted = new ArrayList<DiffEntry>();
 
@@ -112,13 +109,6 @@ public class RenameDetector {
 
 	/** Similarity score required to pair an add/delete as a rename. */
 	private int renameScore = 60;
-
-	/**
-	 * Similarity score required to keep modified file pairs together. Any
-	 * modified file pairs with a similarity score below this will be broken
-	 * apart.
-	 */
-	private int breakScore = -1;
 
 	/** Limit in the number of files to consider for renames. */
 	private int renameLimit;
@@ -156,38 +146,13 @@ public class RenameDetector {
 	 * that approximately 60% of the bytes in the files are identical.
 	 *
 	 * @param score
-	 *            new rename score, must be within [0, 100].
-	 * @throws IllegalArgumentException
-	 *             the score was not within [0, 100].
+	 *            new rename score, must be within (0, 100).
 	 */
 	public void setRenameScore(int score) {
 		if (score < 0 || score > 100)
 			throw new IllegalArgumentException(
 					JGitText.get().similarityScoreMustBeWithinBounds);
 		renameScore = score;
-	}
-
-	/**
-	 * @return the similarity score required to keep modified file pairs
-	 *         together. Any modify pairs that score below this will be broken
-	 *         apart into separate add/deletes. Values less than or equal to
-	 *         zero indicate that no modifies will be broken apart. Values over
-	 *         100 cause all modify pairs to be broken.
-	 */
-	public int getBreakScore() {
-		return breakScore;
-	}
-
-	/**
-	 * @param breakScore
-	 *            the similarity score required to keep modified file pairs
-	 *            together. Any modify pairs that score below this will be
-	 *            broken apart into separate add/deletes. Values less than or
-	 *            equal to zero indicate that no modifies will be broken apart.
-	 *            Values over 100 cause all modify pairs to be broken.
-	 */
-	public void setBreakScore(int breakScore) {
-		this.breakScore = breakScore;
 	}
 
 	/** @return limit on number of paths to perform inexact rename detection. */
@@ -250,13 +215,10 @@ public class RenameDetector {
 				break;
 
 			case MODIFY:
-				if (sameType(entry.getOldMode(), entry.getNewMode())) {
+				if (sameType(entry.getOldMode(), entry.getNewMode()))
 					entries.add(entry);
-				} else {
-					List<DiffEntry> tmp = DiffEntry.breakModify(entry);
-					deleted.add(tmp.get(0));
-					added.add(tmp.get(1));
-				}
+				else
+					entries.addAll(DiffEntry.breakModify(entry));
 				break;
 
 			case COPY:
@@ -309,15 +271,8 @@ public class RenameDetector {
 
 			if (pm == null)
 				pm = NullProgressMonitor.INSTANCE;
-			ObjectReader reader = repo.newObjectReader();
-			try {
-				breakModifies(reader, pm);
-				findExactRenames(pm);
-				findContentRenames(reader, pm);
-				rejoinModifies(pm);
-			} finally {
-				reader.release();
-			}
+			findExactRenames(pm);
+			findContentRenames(pm);
 
 			entries.addAll(added);
 			added = null;
@@ -330,83 +285,7 @@ public class RenameDetector {
 		return Collections.unmodifiableList(entries);
 	}
 
-	private void breakModifies(ObjectReader reader, ProgressMonitor pm)
-			throws IOException {
-		if (breakScore <= 0)
-			return;
-
-		ArrayList<DiffEntry> newEntries = new ArrayList<DiffEntry>(entries.size());
-
-		pm.beginTask(JGitText.get().renamesBreakingModifies, entries.size());
-
-		for (int i = 0; i < entries.size(); i++) {
-			DiffEntry e = entries.get(i);
-			if (e.getChangeType() == ChangeType.MODIFY) {
-				int score = calculateModifyScore(reader, e);
-				if (score < breakScore) {
-					List<DiffEntry> tmp = DiffEntry.breakModify(e);
-					DiffEntry del = tmp.get(0);
-					del.score = score;
-					deleted.add(del);
-					added.add(tmp.get(1));
-				} else {
-					newEntries.add(e);
-				}
-			} else {
-				newEntries.add(e);
-			}
-			pm.update(1);
-		}
-
-		entries = newEntries;
-	}
-
-	private void rejoinModifies(ProgressMonitor pm) {
-		HashMap<String, DiffEntry> nameMap = new HashMap<String, DiffEntry>();
-		ArrayList<DiffEntry> newAdded = new ArrayList<DiffEntry>(added.size());
-
-		pm.beginTask(JGitText.get().renamesRejoiningModifies, added.size()
-				+ deleted.size());
-
-		for (DiffEntry src : deleted) {
-			nameMap.put(src.oldName, src);
-			pm.update(1);
-		}
-
-		for (DiffEntry dst : added) {
-			DiffEntry src = nameMap.remove(dst.newName);
-			if (src != null) {
-				if (sameType(src.oldMode, dst.newMode)) {
-					entries.add(DiffEntry.pair(ChangeType.MODIFY, src, dst,
-							src.score));
-				} else {
-					nameMap.put(src.oldName, src);
-					newAdded.add(dst);
-				}
-			} else {
-				newAdded.add(dst);
-			}
-			pm.update(1);
-		}
-
-		added = newAdded;
-		deleted = new ArrayList<DiffEntry>(nameMap.values());
-	}
-
-	private int calculateModifyScore(ObjectReader reader, DiffEntry d)
-			throws IOException {
-		SimilarityIndex src = new SimilarityIndex();
-		src.hash(reader.open(d.oldId.toObjectId(), Constants.OBJ_BLOB));
-		src.sort();
-
-		SimilarityIndex dst = new SimilarityIndex();
-		dst.hash(reader.open(d.newId.toObjectId(), Constants.OBJ_BLOB));
-		dst.sort();
-		return src.score(dst, 100);
-	}
-
-	private void findContentRenames(ObjectReader reader, ProgressMonitor pm)
-			throws IOException {
+	private void findContentRenames(ProgressMonitor pm) throws IOException {
 		int cnt = Math.max(added.size(), deleted.size());
 		if (cnt == 0)
 			return;
@@ -414,7 +293,7 @@ public class RenameDetector {
 		if (getRenameLimit() == 0 || cnt <= getRenameLimit()) {
 			SimilarityRenameDetector d;
 
-			d = new SimilarityRenameDetector(reader, deleted, added);
+			d = new SimilarityRenameDetector(repo, deleted, added);
 			d.setRenameScore(getRenameScore());
 			d.compute(pm);
 			deleted = d.getLeftOverSources();
@@ -431,133 +310,68 @@ public class RenameDetector {
 			return;
 
 		pm.beginTask(JGitText.get().renamesFindingExact, //
-				added.size() + added.size() + deleted.size()
-						+ added.size() * deleted.size());
+				added.size() + deleted.size());
 
-		HashMap<AbbreviatedObjectId, Object> deletedMap = populateMap(deleted, pm);
-		HashMap<AbbreviatedObjectId, Object> addedMap = populateMap(added, pm);
+		HashMap<AbbreviatedObjectId, Object> map = new HashMap<AbbreviatedObjectId, Object>();
+		for (DiffEntry del : deleted) {
+			Object old = map.put(del.oldId, del);
+			if (old instanceof DiffEntry) {
+				ArrayList<DiffEntry> list = new ArrayList<DiffEntry>(2);
+				list.add((DiffEntry) old);
+				list.add(del);
+				map.put(del.oldId, list);
 
-		ArrayList<DiffEntry> uniqueAdds = new ArrayList<DiffEntry>(added.size());
-		ArrayList<List<DiffEntry>> nonUniqueAdds = new ArrayList<List<DiffEntry>>();
-
-		for (Object o : addedMap.values()) {
-			if (o instanceof DiffEntry)
-				uniqueAdds.add((DiffEntry) o);
-			else
-				nonUniqueAdds.add((List<DiffEntry>) o);
-		}
-
-		ArrayList<DiffEntry> left = new ArrayList<DiffEntry>(added.size());
-
-		for (DiffEntry a : uniqueAdds) {
-			Object del = deletedMap.get(a.newId);
-			if (del instanceof DiffEntry) {
-				// We have one add to one delete: pair them if they are the same
-				// type
-				DiffEntry e = (DiffEntry) del;
-				if (sameType(e.oldMode, a.newMode)) {
-					e.changeType = ChangeType.RENAME;
-					entries.add(exactRename(e, a));
-				} else {
-					left.add(a);
-				}
-			} else if (del != null) {
-				// We have one add to many deletes: find the delete with the
-				// same type and closest name to the add, then pair them
-				List<DiffEntry> list = (List<DiffEntry>) del;
-				DiffEntry best = bestPathMatch(a, list);
-				if (best != null) {
-					best.changeType = ChangeType.RENAME;
-					entries.add(exactRename(best, a));
-				} else {
-					left.add(a);
-				}
-			} else {
-				left.add(a);
+			} else if (old != null) {
+				// Must be a list of DiffEntries
+				((List) old).add(del);
+				map.put(del.oldId, old);
 			}
 			pm.update(1);
 		}
 
-		for (List<DiffEntry> adds : nonUniqueAdds) {
-			Object o = deletedMap.get(adds.get(0).newId);
-			if (o instanceof DiffEntry) {
-				// We have many adds to one delete: find the add with the same
-				// type and closest name to the delete, then pair them. Mark the
-				// rest as copies of the delete.
-				DiffEntry d = (DiffEntry) o;
-				DiffEntry best = bestPathMatch(d, adds);
-				if (best != null) {
-					d.changeType = ChangeType.RENAME;
-					entries.add(exactRename(d, best));
-					for (DiffEntry a : adds) {
-						if (a != best) {
-							if (sameType(d.oldMode, a.newMode)) {
-								entries.add(exactCopy(d, a));
-							} else {
-								left.add(a);
-							}
-						}
+		ArrayList<DiffEntry> left = new ArrayList<DiffEntry>(added.size());
+		for (DiffEntry dst : added) {
+			Object del = map.get(dst.newId);
+			if (del instanceof DiffEntry) {
+				DiffEntry e = (DiffEntry) del;
+				if (sameType(e.oldMode, dst.newMode)) {
+					if (e.changeType == ChangeType.DELETE) {
+						e.changeType = ChangeType.RENAME;
+						entries.add(exactRename(e, dst));
+					} else {
+						entries.add(exactCopy(e, dst));
 					}
 				} else {
-					left.addAll(adds);
-				}
-			} else if (o != null) {
-				// We have many adds to many deletes: score all the adds against
-				// all the deletes by path name, take the best matches, pair
-				// them as renames, then call the rest copies
-				List<DiffEntry> dels = (List<DiffEntry>) o;
-				long[] matrix = new long[dels.size() * adds.size()];
-				int mNext = 0;
-				for (int addIdx = 0; addIdx < adds.size(); addIdx++) {
-					String addedName = adds.get(addIdx).newName;
-
-					for (int delIdx = 0; delIdx < dels.size(); delIdx++) {
-						String deletedName = dels.get(delIdx).oldName;
-
-						int score = SimilarityRenameDetector.nameScore(addedName, deletedName);
-						matrix[mNext] = SimilarityRenameDetector.encode(score, addIdx, delIdx);
-						mNext++;
-					}
+					left.add(dst);
 				}
 
-				Arrays.sort(matrix);
-
-				for (--mNext; mNext >= 0; mNext--) {
-					long ent = matrix[mNext];
-					int delIdx = SimilarityRenameDetector.srcFile(ent);
-					int addIdx = SimilarityRenameDetector.dstFile(ent);
-					DiffEntry d = dels.get(delIdx);
-					DiffEntry a = adds.get(addIdx);
-
-					if (a == null) {
-						pm.update(1);
-						continue; // was already matched earlier
-					}
-
-					ChangeType type;
-					if (d.changeType == ChangeType.DELETE) {
-						// First use of this source file. Tag it as a rename so we
-						// later know it is already been used as a rename, other
-						// matches (if any) will claim themselves as copies instead.
-						//
-						d.changeType = ChangeType.RENAME;
-						type = ChangeType.RENAME;
+			} else if (del != null) {
+				List<DiffEntry> list = (List<DiffEntry>) del;
+				DiffEntry best = null;
+				for (DiffEntry e : list) {
+					if (best == null && sameType(e.oldMode, dst.newMode))
+						best = e;
+				}
+				if (best != null) {
+					if (best.changeType == ChangeType.DELETE) {
+						best.changeType = ChangeType.RENAME;
+						entries.add(exactRename(best, dst));
 					} else {
-						type = ChangeType.COPY;
+						entries.add(exactCopy(best, dst));
 					}
-
-					entries.add(DiffEntry.pair(type, d, a, 100));
-					adds.set(addIdx, null); // Claim the destination was matched.
-					pm.update(1);
+				} else {
+					left.add(dst);
 				}
+
 			} else {
-				left.addAll(adds);
+				left.add(dst);
 			}
+			pm.update(1);
 		}
 		added = left;
 
-		deleted = new ArrayList<DiffEntry>(deletedMap.size());
-		for (Object o : deletedMap.values()) {
+		deleted = new ArrayList<DiffEntry>(map.size());
+		for (Object o : map.values()) {
 			if (o instanceof DiffEntry) {
 				DiffEntry e = (DiffEntry) o;
 				if (e.changeType == ChangeType.DELETE)
@@ -571,69 +385,6 @@ public class RenameDetector {
 			}
 		}
 		pm.endTask();
-	}
-
-	/**
-	 * Find the best match by file path for a given DiffEntry from a list of
-	 * DiffEntrys. The returned DiffEntry will be of the same type as <src>. If
-	 * no DiffEntry can be found that has the same type, this method will return
-	 * null.
-	 *
-	 * @param src
-	 *            the DiffEntry to try to find a match for
-	 * @param list
-	 *            a list of DiffEntrys to search through
-	 * @return the DiffEntry from <list> who's file path best matches <src>
-	 */
-	private static DiffEntry bestPathMatch(DiffEntry src, List<DiffEntry> list) {
-		DiffEntry best = null;
-		int score = -1;
-
-		for (DiffEntry d : list) {
-			if (sameType(mode(d), mode(src))) {
-				int tmp = SimilarityRenameDetector
-						.nameScore(path(d), path(src));
-				if (tmp > score) {
-					best = d;
-					score = tmp;
-				}
-			}
-		}
-
-		return best;
-	}
-
-	@SuppressWarnings("unchecked")
-	private HashMap<AbbreviatedObjectId, Object> populateMap(
-			List<DiffEntry> diffEntries, ProgressMonitor pm) {
-		HashMap<AbbreviatedObjectId, Object> map = new HashMap<AbbreviatedObjectId, Object>();
-		for (DiffEntry de : diffEntries) {
-			Object old = map.put(id(de), de);
-			if (old instanceof DiffEntry) {
-				ArrayList<DiffEntry> list = new ArrayList<DiffEntry>(2);
-				list.add((DiffEntry) old);
-				list.add(de);
-				map.put(id(de), list);
-			} else if (old != null) {
-				// Must be a list of DiffEntries
-				((List<DiffEntry>) old).add(de);
-				map.put(id(de), old);
-			}
-			pm.update(1);
-		}
-		return map;
-	}
-
-	private static String path(DiffEntry de) {
-		return de.changeType == ChangeType.DELETE ? de.oldName : de.newName;
-	}
-
-	private static FileMode mode(DiffEntry de) {
-		return de.changeType == ChangeType.DELETE ? de.oldMode : de.newMode;
-	}
-
-	private static AbbreviatedObjectId id(DiffEntry de) {
-		return de.changeType == ChangeType.DELETE ? de.oldId : de.newId;
 	}
 
 	static boolean sameType(FileMode a, FileMode b) {

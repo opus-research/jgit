@@ -57,8 +57,7 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 
 /** A value class representing a change to a file */
 public class DiffEntry {
-	/** Magical SHA1 used for file adds or deletes */
-	static final AbbreviatedObjectId A_ZERO = AbbreviatedObjectId
+	private static final AbbreviatedObjectId A_ZERO = AbbreviatedObjectId
 			.fromObjectId(ObjectId.zeroId());
 
 	/** Magical file name used for file adds or deletes. */
@@ -80,13 +79,6 @@ public class DiffEntry {
 
 		/** Copy an existing file to a new location, keeping the original */
 		COPY;
-	}
-
-	/**
-	 * Create an empty DiffEntry
-	 */
-	protected DiffEntry(){
-		// reduce the visibility of the default constructor
 	}
 
 	/**
@@ -172,15 +164,6 @@ public class DiffEntry {
 		return e;
 	}
 
-	/**
-	 * Breaks apart a DiffEntry into two entries, one DELETE and one ADD.
-	 *
-	 * @param entry
-	 *            the DiffEntry to break apart.
-	 * @return a list containing two entries. Calling {@link #getChangeType()}
-	 *         on the first entry will return ChangeType.DELETE. Calling it on
-	 *         the second entry will return ChangeType.ADD.
-	 */
 	static List<DiffEntry> breakModify(DiffEntry entry) {
 		DiffEntry del = new DiffEntry();
 		del.oldId = entry.getOldId();
@@ -324,32 +307,5 @@ public class DiffEntry {
 	 */
 	public AbbreviatedObjectId getNewId() {
 		return newId;
-	}
-
-	@Override
-	public String toString() {
-		StringBuilder buf = new StringBuilder();
-		buf.append("DiffEntry[");
-		buf.append(changeType);
-		buf.append(" ");
-		switch (changeType) {
-		case ADD:
-			buf.append(newName);
-			break;
-		case COPY:
-			buf.append(oldName + "->" + newName);
-			break;
-		case DELETE:
-			buf.append(oldName);
-			break;
-		case MODIFY:
-			buf.append(oldName);
-			break;
-		case RENAME:
-			buf.append(oldName + "->" + newName);
-			break;
-		}
-		buf.append("]");
-		return buf.toString();
 	}
 }

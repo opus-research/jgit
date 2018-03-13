@@ -50,12 +50,11 @@ import java.util.List;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
+import org.eclipse.jgit.lib.Repository;
 
 class SimilarityRenameDetector {
 	/**
@@ -72,7 +71,7 @@ class SimilarityRenameDetector {
 
 	private static final int SCORE_SHIFT = 2 * BITS_PER_INDEX;
 
-	private ObjectReader reader;
+	private final Repository repo;
 
 	/**
 	 * All sources to consider for copies or renames.
@@ -112,9 +111,9 @@ class SimilarityRenameDetector {
 
 	private List<DiffEntry> out;
 
-	SimilarityRenameDetector(ObjectReader reader, List<DiffEntry> srcs,
+	SimilarityRenameDetector(Repository repo, List<DiffEntry> srcs,
 			List<DiffEntry> dsts) {
-		this.reader = reader;
+		this.repo = repo;
 		this.srcs = srcs;
 		this.dsts = dsts;
 	}
@@ -206,14 +205,6 @@ class SimilarityRenameDetector {
 		//
 		matrix = new long[srcs.size() * dsts.size()];
 
-		long[] srcSizes = new long[srcs.size()];
-		long[] dstSizes = new long[dsts.size()];
-
-		// Init the size arrays to some value that indicates that we haven't
-		// calculated the size yet. Since sizes cannot be negative, -1 will work
-		Arrays.fill(srcSizes, -1);
-		Arrays.fill(dstSizes, -1);
-
 		// Consider each pair of files, if the score is above the minimum
 		// threshold we need record that scoring in the matrix so we can
 		// later find the best matches.
@@ -240,35 +231,8 @@ class SimilarityRenameDetector {
 					continue;
 				}
 
-				long srcSize = srcSizes[srcIdx];
-				if (srcSize < 0) {
-					srcSize = size(srcEnt.oldId.toObjectId());
-					srcSizes[srcIdx] = srcSize;
-				}
-
-				long dstSize = dstSizes[dstIdx];
-				if (dstSize < 0) {
-					dstSize = size(dstEnt.newId.toObjectId());
-					dstSizes[dstIdx] = dstSize;
-				}
-
-				long max = Math.max(srcSize, dstSize);
-				long min = Math.min(srcSize, dstSize);
-				if (min * 100 / max < renameScore) {
-					// Cannot possibly match, as the file sizes are so different
-					pm.update(1);
-					continue;
-				}
-
 				SimilarityIndex d = hash(dstEnt.newId.toObjectId());
-				int contentScore = s.score(d, 10000);
-
-				// nameScore returns a value between 0 and 100, but we want it
-				// to be in the same range as the content score. This allows it
-				// to be dropped into the pretty formula for the final score.
-				int nameScore = nameScore(srcEnt.oldName, dstEnt.newName) * 100;
-
-				int score = (contentScore * 99 + nameScore * 1) / 10000;
+				int score = s.score(d);
 
 				if (score < renameScore) {
 					pm.update(1);
@@ -288,77 +252,26 @@ class SimilarityRenameDetector {
 		return mNext;
 	}
 
-	static int nameScore(String a, String b) {
-	    int aDirLen = a.lastIndexOf("/") + 1;
-	    int bDirLen = b.lastIndexOf("/") + 1;
-
-	    int dirMin = Math.min(aDirLen, bDirLen);
-	    int dirMax = Math.max(aDirLen, bDirLen);
-
-	    final int dirScoreLtr;
-	    final int dirScoreRtl;
-
-		if (dirMax == 0) {
-			dirScoreLtr = 100;
-			dirScoreRtl = 100;
-		} else {
-			int dirSim = 0;
-			for (; dirSim < dirMin; dirSim++) {
-				if (a.charAt(dirSim) != b.charAt(dirSim))
-					break;
-			}
-			dirScoreLtr = (dirSim * 100) / dirMax;
-
-			if (dirScoreLtr == 100) {
-				dirScoreRtl = 100;
-			} else {
-				for (dirSim = 0; dirSim < dirMin; dirSim++) {
-					if (a.charAt(aDirLen - 1 - dirSim) != b.charAt(bDirLen - 1
-							- dirSim))
-						break;
-				}
-				dirScoreRtl = (dirSim * 100) / dirMax;
-			}
-		}
-
-		int fileMin = Math.min(a.length() - aDirLen, b.length() - bDirLen);
-		int fileMax = Math.max(a.length() - aDirLen, b.length() - bDirLen);
-
-		int fileSim = 0;
-		for (; fileSim < fileMin; fileSim++) {
-			if (a.charAt(a.length() - 1 - fileSim) != b.charAt(b.length() - 1
-					- fileSim))
-				break;
-		}
-		int fileScore = (fileSim * 100) / fileMax;
-
-		return (((dirScoreLtr + dirScoreRtl) * 25) + (fileScore * 50)) / 100;
-	}
-
 	private SimilarityIndex hash(ObjectId objectId) throws IOException {
 		SimilarityIndex r = new SimilarityIndex();
-		r.hash(reader.open(objectId));
+		r.hash(repo.openObject(objectId));
 		r.sort();
 		return r;
-	}
-
-	private long size(ObjectId objectId) throws IOException {
-		return reader.getObjectSize(objectId, Constants.OBJ_BLOB);
 	}
 
 	private static int score(long value) {
 		return (int) (value >>> SCORE_SHIFT);
 	}
 
-	static int srcFile(long value) {
+	private static int srcFile(long value) {
 		return decodeFile(((int) (value >>> BITS_PER_INDEX)) & INDEX_MASK);
 	}
 
-	static int dstFile(long value) {
+	private static int dstFile(long value) {
 		return decodeFile(((int) value) & INDEX_MASK);
 	}
 
-	static long encode(int score, int srcIdx, int dstIdx) {
+	private static long encode(int score, int srcIdx, int dstIdx) {
 		return (((long) score) << SCORE_SHIFT) //
 				| (encodeFile(srcIdx) << BITS_PER_INDEX) //
 				| encodeFile(dstIdx);

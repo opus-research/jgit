@@ -116,8 +116,6 @@ public class HunkHeader {
 	/** Total number of lines of context appearing in this hunk */
 	int nContext;
 
-	private EditList editList;
-
 	HunkHeader(final FileHeader fh, final int offset) {
 		this(fh, offset, new OldImage() {
 			@Override
@@ -131,21 +129,6 @@ public class HunkHeader {
 		file = fh;
 		startOffset = offset;
 		old = oi;
-	}
-
-	HunkHeader(final FileHeader fh, final EditList editList) {
-		this(fh, fh.buf.length);
-		this.editList = editList;
-		endOffset = startOffset;
-		nContext = 0;
-		if (editList.isEmpty()) {
-			newStartLine = 0;
-			newLineCount = 0;
-		} else {
-			newStartLine = editList.get(0).getBeginB();
-			Edit last = editList.get(editList.size() - 1);
-			newLineCount = last.getEndB() - newStartLine;
-		}
 	}
 
 	/** @return header for the file this hunk applies to */
@@ -190,50 +173,48 @@ public class HunkHeader {
 
 	/** @return a list describing the content edits performed within the hunk. */
 	public EditList toEditList() {
-		if (editList == null) {
-			editList = new EditList();
-			final byte[] buf = file.buf;
-			int c = nextLF(buf, startOffset);
-			int oLine = old.startLine;
-			int nLine = newStartLine;
-			Edit in = null;
+		final EditList r = new EditList();
+		final byte[] buf = file.buf;
+		int c = nextLF(buf, startOffset);
+		int oLine = old.startLine;
+		int nLine = newStartLine;
+		Edit in = null;
 
-			SCAN: for (; c < endOffset; c = nextLF(buf, c)) {
-				switch (buf[c]) {
-				case ' ':
-				case '\n':
-					in = null;
-					oLine++;
-					nLine++;
-					continue;
+		SCAN: for (; c < endOffset; c = nextLF(buf, c)) {
+			switch (buf[c]) {
+			case ' ':
+			case '\n':
+				in = null;
+				oLine++;
+				nLine++;
+				continue;
 
-				case '-':
-					if (in == null) {
-						in = new Edit(oLine - 1, nLine - 1);
-						editList.add(in);
-					}
-					oLine++;
-					in.extendA();
-					continue;
-
-				case '+':
-					if (in == null) {
-						in = new Edit(oLine - 1, nLine - 1);
-						editList.add(in);
-					}
-					nLine++;
-					in.extendB();
-					continue;
-
-				case '\\': // Matches "\ No newline at end of file"
-					continue;
-
-				default:
-					break SCAN;
+			case '-':
+				if (in == null) {
+					in = new Edit(oLine - 1, nLine - 1);
+					r.add(in);
 				}
+				oLine++;
+				in.extendA();
+				continue;
+
+			case '+':
+				if (in == null) {
+					in = new Edit(oLine - 1, nLine - 1);
+					r.add(in);
+				}
+				nLine++;
+				in.extendB();
+				continue;
+
+			case '\\': // Matches "\ No newline at end of file"
+				continue;
+
+			default:
+				break SCAN;
 			}
 		}
-		return editList;
+		return r;
 	}
 
 	void parseHeader() {
