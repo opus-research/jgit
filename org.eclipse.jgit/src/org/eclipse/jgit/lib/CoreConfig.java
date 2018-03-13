@@ -77,7 +77,7 @@ public class CoreConfig {
 	/**
 	 * Permissible values for {@code core.checkstat}
 	 *
-	 * @since 2.3
+	 * @since 3.0
 	 */
 	public static enum CheckStat {
 		/**
@@ -100,16 +100,6 @@ public class CoreConfig {
 	private final boolean logAllRefUpdates;
 
 	private final String excludesfile;
-
-	/**
-	 * Options for symlink handling
-	 */
-	public static enum SymLinks {
-		/** Checkout symbolic links as plain files */
-		FALSE,
-		/** Checkout symbolic links as links */
-		TRUE
-	}
 
 	private CoreConfig(final Config rc) {
 		compression = rc.getInt(ConfigConstants.CONFIG_CORE_SECTION,
