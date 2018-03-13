@@ -153,9 +153,4 @@ public class FS_POSIX_Java7 extends FS_POSIX {
 	public Attributes getAttributes(File path) {
 		return FileUtil.getFileAttributes(this, path);
 	}
-
-	@Override
-	public File normalize(File file) {
-		return FileUtil.normalize(file);
-	}
 }
