@@ -51,7 +51,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.CommandFailedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,7 +64,6 @@ import org.slf4j.LoggerFactory;
 public class FS_Win32 extends FS {
 	private final static Logger LOG = LoggerFactory.getLogger(FS_Win32.class);
 
-	@Nullable
 	private volatile Boolean supportSymlinks;
 
 	/**
@@ -112,7 +110,6 @@ public class FS_Win32 extends FS {
 	}
 
 	@Override
-	@Nullable
 	protected File discoverGitExe() {
 		String path = SystemReader.getInstance().getenv("PATH"); //$NON-NLS-1$
 		File gitExe = searchPath(path, "git.exe", "git.cmd"); //$NON-NLS-1$ //$NON-NLS-2$
@@ -141,7 +138,6 @@ public class FS_Win32 extends FS {
 	}
 
 	@Override
-	@Nullable
 	protected File userHomeImpl() {
 		String home = SystemReader.getInstance().getenv("HOME"); //$NON-NLS-1$
 		if (home != null)

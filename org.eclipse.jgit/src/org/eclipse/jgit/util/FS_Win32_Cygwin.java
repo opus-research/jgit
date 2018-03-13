@@ -53,7 +53,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.CommandFailedException;
 import org.eclipse.jgit.lib.Constants;
@@ -111,8 +110,7 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 		return new FS_Win32_Cygwin(this);
 	}
 
-	@Override
-	public File resolve(final @Nullable File dir, final String pn) {
+	public File resolve(final File dir, final String pn) {
 		String useCygPath = System.getProperty("jgit.usecygpath"); //$NON-NLS-1$
 		if (useCygPath != null && useCygPath.equals("true")) { //$NON-NLS-1$
 			String w;
@@ -122,7 +120,7 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 					"UTF-8"); //$NON-NLS-1$
 			} catch (CommandFailedException e) {
 				LOG.warn(e.getMessage());
-				throw new RuntimeException(e);
+				return null;
 			}
 			if (!StringUtils.isEmptyOrNull(w)) {
 				return new File(w);
@@ -132,11 +130,10 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 	}
 
 	@Override
-	@Nullable
 	protected File userHomeImpl() {
 		final String home = AccessController
-				.doPrivileged(new PrivilegedAction<@Nullable String>() {
-					public @Nullable String run() {
+				.doPrivileged(new PrivilegedAction<String>() {
+					public String run() {
 						return System.getenv("HOME"); //$NON-NLS-1$
 					}
 				});
@@ -172,9 +169,8 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 	 */
 	@Override
 	public ProcessResult runHookIfPresent(Repository repository, String hookName,
-			String[] args, @Nullable PrintStream outRedirect,
-			@Nullable PrintStream errRedirect, @Nullable String stdinArgs)
-					throws JGitInternalException {
+			String[] args, PrintStream outRedirect, PrintStream errRedirect,
+			String stdinArgs) throws JGitInternalException {
 		return internalRunHookIfPresent(repository, hookName, args, outRedirect,
 				errRedirect, stdinArgs);
 	}
@@ -183,7 +179,6 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 	 * @since 3.7
 	 */
 	@Override
-	@Nullable
 	public File findHook(Repository repository, String hookName) {
 		final File gitdir = repository.getDirectory();
 		if (gitdir == null) {

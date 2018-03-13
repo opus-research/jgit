@@ -43,14 +43,10 @@
 
 package org.eclipse.jgit.util;
 
-import static java.util.Objects.requireNonNull;
-
 import java.util.AbstractList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
-
-import org.eclipse.jgit.annotations.Nullable;
 
 /**
  * Random access list that allocates entries in blocks.
@@ -221,7 +217,6 @@ public class BlockList<T> extends AbstractList<T> {
 		return true;
 	}
 
-	@SuppressWarnings("nullness")
 	@Override
 	public void add(int index, T element) {
 		if (index == size) {
@@ -243,7 +238,6 @@ public class BlockList<T> extends AbstractList<T> {
 		}
 	}
 
-	@SuppressWarnings("nullness")
 	@Override
 	public T remove(int index) {
 		if (index == size - 1) {
@@ -313,7 +307,7 @@ public class BlockList<T> extends AbstractList<T> {
 
 		private int blkIdx;
 
-		private T @Nullable [] block = directory[0];
+		private T[] block = directory[0];
 
 		public boolean hasNext() {
 			return index < size;
@@ -322,7 +316,6 @@ public class BlockList<T> extends AbstractList<T> {
 		public T next() {
 			if (size <= index)
 				throw new NoSuchElementException();
-			requireNonNull(block);
 
 			T res = block[blkIdx];
 			if (++blkIdx == BLOCK_SIZE) {
