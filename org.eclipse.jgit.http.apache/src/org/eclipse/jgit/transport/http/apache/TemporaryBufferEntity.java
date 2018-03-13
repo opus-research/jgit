@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2014, Alexey Kuznetsov <axet@me.com>
+ * Copyright (C) 2014 Christian Halstrick <christian.halstrick@sap.com>
+ * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -39,80 +40,70 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.transport.http.apache;
 
-package org.eclipse.jgit.transport;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
-import org.eclipse.jgit.errors.UnsupportedCredentialItem;
-import org.eclipse.jgit.transport.NetRC.NetRCEntry;
+import org.apache.http.HttpEntity;
+import org.apache.http.entity.AbstractHttpEntity;
+import org.eclipse.jgit.util.TemporaryBuffer;
 
 /**
- * Simple .netrc credentials provider. It can lookup for first machine entry
- * from your .netrc file.
+ * A {@link HttpEntity} which takes it's content from a {@link TemporaryBuffer}
  *
+ * @since 3.3
  */
-public class NetRCCredentialsProvider extends CredentialsProvider {
+public class TemporaryBufferEntity extends AbstractHttpEntity {
+	private TemporaryBuffer buffer;
 
-	NetRC netrc = new NetRC();
+	private Integer contentLength;
 
 	/**
+	 * Construct a new {@link HttpEntity} which will contain the content stored
+	 * in the specified buffer
 	 *
+	 * @param buffer
 	 */
-	public NetRCCredentialsProvider() {
+	public TemporaryBufferEntity(TemporaryBuffer buffer) {
+		this.buffer = buffer;
 	}
 
 	/**
-	 * Install default provider for the .netrc parser.
+	 * @return buffer containing the content
 	 */
-	public static void install() {
-		CredentialsProvider.setDefault(new NetRCCredentialsProvider());
+	public TemporaryBuffer getBuffer() {
+		return buffer;
 	}
 
-	@Override
-	public boolean supports(CredentialItem... items) {
-		for (CredentialItem i : items) {
-			if (i instanceof CredentialItem.Username)
-				continue;
-			else if (i instanceof CredentialItem.Password)
-				continue;
-			else
-				return false;
-		}
+	public boolean isRepeatable() {
 		return true;
 	}
 
-	@Override
-	public boolean get(URIish uri, CredentialItem... items)
-			throws UnsupportedCredentialItem {
-		NetRCEntry cc = netrc.entry(uri.getHost());
-
-		if (cc == null)
-			return false;
-
-		for (CredentialItem i : items) {
-			if (i instanceof CredentialItem.Username) {
-				((CredentialItem.Username) i).setValue(cc.login);
-				continue;
-			}
-			if (i instanceof CredentialItem.Password) {
-				((CredentialItem.Password) i).setValue(cc.password);
-				continue;
-			}
-			if (i instanceof CredentialItem.StringType) {
-				if (i.getPromptText().equals("Password: ")) { //$NON-NLS-1$
-					((CredentialItem.StringType) i).setValue(new String(
-							cc.password));
-					continue;
-				}
-			}
-			throw new UnsupportedCredentialItem(uri, i.getClass().getName()
-					+ ":" + i.getPromptText()); //$NON-NLS-1$
-		}
-		return true;
+	public long getContentLength() {
+		if (contentLength != null)
+			return contentLength.intValue();
+		return buffer.length();
 	}
 
-	@Override
-	public boolean isInteractive() {
+	public InputStream getContent() throws IOException, IllegalStateException {
+		return buffer.openInputStream();
+	}
+
+	public void writeTo(OutputStream outstream) throws IOException {
+		// TODO: dont we need a progressmonitor
+		buffer.writeTo(outstream, null);
+	}
+
+	public boolean isStreaming() {
 		return false;
 	}
 
+	/**
+	 * @param contentLength
+	 */
+	public void setContentLength(int contentLength) {
+		this.contentLength = new Integer(contentLength);
+	}
 }
