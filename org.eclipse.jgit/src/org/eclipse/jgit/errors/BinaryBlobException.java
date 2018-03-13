@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2017 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,22 +40,19 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.errors;
 
-package org.eclipse.jgit.internal.storage.dfs;
+/**
+ * BinaryBlobException is used to signal that binary data was found
+ * in a context that requires text (eg. for generating textual diffs).
+ *
+ * @since 4.10
+ */
+public class BinaryBlobException extends Exception {
+	private static final long serialVersionUID = 1L;
 
-import org.eclipse.jgit.nls.NLS;
-import org.eclipse.jgit.nls.TranslationBundle;
-
-/** Translation bundle for the DFS storage implementation. */
-public class DfsText extends TranslationBundle {
-	/** @return instance of this translation bundle */
-	public static DfsText get() {
-		return NLS.getBundleFor(DfsText.class);
-	}
-
-	// @formatter:off
-	/***/ public String cannotReadIndex;
-	/***/ public String shortReadOfBlock;
-	/***/ public String shortReadOfIndex;
-	/***/ public String willNotStoreEmptyPack;
+	/**
+	 * Construct a BinaryBlobException.
+	 */
+	public BinaryBlobException() {}
 }
