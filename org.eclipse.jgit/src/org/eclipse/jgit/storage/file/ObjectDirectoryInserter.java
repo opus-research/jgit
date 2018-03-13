@@ -83,10 +83,36 @@ class ObjectDirectoryInserter extends ObjectInserter {
 		final MessageDigest md = digest();
 		final File tmp = toTemp(md, type, len, is);
 		final ObjectId id = ObjectId.fromRaw(md.digest());
-		if (db.insertUnpackedObject(tmp, id, false /* no duplicate */))
+		if (db.has(id)) {
+			// Object is already in the repository, remove temporary file.
+			//
+			tmp.delete();
 			return id;
+		}
 
 		final File dst = db.fileFor(id);
+		if (tmp.renameTo(dst))
+			return id;
+
+		// Maybe the directory doesn't exist yet as the object
+		// directories are always lazily created. Note that we
+		// try the rename first as the directory likely does exist.
+		//
+		dst.getParentFile().mkdir();
+		if (tmp.renameTo(dst))
+			return id;
+
+		if (db.has(id)) {
+			tmp.delete();
+			return id;
+		}
+
+		// The object failed to be renamed into its proper
+		// location and it doesn't exist in the repository
+		// either. We really don't know what went wrong, so
+		// fail.
+		//
+		tmp.delete();
 		throw new ObjectWritingException("Unable to create new object: " + dst);
 	}
 
@@ -110,12 +136,15 @@ class ObjectDirectoryInserter extends ObjectInserter {
 			final InputStream is) throws IOException, FileNotFoundException,
 			Error {
 		boolean delete = true;
-		File tmp = newTempFile();
+		File tmp = File.createTempFile("noz", null, db.getDirectory());
 		try {
 			DigestOutputStream dOut = new DigestOutputStream(
 					compress(new FileOutputStream(tmp)), md);
 			try {
-				writeHeader(dOut, type, len);
+				dOut.write(Constants.encodedTypeString(type));
+				dOut.write((byte) ' ');
+				dOut.write(Constants.encodeASCII(len));
+				dOut.write((byte) 0);
 
 				final byte[] buf = buffer();
 				while (len > 0) {
@@ -129,6 +158,7 @@ class ObjectDirectoryInserter extends ObjectInserter {
 				dOut.close();
 			}
 
+			tmp.setReadOnly();
 			delete = false;
 			return tmp;
 		} finally {
@@ -137,19 +167,7 @@ class ObjectDirectoryInserter extends ObjectInserter {
 		}
 	}
 
-	void writeHeader(OutputStream out, final int type, long len)
-			throws IOException {
-		out.write(Constants.encodedTypeString(type));
-		out.write((byte) ' ');
-		out.write(Constants.encodeASCII(len));
-		out.write((byte) 0);
-	}
-
-	File newTempFile() throws IOException {
-		return File.createTempFile("noz", null, db.getDirectory());
-	}
-
-	DeflaterOutputStream compress(final OutputStream out) {
+	private DeflaterOutputStream compress(final OutputStream out) {
 		if (deflate == null)
 			deflate = new Deflater(config.get(CoreConfig.KEY).getCompression());
 		else

@@ -55,7 +55,7 @@ package org.eclipse.jgit.diff;
 public interface DiffAlgorithm {
 	/**
 	 * Compare two sequences and identify a list of edits between them.
-	 * 
+	 *
 	 * @param <S>
 	 *            type of sequence being compared.
 	 * @param <C>
@@ -67,7 +67,7 @@ public interface DiffAlgorithm {
 	 *            returned by this algorithm will reference indexes using the
 	 *            'A' side: {@link Edit#getBeginA()}, {@link Edit#getEndA()}.
 	 * @param b
-	 *            the second (also known as new or post-image) sequence. Edits
+	 *            the first (also known as new or post-image) sequence. Edits
 	 *            returned by this algorithm will reference indexes using the
 	 *            'B' side: {@link Edit#getBeginB()}, {@link Edit#getEndB()}.
 	 * @return a modifiable edit list comparing the two sequences. If empty, the

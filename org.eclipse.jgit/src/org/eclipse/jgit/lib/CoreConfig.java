@@ -47,6 +47,7 @@
 package org.eclipse.jgit.lib;
 
 import static java.util.zip.Deflater.DEFAULT_COMPRESSION;
+import static org.eclipse.jgit.lib.ObjectLoader.STREAM_THRESHOLD;
 
 import org.eclipse.jgit.lib.Config.SectionParser;
 
@@ -61,31 +62,28 @@ public class CoreConfig {
 		}
 	};
 
-	/** Permissible values for {@code core.autocrlf}. */
-	public static enum AutoCRLF {
-		/** Automatic CRLF->LF conversion is disabled. */
-		FALSE,
-
-		/** Automatic CRLF->LF conversion is enabled. */
-		TRUE,
-
-		/** CRLF->LF performed, but no LF->CRLF. */
-		INPUT;
-	}
-
 	private final int compression;
 
 	private final int packIndexVersion;
 
 	private final boolean logAllRefUpdates;
 
-	private final AutoCRLF autoCRLF;
+	private final int streamFileThreshold;
+
+	private final boolean autoCRLF;
 
 	private CoreConfig(final Config rc) {
 		compression = rc.getInt("core", "compression", DEFAULT_COMPRESSION);
 		packIndexVersion = rc.getInt("pack", "indexversion", 2);
 		logAllRefUpdates = rc.getBoolean("core", "logallrefupdates", true);
-		autoCRLF = rc.getEnum("core", null, "autocrlf", AutoCRLF.FALSE);
+
+		long maxMem = Runtime.getRuntime().maxMemory();
+		long sft = rc.getLong("core", null, "streamfilethreshold", STREAM_THRESHOLD);
+		sft = Math.min(sft, maxMem / 4); // don't use more than 1/4 of the heap
+		sft = Math.min(sft, Integer.MAX_VALUE); // cannot exceed array length
+		streamFileThreshold = (int) sft;
+
+		autoCRLF = rc.getBoolean("core", "autocrlf", false);
 	}
 
 	/**
@@ -110,10 +108,15 @@ public class CoreConfig {
 		return logAllRefUpdates;
 	}
 
+	/** @return the size threshold beyond which objects must be streamed. */
+	public int getStreamFileThreshold() {
+		return streamFileThreshold;
+	}
+
 	/**
 	 * @return whether automatic CRLF conversion has been configured
 	 */
-	public AutoCRLF getAutoCRLF() {
+	public boolean isAutoCRLF() {
 		return autoCRLF;
 	}
 }
