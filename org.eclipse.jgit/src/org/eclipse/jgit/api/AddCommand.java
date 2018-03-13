@@ -226,8 +226,8 @@ public class AddCommand extends GitCommand<DirCache> {
 					long len = f.getEntryContentLength();
 					// We read and filter the content multiple times.
 					// f.getEntryContentLength() reads and filters the input and
-					// inserter.insert(...) does it again. That's because and
-					// ObjectInserter needs to know the length before he starts
+					// inserter.insert(...) does it again. That's because an
+					// ObjectInserter needs to know the length before it starts
 					// inserting. TODO: Fix this by using Buffers.
 					try (InputStream in = f.openEntryStream()) {
 						ObjectId id = inserter.insert(OBJ_BLOB, len, in);

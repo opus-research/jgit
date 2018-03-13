@@ -62,14 +62,14 @@ import org.eclipse.jgit.util.FilterCommandFactory;
  * when a checkout needs to update a working tree file which is under LFS
  * control. This implementation expects that the origin content is already
  * available in the .git/lfs/objects folder. This implementation will not
- * contact any lfs servers in order to get the missing content.
+ * contact any LFS servers in order to get the missing content.
  *
  * @since 4.5
  */
 public class SmudgeFilter extends FilterCommand {
 	/**
-	 * The factory is responsible for creating instances of {@link SmudgeFilter}
-	 * . This factory can be registered using
+	 * The factory is responsible for creating instances of
+	 * {@link SmudgeFilter}. This factory can be registered using
 	 * {@link Repository#registerCommand(String, FilterCommandFactory)}
 	 */
 	public final static FilterCommandFactory FACTORY = new FilterCommandFactory() {
@@ -120,8 +120,9 @@ public class SmudgeFilter extends FilterCommand {
 	public int run() throws IOException {
 		int b;
 		if (in != null) {
-			while ((b = in.read()) != -1)
+			while ((b = in.read()) != -1) {
 				out.write(b);
+			}
 			in.close();
 		}
 		out.close();

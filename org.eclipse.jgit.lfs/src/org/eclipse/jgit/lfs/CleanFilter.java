@@ -63,17 +63,19 @@ import org.eclipse.jgit.util.FilterCommandFactory;
  *
  * When new content is about to be added to the git repository and this filter
  * is configured for that content, then this filter will replace the original
- * content with content of a so called LFS pointer file. The pointer file
+ * content with content of a so-called LFS pointer file. The pointer file
  * content will then be added to the git repository. Additionally this filter
- * writes the original content in a so called 'media file' at '.git/lfs/objects/
+ * writes the original content in a so-called 'media file' at '.git/lfs/objects/
  * <first-two-characters-of-contentid>/<rest-of-contentid>'
  *
+ * @see <a href="https://github.com/github/git-lfs/blob/master/docs/spec.md">Git
+ *      LFS Specification</a>
  * @since 4.5
  */
 public class CleanFilter extends FilterCommand {
 	/**
-	 * The factory is responsible for creating instances of {@link CleanFilter}
-	 * . This factory can be registered using
+	 * The factory is responsible for creating instances of {@link CleanFilter}.
+	 * This factory can be registered using
 	 * {@link Repository#registerCommand(String, FilterCommandFactory)}
 	 */
 	public final static FilterCommandFactory FACTORY = new FilterCommandFactory() {
@@ -114,10 +116,10 @@ public class CleanFilter extends FilterCommand {
 	 * @param db
 	 *            the repository
 	 * @param in
-	 *            a {@link InputStream} providing the original content
+	 *            an {@link InputStream} providing the original content
 	 * @param out
 	 *            the {@link OutputStream} into which the content of the pointer
-	 *            file should be written. That's the content which will be add
+	 *            file should be written. That's the content which will be added
 	 *            to the git repository
 	 * @throws IOException
 	 *             when the creation of the temporary file fails or when no

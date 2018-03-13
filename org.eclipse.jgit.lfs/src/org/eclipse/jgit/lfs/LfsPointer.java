@@ -49,12 +49,12 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintStream;
 
-import org.eclipse.jgit.lfs.lib.Constants;
 import org.eclipse.jgit.annotations.Nullable;
+import org.eclipse.jgit.lfs.lib.Constants;
 import org.eclipse.jgit.lfs.lib.LongObjectId;
 
 /**
- * Represents a LFS pointer file
+ * Represents an LFS pointer file
  *
  * @since 4.5
  */
@@ -124,8 +124,8 @@ public class LfsPointer {
 	 *
 	 * @param in
 	 *            the {@link InputStream} from where to read the data
-	 * @return a {@link LfsPointer} or <code>null</code> if the stream was not
-	 *         parseable as LFSPointer
+	 * @return an {@link LfsPointer} or <code>null</code> if the stream was not
+	 *         parseable as LfsPointer
 	 * @throws IOException
 	 */
 	@Nullable
