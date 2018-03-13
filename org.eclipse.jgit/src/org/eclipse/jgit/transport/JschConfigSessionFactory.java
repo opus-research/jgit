@@ -107,7 +107,7 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 				user = hc.getUser();
 
 			Session session = createSession(credentialsProvider, fs, user,
-					pass, host, port, hc, false);
+					pass, host, port, hc);
 
 			int retries = 0;
 			while (!session.isConnected() && retries < 3) {
@@ -123,7 +123,7 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 							&& e.getMessage().equals("Auth fail")) {
 						credentialsProvider.reset(uri);
 						session = createSession(credentialsProvider, fs, user,
-								pass, host, port, hc, true);
+								pass, host, port, hc);
 					} else {
 						throw e;
 					}
@@ -145,7 +145,7 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 
 	private Session createSession(CredentialsProvider credentialsProvider,
 			FS fs, String user, final String pass, String host, int port,
-			final OpenSshConfig.Host hc, boolean reset) throws JSchException {
+			final OpenSshConfig.Host hc) throws JSchException {
 		final Session session = createSession(hc, user, host, port, fs);
 		if (pass != null)
 			session.setPassword(pass);
@@ -159,11 +159,8 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 			session.setConfig("PreferredAuthentications", pauth);
 		if (credentialsProvider != null
 				&& (!hc.isBatchMode() || !credentialsProvider.isInteractive())) {
-			if (!reset)
-				session.setUserInfo(new CredentialsProviderUserInfo(session,
-						credentialsProvider));
-			else
-				session.setUserInfo(null);
+			session.setUserInfo(new CredentialsProviderUserInfo(session,
+					credentialsProvider));
 		}
 		configure(hc, session);
 		return session;
