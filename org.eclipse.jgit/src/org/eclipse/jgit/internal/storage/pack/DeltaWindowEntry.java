@@ -80,14 +80,12 @@ final class DeltaWindowEntry {
 		return object == null;
 	}
 
-	/** Remove this entry from the window chain. */
-	private final void unlink() {
-		prev.next = next;
-		next.prev = prev;
-	}
-
 	final void makeNext(DeltaWindowEntry e) {
-		e.unlink();
+		// Disconnect e from the chain.
+		e.prev.next = e.next;
+		e.next.prev = e.prev;
+
+		// Insert e after this.
 		e.next = next;
 		e.prev = this;
 		next.prev = e;
