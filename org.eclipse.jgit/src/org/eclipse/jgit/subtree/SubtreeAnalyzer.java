@@ -77,7 +77,7 @@ import org.eclipse.jgit.treewalk.filter.TreeFilter;
 /**
  * Maps parents of commits to the subtrees they most likely belong to.
  */
-class SubtreeAnalyzer {
+public class SubtreeAnalyzer {
 
 	/**
 	 * Return entries that match across trees.
@@ -147,14 +147,20 @@ class SubtreeAnalyzer {
 
 	private ObjectInserter inserter;
 
-	SubtreeAnalyzer(Repository db) {
+	/**
+	 * @param db
+	 */
+	public SubtreeAnalyzer(Repository db) {
 		repo = db;
 		reader = repo.newObjectReader();
 		inserter = repo.newObjectInserter();
 		tw = new TreeWalk(reader);
 	}
 
-	void release() {
+	/**
+	 * Release any resources used by this SubtreeAnalyzer.
+	 */
+	public void release() {
 		tw.release();
 		reader.release();
 		inserter.release();
@@ -169,7 +175,7 @@ class SubtreeAnalyzer {
 	 * @return A map of subtree ids to parent commits.
 	 * @throws IOException
 	 */
-	Map<String, RevCommit> getSubtreeParents(RevCommit cmit,
+	public Map<String, RevCommit> getSubtreeParents(RevCommit cmit,
 			RevWalk walker) throws IOException {
 		Map<String, RevCommit> subtreeParents = null;
 
@@ -241,8 +247,9 @@ class SubtreeAnalyzer {
 					}
 
 					// Find the subtree's Tree object.
-					ObjectId subtree = TreeWalk.findObject(cmit.getTree(),
-							curPath, walker.getObjectReader());
+					TreeWalk subWalk = TreeWalk.forPath(walker.getObjectReader(), curPath, cmit.getTree());
+					ObjectId subtree = subWalk != null ? subWalk.getObjectId(0)
+							: null;
 
 					// Does the subtree Tree exist?
 					if (subtree == null) {
@@ -486,7 +493,7 @@ class SubtreeAnalyzer {
 	 *         old note map if no changes were made).
 	 * @throws IOException
 	 */
-	ObjectId flushCache(RevWalk walker) throws IOException {
+	public ObjectId flushCache(RevWalk walker) throws IOException {
 
 		for (int retryCount = 0; retryCount < 3; retryCount++) {
 

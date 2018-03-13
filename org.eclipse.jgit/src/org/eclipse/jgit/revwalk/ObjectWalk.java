@@ -45,6 +45,8 @@ package org.eclipse.jgit.revwalk;
 
 import java.io.IOException;
 import java.text.MessageFormat;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
@@ -83,7 +85,11 @@ public class ObjectWalk extends RevWalk {
 	 */
 	private static final int IN_PENDING = RevWalk.REWRITE;
 
+	private static final byte[] EMPTY_PATH = {};
+
 	private CanonicalTreeParser treeWalk;
+
+	private List<RevObject> rootObjects;
 
 	private BlockObjQueue pendingObjects;
 
@@ -115,6 +121,7 @@ public class ObjectWalk extends RevWalk {
 	 */
 	public ObjectWalk(ObjectReader or) {
 		super(or);
+		rootObjects = new ArrayList<RevObject>();
 		pendingObjects = new BlockObjQueue();
 		treeWalk = new CanonicalTreeParser();
 	}
@@ -233,10 +240,8 @@ public class ObjectWalk extends RevWalk {
 				return null;
 			if ((r.flags & UNINTERESTING) != 0) {
 				markTreeUninteresting(r.getTree());
-				if (hasRevSort(RevSort.BOUNDARY)) {
-					pendingObjects.add(r.getTree());
+				if (hasRevSort(RevSort.BOUNDARY))
 					return r;
-				}
 				continue;
 			}
 			if (firstCommit == null)
@@ -411,6 +416,16 @@ public class ObjectWalk extends RevWalk {
 		return last != null ? treeWalk.getEntryPathHashCode() : 0;
 	}
 
+	/** @return the internal buffer holding the current path. */
+	public byte[] getPathBuffer() {
+		return last != null ? treeWalk.getEntryPathBuffer() : EMPTY_PATH;
+	}
+
+	/** @return length of the path in {@link #getPathBuffer()}. */
+	public int getPathLength() {
+		return last != null ? treeWalk.getEntryPathLength() : 0;
+	}
+
 	@Override
 	public void dispose() {
 		super.dispose();
@@ -425,6 +440,11 @@ public class ObjectWalk extends RevWalk {
 	@Override
 	protected void reset(final int retainFlags) {
 		super.reset(retainFlags);
+
+		for (RevObject obj : rootObjects)
+			obj.flags &= ~IN_PENDING;
+
+		rootObjects = new ArrayList<RevObject>();
 		pendingObjects = new BlockObjQueue();
 		treeWalk = new CanonicalTreeParser();
 		currentTree = null;
@@ -436,6 +456,7 @@ public class ObjectWalk extends RevWalk {
 	private void addObject(final RevObject o) {
 		if ((o.flags & IN_PENDING) == 0) {
 			o.flags |= IN_PENDING;
+			rootObjects.add(o);
 			pendingObjects.add(o);
 		}
 	}

@@ -47,17 +47,17 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
 
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
-import org.eclipse.jgit.http.server.resolver.FileResolver;
-import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.resolver.FileResolver;
+import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
+import org.eclipse.jgit.util.FileUtils;
 import org.junit.Test;
 
 public class FileResolverTest extends LocalDiskRepositoryTestCase {
@@ -116,8 +116,7 @@ public class FileResolverTest extends LocalDiskRepositoryTestCase {
 			fail("did not honor export-all flag");
 		}
 
-		export.createNewFile();
-		assertTrue("has git-daemon-export-ok", export.exists());
+		FileUtils.createNewFile(export);
 		resolver = new FileResolver(base, false /* require flag */);
 		try {
 			resolver.open(null, name).close();

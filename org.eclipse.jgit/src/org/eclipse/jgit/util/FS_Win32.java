@@ -48,9 +48,12 @@ import java.io.File;
 import java.nio.charset.Charset;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 class FS_Win32 extends FS {
-	static boolean detect() {
+	static boolean isWin32() {
 		final String osDotName = AccessController
 				.doPrivileged(new PrivilegedAction<String>() {
 					public String run() {
@@ -59,6 +62,18 @@ class FS_Win32 extends FS {
 				});
 		return osDotName != null
 				&& StringUtils.toLowerCase(osDotName).indexOf("windows") != -1;
+	}
+
+	FS_Win32() {
+		super();
+	}
+
+	FS_Win32(FS src) {
+		super(src);
+	}
+
+	public FS newInstance() {
+		return new FS_Win32(this);
 	}
 
 	public boolean supportsExecute() {
@@ -79,7 +94,7 @@ class FS_Win32 extends FS {
 	}
 
 	@Override
-	public File gitPrefix() {
+	protected File discoverGitPrefix() {
 		String path = SystemReader.getInstance().getenv("PATH");
 		File gitExe = searchPath(path, "git.exe", "git.cmd");
 		if (gitExe != null)
@@ -93,7 +108,6 @@ class FS_Win32 extends FS {
 				Charset.defaultCharset().name());
 		if (w != null)
 			return new File(w).getParentFile().getParentFile();
-
 		return null;
 	}
 
@@ -113,5 +127,17 @@ class FS_Win32 extends FS {
 			return new File(homeShare);
 
 		return super.userHomeImpl();
+	}
+
+	@Override
+	public ProcessBuilder runInShell(String cmd, String[] args) {
+		List<String> argv = new ArrayList<String>(3 + args.length);
+		argv.add("cmd.exe");
+		argv.add("/c");
+		argv.add(cmd);
+		argv.addAll(Arrays.asList(args));
+		ProcessBuilder proc = new ProcessBuilder();
+		proc.command(argv);
+		return proc;
 	}
 }

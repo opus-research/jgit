@@ -58,7 +58,10 @@ public abstract class SubtreeContext {
 
 	private Map<ObjectId, RevCommit> mNewParents = new HashMap<ObjectId, RevCommit>();
 
-	String id;
+	/**
+	 * The unique id of this subtree.
+	 */
+	protected String id;
 
 	SubtreeContext(String id) {
 		this.id = id;
