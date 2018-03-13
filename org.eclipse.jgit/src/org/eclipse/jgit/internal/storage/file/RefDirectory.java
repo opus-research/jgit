@@ -746,32 +746,22 @@ public class RefDirectory extends RefDatabase {
 	}
 
 	private PackedRefList readPackedRefs() throws IOException {
-		int maxStaleRetries = 5;
-		int retries = 0;
-		while (true) {
-			final FileSnapshot snapshot = FileSnapshot.save(packedRefsFile);
-			final BufferedReader br;
-			final MessageDigest digest = Constants.newMessageDigest();
-			try {
-				br = new BufferedReader(new InputStreamReader(
-						new DigestInputStream(new FileInputStream(packedRefsFile),
-								digest), CHARSET));
-			} catch (FileNotFoundException noPackedRefs) {
-				// Ignore it and leave the new list empty.
-				return PackedRefList.NO_PACKED_REFS;
-			}
-			try {
-				return new PackedRefList(parsePackedRefs(br), snapshot,
-						ObjectId.fromRaw(digest.digest()));
-			} catch (IOException e) {
-				if (FileUtils.isStaleFileHandle(e) && retries < maxStaleRetries) {
-					retries++;
-					continue;
-				}
-				throw e;
-			} finally {
-				br.close();
-			}
+		final FileSnapshot snapshot = FileSnapshot.save(packedRefsFile);
+		final BufferedReader br;
+		final MessageDigest digest = Constants.newMessageDigest();
+		try {
+			br = new BufferedReader(new InputStreamReader(
+					new DigestInputStream(new FileInputStream(packedRefsFile),
+							digest), CHARSET));
+		} catch (FileNotFoundException noPackedRefs) {
+			// Ignore it and leave the new list empty.
+			return PackedRefList.NO_PACKED_REFS;
+		}
+		try {
+			return new PackedRefList(parsePackedRefs(br), snapshot,
+					ObjectId.fromRaw(digest.digest()));
+		} finally {
+			br.close();
 		}
 	}
 
@@ -891,7 +881,6 @@ public class RefDirectory extends RefDatabase {
 		return n;
 	}
 
-	@SuppressWarnings("null")
 	private LooseRef scanRef(LooseRef ref, String name) throws IOException {
 		final File path = fileFor(name);
 		FileSnapshot currentSnapshot = null;
@@ -930,6 +919,7 @@ public class RefDirectory extends RefDatabase {
 			final String target = RawParseUtils.decode(buf, 5, n);
 			if (ref != null && ref.isSymbolic()
 					&& ref.getTarget().getName().equals(target)) {
+				assert(currentSnapshot != null);
 				currentSnapshot.setClean(otherSnapshot);
 				return ref;
 			}
@@ -944,6 +934,7 @@ public class RefDirectory extends RefDatabase {
 			id = ObjectId.fromString(buf, 0);
 			if (ref != null && !ref.isSymbolic()
 					&& ref.getTarget().getObjectId().equals(id)) {
+				assert(currentSnapshot != null);
 				currentSnapshot.setClean(otherSnapshot);
 				return ref;
 			}
