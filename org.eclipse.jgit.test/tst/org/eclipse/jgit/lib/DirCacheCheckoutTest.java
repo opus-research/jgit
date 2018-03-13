@@ -40,12 +40,7 @@
  */
 package org.eclipse.jgit.lib;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -1615,7 +1610,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 	}
 
 	@Test(expected = CheckoutConflictException.class)
-	public void testFolderFileConflict() throws Exception {
+	public void testSkipConflictsWithFolderFileConflict() throws Exception {
 		RevCommit headCommit = commitFile("f/a", "initial content", "master");
 		RevCommit checkoutCommit = commitFile("f/a", "side content", "side");
 		FileUtils.delete(new File(db.getWorkTree(), "f"), FileUtils.RECURSIVE);
@@ -1667,7 +1662,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 					.contains("b"));
 			assertTrue(Arrays.asList(expected.getConflictingFiles())
 					.contains("f"));
-			assertEquals("file instead of a folder", read("f"));
+			assertEquals("file instead of folder", read("f"));
 			assertEquals("changed content", read("b"));
 		}
 	}
