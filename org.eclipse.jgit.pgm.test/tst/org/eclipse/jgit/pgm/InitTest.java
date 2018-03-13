@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2016, Rüdiger Herrmann <ruediger.herrmann@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,74 +40,51 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
+package org.eclipse.jgit.pgm;
 
-import org.eclipse.jgit.lfs.lib.LongObjectId;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.util.BuiltinCommand;
-import org.eclipse.jgit.util.BuiltinCommandFactory;
+import static org.junit.Assert.assertArrayEquals;
 
-/**
- * @since 4.4
- */
-public class SmudgeFilter extends BuiltinCommand {
-	/**
-	 *
-	 */
-	public final static BuiltinCommandFactory FACTORY = new BuiltinCommandFactory() {
-		@Override
-		public BuiltinCommand create(Repository db, InputStream in, OutputStream out) {
-			try {
-				return new SmudgeFilter(db, in, out);
-			} catch (IOException e) {
-				return null; // TODO: improve error handling
-			}
-		}
-	};
+import java.io.File;
 
-	LongObjectId id;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.eclipse.jgit.lib.Constants;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
-	private InputStream mIn;
+public class InitTest extends CLIRepositoryTestCase {
 
-	private LfsUtil lfsUtil;
+	@Rule
+	public final TemporaryFolder tempFolder = new TemporaryFolder();
 
-	private OutputStream out;
+	@Test
+	public void testInitBare() throws Exception {
+		File directory = tempFolder.getRoot();
 
-	/**
-	 * @param db
-	 * @param in
-	 * @param out
-	 * @throws IOException
-	 */
-	public SmudgeFilter(Repository db, InputStream in, OutputStream out)
-			throws IOException {
-		super(in, out);
-		lfsUtil = new LfsUtil(db.getDirectory().toPath().resolve("lfs")); //$NON-NLS-1$
-		byte buffer[] = new byte[1024];
-		LfsParserResult res = LfsPointer.parseLfsPointer(in, buffer);
-		if (res.pointer != null) {
-			Path mediaFile = lfsUtil.getMediaFile(res.pointer.getOid());
-			if (Files.exists(mediaFile)) {
-				mIn = Files.newInputStream(mediaFile);
-			}
-		}
+		String[] result = execute(
+				"git init '" + directory.getCanonicalPath() + "' --bare");
+
+		String[] expecteds = new String[] {
+				"Initialized empty Git repository in "
+						+ directory.getCanonicalPath(),
+				"" };
+		assertArrayEquals(expecteds, result);
 	}
 
-	@Override
-	public int run() throws IOException {
-		int b;
-		if (mIn != null) {
-			while ((b = mIn.read()) != -1)
-				out.write(b);
-			mIn.close();
-		}
-		out.close();
-		return -1;
+	@Test
+	public void testInitDirectory() throws Exception {
+		File workDirectory = tempFolder.getRoot();
+		File gitDirectory = new File(workDirectory, Constants.DOT_GIT);
+
+		String[] result = execute(
+				"git init '" + workDirectory.getCanonicalPath() + "'");
+
+		String[] expecteds = new String[] {
+				"Initialized empty Git repository in "
+						+ gitDirectory.getCanonicalPath(),
+				"" };
+		assertArrayEquals(expecteds, result);
 	}
+
 }
