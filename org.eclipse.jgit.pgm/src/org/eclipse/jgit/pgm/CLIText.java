@@ -41,7 +41,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.pgm.internal;
+package org.eclipse.jgit.pgm;
 
 import java.text.MessageFormat;
 
@@ -102,6 +102,7 @@ public class CLIText extends TranslationBundle {
 	/***/ public String cannotResolve;
 	/***/ public String cannotSetupConsole;
 	/***/ public String cannotUseObjectsWithGlog;
+	/***/ public String cannotWrite;
 	/***/ public String cantFindGitDirectory;
 	/***/ public String cantWrite;
 	/***/ public String changesNotStagedForCommit;
@@ -115,6 +116,7 @@ public class CLIText extends TranslationBundle {
 	/***/ public String doesNotExist;
 	/***/ public String dontOverwriteLocalChanges;
 	/***/ public String everythingUpToDate;
+	/***/ public String exceptionCaughtDuringExecutionOfArchiveCommand;
 	/***/ public String expectedNumberOfbytes;
 	/***/ public String exporting;
 	/***/ public String failedToCommitIndex;
@@ -189,6 +191,7 @@ public class CLIText extends TranslationBundle {
 	/***/ public String notAGitRepository;
 	/***/ public String notAJgitCommand;
 	/***/ public String notARevision;
+	/***/ public String notATagVersionIsRequired;
 	/***/ public String notATree;
 	/***/ public String notAValidRefName;
 	/***/ public String notAnIndexFile;
@@ -238,4 +241,5 @@ public class CLIText extends TranslationBundle {
 	/***/ public String unsupportedOperation;
 	/***/ public String untrackedFiles;
 	/***/ public String updating;
+	/***/ public String warningNoCommitGivenOnCommandLine;
 }
