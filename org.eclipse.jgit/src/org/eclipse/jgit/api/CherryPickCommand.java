@@ -248,11 +248,10 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 	 * <p>
 	 * This is primarily needed for implementing rebase in terms of
 	 * cherry-picking
-	 * 
+	 *
 	 * @param prefix
 	 *            including ":"
 	 * @return {@code this}
-	 * @since 3.1
 	 */
 	public CherryPickCommand setReflogPrefix(final String prefix) {
 		this.reflogPrefix = prefix;
