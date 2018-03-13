@@ -99,8 +99,8 @@ public class ObjectChecker {
 	private final MutableInteger ptrout = new MutableInteger();
 
 	private boolean allowZeroMode;
-	private boolean ignoreCase;
 	private boolean windows;
+	private boolean macosx;
 
 	/**
 	 * Enable accepting leading zero mode in tree entries.
@@ -120,21 +120,9 @@ public class ObjectChecker {
 	}
 
 	/**
-	 * Assume working directory filesystems are not case sensitive.
-	 *
-	 * @param ignore true if JGit should reject problems with case.
-	 * @return {@code this}.
-	 * @since 3.4
-	 */
-	public ObjectChecker setIgnoreCase(boolean ignore) {
-		ignoreCase = ignore;
-		return this;
-	}
-
-	/**
 	 * Restrict trees to only names legal on Windows platforms.
 	 * <p>
-	 * Also sets {@link #setIgnoreCase(boolean)} to true.
+	 * Also rejects any mixed case forms of reserved names ({@code .git}).
 	 *
 	 * @param win true if Windows name checking should be performed.
 	 * @return {@code this}.
@@ -142,7 +130,22 @@ public class ObjectChecker {
 	 */
 	public ObjectChecker setSafeForWindows(boolean win) {
 		windows = win;
-		return setIgnoreCase(true);
+		return this;
+	}
+
+
+	/**
+	 * Restrict trees to only names legal on Mac OS X platforms.
+	 * <p>
+	 * Rejects any mixed case forms of reserved names ({@code .git}).
+	 *
+	 * @param mac true if Mac OS X name checking should be performed.
+	 * @return {@code this}.
+	 * @since 3.4
+	 */
+	public ObjectChecker setSafeForMacOS(boolean mac) {
+		macosx = mac;
+		return this;
 	}
 
 	/**
@@ -403,29 +406,23 @@ public class ObjectChecker {
 		}
 	}
 
-	/**
-	 * Check tree path entry for validity.
-	 *
-	 * @param raw buffer to scan.
-	 * @param ptr offset to first byte of the name.
-	 * @param end offset to one past last byte of name.
-	 * @throws CorruptObjectException name is invalid.
-	 * @since 3.4
-	 */
-	public void checkPathSegment(byte[] raw, int ptr, int end)
+	private void checkPathSegment(byte[] raw, int ptr, int end)
 			throws CorruptObjectException {
 		if (ptr == end)
 			throw new CorruptObjectException("zero length name");
 		if (raw[ptr] == '.') {
-			int nameLen = end - ptr;
-			if (nameLen == 1)
+			switch (end - ptr) {
+			case 1:
 				throw new CorruptObjectException("invalid name '.'");
-			else if (nameLen == 2 && raw[ptr + 1] == '.')
-				throw new CorruptObjectException("invalid name '..'");
-			else if (nameLen == 4 && isDotGit(raw, ptr + 1)) {
-				throw new CorruptObjectException(String.format(
-						"invalid name '%s'",
-						RawParseUtils.decode(raw, ptr, end)));
+			case 2:
+				if (raw[ptr + 1] == '.')
+					throw new CorruptObjectException("invalid name '..'");
+				break;
+			case 4:
+				if (isDotGit(raw, ptr + 1))
+					throw new CorruptObjectException(String.format(
+							"invalid name '%s'",
+							RawParseUtils.decode(raw, ptr, end)));
 			}
 		}
 
@@ -434,7 +431,7 @@ public class ObjectChecker {
 			if (raw[end - 1] == ' ' || raw[end - 1] == '.')
 				throw new CorruptObjectException("invalid name ends with '"
 						+ ((char) raw[end - 1]) + "'");
-			if (end - ptr > 2)
+			if (end - ptr >= 3)
 				checkNotWindowsDevice(raw, ptr, end);
 		}
 	}
@@ -452,13 +449,13 @@ public class ObjectChecker {
 
 		case 'c': // CON, COM[1-9]
 			if (end - ptr >= 3
-					&& toLower(raw[ptr + 1]) == 'o'
 					&& toLower(raw[ptr + 2]) == 'n'
+					&& toLower(raw[ptr + 1]) == 'o'
 					&& (end - ptr == 3 || raw[ptr + 3] == '.'))
 				throw new CorruptObjectException("invalid name 'CON'");
 			if (end - ptr >= 4
-					&& toLower(raw[ptr + 1]) == 'o'
 					&& toLower(raw[ptr + 2]) == 'm'
+					&& toLower(raw[ptr + 1]) == 'o'
 					&& isDigit(raw[ptr + 3])
 					&& (end - ptr == 4 || raw[ptr + 4] == '.'))
 				throw new CorruptObjectException("invalid name 'COM"
@@ -510,17 +507,17 @@ public class ObjectChecker {
 	}
 
 	private boolean isDotGit(byte[] buf, int p) {
-		if (ignoreCase || windows)
+		if (windows || macosx)
 			return toLower(buf[p]) == 'g'
 					&& toLower(buf[p + 1]) == 'i'
 					&& toLower(buf[p + 2]) == 't';
 		return buf[p] == 'g' && buf[p + 1] == 'i' && buf[p + 2] == 't';
 	}
 
-	private static byte toLower(byte b) {
+	private static char toLower(byte b) {
 		if ('A' <= b && b <= 'Z')
-			return (byte) (b + ('a' - 'A'));
-		return b;
+			return (char) (b + ('a' - 'A'));
+		return (char) b;
 	}
 
 	private static boolean isDigit(byte b) {
