@@ -418,7 +418,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 	private void updateStashRef(ObjectId commitId, PersonIdent refLogIdent,
 			String refLogMessage) throws IOException {
-		Ref currentRef = repo.getRef(Constants.R_STASH);
+		Ref currentRef = repo.exactRef(Constants.R_STASH);
 		RefUpdate refUpdate = repo.updateRef(Constants.R_STASH);
 		refUpdate.setNewObjectId(commitId);
 		refUpdate.setRefLogIdent(refLogIdent);
@@ -668,13 +668,12 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	}
 
 	private void writeRewrittenHashes() throws RevisionSyntaxException,
-			IOException, RefNotFoundException {
+			IOException {
 		File currentCommitFile = rebaseState.getFile(CURRENT_COMMIT);
 		if (!currentCommitFile.exists())
 			return;
 
-		ObjectId headId = getHead().getObjectId();
-		String head = headId.getName();
+		String head = repo.resolve(Constants.HEAD).getName();
 		String currentCommits = rebaseState.readFile(CURRENT_COMMIT);
 		for (String current : currentCommits.split("\n")) //$NON-NLS-1$
 			RebaseState
@@ -744,8 +743,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 	private void resetSoftToParent() throws IOException,
 			GitAPIException, CheckoutConflictException {
-		Ref ref = repo.getRef(Constants.ORIG_HEAD);
-		ObjectId orig_head = ref == null ? null : ref.getObjectId();
+		Ref orig_head = repo.exactRef(Constants.ORIG_HEAD);
+		ObjectId orig_headId = orig_head.getObjectId();
 		try {
 			// we have already commited the cherry-picked commit.
 			// what we need is to have changes introduced by this
@@ -756,7 +755,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		} finally {
 			// set ORIG_HEAD back to where we started because soft
 			// reset moved it
-			repo.writeOrigHead(orig_head);
+			repo.writeOrigHead(orig_headId);
 		}
 	}
 
@@ -981,9 +980,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		try {
 			raw = IO.readFully(authorScriptFile);
 		} catch (FileNotFoundException notFound) {
-			if (authorScriptFile.exists()) {
-				throw notFound;
-			}
 			return null;
 		}
 		return parseAuthor(raw);
@@ -1196,7 +1192,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	}
 
 	private Ref getHead() throws IOException, RefNotFoundException {
-		Ref head = repo.getRef(Constants.HEAD);
+		Ref head = repo.exactRef(Constants.HEAD);
 		if (head == null || head.getObjectId() == null)
 			throw new RefNotFoundException(MessageFormat.format(
 					JGitText.get().refNotResolved, Constants.HEAD));
