@@ -119,7 +119,7 @@ class ShowPackDelta extends TextBuiltin {
 			ptr++;
 		ptr++;
 
-		TemporaryBuffer.Heap raw = new TemporaryBuffer.Heap(Integer.MAX_VALUE);
+		TemporaryBuffer.Heap raw = new TemporaryBuffer.Heap(bufArray.length);
 		InflaterInputStream inf = new InflaterInputStream(
 				new ByteArrayInputStream(bufArray, ptr, bufArray.length));
 		raw.copy(inf);
