@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,43 +40,38 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util.fs;
+package org.eclipse.jgit.api;
 
-import java.io.File;
+import java.io.IOException;
 
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.util.FS;
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.api.errors.NoFilepatternException;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 
-/**
- * Java implementation of FSAccess, used when no native implementation is around
- */
-public class FSAccessJava extends FSAccess {
+public class RmCommandTest extends RepositoryTestCase {
 
-	FSAccessJava() {
-		// empty default constructor
-	}
+	private Git git;
+
+	private static final String FILE = "test.txt";
 
 	@Override
-	public LStat lstat(FS fs, File file) throws NoSuchFileException,
-			NotDirectoryException {
-		FileMode mode;
-		if (file.isDirectory()) {
-			if (new File(file, Constants.DOT_GIT).isDirectory())
-				mode = FileMode.GITLINK;
-			else
-				mode = FileMode.TREE;
-		} else if (fs.canExecute(file))
-			mode = FileMode.EXECUTABLE_FILE;
-		else
-			mode = FileMode.REGULAR_FILE;
-
-		return new LStat(file.lastModified(), mode, file.length());
+	protected void setUp() throws Exception {
+		super.setUp();
+		git = new Git(db);
+		// commit something
+		writeTrashFile(FILE, "Hello world");
+		git.add().addFilepattern(FILE).call();
+		git.commit().setMessage("Initial commit").call();
 	}
 
-	@Override
-	public boolean isNativeImplementation() {
-		return false;
+	public void testRemove() throws JGitInternalException,
+			NoFilepatternException, IllegalStateException, IOException {
+		assertEquals("[test.txt, mode:100644, content:Hello world]",
+				indexState(CONTENT));
+		RmCommand command = git.rm();
+		command.addFilepattern(FILE);
+		command.call();
+		assertEquals("", indexState(CONTENT));
 	}
 
 }

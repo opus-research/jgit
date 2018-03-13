@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,73 +40,65 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util.fs;
+package org.eclipse.jgit.api;
 
-import java.io.File;
-
-import org.eclipse.jgit.util.FS;
+import org.eclipse.jgit.revwalk.RevCommit;
 
 /**
- * Expose some file system functions not available from Java
+ * The result of a {@link RebaseCommand} execution
  */
-public class FSAccessNative extends FSAccess {
+public class RebaseResult {
+	/**
+	 * The overall status
+	 */
+	public enum Status {
+		/**
+		 * Rebase was successful, HEAD points to the new commit
+		 */
+		OK,
+		/**
+		 * Aborted; the original HEAD was restored
+		 */
+		ABORTED,
+		/**
+		 * Stopped due to a conflict; must either abort or resolve or skip
+		 */
+		STOPPED,
+		/**
+		 * Already up-to-date
+		 */
+		UP_TO_DATE;
+	}
 
-	static {
-		System.loadLibrary("jgitnative");
+	static final RebaseResult UP_TO_DATE_RESULT = new RebaseResult(
+			Status.UP_TO_DATE);
+
+	private final Status mySatus;
+
+	private final RevCommit currentCommit;
+
+	RebaseResult(Status status) {
+		this.mySatus = status;
+		currentCommit = null;
+	}
+
+	RebaseResult(RevCommit commit) {
+		this.mySatus = Status.STOPPED;
+		currentCommit = commit;
 	}
 
 	/**
-	 * empty default constructor
+	 * @return the overall status
 	 */
-	FSAccessNative() {
-		// empty
+	public Status getStatus() {
+		return mySatus;
 	}
 
 	/**
-	 * Retrieves lstat() data via native lstat() call
-	 *
-	 * @param path
-	 *            Filesystem path the lstat data is requested for
-	 * @return the returned array contains the following lstat data:
-	 *         <ul>
-	 *         <li>[0] ctime seconds, the last time a file's metadata changed</li>
-	 *         <li>[1] ctime nanoseconds</li>
-	 *         <li>[2] mtime seconds, the last time a file's data changed</li>
-	 *         <li>[3] mtime nanoseconds</li>
-	 *         <li>[4] dev, device inode resides on</li>
-	 *         <li>[5] ino, inode's number</li>
-	 *         <li>[6] mode, inode protection mode</li>
-	 *         <li>[7] uid, user-id of owner</li>
-	 *         <li>[8] gid, group-id of owner</li>
-	 *         <li>[9] file size, in bytes, lower bits</li>
-	 *         <li>[10] file size, in bytes, higher bits</li>
-	 *         </ul>
+	 * @return the current commit if status is {@link Status#STOPPED}, otherwise
+	 *         <code>null</code>
 	 */
-	private static final native int[] lstatImpl(String path);
-
-	/**
-	 * Retrieves lstat data for file at given path
-	 *
-	 * @param fs
-	 *            file system abstraction
-	 * @param file
-	 *            file the lstat data is requested for
-	 * @return the lstat data
-	 */
-	public LStat lstat(FS fs, File file) throws NoSuchFileException,
-			NotDirectoryException {
-		// fs is not needed here, since native implementation can directly
-		// determine execute bit
-		String path = file.getAbsolutePath();
-		int[] rawlstat = lstatImpl(path);
-		if (rawlstat.length != 11)
-			throw new IllegalArgumentException("lstat() didn't return int[11]");
-
-		return new LStat(rawlstat);
-	}
-
-	@Override
-	public boolean isNativeImplementation() {
-		return true;
+	public RevCommit getCurrentCommit() {
+		return currentCommit;
 	}
 }

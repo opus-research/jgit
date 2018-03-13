@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,36 +40,42 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util.fs;
 
-import java.io.IOException;
+package org.eclipse.jgit.storage.file;
 
-/**
- * Thrown if lstat() call in native code returns errorno ENOTDIR
- *
- * TODO: To be replaced by java.nio.file.NoSuchFileException as soon as we can
- * use Java 7
- */
-public class NoSuchFileException extends IOException {
-	private static final long serialVersionUID = 1L;
+import org.eclipse.jgit.lib.Config;
+import org.eclipse.jgit.lib.Config.SectionParser;
+import org.eclipse.jgit.lib.CoreConfig;
 
-	/**
-	 * @param file
-	 *            a string identifying the file or null if not known
-	 */
-	public NoSuchFileException(String file) {
-		super(file);
+class WriteConfig {
+	/** Key for {@link Config#get(SectionParser)}. */
+	static final Config.SectionParser<WriteConfig> KEY = new SectionParser<WriteConfig>() {
+		public WriteConfig parse(final Config cfg) {
+			return new WriteConfig(cfg);
+		}
+	};
+
+	private final int compression;
+
+	private final boolean fsyncObjectFiles;
+
+	private final boolean fsyncRefFiles;
+
+	private WriteConfig(final Config rc) {
+		compression = rc.get(CoreConfig.KEY).getCompression();
+		fsyncObjectFiles = rc.getBoolean("core", "fsyncobjectfiles", false);
+		fsyncRefFiles = rc.getBoolean("core", "fsyncreffiles", false);
 	}
 
-	/**
-	 * @param file
-	 *            a string identifying the file or null if not known
-	 * @param other
-	 *            a string identifying the other file or null if not known
-	 * @param reason
-	 *            a reason message with additional information or null
-	 */
-	public NoSuchFileException(String file, String other, String reason) {
-		super(file + ", other " + other + ", reason " + reason);
+	int getCompression() {
+		return compression;
+	}
+
+	boolean getFSyncObjectFiles() {
+		return fsyncObjectFiles;
+	}
+
+	boolean getFSyncRefFiles() {
+		return fsyncRefFiles;
 	}
 }

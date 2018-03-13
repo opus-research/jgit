@@ -43,12 +43,20 @@
 
 package org.eclipse.jgit.notes;
 
+import java.io.IOException;
+
 import org.eclipse.jgit.junit.TestRepository;
+import org.eclipse.jgit.lib.CommitBuilder;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.MutableObjectId;
+import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevTree;
+import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.util.RawParseUtils;
 
 public class NoteMapTest extends RepositoryTestCase {
@@ -56,17 +64,21 @@ public class NoteMapTest extends RepositoryTestCase {
 
 	private ObjectReader reader;
 
+	private ObjectInserter inserter;
+
 	@Override
 	protected void setUp() throws Exception {
 		super.setUp();
 
 		tr = new TestRepository<Repository>(db);
 		reader = db.newObjectReader();
+		inserter = db.newObjectInserter();
 	}
 
 	@Override
 	protected void tearDown() throws Exception {
 		reader.release();
+		inserter.release();
 		super.tearDown();
 	}
 
@@ -180,6 +192,240 @@ public class NoteMapTest extends RepositoryTestCase {
 		byte[] act = map.getCachedBytes(a, exp.length() * 4);
 		assertNotNull("has data for a", act);
 		assertEquals(exp, RawParseUtils.decode(act));
+	}
+
+	public void testWriteUnchangedFlat() throws Exception {
+		RevBlob a = tr.blob("a");
+		RevBlob b = tr.blob("b");
+		RevBlob data1 = tr.blob("data1");
+		RevBlob data2 = tr.blob("data2");
+
+		RevCommit r = tr.commit() //
+				.add(a.name(), data1) //
+				.add(b.name(), data2) //
+				.add(".gitignore", "") //
+				.add("zoo-animals.txt", "") //
+				.create();
+		tr.parseBody(r);
+
+		NoteMap map = NoteMap.read(reader, r);
+		assertTrue("has note for a", map.contains(a));
+		assertTrue("has note for b", map.contains(b));
+
+		RevCommit n = commitNoteMap(map);
+		assertNotSame("is new commit", r, n);
+		assertSame("same tree", r.getTree(), n.getTree());
+	}
+
+	public void testWriteUnchangedFanout2_38() throws Exception {
+		RevBlob a = tr.blob("a");
+		RevBlob b = tr.blob("b");
+		RevBlob data1 = tr.blob("data1");
+		RevBlob data2 = tr.blob("data2");
+
+		RevCommit r = tr.commit() //
+				.add(fanout(2, a.name()), data1) //
+				.add(fanout(2, b.name()), data2) //
+				.add(".gitignore", "") //
+				.add("zoo-animals.txt", "") //
+				.create();
+		tr.parseBody(r);
+
+		NoteMap map = NoteMap.read(reader, r);
+		assertTrue("has note for a", map.contains(a));
+		assertTrue("has note for b", map.contains(b));
+
+		// This is a non-lazy map, so we'll be looking at the leaf buckets.
+		RevCommit n = commitNoteMap(map);
+		assertNotSame("is new commit", r, n);
+		assertSame("same tree", r.getTree(), n.getTree());
+
+		// Use a lazy-map for the next round of the same test.
+		map = NoteMap.read(reader, r);
+		n = commitNoteMap(map);
+		assertNotSame("is new commit", r, n);
+		assertSame("same tree", r.getTree(), n.getTree());
+	}
+
+	public void testCreateFromEmpty() throws Exception {
+		RevBlob a = tr.blob("a");
+		RevBlob b = tr.blob("b");
+		RevBlob data1 = tr.blob("data1");
+		RevBlob data2 = tr.blob("data2");
+
+		NoteMap map = NoteMap.newEmptyMap();
+		assertFalse("no a", map.contains(a));
+		assertFalse("no b", map.contains(b));
+
+		map.set(a, data1);
+		map.set(b, data2);
+
+		assertEquals(data1, map.get(a));
+		assertEquals(data2, map.get(b));
+
+		map.remove(a);
+		map.remove(b);
+
+		assertFalse("no a", map.contains(a));
+		assertFalse("no b", map.contains(b));
+
+		map.set(a, "data1", inserter);
+		assertEquals(data1, map.get(a));
+
+		map.set(a, null, inserter);
+		assertFalse("no a", map.contains(a));
+	}
+
+	public void testEditFlat() throws Exception {
+		RevBlob a = tr.blob("a");
+		RevBlob b = tr.blob("b");
+		RevBlob data1 = tr.blob("data1");
+		RevBlob data2 = tr.blob("data2");
+
+		RevCommit r = tr.commit() //
+				.add(a.name(), data1) //
+				.add(b.name(), data2) //
+				.add(".gitignore", "") //
+				.add("zoo-animals.txt", b) //
+				.create();
+		tr.parseBody(r);
+
+		NoteMap map = NoteMap.read(reader, r);
+		map.set(a, data2);
+		map.set(b, null);
+		map.set(data1, b);
+		map.set(data2, null);
+
+		assertEquals(data2, map.get(a));
+		assertEquals(b, map.get(data1));
+		assertFalse("no b", map.contains(b));
+		assertFalse("no data2", map.contains(data2));
+
+		MutableObjectId id = new MutableObjectId();
+		for (int p = 42; p > 0; p--) {
+			id.setByte(1, p);
+			map.set(id, data1);
+		}
+
+		for (int p = 42; p > 0; p--) {
+			id.setByte(1, p);
+			assertTrue("contains " + id, map.contains(id));
+		}
+
+		RevCommit n = commitNoteMap(map);
+		map = NoteMap.read(reader, n);
+		assertEquals(data2, map.get(a));
+		assertEquals(b, map.get(data1));
+		assertFalse("no b", map.contains(b));
+		assertFalse("no data2", map.contains(data2));
+		assertEquals(b, TreeWalk
+				.forPath(reader, "zoo-animals.txt", n.getTree()).getObjectId(0));
+	}
+
+	public void testEditFanout2_38() throws Exception {
+		RevBlob a = tr.blob("a");
+		RevBlob b = tr.blob("b");
+		RevBlob data1 = tr.blob("data1");
+		RevBlob data2 = tr.blob("data2");
+
+		RevCommit r = tr.commit() //
+				.add(fanout(2, a.name()), data1) //
+				.add(fanout(2, b.name()), data2) //
+				.add(".gitignore", "") //
+				.add("zoo-animals.txt", b) //
+				.create();
+		tr.parseBody(r);
+
+		NoteMap map = NoteMap.read(reader, r);
+		map.set(a, data2);
+		map.set(b, null);
+		map.set(data1, b);
+		map.set(data2, null);
+
+		assertEquals(data2, map.get(a));
+		assertEquals(b, map.get(data1));
+		assertFalse("no b", map.contains(b));
+		assertFalse("no data2", map.contains(data2));
+		RevCommit n = commitNoteMap(map);
+
+		map.set(a, null);
+		map.set(data1, null);
+		assertFalse("no a", map.contains(a));
+		assertFalse("no data1", map.contains(data1));
+
+		map = NoteMap.read(reader, n);
+		assertEquals(data2, map.get(a));
+		assertEquals(b, map.get(data1));
+		assertFalse("no b", map.contains(b));
+		assertFalse("no data2", map.contains(data2));
+		assertEquals(b, TreeWalk
+				.forPath(reader, "zoo-animals.txt", n.getTree()).getObjectId(0));
+	}
+
+	public void testLeafSplitsWhenFull() throws Exception {
+		RevBlob data1 = tr.blob("data1");
+		MutableObjectId idBuf = new MutableObjectId();
+
+		RevCommit r = tr.commit() //
+				.add(data1.name(), data1) //
+				.create();
+		tr.parseBody(r);
+
+		NoteMap map = NoteMap.read(reader, r);
+		for (int i = 0; i < 254; i++) {
+			idBuf.setByte(Constants.OBJECT_ID_LENGTH - 1, i);
+			map.set(idBuf, data1);
+		}
+
+		RevCommit n = commitNoteMap(map);
+		TreeWalk tw = new TreeWalk(reader);
+		tw.reset(n.getTree());
+		while (tw.next())
+			assertFalse("no fan-out subtree", tw.isSubtree());
+
+		for (int i = 254; i < 256; i++) {
+			idBuf.setByte(Constants.OBJECT_ID_LENGTH - 1, i);
+			map.set(idBuf, data1);
+		}
+		idBuf.setByte(Constants.OBJECT_ID_LENGTH - 2, 1);
+		map.set(idBuf, data1);
+		n = commitNoteMap(map);
+
+		// The 00 bucket is fully split.
+		String path = fanout(38, idBuf.name());
+		tw = TreeWalk.forPath(reader, path, n.getTree());
+		assertNotNull("has " + path, tw);
+
+		// The other bucket is not.
+		path = fanout(2, data1.name());
+		tw = TreeWalk.forPath(reader, path, n.getTree());
+		assertNotNull("has " + path, tw);
+	}
+
+	public void testRemoveDeletesTreeFanout2_38() throws Exception {
+		RevBlob a = tr.blob("a");
+		RevBlob data1 = tr.blob("data1");
+		RevTree empty = tr.tree();
+
+		RevCommit r = tr.commit() //
+				.add(fanout(2, a.name()), data1) //
+				.create();
+		tr.parseBody(r);
+
+		NoteMap map = NoteMap.read(reader, r);
+		map.set(a, null);
+
+		RevCommit n = commitNoteMap(map);
+		assertEquals("empty tree", empty, n.getTree());
+	}
+
+	private RevCommit commitNoteMap(NoteMap map) throws IOException {
+		tr.tick(600);
+
+		CommitBuilder builder = new CommitBuilder();
+		builder.setTreeId(map.writeTree(inserter));
+		tr.setAuthorAndCommitter(builder);
+		return tr.getRevWalk().parseCommit(inserter.insert(builder));
 	}
 
 	private static String fanout(int prefix, String name) {

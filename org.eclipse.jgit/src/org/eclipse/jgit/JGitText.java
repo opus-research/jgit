@@ -68,12 +68,14 @@ public class JGitText extends TranslationBundle {
 	/***/ public String URLNotFound;
 	/***/ public String aNewObjectIdIsRequired;
 	/***/ public String abbreviationLengthMustBeNonNegative;
+	/***/ public String abortingRebase;
 	/***/ public String advertisementCameBefore;
 	/***/ public String advertisementOfCameBefore;
 	/***/ public String amazonS3ActionFailed;
 	/***/ public String amazonS3ActionFailedGivingUp;
 	/***/ public String ambiguousObjectAbbreviation;
 	/***/ public String anExceptionOccurredWhileTryingToAddTheIdOfHEAD;
+	/***/ public String applyingCommit;
 	/***/ public String anSSHSessionHasBeenAlreadyCreated;
 	/***/ public String atLeastOnePathIsRequired;
 	/***/ public String atLeastOnePatternIsRequired;
@@ -135,6 +137,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cantPassMeATree;
 	/***/ public String channelMustBeInRange0_255;
 	/***/ public String characterClassIsNotSupported;
+	/***/ public String checkoutUnexpectedResult;
 	/***/ public String checkoutConflictWithFile;
 	/***/ public String checkoutConflictWithFiles;
 	/***/ public String classCastNotA;
@@ -225,6 +228,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String exceptionCaughtDuringExecutionOfMergeCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfPushCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfPullCommand;
+	/***/ public String exceptionCaughtDuringExecutionOfRmCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfTagCommand;
 	/***/ public String exceptionOccuredDuringAddingOfOptionToALogCommand;
 	/***/ public String exceptionOccuredDuringReadingOfGIT_DIR;
@@ -318,6 +322,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String missingForwardImageInGITBinaryPatch;
 	/***/ public String missingObject;
 	/***/ public String missingPrerequisiteCommits;
+	/***/ public String missingRequiredParameter;
 	/***/ public String missingSecretkey;
 	/***/ public String mixedStagesNotAllowed;
 	/***/ public String multipleMergeBasesFor;
@@ -352,6 +357,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String objectIsCorrupt;
 	/***/ public String objectIsNotA;
 	/***/ public String objectNotFoundIn;
+	/***/ public String obtainingCommitsForCherryPick;
 	/***/ public String offsetWrittenDeltaBaseForObjectNotFoundInAPack;
 	/***/ public String onlyAlreadyUpToDateAndFastForwardMergesAreAvailable;
 	/***/ public String onlyOneFetchSupported;
@@ -418,8 +424,10 @@ public class JGitText extends TranslationBundle {
 	/***/ public String repositoryState_rebaseOrApplyMailbox;
 	/***/ public String repositoryState_rebaseWithMerge;
 	/***/ public String requiredHashFunctionNotAvailable;
+	/***/ public String resettingHead;	
 	/***/ public String resolvingDeltas;
 	/***/ public String resultLengthIncorrect;
+	/***/ public String rewinding;
 	/***/ public String searchForReuse;
 	/***/ public String sequenceTooLargeForDiffAlgorithm;
 	/***/ public String serviceNotPermitted;
@@ -496,4 +504,5 @@ public class JGitText extends TranslationBundle {
 	/***/ public String writingNotSupported;
 	/***/ public String writingObjects;
 	/***/ public String wrongDecompressedLength;
+	/***/ public String wrongRepositoryState;
 }

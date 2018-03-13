@@ -54,7 +54,20 @@ abstract class InMemoryNoteBucket extends NoteBucket {
 	 */
 	final int prefixLen;
 
+	/**
+	 * Chain of non-note tree entries found at this path in the tree.
+	 *
+	 * During parsing of a note tree into the in-memory representation,
+	 * {@link NoteParser} keeps track of all non-note tree entries and stores
+	 * them here as a sorted linked list. That list can be merged back with the
+	 * note data that is held by the subclass, allowing the tree to be
+	 * recreated.
+	 */
+	NonNoteEntry nonNotes;
+
 	InMemoryNoteBucket(int prefixLen) {
 		this.prefixLen = prefixLen;
 	}
+
+	abstract InMemoryNoteBucket append(Note note);
 }

@@ -43,12 +43,19 @@
 
 package org.eclipse.jgit.notes;
 
+import static org.eclipse.jgit.lib.FileMode.TREE;
+
 import java.io.IOException;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.TreeFormatter;
 
 /**
  * A note tree holding only note subtrees, each named using a 2 digit hex name.
@@ -84,6 +91,9 @@ class FanoutBucket extends InMemoryNoteBucket {
 	 */
 	private final NoteBucket[] table;
 
+	/** Number of non-null slots in {@link #table}. */
+	private int cnt;
+
 	FanoutBucket(int prefixLen) {
 		super(prefixLen);
 		table = new NoteBucket[256];
@@ -91,12 +101,185 @@ class FanoutBucket extends InMemoryNoteBucket {
 
 	void parseOneEntry(int cell, ObjectId id) {
 		table[cell] = new LazyNoteBucket(id);
+		cnt++;
 	}
 
 	@Override
 	ObjectId get(AnyObjectId objId, ObjectReader or) throws IOException {
 		NoteBucket b = table[cell(objId)];
 		return b != null ? b.get(objId, or) : null;
+	}
+
+	@Override
+	Iterator<Note> iterator(AnyObjectId objId, final ObjectReader reader)
+			throws IOException {
+		final MutableObjectId id = new MutableObjectId();
+		id.fromObjectId(objId);
+
+		return new Iterator<Note>() {
+			private int cell;
+
+			private Iterator<Note> itr;
+
+			public boolean hasNext() {
+				if (itr != null && itr.hasNext())
+					return true;
+
+				for (; cell < table.length; cell++) {
+					NoteBucket b = table[cell];
+					if (b == null)
+						continue;
+
+					try {
+						id.setByte(prefixLen >> 1, cell);
+						itr = b.iterator(id, reader);
+					} catch (IOException err) {
+						throw new RuntimeException(err);
+					}
+
+					if (itr.hasNext()) {
+						cell++;
+						return true;
+					}
+				}
+				return false;
+			}
+
+			public Note next() {
+				if (hasNext())
+					return itr.next();
+				else
+					throw new NoSuchElementException();
+			}
+
+			public void remove() {
+				throw new UnsupportedOperationException();
+			}
+		};
+	}
+
+	@Override
+	int estimateSize(AnyObjectId noteOn, ObjectReader or) throws IOException {
+		// If most of this fan-out is full, estimate it should still be split.
+		if (LeafBucket.MAX_SIZE * 3 / 4 <= cnt)
+			return 1 + LeafBucket.MAX_SIZE;
+
+		// Due to the uniform distribution of ObjectIds, having less nodes full
+		// indicates a good chance the total number of children below here
+		// is less than the MAX_SIZE split point. Get a more accurate count.
+
+		MutableObjectId id = new MutableObjectId();
+		id.fromObjectId(noteOn);
+
+		int sz = 0;
+		for (int cell = 0; cell < 256; cell++) {
+			NoteBucket b = table[cell];
+			if (b == null)
+				continue;
+
+			id.setByte(prefixLen >> 1, cell);
+			sz += b.estimateSize(id, or);
+			if (LeafBucket.MAX_SIZE < sz)
+				break;
+		}
+		return sz;
+	}
+
+	@Override
+	InMemoryNoteBucket set(AnyObjectId noteOn, AnyObjectId noteData,
+			ObjectReader or) throws IOException {
+		int cell = cell(noteOn);
+		NoteBucket b = table[cell];
+
+		if (b == null) {
+			if (noteData == null)
+				return this;
+
+			LeafBucket n = new LeafBucket(prefixLen + 2);
+			table[cell] = n.set(noteOn, noteData, or);
+			cnt++;
+			return this;
+
+		} else {
+			NoteBucket n = b.set(noteOn, noteData, or);
+			if (n == null) {
+				table[cell] = null;
+				cnt--;
+
+				if (cnt == 0)
+					return null;
+
+				if (estimateSize(noteOn, or) < LeafBucket.MAX_SIZE) {
+					// We are small enough to just contract to a single leaf.
+					InMemoryNoteBucket r = new LeafBucket(prefixLen);
+					for (Iterator<Note> i = iterator(noteOn, or); i.hasNext();)
+						r = r.append(i.next());
+					r.nonNotes = nonNotes;
+					return r;
+				}
+
+				return this;
+
+			} else if (n != b) {
+				table[cell] = n;
+			}
+			return this;
+		}
+	}
+
+	private static final byte[] hexchar = { '0', '1', '2', '3', '4', '5', '6',
+			'7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
+
+	@Override
+	ObjectId writeTree(ObjectInserter inserter) throws IOException {
+		byte[] nameBuf = new byte[2];
+		TreeFormatter fmt = new TreeFormatter(treeSize());
+		NonNoteEntry e = nonNotes;
+
+		for (int cell = 0; cell < 256; cell++) {
+			NoteBucket b = table[cell];
+			if (b == null)
+				continue;
+
+			nameBuf[0] = hexchar[cell >>> 4];
+			nameBuf[1] = hexchar[cell & 0x0f];
+
+			while (e != null && e.pathCompare(nameBuf, 0, 2, TREE) < 0) {
+				e.format(fmt);
+				e = e.next;
+			}
+
+			fmt.append(nameBuf, 0, 2, TREE, b.writeTree(inserter));
+		}
+
+		for (; e != null; e = e.next)
+			e.format(fmt);
+		return fmt.insert(inserter);
+	}
+
+	private int treeSize() {
+		int sz = cnt * TreeFormatter.entrySize(TREE, 2);
+		for (NonNoteEntry e = nonNotes; e != null; e = e.next)
+			sz += e.treeEntrySize();
+		return sz;
+	}
+
+	@Override
+	InMemoryNoteBucket append(Note note) {
+		int cell = cell(note);
+		InMemoryNoteBucket b = (InMemoryNoteBucket) table[cell];
+
+		if (b == null) {
+			LeafBucket n = new LeafBucket(prefixLen + 2);
+			table[cell] = n.append(note);
+			cnt++;
+
+		} else {
+			InMemoryNoteBucket n = b.append(note);
+			if (n != b)
+				table[cell] = n;
+		}
+		return this;
 	}
 
 	private int cell(AnyObjectId id) {
@@ -113,6 +296,28 @@ class FanoutBucket extends InMemoryNoteBucket {
 		@Override
 		ObjectId get(AnyObjectId objId, ObjectReader or) throws IOException {
 			return load(objId, or).get(objId, or);
+		}
+
+		@Override
+		Iterator<Note> iterator(AnyObjectId objId, ObjectReader reader)
+				throws IOException {
+			return load(objId, reader).iterator(objId, reader);
+		}
+
+		@Override
+		int estimateSize(AnyObjectId objId, ObjectReader or) throws IOException {
+			return load(objId, or).estimateSize(objId, or);
+		}
+
+		@Override
+		InMemoryNoteBucket set(AnyObjectId noteOn, AnyObjectId noteData,
+				ObjectReader or) throws IOException {
+			return load(noteOn, or).set(noteOn, noteData, or);
+		}
+
+		@Override
+		ObjectId writeTree(ObjectInserter inserter) {
+			return treeId;
 		}
 
 		private NoteBucket load(AnyObjectId objId, ObjectReader or)

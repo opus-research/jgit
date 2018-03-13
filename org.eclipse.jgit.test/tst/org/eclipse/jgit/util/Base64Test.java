@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,19 +40,57 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util.fs;
 
-/**
- * Thrown if lstat() call in native code hit an error
- */
-public class LStatException extends RuntimeException {
-	private static final long serialVersionUID = 1L;
+package org.eclipse.jgit.util;
 
-	LStatException(String message, Throwable cause) {
-		super(message, cause);
+import static org.eclipse.jgit.util.Base64.decode;
+import static org.eclipse.jgit.util.Base64.encodeBytes;
+import junit.framework.TestCase;
+
+import org.eclipse.jgit.lib.Constants;
+
+public class Base64Test extends TestCase {
+	public void testEncode() {
+		assertEquals("aGkK", encodeBytes(b("hi\n")));
+		assertEquals("AAECDQoJcQ==", encodeBytes(b("\0\1\2\r\n\tq")));
 	}
 
-	LStatException(String message) {
-		super(message);
+	public void testDecode() {
+		assertEquals(b("hi\n"), decode("aGkK"));
+		assertEquals(b("\0\1\2\r\n\tq"), decode("AAECDQoJcQ=="));
+		assertEquals(b("\0\1\2\r\n\tq"), decode("A A E\tC D\rQ o\nJ c Q=="));
+		assertEquals(b("\u000EB"), decode("DkL="));
+	}
+
+	public void testDecodeFail_NonBase64Character() {
+		try {
+			decode("! a bad base64 string !");
+			fail("Accepted bad string in decode");
+		} catch (IllegalArgumentException fail) {
+			// Expected
+		}
+	}
+
+	public void testEncodeMatchesDecode() {
+		String[] testStrings = { "", //
+				"cow", //
+				"a", //
+				"a secret string", //
+				"\0\1\2\r\n\t" //
+		};
+		for (String e : testStrings)
+			assertEquals(b(e), decode(encodeBytes(b(e))));
+	}
+
+	private static void assertEquals(byte[] exp, byte[] act) {
+		assertEquals(s(exp), s(act));
+	}
+
+	private static byte[] b(String str) {
+		return Constants.encode(str);
+	}
+
+	private static String s(byte[] raw) {
+		return RawParseUtils.decode(raw);
 	}
 }

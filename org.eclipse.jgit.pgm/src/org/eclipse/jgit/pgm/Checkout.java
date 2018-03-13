@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,36 +40,32 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util.fs;
 
-import java.io.IOException;
+package org.eclipse.jgit.pgm;
 
-/**
- * Thrown if lstat() call in native code returns errorno EACCESS
- * 
- * TODO: To be replaced by java.nio.file.AccessDeniedException as soon as we can
- * use Java 7
- */
-public class AccessDeniedException extends IOException {
-	private static final long serialVersionUID = 1L;
+import org.eclipse.jgit.api.CheckoutCommand;
+import org.eclipse.jgit.api.Git;
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.Option;
 
-	/**
-	 * @param file
-	 *            a string identifying the file or null if not known
-	 */
-	public AccessDeniedException(String file) {
-		super(file);
-	}
+@Command(common = true, usage = "usage_checkout")
+class Checkout extends TextBuiltin {
 
-	/**
-	 * @param file
-	 *            a string identifying the file or null if not known
-	 * @param other
-	 *            a string identifying the other file or null if not known
-	 * @param reason
-	 *            a reason message with additional information or null
-	 */
-	public AccessDeniedException(String file, String other, String reason) {
-		super(file + ", other " + other + ", reason " + reason);
+	@Option(name = "-b", usage = "usage_createBranchAndCheckout")
+	private boolean createBranch = false;
+
+	@Option(name = "---force", aliases = { "-f" }, usage = "usage_forceCheckout")
+	private boolean force = false;
+
+	@Argument(required = true, metaVar = "metaVar_name", usage = "usage_checkout")
+	private String name;
+
+	@Override
+	protected void run() throws Exception {
+		CheckoutCommand command = new Git(db).checkout();
+		command.setCreateBranch(createBranch);
+		command.setName(name);
+		command.setForce(force);
+		command.call();
 	}
 }
