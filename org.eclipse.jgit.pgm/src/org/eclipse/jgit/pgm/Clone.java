@@ -64,7 +64,6 @@ import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.transport.FetchResult;
 import org.eclipse.jgit.transport.RefSpec;
@@ -110,9 +109,8 @@ class Clone extends AbstractFetchCommand {
 
 		dst = new FileRepository(gitdir);
 		dst.create();
-		final FileBasedConfig dstcfg = dst.getConfig();
-		dstcfg.setBoolean("core", null, "bare", false);
-		dstcfg.save();
+		dst.getConfig().setBoolean("core", null, "bare", false);
+		dst.getConfig().save();
 		db = dst;
 
 		out.print(MessageFormat.format(
@@ -129,14 +127,13 @@ class Clone extends AbstractFetchCommand {
 
 	private void saveRemote(final URIish uri) throws URISyntaxException,
 			IOException {
-		final FileBasedConfig dstcfg = dst.getConfig();
-		final RemoteConfig rc = new RemoteConfig(dstcfg, remoteName);
+		final RemoteConfig rc = new RemoteConfig(dst.getConfig(), remoteName);
 		rc.addURI(uri);
 		rc.addFetchRefSpec(new RefSpec().setForceUpdate(true)
 				.setSourceDestination(Constants.R_HEADS + "*",
 						Constants.R_REMOTES + remoteName + "/*"));
-		rc.update(dstcfg);
-		dstcfg.save();
+		rc.update(dst.getConfig());
+		dst.getConfig().save();
 	}
 
 	private FetchResult runFetch() throws NotSupportedException,
