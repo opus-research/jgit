@@ -54,9 +54,6 @@ import java.util.Set;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.ConfigInvalidException;
-import org.eclipse.jgit.events.ConfigChangedEvent;
-import org.eclipse.jgit.events.ConfigChangedListener;
-import org.eclipse.jgit.events.ListenerHandle;
 import org.eclipse.jgit.lib.BaseRepositoryBuilder;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
@@ -103,8 +100,6 @@ public class FileRepository extends Repository {
 
 	private final ObjectDirectory objectDatabase;
 
-	private final ListenerHandle configChangeListenerHandle;
-
 	/**
 	 * Construct a representation of a Git repository.
 	 * <p>
@@ -148,15 +143,6 @@ public class FileRepository extends Repository {
 		loadUserConfig();
 		loadRepoConfig();
 
-		ConfigChangedListener configChangeListener = new ConfigChangedListener() {
-			public void onConfigChanged(ConfigChangedEvent event) {
-				fireEvent(event);
-
-			}
-		};
-
-		configChangeListenerHandle = getConfig().addChangeListener(configChangeListener);
-
 		refs = new RefDirectory(this);
 		objectDatabase = new ObjectDirectory(repoConfig, //
 				options.getObjectDirectory(), //
@@ -174,12 +160,6 @@ public class FileRepository extends Repository {
 						repositoryFormatVersion));
 			}
 		}
-	}
-
-	@Override
-	protected void doClose() {
-		configChangeListenerHandle.remove();
-		super.doClose();
 	}
 
 	private void loadUserConfig() throws IOException {
