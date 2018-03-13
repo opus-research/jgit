@@ -72,9 +72,20 @@ public class StageBuilder {
 	 * Acceptable number of references to send in a single stage transaction.
 	 * <p>
 	 * If the number of unique objects exceeds this amount the builder will
-	 * attempt to decrease the reference count using commit connectivity.
+	 * attempt to decrease the reference count by chaining commits..
 	 */
 	private static final int SMALL_BATCH_SIZE = 5;
+
+	/**
+	 * Acceptable number of commits to chain together using parent pointers.
+	 * <p>
+	 * When staging many unique commits the {@link StageBuilder} batches
+	 * together unrelated commits as parents of a temporary commit. After the
+	 * proposal completes the temporary commit is discarded and can be garbage
+	 * collected by all replicas.
+	 */
+	private static final int TEMP_PARENTS = 128;
+
 	private static final byte[] PEEL = { ' ', '^' };
 
 	private final String txnStage;
@@ -191,12 +202,12 @@ public class StageBuilder {
 			return cmds;
 		}
 
-		// Commits is sorted most recent to least recent commit.
+		// 'commits' is sorted most recent to least recent commit.
 		// Group batches of commits and build a chain.
 		// TODO(sop) Cluster by restricted graphs to support filtering.
 		ObjectId tip = null;
 		for (int end = commits.size(); end > 0;) {
-			int start = Math.max(0, end - 128);
+			int start = Math.max(0, end - TEMP_PARENTS);
 			List<RevCommit> batch = commits.subList(start, end);
 			List<ObjectId> parents = new ArrayList<>(1 + batch.size());
 			if (tip != null) {

@@ -1,5 +1,7 @@
 /*
- * Copyright (C) 2016, Google Inc.
+ * Copyright (C) 2009, Jonas Fonseca <fonseca@diku.dk>
+ * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,74 +43,45 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.ketch;
+package org.eclipse.jgit.lib;
 
-import static org.eclipse.jgit.internal.ketch.KetchReplica.State.OFFLINE;
+/**
+ * A tree entry representing a gitlink entry used for submodules.
+ *
+ * Note. Java cannot really handle these as file system objects.
+ *
+ * @deprecated To look up information about a single path, use
+ * {@link org.eclipse.jgit.treewalk.TreeWalk#forPath(Repository, String, org.eclipse.jgit.revwalk.RevTree)}.
+ * To lookup information about multiple paths at once, use a
+ * {@link org.eclipse.jgit.treewalk.TreeWalk} and obtain the current entry's
+ * information from its getter methods.
+ */
+@Deprecated
+public class GitlinkTreeEntry extends TreeEntry {
 
-import java.util.ArrayList;
-import java.util.List;
+	/**
+	 * Construct a {@link GitlinkTreeEntry} with the specified name and SHA-1 in
+	 * the specified parent
+	 *
+	 * @param parent
+	 * @param id
+	 * @param nameUTF8
+	 */
+	public GitlinkTreeEntry(final Tree parent, final ObjectId id,
+			final byte[] nameUTF8) {
+		super(parent, id, nameUTF8);
+	}
 
-import org.eclipse.jgit.lib.ObjectId;
-
-/** A snapshot of a leader and its view of the world. */
-public class LeaderSnapshot {
-	final List<ReplicaSnapshot> replicas = new ArrayList<>();
-	KetchLeader.State state;
-	long term;
-	LogIndex head;
-	LogIndex committed;
-	boolean running;
-
-	LeaderSnapshot() {
+	public FileMode getMode() {
+		return FileMode.GITLINK;
 	}
 
 	@Override
 	public String toString() {
-		StringBuilder s = new StringBuilder();
-		s.append(running ? "RUNNING" : "IDLE"); //$NON-NLS-1$ //$NON-NLS-2$
-		s.append(" state ").append(state); //$NON-NLS-1$
-		if (term > 0) {
-			s.append(" term ").append(term); //$NON-NLS-1$
-		}
-		s.append('\n');
-		s.append(String.format(
-				"%-10s %12s %12s\n", //$NON-NLS-1$
-				"Replica", "Accepted", "Committed")); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
-		s.append("------------------------------------\n"); //$NON-NLS-1$
-		debug(s, "(leader)", head, committed); //$NON-NLS-1$
-		s.append('\n');
-		for (ReplicaSnapshot r : replicas) {
-			debug(s, r);
-			s.append('\n');
-		}
-		s.append('\n');
-		return s.toString();
-	}
-
-	private static void debug(StringBuilder s, ReplicaSnapshot r) {
-		debug(s, r.name, r.txnAccepted, r.txnCommitted);
-		s.append(String.format(" %-8s %s", r.type, r.state)); //$NON-NLS-1$
-		if (r.state == OFFLINE) {
-			String e = r.error;
-			if (e != null) {
-				s.append(" (").append(e).append(')'); //$NON-NLS-1$
-			}
-		}
-	}
-
-	private static void debug(StringBuilder s, String name,
-			ObjectId accepted, ObjectId committed) {
-		s.append(String.format(
-				"%-10s %-12s %-12s", //$NON-NLS-1$
-				name, str(accepted), str(committed)));
-	}
-
-	private static String str(ObjectId c) {
-		if (c instanceof LogIndex) {
-			return ((LogIndex) c).describeForLog();
-		} else if (c != null) {
-			return c.abbreviate(8).name();
-		}
-		return "-"; //$NON-NLS-1$
+		final StringBuilder r = new StringBuilder();
+		r.append(ObjectId.toString(getId()));
+		r.append(" G "); //$NON-NLS-1$
+		r.append(getFullName());
+		return r.toString();
 	}
 }

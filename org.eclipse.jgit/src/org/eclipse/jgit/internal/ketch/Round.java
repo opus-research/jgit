@@ -49,23 +49,41 @@ import java.util.List;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.transport.ReceiveCommand;
 
-/** One round-trip to all replicas proposing a log entry. */
+/**
+ * One round-trip to all replicas proposing a log entry.
+ * <p>
+ * In Raft a log entry represents a state transition at a specific index in the
+ * replicated log. The leader can only append log entries to the log.
+ * <p>
+ * In Ketch a log entry is recorded under the {@code refs/txn} namespace. This
+ * occurs when:
+ * <ul>
+ * <li>a replica wants to establish itself as a new leader by proposing a new
+ * term (see {@link ElectionRound})
+ * <li>an established leader wants to gain consensus on new {@link Proposal}s
+ * (see {@link ProposalRound})
+ * </ul>
+ */
 abstract class Round {
 	final KetchLeader leader;
-	final LogId acceptedOld;
-	LogId acceptedNew;
+	final LogIndex acceptedOldIndex;
+	LogIndex acceptedNewIndex;
 	List<ReceiveCommand> stageCommands;
 
-	Round(KetchLeader leader, LogId head) {
+	Round(KetchLeader leader, LogIndex head) {
 		this.leader = leader;
-		this.acceptedOld = head;
+		this.acceptedOldIndex = head;
 	}
 
 	/**
-	 * Invoked without {@link KetchLeader#lock} to build objects.
+	 * Creates commit for {@code refs/txn/accepted} and calls
+	 * {@link #runAsync(AnyObjectId)} to begin execution of the round across
+	 * the system.
 	 * <p>
-	 * Creates new accepted commit and calls {@link #acceptAsync(AnyObjectId)}
-	 * to begin execution of the round across the system.
+	 * If references are being updated (such as in a {@link ProposalRound}) the
+	 * RefTree may be modified.
+	 * <p>
+	 * Invoked without {@link KetchLeader#lock} to build objects.
 	 *
 	 * @throws IOException
 	 *             the round cannot build new objects within the leader's
@@ -73,15 +91,26 @@ abstract class Round {
 	 */
 	abstract void start() throws IOException;
 
-	void acceptAsync(AnyObjectId id) {
-		acceptedNew = acceptedOld.nextId(id);
+	/**
+	 * Asynchronously distribute the round's new value for
+	 * {@code refs/txn/accepted} to all replicas.
+	 * <p>
+	 * Invoked by {@link #start()} after new commits have been created for the
+	 * log. The method passes {@code newId} to {@link KetchLeader} to be
+	 * distributed to all known replicas.
+	 *
+	 * @param newId
+	 *            new value for {@code refs/txn/accepted}.
+	 */
+	void runAsync(AnyObjectId newId) {
+		acceptedNewIndex = acceptedOldIndex.nextIndex(newId);
 		leader.acceptAsync(this);
 	}
 
 	/**
 	 * Notify the round it was accepted by a majority of the system.
 	 * <p>
-	 * Invoked with {@link KetchLeader#lock} held by the caller.
+	 * Invoked by the leader with {@link KetchLeader#lock} held by the caller.
 	 */
 	abstract void success();
 }
