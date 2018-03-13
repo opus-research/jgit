@@ -68,7 +68,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.transport.PackedObjectInfo;
-import org.eclipse.jgit.util.FileUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -177,7 +176,7 @@ public class AbbreviationTest extends LocalDiskRepositoryTestCase {
 		File packDir = new File(db.getObjectDatabase().getDirectory(), "pack");
 		File idxFile = new File(packDir, packName + ".idx");
 		File packFile = new File(packDir, packName + ".pack");
-		FileUtils.mkdir(packDir, true);
+		packDir.mkdir();
 		OutputStream dst = new BufferedOutputStream(new FileOutputStream(
 				idxFile));
 		try {
