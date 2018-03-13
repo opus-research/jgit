@@ -46,6 +46,7 @@ package org.eclipse.jgit.transport;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_ATOMIC;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_DELETE_REFS;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_OFS_DELTA;
+import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_QUIET;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_REPORT_STATUS;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_SIDE_BAND_64K;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_AGENT;
@@ -176,6 +177,7 @@ public abstract class BaseReceivePack {
 	private boolean allowNonFastForwards;
 
 	private boolean allowOfsDelta;
+	private boolean allowQuiet = true;
 
 	/** Identity to record action as within the reflog. */
 	private PersonIdent refLogIdent;
@@ -234,6 +236,8 @@ public abstract class BaseReceivePack {
 	/** If {@link BasePackPushConnection#CAPABILITY_SIDE_BAND_64K} is enabled. */
 	private boolean sideBand;
 
+	private boolean quiet;
+
 	/** Lock around the received pack file, while updating refs. */
 	private PackLock packLock;
 
@@ -248,13 +252,35 @@ public abstract class BaseReceivePack {
 	/** The size of the received pack, including index size */
 	private Long packSize;
 
-	PushCertificateParser pushCertificateParser;
+	private PushCertificateParser pushCertificateParser;
+	private SignedPushConfig signedPushConfig;
+	private PushCertificate pushCert;
 
 	/**
-	 * @return the push certificate used to verify the pushers identity.
+	 * Get the push certificate used to verify the pusher's identity.
+	 * <p>
+	 * Only valid after commands are read from the wire.
+	 *
+	 * @return the parsed certificate, or null if push certificates are disabled
+	 *         or no cert was presented by the client.
+	 * @since 4.1
 	 */
-	PushCertificate getPushCertificate() {
-		return pushCertificateParser;
+	public PushCertificate getPushCertificate() {
+		return pushCert;
+	}
+
+	/**
+	 * Set the push certificate used to verify the pusher's identity.
+	 * <p>
+	 * Should only be called if reconstructing an instance without going through
+	 * the normal {@link #recvCommands()} flow.
+	 *
+	 * @param cert
+	 *            the push certificate to set.
+	 * @since 4.1
+	 */
+	public void setPushCertificate(PushCertificate cert) {
+		pushCert = cert;
 	}
 
 	/**
@@ -278,7 +304,7 @@ public abstract class BaseReceivePack {
 		refFilter = RefFilter.DEFAULT;
 		advertisedHaves = new HashSet<ObjectId>();
 		clientShallowCommits = new HashSet<ObjectId>();
-		pushCertificateParser = new PushCertificateParser(db, cfg);
+		signedPushConfig = cfg.signedPush;
 	}
 
 	/** Configuration for receive operations. */
@@ -300,8 +326,7 @@ public abstract class BaseReceivePack {
 		final boolean allowNonFastForwards;
 		final boolean allowOfsDelta;
 
-		final String certNonceSeed;
-		final int certNonceSlopLimit;
+		final SignedPushConfig signedPush;
 
 		ReceiveConfig(final Config config) {
 			checkReceivedObjects = config.getBoolean(
@@ -322,8 +347,7 @@ public abstract class BaseReceivePack {
 					"denynonfastforwards", false); //$NON-NLS-1$
 			allowOfsDelta = config.getBoolean("repack", "usedeltabaseoffset", //$NON-NLS-1$ //$NON-NLS-2$
 					true);
-			certNonceSeed = config.getString("receive", null, "certnonceseed"); //$NON-NLS-1$ //$NON-NLS-2$
-			certNonceSlopLimit = config.getInt("receive", "certnonceslop", 0); //$NON-NLS-1$ //$NON-NLS-2$
+			signedPush = SignedPushConfig.KEY.parse(config);
 		}
 
 		ObjectChecker newObjectChecker() {
@@ -741,6 +765,65 @@ public abstract class BaseReceivePack {
 	}
 
 	/**
+	 * @return true if clients may request avoiding noisy progress messages.
+	 * @since 4.0
+	 */
+	public boolean isAllowQuiet() {
+		return allowQuiet;
+	}
+
+	/**
+	 * Configure if clients may request the server skip noisy messages.
+	 *
+	 * @param allow
+	 *            true to allow clients to request quiet behavior; false to
+	 *            refuse quiet behavior and send messages anyway. This may be
+	 *            necessary if processing is slow and the client-server network
+	 *            connection can timeout.
+	 * @since 4.0
+	 */
+	public void setAllowQuiet(boolean allow) {
+		allowQuiet = allow;
+	}
+
+	/**
+	 * True if the client wants less verbose output.
+	 *
+	 * @return true if the client has requested the server to be less verbose.
+	 * @throws RequestNotYetReadException
+	 *             if the client's request has not yet been read from the wire,
+	 *             so we do not know if they expect side-band. Note that the
+	 *             client may have already written the request, it just has not
+	 *             been read.
+	 * @since 4.0
+	 */
+	public boolean isQuiet() throws RequestNotYetReadException {
+		if (enabledCapabilities == null)
+			throw new RequestNotYetReadException();
+		return quiet;
+	}
+
+	/**
+	 * Set the configuration for push certificate verification.
+	 *
+	 * @param cfg
+	 *            new configuration; if this object is null or its {@link
+	 *            SignedPushConfig#getCertNonceSeed()} is null, push certificate
+	 *            verification will be disabled.
+	 * @since 4.1
+	 */
+	public void setSignedPushConfig(SignedPushConfig cfg) {
+		signedPushConfig = cfg;
+	}
+
+	private PushCertificateParser getPushCertificateParser() {
+		if (pushCertificateParser == null) {
+			pushCertificateParser = new PushCertificateParser(db, signedPushConfig);
+		}
+		return pushCertificateParser;
+	}
+
+	/**
 	 * Get the user agent of the client.
 	 * <p>
 	 * If the client is new enough to use {@code agent=} capability that value
@@ -969,9 +1052,12 @@ public abstract class BaseReceivePack {
 		adv.advertiseCapability(CAPABILITY_SIDE_BAND_64K);
 		adv.advertiseCapability(CAPABILITY_DELETE_REFS);
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
-		if (pushCertificateParser.enabled())
-			adv.advertiseCapability(
-				pushCertificateParser.getAdvertiseNonce());
+		if (allowQuiet)
+			adv.advertiseCapability(CAPABILITY_QUIET);
+		String nonce = getPushCertificateParser().getAdvertiseNonce();
+		if (nonce != null) {
+			adv.advertiseCapability(nonce);
+		}
 		if (db.getRefDatabase().performsAtomicTransactions())
 			adv.advertiseCapability(CAPABILITY_ATOMIC);
 		if (allowOfsDelta)
@@ -991,61 +1077,94 @@ public abstract class BaseReceivePack {
 	 * @throws IOException
 	 */
 	protected void recvCommands() throws IOException {
-		for (;;) {
-			String line;
-			try {
-				line = pckIn.readStringRaw();
-			} catch (EOFException eof) {
-				if (commands.isEmpty())
-					return;
-				throw eof;
+		PushCertificateParser certParser = getPushCertificateParser();
+		FirstLine firstLine = null;
+		try {
+			for (;;) {
+				String line;
+				try {
+					line = pckIn.readString();
+				} catch (EOFException eof) {
+					if (commands.isEmpty())
+						return;
+					throw eof;
+				}
+				if (line == PacketLineIn.END) {
+					break;
+				}
+
+				if (line.length() >= 48 && line.startsWith("shallow ")) { //$NON-NLS-1$
+					clientShallowCommits.add(ObjectId.fromString(line.substring(8, 48)));
+					continue;
+				}
+
+				if (firstLine == null) {
+					firstLine = new FirstLine(line);
+					enabledCapabilities = firstLine.getCapabilities();
+					line = firstLine.getLine();
+
+					if (line.equals(GitProtocolConstants.OPTION_PUSH_CERT)) {
+						certParser.receiveHeader(pckIn, !isBiDirectionalPipe());
+						continue;
+					}
+				}
+
+				if (line.equals(PushCertificateParser.BEGIN_SIGNATURE)) {
+					certParser.receiveSignature(pckIn);
+					continue;
+				}
+
+				ReceiveCommand cmd;
+				try {
+					cmd = parseCommand(line);
+				} catch (PackProtocolException e) {
+					sendError(e.getMessage());
+					throw e;
+				}
+				if (cmd.getRefName().equals(Constants.HEAD)) {
+					cmd.setResult(Result.REJECTED_CURRENT_BRANCH);
+				} else {
+					cmd.setRef(refs.get(cmd.getRefName()));
+				}
+				commands.add(cmd);
+				if (certParser.enabled()) {
+					certParser.addCommand(cmd);
+				}
 			}
-			if (line == PacketLineIn.END)
-				break;
-
-			if (line.length() >= 48 && line.startsWith("shallow ")) { //$NON-NLS-1$
-				clientShallowCommits.add(ObjectId.fromString(line.substring(8, 48)));
-				continue;
-			}
-
-			if (commands.isEmpty()) {
-				final FirstLine firstLine = new FirstLine(line);
-				enabledCapabilities = firstLine.getCapabilities();
-				line = firstLine.getLine();
-
-				if (line.equals(GitProtocolConstants.OPTION_PUSH_CERT))
-					pushCertificateParser.receiveHeader(pckIn,
-							!isBiDirectionalPipe());
-			}
-
-			if (line.equals("-----BEGIN PGP SIGNATURE-----\n")) //$NON-NLS-1$
-				pushCertificateParser.receiveSignature(pckIn);
-
-			if (pushCertificateParser.enabled())
-				pushCertificateParser.addCommand(line);
-
-			if (line.length() < 83) {
-				final String m = JGitText.get().errorInvalidProtocolWantedOldNewRef;
-				sendError(m);
-				throw new PackProtocolException(m);
-			}
-
-			final ObjectId oldId = ObjectId.fromString(line.substring(0, 40));
-			final ObjectId newId = ObjectId.fromString(line.substring(41, 81));
-			final String name = line.substring(82);
-			final ReceiveCommand cmd = new ReceiveCommand(oldId, newId, name);
-			if (name.equals(Constants.HEAD)) {
-				cmd.setResult(Result.REJECTED_CURRENT_BRANCH);
-			} else {
-				cmd.setRef(refs.get(cmd.getRefName()));
-			}
-			commands.add(cmd);
+			pushCert = certParser.build();
+		} catch (PackProtocolException e) {
+			sendError(e.getMessage());
+			throw e;
 		}
+	}
+
+	static ReceiveCommand parseCommand(String line) throws PackProtocolException {
+          if (line == null || line.length() < 83) {
+			throw new PackProtocolException(
+					JGitText.get().errorInvalidProtocolWantedOldNewRef);
+		}
+		String oldStr = line.substring(0, 40);
+		String newStr = line.substring(41, 81);
+		ObjectId oldId, newId;
+		try {
+			oldId = ObjectId.fromString(oldStr);
+			newId = ObjectId.fromString(newStr);
+		} catch (IllegalArgumentException e) {
+			throw new PackProtocolException(
+					JGitText.get().errorInvalidProtocolWantedOldNewRef, e);
+		}
+		String name = line.substring(82);
+		if (!Repository.isValidRefName(name)) {
+			throw new PackProtocolException(
+					JGitText.get().errorInvalidProtocolWantedOldNewRef);
+		}
+		return new ReceiveCommand(oldId, newId, name);
 	}
 
 	/** Enable capabilities based on a previously read capabilities line. */
 	protected void enableCapabilities() {
 		sideBand = isCapabilityEnabled(CAPABILITY_SIDE_BAND_64K);
+		quiet = allowQuiet && isCapabilityEnabled(CAPABILITY_QUIET);
 		if (sideBand) {
 			OutputStream out = rawOut;
 
@@ -1093,7 +1212,7 @@ public abstract class BaseReceivePack {
 
 		ProgressMonitor receiving = NullProgressMonitor.INSTANCE;
 		ProgressMonitor resolving = NullProgressMonitor.INSTANCE;
-		if (sideBand)
+		if (sideBand && !quiet)
 			resolving = new SideBandProgressMonitor(msgOut);
 
 		try (ObjectInserter ins = db.newObjectInserter()) {
@@ -1130,7 +1249,7 @@ public abstract class BaseReceivePack {
 		ObjectIdSubclassMap<ObjectId> baseObjects = null;
 		ObjectIdSubclassMap<ObjectId> providedObjects = null;
 		ProgressMonitor checking = NullProgressMonitor.INSTANCE;
-		if (sideBand) {
+		if (sideBand && !quiet) {
 			SideBandProgressMonitor m = new SideBandProgressMonitor(msgOut);
 			m.setDelayStart(750, TimeUnit.MILLISECONDS);
 			checking = m;
@@ -1386,6 +1505,7 @@ public abstract class BaseReceivePack {
 		batch.setRefLogMessage("push", true); //$NON-NLS-1$
 		batch.addCommand(toApply);
 		try {
+			batch.setPushCertificate(getPushCertificate());
 			batch.execute(walk, updating);
 		} catch (IOException err) {
 			for (ReceiveCommand cmd : toApply) {
@@ -1537,7 +1657,9 @@ public abstract class BaseReceivePack {
 		pckIn = null;
 		pckOut = null;
 		refs = null;
-		enabledCapabilities = null;
+		// Keep the capabilities. If responses are sent after this release
+		// we need to remember at least whether sideband communication has to be
+		// used
 		commands = null;
 		if (timer != null) {
 			try {

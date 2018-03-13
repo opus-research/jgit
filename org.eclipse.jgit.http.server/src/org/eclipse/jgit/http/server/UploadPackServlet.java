@@ -117,7 +117,7 @@ class UploadPackServlet extends HttpServlet {
 				up.setBiDirectionalPipe(false);
 				up.sendAdvertisedRefs(pck);
 			} finally {
-				up.getRevWalk().release();
+				up.getRevWalk().close();
 			}
 		}
 	}
@@ -137,11 +137,10 @@ class UploadPackServlet extends HttpServlet {
 			try {
 				rp = uploadPackFactory.create(req, getRepository(req));
 			} catch (ServiceNotAuthorizedException e) {
-				rsp.sendError(SC_UNAUTHORIZED);
+				rsp.sendError(SC_UNAUTHORIZED, e.getMessage());
 				return;
-
 			} catch (ServiceNotEnabledException e) {
-				sendError(req, rsp, SC_FORBIDDEN);
+				sendError(req, rsp, SC_FORBIDDEN, e.getMessage());
 				return;
 			}
 

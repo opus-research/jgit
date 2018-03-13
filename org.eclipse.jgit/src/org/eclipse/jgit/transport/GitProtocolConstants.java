@@ -130,6 +130,14 @@ public class GitProtocolConstants {
 	public static final String OPTION_ALLOW_TIP_SHA1_IN_WANT = "allow-tip-sha1-in-want"; //$NON-NLS-1$
 
 	/**
+	 * The client supports fetching objects that are reachable from a tip of a
+	 * ref that is allowed to fetch.
+	 *
+	 * @since 4.1
+	 */
+	public static final String OPTION_ALLOW_REACHABLE_SHA1_IN_WANT = "allow-reachable-sha1-in-want"; //$NON-NLS-1$
+
+	/**
 	 * Symbolic reference support for better negotiation.
 	 *
 	 * @since 3.6
@@ -150,6 +158,13 @@ public class GitProtocolConstants {
 	 * @since 3.6
 	 */
 	public static final String CAPABILITY_ATOMIC = "atomic"; //$NON-NLS-1$
+
+	/**
+	 * The client expects less noise, e.g. no progress.
+	 *
+	 * @since 4.0
+	 */
+	public static final String CAPABILITY_QUIET = "quiet"; //$NON-NLS-1$
 
 	/**
 	 * The client expects a status report after the server processes the pack.
