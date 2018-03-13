@@ -192,9 +192,11 @@ class FileUtil {
 
 	public static File normalize(File file) {
 		if (SystemReader.getInstance().isMacOS()) {
-				String normalized = Normalizer.normalize(file.getPath(),
-						Normalizer.Form.NFC);
-				return new File(normalized);
+			// TODO: Would it be faster to check with isNormalized first
+			// assuming normalized paths are much more common
+			String normalized = Normalizer.normalize(file.getPath(),
+					Normalizer.Form.NFC);
+			return new File(normalized);
 		}
 		return file;
 	}
