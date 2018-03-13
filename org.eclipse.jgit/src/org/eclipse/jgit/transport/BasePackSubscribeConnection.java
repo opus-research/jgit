@@ -45,6 +45,7 @@ package org.eclipse.jgit.transport;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
@@ -67,6 +68,8 @@ import org.eclipse.jgit.transport.SubscribeCommand.Command;
  */
 public class BasePackSubscribeConnection extends BasePackConnection implements
 		SubscribeConnection {
+	private static final int LATENCY_TIMEOUT = 4; // seconds
+
 	class ReceivePublishedPack extends BaseReceivePack {
 		final String remote;
 
@@ -80,11 +83,7 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 			try {
 				execute();
 			} finally {
-				try {
-					unlockPack();
-				} finally {
-					release();
-				}
+				unlockPack();
 			}
 		}
 
@@ -131,6 +130,17 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 	 */
 	BasePackSubscribeConnection(PackTransport packTransport) {
 		super(packTransport);
+	}
+
+	/**
+	 * Prepare a new connection.
+	 *
+	 * @param myIn
+	 * @param myOut
+	 */
+	protected void start(InputStream myIn, OutputStream myOut) {
+		closed = false;
+		init(myIn, myOut);
 	}
 
 	/**
@@ -195,28 +205,9 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 			write("done");
 			monitor.update(1);
 
-			// Read restart token and heartbeat interval
-			String line = pckIn.readString();
-			if ("reconnect".equals(line))
+			if (!readResponseHeader(subscriber))
 				return;
 
-			if (!line.startsWith("restart-token "))
-				throw new TransportException(MessageFormat.format(
-						JGitText.get().expectedGot, "restart-token", line));
-			subscriber.setRestartToken(line.substring(
-					"restart-token ".length()));
-			line = pckIn.readString();
-
-			if (!line.startsWith("heartbeat-interval "))
-				throw new TransportException(MessageFormat.format(
-						JGitText.get().expectedGot, "heartbeat-interval",
-						line));
-			transport.setTimeout(Integer.parseInt(
-					line.substring("heartbeat-interval ".length())));
-
-			if ((line = pckIn.readString()) != PacketLineIn.END)
-				throw new TransportException(MessageFormat.format(
-						JGitText.get().expectedGot, "END", line));
 			monitor.update(1);
 			monitor.endTask();
 
@@ -225,7 +216,7 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 				if (Thread.interrupted() || monitor.isCancelled())
 					throw new InterruptedException();
 
-				line = pckIn.readString();
+				String line = pckIn.readString();
 				if (line.equals("heartbeat"))
 					continue;
 				if (line.startsWith("change-restart-token ")) {
@@ -260,6 +251,57 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 		}
 	}
 
+	/**
+	 * Do the initial advertisement with only repository names to determine if
+	 * authentication is needed for this request.
+	 *
+	 * @param subscriber
+	 * @throws IOException
+	 */
+	public void doSubscribeAdvertisment(Subscriber subscriber)
+			throws IOException {
+		try {
+			pckOut.end();
+			for (String repository : subscriber.getAllRepositories()) {
+				write("repository " + repository);
+				pckOut.end();
+			}
+			write("done advertisement");
+
+			readResponseHeader(subscriber);
+		} finally {
+			close();
+		}
+	}
+
+	private boolean readResponseHeader(Subscriber subscriber)
+			throws IOException, TransportException {
+		// Read restart token and heartbeat interval
+		String line = pckIn.readString();
+		if ("reconnect".equals(line))
+			return false;
+
+		if (!line.startsWith("restart-token "))
+			throw new TransportException(MessageFormat.format(
+					JGitText.get().expectedGot, "restart-token", line));
+		subscriber.setRestartToken(line.substring(
+				"restart-token ".length()));
+		line = pckIn.readString();
+
+		if (!line.startsWith("heartbeat-interval "))
+			throw new TransportException(MessageFormat.format(
+					JGitText.get().expectedGot, "heartbeat-interval",
+					line));
+		transport.setTimeout(Integer.parseInt(
+				line.substring("heartbeat-interval ".length()))
+				+ LATENCY_TIMEOUT);
+
+		if ((line = pckIn.readString()) != PacketLineIn.END)
+			throw new TransportException(MessageFormat.format(
+					JGitText.get().expectedGot, "END", line));
+		return true;
+	}
+
 	private void write(String line) throws IOException {
 		pckOut.writeString(line + "\n");
 	}
@@ -271,9 +313,19 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 		rp.setExpectDataAfterPackFooter(true);
 		// Set the advertised refs to be the current refs/pubsub/* refs
 		rp.setAdvertisedRefs(repo.getPubSubRefs(), null);
-		rp.receive(in);
+		try {
+			rp.receive(in);
+			// Check for any errors during receive
+			for (ReceiveCommand rc : rp.getAllCommands()) {
+				if (rc.getResult() != ReceiveCommand.Result.OK)
+					throw new TransportException(rc.getMessage() + " " + rc);
+			}
+		} finally {
+			rp.release();
+		}
 	}
 
+	@Override
 	public void close() {
 		closed = true;
 		super.close();
