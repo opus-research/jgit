@@ -315,7 +315,6 @@ public class IndexDiff {
 	/**
 	 * @param mode
 	 *            defines how modifications in submodules are treated
-	 * @since 3.6
 	 */
 	public void setIgnoreSubmoduleMode(IgnoreSubmoduleMode mode) {
 		this.ignoreSubmoduleMode = mode;
@@ -323,7 +322,6 @@ public class IndexDiff {
 
 	/**
 	 * A factory to producing WorkingTreeIterators
-	 * @since 3.6
 	 */
 	public interface WorkingTreeIteratorFactory {
 		/**
@@ -343,7 +341,6 @@ public class IndexDiff {
 	 * Allows higher layers to set the factory for WorkingTreeIterators.
 	 *
 	 * @param wTreeIt
-	 * @since 3.6
 	 */
 	public void setWorkingTreeItFactory(WorkingTreeIteratorFactory wTreeIt) {
 		this.wTreeIt = wTreeIt;
