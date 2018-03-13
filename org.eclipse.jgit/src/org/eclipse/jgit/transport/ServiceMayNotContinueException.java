@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Tomasz Zarna <Tomasz.Zarna@pl.ibm.com>
+ * Copyright (C) 2011-2012, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,28 +40,38 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api.errors;
 
-/**
- * Exception thrown when applying a patch fails
- *
- */
-public class PatchApplyException extends GitAPIException {
+package org.eclipse.jgit.transport;
+
+import java.io.IOException;
+
+/** Indicates a transport service may not continue execution. */
+public class ServiceMayNotContinueException extends IOException {
 	private static final long serialVersionUID = 1L;
 
-	/**
-	 * @param message
-	 * @param cause
-	 */
-	public PatchApplyException(String message, Throwable cause) {
-		super(message, cause);
+	private boolean output;
+
+	/** Initialize with no message. */
+	public ServiceMayNotContinueException() {
+		// Do not set a message.
 	}
 
 	/**
-	 * @param message
+	 * @param msg
+	 *            a message explaining why it cannot continue. This message may
+	 *            be shown to an end-user.
 	 */
-	public PatchApplyException(String message) {
-		super(message);
+	public ServiceMayNotContinueException(String msg) {
+		super(msg);
 	}
 
+	/** @return true if the message was already output to the client. */
+	public boolean isOutput() {
+		return output;
+	}
+
+	/** Mark this message has being sent to the client. */
+	public void setOutput() {
+		output = true;
+	}
 }

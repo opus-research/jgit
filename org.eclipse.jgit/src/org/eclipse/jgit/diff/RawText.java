@@ -278,19 +278,19 @@ public class RawText extends Sequence {
 	}
 
 	/**
-	 * Get the EOL chars for the first line.
+	 * Get the line delimiter for the first line.
 	 *
-	 * @return the EOL chars or <code>null</code>
+	 * @return the line delimiter or <code>null</code>
 	 */
-	public String getEOL() {
+	public String getLineDelimiter() {
+		if (size() == 0)
+			return null;
 		int e = getEnd(0);
-		if (content.length > 1 && content[e - 2] == '\r'
-				&& content[e - 1] == '\n')
+		if (content[e - 1] != '\n')
+			return null;
+		if (content.length > 1 && content[e - 2] == '\r')
 			return "\r\n";
-		if (content.length > 0 && content[e - 1] == '\n')
+		else
 			return "\n";
-		if (content.length > 0 && content[e - 1] == '\r')
-			return "\r";
-		return null;
 	}
 }

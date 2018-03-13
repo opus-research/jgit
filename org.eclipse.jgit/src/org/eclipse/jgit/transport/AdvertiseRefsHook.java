@@ -1,8 +1,7 @@
 /*
- * Copyright (C) 2011, 2012 Tomasz Zarna <Tomasz.Zarna@pl.ibm.com>
+ * Copyright (C) 2012, Google Inc.
  * and other copyright owners as documented in the project's IP log.
- *
- * This program and the accompanying materials are made available
+ * * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
  * accompanies this distribution, is reproduced below, and is
  * available at http://www.eclipse.org/org/documents/edl-v10.php
@@ -40,34 +39,49 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
+package org.eclipse.jgit.transport;
 
-/**
- * Encapsulates the result of a {@link ApplyCommand}
- */
-public class ApplyResult {
+/** Hook to allow callers to take over advertising refs to the client. */
+public interface AdvertiseRefsHook {
+	/**
+	 * A simple hook that advertises the default refs.
+	 * <p>
+	 * The method implementations do nothing to preserve the default behavior; see
+	 * {@link UploadPack#setAdvertisedRefs(java.util.Map)} and
+	 * {@link ReceivePack#setAdvertisedRefs(java.util.Map,java.util.Set)}.
+	 */
+	public static final AdvertiseRefsHook DEFAULT = new AdvertiseRefsHook() {
+		public void advertiseRefs(UploadPack uploadPack) {
+			// Do nothing.
+		}
 
-	private List<File> updatedFiles = new ArrayList<File>();
+		public void advertiseRefs(ReceivePack receivePack) {
+			// Do nothing.
+		}
+	};
 
 	/**
-	 * @param f
-	 *            an updated file
-	 * @return this instance
+	 * Advertise refs for upload-pack.
+	 *
+	 * @param uploadPack instance on which to call
+	 *            {@link UploadPack#setAdvertisedRefs(java.util.Map)}
+	 *            if necessary.
+	 * @throws ServiceMayNotContinueException
+	 *             abort; the message will be sent to the user.
 	 */
-	public ApplyResult addUpdatedFile(File f) {
-		updatedFiles.add(f);
-		return this;
-
-	}
+	public void advertiseRefs(UploadPack uploadPack)
+			throws ServiceMayNotContinueException;
 
 	/**
-	 * @return updated files
+	 * Advertise refs for receive-pack.
+	 *
+	 * @param receivePack instance on which to call
+	 *            {@link ReceivePack#setAdvertisedRefs(java.util.Map,java.util.Set)}
+	 *            if necessary.
+	 * @throws ServiceMayNotContinueException
+	 *             abort; the message will be sent to the user.
 	 */
-	public List<File> getUpdatedFiles() {
-		return updatedFiles;
-	}
+	public void advertiseRefs(ReceivePack receivePack)
+			throws ServiceMayNotContinueException;
 }

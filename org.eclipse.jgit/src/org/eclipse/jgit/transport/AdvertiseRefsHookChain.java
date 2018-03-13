@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Tomasz Zarna <Tomasz.Zarna@pl.ibm.com>
+ * Copyright (C) 2012, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,36 +40,59 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api.errors;
 
-import java.text.MessageFormat;
+package org.eclipse.jgit.transport;
+
 import java.util.List;
 
-import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.patch.FormatError;
-
 /**
- * Exception thrown when applying a patch fails due to an invalid format
- *
+ * {@link AdvertiseRefsHook} that delegates to a list of other hooks.
+ * <p>
+ * Hooks are run in the order passed to the constructor. A hook may inspect or
+ * modify the results of the previous hooks in the chain by calling
+ * {@link UploadPack#getAdvertisedRefs()}, or
+ * {@link ReceivePack#getAdvertisedRefs()} or
+ * {@link ReceivePack#getAdvertisedObjects()}.
  */
-public class PatchFormatException extends GitAPIException {
-	private static final long serialVersionUID = 1L;
-
-	private List<FormatError> errors;
-
-	/**
-	 * @param errors
-	 */
-	public PatchFormatException(List<FormatError> errors) {
-		super(MessageFormat.format(JGitText.get().patchFormatException, errors));
-		this.errors = errors;
-	}
+public class AdvertiseRefsHookChain implements AdvertiseRefsHook {
+	private final AdvertiseRefsHook[] hooks;
+	private final int count;
 
 	/**
-	 * @return all the errors where unresolved conflicts have been detected
+	 * Create a new hook chaining the given hooks together.
+	 *
+	 * @param hooks
+	 *            hooks to execute, in order.
+	 * @return a new hook chain of the given hooks.
 	 */
-	public List<FormatError> getErrors() {
-		return errors;
+	public static AdvertiseRefsHook newChain(List<? extends AdvertiseRefsHook> hooks) {
+		AdvertiseRefsHook[] newHooks = new AdvertiseRefsHook[hooks.size()];
+		int i = 0;
+		for (AdvertiseRefsHook hook : hooks)
+			if (hook != AdvertiseRefsHook.DEFAULT)
+				newHooks[i++] = hook;
+		if (i == 0)
+			return AdvertiseRefsHook.DEFAULT;
+		else if (i == 1)
+			return newHooks[0];
+		else
+			return new AdvertiseRefsHookChain(newHooks, i);
 	}
 
+	public void advertiseRefs(ReceivePack rp)
+			throws ServiceMayNotContinueException {
+		for (int i = 0; i < count; i++)
+			hooks[i].advertiseRefs(rp);
+	}
+
+	public void advertiseRefs(UploadPack rp)
+			throws ServiceMayNotContinueException {
+		for (int i = 0; i < count; i++)
+			hooks[i].advertiseRefs(rp);
+	}
+
+	private AdvertiseRefsHookChain(AdvertiseRefsHook[] hooks, int count) {
+		this.hooks = hooks;
+		this.count = count;
+	}
 }
