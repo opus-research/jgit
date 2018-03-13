@@ -61,6 +61,10 @@ public interface PublisherClientFactory<C> {
 			// Nothing
 		}
 
+		public void setResolver(RepositoryResolver r) {
+			// Nothing
+		}
+
 		public PublisherClient create(Object req)
 				throws ServiceNotEnabledException,
 				ServiceNotAuthorizedException {
@@ -73,6 +77,13 @@ public interface PublisherClientFactory<C> {
 	 *            Publisher instance used when creating PublisherClients
 	 */
 	void setPublisher(Publisher p);
+
+	/**
+	 * @param r
+	 *            RepositoryResolver used to look up repositories using the
+	 *            connection passed to {@link #create(Object)}.
+	 */
+	void setResolver(RepositoryResolver<C> r);
 
 	/**
 	 * @param req

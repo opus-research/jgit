@@ -47,6 +47,7 @@ import static org.eclipse.jgit.transport.SubscribeCommand.Command.SUBSCRIBE;
 import static org.eclipse.jgit.transport.SubscribeCommand.Command.UNSUBSCRIBE;
 
 import java.io.BufferedOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -57,13 +58,17 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
+import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
 /**
  * A single client (connection) subscribed to one or more repositories.
  */
-public class PublisherClient {
+public abstract class PublisherClient {
 	private static final int HEARTBEAT_INTERVAL = 10000;
 
 	private final Publisher publisher;
@@ -104,17 +109,20 @@ public class PublisherClient {
 	 * @param myOut
 	 * @param messages
 	 * @throws IOException
+	 * @throws ServiceNotEnabledException
+	 * @throws ServiceNotAuthorizedException
 	 */
 	public void subscribe(
 			InputStream myIn, OutputStream myOut, OutputStream messages)
-			throws IOException {
+			throws IOException, ServiceNotAuthorizedException,
+			ServiceNotEnabledException {
 		this.in = new PacketLineIn(myIn);
 		this.out = new BufferedOutputStream(myOut);
 
 		readRestart();
-		readSubscribeCommands();
+		boolean isAdvertisment = readSubscribeCommands();
 
-		// Add client to each of the subscribed repos
+		// Add client to each of the subscribed repositories.
 		PublisherSession clientState = publisher.connectClient(this);
 		PacketLineOut pktLineOut = new PacketLineOut(out);
 		if (clientState == null) {
@@ -124,7 +132,7 @@ public class PublisherClient {
 		}
 		// If restarting from a pack number, check that we have a reference
 		// to that pack next in the stream. Clients will supply this number only
-		// when they were in the process of receiving a pack
+		// when they were in the process of receiving a pack.
 		if (lastPackNumber != -1) {
 			PublisherPack nextPack = clientState.peekNextUpdate();
 			if (nextPack == null
@@ -139,14 +147,23 @@ public class PublisherClient {
 				"heartbeat-interval " + HEARTBEAT_INTERVAL / 1000);
 		pktLineOut.end();
 
+		if (isAdvertisment) {
+			clientState.disconnect();
+			return;
+		}
+
 		// Wait here for new PublisherUpdates until the connection is dropped
 		consumeThread = Thread.currentThread();
 		String oldThreadName = consumeThread.getName();
 		consumeThread.setName("PubSub Consumer " + clientState.getKey());
 		try {
 			while (true) {
+				if (Thread.interrupted())
+					throw new InterruptedException();
 				PublisherPack pk = clientState.getNextUpdate(
 						HEARTBEAT_INTERVAL);
+				if (closed)
+					throw new EOFException();
 				if (pk == null)
 					pktLineOut.writeString("heartbeat");
 				else {
@@ -161,11 +178,9 @@ public class PublisherClient {
 				pktLineOut.flush();
 			}
 		} catch (IOException e) {
-			System.err.println("Client disconnected");
 			clientState.rollbackUpdateStream();
 		} catch (InterruptedException e) {
-			System.err.println("Interrupted while polling");
-			e.printStackTrace();
+			// Nothing, interrupted by disconnect
 		} finally {
 			consumeThread.setName(oldThreadName);
 			consumeThread = null;
@@ -206,14 +221,17 @@ public class PublisherClient {
 	 * done
 	 * </pre>
 	 *
+	 * @return true if this request is an advertisement to determine if the
+	 *         publish-subscribe service exists and the client is authorized to
+	 *         read all listed repositories.
 	 * @throws IOException
 	 */
-	private void readSubscribeCommands() throws IOException {
+	private boolean readSubscribeCommands() throws IOException {
 		String line;
 		ArrayList<SubscribeCommand> cmdList = null;
 		Map<String, ObjectId> stateList = null;
 		String repo = null;
-		while (!(line = in.readString()).equals("done")) {
+		while (!(line = in.readString()).startsWith("done")) {
 			if (line == PacketLineIn.END) {
 				commands.put(repo, cmdList);
 				refState.put(repo, stateList);
@@ -240,6 +258,7 @@ public class PublisherClient {
 				}
 			}
 		}
+		return line.endsWith(" advertisement");
 	}
 
 	/** @return restart token, or null if none exists */
@@ -282,4 +301,16 @@ public class PublisherClient {
 	public OutputStream getOutputStream() {
 		return out;
 	}
+
+	/**
+	 * @param name
+	 * @return the repository with this name
+	 * @throws ServiceNotEnabledException
+	 * @throws ServiceNotAuthorizedException
+	 * @throws ServiceMayNotContinueException
+	 * @throws RepositoryNotFoundException
+	 */
+	public abstract Repository openRepository(String name)
+			throws RepositoryNotFoundException, ServiceMayNotContinueException,
+			ServiceNotAuthorizedException, ServiceNotEnabledException;
 }

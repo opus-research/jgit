@@ -45,43 +45,41 @@ package org.eclipse.jgit.http.server.resolver;
 
 import javax.servlet.http.HttpServletRequest;
 
+import org.eclipse.jgit.errors.RepositoryNotFoundException;
+import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.Publisher;
 import org.eclipse.jgit.transport.PublisherClient;
+import org.eclipse.jgit.transport.ServiceMayNotContinueException;
 import org.eclipse.jgit.transport.resolver.PublisherClientFactory;
+import org.eclipse.jgit.transport.resolver.RepositoryResolver;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
 /** Default creator for PublisherClients */
 public class DefaultPublisherClientFactory
 		implements PublisherClientFactory<HttpServletRequest> {
-	/** Store the connection object */
-	public class PublisherClientConnectionWrapper extends PublisherClient {
-		HttpServletRequest req;
-
-		/**
-		 * @param p
-		 * @param req
-		 */
-		public PublisherClientConnectionWrapper(
-				Publisher p, HttpServletRequest req) {
-			super(p);
-			this.req = req;
-		}
-
-		/** @return the request object passed when creating this client */
-		public HttpServletRequest getRequest() {
-			return req;
-		}
-	}
-
 	private Publisher publisher;
+
+	private RepositoryResolver<HttpServletRequest> resolver;
+
+	public void setResolver(RepositoryResolver<HttpServletRequest> r) {
+		this.resolver = r;
+	}
 
 	public void setPublisher(Publisher p) {
 		this.publisher = p;
 	}
 
-	public PublisherClient create(HttpServletRequest req)
+	public PublisherClient create(final HttpServletRequest req)
 			throws ServiceNotEnabledException, ServiceNotAuthorizedException {
-		return new PublisherClientConnectionWrapper(publisher, req);
+		return new PublisherClient(publisher) {
+			@Override
+			public Repository openRepository(String name)
+					throws RepositoryNotFoundException,
+					ServiceMayNotContinueException,
+					ServiceNotAuthorizedException, ServiceNotEnabledException {
+				return resolver.open(req, name);
+			}
+		};
 	}
 }

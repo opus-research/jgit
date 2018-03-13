@@ -55,7 +55,6 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.http.server.glue.ErrorServlet;
 import org.eclipse.jgit.http.server.glue.MetaFilter;
 import org.eclipse.jgit.http.server.glue.RegexGroupFilter;
@@ -64,9 +63,7 @@ import org.eclipse.jgit.http.server.resolver.AsIsFileService;
 import org.eclipse.jgit.http.server.resolver.DefaultPublisherClientFactory;
 import org.eclipse.jgit.http.server.resolver.DefaultReceivePackFactory;
 import org.eclipse.jgit.http.server.resolver.DefaultUploadPackFactory;
-import org.eclipse.jgit.http.server.resolver.DefaultPublisherClientFactory.PublisherClientConnectionWrapper;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.Publisher;
 import org.eclipse.jgit.transport.PublisherBuffer;
 import org.eclipse.jgit.transport.PublisherClient;
@@ -74,14 +71,11 @@ import org.eclipse.jgit.transport.PublisherPackFactory;
 import org.eclipse.jgit.transport.PublisherReverseResolver;
 import org.eclipse.jgit.transport.PublisherSession.SessionGenerator;
 import org.eclipse.jgit.transport.ReceivePack;
-import org.eclipse.jgit.transport.ServiceMayNotContinueException;
 import org.eclipse.jgit.transport.UploadPack;
 import org.eclipse.jgit.transport.resolver.FileResolver;
 import org.eclipse.jgit.transport.resolver.PublisherClientFactory;
 import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
 import org.eclipse.jgit.transport.resolver.RepositoryResolver;
-import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
-import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.transport.resolver.UploadPackFactory;
 import org.eclipse.jgit.util.StringUtils;
 
@@ -255,16 +249,7 @@ public class GitFilter extends MetaFilter {
 				&& publisherClientFactory != PublisherClientFactory.DISABLED) {
 			// Default publisher with 1 GiB max buffer
 			publisher = new Publisher(new PublisherReverseResolver(),
-				new RepositoryResolver<PublisherClient>() {
-				public Repository open(PublisherClient req, String name)
-						throws RepositoryNotFoundException,
-						ServiceNotAuthorizedException,
-						ServiceNotEnabledException,
-						ServiceMayNotContinueException {
-					HttpServletRequest request = ((PublisherClientConnectionWrapper) req).getRequest();
-					return resolver.open(request, name);
-				}
-			}, new PublisherPackFactory(new PublisherBuffer(1 << 30)),
+				new PublisherPackFactory(new PublisherBuffer(1 << 30)),
 			new SessionGenerator() {
 				public String generate() {
 					return UUID.randomUUID().toString();
@@ -295,18 +280,13 @@ public class GitFilter extends MetaFilter {
 
 		if (publisherClientFactory != PublisherClientFactory.DISABLED) {
 			publisherClientFactory.setPublisher(publisher);
+			publisherClientFactory.setResolver(resolver);
 			ServletBinder b = serveRegex(
 					"^/" + GitSmartHttpTools.PUBLISH_SUBSCRIBE, true);
 			b = b.through(new PublisherServlet.Factory(publisherClientFactory));
 			for (Filter f : publisherClientFilters)
 				b = b.through(f);
 			b.with(new PublisherServlet());
-
-			ServletBinder pubRefs = serveRegex("^/" + Constants.INFO_REFS,
-					true);
-			pubRefs = pubRefs.through(new PublisherServlet.InfoRefs(
-					publisherClientFilters));
-			pubRefs.with(new ErrorServlet(HttpServletResponse.SC_FORBIDDEN));
 		}
 
 		ServletBinder refs = serve("*/" + Constants.INFO_REFS);

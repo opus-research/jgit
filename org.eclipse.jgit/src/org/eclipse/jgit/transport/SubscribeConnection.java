@@ -58,6 +58,14 @@ import org.eclipse.jgit.lib.ProgressMonitor;
  */
 public interface SubscribeConnection extends Connection {
 	/**
+	 * Send the initial advertisement to determine authentication.
+	 *
+	 * @param subscriber
+	 * @throws IOException
+	 */
+	void doSubscribeAdvertisment(Subscriber subscriber) throws IOException;
+
+	/**
 	 * Subscribe using this connection.
 	 *
 	 * @param subscriber

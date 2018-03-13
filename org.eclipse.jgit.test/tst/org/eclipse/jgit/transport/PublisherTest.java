@@ -67,7 +67,6 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.transport.PublisherSession.SessionGenerator;
 import org.eclipse.jgit.transport.SubscribeCommand.Command;
-import org.eclipse.jgit.transport.resolver.RepositoryResolver;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 import org.junit.Test;
@@ -92,7 +91,7 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 
 	Publisher publisher;
 
-	volatile CountDownLatch connectLatch;
+	CountDownLatch connectLatch;
 
 	private void setUpPublisher(int expectedClients) {
 		// Every PublisherTestClient that is created makes 2 calls to
@@ -103,16 +102,7 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 		packFactory.setSliceSize(1024);
 		packFactory.setSliceMemoryThreshold(3);
 		publisher = new Publisher(new PublisherReverseResolver(),
-			new RepositoryResolver<PublisherClient>() {
-			public Repository open(PublisherClient req, String name)
-					throws RepositoryNotFoundException,
-					ServiceNotAuthorizedException, ServiceNotEnabledException,
-					ServiceMayNotContinueException {
-				if (!name.equals("testrepository"))
-					fail("Invalid open database request");
-				return db;
-			}
-		}, packFactory, new SessionGenerator() {
+			packFactory, new SessionGenerator() {
 			private AtomicInteger sid = new AtomicInteger();
 
 			public String generate() {
@@ -121,7 +111,8 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 		}) {
 			@Override
 			public synchronized PublisherSession connectClient(
-					PublisherClient c) {
+					PublisherClient c) throws ServiceNotAuthorizedException,
+					ServiceNotEnabledException {
 				PublisherSession s = super.connectClient(c);
 				connectLatch.countDown();
 				return s;
@@ -150,6 +141,16 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 						"have " + OBJECT_ID1.getName() + " " + refName);
 				pckLineOut.end();
 				pckLineOut.writeString("done");
+			}
+
+			@Override
+			public Repository openRepository(String name)
+					throws RepositoryNotFoundException,
+					ServiceMayNotContinueException,
+					ServiceNotAuthorizedException, ServiceNotEnabledException {
+				if (!name.equals("testrepository"))
+					fail("Invalid open database request");
+				return db;
 			}
 		};
 
@@ -219,6 +220,16 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 				pckLineOut.end();
 				pckLineOut.writeString("done");
 			}
+
+			@Override
+			public Repository openRepository(String name)
+					throws RepositoryNotFoundException,
+					ServiceMayNotContinueException,
+					ServiceNotAuthorizedException, ServiceNotEnabledException {
+				if (!name.equals("testrepository"))
+					fail("Invalid open database request");
+				return db;
+			}
 		};
 
 		connectLatch.await();
@@ -283,6 +294,17 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 							"have " + OBJECT_ID1.getName() + " " + refName);
 					pckLineOut.end();
 					pckLineOut.writeString("done");
+				}
+
+				@Override
+				public Repository openRepository(String name)
+						throws RepositoryNotFoundException,
+						ServiceMayNotContinueException,
+						ServiceNotAuthorizedException,
+						ServiceNotEnabledException {
+					if (!name.equals("testrepository"))
+						fail("Invalid open database request");
+					return db;
 				}
 			};
 			testClients.add(t);
@@ -356,8 +378,12 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 		 *
 		 * @param delayWrite
 		 * @param space
+		 * @throws ServiceNotAuthorizedException
+		 * @throws ServiceNotEnabledException
 		 */
-		public PublisherClientTest(final int delayWrite, int space) {
+		public PublisherClientTest(final int delayWrite, int space)
+				throws ServiceNotAuthorizedException,
+				ServiceNotEnabledException {
 			super(publisher);
 			state = publisher.connectClient(this);
 			state.disconnect();
@@ -398,7 +424,7 @@ public class PublisherTest extends SampleDataRepositoryTestCase {
 				public void run() {
 					try {
 						me.subscribe(myIn, output, null);
-					} catch (IOException e) {
+					} catch (Exception e) {
 						fail(e.toString());
 					}
 				}

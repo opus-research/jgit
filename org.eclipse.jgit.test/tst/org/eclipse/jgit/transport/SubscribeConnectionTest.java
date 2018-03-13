@@ -45,6 +45,7 @@ package org.eclipse.jgit.transport;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -54,6 +55,8 @@ import java.io.InterruptedIOException;
 import java.io.OutputStreamWriter;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.errors.NotSupportedException;
@@ -99,9 +102,25 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 		public SubscribeConnection openSubscribe()
 				throws NotSupportedException, TransportException {
 			BasePackSubscribeConnection c = new BasePackSubscribeConnection(
-					this);
-			c.init(new ByteArrayInputStream(publisherOut.toByteArray()),
-					testOut);
+					this) {
+				@Override
+				public void doSubscribeAdvertisment(
+						Subscriber s) throws IOException {
+					// Nothing
+				}
+				
+				@Override
+				public void doSubscribe(Subscriber s, Map<
+						String,
+						List<SubscribeCommand>> subscribeCommands,
+						ProgressMonitor monitor)
+						throws InterruptedException, TransportException,
+						IOException {
+					init(new ByteArrayInputStream(publisherOut.toByteArray()),
+							testOut);
+					super.doSubscribe(s, subscribeCommands, monitor);
+				}
+			};
 			return c;
 		}
 
@@ -329,6 +348,27 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 				.getLeaf().getObjectId().name();
 		assertEquals(id2.name(), pubsubId2);
 		assertEquals("5678", subscriber.getLastPackNumber());
+	}
+
+	@Test
+	public void testBadUpdate() throws Exception {
+		// Setup server response
+		publisherLineOut.writeString("restart-token server-token");
+		publisherLineOut.writeString("heartbeat-interval 10");
+		publisherLineOut.end();
+		writeHeartbeat();
+		// Add refs/heads/master (bad command, master already exists)
+		ObjectId id = db.getRef("refs/heads/master").getLeaf().getObjectId();
+		writeUpdate(ObjectId.zeroId(), id, "refs/heads/master", "1234");
+
+		try {
+			executeSubscribe();
+			fail("Should have failed creating refs/heads/master");
+		} catch (TransportException e) {
+			// Expected
+		} catch (InterruptedIOException e) {
+			// Stream timeout
+		}
 	}
 
 	private void writeHeartbeat() throws IOException {
