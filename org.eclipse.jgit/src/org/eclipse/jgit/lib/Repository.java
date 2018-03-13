@@ -1137,7 +1137,7 @@ public abstract class Repository {
 				fos.close();
 			}
 		} else {
-			FileUtils.delete(mergeMsgFile, FileUtils.SKIP_MISSING);
+			FileUtils.delete(mergeMsgFile);
 		}
 	}
 

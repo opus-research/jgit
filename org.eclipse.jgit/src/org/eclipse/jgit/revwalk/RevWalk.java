@@ -170,7 +170,7 @@ public class RevWalk implements Iterable<RevCommit> {
 
 	final MutableObjectId idBuffer;
 
-	ObjectIdOwnerMap<RevObject> objects;
+	private ObjectIdOwnerMap<RevObject> objects;
 
 	private int freeFlags = APP_FLAGS;
 
