@@ -47,7 +47,6 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.LinkedList;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.dircache.DirCache;
@@ -100,8 +99,7 @@ public class RmCommand extends GitCommand<DirCache> {
 	 *
 	 * @return the DirCache after Rm
 	 */
-	public DirCache call() throws GitAPIException, JGitInternalException,
-			NoFilepatternException {
+	public DirCache call() throws NoFilepatternException {
 
 		if (filepatterns.isEmpty())
 			throw new NoFilepatternException(JGitText.get().atLeastOnePatternIsRequired);
