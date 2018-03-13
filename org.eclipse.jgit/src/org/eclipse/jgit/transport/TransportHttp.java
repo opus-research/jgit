@@ -264,6 +264,9 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 		http = local.getConfig().get(HTTP_KEY);
 		proxySelector = ProxySelector.getDefault();
+
+		if (getCredentialsProvider() == null)
+			setCredentialsProvider(new NetRCCredentialsProvider());
 	}
 
 	/**
@@ -494,6 +497,9 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 						throw new TransportException(uri, MessageFormat.format(
 								JGitText.get().authenticationNotSupported, uri));
 					CredentialsProvider credentialsProvider = getCredentialsProvider();
+					if (credentialsProvider == null)
+						throw new TransportException(uri,
+								JGitText.get().noCredentialsProvider);
 					if (authAttempts > 1)
 						credentialsProvider.reset(uri);
 					if (3 < authAttempts
@@ -624,15 +630,15 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 	}
 
 	class HttpObjectDB extends WalkRemoteObjectDatabase {
-		private final URL objectsUrl;
+		private final URL httpObjectsUrl;
 
 		HttpObjectDB(final URL b) {
-			objectsUrl = b;
+			httpObjectsUrl = b;
 		}
 
 		@Override
 		URIish getURI() {
-			return new URIish(objectsUrl);
+			return new URIish(httpObjectsUrl);
 		}
 
 		@Override
@@ -655,7 +661,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		@Override
 		WalkRemoteObjectDatabase openAlternate(final String location)
 				throws IOException {
-			return new HttpObjectDB(new URL(objectsUrl, location));
+			return new HttpObjectDB(new URL(httpObjectsUrl, location));
 		}
 
 		@Override
@@ -683,7 +689,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		@Override
 		FileStream open(final String path) throws IOException {
-			final URL base = objectsUrl;
+			final URL base = httpObjectsUrl;
 			final URL u = new URL(base, path);
 			final HttpConnection c = httpOpen(u);
 			switch (HttpSupport.response(c)) {
