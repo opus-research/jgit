@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
- * Copyright (C) 2012-2013, Robin Rosenberg
+ * Copyright (C) 2012-2013, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,64 +42,30 @@
  */
 package org.eclipse.jgit.treewalk;
 
-import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.ConfigConstants;
-import org.eclipse.jgit.lib.Config.SectionParser;
-import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
-import org.eclipse.jgit.lib.CoreConfig.CheckStat;
-import org.eclipse.jgit.lib.CoreConfig.SymLinks;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
-/** Options used by the {@link WorkingTreeIterator}. */
-public class WorkingTreeOptions {
-	/** Key for {@link Config#get(SectionParser)}. */
-	public static final Config.SectionParser<WorkingTreeOptions> KEY = new SectionParser<WorkingTreeOptions>() {
-		public WorkingTreeOptions parse(final Config cfg) {
-			return new WorkingTreeOptions(cfg);
-		}
-	};
+import java.io.File;
 
-	private final boolean fileMode;
+import org.eclipse.jgit.junit.RepositoryTestCase;
+import org.eclipse.jgit.util.FS;
+import org.junit.Test;
 
-	private final AutoCRLF autoCRLF;
-
-	private final CheckStat checkStat;
-
-	private final SymLinks symlinks;
-
-	private WorkingTreeOptions(final Config rc) {
-		fileMode = rc.getBoolean(ConfigConstants.CONFIG_CORE_SECTION,
-				ConfigConstants.CONFIG_KEY_FILEMODE, true);
-		autoCRLF = rc.getEnum(ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_AUTOCRLF, AutoCRLF.FALSE);
-		checkStat = rc.getEnum(ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_CHECKSTAT, CheckStat.DEFAULT);
-		symlinks = rc.getEnum(ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_SYMLINKS, SymLinks.TRUE);
-	}
-
-	/** @return true if the execute bit on working files should be trusted. */
-	public boolean isFileMode() {
-		return fileMode;
-	}
-
-	/** @return how automatic CRLF conversion has been configured. */
-	public AutoCRLF getAutoCRLF() {
-		return autoCRLF;
-	}
-
-	/**
-	 * @return how stat data is compared
-	 * @since 3.0
-	 */
-	public CheckStat getCheckStat() {
-		return checkStat;
-	}
-
-	/**
-	 * @return how we handle symbolic links
-	 * @since 3.3
-	 */
-	public SymLinks getSymLinks() {
-		return symlinks;
+public class TreeWalkJava7Test extends RepositoryTestCase {
+	@Test
+	public void testSymlinkToDirNotRecursingViaSymlink() throws Exception {
+		FS fs = db.getFS();
+		assertTrue(fs.supportsSymlinks());
+		writeTrashFile("target/data", "targetdata");
+		fs.createSymLink(new File(trash, "link"), "target");
+		TreeWalk tw = new TreeWalk(db);
+		tw.setRecursive(true);
+		tw.addTree(new FileTreeIterator(db));
+		assertTrue(tw.next());
+		assertEquals("link", tw.getPathString());
+		assertTrue(tw.next());
+		assertEquals("target/data", tw.getPathString());
+		assertFalse(tw.next());
 	}
 }
