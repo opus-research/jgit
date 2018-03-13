@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2015, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,45 +40,30 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs.lib;
 
-import java.io.IOException;
-import java.util.Map;
+package org.eclipse.jgit.annotations;
+
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.LOCAL_VARIABLE;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
- * Abstraction of a repository for storing large objects
+ * JGit's replacement for the {@code javax.annotations.Nullable}.
+ * <p>
+ * Denotes that a local variable, parameter, field, method return value can be
+ * {@code null}.
  *
  * @since 4.2
  */
-public interface LargeFileRepository {
-
-	/**
-	 * @param id
-	 *            id of the object
-	 * @return URL of the large file repository
-	 */
-	public String getUrl(AnyLongObjectId id);
-
-	/**
-	 * @param id
-	 *            id of the object
-	 * @return {@code true} if the object exists, {@code false} otherwise
-	 */
-	public boolean exists(AnyLongObjectId id);
-
-	/**
-	 * @param id
-	 *            id of the object
-	 * @return length of the object content in bytes
-	 * @throws IOException
-	 */
-	public long getLength(AnyLongObjectId id) throws IOException;
-
-	/**
-	 * @param id
-	 *            id of the object
-	 * @return Set of HTTP headers (key, value) which will be passed to the
-	 *         upload/download request
-	 */
-	public Map<String, String> getHeaders(AnyLongObjectId id);
+@Documented
+@Retention(RetentionPolicy.CLASS)
+@Target({ FIELD, METHOD, PARAMETER, LOCAL_VARIABLE })
+public @interface Nullable {
+	// marker annotation with no members
 }

@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2015, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2014, Arthur Daussy <arthur.daussy@obeo.fr>
+ * Copyright (C) 2015, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,58 +41,47 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.internal.storage.file;
 
-package org.eclipse.jgit.lfs.server;
+import java.io.File;
+import java.io.IOException;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import org.eclipse.jgit.attributes.AttributesNode;
+import org.eclipse.jgit.lib.CoreConfig;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.util.FS;
 
-import org.eclipse.jgit.lfs.lib.LargeFileRepository;
-import org.eclipse.jgit.lfs.lib.LongObjectId;
+/** Attribute node loaded from global system-wide file. */
+public class GlobalAttributesNode extends AttributesNode {
+	final Repository repository;
 
-class TransferHandler {
-
-	private static final String DOWNLOAD = "download"; //$NON-NLS-1$
-	private static final String UPLOAD = "upload"; //$NON-NLS-1$
-
-	private final LargeFileRepository repository;
-	private final List<LfsObject> objects;
-
-	TransferHandler(LargeFileRepository repository, List<LfsObject> objects) {
+	/**
+	 * @param repository
+	 */
+	public GlobalAttributesNode(Repository repository) {
 		this.repository = repository;
-		this.objects = objects;
 	}
 
-	Response.Body process() {
-		Response.Body body = new Response.Body();
-		if (objects.size() > 0) {
-			body.objects = new ArrayList<>();
-			for (LfsObject o : objects) {
-				Response.ObjectInfo info = new Response.ObjectInfo();
-				body.objects.add(info);
-				info.oid = o.oid;
-				info.size = o.size;
-				info.actions = new HashMap<>();
+	/**
+	 * @return the attributes node
+	 * @throws IOException
+	 */
+	public AttributesNode load() throws IOException {
+		AttributesNode r = new AttributesNode();
 
-				LongObjectId oid = LongObjectId.fromString(o.oid);
-				addAction(UPLOAD, oid, info.actions);
-				if (repository.exists(oid)) {
-					addAction(DOWNLOAD, oid, info.actions);
-				}
+		FS fs = repository.getFS();
+		String path = repository.getConfig().get(CoreConfig.KEY)
+				.getAttributesFile();
+		if (path != null) {
+			File attributesFile;
+			if (path.startsWith("~/")) { //$NON-NLS-1$
+				attributesFile = fs.resolve(fs.userHome(),
+						path.substring(2));
+			} else {
+				attributesFile = fs.resolve(null, path);
 			}
+			FileRepository.AttributesNodeProviderImpl.loadRulesFromFile(r, attributesFile);
 		}
-		return body;
-	}
-
-	private void addAction(String name, LongObjectId oid,
-			Map<String, Response.Action> actions) {
-		Response.Action action = new Response.Action();
-		action.href = repository.getUrl(oid) + oid.getName();
-		action.header = new HashMap<>();
-		// TODO: when should this be used:
-		action.header.put("Authorization", "not:required");
-		actions.put(name, action);
+		return r.getRules().isEmpty() ? null : r;
 	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2015, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,25 +40,16 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.attributes;
 
-package org.eclipse.jgit.lfs.server;
-
-import java.util.List;
-import java.util.Map;
-
-interface Response {
-	class Action {
-		String href;
-		Map<String, String> header;
-	}
-
-	class ObjectInfo {
-		String oid;
-		long size;
-		Map<String, Action> actions;
-	}
-
-	class Body {
-		List<ObjectInfo> objects;
-	}
+/**
+ * Interface for classes which provide git attributes
+ *
+ * @since 4.2
+ */
+public interface AttributesProvider {
+	/**
+	 * @return the currently active attributes
+	 */
+	public Attributes getAttributes();
 }
