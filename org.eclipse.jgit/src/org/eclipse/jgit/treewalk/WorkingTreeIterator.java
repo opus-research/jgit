@@ -62,7 +62,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 
-import org.eclipse.jgit.api.errors.FilterFailedException;
 import org.eclipse.jgit.attributes.AttributesNode;
 import org.eclipse.jgit.attributes.AttributesRule;
 import org.eclipse.jgit.diff.RawText;
@@ -75,11 +74,8 @@ import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.ignore.FastIgnoreRule;
 import org.eclipse.jgit.ignore.IgnoreNode;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.file.GlobalAttributesNode;
-import org.eclipse.jgit.internal.storage.file.InfoAttributesNode;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig;
-import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
 import org.eclipse.jgit.lib.CoreConfig.CheckStat;
 import org.eclipse.jgit.lib.CoreConfig.SymLinks;
 import org.eclipse.jgit.lib.FileMode;
@@ -89,7 +85,6 @@ import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.submodule.SubmoduleWalk;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FS.ExecutionResult;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.io.EolCanonicalizingInputStream;
@@ -106,8 +101,6 @@ import org.eclipse.jgit.util.io.EolCanonicalizingInputStream;
  * @see FileTreeIterator
  */
 public abstract class WorkingTreeIterator extends AbstractTreeIterator {
-	private static final int MAX_EXCEPTION_TEXT_SIZE = 10 * 1024;
-
 	/** An empty entry array, suitable for {@link #init(Entry[])}. */
 	protected static final Entry[] EOF = {};
 
@@ -141,11 +134,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	/** If there is a .gitignore file present, the parsed rules from it. */
 	private IgnoreNode ignoreNode;
 
-	/** If there is a .gitattributes file present, the parsed rules from it. */
-	private AttributesNode attributesNode;
-
-	private String cleanFilterCommand;
-
 	/** Repository that is the root level being iterated over */
 	protected Repository repository;
 
@@ -154,19 +142,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 	/** The offset of the content id in {@link #idBuffer()} */
 	private int contentIdOffset;
-
-	/**
-	 * Holds the {@link AttributesNode} that is stored in
-	 * $GIT_DIR/info/attributes file.
-	 */
-	private AttributesNode infoAttributesNode;
-
-	/**
-	 * Holds the {@link AttributesNode} that is stored in global attribute file.
-	 *
-	 * @see CoreConfig#getAttributesFile()
-	 */
-	private AttributesNode globalAttributesNode;
 
 	/**
 	 * Create a new iterator with no parent.
@@ -211,9 +186,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	protected WorkingTreeIterator(final WorkingTreeIterator p) {
 		super(p);
 		state = p.state;
-		infoAttributesNode = p.infoAttributesNode;
-		globalAttributesNode = p.globalAttributesNode;
-		repository = p.repository;
 	}
 
 	/**
@@ -233,10 +205,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		else
 			entry = null;
 		ignoreNode = new RootIgnoreNode(entry, repo);
-
-		infoAttributesNode = new InfoAttributesNode(repo);
-
-		globalAttributesNode = new GlobalAttributesNode(repo);
 	}
 
 	/**
@@ -380,8 +348,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 	private InputStream possiblyFilteredInputStream(final Entry e,
 			final InputStream is, final long len) throws IOException {
-		boolean mightNeedCleaning = mightNeedCleaning();
-		if (!mightNeedCleaning) {
+		if (!mightNeedCleaning()) {
 			canonLen = len;
 			return is;
 		}
@@ -399,8 +366,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			return new ByteArrayInputStream(raw, 0, n);
 		}
 
-		// TODO: fix autocrlf causing mightneedcleaning
-		if (!mightNeedCleaning && isBinary(e)) {
+		if (isBinary(e)) {
 			canonLen = len;
 			return is;
 		}
@@ -424,12 +390,10 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private boolean mightNeedCleaning() throws IOException {
+	private boolean mightNeedCleaning() {
 		switch (getOptions().getAutoCRLF()) {
 		case FALSE:
 		default:
-			if (getCleanFilterCommand() != null)
-				return true;
 			return false;
 
 		case TRUE:
@@ -451,7 +415,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private ByteBuffer filterClean(byte[] src, int n) throws IOException {
+	private static ByteBuffer filterClean(byte[] src, int n)
+			throws IOException {
 		InputStream in = new ByteArrayInputStream(src);
 		try {
 			return IO.readWholeStream(filterClean(in), n);
@@ -460,40 +425,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private InputStream filterClean(InputStream in) throws IOException {
-		in = handleAutoCRLF(in);
-		String filterCommand = getCleanFilterCommand();
-		if (filterCommand != null) {
-			FS fs = repository.getFS();
-			ProcessBuilder filterProcessBuilder = fs.runInShell(filterCommand,
-					new String[0]);
-
-			ExecutionResult result;
-			try {
-				result = fs.execute(filterProcessBuilder, in);
-			} catch (IOException | InterruptedException e) {
-				throw new IOException(new FilterFailedException(e,
-						filterCommand, getEntryPathString()));
-			}
-			int rc = result.getRc();
-			if (rc != 0) {
-				throw new IOException(new FilterFailedException(rc,
-						filterCommand, getEntryPathString(),
-						result.getStdout().toByteArray(MAX_EXCEPTION_TEXT_SIZE),
-						RawParseUtils.decode(result.getStderr()
-								.toByteArray(MAX_EXCEPTION_TEXT_SIZE))));
-			}
-			return result.getStdout().openInputStream();
-		}
-		return in;
-	}
-
-	private InputStream handleAutoCRLF(InputStream in) {
-		AutoCRLF autoCRLF = getOptions().getAutoCRLF();
-		if (autoCRLF == AutoCRLF.TRUE || autoCRLF == AutoCRLF.INPUT) {
-			in = new EolCanonicalizingInputStream(in, true);
-		}
-		return in;
+	private static InputStream filterClean(InputStream in) {
+		return new EolCanonicalizingInputStream(in, true);
 	}
 
 	/**
@@ -552,7 +485,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		System.arraycopy(e.encodedName, 0, path, pathOffset, nameLen);
 		pathLen = pathOffset + nameLen;
 		canonLen = -1;
-		cleanFilterCommand = null;
 	}
 
 	/**
@@ -711,41 +643,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			attributesNode = ((PerDirectoryAttributesNode) attributesNode)
 					.load();
 		return attributesNode;
-	}
-
-	/**
-	 * Retrieves the {@link AttributesNode} that holds the information located
-	 * in $GIT_DIR/info/attributes file.
-	 *
-	 * @return the {@link AttributesNode} that holds the information located in
-	 *         $GIT_DIR/info/attributes file.
-	 * @throws IOException
-	 *             if an error is raised while parsing the attributes file
-	 * @since 3.7
-	 */
-	public AttributesNode getInfoAttributesNode() throws IOException {
-		if (infoAttributesNode instanceof InfoAttributesNode)
-			infoAttributesNode = ((InfoAttributesNode) infoAttributesNode).load();
-		return infoAttributesNode;
-	}
-
-	/**
-	 * Retrieves the {@link AttributesNode} that holds the information located
-	 * in system-wide file.
-	 *
-	 * @return the {@link AttributesNode} that holds the information located in
-	 *         system-wide file.
-	 * @throws IOException
-	 *             IOException if an error is raised while parsing the
-	 *             attributes file
-	 * @see CoreConfig#getAttributesFile()
-	 * @since 3.7
-	 */
-	public AttributesNode getGlobalAttributesNode() throws IOException {
-		if (globalAttributesNode instanceof GlobalAttributesNode)
-			globalAttributesNode = ((GlobalAttributesNode) globalAttributesNode)
-					.load();
-		return globalAttributesNode;
 	}
 
 	private static final Comparator<Entry> ENTRY_CMP = new Comparator<Entry>() {
@@ -1373,19 +1270,5 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				contentReadBuffer = new byte[BUFFER_SIZE];
 			}
 		}
-	}
-
-	/**
-	 * @return the clean filter command for the current entry or
-	 *         <code>null</code> if no such command is defined
-	 * @throws IOException
-	 * @since 4.2
-	 */
-	public String getCleanFilterCommand() throws IOException {
-		if (cleanFilterCommand == null && state.walk != null) {
-			cleanFilterCommand = state.walk
-					.getFilterCommand(Constants.ATTR_FILTER_TYPE_CLEAN);
-		}
-		return cleanFilterCommand;
 	}
 }
