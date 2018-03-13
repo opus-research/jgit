@@ -411,7 +411,8 @@ public class FileUtils {
 	 *
 	 * @param base
 	 *            The path against which <code>other</code> should be
-	 *            relativized.
+	 *            relativized. This will be assumed to denote the path to a
+	 *            folder and not a file.
 	 * @param other
 	 *            The path that will be made relative to <code>base</code>.
 	 * @return A relative path that, when resolved against <code>base</code>,
@@ -422,6 +423,7 @@ public class FileUtils {
 		if (base.equals(other))
 			return ""; //$NON-NLS-1$
 
+		final boolean ignoreCase = !FS.DETECTED.isCaseSensitive();
 		final String[] baseSegments = base.split(Pattern.quote(File.separator));
 		final String[] otherSegments = other.split(Pattern
 				.quote(File.separator));
@@ -429,7 +431,13 @@ public class FileUtils {
 		int commonPrefix = 0;
 		while (commonPrefix < baseSegments.length
 				&& commonPrefix < otherSegments.length) {
-			if (baseSegments[commonPrefix].equals(otherSegments[commonPrefix]))
+			if (ignoreCase
+					&& baseSegments[commonPrefix]
+							.equalsIgnoreCase(otherSegments[commonPrefix]))
+				commonPrefix++;
+			else if (!ignoreCase
+					&& baseSegments[commonPrefix]
+							.equals(otherSegments[commonPrefix]))
 				commonPrefix++;
 			else
 				break;
