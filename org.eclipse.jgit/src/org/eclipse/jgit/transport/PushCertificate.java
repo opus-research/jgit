@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2015, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,27 +41,97 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.console;
-
-import org.eclipse.jgit.nls.NLS;
-import org.eclipse.jgit.nls.TranslationBundle;
+package org.eclipse.jgit.transport;
 
 /**
- * Translation bundle for JGit console
+ * The required information to verify the push.
+ *
+ * @since 4.0
  */
-public class ConsoleText extends TranslationBundle {
+public class PushCertificate {
+
+	/** The tuple "name <email>" as presented in the push certificate */
+	String pusher;
+
+	/** The remote URL the signed push goes to */
+	String pushee;
+
+	/** What we think about the returned signed nonce */
+	NonceStatus nonceStatus;
 
 	/**
-	 * @return an instance of this translation bundle
+	 *
+	 *
 	 */
-	public static ConsoleText get() {
-		return NLS.getBundleFor(ConsoleText.class);
+	public enum NonceStatus {
+		/**
+		 *
+		 */
+		UNSOLICITED,
+		/**
+		 *
+		 */
+		BAD,
+		/**
+		 *
+		 */
+		MISSING,
+		/**
+		 *
+		 */
+		OK,
+		/**
+		 *
+		 */
+		SLOP
 	}
 
-	// @formatter:off
-	/***/ public String answerNo;
-	/***/ public String answerYes;
-	/***/ public String noSystemConsoleAvailable;
-	/***/ public String password;
-	/***/ public String usernameFor;
+	/**
+	 *
+	 */
+	String commandList;
+
+	/**
+	 *
+	 */
+	String signature;
+
+	/**
+	 *
+	 * @return the signature, consisting of the lines received between the lines
+	 *         '----BEGIN GPG SIGNATURE-----\n' and the '----END GPG
+	 *         SIGNATURE-----\n'
+	 */
+	public String getSignature() {
+		return signature;
+	}
+
+	/**
+	 * @return the list of commands as one string to be feed into the signature
+	 *         verifier.
+	 */
+	public String getCommandList() {
+		return commandList;
+	}
+
+	/**
+	 * @return the pushedCertPusher
+	 */
+	public String getPusher() {
+		return pusher;
+	}
+
+	/**
+	 * @return the pushedCertPushee
+	 */
+	public String getPushee() {
+		return pushee;
+	}
+
+	/**
+	 * @return the pushCertNonceStatus
+	 */
+	public NonceStatus getNonceStatus() {
+		return nonceStatus;
+	}
 }

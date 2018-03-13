@@ -51,7 +51,7 @@
   <groupId>org.eclipse.jgit</groupId>
   <artifactId>org.eclipse.jgit-parent</artifactId>
   <packaging>pom</packaging>
-  <version>3.7.1-SNAPSHOT</version>
+  <version>4.0.0-SNAPSHOT</version>
 
   <name>JGit - Parent</name>
   <url>${jgit-url}</url>
@@ -239,6 +239,11 @@
         <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
           <version>3.1</version>
+          <configuration>
+            <encoding>UTF-8</encoding>
+            <source>1.7</source>
+            <target>1.7</target>
+          </configuration>
         </plugin>
 
         <plugin>
@@ -316,7 +321,7 @@
           <configuration>
             <sourceEncoding>utf-8</sourceEncoding>
             <minimumTokens>100</minimumTokens>
-            <targetJdk>1.5</targetJdk>
+            <targetJdk>1.7</targetJdk>
             <format>xml</format>
             <failOnViolation>false</failOnViolation>
           </configuration>
@@ -377,11 +382,6 @@
     <plugins>
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
-        <configuration>
-          <source>1.5</source>
-          <target>1.5</target>
-          <encoding>UTF-8</encoding>
-        </configuration>
       </plugin>
 
       <plugin>
@@ -428,7 +428,7 @@
           <encoding>${project.build.sourceEncoding}</encoding>
           <quiet>true</quiet>
           <links>
-            <link>http://java.sun.com/j2se/1.5.0/docs/api</link>
+            <link>http://docs.oracle.com/javase/7/docs/api</link>
           </links>
         </configuration>
         <executions>
@@ -587,23 +587,10 @@
 
   <profiles>
     <profile>
-      <id>jgit.java6</id>
-      <activation>
-        <jdk>[1.6,)</jdk>
-      </activation>
-      <modules>
-        <module>org.eclipse.jgit.console</module>
-      </modules>
-    </profile>
-    <profile>
       <id>jgit.java7</id>
       <activation>
         <jdk>[1.7,)</jdk>
       </activation>
-      <modules>
-        <module>org.eclipse.jgit.java7</module>
-        <module>org.eclipse.jgit.java7.test</module>
-      </modules>
     </profile>
     <profile>
       <id>jgit.java8</id>
@@ -711,9 +698,11 @@
     <module>org.eclipse.jgit.http.apache</module>
     <module>org.eclipse.jgit.http.server</module>
     <module>org.eclipse.jgit.pgm</module>
+    <module>org.eclipse.jgit.java7</module>
     <module>org.eclipse.jgit.junit</module>
     <module>org.eclipse.jgit.junit.http</module>
 
+    <module>org.eclipse.jgit.java7.test</module>
     <module>org.eclipse.jgit.test</module>
     <module>org.eclipse.jgit.ant.test</module>
     <module>org.eclipse.jgit.http.test</module>
