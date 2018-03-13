@@ -531,7 +531,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String pullOnRepoWithoutHEADCurrentlyNotSupported;
 	/***/ public String pullTaskName;
 	/***/ public String pushCancelled;
-	/***/ public String pushCertificateAlreadyComputed;
 	/***/ public String pushCertificateInvalidField;
 	/***/ public String pushCertificateInvalidFieldValue;
 	/***/ public String pushCertificateInvalidHeader;
