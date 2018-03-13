@@ -61,17 +61,16 @@ import org.eclipse.jgit.lib.PersonIdent;
  */
 public class ChangeIdUtil {
 
-	static final String CHANGE_ID = "Change-Id:"; //$NON-NLS-1$
+	static final String CHANGE_ID = "Change-Id:";
 
 	// package-private so the unit test can test this part only
-	@SuppressWarnings("nls")
 	static String clean(String msg) {
 		return msg.//
-				replaceAll("(?i)(?m)^Signed-off-by:.*$\n?", "").// //$NON-NLS-1$
-				replaceAll("(?m)^#.*$\n?", "").// //$NON-NLS-1$
-				replaceAll("(?m)\n\n\n+", "\\\n").// //$NON-NLS-1$
-				replaceAll("\\n*$", "").// //$NON-NLS-1$
-				replaceAll("(?s)\ndiff --git.*", "").// //$NON-NLS-1$
+				replaceAll("(?i)(?m)^Signed-off-by:.*$\n?", "").//
+				replaceAll("(?m)^#.*$\n?", "").//
+				replaceAll("(?m)\n\n\n+", "\\\n").//
+				replaceAll("\\n*$", "").//
+				replaceAll("(?s)\ndiff --git.*", "").//
 				trim();
 	}
 
@@ -100,33 +99,33 @@ public class ChangeIdUtil {
 		if (cleanMessage.length() == 0)
 			return null;
 		StringBuilder b = new StringBuilder();
-		b.append("tree "); //$NON-NLS-1$
+		b.append("tree ");
 		b.append(ObjectId.toString(treeId));
-		b.append("\n"); //$NON-NLS-1$
+		b.append("\n");
 		if (firstParentId != null) {
-			b.append("parent "); //$NON-NLS-1$
+			b.append("parent ");
 			b.append(ObjectId.toString(firstParentId));
-			b.append("\n"); //$NON-NLS-1$
+			b.append("\n");
 		}
-		b.append("author "); //$NON-NLS-1$
+		b.append("author ");
 		b.append(author.toExternalString());
-		b.append("\n"); //$NON-NLS-1$
-		b.append("committer "); //$NON-NLS-1$
+		b.append("\n");
+		b.append("committer ");
 		b.append(committer.toExternalString());
-		b.append("\n\n"); //$NON-NLS-1$
+		b.append("\n\n");
 		b.append(cleanMessage);
 		return new ObjectInserter.Formatter().idFor(Constants.OBJ_COMMIT, //
 				b.toString().getBytes(Constants.CHARACTER_ENCODING));
 	}
 
 	private static final Pattern issuePattern = Pattern
-			.compile("^(Bug|Issue)[a-zA-Z0-9-]*:.*$"); //$NON-NLS-1$
+			.compile("^(Bug|Issue)[a-zA-Z0-9-]*:.*$");
 
 	private static final Pattern footerPattern = Pattern
-			.compile("(^[a-zA-Z0-9-]+:(?!//).*$)"); //$NON-NLS-1$
+			.compile("(^[a-zA-Z0-9-]+:(?!//).*$)");
 
 	private static final Pattern includeInFooterPattern = Pattern
-			.compile("^[ \\[].*$"); //$NON-NLS-1$
+			.compile("^[ \\[].*$");
 
 	/**
 	 * Find the right place to insert a Change-Id and return it.
@@ -168,12 +167,12 @@ public class ChangeIdUtil {
 					i++;
 				String oldId = message.length() == (i + 40) ?
 						message.substring(i) : message.substring(i, i + 41);
-				message = message.replace(oldId, "I" + changeId.getName()); //$NON-NLS-1$
+				message = message.replace(oldId, "I" + changeId.getName());
 			}
 			return message;
 		}
 
-		String[] lines = message.split("\n"); //$NON-NLS-1$
+		String[] lines = message.split("\n");
 		int footerFirstLine = lines.length;
 		for (int i = lines.length - 1; i > 1; --i) {
 			if (footerPattern.matcher(lines[i]).matches()) {
@@ -203,17 +202,17 @@ public class ChangeIdUtil {
 		int i = 0;
 		for (; i < insertAfter; ++i) {
 			ret.append(lines[i]);
-			ret.append("\n"); //$NON-NLS-1$
+			ret.append("\n");
 		}
 		if (insertAfter == lines.length && insertAfter == footerFirstLine)
-			ret.append("\n"); //$NON-NLS-1$
+			ret.append("\n");
 		ret.append(CHANGE_ID);
-		ret.append(" I"); //$NON-NLS-1$
+		ret.append(" I");
 		ret.append(ObjectId.toString(changeId));
-		ret.append("\n"); //$NON-NLS-1$
+		ret.append("\n");
 		for (; i < lines.length; ++i) {
 			ret.append(lines[i]);
-			ret.append("\n"); //$NON-NLS-1$
+			ret.append("\n");
 		}
 		return ret.toString();
 	}

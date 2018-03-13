@@ -87,8 +87,8 @@ class FS_Win32 extends FS {
 
 	@Override
 	protected File discoverGitPrefix() {
-		String path = SystemReader.getInstance().getenv("PATH"); //$NON-NLS-1$
-		File gitExe = searchPath(path, "git.exe", "git.cmd"); //$NON-NLS-1$ //$NON-NLS-2$
+		String path = SystemReader.getInstance().getenv("PATH");
+		File gitExe = searchPath(path, "git.exe", "git.cmd");
 		if (gitExe != null)
 			return gitExe.getParentFile().getParentFile();
 
@@ -96,7 +96,7 @@ class FS_Win32 extends FS {
 		// also be in $PATH. But its worth trying.
 		//
 		String w = readPipe(userHome(), //
-				new String[] { "bash", "--login", "-c", "which git" }, // //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
+				new String[] { "bash", "--login", "-c", "which git" }, //
 				Charset.defaultCharset().name());
 		if (w != null) {
 			// The path may be in cygwin/msys notation so resolve it right away
@@ -109,16 +109,16 @@ class FS_Win32 extends FS {
 
 	@Override
 	protected File userHomeImpl() {
-		String home = SystemReader.getInstance().getenv("HOME"); //$NON-NLS-1$
+		String home = SystemReader.getInstance().getenv("HOME");
 		if (home != null)
 			return resolve(null, home);
-		String homeDrive = SystemReader.getInstance().getenv("HOMEDRIVE"); //$NON-NLS-1$
+		String homeDrive = SystemReader.getInstance().getenv("HOMEDRIVE");
 		if (homeDrive != null) {
-			String homePath = SystemReader.getInstance().getenv("HOMEPATH"); //$NON-NLS-1$
+			String homePath = SystemReader.getInstance().getenv("HOMEPATH");
 			return new File(homeDrive, homePath);
 		}
 
-		String homeShare = SystemReader.getInstance().getenv("HOMESHARE"); //$NON-NLS-1$
+		String homeShare = SystemReader.getInstance().getenv("HOMESHARE");
 		if (homeShare != null)
 			return new File(homeShare);
 
@@ -128,8 +128,8 @@ class FS_Win32 extends FS {
 	@Override
 	public ProcessBuilder runInShell(String cmd, String[] args) {
 		List<String> argv = new ArrayList<String>(3 + args.length);
-		argv.add("cmd.exe"); //$NON-NLS-1$
-		argv.add("/c"); //$NON-NLS-1$
+		argv.add("cmd.exe");
+		argv.add("/c");
 		argv.add(cmd);
 		argv.addAll(Arrays.asList(args));
 		ProcessBuilder proc = new ProcessBuilder();

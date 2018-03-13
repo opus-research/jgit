@@ -154,7 +154,7 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 
 	String commandFor(final String exe) {
 		String path = uri.getPath();
-		if (uri.getScheme() != null && uri.getPath().startsWith("/~")) //$NON-NLS-1$
+		if (uri.getScheme() != null && uri.getPath().startsWith("/~"))
 			path = (uri.getPath().substring(1));
 
 		final StringBuilder cmd = new StringBuilder();
@@ -181,13 +181,13 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 			return nf;
 
 		String path = uri.getPath();
-		if (uri.getScheme() != null && uri.getPath().startsWith("/~")) //$NON-NLS-1$
+		if (uri.getScheme() != null && uri.getPath().startsWith("/~"))
 			path = uri.getPath().substring(1);
 
 		final StringBuilder pfx = new StringBuilder();
-		pfx.append("fatal: "); //$NON-NLS-1$
+		pfx.append("fatal: ");
 		pfx.append(QuotedString.BOURNE.quote(path));
-		pfx.append(": "); //$NON-NLS-1$
+		pfx.append(": ");
 		if (why.startsWith(pfx.toString()))
 			why = why.substring(pfx.length());
 
@@ -195,25 +195,25 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 	}
 
 	private static boolean useExtSession() {
-		return SystemReader.getInstance().getenv("GIT_SSH") != null; //$NON-NLS-1$
+		return SystemReader.getInstance().getenv("GIT_SSH") != null;
 	}
 
 	private class ExtSession implements RemoteSession {
 		public Process exec(String command, int timeout)
 				throws TransportException {
-			String ssh = SystemReader.getInstance().getenv("GIT_SSH"); //$NON-NLS-1$
-			boolean putty = ssh.toLowerCase().contains("plink"); //$NON-NLS-1$
+			String ssh = SystemReader.getInstance().getenv("GIT_SSH");
+			boolean putty = ssh.toLowerCase().contains("plink");
 
 			List<String> args = new ArrayList<String>();
 			args.add(ssh);
-			if (putty && !ssh.toLowerCase().contains("tortoiseplink")) //$NON-NLS-1$
-				args.add("-batch"); //$NON-NLS-1$
+			if (putty && !ssh.toLowerCase().contains("tortoiseplink"))
+				args.add("-batch");
 			if (0 < getURI().getPort()) {
-				args.add(putty ? "-P" : "-p"); //$NON-NLS-1$ //$NON-NLS-2$
+				args.add(putty ? "-P" : "-p");
 				args.add(String.valueOf(getURI().getPort()));
 			}
 			if (getURI().getUser() != null)
-				args.add(getURI().getUser() + "@" + getURI().getHost()); //$NON-NLS-1$
+				args.add(getURI().getUser() + "@" + getURI().getHost());
 			else
 				args.add(getURI().getHost());
 			args.add(command);
