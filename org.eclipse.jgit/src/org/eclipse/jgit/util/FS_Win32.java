@@ -53,7 +53,6 @@ import java.util.Arrays;
 import java.util.List;
 
 class FS_Win32 extends FS {
-
 	static boolean isWin32() {
 		final String osDotName = AccessController
 				.doPrivileged(new PrivilegedAction<String>() {
@@ -86,11 +85,6 @@ class FS_Win32 extends FS {
 	}
 
 	public boolean setExecute(final File f, final boolean canExec) {
-		return false;
-	}
-
-	@Override
-	public boolean isCaseSensitive() {
 		return false;
 	}
 
