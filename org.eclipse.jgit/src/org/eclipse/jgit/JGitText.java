@@ -275,7 +275,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String hunkHeaderDoesNotMatchBodyLineCountOf;
 	/***/ public String illegalArgumentNotA;
 	/***/ public String illegalCombinationOfArguments;
-	/***/ public String illegalPackingPhase;
 	/***/ public String illegalStateExists;
 	/***/ public String improperlyPaddedBase64Input;
 	/***/ public String inMemoryBufferLimitExceeded;
