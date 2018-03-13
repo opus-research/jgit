@@ -142,11 +142,9 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 	 * Set the person to use as the author and committer in the commits made
 	 *
 	 * @param person
-	 * @return {@code this}
 	 */
-	public StashCreateCommand setPerson(PersonIdent person) {
+	public void setPerson(PersonIdent person) {
 		this.person = person;
-		return this;
 	}
 
 	/**
@@ -155,11 +153,9 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 	 * This value defaults to {@link Constants#R_STASH}
 	 *
 	 * @param ref
-	 * @return {@code this}
 	 */
-	public StashCreateCommand setRef(String ref) {
+	public void setRef(String ref) {
 		this.ref = ref;
-		return this;
 	}
 
 	private RevCommit parseCommit(final ObjectReader reader,
