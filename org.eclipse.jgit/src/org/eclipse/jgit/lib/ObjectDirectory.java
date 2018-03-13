@@ -292,20 +292,7 @@ public class ObjectDirectory extends ObjectDatabase {
 		PackList o, n;
 		do {
 			o = packList.get();
-
-			// If the pack in question is already present in the list
-			// (picked up by a concurrent thread that did a scan?) we
-			// do not want to insert it a second time.
-			//
 			final PackFile[] oldList = o.packs;
-			final String name = pf.getPackFile().getName();
-			for (PackFile p : oldList) {
-				if (PackFile.SORT.compare(pf, p) < 0)
-					break;
-				if (name.equals(p.getPackFile().getName()))
-					return;
-			}
-
 			final PackFile[] newList = new PackFile[1 + oldList.length];
 			newList[0] = pf;
 			System.arraycopy(oldList, 0, newList, 1, oldList.length);
@@ -429,11 +416,10 @@ public class ObjectDirectory extends ObjectDatabase {
 				// This should never occur. It should be impossible for us
 				// to have two pack files with the same name, as all of them
 				// came out of the same directory. If it does, we promised to
-				// close any PackFiles we did not reuse, so close the second,
-				// readers are likely to be actively using the first.
+				// close any PackFiles we did not reuse, so close the one we
+				// just evicted out of the reuse map.
 				//
-				forReuse.put(prior.getPackFile().getName(), prior);
-				p.close();
+				prior.close();
 			}
 		}
 		return forReuse;

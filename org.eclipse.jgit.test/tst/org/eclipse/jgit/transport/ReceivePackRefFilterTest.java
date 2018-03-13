@@ -114,15 +114,6 @@ public class ReceivePackRefFilterTest extends LocalDiskRepositoryTestCase {
 		d.update(R_PRIVATE, P);
 	}
 
-	@Override
-	protected void tearDown() throws Exception {
-		if (src != null)
-			src.close();
-		if (dst != null)
-			dst.close();
-		super.tearDown();
-	}
-
 	public void testFilterHidesPrivate() throws Exception {
 		Map<String, Ref> refs;
 		TransportLocal t = new TransportLocal(src, uriOf(dst)) {
