@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Google Inc.
+ * Copyright (C) 2011, 2013 Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,52 +40,52 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.archive;
+package org.eclipse.jgit.gitrepo;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import static org.junit.Assert.assertTrue;
 
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream;
-import org.eclipse.jgit.api.ArchiveCommand;
-import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectLoader;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 
-/**
- * bzip2-compressed tarball (tar.bz2) format.
- */
-public final class Tbz2Format implements ArchiveCommand.Format<ArchiveOutputStream> {
-	private static final List<String> SUFFIXES = Collections
-			.unmodifiableList(Arrays.asList(".tar.bz2", ".tbz", ".tbz2")); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.junit.JGitTestUtil;
+import org.eclipse.jgit.junit.RepositoryTestCase;
+import org.eclipse.jgit.lib.Repository;
+import org.junit.Test;
 
-	private final ArchiveCommand.Format<ArchiveOutputStream> tarFormat = new TarFormat();
+public class RepoCommandTest extends RepositoryTestCase {
 
-	public ArchiveOutputStream createArchiveOutputStream(OutputStream s)
-			throws IOException {
-		BZip2CompressorOutputStream out = new BZip2CompressorOutputStream(s);
-		return tarFormat.createArchiveOutputStream(out);
+	private Git remoteGit;
+
+	public void setUp() throws Exception {
+		super.setUp();
+
+		Repository remoteDb = createWorkRepository();
+		remoteGit = new Git(remoteDb);
+		JGitTestUtil.writeTrashFile(remoteDb, "hello.txt", "world");
+		remoteGit.add().addFilepattern("hello.txt").call();
+		remoteGit.commit().setMessage("Initial commit").call();
 	}
 
-	public void putEntry(ArchiveOutputStream out,
-			String path, FileMode mode, ObjectLoader loader)
-			throws IOException {
-		tarFormat.putEntry(out, path, mode, loader);
-	}
-
-	public Iterable<String> suffixes() {
-		return SUFFIXES;
-	}
-
-	@Override
-	public boolean equals(Object other) {
-		return (other instanceof Tbz2Format);
-	}
-
-	@Override
-	public int hashCode() {
-		return getClass().hashCode();
+	@Test
+	public void testAddRepoManifest() throws Exception {
+		StringBuilder xmlContent = new StringBuilder();
+		xmlContent.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
+			.append("<manifest>")
+			.append("<remote name=\"remote1\" fetch=\".\" />")
+			.append("<default revision=\"master\" remote=\"remote1\" />")
+			.append("<project path=\"foo\" name=\".\" />")
+			.append("</manifest>");
+		writeTrashFile("manifest.xml", xmlContent.toString());
+		RepoCommand command = new RepoCommand(db);
+		command.setPath(db.getWorkTree() + "/manifest.xml")
+			.setURI(remoteGit.getRepository().getDirectory().toURI().toString())
+			.call();
+		File hello = new File(db.getWorkTree() + "/foo/hello.txt");
+		assertTrue(hello.exists());
+		BufferedReader reader = new BufferedReader(new FileReader(hello));
+		String content = reader.readLine();
+		assertTrue(content.startsWith("world"));
 	}
 }

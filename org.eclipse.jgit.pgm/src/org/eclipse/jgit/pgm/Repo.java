@@ -52,9 +52,6 @@ class Repo extends TextBuiltin {
 	@Option(name = "--base-uri", aliases = { "-u" }, usage = "usage_baseUri")
 	private String uri;
 
-	@Option(name = "--groups", aliases = { "-g" }, usage = "usage_groups")
-	private String groups = "default"; //$NON-NLS-1$
-
 	@Argument(required = true, usage = "usage_pathToXml")
 	private String path;
 
@@ -63,7 +60,6 @@ class Repo extends TextBuiltin {
 		new RepoCommand(db)
 			.setURI(uri)
 			.setPath(path)
-			.setGroups(groups)
 			.call();
 	}
 }
