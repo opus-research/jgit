@@ -50,10 +50,10 @@ import java.io.ByteArrayInputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.MessageDigest;
 
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.transport.PackParser;
-import org.eclipse.jgit.util.sha1.SHA1;
 
 /**
  * Inserts objects into an existing {@code ObjectDatabase}.
@@ -177,11 +177,15 @@ public abstract class ObjectInserter implements AutoCloseable {
 		}
 	}
 
+	/** Digest to compute the name of an object. */
+	private final MessageDigest digest;
+
 	/** Temporary working buffer for streaming data through. */
 	private byte[] tempBuffer;
 
 	/** Create a new inserter for a database. */
 	protected ObjectInserter() {
+		digest = Constants.newMessageDigest();
 	}
 
 	/**
@@ -216,8 +220,9 @@ public abstract class ObjectInserter implements AutoCloseable {
 	}
 
 	/** @return digest to help compute an ObjectId */
-	protected SHA1 digest() {
-		return new SHA1();
+	protected MessageDigest digest() {
+		digest.reset();
+		return digest;
 	}
 
 	/**
@@ -247,13 +252,13 @@ public abstract class ObjectInserter implements AutoCloseable {
 	 * @return the name of the object.
 	 */
 	public ObjectId idFor(int type, byte[] data, int off, int len) {
-		SHA1 md = new SHA1();
+		MessageDigest md = digest();
 		md.update(Constants.encodedTypeString(type));
 		md.update((byte) ' ');
 		md.update(Constants.encodeASCII(len));
 		md.update((byte) 0);
 		md.update(data, off, len);
-		return md.toObjectId();
+		return ObjectId.fromRaw(md.digest());
 	}
 
 	/**
@@ -272,7 +277,7 @@ public abstract class ObjectInserter implements AutoCloseable {
 	 */
 	public ObjectId idFor(int objectType, long length, InputStream in)
 			throws IOException {
-		SHA1 md = new SHA1();
+		MessageDigest md = digest();
 		md.update(Constants.encodedTypeString(objectType));
 		md.update((byte) ' ');
 		md.update(Constants.encodeASCII(length));

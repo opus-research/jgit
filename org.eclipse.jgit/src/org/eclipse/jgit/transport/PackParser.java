@@ -83,7 +83,6 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
-import org.eclipse.jgit.util.sha1.SHA1;
 
 /**
  * Parses a pack stream and imports it for an {@link ObjectInserter}.
@@ -116,6 +115,8 @@ public abstract class PackParser {
 	private byte[] tempBuffer;
 
 	private byte[] hdrBuf;
+
+	private final MessageDigest objectDigest;
 
 	private final MutableObjectId tempObjectId;
 
@@ -205,6 +206,7 @@ public abstract class PackParser {
 		buf = new byte[BUFFER_SIZE];
 		tempBuffer = new byte[BUFFER_SIZE];
 		hdrBuf = new byte[64];
+		objectDigest = Constants.newMessageDigest();
 		tempObjectId = new MutableObjectId();
 		packDigest = Constants.newMessageDigest();
 		checkObjectCollisions = true;
@@ -665,13 +667,12 @@ public abstract class PackParser {
 						JGitText.get().corruptionDetectedReReadingAt,
 						Long.valueOf(visit.delta.position)));
 
-			SHA1 objectDigest = new SHA1();
 			objectDigest.update(Constants.encodedTypeString(type));
 			objectDigest.update((byte) ' ');
 			objectDigest.update(Constants.encodeASCII(visit.data.length));
 			objectDigest.update((byte) 0);
 			objectDigest.update(visit.data);
-			objectDigest.digest(tempObjectId);
+			tempObjectId.fromRaw(objectDigest.digest(), 0);
 
 			verifySafeObject(tempObjectId, type, visit.data);
 
@@ -1023,7 +1024,6 @@ public abstract class PackParser {
 
 	private void whole(final long pos, final int type, final long sz)
 			throws IOException {
-		SHA1 objectDigest = new SHA1();
 		objectDigest.update(Constants.encodedTypeString(type));
 		objectDigest.update((byte) ' ');
 		objectDigest.update(Constants.encodeASCII(sz));
@@ -1043,7 +1043,7 @@ public abstract class PackParser {
 				cnt += r;
 			}
 			inf.close();
-			objectDigest.digest(tempObjectId);
+			tempObjectId.fromRaw(objectDigest.digest(), 0);
 			checkContentLater = isCheckObjectCollisions()
 					&& readCurs.has(tempObjectId);
 			data = null;
@@ -1051,7 +1051,7 @@ public abstract class PackParser {
 		} else {
 			data = inflateAndReturn(Source.INPUT, sz);
 			objectDigest.update(data);
-			objectDigest.digest(tempObjectId);
+			tempObjectId.fromRaw(objectDigest.digest(), 0);
 			verifySafeObject(tempObjectId, type, data);
 		}
 
