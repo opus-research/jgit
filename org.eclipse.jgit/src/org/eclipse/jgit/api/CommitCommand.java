@@ -255,7 +255,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 			}
 
 			// lock the index
-			RevCommit revCommit = null;
 			DirCache index = repo.lockDirCache();
 			try {
 				if (!only.isEmpty())
@@ -282,7 +281,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 					ObjectId commitId = odi.insert(commit);
 					odi.flush();
 
-					revCommit = rw.parseCommit(commitId);
+					RevCommit revCommit = rw.parseCommit(commitId);
 					RefUpdate ru = repo.updateRef(Constants.HEAD);
 					ru.setNewObjectId(commitId);
 					if (reflogComment != null) {
@@ -317,7 +316,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 							repo.writeMergeCommitMsg(null);
 							repo.writeRevertHead(null);
 						}
-						break;
+						return revCommit;
 					}
 					case REJECTED:
 					case LOCK_FAILURE:
@@ -335,16 +334,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 			} finally {
 				index.unlock();
 			}
-
-			int postCommitHookResult = FS.DETECTED.runIfPresent(repo,
-					Hook.POST_COMMIT, new String[0]);
-			if (postCommitHookResult != 0) {
-				// TODO do we wish to log? If so, how? The post-commit hook
-				// cannot reject a commit, but the user might want to be told
-				// his hook failed...
-			}
-
-			return revCommit;
 		} catch (UnmergedPathException e) {
 			throw new UnmergedPathsException(e);
 		} catch (IOException e) {

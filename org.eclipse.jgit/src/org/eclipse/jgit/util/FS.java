@@ -803,11 +803,9 @@ public abstract class FS {
 				}
 				process.destroy();
 			}
-			if (ioException != null) {
-				throw ioException;
-			}
 		}
-		return -1;
+		// We can only be here if the outer try threw an IOException.
+		throw ioException;
 	}
 
 	/**
