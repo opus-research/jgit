@@ -609,7 +609,7 @@ public class DirCacheCheckout {
 			// switch processes all relevant cases.
 			switch (ffMask) {
 			case 0xDDF: // 1 2
-				if (f != null && isModified(name)) {
+				if (isModified(name)) {
 					conflict(name, dce, h, m); // 1
 				} else {
 					update(name, mId, mMode); // 2
@@ -627,7 +627,6 @@ public class DirCacheCheckout {
 					keep(dce); // 5 6
 				else
 					conflict(name, dce, h, m); // 5b 6b
-				break;
 			case 0xFDD: // 10 11
 				// TODO: make use of tree extension as soon as available in jgit
 				// we would like to do something like
@@ -650,13 +649,9 @@ public class DirCacheCheckout {
 						conflict(name, dce, h, m); // 8
 					else
 						update(name, mId, mMode); // 7
-				} else if (!isModified(name)) {
-					if (walk.isDirectoryFileConflict()
-							&& !f.getEntryObjectId().equals(ObjectId.zeroId()))
-						conflict(name, dce, h, m);
-					else
-						update(name, mId, mMode); // 9
-				} else
+				} else if (!isModified(name))
+					update(name, mId, mMode); // 9
+				else
 					// To be confirmed - this case is not in the table.
 					conflict(name, dce, h, m);
 				break;
@@ -665,10 +660,8 @@ public class DirCacheCheckout {
 				break;
 			case 0xFFD: // 12 13 14
 				if (equalIdAndMode(hId, hMode, iId, iMode))
-					if (f == null && walk.isDirectoryFileConflict())
-						conflict(name, dce, h, m);
-					else if (f != null
-							&& f.isModified(dce, true,
+					if (f == null
+							|| f.isModified(dce, true,
 									this.walk.getObjectReader()))
 						conflict(name, dce, h, m);
 					else
@@ -689,16 +682,12 @@ public class DirCacheCheckout {
 		}
 
 		// if we have no file at all then there is nothing to do
-		if ((ffMask & 0x222) == 0) {
-			if (m != null && walk.isDirectoryFileConflict())
-				conflict(name, dce, h, m);
+		if ((ffMask & 0x222) == 0)
 			return;
-		}
 
 		if ((ffMask == 0x00F) && f != null && FileMode.TREE.equals(f.getEntryFileMode())) {
 			// File/Directory conflict case #20
 			conflict(name, null, h, m);
-			return;
 		}
 
 		if (i == null) {
@@ -731,15 +720,14 @@ public class DirCacheCheckout {
 			 * </pre>
 			 */
 
-			if (h == null) {
+			if (h == null)
 				// Nothing in Head
 				// Nothing in Index
 				// At least one of Head, Index, Merge is not empty
 				// -> only Merge contains something for this path. Use it!
 				// Potentially update the file
-				if (f == null || !walk.isDirectoryFileConflict())
-					update(name, mId, mMode); // 1
-			} else if (m == null)
+				update(name, mId, mMode); // 1
+			else if (m == null)
 				// Nothing in Merge
 				// Something in Head
 				// Nothing in Index
@@ -856,8 +844,8 @@ public class DirCacheCheckout {
 						// Something different from a submodule in Index
 						// Nothing in Merge
 						// Something in Head
-						if (f != null
-								&& f.isModified(dce, true,
+						if (f == null
+								|| f.isModified(dce, true,
 										this.walk.getObjectReader()))
 							// file is dirty
 							// Index contains the same as Head
@@ -921,9 +909,9 @@ public class DirCacheCheckout {
 						// file content
 						update(name, mId, mMode);
 					} else if (dce != null
-							&& (f != null && f.isModified(dce, true,
+							&& (f == null || f.isModified(dce, true,
 									this.walk.getObjectReader()))) {
-						// File exists and is dirty
+						// File doesn't exist or is dirty
 						// Head and Index don't contain a submodule
 						// Head contains the same as Index. Merge differs
 						// Something in Merge
@@ -931,7 +919,7 @@ public class DirCacheCheckout {
 						// but the file is dirty. Report a conflict
 						conflict(name, dce, h, m);
 					} else {
-						// File doesn't exist or is clean
+						// File exists and is clean
 						// Head and Index don't contain a submodule
 						// Head contains the same as Index. Merge differs
 						// Something in Merge

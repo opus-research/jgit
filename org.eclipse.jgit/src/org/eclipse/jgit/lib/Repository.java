@@ -384,8 +384,7 @@ public abstract class Repository {
 		try {
 			Object resolved = resolve(rw, revstr);
 			if (resolved instanceof String) {
-				final Ref ref = getRef((String)resolved);
-				return ref != null ? ref.getLeaf().getObjectId() : null;
+				return getRef((String) resolved).getLeaf().getObjectId();
 			} else {
 				return (ObjectId) resolved;
 			}
