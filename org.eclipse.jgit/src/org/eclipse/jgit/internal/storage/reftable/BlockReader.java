@@ -68,6 +68,7 @@ import java.util.Arrays;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.io.BlockSource;
 import org.eclipse.jgit.lib.CheckoutEntry;
@@ -93,8 +94,9 @@ class BlockReader {
 
 	private int keysStart;
 	private int keysEnd;
-	private int restartIdx;
-	private int restartCount;
+
+	private int restartCnt;
+	private int restartTbl;
 
 	private byte[] nameBuf = new byte[256];
 	private int nameLen;
@@ -152,7 +154,7 @@ class BlockReader {
 		return compare(match, 0, n, nameBuf, 0, n) == 0;
 	}
 
-	long readIndex() throws IOException {
+	long readPositionFromIndex() throws IOException {
 		if (blockType != INDEX_BLOCK_TYPE) {
 			throw invalidBlock();
 		}
@@ -197,11 +199,16 @@ class BlockReader {
 		}
 	}
 
-	IntList readBlockList() {
+	@Nullable
+	IntList readBlockIdList() {
 		int n = valueType & VALUE_TYPE_MASK;
 		if (n == 0) {
 			n = readVarint32();
+			if (n == 0) {
+				return null;
+			}
 		}
+
 		IntList b = new IntList(n);
 		b.add(readVarint32());
 		for (int j = 1; j < n; j++) {
@@ -215,11 +222,11 @@ class BlockReader {
 		return reverseUpdateIndex(NB.decodeUInt64(nameBuf, nameLen - 8));
 	}
 
-	ReflogEntry readLog() {
+	ReflogEntry readLogEntry() {
 		ObjectId oldId = readValueId();
 		ObjectId newId = readValueId();
-		long ms = readVarint64() * 1000L;
 		short tz = readInt16();
+		long ms = readVarint64() * 1000L;
 		String name = readValueString();
 		String email = readValueString();
 		String comment = readValueString();
@@ -322,13 +329,15 @@ class BlockReader {
 			bufLen = blockLen;
 		}
 
-		keysStart = ptr;
 		if (blockType != FILE_BLOCK_TYPE) {
-			restartCount = NB.decodeUInt16(buf, bufLen - 2);
-			restartIdx = bufLen - (restartCount * 3 + 2);
-			keysEnd = restartIdx;
+			restartCnt = NB.decodeUInt16(buf, ptr);
+			restartTbl = ptr + 2;
+			keysStart = restartTbl + restartCnt * 3;
+			keysEnd = bufLen;
+			ptr = keysStart;
 		} else {
-			keysEnd = keysStart;
+			keysStart = ptr;
+			keysEnd = ptr;
 		}
 	}
 
@@ -369,8 +378,8 @@ class BlockReader {
 		// An empty reftable has only the file header in first block.
 		blockType = FILE_BLOCK_TYPE;
 		ptr = FILE_HEADER_LEN;
-		restartCount = 0;
-		restartIdx = bufLen;
+		restartCnt = 0;
+		restartTbl = bufLen;
 		keysStart = bufLen;
 		keysEnd = bufLen;
 	}
@@ -400,10 +409,10 @@ class BlockReader {
 
 	private int seek(byte[] key, boolean useKeyLen) {
 		int low = 0;
-		int end = restartCount;
+		int end = restartCnt;
 		for (;;) {
 			int mid = (low + end) >>> 1;
-			int p = NB.decodeUInt24(buf, restartIdx + mid * 3);
+			int p = NB.decodeUInt24(buf, restartTbl + mid * 3);
 			ptr = p + 1; // skip 0 prefix length
 			int n = readVarint32() >>> 3;
 			int cmp = compareKey(useKeyLen, key, buf, ptr, n);
@@ -428,7 +437,7 @@ class BlockReader {
 				ptr = keysStart;
 				return -1;
 			}
-			ptr = NB.decodeUInt24(buf, restartIdx + (rIdx - 1) * 3);
+			ptr = NB.decodeUInt24(buf, restartTbl + (rIdx - 1) * 3);
 		} else {
 			ptr = rPtr;
 		}
@@ -483,9 +492,8 @@ class BlockReader {
 			return;
 
 		case LOG_BLOCK_TYPE:
-			ptr += 2 * OBJECT_ID_LENGTH; // 2x id;
+			ptr += 2 * OBJECT_ID_LENGTH + 2; // 2x id; tz
 			readVarint64(); // time
-			ptr += 2; // 2-byte tz
 			skipString(); // name
 			skipString(); // email
 			skipString(); // comment
