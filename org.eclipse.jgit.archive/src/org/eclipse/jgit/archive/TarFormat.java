@@ -47,21 +47,23 @@ import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.text.MessageFormat;
 
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarConstants;
 import org.eclipse.jgit.api.ArchiveCommand;
+import org.eclipse.jgit.archive.internal.ArchiveText;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectLoader;
 
 /**
  * Unix TAR format (ustar + some PAX extensions).
  */
-public class TarFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
-	private static final List<String> SUFFIXES =
-			Collections.unmodifiableList(Arrays.asList(".tar"));
+public final class TarFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
+	private static final List<String> SUFFIXES = Collections
+			.unmodifiableList(Arrays.asList(".tar")); //$NON-NLS-1$
 
 	public ArchiveOutputStream createArchiveOutputStream(OutputStream s) {
 		TarArchiveOutputStream out = new TarArchiveOutputStream(s, "UTF-8"); //$NON-NLS-1$
@@ -83,24 +85,47 @@ public class TarFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
 			return;
 		}
 
+		// TarArchiveEntry detects directories by checking
+		// for '/' at the end of the filename.
+		if (path.endsWith("/") && mode != FileMode.TREE) //$NON-NLS-1$
+			throw new IllegalArgumentException(MessageFormat.format(
+					ArchiveText.get().pathDoesNotMatchMode, path, mode));
+		if (!path.endsWith("/") && mode == FileMode.TREE) //$NON-NLS-1$
+			path = path + "/"; //$NON-NLS-1$
+
 		final TarArchiveEntry entry = new TarArchiveEntry(path);
-		if (mode == FileMode.REGULAR_FILE ||
-		    mode == FileMode.EXECUTABLE_FILE) {
+		if (mode == FileMode.TREE) {
+			out.putArchiveEntry(entry);
+			out.closeArchiveEntry();
+			return;
+		}
+
+		if (mode == FileMode.REGULAR_FILE) {
+			// ok
+		} else if (mode == FileMode.EXECUTABLE_FILE) {
 			entry.setMode(mode.getBits());
 		} else {
-			// TODO(jrn): Let the caller know the tree contained
-			// an entry with unsupported mode (e.g., a submodule).
+			// Unsupported mode (e.g., GITLINK).
+			throw new IllegalArgumentException(MessageFormat.format(
+					ArchiveText.get().unsupportedMode, mode));
 		}
 		entry.setSize(loader.getSize());
 		out.putArchiveEntry(entry);
-		try {
-			loader.copyTo(out);
-		} finally {
-			out.closeArchiveEntry();
-		}
+		loader.copyTo(out);
+		out.closeArchiveEntry();
 	}
 
 	public Iterable<String> suffixes() {
 		return SUFFIXES;
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		return (other instanceof TarFormat);
+	}
+
+	@Override
+	public int hashCode() {
+		return getClass().hashCode();
 	}
 }

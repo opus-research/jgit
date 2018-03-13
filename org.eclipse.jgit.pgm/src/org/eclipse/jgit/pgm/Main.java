@@ -73,6 +73,9 @@ public class Main {
 	@Option(name = "--help", usage = "usage_displayThisHelpText", aliases = { "-h" })
 	private boolean help;
 
+	@Option(name = "--version", usage = "usage_displayVersion")
+	private boolean version;
+
 	@Option(name = "--show-stack-trace", usage = "usage_displayThejavaStackTraceOnExceptions")
 	private boolean showStackTrace;
 
@@ -120,6 +123,8 @@ public class Main {
 			configureHttpProxy();
 			execute(argv);
 		} catch (Die err) {
+			if (err.isAborted())
+				System.exit(1);
 			System.err.println(MessageFormat.format(CLIText.get().fatalError, err.getMessage()));
 			if (showStackTrace)
 				err.printStackTrace();
@@ -167,7 +172,7 @@ public class Main {
 		try {
 			clp.parseArgument(argv);
 		} catch (CmdLineException err) {
-			if (argv.length > 0 && !help) {
+			if (argv.length > 0 && !help && !version) {
 				writer.println(MessageFormat.format(CLIText.get().fatalError, err.getMessage()));
 				writer.flush();
 				System.exit(1);
@@ -204,6 +209,11 @@ public class Main {
 			System.exit(1);
 		}
 
+		if (version) {
+			String cmdId = Version.class.getSimpleName().toLowerCase();
+			subcommand = CommandCatalog.get(cmdId).create();
+		}
+
 		final TextBuiltin cmd = subcommand;
 		if (cmd.requiresRepository())
 			cmd.init(openGitDir(gitdir), null);
@@ -214,22 +224,24 @@ public class Main {
 		} finally {
 			if (cmd.outw != null)
 				cmd.outw.flush();
+			if (cmd.errw != null)
+				cmd.errw.flush();
 		}
 	}
 
 	/**
 	 * Evaluate the {@code --git-dir} option and open the repository.
 	 *
-	 * @param gitdir
+	 * @param aGitdir
 	 *            the {@code --git-dir} option given on the command line. May be
 	 *            null if it was not supplied.
 	 * @return the repository to operate on.
 	 * @throws IOException
 	 *             the repository cannot be opened.
 	 */
-	protected Repository openGitDir(String gitdir) throws IOException {
+	protected Repository openGitDir(String aGitdir) throws IOException {
 		RepositoryBuilder rb = new RepositoryBuilder() //
-				.setGitDir(gitdir != null ? new File(gitdir) : null) //
+				.setGitDir(aGitdir != null ? new File(aGitdir) : null) //
 				.readEnvironment() //
 				.findGitDir();
 		if (rb.getGitDir() == null)

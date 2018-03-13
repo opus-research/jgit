@@ -600,11 +600,11 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 	 *            position within the file to read from.
 	 * @param dstbuf
 	 *            destination buffer the inflater should output decompressed
-	 *            data to.
+	 *            data to. Must be large enough to store the entire stream,
+	 *            unless headerOnly is true.
 	 * @param headerOnly
 	 *            if true the caller wants only {@code dstbuf.length} bytes.
-	 * @return updated <code>dstoff</code> based on the number of bytes
-	 *         successfully inflated into <code>dstbuf</code>.
+	 * @return number of bytes inflated into <code>dstbuf</code>.
 	 * @throws IOException
 	 *             this cursor does not match the provider or id and the proper
 	 *             window could not be acquired through the provider's cache.
@@ -616,18 +616,16 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 			boolean headerOnly) throws IOException, DataFormatException {
 		prepareInflater();
 		pin(pack, position);
-		int dstoff = 0;
-		for (;;) {
-			dstoff = block.inflate(inf, position, dstbuf, dstoff);
-
-			if (headerOnly && dstoff == dstbuf.length)
+		position += block.setInput(position, inf);
+		for (int dstoff = 0;;) {
+			int n = inf.inflate(dstbuf, dstoff, dstbuf.length - dstoff);
+			dstoff += n;
+			if (inf.finished() || (headerOnly && dstoff == dstbuf.length))
 				return dstoff;
 			if (inf.needsInput()) {
-				position += block.remaining(position);
 				pin(pack, position);
-			} else if (inf.finished())
-				return dstoff;
-			else
+				position += block.setInput(position, inf);
+			} else if (n == 0)
 				throw new DataFormatException();
 		}
 	}

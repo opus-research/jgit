@@ -288,6 +288,13 @@ public final class Constants {
 	public static final String GIT_COMMITTER_EMAIL_KEY = "GIT_COMMITTER_EMAIL";
 
 	/**
+	 * The environment variable that blocks use of the system config file
+	 *
+	 * @since 3.3
+	 */
+	public static final String GIT_CONFIG_NOSYSTEM_KEY = "GIT_CONFIG_NOSYSTEM";
+
+	/**
 	 * The environment variable that limits how close to the root of the file
 	 * systems JGit will traverse when looking for a repository root.
 	 */
@@ -341,9 +348,6 @@ public final class Constants {
 
 	/** A bare repository typically ends with this string */
 	public static final String DOT_GIT_EXT = ".git";
-
-	/** Name of the attributes file */
-	public static final String DOT_GIT_ATTRIBUTES = ".gitattributes";
 
 	/** Name of the ignore file */
 	public static final String DOT_GIT_IGNORE = ".gitignore";

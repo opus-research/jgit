@@ -61,16 +61,14 @@ import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.List;
 
-import org.eclipse.jgit.attributes.Attribute;
-import org.eclipse.jgit.attributes.AttributesNode;
-import org.eclipse.jgit.attributes.AttributesRule;
+import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
+import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.ignore.IgnoreNode;
 import org.eclipse.jgit.ignore.IgnoreRule;
@@ -78,12 +76,16 @@ import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig;
 import org.eclipse.jgit.lib.CoreConfig.CheckStat;
+import org.eclipse.jgit.lib.CoreConfig.SymLinks;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectLoader;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.submodule.SubmoduleWalk;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
+import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.io.EolCanonicalizingInputStream;
 
 /**
@@ -130,9 +132,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 	/** If there is a .gitignore file present, the parsed rules from it. */
 	private IgnoreNode ignoreNode;
-
-	/** If there is a .gitattributes file present, the parsed rules from it. */
-	private AttributesNode attributesNode;
 
 	/** Repository that is the root level being iterated over */
 	protected Repository repository;
@@ -205,12 +204,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		else
 			entry = null;
 		ignoreNode = new RootIgnoreNode(entry, repo);
-
-		if (attributesNode instanceof PerDirectoryAttributesNode)
-			entry = ((PerDirectoryAttributesNode) attributesNode).entry;
-		else
-			entry = null;
-		attributesNode = new RootAttributesNode(entry, repo);
 	}
 
 	/**
@@ -263,14 +256,10 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			}
 		}
 		switch (mode & FileMode.TYPE_MASK) {
+		case FileMode.TYPE_SYMLINK:
 		case FileMode.TYPE_FILE:
 			contentIdFromPtr = ptr;
 			return contentId = idBufferBlob(entries[ptr]);
-		case FileMode.TYPE_SYMLINK:
-			// Java does not support symbolic links, so we should not
-			// have reached this particular part of the walk code.
-			//
-			return zeroid;
 		case FileMode.TYPE_GITLINK:
 			contentIdFromPtr = ptr;
 			return contentId = idSubmodule(entries[ptr]);
@@ -412,11 +401,11 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private boolean isBinary(byte[] content, int sz) {
+	private static boolean isBinary(byte[] content, int sz) {
 		return RawText.isBinary(content, sz);
 	}
 
-	private boolean isBinary(Entry entry) throws IOException {
+	private static boolean isBinary(Entry entry) throws IOException {
 		InputStream in = entry.openInputStream();
 		try {
 			return RawText.isBinary(in);
@@ -425,7 +414,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private ByteBuffer filterClean(byte[] src, int n)
+	private static ByteBuffer filterClean(byte[] src, int n)
 			throws IOException {
 		InputStream in = new ByteArrayInputStream(src);
 		try {
@@ -435,7 +424,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private InputStream filterClean(InputStream in) {
+	private static InputStream filterClean(InputStream in) {
 		return new EolCanonicalizingInputStream(in, true);
 	}
 
@@ -476,7 +465,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	public void next(final int delta) throws CorruptObjectException {
 		ptr += delta;
 		if (!eof()) {
-			canonLen = -1;
 			parseEntry();
 		}
 	}
@@ -495,6 +483,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		ensurePathCapacity(pathOffset + nameLen, pathOffset);
 		System.arraycopy(e.encodedName, 0, path, pathOffset, nameLen);
 		pathLen = pathOffset + nameLen;
+		canonLen = -1;
 	}
 
 	/**
@@ -614,55 +603,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		return ignoreNode;
 	}
 
-	/**
-	 * Returns the attributes of the current entry path.
-	 *
-	 * @return a list of attributes (empty if no attributes are available)
-	 * @throws IOException
-	 *             a relevant attributes file exists but cannot be read.
-	 */
-	public List<Attribute> getEntryAttributes() throws IOException {
-		return getEntryAttributes(pathLen);
-	}
-
-	/**
-	 * Returns the attributes of the current entry path.
-	 *
-	 * @param pLen
-	 *            the length of the path in the path buffer.
-	 * @return a list of attributes (empty if not attributes are available)
-	 * @throws IOException
-	 *             a relevant attributes file exists but cannot be read.
-	 */
-	protected List<Attribute> getEntryAttributes(final int pLen)
-			throws IOException {
-		AttributesNode rules = getAttributesNode();
-		if (rules != null) {
-			// The ignore code wants path to start with a '/' if possible.
-			// If we have the '/' in our path buffer because we are inside
-			// a subdirectory include it in the range we convert to string.
-			//
-			int pOff = pathOffset;
-			if (0 < pOff)
-				pOff--;
-			String p = TreeWalk.pathOf(path, pOff, pLen);
-			List<Attribute> attributes = rules.getAttributes(p,
-					FileMode.TREE.equals(mode));
-			if (!attributes.isEmpty())
-				return attributes;
-		}
-		if (parent instanceof WorkingTreeIterator)
-			return ((WorkingTreeIterator) parent).getEntryAttributes(pLen);
-		return Collections.emptyList();
-	}
-
-	private AttributesNode getAttributesNode() throws IOException {
-		if (attributesNode instanceof PerDirectoryAttributesNode)
-			attributesNode = ((PerDirectoryAttributesNode) attributesNode)
-					.load();
-		return attributesNode;
-	}
-
 	private static final Comparator<Entry> ENTRY_CMP = new Comparator<Entry>() {
 		public int compare(final Entry o1, final Entry o2) {
 			final byte[] a = o1.encodedName;
@@ -716,8 +656,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				continue;
 			if (Constants.DOT_GIT_IGNORE.equals(name))
 				ignoreNode = new PerDirectoryIgnoreNode(e);
-			if (Constants.DOT_GIT_ATTRIBUTES.equals(name))
-				attributesNode = new PerDirectoryAttributesNode(e);
 			if (i != o)
 				entries[o] = e;
 			e.encodeName(nameEncoder);
@@ -785,8 +723,9 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			return false;
 
 		// Do not rely on filemode differences in case of symbolic links
-		if (FileMode.SYMLINK.equals(rawMode))
-			return false;
+		if (getOptions().getSymLinks() == SymLinks.FALSE)
+			if (FileMode.SYMLINK.equals(rawMode))
+				return false;
 
 		// Ignore the executable file bits if WorkingTreeOptions tell me to
 		// do so. Ignoring is done by setting the bits representing a
@@ -860,25 +799,60 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *            True if the actual file content should be checked if
 	 *            modification time differs.
 	 * @return true if content is most likely different.
+	 * @deprecated Use {@link #isModified(DirCacheEntry, boolean, ObjectReader)}
 	 */
+	@Deprecated
 	public boolean isModified(DirCacheEntry entry, boolean forceContentCheck) {
+		try {
+			return isModified(entry, forceContentCheck,
+					repository.newObjectReader());
+		} catch (IOException e) {
+			throw new JGitInternalException(e.getMessage(), e);
+		}
+	}
+
+	/**
+	 * Checks whether this entry differs from a given entry from the
+	 * {@link DirCache}.
+	 *
+	 * File status information is used and if status is same we consider the
+	 * file identical to the state in the working directory. Native git uses
+	 * more stat fields than we have accessible in Java.
+	 *
+	 * @param entry
+	 *            the entry from the dircache we want to compare against
+	 * @param forceContentCheck
+	 *            True if the actual file content should be checked if
+	 *            modification time differs.
+	 * @param reader
+	 *            access to repository objects if necessary. Should not be null.
+	 * @return true if content is most likely different.
+	 * @throws IOException
+	 * @since 3.3
+	 */
+	public boolean isModified(DirCacheEntry entry, boolean forceContentCheck,
+			ObjectReader reader) throws IOException {
+		if (entry == null)
+			return !FileMode.MISSING.equals(getEntryFileMode());
 		MetadataDiff diff = compareMetadata(entry);
 		switch (diff) {
 		case DIFFER_BY_TIMESTAMP:
 			if (forceContentCheck)
 				// But we are told to look at content even though timestamps
 				// tell us about modification
-				return contentCheck(entry);
+				return contentCheck(entry, reader);
 			else
 				// We are told to assume a modification if timestamps differs
 				return true;
 		case SMUDGED:
 			// The file is clean by timestamps but the entry was smudged.
 			// Lets do a content check
-			return contentCheck(entry);
+			return contentCheck(entry, reader);
 		case EQUAL:
 			return false;
 		case DIFFER_BY_METADATA:
+			if (mode == FileMode.SYMLINK.getBits())
+				return contentCheck(entry, reader);
 			return true;
 		default:
 			throw new IllegalStateException(MessageFormat.format(
@@ -918,10 +892,14 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *
 	 * @param entry
 	 *            the entry to be checked
-	 * @return <code>true</code> if the content matches, <code>false</code>
-	 *         otherwise
+	 * @param reader
+	 *            acccess to repository data if necessary
+	 * @return <code>true</code> if the content doesn't match,
+	 *         <code>false</code> if it matches
+	 * @throws IOException
 	 */
-	private boolean contentCheck(DirCacheEntry entry) {
+	private boolean contentCheck(DirCacheEntry entry, ObjectReader reader)
+			throws IOException {
 		if (getEntryObjectId().equals(entry.getObjectId())) {
 			// Content has not changed
 
@@ -937,12 +915,74 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 			return false;
 		} else {
-			// Content differs: that's a real change!
+			if (mode == FileMode.SYMLINK.getBits())
+				return !new File(readContentAsNormalizedString(current()))
+						.equals(new File((readContentAsNormalizedString(entry,
+								reader))));
+			// Content differs: that's a real change, perhaps
+			if (reader == null) // deprecated use, do no further checks
+				return true;
+			switch (getOptions().getAutoCRLF()) {
+			case INPUT:
+			case TRUE:
+				InputStream dcIn = null;
+				try {
+					ObjectLoader loader = reader.open(entry.getObjectId());
+					if (loader == null)
+						return true;
+
+					// We need to compute the length, but only if it is not
+					// a binary stream.
+					dcIn = new EolCanonicalizingInputStream(
+							loader.openStream(), true, true /* abort if binary */);
+					long dcInLen;
+					try {
+						dcInLen = computeLength(dcIn);
+					} catch (EolCanonicalizingInputStream.IsBinaryException e) {
+						return true;
+					} finally {
+						dcIn.close();
+					}
+
+					dcIn = new EolCanonicalizingInputStream(
+							loader.openStream(), true);
+					byte[] autoCrLfHash = computeHash(dcIn, dcInLen);
+					boolean changed = getEntryObjectId().compareTo(
+							autoCrLfHash, 0) != 0;
+					return changed;
+				} catch (IOException e) {
+					return true;
+				} finally {
+					if (dcIn != null)
+						try {
+							dcIn.close();
+						} catch (IOException e) {
+							// empty
+						}
+				}
+			case FALSE:
+				break;
+			}
 			return true;
 		}
 	}
 
-	private long computeLength(InputStream in) throws IOException {
+	private static String readContentAsNormalizedString(DirCacheEntry entry,
+			ObjectReader reader) throws MissingObjectException, IOException {
+		ObjectLoader open = reader.open(entry.getObjectId());
+		byte[] cachedBytes = open.getCachedBytes();
+		return FS.detect().normalize(RawParseUtils.decode(cachedBytes));
+	}
+
+	private static String readContentAsNormalizedString(Entry entry) throws IOException {
+		long length = entry.getLength();
+		byte[] content = new byte[(int) length];
+		InputStream is = entry.openInputStream();
+		IO.readFully(is, content, 0, (int) length);
+		return FS.detect().normalize(RawParseUtils.decode(content));
+	}
+
+	private static long computeLength(InputStream in) throws IOException {
 		// Since we only care about the length, use skip. The stream
 		// may be able to more efficiently wade through its data.
 		//
@@ -1147,81 +1187,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 		private static void loadRulesFromFile(IgnoreNode r, File exclude)
 				throws FileNotFoundException, IOException {
-			if (exclude.exists()) {
+			if (FS.DETECTED.exists(exclude)) {
 				FileInputStream in = new FileInputStream(exclude);
-				try {
-					r.parse(in);
-				} finally {
-					in.close();
-				}
-			}
-		}
-	}
-
-	/** Magic type indicating we know rules exist, but they aren't loaded. */
-	private static class PerDirectoryAttributesNode extends AttributesNode {
-		final Entry entry;
-
-		PerDirectoryAttributesNode(Entry entry) {
-			super(Collections.<AttributesRule> emptyList());
-			this.entry = entry;
-		}
-
-		AttributesNode load() throws IOException {
-			AttributesNode r = new AttributesNode();
-			InputStream in = entry.openInputStream();
-			try {
-				r.parse(in);
-			} finally {
-				in.close();
-			}
-			return r.getRules().isEmpty() ? null : r;
-		}
-	}
-
-	/** Magic type indicating there may be rules for the top level. */
-	private static class RootAttributesNode extends PerDirectoryAttributesNode {
-		final Repository repository;
-
-		RootAttributesNode(Entry entry, Repository repository) {
-			super(entry);
-			this.repository = repository;
-		}
-
-		@Override
-		AttributesNode load() throws IOException {
-			AttributesNode r;
-			if (entry != null) {
-				r = super.load();
-				if (r == null)
-					r = new AttributesNode();
-			} else {
-				r = new AttributesNode();
-			}
-
-			FS fs = repository.getFS();
-			String path = repository.getConfig().get(CoreConfig.KEY)
-					.getAttributesFile();
-			if (path != null) {
-				File attributesFile;
-				if (path.startsWith("~/")) //$NON-NLS-1$
-					attributesFile = fs.resolve(fs.userHome(), path.substring(2));
-				else
-					attributesFile = fs.resolve(null, path);
-				loadRulesFromFile(r, attributesFile);
-			}
-
-			File attributes = fs.resolve(repository.getDirectory(),
-					"info/attributes"); //$NON-NLS-1$
-			loadRulesFromFile(r, attributes);
-
-			return r.getRules().isEmpty() ? null : r;
-		}
-
-		private static void loadRulesFromFile(AttributesNode r, File attrs)
-				throws FileNotFoundException, IOException {
-			if (attrs.exists()) {
-				FileInputStream in = new FileInputStream(attrs);
 				try {
 					r.parse(in);
 				} finally {
