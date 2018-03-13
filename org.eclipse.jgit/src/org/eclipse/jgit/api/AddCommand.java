@@ -170,7 +170,7 @@ public class AddCommand extends GitCommand<DirCache> {
 									|| !c.getDirCacheEntry().isAssumeValid()) {
 								entry.setLength(sz);
 								entry.setLastModified(f.getEntryLastModified());
-								entry.setFileMode(f.getIndexMode(c));
+								entry.setFileMode(f.getEntryFileMode());
 
 								InputStream in = f.openEntryStream();
 								try {

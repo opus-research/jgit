@@ -343,7 +343,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 					long entryLength = fTree.getEntryLength();
 					dcEntry.setLength(entryLength);
 					dcEntry.setLastModified(fTree.getEntryLastModified());
-					dcEntry.setFileMode(fTree.getIndexMode(dcTree));
+					dcEntry.setFileMode(fTree.getEntryFileMode());
 
 					boolean objectExists = (dcTree != null && fTree
 							.idEqual(dcTree))
