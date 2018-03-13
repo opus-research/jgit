@@ -1,9 +1,3 @@
-java_bundle(
-  name = 'bundle',
-  srcs = ['META-INF/MANIFEST.MF', 'plugin.properties'],
-  deps = [':http'],
-)
-
 java_library(
   name = 'http',
   srcs = glob(['src/**/*.java']),

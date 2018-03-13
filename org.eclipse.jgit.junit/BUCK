@@ -1,9 +1,3 @@
-java_bundle(
-  name = 'bundle',
-  srcs = ['META-INF/MANIFEST.MF', 'plugin.properties'],
-  deps = [':junit'],
-)
-
 java_library(
   name = 'junit',
   srcs = glob(['src/**/*.java']),
