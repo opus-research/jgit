@@ -338,14 +338,6 @@ public class NameConflictTreeWalk extends TreeWalk {
 			dfConflict = null;
 	}
 
-	void stopWalk() throws CorruptObjectException {
-		while (depth > 0) {
-			exitSubtree();
-			popEntriesEqual();
-		}
-		super.stopWalk();
-	}
-
 	/**
 	 * True if the current entry is covered by a directory/file conflict.
 	 *
