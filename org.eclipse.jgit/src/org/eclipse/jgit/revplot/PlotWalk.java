@@ -114,13 +114,14 @@ public class PlotWalk extends RevWalk {
 
 	private Ref[] getRefs(final AnyObjectId commitId) {
 		Collection<Ref> list = reverseRefMap.get(commitId);
+		Ref[] tags;
 		if (list == null)
-			return PlotCommit.NO_REFS;
+			tags = null;
 		else {
-			Ref[] tags = list.toArray(new Ref[list.size()]);
+			tags = list.toArray(new Ref[list.size()]);
 			Arrays.sort(tags, new PlotRefComparator());
-			return tags;
 		}
+		return tags;
 	}
 
 	class PlotRefComparator implements Comparator<Ref> {
