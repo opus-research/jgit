@@ -150,7 +150,7 @@ public class RepositoryCache {
 	public static void close(@NonNull final Repository db) {
 		if (db.getDirectory() != null) {
 			FileKey key = FileKey.exact(db.getDirectory(), db.getFS());
-			cache.unregisterAndCloseRepository(key);
+			cache.unregisterAndCloseRepository(key, db);
 		}
 	}
 
@@ -298,15 +298,18 @@ public class RepositoryCache {
 	}
 
 	private boolean isExpired(Repository db) {
-		return db != null && db.useCnt.get() <= 0
+		return db != null && db.useCnt.get() == 0
 			&& (System.currentTimeMillis() - db.closedAt.get() > expireAfter);
 	}
 
-	private void unregisterAndCloseRepository(final Key location) {
+	private void unregisterAndCloseRepository(final Key location,
+			Repository db) {
 		synchronized (lockFor(location)) {
-			Repository oldDb = unregisterRepository(location);
-			if (oldDb != null) {
-				oldDb.doClose();
+			if (isExpired(db)) {
+				Repository oldDb = unregisterRepository(location);
+				if (oldDb != null) {
+					oldDb.close();
+				}
 			}
 		}
 	}
@@ -325,9 +328,15 @@ public class RepositoryCache {
 	}
 
 	private void clearAll() {
-		for (Iterator<Map.Entry<Key, Reference<Repository>>> i = cacheMap
-				.entrySet().iterator(); i.hasNext();) {
-			unregisterAndCloseRepository(i.next().getKey());
+		for (int stage = 0; stage < 2; stage++) {
+			for (Iterator<Map.Entry<Key, Reference<Repository>>> i = cacheMap
+					.entrySet().iterator(); i.hasNext();) {
+				final Map.Entry<Key, Reference<Repository>> e = i.next();
+				final Repository db = e.getValue().get();
+				if (db != null)
+					db.close();
+				i.remove();
+			}
 		}
 	}
 
