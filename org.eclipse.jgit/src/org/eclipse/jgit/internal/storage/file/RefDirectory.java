@@ -179,8 +179,9 @@ public class RefDirectory extends RefDatabase {
 		parent = db;
 		gitDir = db.getDirectory();
 		logWriter = new ReflogWriter(db);
-		refsDir = fs.resolve(db.getCommonDirectory(), R_REFS);
-		packedRefsFile = fs.resolve(db.getCommonDirectory(), PACKED_REFS);
+		refsDir = fs.resolve(gitDir, R_REFS);
+		packedRefsFile = fs.resolve(gitDir, PACKED_REFS);
+
 		looseRefs.set(RefList.<LooseRef> emptyList());
 		packedRefs.set(PackedRefList.NO_PACKED_REFS);
 	}
