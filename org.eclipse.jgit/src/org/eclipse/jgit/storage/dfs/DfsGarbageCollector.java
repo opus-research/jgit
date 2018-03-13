@@ -100,6 +100,12 @@ public class DfsGarbageCollector {
 
 	private Set<ObjectId> nonHeads;
 
+	/** Sum of object counts in {@link #packsBefore}. */
+	private long objectsBefore;
+
+	/** Sum of object counts iN {@link #newPackDesc}. */
+	private long objectsPacked;
+
 	private Set<ObjectId> tagTargets;
 
 	/**
@@ -275,14 +281,14 @@ public class DfsGarbageCollector {
 		try {
 			pw.preparePack(pm, allHeads, Collections.<ObjectId> emptySet());
 			if (0 < pw.getObjectCount())
-				writePack(GC, pw, pm);
+				writePack(GC, pw, pm).setTips(allHeads);
 		} finally {
 			pw.release();
 		}
 	}
 
 	private void packRest(ProgressMonitor pm) throws IOException {
-		if (nonHeads.isEmpty())
+		if (nonHeads.isEmpty() || objectsPacked == getObjectsBefore())
 			return;
 
 		PackWriter pw = newPackWriter();
@@ -298,11 +304,14 @@ public class DfsGarbageCollector {
 	}
 
 	private void packGarbage(ProgressMonitor pm) throws IOException {
+		if (objectsPacked == getObjectsBefore())
+			return;
+
 		// TODO(sop) This is ugly. The garbage pack needs to be deleted.
 		PackWriter pw = newPackWriter();
 		try {
 			RevWalk pool = new RevWalk(ctx);
-			pm.beginTask("Finding garbage", objectsBefore());
+			pm.beginTask("Finding garbage", (int) getObjectsBefore());
 			for (DfsPackFile oldPack : packsBefore) {
 				PackIndex oldIdx = oldPack.getPackIndex(ctx);
 				for (PackIndex.MutableEntry ent : oldIdx) {
@@ -334,11 +343,12 @@ public class DfsGarbageCollector {
 		return ref.getName().startsWith(Constants.R_HEADS);
 	}
 
-	private int objectsBefore() {
-		int cnt = 0;
-		for (DfsPackFile p : packsBefore)
-			cnt += p.getPackDescription().getObjectCount();
-		return cnt;
+	private long getObjectsBefore() {
+		if (objectsBefore == 0) {
+			for (DfsPackFile p : packsBefore)
+				objectsBefore += p.getPackDescription().getObjectCount();
+		}
+		return objectsBefore;
 	}
 
 	private PackWriter newPackWriter() {
@@ -393,6 +403,10 @@ public class DfsGarbageCollector {
 
 		PackWriter.Statistics stats = pw.getStatistics();
 		pack.setPackStats(stats);
+		pack.setFileSize(PACK, stats.getTotalBytes());
+		pack.setObjectCount(stats.getTotalObjects());
+		pack.setDeltaCount(stats.getTotalDeltas());
+		objectsPacked += stats.getTotalObjects();
 		newPackStats.add(stats);
 
 		DfsBlockCache.getInstance().getOrCreate(pack, null);

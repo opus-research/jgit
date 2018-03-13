@@ -196,6 +196,11 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 			out.writeObject(otp);
 	}
 
+	@SuppressWarnings("unchecked")
+	public Collection<CachedPack> getCachedPacks() throws IOException {
+		return (Collection<CachedPack>) db.getCachedPacks();
+	}
+
 	/**
 	 * Copy bytes from the window to a caller supplied buffer.
 	 *
