@@ -83,7 +83,6 @@ public class SubmoduleInitCommand extends GitCommand<Collection<String>> {
 	 * Add repository-relative submodule path to initialize
 	 *
 	 * @param path
-	 *            (with <code>/</code> as separator)
 	 * @return this command
 	 */
 	public SubmoduleInitCommand addPath(final String path) {
