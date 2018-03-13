@@ -72,8 +72,7 @@ import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
  * source projects, as there are no authentication or authorization overheads.
  */
 class TransportGitAnon extends TcpTransport implements PackTransport {
-	/** 9418: IANA assigned port number for Git. */
-	static final int GIT_PORT = 9418;
+	static final int GIT_PORT = Daemon.DEFAULT_PORT;
 
 	static final TransportProtocol PROTO_GIT = new TransportProtocol() {
 		public String getName() {
