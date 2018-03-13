@@ -54,8 +54,6 @@ public class FastIgnoreRuleTest {
 
 	@Test
 	public void testSimpleCharClass() {
-		assertMatched("][", "][");
-		assertMatched("][a]", "]a");
 		assertMatched("[a]", "a");
 		assertMatched("][a]", "]a");
 		assertMatched("[a]", "a/");

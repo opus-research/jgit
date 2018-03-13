@@ -830,21 +830,29 @@ public class IgnoreRuleSpecialCasesTest {
 	}
 
 	@Test
+	public void testIgnoredBackslash() throws Exception {
+		// In Git CLI a\b\c is equal to abc
+		assertMatch("a\\b\\c", "abc", true);
+	}
+
+	@Test
 	public void testEscapedBackslash() throws Exception {
 		// In Git CLI a\\b matches a\b file
 		assertMatch("a\\\\b", "a\\b", true);
+		assertMatch("a\\\\b\\c", "a\\bc", true);
+
 	}
 
 	@Test
 	public void testEscapedExclamationMark() throws Exception {
 		assertMatch("\\!b!.txt", "!b!.txt", true);
-		assertMatch("a\\!b!.txt", "a\\!b!.txt", true);
+		assertMatch("a\\!b!.txt", "a!b!.txt", true);
 	}
 
 	@Test
 	public void testEscapedHash() throws Exception {
 		assertMatch("\\#b", "#b", true);
-		assertMatch("a\\#", "a\\#", true);
+		assertMatch("a\\#", "a#", true);
 	}
 
 	@Test
@@ -855,17 +863,33 @@ public class IgnoreRuleSpecialCasesTest {
 
 	@Test
 	public void testNotEscapingBackslash() throws Exception {
-		assertMatch("\\out", "\\out", true);
-		assertMatch("\\out", "a/\\out", true);
-		assertMatch("c:\\/", "c:\\/", true);
-		assertMatch("c:\\/", "a/c:\\/", true);
-		assertMatch("c:\\tmp", "c:\\tmp", true);
-		assertMatch("c:\\tmp", "a/c:\\tmp", true);
+		assertMatch("\\out", "out", true);
+		assertMatch("\\out", "a/out", true);
+		assertMatch("c:\\/", "c:/", true);
+		assertMatch("c:\\/", "a/c:/", true);
+		assertMatch("c:\\tmp", "c:tmp", true);
+		assertMatch("c:\\tmp", "a/c:tmp", true);
 	}
 
 	@Test
 	public void testMultipleEscapedCharacters1() throws Exception {
 		assertMatch("\\]a?c\\*\\[d\\?\\]", "]abc*[d?]", true);
+	}
+
+	@Test
+	public void testBackslash() throws Exception {
+		assertMatch("a\\", "a", true);
+		assertMatch("\\a", "a", true);
+		assertMatch("a/\\", "a/", true);
+		assertMatch("a/b\\", "a/b", true);
+		assertMatch("\\a/b", "a/b", true);
+		assertMatch("/\\a", "/a", true);
+		assertMatch("\\a\\b\\c\\", "abc", true);
+		assertMatch("/\\a/\\b/\\c\\", "a/b/c", true);
+
+		// empty path segment doesn't match
+		assertMatch("\\/a", "/a", false);
+		assertMatch("\\/a", "a", false);
 	}
 
 	@Test
@@ -944,73 +968,6 @@ public class IgnoreRuleSpecialCasesTest {
 		assertMatch("[a{}()b][a{}()b]?[a{}()b][a{}()b]", "{}x()", true);
 		assertMatch("x*{x}3", "xa{x}3", true);
 		assertMatch("a*{x}3", "axxx", false);
-
-		assertMatch("?", "[", true);
-		assertMatch("*", "[", true);
-
-		// Escaped bracket matches, but see weird things below...
-		assertMatch("\\[", "[", true);
-	}
-
-	/**
-	 * Tests which do NOT match in Git CLI, but seem to be correct
-	 *
-	 * The ignore rules here <b>match</b> paths because single '[' is treated
-	 * here literally, not as a beginning of a character group
-	 *
-	 * @throws Exception
-	 */
-	@Test
-	public void testBracketsIncompatibleBehavior() throws Exception {
-		// Git CLI seem to "oversee" single open bracket as if it would
-		// open an empty character group
-		assertMatch("[", "[", true);
-
-		// Same as above. Looks like Git understands "*" literally, as if it
-		// would be inside a character group?
-		assertMatch("[*", "[", true);
-
-		// If bracket is not matching anything, why * does not match here?
-		assertMatch("*[", "[", true);
-		assertMatch("*[", "a[", true);
-	}
-
-	/**
-	 * Tests which DO match to Git CLI, but are contradictory to the Git CLI
-	 * behavior above.
-	 *
-	 * The ignore rules here <b>do not match</b> paths because single '[' is
-	 * treated here literally, not as a beginning of a character group
-	 *
-	 * @throws Exception
-	 */
-	@Test
-	public void testBracketsCompatibleBehavior() throws Exception {
-		// If Git CLI "oversees" open bracket, why it does not match here?
-		assertMatch("*[", "a", false);
-
-		// If this is a character group, why "a" is not matched?
-		assertMatch("[a", "a", false);
-
-		// OK if Git interpret * here literally, as a part of character group
-		assertMatch("[*", "a", false);
-
-		// But not OK here, if the rule interpreted as a character group
-		assertMatch("[*a", "a", false);
-
-		// If above does not work because of a broken group, why below works??
-		// Here ']' is interpreted literally
-		assertMatch("*]", "a", false);
-		assertMatch("]a", "a", false);
-		assertMatch("]*", "a", false);
-		assertMatch("]*a", "a", false);
-
-		// This also does work in Git CLI:
-		assertMatch("]", "]", true);
-		assertMatch("]*", "]", true);
-		assertMatch("]*", "]a", true);
-		assertMatch("*]", "]", true);
-		assertMatch("*]", "a]", true);
 	}
 
 	@Test
