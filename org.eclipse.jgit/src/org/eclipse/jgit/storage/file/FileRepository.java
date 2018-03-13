@@ -60,11 +60,11 @@ import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.BaseRepositoryBuilder;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.GraftsDatabase;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.RefUpdate;
+import org.eclipse.jgit.lib.AbstractRepository;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileObjectDatabase.AlternateHandle;
 import org.eclipse.jgit.storage.file.FileObjectDatabase.AlternateRepository;
@@ -96,7 +96,7 @@ import org.eclipse.jgit.util.SystemReader;
  * This implementation only handles a subtly undocumented subset of git features.
  *
  */
-public class FileRepository extends Repository {
+public class FileRepository extends AbstractRepository {
 	private final FileBasedConfig systemConfig;
 
 	private final FileBasedConfig userConfig;
@@ -108,8 +108,6 @@ public class FileRepository extends Repository {
 	private final ObjectDirectory objectDatabase;
 
 	private FileSnapshot snapshot;
-
-	private final FileGraftsDataBase graftsDb;
 
 	/**
 	 * Construct a representation of a Git repository.
@@ -195,8 +193,6 @@ public class FileRepository extends Repository {
 
 		if (!isBare())
 			snapshot = FileSnapshot.save(getIndexFile());
-
-		graftsDb = new FileGraftsDataBase(getGraftsFile());
 	}
 
 	private void loadSystemConfig() throws IOException {
@@ -416,16 +412,5 @@ public class FileRepository extends Repository {
 		if (ref != null)
 			return new ReflogReader(this, ref.getName());
 		return null;
-	}
-
-	public GraftsDatabase getGraftsDatabase() {
-		return graftsDb;
-	}
-
-	/**
-	 * @return the grafts file
-	 */
-	public File getGraftsFile() {
-		return new File(getDirectory(), "info/grafts");
 	}
 }

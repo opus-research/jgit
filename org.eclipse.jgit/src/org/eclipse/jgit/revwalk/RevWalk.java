@@ -48,11 +48,9 @@ import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -160,13 +158,8 @@ public class RevWalk implements Iterable<RevCommit> {
 	 */
 	static final int TOPO_DELAY = 1 << 5;
 
-	/**
-	 * Set on commits whose parents have been replace with grafts
-	 */
-	static final int GRAFTED = 1 << 6;
-
 	/** Number of flag bits we keep internal for our own use. See above flags. */
-	static final int RESERVED_FLAGS = 7;
+	static final int RESERVED_FLAGS = 6;
 
 	private static final int APP_FLAGS = -1 & ~((1 << RESERVED_FLAGS) - 1);
 
@@ -199,10 +192,6 @@ public class RevWalk implements Iterable<RevCommit> {
 
 	private boolean retainBody;
 
-	private Map<AnyObjectId, List<ObjectId>> grafts;
-
-	private Map<AnyObjectId, ObjectId> replacements;
-
 	/**
 	 * Create a new revision walker for a given repository.
 	 *
@@ -212,7 +201,7 @@ public class RevWalk implements Iterable<RevCommit> {
 	 *            released by the caller.
 	 */
 	public RevWalk(final Repository repo) {
-		this(repo, repo.newObjectReader(), true);
+		this(repo, repo.newObjectReader());
 	}
 
 	/**
@@ -224,11 +213,10 @@ public class RevWalk implements Iterable<RevCommit> {
 	 *            required.
 	 */
 	public RevWalk(ObjectReader or) {
-		this(null, or, false);
+		this(null, or);
 	}
 
-	private RevWalk(final Repository repo, final ObjectReader or,
-			final boolean useGrafts) {
+	private RevWalk(final Repository repo, final ObjectReader or) {
 		repository = repo;
 		reader = or;
 		idBuffer = new MutableObjectId();
@@ -240,18 +228,6 @@ public class RevWalk implements Iterable<RevCommit> {
 		filter = RevFilter.ALL;
 		treeFilter = TreeFilter.ALL;
 		retainBody = true;
-		if (useGrafts) {
-			try {
-				setGrafts(repo.getGrafts());
-				setReplacements(repo.getReplacements());
-			} catch (IOException e) {
-				throw new RuntimeException(e);
-			}
-		} else {
-			setGrafts(Collections.<AnyObjectId, List<ObjectId>> emptyMap());
-			setReplacements(Collections.<AnyObjectId, ObjectId> emptyMap());
-		}
-		assert !useGrafts || repo != null;
 	}
 
 	/** @return the reader this walker is using to load objects. */
@@ -606,21 +582,15 @@ public class RevWalk implements Iterable<RevCommit> {
 	 * <p>
 	 * The blob may or may not exist in the repository. It is impossible to tell
 	 * from this method's return value.
-	 * <p>
-	 * Blobs may be replaced by other objects as defined by
-	 * {@link #setReplacements(Map)}
 	 *
 	 * @param id
 	 *            name of the blob object.
 	 * @return reference to the blob object. Never null.
 	 */
 	public RevBlob lookupBlob(final AnyObjectId id) {
-		AnyObjectId altId = replacements.get(id);
-		if (altId == null)
-			altId = id;
-		RevBlob c = (RevBlob) objects.get(altId);
+		RevBlob c = (RevBlob) objects.get(id);
 		if (c == null) {
-			c = new RevBlob(altId);
+			c = new RevBlob(id);
 			objects.add(c);
 		}
 		return c;
@@ -631,21 +601,15 @@ public class RevWalk implements Iterable<RevCommit> {
 	 * <p>
 	 * The tree may or may not exist in the repository. It is impossible to tell
 	 * from this method's return value.
-	 * <p>
-	 * Trees may be replaced by other objects as defined by
-	 * {@link #setReplacements(Map)}
 	 *
 	 * @param id
 	 *            name of the tree object.
 	 * @return reference to the tree object. Never null.
 	 */
 	public RevTree lookupTree(final AnyObjectId id) {
-		AnyObjectId altId = replacements.get(id);
-		if (altId == null)
-			altId = id;
-		RevTree c = (RevTree) objects.get(altId);
+		RevTree c = (RevTree) objects.get(id);
 		if (c == null) {
-			c = new RevTree(altId);
+			c = new RevTree(id);
 			objects.add(c);
 		}
 		return c;
@@ -656,21 +620,15 @@ public class RevWalk implements Iterable<RevCommit> {
 	 * <p>
 	 * The commit may or may not exist in the repository. It is impossible to
 	 * tell from this method's return value.
-	 * <p>
-	 * Commits may be replaced by other objects as defined by
-	 * {@link #setReplacements(Map)}
 	 *
 	 * @param id
 	 *            name of the commit object.
 	 * @return reference to the commit object. Never null.
 	 */
 	public RevCommit lookupCommit(final AnyObjectId id) {
-		AnyObjectId altId = replacements.get(id);
-		if (altId == null)
-			altId = id;
-		RevCommit c = (RevCommit) objects.get(altId);
+		RevCommit c = (RevCommit) objects.get(id);
 		if (c == null) {
-			c = createCommit(altId);
+			c = createCommit(id);
 			objects.add(c);
 		}
 		return c;
@@ -681,21 +639,15 @@ public class RevWalk implements Iterable<RevCommit> {
 	 * <p>
 	 * The tag may or may not exist in the repository. It is impossible to tell
 	 * from this method's return value.
-	 * <p>
-	 * Tags may be replaced by other objects as defined by
-	 * {@link #setReplacements(Map)}
 	 *
 	 * @param id
 	 *            name of the tag object.
 	 * @return reference to the tag object. Never null.
 	 */
 	public RevTag lookupTag(final AnyObjectId id) {
-		AnyObjectId altId = replacements.get(id);
-		if (altId == null)
-			altId = id;
-		RevTag c = (RevTag) objects.get(altId);
+		RevTag c = (RevTag) objects.get(id);
 		if (c == null) {
-			c = new RevTag(altId);
+			c = new RevTag(id);
 			objects.add(c);
 		}
 		return c;
@@ -714,23 +666,20 @@ public class RevWalk implements Iterable<RevCommit> {
 	 * @return reference to the object. Never null.
 	 */
 	public RevObject lookupAny(final AnyObjectId id, final int type) {
-		AnyObjectId altId = replacements.get(id);
-		if (altId == null)
-			altId = id;
-		RevObject r = objects.get(altId);
+		RevObject r = objects.get(id);
 		if (r == null) {
 			switch (type) {
 			case Constants.OBJ_COMMIT:
-				r = createCommit(altId);
+				r = createCommit(id);
 				break;
 			case Constants.OBJ_TREE:
-				r = new RevTree(altId);
+				r = new RevTree(id);
 				break;
 			case Constants.OBJ_BLOB:
-				r = new RevBlob(altId);
+				r = new RevBlob(id);
 				break;
 			case Constants.OBJ_TAG:
-				r = new RevTag(altId);
+				r = new RevTag(id);
 				break;
 			default:
 				throw new IllegalArgumentException(MessageFormat.format(
@@ -743,9 +692,6 @@ public class RevWalk implements Iterable<RevCommit> {
 
 	/**
 	 * Locate an object that was previously allocated in this walk.
-	 * <p>
-	 * The input argument is subject to replacement according to
-	 * {@link #setReplacements(Map)}
 	 *
 	 * @param id
 	 *            name of the object.
@@ -753,10 +699,7 @@ public class RevWalk implements Iterable<RevCommit> {
 	 *         otherwise null.
 	 */
 	public RevObject lookupOrNull(AnyObjectId id) {
-		AnyObjectId altId = replacements.get(id);
-		if (altId == null)
-			altId = id;
-		return objects.get(altId);
+		return objects.get(id);
 	}
 
 	/**
@@ -765,11 +708,9 @@ public class RevWalk implements Iterable<RevCommit> {
 	 * Unlike {@link #lookupCommit(AnyObjectId)} this method only returns
 	 * successfully if the commit object exists, is verified to be a commit, and
 	 * was parsed without error.
-	 * <p>
 	 *
 	 * @param id
-	 *            name of the commit object, subject to the replacement
-	 *            mechanism
+	 *            name of the commit object.
 	 * @return reference to the commit object. Never null.
 	 * @throws MissingObjectException
 	 *             the supplied commit does not exist.
@@ -857,7 +798,7 @@ public class RevWalk implements Iterable<RevCommit> {
 	 * unnecessarily, and thrown away.
 	 *
 	 * @param id
-	 *            name of the object, subject to the replacement mechanism
+	 *            name of the object.
 	 * @return reference to the object. Never null.
 	 * @throws MissingObjectException
 	 *             the supplied does not exist.
@@ -866,12 +807,9 @@ public class RevWalk implements Iterable<RevCommit> {
 	 */
 	public RevObject parseAny(final AnyObjectId id)
 			throws MissingObjectException, IOException {
-		AnyObjectId altId = replacements.get(id);
-		if (altId == null)
-			altId = id;
-		RevObject r = objects.get(altId);
+		RevObject r = objects.get(id);
 		if (r == null)
-			r = parseNew(id, reader.open(altId));
+			r = parseNew(id, reader.open(id));
 		else
 			parseHeaders(r);
 		return r;
@@ -935,8 +873,7 @@ public class RevWalk implements Iterable<RevCommit> {
 	 *            any ObjectId type.
 	 * @param objectIds
 	 *            objects to open from the object store. The supplied collection
-	 *            must not be modified until the queue has finished. The id's
-	 *            may be replaced by the replacement mechanism.
+	 *            must not be modified until the queue has finished.
 	 * @param reportMissing
 	 *            if true missing objects are reported by calling failure with a
 	 *            MissingObjectException. This may be more expensive for the
@@ -950,14 +887,11 @@ public class RevWalk implements Iterable<RevCommit> {
 		List<T> need = new ArrayList<T>();
 		List<RevObject> have = new ArrayList<RevObject>();
 		for (T id : objectIds) {
-			T altId = (T) replacements.get(id);
-			if (altId == null)
-				altId = id;
-			RevObject r = objects.get(altId);
+			RevObject r = objects.get(id);
 			if (r != null && (r.flags & PARSED) != 0)
 				have.add(r);
 			else
-				need.add(altId);
+				need.add(id);
 		}
 
 		final Iterator<RevObject> objItr = have.iterator();
@@ -1374,42 +1308,5 @@ public class RevWalk implements Iterable<RevCommit> {
 		final int carry = c.flags & carryFlags;
 		if (carry != 0)
 			RevCommit.carryFlags(c, carry);
-	}
-
-	/**
-	 * Tell the RevWalk to replace parents during walk.
-	 * <p>
-	 * A graft is a surgical replacement of the parents with an arbitrary
-	 * different list.
-	 * <p>
-	 *
-	 * @param map
-	 *            Map from commit to replacement parents
-	 */
-	public void setGrafts(final Map<AnyObjectId, List<ObjectId>> map) {
-		this.grafts = map;
-	}
-
-	/**
-	 * @return the mapping from child id to alternative parents
-	 */
-	public Map<AnyObjectId, List<ObjectId>> getGrafts() {
-		return grafts;
-	}
-
-	/**
-	 * Set the replacement map to use
-	 *
-	 * @param replacements
-	 */
-	public void setReplacements(final Map<AnyObjectId, ObjectId> replacements) {
-		this.replacements = replacements;
-	}
-
-	/**
-	 * @return the replacement map to use
-	 */
-	public Map<AnyObjectId, ObjectId> getReplacements() {
-		return replacements;
 	}
 }
