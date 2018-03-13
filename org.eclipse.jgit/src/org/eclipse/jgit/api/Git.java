@@ -207,7 +207,7 @@ public class Git implements AutoCloseable {
 		this(repo, false);
 	}
 
-	Git(Repository repo, boolean closeRepo) {
+	private Git(Repository repo, boolean closeRepo) {
 		if (repo == null)
 			throw new NullPointerException();
 		this.repo = repo;
@@ -508,16 +508,6 @@ public class Git implements AutoCloseable {
 	 */
 	public LsRemoteCommand lsRemote() {
 		return new LsRemoteCommand(repo);
-	}
-
-	/**
-	 * Returns a command object used to rename remotes
-	 *
-	 * @return a {@link RenameRemoteCommand}
-	 * @since 4.0
-	 */
-	public RenameRemoteCommand remoteRename() {
-		return new RenameRemoteCommand(repo);
 	}
 
 	/**

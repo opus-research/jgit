@@ -40,22 +40,20 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.attributes;
+package org.eclipse.jgit.ignore;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
+
 /**
- * Tests git attributes pattern matches
- * <p>
- * Inspired by {@link org.eclipse.jgit.ignore.IgnoreMatcherTest}
- * </p>
+ * Tests ignore pattern matches
  */
-public class AttributesMatcherTest {
+@SuppressWarnings("deprecation")
+public class IgnoreMatcherTest {
 
 	@Test
 	public void testBasic() {
@@ -187,8 +185,8 @@ public class AttributesMatcherTest {
 	}
 
 	@Test
-	public void testParentDirectoryGitAttributes() {
-		//Contains git attribute patterns such as might be seen in a parent directory
+	public void testParentDirectoryGitIgnores() {
+		//Contains git ignore patterns such as might be seen in a parent directory
 
 		//Test for wildcards
 		String pattern = "/*/*.c";
@@ -293,84 +291,75 @@ public class AttributesMatcherTest {
 	}
 
 	@Test
+	public void testNegation() {
+		String pattern = "!/test.stp";
+		assertMatched(pattern, "/test.stp");
+	}
+
+	@Test
 	public void testGetters() {
-		AttributesRule r = new AttributesRule("/pattern/", "");
-		assertFalse(r.isNameOnly());
+		IgnoreRule r = new IgnoreRule("/pattern/");
+		assertFalse(r.getNameOnly());
 		assertTrue(r.dirOnly());
-		assertNotNull(r.getAttributes());
-		assertTrue(r.getAttributes().isEmpty());
+		assertFalse(r.getNegation());
 		assertEquals(r.getPattern(), "/pattern");
 
-		r = new AttributesRule("/patter?/", "");
-		assertFalse(r.isNameOnly());
+		r = new IgnoreRule("/patter?/");
+		assertFalse(r.getNameOnly());
 		assertTrue(r.dirOnly());
-		assertNotNull(r.getAttributes());
-		assertTrue(r.getAttributes().isEmpty());
+		assertFalse(r.getNegation());
 		assertEquals(r.getPattern(), "/patter?");
 
-		r = new AttributesRule("patt*", "");
-		assertTrue(r.isNameOnly());
+		r = new IgnoreRule("patt*");
+		assertTrue(r.getNameOnly());
 		assertFalse(r.dirOnly());
-		assertNotNull(r.getAttributes());
-		assertTrue(r.getAttributes().isEmpty());
+		assertFalse(r.getNegation());
 		assertEquals(r.getPattern(), "patt*");
 
-		r = new AttributesRule("pattern", "attribute1");
-		assertTrue(r.isNameOnly());
+		r = new IgnoreRule("pattern");
+		assertTrue(r.getNameOnly());
 		assertFalse(r.dirOnly());
-		assertNotNull(r.getAttributes());
-		assertFalse(r.getAttributes().isEmpty());
-		assertEquals(r.getAttributes().size(), 1);
+		assertFalse(r.getNegation());
 		assertEquals(r.getPattern(), "pattern");
 
-		r = new AttributesRule("pattern", "attribute1 -attribute2");
-		assertTrue(r.isNameOnly());
+		r = new IgnoreRule("!pattern");
+		assertTrue(r.getNameOnly());
 		assertFalse(r.dirOnly());
-		assertNotNull(r.getAttributes());
-		assertEquals(r.getAttributes().size(), 2);
+		assertTrue(r.getNegation());
 		assertEquals(r.getPattern(), "pattern");
 
-		r = new AttributesRule("pattern", "attribute1 \t-attribute2 \t");
-		assertTrue(r.isNameOnly());
+		r = new IgnoreRule("!/pattern");
+		assertFalse(r.getNameOnly());
 		assertFalse(r.dirOnly());
-		assertNotNull(r.getAttributes());
-		assertEquals(r.getAttributes().size(), 2);
-		assertEquals(r.getPattern(), "pattern");
+		assertTrue(r.getNegation());
+		assertEquals(r.getPattern(), "/pattern");
 
-		r = new AttributesRule("pattern", "attribute1\t-attribute2\t");
-		assertTrue(r.isNameOnly());
+		r = new IgnoreRule("!/patter?");
+		assertFalse(r.getNameOnly());
 		assertFalse(r.dirOnly());
-		assertNotNull(r.getAttributes());
-		assertEquals(r.getAttributes().size(), 2);
-		assertEquals(r.getPattern(), "pattern");
+		assertTrue(r.getNegation());
+		assertEquals(r.getPattern(), "/patter?");
+	}
 
-		r = new AttributesRule("pattern", "attribute1\t -attribute2\t ");
-		assertTrue(r.isNameOnly());
-		assertFalse(r.dirOnly());
-		assertNotNull(r.getAttributes());
-		assertEquals(r.getAttributes().size(), 2);
-		assertEquals(r.getPattern(), "pattern");
-
-		r = new AttributesRule("pattern",
-				"attribute1 -attribute2  attribute3=value ");
-		assertTrue(r.isNameOnly());
-		assertFalse(r.dirOnly());
-		assertNotNull(r.getAttributes());
-		assertEquals(r.getAttributes().size(), 3);
-		assertEquals(r.getPattern(), "pattern");
-		assertEquals(r.getAttributes().get(0).toString(), "attribute1");
-		assertEquals(r.getAttributes().get(1).toString(), "-attribute2");
-		assertEquals(r.getAttributes().get(2).toString(), "attribute3=value");
+	@Test
+	public void testResetState() {
+		String pattern = "/build/*";
+		String target = "/build";
+		// Don't use the assert methods of this class, as we want to test
+		// whether the state in IgnoreRule is reset properly
+		IgnoreRule r = new IgnoreRule(pattern);
+		// Result should be the same for the same inputs
+		assertFalse(r.isMatch(target, true));
+		assertFalse(r.isMatch(target, true));
 	}
 
 	/**
 	 * Check for a match. If target ends with "/", match will assume that the
 	 * target is meant to be a directory.
-	 *
 	 * @param pattern
-	 *            Pattern as it would appear in a .gitattributes file
+	 * 			  Pattern as it would appear in a .gitignore file
 	 * @param target
-	 *            Target file path relative to repository's GIT_DIR
+	 * 			  Target file path relative to repository's GIT_DIR
 	 */
 	public void assertMatched(String pattern, String target) {
 		boolean value = match(pattern, target);
@@ -381,11 +370,10 @@ public class AttributesMatcherTest {
 	/**
 	 * Check for a match. If target ends with "/", match will assume that the
 	 * target is meant to be a directory.
-	 *
 	 * @param pattern
-	 *            Pattern as it would appear in a .gitattributes file
+	 * 			  Pattern as it would appear in a .gitignore file
 	 * @param target
-	 *            Target file path relative to repository's GIT_DIR
+	 * 			  Target file path relative to repository's GIT_DIR
 	 */
 	public void assertNotMatched(String pattern, String target) {
 		boolean value = match(pattern, target);
@@ -398,13 +386,13 @@ public class AttributesMatcherTest {
 	 * target is meant to be a directory.
 	 *
 	 * @param pattern
-	 *            Pattern as it would appear in a .gitattributes file
+	 *            Pattern as it would appear in a .gitignore file
 	 * @param target
 	 *            Target file path relative to repository's GIT_DIR
-	 * @return Result of {@link AttributesRule#isMatch(String, boolean)}
+	 * @return Result of IgnoreRule.isMatch(String, boolean)
 	 */
 	private static boolean match(String pattern, String target) {
-		AttributesRule r = new AttributesRule(pattern, "");
+		IgnoreRule r = new IgnoreRule(pattern);
 		//If speed of this test is ever an issue, we can use a presetRule field
 		//to avoid recompiling a pattern each time.
 		return r.isMatch(target, target.endsWith("/"));

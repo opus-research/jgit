@@ -240,17 +240,10 @@ public class ReceivePack extends BaseReceivePack {
 				});
 			}
 
-			if (unpackError != null) {
-				// we already know which exception to throw. Ignore
-				// potential additional exceptions raised in postReceiveHooks
-				try {
-					postReceive.onPostReceive(this, filterCommands(Result.OK));
-				} catch (Throwable e) {
-					// empty
-				}
-				throw new UnpackException(unpackError);
-			}
 			postReceive.onPostReceive(this, filterCommands(Result.OK));
+
+			if (unpackError != null)
+				throw new UnpackException(unpackError);
 		}
 	}
 

@@ -123,7 +123,7 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 	@After
 	public void tearDown() throws Exception {
 		if (wc != null)
-			wc.close();
+			wc.release();
 		new WindowCacheConfig().install();
 		super.tearDown();
 	}
@@ -373,9 +373,8 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 
 	@After
 	public void release() {
-		if (inserter != null) {
-			inserter.close();
-		}
+		if (inserter != null)
+			inserter.release();
 	}
 
 	private PackParser index(byte[] raw) throws IOException {

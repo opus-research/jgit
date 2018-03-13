@@ -184,6 +184,11 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 	}
 
 	@Override
+	public void delete(File path) throws IOException {
+		FileUtil.delete(path);
+	}
+
+	@Override
 	public long length(File f) throws IOException {
 		return FileUtil.getLength(f);
 	}
@@ -211,6 +216,16 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 	@Override
 	public void setHidden(File path, boolean hidden) throws IOException {
 		FileUtil.setHidden(path, hidden);
+	}
+
+	@Override
+	public String readSymLink(File path) throws IOException {
+		return FileUtil.readSymlink(path);
+	}
+
+	@Override
+	public void createSymLink(File path, String target) throws IOException {
+		FileUtil.createSymLink(path, target);
 	}
 
 	/**

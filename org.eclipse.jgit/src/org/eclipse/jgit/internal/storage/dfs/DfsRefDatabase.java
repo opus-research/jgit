@@ -91,13 +91,6 @@ public abstract class DfsRefDatabase extends RefDatabase {
 	}
 
 	@Override
-	public Ref exactRef(String name) throws IOException {
-		RefCache curr = read();
-		Ref ref = curr.ids.get(name);
-		return ref != null ? resolve(ref, 0, curr.ids) : null;
-	}
-
-	@Override
 	public Ref getRef(String needle) throws IOException {
 		RefCache curr = read();
 		for (String prefix : SEARCH_PATH) {
@@ -108,6 +101,14 @@ public abstract class DfsRefDatabase extends RefDatabase {
 			}
 		}
 		return null;
+	}
+
+	private Ref getOneRef(String refName) throws IOException {
+		RefCache curr = read();
+		Ref ref = curr.ids.get(refName);
+		if (ref != null)
+			return resolve(ref, 0, curr.ids);
+		return ref;
 	}
 
 	@Override
@@ -182,7 +183,8 @@ public abstract class DfsRefDatabase extends RefDatabase {
 
 	private Ref doPeel(final Ref leaf) throws MissingObjectException,
 			IOException {
-		try (RevWalk rw = new RevWalk(repository)) {
+		RevWalk rw = new RevWalk(repository);
+		try {
 			RevObject obj = rw.parseAny(leaf.getObjectId());
 			if (obj instanceof RevTag) {
 				return new ObjectIdRef.PeeledTag(
@@ -196,6 +198,8 @@ public abstract class DfsRefDatabase extends RefDatabase {
 						leaf.getName(),
 						leaf.getObjectId());
 			}
+		} finally {
+			rw.release();
 		}
 	}
 
@@ -211,7 +215,7 @@ public abstract class DfsRefDatabase extends RefDatabase {
 	public RefUpdate newUpdate(String refName, boolean detach)
 			throws IOException {
 		boolean detachingSymbolicRef = false;
-		Ref ref = exactRef(refName);
+		Ref ref = getOneRef(refName);
 		if (ref == null)
 			ref = new ObjectIdRef.Unpeeled(NEW, refName, null);
 		else

@@ -379,7 +379,8 @@ public abstract class Repository implements AutoCloseable {
 	public ObjectId resolve(final String revstr)
 			throws AmbiguousObjectException, IncorrectObjectTypeException,
 			RevisionSyntaxException, IOException {
-		try (RevWalk rw = new RevWalk(this)) {
+		RevWalk rw = new RevWalk(this);
+		try {
 			Object resolved = resolve(rw, revstr);
 			if (resolved instanceof String) {
 				final Ref ref = getRef((String)resolved);
@@ -387,6 +388,8 @@ public abstract class Repository implements AutoCloseable {
 			} else {
 				return (ObjectId) resolved;
 			}
+		} finally {
+			rw.release();
 		}
 	}
 
@@ -403,7 +406,8 @@ public abstract class Repository implements AutoCloseable {
 	 */
 	public String simplify(final String revstr)
 			throws AmbiguousObjectException, IOException {
-		try (RevWalk rw = new RevWalk(this)) {
+		RevWalk rw = new RevWalk(this);
+		try {
 			Object resolved = resolve(rw, revstr);
 			if (resolved != null)
 				if (resolved instanceof String)
@@ -411,6 +415,8 @@ public abstract class Repository implements AutoCloseable {
 				else
 					return ((AnyObjectId) resolved).getName();
 			return null;
+		} finally {
+			rw.release();
 		}
 	}
 
@@ -751,11 +757,8 @@ public abstract class Repository implements AutoCloseable {
 
 	private String resolveReflogCheckout(int checkoutNo)
 			throws IOException {
-		ReflogReader reader = getReflogReader(Constants.HEAD);
-		if (reader == null) {
-			return null;
-		}
-		List<ReflogEntry> reflogEntries = reader.getReverseEntries();
+		List<ReflogEntry> reflogEntries = getReflogReader(Constants.HEAD)
+				.getReverseEntries();
 		for (ReflogEntry entry : reflogEntries) {
 			CheckoutEntry checkout = entry.parseCheckout();
 			if (checkout != null)
@@ -776,11 +779,6 @@ public abstract class Repository implements AutoCloseable {
 		}
 		assert number >= 0;
 		ReflogReader reader = getReflogReader(ref.getName());
-		if (reader == null) {
-			throw new RevisionSyntaxException(
-					MessageFormat.format(JGitText.get().reflogEntryNotFound,
-							Integer.valueOf(number), ref.getName()));
-		}
 		ReflogEntry entry = reader.getReverseEntry(number);
 		if (entry == null)
 			throw new RevisionSyntaxException(MessageFormat.format(
@@ -793,7 +791,8 @@ public abstract class Repository implements AutoCloseable {
 	private ObjectId resolveAbbreviation(final String revstr) throws IOException,
 			AmbiguousObjectException {
 		AbbreviatedObjectId id = AbbreviatedObjectId.fromString(revstr);
-		try (ObjectReader reader = newObjectReader()) {
+		ObjectReader reader = newObjectReader();
+		try {
 			Collection<ObjectId> matches = reader.resolve(id);
 			if (matches.size() == 0)
 				return null;
@@ -801,6 +800,8 @@ public abstract class Repository implements AutoCloseable {
 				return matches.iterator().next();
 			else
 				throw new AmbiguousObjectException(id, matches);
+		} finally {
+			reader.release();
 		}
 	}
 
@@ -849,9 +850,8 @@ public abstract class Repository implements AutoCloseable {
 	 * Except when HEAD is detached, in which case this method returns the
 	 * current ObjectId in hexadecimal string format.
 	 *
-	 * @return name of current branch (for example {@code refs/heads/master}),
-	 *         an ObjectId in hex format if the current branch is detached,
-	 *         or null if the repository is corrupt and has no HEAD reference.
+	 * @return name of current branch (for example {@code refs/heads/master}) or
+	 *         an ObjectId in hex format if the current branch is detached.
 	 * @throws IOException
 	 */
 	public String getFullBranch() throws IOException {
@@ -872,9 +872,8 @@ public abstract class Repository implements AutoCloseable {
 	 * leading prefix {@code refs/heads/} is removed from the reference before
 	 * it is returned to the caller.
 	 *
-	 * @return name of current branch (for example {@code master}), an
-	 *         ObjectId in hex format if the current branch is detached,
-	 *         or null if the repository is corrupt and has no HEAD reference.
+	 * @return name of current branch (for example {@code master}), or an
+	 *         ObjectId in hex format if the current branch is detached.
 	 * @throws IOException
 	 */
 	public String getBranch() throws IOException {

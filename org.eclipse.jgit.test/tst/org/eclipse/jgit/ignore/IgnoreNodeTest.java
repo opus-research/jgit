@@ -44,15 +44,12 @@ package org.eclipse.jgit.ignore;
 
 import static org.eclipse.jgit.junit.Assert.assertEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
 import java.util.Arrays;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
@@ -327,15 +324,6 @@ public class IgnoreNodeTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testEmptyIgnoreRules() throws IOException {
-		IgnoreNode node = new IgnoreNode();
-		node.parse(writeToString("", "#", "!", "[[=a=]]"));
-		assertEquals(new ArrayList<>(), node.getRules());
-		node.parse(writeToString(" ", " / "));
-		assertEquals(2, node.getRules().size());
-	}
-
-	@Test
 	public void testSlashOnlyMatchesDirectory() throws IOException {
 		writeIgnoreFile(".gitignore", "out/");
 		writeTrashFile("out", "");
@@ -351,56 +339,6 @@ public class IgnoreNodeTest extends RepositoryTestCase {
 		assertEntry(F, tracked, ".gitignore");
 		assertEntry(D, ignored, "out");
 		assertEntry(F, ignored, "out/foo");
-		endWalk();
-	}
-
-	@Test
-	public void testSlashMatchesDirectory() throws IOException {
-		writeIgnoreFile(".gitignore", "out2/");
-
-		writeTrashFile("out1/out1", "");
-		writeTrashFile("out1/out2", "");
-		writeTrashFile("out2/out1", "");
-		writeTrashFile("out2/out2", "");
-
-		beginWalk();
-		assertEntry(F, tracked, ".gitignore");
-		assertEntry(D, tracked, "out1");
-		assertEntry(F, tracked, "out1/out1");
-		assertEntry(F, tracked, "out1/out2");
-		assertEntry(D, ignored, "out2");
-		assertEntry(F, ignored, "out2/out1");
-		assertEntry(F, ignored, "out2/out2");
-		endWalk();
-	}
-
-	@Test
-	public void testWildcardWithSlashMatchesDirectory() throws IOException {
-		writeIgnoreFile(".gitignore", "out2*/");
-
-		writeTrashFile("out1/out1.txt", "");
-		writeTrashFile("out1/out2", "");
-		writeTrashFile("out1/out2.txt", "");
-		writeTrashFile("out1/out2x/a", "");
-		writeTrashFile("out2/out1.txt", "");
-		writeTrashFile("out2/out2.txt", "");
-		writeTrashFile("out2x/out1.txt", "");
-		writeTrashFile("out2x/out2.txt", "");
-
-		beginWalk();
-		assertEntry(F, tracked, ".gitignore");
-		assertEntry(D, tracked, "out1");
-		assertEntry(F, tracked, "out1/out1.txt");
-		assertEntry(F, tracked, "out1/out2");
-		assertEntry(F, tracked, "out1/out2.txt");
-		assertEntry(D, ignored, "out1/out2x");
-		assertEntry(F, ignored, "out1/out2x/a");
-		assertEntry(D, ignored, "out2");
-		assertEntry(F, ignored, "out2/out1.txt");
-		assertEntry(F, ignored, "out2/out2.txt");
-		assertEntry(D, ignored, "out2x");
-		assertEntry(F, ignored, "out2x/out1.txt");
-		assertEntry(F, ignored, "out2x/out2.txt");
 		endWalk();
 	}
 
@@ -433,67 +371,6 @@ public class IgnoreNodeTest extends RepositoryTestCase {
 		assertEntry(F, tracked, ".gitignore");
 		assertEntry(D, tracked, "a");
 		assertEntry(F, tracked, "a/a");
-		endWalk();
-	}
-
-	@Test
-	public void testLeadingSpaces() throws IOException {
-		writeTrashFile("  a/  a", "");
-		writeTrashFile("  a/ a", "");
-		writeTrashFile("  a/a", "");
-		writeTrashFile(" a/  a", "");
-		writeTrashFile(" a/ a", "");
-		writeTrashFile(" a/a", "");
-		writeIgnoreFile(".gitignore", " a", "  a");
-		writeTrashFile("a/  a", "");
-		writeTrashFile("a/ a", "");
-		writeTrashFile("a/a", "");
-
-		beginWalk();
-		assertEntry(D, ignored, "  a");
-		assertEntry(F, ignored, "  a/  a");
-		assertEntry(F, ignored, "  a/ a");
-		assertEntry(F, ignored, "  a/a");
-		assertEntry(D, ignored, " a");
-		assertEntry(F, ignored, " a/  a");
-		assertEntry(F, ignored, " a/ a");
-		assertEntry(F, ignored, " a/a");
-		assertEntry(F, tracked, ".gitignore");
-		assertEntry(D, tracked, "a");
-		assertEntry(F, ignored, "a/  a");
-		assertEntry(F, ignored, "a/ a");
-		assertEntry(F, tracked, "a/a");
-		endWalk();
-	}
-
-	@Test
-	public void testTrailingSpaces() throws IOException {
-		writeTrashFile("a  /a", "");
-		writeTrashFile("a  /a ", "");
-		writeTrashFile("a  /a  ", "");
-		writeTrashFile("a /a", "");
-		writeTrashFile("a /a ", "");
-		writeTrashFile("a /a  ", "");
-		writeTrashFile("a/a", "");
-		writeTrashFile("a/a ", "");
-		writeTrashFile("a/a  ", "");
-
-		writeIgnoreFile(".gitignore", "a\\ ", "a \\ ");
-
-		beginWalk();
-		assertEntry(F, tracked, ".gitignore");
-		assertEntry(D, ignored, "a  ");
-		assertEntry(F, ignored, "a  /a");
-		assertEntry(F, ignored, "a  /a ");
-		assertEntry(F, ignored, "a  /a  ");
-		assertEntry(D, ignored, "a ");
-		assertEntry(F, ignored, "a /a");
-		assertEntry(F, ignored, "a /a ");
-		assertEntry(F, ignored, "a /a  ");
-		assertEntry(D, tracked, "a");
-		assertEntry(F, tracked, "a/a");
-		assertEntry(F, ignored, "a/a ");
-		assertEntry(F, ignored, "a/a  ");
 		endWalk();
 	}
 
@@ -533,13 +410,5 @@ public class IgnoreNodeTest extends RepositoryTestCase {
 		for (String line : rules)
 			data.append(line + "\n");
 		writeTrashFile(name, data.toString());
-	}
-
-	private InputStream writeToString(String... rules) throws IOException {
-		StringBuilder data = new StringBuilder();
-		for (String line : rules) {
-			data.append(line + "\n");
-		}
-		return new ByteArrayInputStream(data.toString().getBytes("UTF-8"));
 	}
 }

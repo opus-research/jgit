@@ -292,10 +292,10 @@ public class AmazonS3 {
 			case HttpURLConnection.HTTP_INTERNAL_ERROR:
 				continue;
 			default:
-				throw error(JGitText.get().s3ActionReading, key, c);
+				throw error("Reading", key, c);
 			}
 		}
-		throw maxAttempts(JGitText.get().s3ActionReading, key);
+		throw maxAttempts("Reading", key);
 	}
 
 	/**
@@ -365,10 +365,10 @@ public class AmazonS3 {
 			case HttpURLConnection.HTTP_INTERNAL_ERROR:
 				continue;
 			default:
-				throw error(JGitText.get().s3ActionDeletion, key, c);
+				throw error("Deletion", key, c);
 			}
 		}
-		throw maxAttempts(JGitText.get().s3ActionDeletion, key);
+		throw maxAttempts("Deletion", key);
 	}
 
 	/**
@@ -426,10 +426,10 @@ public class AmazonS3 {
 			case HttpURLConnection.HTTP_INTERNAL_ERROR:
 				continue;
 			default:
-				throw error(JGitText.get().s3ActionWriting, key, c);
+				throw error("Writing", key, c);
 			}
 		}
-		throw maxAttempts(JGitText.get().s3ActionWriting, key);
+		throw maxAttempts("Writing", key);
 	}
 
 	/**
@@ -489,14 +489,16 @@ public class AmazonS3 {
 
 		final String md5str = Base64.encodeBytes(csum);
 		final long len = buf.length();
+		final String lenstr = String.valueOf(len);
 		for (int curAttempt = 0; curAttempt < maxAttempts; curAttempt++) {
 			final HttpURLConnection c = open("PUT", bucket, key); //$NON-NLS-1$
-			c.setFixedLengthStreamingMode(len);
+			c.setRequestProperty("Content-Length", lenstr); //$NON-NLS-1$
 			c.setRequestProperty("Content-MD5", md5str); //$NON-NLS-1$
 			c.setRequestProperty(X_AMZ_ACL, acl);
 			encryption.request(c, X_AMZ_META);
 			authorize(c);
 			c.setDoOutput(true);
+			c.setFixedLengthStreamingMode((int) len);
 			monitor.beginTask(monitorTask, (int) (len / 1024));
 			final OutputStream os = c.getOutputStream();
 			try {
@@ -512,10 +514,10 @@ public class AmazonS3 {
 			case HttpURLConnection.HTTP_INTERNAL_ERROR:
 				continue;
 			default:
-				throw error(JGitText.get().s3ActionWriting, key, c);
+				throw error("Writing", key, c);
 			}
 		}
-		throw maxAttempts(JGitText.get().s3ActionWriting, key);
+		throw maxAttempts("Writing", key);
 	}
 
 	private IOException error(final String action, final String key,

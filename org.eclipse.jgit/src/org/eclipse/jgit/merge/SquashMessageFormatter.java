@@ -76,9 +76,9 @@ public class SquashMessageFormatter {
 	 */
 	public String format(List<RevCommit> squashedCommits, Ref target) {
 		StringBuilder sb = new StringBuilder();
-		sb.append("Squashed commit of the following:\n"); //$NON-NLS-1$
+		sb.append("Squashed commit of the following:\n");
 		for (RevCommit c : squashedCommits) {
-			sb.append("\ncommit "); //$NON-NLS-1$
+			sb.append("\ncommit ");
 			sb.append(c.getName());
 			sb.append("\n"); //$NON-NLS-1$
 			sb.append(toString(c.getAuthorIdent()));
@@ -92,12 +92,12 @@ public class SquashMessageFormatter {
 	private String toString(PersonIdent author) {
 		final StringBuilder a = new StringBuilder();
 
-		a.append("Author: "); //$NON-NLS-1$
+		a.append("Author: ");
 		a.append(author.getName());
 		a.append(" <"); //$NON-NLS-1$
 		a.append(author.getEmailAddress());
 		a.append(">\n"); //$NON-NLS-1$
-		a.append("Date:   "); //$NON-NLS-1$
+		a.append("Date:   ");
 		a.append(dateFormatter.formatDate(author));
 		a.append("\n"); //$NON-NLS-1$
 

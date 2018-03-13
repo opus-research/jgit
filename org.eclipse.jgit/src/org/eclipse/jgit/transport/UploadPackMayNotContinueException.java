@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015, Google Inc.
+/*
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,53 +41,28 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.revwalk.filter;
-
-import java.io.IOException;
-
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.revwalk.ObjectWalk;
+package org.eclipse.jgit.transport;
 
 /**
- * Selects interesting objects when walking.
- * <p>
- * Applications should install the filter on an ObjectWalk by
- * {@link ObjectWalk#setObjectFilter(ObjectFilter)} prior to starting traversal.
+ * Indicates UploadPack may not continue execution.
  *
- * @since 4.0
+ * @deprecated use {@link ServiceMayNotContinueException} instead.
  */
-public abstract class ObjectFilter {
-	/** Default filter that always returns true. */
-	public static final ObjectFilter ALL = new AllFilter();
+@Deprecated
+public class UploadPackMayNotContinueException extends ServiceMayNotContinueException {
+	private static final long serialVersionUID = 1L;
 
-	private static final class AllFilter extends ObjectFilter {
-		@Override
-		public boolean include(ObjectWalk walker, AnyObjectId o) {
-			return true;
-		}
+	/** Initialize with no message. */
+	public UploadPackMayNotContinueException() {
+		// Do not set a message.
 	}
 
 	/**
-	 * Determine if the named object should be included in the walk.
-	 *
-	 * @param walker
-	 *            the active walker this filter is being invoked from within.
-	 * @param objid
-	 *            the object currently being tested.
-	 * @return {@code true} if the named object should be included in the walk.
-	 * @throws MissingObjectException
-	 *             an object the filter needed to consult to determine its
-	 *             answer was missing
-	 * @throws IncorrectObjectTypeException
-	 *             an object the filter needed to consult to determine its
-	 *             answer was of the wrong type
-	 * @throws IOException
-	 *             an object the filter needed to consult to determine its
-	 *             answer could not be read.
+	 * @param msg
+	 *            a message explaining why it cannot continue. This message may
+	 *            be shown to an end-user.
 	 */
-	public abstract boolean include(ObjectWalk walker, AnyObjectId objid)
-			throws MissingObjectException, IncorrectObjectTypeException,
-			       IOException;
+	public UploadPackMayNotContinueException(String msg) {
+		super(msg);
+	}
 }
