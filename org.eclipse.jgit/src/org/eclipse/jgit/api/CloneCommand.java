@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2013 Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2011, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -50,14 +50,13 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -67,7 +66,6 @@ import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.submodule.SubmoduleWalk;
 import org.eclipse.jgit.transport.FetchResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
@@ -96,8 +94,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 
 	private boolean cloneAllBranches;
 
-	private boolean cloneSubmodules;
-
 	private boolean noCheckout;
 
 	private Collection<String> branchesToClone;
@@ -112,13 +108,11 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	/**
 	 * Executes the {@code Clone} command.
 	 *
+	 * @throws JGitInternalException
+	 *             if the repository can't be created
 	 * @return the newly created {@code Git} object with associated repository
-	 * @throws InvalidRemoteException
-	 * @throws org.eclipse.jgit.api.errors.TransportException
-	 * @throws GitAPIException
 	 */
-	public Git call() throws GitAPIException, InvalidRemoteException,
-			org.eclipse.jgit.api.errors.TransportException {
+	public Git call() throws JGitInternalException {
 		try {
 			URIish u = new URIish(uri);
 			Repository repository = init(u);
@@ -128,13 +122,14 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 			return new Git(repository);
 		} catch (IOException ioe) {
 			throw new JGitInternalException(ioe.getMessage(), ioe);
+		} catch (InvalidRemoteException e) {
+			throw new JGitInternalException(e.getMessage(), e);
 		} catch (URISyntaxException e) {
-			throw new InvalidRemoteException(MessageFormat.format(
-					JGitText.get().invalidRemote, remote));
+			throw new JGitInternalException(e.getMessage(), e);
 		}
 	}
 
-	private Repository init(URIish u) throws GitAPIException {
+	private Repository init(URIish u) {
 		InitCommand command = Git.init();
 		command.setBare(bare);
 		if (directory == null)
@@ -148,17 +143,17 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 
 	private FetchResult fetch(Repository clonedRepo, URIish u)
 			throws URISyntaxException,
-			org.eclipse.jgit.api.errors.TransportException, IOException,
-			GitAPIException {
+			JGitInternalException,
+			InvalidRemoteException, IOException {
 		// create the remote config and save it
 		RemoteConfig config = new RemoteConfig(clonedRepo.getConfig(), remote);
 		config.addURI(u);
 
-		final String dst = (bare ? Constants.R_HEADS : Constants.R_REMOTES
-				+ config.getName() + "/") + "*"; //$NON-NLS-1$//$NON-NLS-2$
+		final String dst = bare ? Constants.R_HEADS : Constants.R_REMOTES
+				+ config.getName();
 		RefSpec refSpec = new RefSpec();
 		refSpec = refSpec.setForceUpdate(true);
-		refSpec = refSpec.setSourceDestination(Constants.R_HEADS + "*", dst); //$NON-NLS-1$
+		refSpec = refSpec.setSourceDestination(Constants.R_HEADS + "*", dst + "/*"); //$NON-NLS-1$ //$NON-NLS-2$
 
 		config.addFetchRefSpec(refSpec);
 		config.update(clonedRepo.getConfig());
@@ -181,7 +176,7 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	private List<RefSpec> calculateRefSpecs(final String dst) {
 		RefSpec wcrs = new RefSpec();
 		wcrs = wcrs.setForceUpdate(true);
-		wcrs = wcrs.setSourceDestination(Constants.R_HEADS + "*", dst); //$NON-NLS-1$
+		wcrs = wcrs.setSourceDestination(Constants.R_HEADS + "*", dst + "/*"); //$NON-NLS-1$ //$NON-NLS-2$
 		List<RefSpec> specs = new ArrayList<RefSpec>();
 		if (cloneAllBranches)
 			specs.add(wcrs);
@@ -195,21 +190,14 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	}
 
 	private void checkout(Repository clonedRepo, FetchResult result)
-			throws MissingObjectException, IncorrectObjectTypeException,
-			IOException, GitAPIException {
+			throws JGitInternalException,
+			MissingObjectException, IncorrectObjectTypeException, IOException {
 
-		Ref head = null;
+		Ref head = result.getAdvertisedRef(branch);
 		if (branch.equals(Constants.HEAD)) {
 			Ref foundBranch = findBranchToCheckout(result);
 			if (foundBranch != null)
 				head = foundBranch;
-		}
-		if (head == null) {
-			head = result.getAdvertisedRef(branch);
-			if (head == null)
-				head = result.getAdvertisedRef(Constants.R_HEADS + branch);
-			if (head == null)
-				head = result.getAdvertisedRef(Constants.R_TAGS + branch);
 		}
 
 		if (head == null || head.getObjectId() == null)
@@ -234,32 +222,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 			DirCacheCheckout co = new DirCacheCheckout(clonedRepo, dc,
 					commit.getTree());
 			co.checkout();
-			if (cloneSubmodules)
-				cloneSubmodules(clonedRepo);
-		}
-	}
-
-	private void cloneSubmodules(Repository clonedRepo) throws IOException,
-			GitAPIException {
-		SubmoduleInitCommand init = new SubmoduleInitCommand(clonedRepo);
-		if (init.call().isEmpty())
-			return;
-
-		SubmoduleUpdateCommand update = new SubmoduleUpdateCommand(clonedRepo);
-		configure(update);
-		update.setProgressMonitor(monitor);
-		if (!update.call().isEmpty()) {
-			SubmoduleWalk walk = SubmoduleWalk.forIndex(clonedRepo);
-			while (walk.next()) {
-				Repository subRepo = walk.getRepository();
-				if (subRepo != null) {
-					try {
-						cloneSubmodules(subRepo);
-					} finally {
-						subRepo.close();
-					}
-				}
-			}
 		}
 	}
 
@@ -293,14 +255,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 				branchName, ConfigConstants.CONFIG_KEY_REMOTE, remote);
 		clonedRepo.getConfig().setString(ConfigConstants.CONFIG_BRANCH_SECTION,
 				branchName, ConfigConstants.CONFIG_KEY_MERGE, head.getName());
-		String autosetupRebase = clonedRepo.getConfig().getString(
-				ConfigConstants.CONFIG_BRANCH_SECTION, null,
-				ConfigConstants.CONFIG_KEY_AUTOSETUPREBASE);
-		if (ConfigConstants.CONFIG_KEY_ALWAYS.equals(autosetupRebase)
-				|| ConfigConstants.CONFIG_KEY_REMOTE.equals(autosetupRebase))
-			clonedRepo.getConfig().setBoolean(
-					ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
-					ConfigConstants.CONFIG_KEY_REBASE, true);
 		clonedRepo.getConfig().save();
 	}
 
@@ -369,9 +323,7 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 
 	/**
 	 * @param branch
-	 *            the initial branch to check out when cloning the repository.
-	 *            Can be specified as ref name (<code>refs/heads/master</code>),
-	 *            branch name (<code>master</code>) or tag name (<code>v1.2.3</code>).
+	 *            the initial branch to check out when cloning the repository
 	 * @return this instance
 	 */
 	public CloneCommand setBranch(String branch) {
@@ -405,21 +357,9 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	}
 
 	/**
-	 * @param cloneSubmodules
-	 *            true to initialize and update submodules. Ignored when
-	 *            {@link #setBare(boolean)} is set to true.
-	 * @return {@code this}
-	 */
-	public CloneCommand setCloneSubmodules(boolean cloneSubmodules) {
-		this.cloneSubmodules = cloneSubmodules;
-		return this;
-	}
-
-	/**
 	 * @param branchesToClone
 	 *            collection of branches to clone. Ignored when allSelected is
-	 *            true. Must be specified as full ref names (e.g.
-	 *            <code>refs/heads/master</code>).
+	 *            true.
 	 * @return {@code this}
 	 */
 	public CloneCommand setBranchesToClone(Collection<String> branchesToClone) {

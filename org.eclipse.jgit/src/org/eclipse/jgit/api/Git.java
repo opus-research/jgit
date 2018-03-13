@@ -54,8 +54,7 @@ import org.eclipse.jgit.util.FS;
 /**
  * Offers a "GitPorcelain"-like API to interact with a git repository.
  * <p>
- * The GitPorcelain commands are described in the <a href=
- * "http://www.kernel.org/pub/software/scm/git/docs/git.html#_high_level_commands_porcelain"
+ * The GitPorcelain commands are described in the <a href="http://www.kernel.org/pub/software/scm/git/docs/git.html#_high_level_commands_porcelain"
  * >Git Documentation</a>.
  * <p>
  * This class only offers methods to construct so-called command classes. Each
@@ -110,7 +109,9 @@ public class Git {
 		RepositoryCache.FileKey key;
 
 		key = RepositoryCache.FileKey.lenient(dir, fs);
-		return wrap(new RepositoryBuilder().setFS(fs).setGitDir(key.getFile())
+		return wrap(new RepositoryBuilder()
+				.setFS(fs)
+				.setGitDir(key.getFile())
 				.setMustExist(true).build());
 	}
 
@@ -125,26 +126,6 @@ public class Git {
 	}
 
 	/**
-	 * Frees resources held by the underlying {@link Repository} instance. It is
-	 * recommended to call this method as soon as you don't need a reference to
-	 * this {@link Git} instance and the underlying {@link Repository} instance
-	 * anymore. This method closes the underlying object and ref databases. This
-	 * will free memory and file handles. E.g. on Windows the repository will
-	 * keep file handles on pack files unless you call this method. Such open
-	 * file handles may for example prevent that the repository folder in the
-	 * filesystem can be deleted.
-	 * <p>
-	 * After calling close() you should not use this {@link Git} instance and
-	 * the underlying {@link Repository} instance anymore.
-	 *
-	 * @since 3.2
-	 */
-	public void close() {
-		if (repo != null)
-			repo.close();
-	}
-
-	/**
 	 * Returns a command object to execute a {@code clone} command
 	 *
 	 * @see <a
@@ -155,17 +136,6 @@ public class Git {
 	 */
 	public static CloneCommand cloneRepository() {
 		return new CloneCommand();
-	}
-
-	/**
-	 * Returns a command to list remote branches/tags without a local
-	 * repository.
-	 *
-	 * @return a {@link LsRemoteCommand}
-	 * @since 3.1
-	 */
-	public static LsRemoteCommand lsRemoteRepository() {
-		return new LsRemoteCommand(null);
 	}
 
 	/**
@@ -296,8 +266,8 @@ public class Git {
 	 * @see <a
 	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-add.html"
 	 *      >Git documentation about Add</a>
-	 * @return a {@link AddCommand} used to collect all optional parameters and
-	 *         to finally execute the {@code Add} command
+	 * @return a {@link AddCommand} used to collect all optional parameters
+	 *         and to finally execute the {@code Add} command
 	 */
 	public AddCommand add() {
 		return new AddCommand(repo);
@@ -309,8 +279,8 @@ public class Git {
 	 * @see <a
 	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-tag.html"
 	 *      >Git documentation about Tag</a>
-	 * @return a {@link TagCommand} used to collect all optional parameters and
-	 *         to finally execute the {@code Tag} command
+	 * @return a {@link TagCommand} used to collect all optional parameters
+	 *         and to finally execute the {@code Tag} command
 	 */
 	public TagCommand tag() {
 		return new TagCommand(repo);
@@ -361,8 +331,8 @@ public class Git {
 	 * @see <a
 	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-revert.html"
 	 *      >Git documentation about reverting changes</a>
-	 * @return a {@link RevertCommand} used to collect all optional parameters
-	 *         and to finally execute the {@code cherry-pick} command
+	 * @return a {@link RevertCommand} used to collect all optional
+	 *         parameters and to finally execute the {@code cherry-pick} command
 	 */
 	public RevertCommand revert() {
 		return new RevertCommand(repo);
@@ -431,16 +401,6 @@ public class Git {
 	 */
 	public StatusCommand status() {
 		return new StatusCommand(repo);
-	}
-
-	/**
-	 * Returns a command to create an archive from a tree
-	 *
-	 * @return a {@link ArchiveCommand}
-	 * @since 3.1
-	 */
-	public ArchiveCommand archive() {
-		return new ArchiveCommand(repo);
 	}
 
 	/**
@@ -546,167 +506,11 @@ public class Git {
 
 	/**
 	 * Returns a command object used to delete tags
-	 *
+	 * 
 	 * @return a {@link DeleteTagCommand}
 	 */
 	public DeleteTagCommand tagDelete() {
 		return new DeleteTagCommand(repo);
-	}
-
-	/**
-<<<<<<< HEAD
-	 * Returns a command object to execute a {@code submodule add} command
-	 *
-	 * @return a {@link SubmoduleAddCommand} used to add a new submodule to a
-	 *         parent repository
-	 */
-	public SubmoduleAddCommand submoduleAdd() {
-		return new SubmoduleAddCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code submodule init} command
-	 *
-	 * @return a {@link SubmoduleInitCommand} used to initialize the
-	 *         repository's config with settings from the .gitmodules file in
-	 *         the working tree
-	 */
-	public SubmoduleInitCommand submoduleInit() {
-		return new SubmoduleInitCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code submodule status} command
-	 *
-	 * @return a {@link SubmoduleStatusCommand} used to report the status of a
-	 *         repository's configured submodules
-	 */
-	public SubmoduleStatusCommand submoduleStatus() {
-		return new SubmoduleStatusCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code submodule sync} command
-	 *
-	 * @return a {@link SubmoduleSyncCommand} used to update the URL of a
-	 *         submodule from the parent repository's .gitmodules file
-	 */
-	public SubmoduleSyncCommand submoduleSync() {
-		return new SubmoduleSyncCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code submodule update} command
-	 *
-	 * @return a {@link SubmoduleUpdateCommand} used to update the submodules in
-	 *         a repository to the configured revision
-	 */
-	public SubmoduleUpdateCommand submoduleUpdate() {
-		return new SubmoduleUpdateCommand(repo);
-	}
-
-	/**
-	 * Returns a command object used to list stashed commits
-	 *
-	 * @return a {@link StashListCommand}
-	 */
-	public StashListCommand stashList() {
-		return new StashListCommand(repo);
-	}
-
-	/**
-	 * Returns a command object used to create a stashed commit
-	 *
-	 * @return a {@link StashCreateCommand}
-	 * @since 2.0
-	 */
-	public StashCreateCommand stashCreate() {
-		return new StashCreateCommand(repo);
-	}
-
-	/**
-	 * Returns a command object used to apply a stashed commit
-	 *
-	 * @return a {@link StashApplyCommand}
-	 * @since 2.0
-	 */
-	public StashApplyCommand stashApply() {
-		return new StashApplyCommand(repo);
-	}
-
-	/**
-	 * Returns a command object used to drop a stashed commit
-	 *
-	 * @return a {@link StashDropCommand}
-	 * @since 2.0
-	 */
-	public StashDropCommand stashDrop() {
-		return new StashDropCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code apply} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-apply.html"
-	 *      >Git documentation about apply</a>
-	 *
-	 * @return a {@link ApplyCommand} used to collect all optional parameters
-	 *         and to finally execute the {@code apply} command
-	 * @since 2.0
-	 */
-	public ApplyCommand apply() {
-		return new ApplyCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code gc} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-gc.html"
-	 *      >Git documentation about gc</a>
-	 *
-	 * @return a {@link GarbageCollectCommand} used to collect all optional
-	 *         parameters and to finally execute the {@code gc} command
-	 * @since 2.2
-	 */
-	public GarbageCollectCommand gc() {
-		return new GarbageCollectCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to find human-readable names of revisions.
-	 *
-	 * @return a {@link NameRevCommand}.
-	 * @since 3.0
-	 */
-	public NameRevCommand nameRev() {
-		return new NameRevCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to come up with a short name that describes a
-	 * commit in terms of the nearest git tag.
-	 *
-	 * @return a {@link DescribeCommand}.
-	 * @since 3.2
-	 */
-	public DescribeCommand describe() {
-		return new DescribeCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code mv} command
-	 * 
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-mv.html"
-	 *      >Git documentation about mv</a>
-	 * @return a {@link MvCommand} used to collect all optional parameters and
-	 *         to finally execute the {@code mv} command
-	 * @since 3.6
-	 */
-	public MvCommand mv() {
-		return new MvCommand(repo);
 	}
 
 	/**
@@ -716,8 +520,4 @@ public class Git {
 		return repo;
 	}
 
-	@Override
-	public String toString() {
-		return "Git[" + repo + "]"; //$NON-NLS-1$//$NON-NLS-2$
-	}
 }

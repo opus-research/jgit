@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012 Robin Rosenberg
+ * Copyright (C) 2011, Robin Rosenberg
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -52,9 +52,7 @@ import org.eclipse.jgit.lib.PersonIdent;
 
 /**
  * A utility for formatting dates according to the Git log.date formats plus
- * extensions.
- * <p>
- * The enum {@link Format} defines the available types.
+ * extensions. <p< The enum {@link Format} defines the available types
  */
 public class GitDateFormatter {
 
@@ -127,29 +125,29 @@ public class GitDateFormatter {
 			break;
 		case DEFAULT: // Not default:
 			dateTimeInstance = new SimpleDateFormat(
-					"EEE MMM dd HH:mm:ss yyyy Z", Locale.US); //$NON-NLS-1$
+					"EEE MMM dd HH:mm:ss yyyy Z", Locale.US);
 			break;
 		case ISO:
-			dateTimeInstance = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z", //$NON-NLS-1$
+			dateTimeInstance = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z",
 					Locale.US);
 			break;
 		case LOCAL:
-			dateTimeInstance = new SimpleDateFormat("EEE MMM dd HH:mm:ss yyyy", //$NON-NLS-1$
+			dateTimeInstance = new SimpleDateFormat("EEE MMM dd HH:mm:ss yyyy",
 					Locale.US);
 			break;
 		case RFC:
 			dateTimeInstance = new SimpleDateFormat(
-					"EEE, dd MMM yyyy HH:mm:ss Z", Locale.US); //$NON-NLS-1$
+					"EEE, dd MMM yyyy HH:mm:ss Z", Locale.US);
 			break;
 		case SHORT:
-			dateTimeInstance = new SimpleDateFormat("yyyy-MM-dd", Locale.US); //$NON-NLS-1$
+			dateTimeInstance = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
 			break;
 		case LOCALE:
 		case LOCALELOCAL:
-			SystemReader systemReader = SystemReader.getInstance();
-			dateTimeInstance = systemReader.getDateTimeInstance(
-					DateFormat.DEFAULT, DateFormat.DEFAULT);
-			dateTimeInstance2 = systemReader.getSimpleDateFormat("Z"); //$NON-NLS-1$
+			Locale locale = SystemReader.getInstance().getLocale();
+			dateTimeInstance = DateFormat.getDateTimeInstance(
+					DateFormat.DEFAULT, DateFormat.DEFAULT, locale);
+			dateTimeInstance2 = new SimpleDateFormat("Z", locale);
 			break;
 		}
 	}
@@ -166,7 +164,7 @@ public class GitDateFormatter {
 		switch (format) {
 		case RAW:
 			int offset = ident.getTimeZoneOffset();
-			String sign = offset < 0 ? "-" : "+"; //$NON-NLS-1$ //$NON-NLS-2$
+			String sign = offset < 0 ? "-" : "+";
 			int offset2;
 			if (offset < 0)
 				offset2 = -offset;
@@ -174,7 +172,7 @@ public class GitDateFormatter {
 				offset2 = offset;
 			int hours = offset2 / 60;
 			int minutes = offset2 % 60;
-			return String.format("%d %s%02d%02d", //$NON-NLS-1$
+			return String.format("%d %s%02d%02d",
 					ident.getWhen().getTime() / 1000, sign, hours, minutes);
 		case RELATIVE:
 			return RelativeDateFormatter.format(ident.getWhen());
@@ -189,7 +187,7 @@ public class GitDateFormatter {
 				tz = SystemReader.getInstance().getTimeZone();
 			dateTimeInstance.setTimeZone(tz);
 			dateTimeInstance2.setTimeZone(tz);
-			return dateTimeInstance.format(ident.getWhen()) + " " //$NON-NLS-1$
+			return dateTimeInstance.format(ident.getWhen()) + " "
 					+ dateTimeInstance2.format(ident.getWhen());
 		default:
 			tz = ident.getTimeZone();

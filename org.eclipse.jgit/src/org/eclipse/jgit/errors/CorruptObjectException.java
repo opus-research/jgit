@@ -49,7 +49,7 @@ package org.eclipse.jgit.errors;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 
@@ -89,20 +89,5 @@ public class CorruptObjectException extends IOException {
 	 */
 	public CorruptObjectException(final String why) {
 		super(why);
-	}
-
-	/**
-	 * Construct a CorruptObjectException for reporting a problem not associated
-	 * with a specific object id.
-	 *
-	 * @param why
-	 *            message describing the corruption.
-	 * @param cause
-	 *            optional root cause exception
-	 * @since 3.4
-	 */
-	public CorruptObjectException(String why, Throwable cause) {
-		super(why);
-		initCause(cause);
 	}
 }

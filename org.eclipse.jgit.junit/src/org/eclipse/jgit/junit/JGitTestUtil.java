@@ -46,19 +46,10 @@
 package org.eclipse.jgit.junit;
 
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
 import java.lang.reflect.Method;
 import java.net.URISyntaxException;
 import java.net.URL;
 
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.util.FileUtils;
-import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.junit.Assert;
 import org.junit.Test;
@@ -126,118 +117,14 @@ public abstract class JGitTestUtil {
 			// loaded previously
 			return new File("tst", fileName);
 		}
-		if ("jar".equals(url.getProtocol())) {
-			try {
-				File tmp = File.createTempFile("tmp_", "_" + fileName);
-				copyTestResource(fileName, tmp);
-				return tmp;
-			} catch (IOException err) {
-				throw new RuntimeException("Cannot create temporary file", err);
-			}
-		}
 		try {
 			return new File(url.toURI());
-		} catch (IllegalArgumentException e) {
-			throw new IllegalArgumentException(e.getMessage() + " " + url);
-		} catch (URISyntaxException e) {
+		} catch(URISyntaxException e) {
 			return new File(url.getPath());
-		}
-	}
-
-	public static void copyTestResource(String name, File dest)
-			throws IOException {
-		URL url = cl().getResource(CLASSPATH_TO_RESOURCES + name);
-		if (url == null)
-			throw new FileNotFoundException(name);
-		InputStream in = url.openStream();
-		try {
-			FileOutputStream out = new FileOutputStream(dest);
-			try {
-				byte[] buf = new byte[4096];
-				for (int n; (n = in.read(buf)) > 0;)
-					out.write(buf, 0, n);
-			} finally {
-				out.close();
-			}
-		} finally {
-			in.close();
 		}
 	}
 
 	private static ClassLoader cl() {
 		return JGitTestUtil.class.getClassLoader();
 	}
-
-	public static File writeTrashFile(final Repository db,
-			final String name, final String data) throws IOException {
-		File path = new File(db.getWorkTree(), name);
-		write(path, data);
-		return path;
-	}
-
-	public static File writeTrashFile(final Repository db,
-			final String subdir,
-			final String name, final String data) throws IOException {
-		File path = new File(db.getWorkTree() + "/" + subdir, name);
-		write(path, data);
-		return path;
-	}
-
-	/**
-	 * Write a string as a UTF-8 file.
-	 *
-	 * @param f
-	 *            file to write the string to. Caller is responsible for making
-	 *            sure it is in the trash directory or will otherwise be cleaned
-	 *            up at the end of the test. If the parent directory does not
-	 *            exist, the missing parent directories are automatically
-	 *            created.
-	 * @param body
-	 *            content to write to the file.
-	 * @throws IOException
-	 *             the file could not be written.
-	 */
-	public static void write(final File f, final String body)
-			throws IOException {
-		FileUtils.mkdirs(f.getParentFile(), true);
-		Writer w = new OutputStreamWriter(new FileOutputStream(f), "UTF-8");
-		try {
-			w.write(body);
-		} finally {
-			w.close();
-		}
-	}
-
-	/**
-	 * Fully read a UTF-8 file and return as a string.
-	 *
-	 * @param file
-	 *            file to read the content of.
-	 * @return UTF-8 decoded content of the file, empty string if the file
-	 *         exists but has no content.
-	 * @throws IOException
-	 *             the file does not exist, or could not be read.
-	 */
-	public static String read(final File file) throws IOException {
-		final byte[] body = IO.readFully(file);
-		return new String(body, 0, body.length, "UTF-8");
-	}
-
-	public static String read(final Repository db, final String name)
-			throws IOException {
-		File file = new File(db.getWorkTree(), name);
-		return read(file);
-	}
-
-	public static boolean check(final Repository db, final String name) {
-		File file = new File(db.getWorkTree(), name);
-		return file.exists();
-	}
-
-	public static void deleteTrashFile(final Repository db,
-			final String name) throws IOException {
-		File path = new File(db.getWorkTree(), name);
-		FileUtils.delete(path);
-	}
-
 }

@@ -109,15 +109,6 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 	}
 
 	/**
-	 * @return the parent of this tree parser
-	 * @deprecated internal use only
-	 */
-	@Deprecated
-	public CanonicalTreeParser getParent() {
-		return (CanonicalTreeParser) parent;
-	}
-
-	/**
 	 * Reset this parser to walk through the given tree data.
 	 *
 	 * @param treeData

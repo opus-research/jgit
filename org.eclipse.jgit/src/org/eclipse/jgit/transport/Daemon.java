@@ -53,8 +53,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketAddress;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.pack.PackConfig;
@@ -103,10 +103,9 @@ public class Daemon {
 	 *            address to listen for connections on. If null, any available
 	 *            port will be chosen on all network interfaces.
 	 */
-	@SuppressWarnings("unchecked")
 	public Daemon(final InetSocketAddress addr) {
 		myAddress = addr;
-		processors = new ThreadGroup("Git-Daemon"); //$NON-NLS-1$
+		processors = new ThreadGroup("Git-Daemon");
 
 		repositoryResolver = (RepositoryResolver<DaemonClient>) RepositoryResolver.NONE;
 
@@ -131,8 +130,8 @@ public class Daemon {
 				String host = peer.getCanonicalHostName();
 				if (host == null)
 					host = peer.getHostAddress();
-				String name = "anonymous"; //$NON-NLS-1$
-				String email = name + "@" + host; //$NON-NLS-1$
+				String name = "anonymous";
+				String email = name + "@" + host;
 				rp.setRefLogIdent(new PersonIdent(name, email));
 				rp.setTimeout(getTimeout());
 
@@ -141,7 +140,7 @@ public class Daemon {
 		};
 
 		services = new DaemonService[] {
-				new DaemonService("upload-pack", "uploadpack") { //$NON-NLS-1$ //$NON-NLS-2$
+				new DaemonService("upload-pack", "uploadpack") {
 					{
 						setEnabled(true);
 					}
@@ -156,7 +155,7 @@ public class Daemon {
 						OutputStream out = dc.getOutputStream();
 						up.upload(in, out, null);
 					}
-				}, new DaemonService("receive-pack", "receivepack") { //$NON-NLS-1$ //$NON-NLS-2$
+				}, new DaemonService("receive-pack", "receivepack") {
 					{
 						setEnabled(false);
 					}
@@ -189,8 +188,8 @@ public class Daemon {
 	 *         the requested service type.
 	 */
 	public synchronized DaemonService getService(String name) {
-		if (!name.startsWith("git-")) //$NON-NLS-1$
-			name = "git-" + name; //$NON-NLS-1$
+		if (!name.startsWith("git-"))
+			name = "git-" + name;
 		for (final DaemonService s : services) {
 			if (s.getCommandName().equals(name))
 				return s;
@@ -287,7 +286,7 @@ public class Daemon {
 		myAddress = (InetSocketAddress) listenSock.getLocalSocketAddress();
 
 		run = true;
-		acceptThread = new Thread(processors, "Git-Daemon-Accept") { //$NON-NLS-1$
+		acceptThread = new Thread(processors, "Git-Daemon-Accept") {
 			public void run() {
 				while (isRunning()) {
 					try {
@@ -333,7 +332,7 @@ public class Daemon {
 		if (peer instanceof InetSocketAddress)
 			dc.setRemoteAddress(((InetSocketAddress) peer).getAddress());
 
-		new Thread(processors, "Git-Daemon-Client " + peer.toString()) { //$NON-NLS-1$
+		new Thread(processors, "Git-Daemon-Client " + peer.toString()) {
 			public void run() {
 				try {
 					dc.execute(s);
@@ -367,8 +366,7 @@ public class Daemon {
 		return null;
 	}
 
-	Repository openRepository(DaemonClient client, String name)
-			throws ServiceMayNotContinueException {
+	Repository openRepository(DaemonClient client, String name) {
 		// Assume any attempt to use \ was by a Windows client
 		// and correct to the more typical / used in Git URIs.
 		//
@@ -376,7 +374,7 @@ public class Daemon {
 
 		// git://thishost/path should always be name="/path" here
 		//
-		if (!name.startsWith("/")) //$NON-NLS-1$
+		if (!name.startsWith("/"))
 			return null;
 
 		try {

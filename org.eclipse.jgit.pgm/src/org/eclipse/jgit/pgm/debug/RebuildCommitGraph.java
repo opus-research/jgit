@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.pgm.debug;
 
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -60,7 +58,6 @@ import java.util.Map;
 
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.ObjectWritingException;
-import org.eclipse.jgit.internal.storage.file.LockFile;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -72,10 +69,10 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefWriter;
 import org.eclipse.jgit.lib.TextProgressMonitor;
-import org.eclipse.jgit.pgm.Command;
+import org.eclipse.jgit.pgm.CLIText;
 import org.eclipse.jgit.pgm.TextBuiltin;
-import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.storage.file.LockFile;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 
@@ -97,9 +94,8 @@ import org.kohsuke.args4j.Option;
  * deleted from the current repository.
  * <p>
  */
-@Command(usage = "usage_RebuildCommitGraph")
 class RebuildCommitGraph extends TextBuiltin {
-	private static final String REALLY = "--destroy-this-repository"; //$NON-NLS-1$
+	private static final String REALLY = "--destroy-this-repository";
 
 	@Option(name = REALLY, usage = "usage_approveDestructionOfRepository")
 	boolean really;
@@ -116,8 +112,8 @@ class RebuildCommitGraph extends TextBuiltin {
 
 	@Override
 	protected void run() throws Exception {
-		if (!really && !db.getRefDatabase().getRefs(ALL).isEmpty()) {
-			errw.println(
+		if (!really && !db.getAllRefs().isEmpty()) {
+			System.err.println(
 				MessageFormat.format(CLIText.get().fatalThisProgramWillDestroyTheRepository
 					, db.getDirectory().getAbsolutePath(), REALLY));
 			throw die(CLIText.get().needApprovalToDestroyCurrentRepository);
@@ -142,7 +138,7 @@ class RebuildCommitGraph extends TextBuiltin {
 		try {
 			String line;
 			while ((line = br.readLine()) != null) {
-				final String[] parts = line.split("[ \t]{1,}"); //$NON-NLS-1$
+				final String[] parts = line.split("[ \t]{1,}");
 				final ObjectId oldId = ObjectId.fromString(parts[0]);
 				try {
 					rw.parseCommit(oldId);
@@ -169,8 +165,8 @@ class RebuildCommitGraph extends TextBuiltin {
 		pm.beginTask("Rewriting commits", queue.size());
 		final ObjectInserter oi = db.newObjectInserter();
 		final ObjectId emptyTree = oi.insert(Constants.OBJ_TREE, new byte[] {});
-		final PersonIdent me = new PersonIdent("jgit rebuild-commitgraph", //$NON-NLS-1$
-				"rebuild-commitgraph@localhost"); //$NON-NLS-1$
+		final PersonIdent me = new PersonIdent("jgit rebuild-commitgraph",
+				"rebuild-commitgraph@localhost");
 		while (!queue.isEmpty()) {
 			final ListIterator<ToRewrite> itr = queue
 					.listIterator(queue.size());
@@ -200,7 +196,7 @@ class RebuildCommitGraph extends TextBuiltin {
 				newc.setAuthor(new PersonIdent(me, new Date(t.commitTime)));
 				newc.setCommitter(newc.getAuthor());
 				newc.setParentIds(newParents);
-				newc.setMessage("ORIGINAL " + t.oldId.name() + "\n"); //$NON-NLS-2$
+				newc.setMessage("ORIGINAL " + t.oldId.name() + "\n");
 				t.newId = oi.insert(newc);
 				rewrites.put(t.oldId, t.newId);
 				pm.update(1);
@@ -243,8 +239,7 @@ class RebuildCommitGraph extends TextBuiltin {
 
 	private void deleteAllRefs() throws Exception {
 		final RevWalk rw = new RevWalk(db);
-		Map<String, Ref> refs = db.getRefDatabase().getRefs(ALL);
-		for (final Ref r : refs.values()) {
+		for (final Ref r : db.getAllRefs().values()) {
 			if (Constants.HEAD.equals(r.getName()))
 				continue;
 			final RefUpdate u = db.updateRef(r.getName());
@@ -282,7 +277,7 @@ class RebuildCommitGraph extends TextBuiltin {
 		try {
 			String line;
 			while ((line = br.readLine()) != null) {
-				final String[] parts = line.split("[ \t]{1,}"); //$NON-NLS-1$
+				final String[] parts = line.split("[ \t]{1,}");
 				final ObjectId origId = ObjectId.fromString(parts[0]);
 				final String type = parts[1];
 				final String name = parts[2];
@@ -294,7 +289,7 @@ class RebuildCommitGraph extends TextBuiltin {
 					rw.parseAny(id);
 				} catch (MissingObjectException mue) {
 					if (!Constants.TYPE_COMMIT.equals(type)) {
-						errw.println(MessageFormat.format(CLIText.get().skippingObject, type, name));
+						System.err.println(MessageFormat.format(CLIText.get().skippingObject, type, name));
 						continue;
 					}
 					throw new MissingObjectException(id, type);

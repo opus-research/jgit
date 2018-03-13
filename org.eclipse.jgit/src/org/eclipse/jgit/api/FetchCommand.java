@@ -47,19 +47,16 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.transport.FetchResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.TagOpt;
@@ -83,7 +80,7 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 
 	private boolean checkFetchedObjects;
 
-	private Boolean removeDeletedRefs;
+	private boolean removeDeletedRefs;
 
 	private boolean dryRun;
 
@@ -109,18 +106,20 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 	 *         result
 	 * @throws InvalidRemoteException
 	 *             when called with an invalid remote uri
-	 * @throws org.eclipse.jgit.api.errors.TransportException
-	 *             when an error occurs during transport
+	 * @throws JGitInternalException
+	 *             a low-level exception of JGit has occurred. The original
+	 *             exception can be retrieved by calling
+	 *             {@link Exception#getCause()}.
 	 */
-	public FetchResult call() throws GitAPIException, InvalidRemoteException,
-			org.eclipse.jgit.api.errors.TransportException {
+	public FetchResult call() throws JGitInternalException,
+			InvalidRemoteException {
 		checkCallable();
 
 		try {
 			Transport transport = Transport.open(repo, remote);
 			try {
 				transport.setCheckFetchedObjects(checkFetchedObjects);
-				transport.setRemoveDeletedRefs(isRemoveDeletedRefs());
+				transport.setRemoveDeletedRefs(removeDeletedRefs);
 				transport.setDryRun(dryRun);
 				if (tagOption != null)
 					transport.setTagOpt(tagOption);
@@ -136,8 +135,9 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 			throw new InvalidRemoteException(MessageFormat.format(
 					JGitText.get().invalidRemote, remote), e);
 		} catch (TransportException e) {
-			throw new org.eclipse.jgit.api.errors.TransportException(
-					e.getMessage(), e);
+			throw new JGitInternalException(
+					JGitText.get().exceptionCaughtDuringExecutionOfFetchCommand,
+					e);
 		} catch (URISyntaxException e) {
 			throw new InvalidRemoteException(MessageFormat.format(
 					JGitText.get().invalidRemote, remote));
@@ -201,17 +201,7 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 	 * @return whether or not to remove refs which no longer exist in the source
 	 */
 	public boolean isRemoveDeletedRefs() {
-		if (removeDeletedRefs != null)
-			return removeDeletedRefs.booleanValue();
-		else { // fall back to configuration
-			boolean result = false;
-			StoredConfig config = repo.getConfig();
-			result = config.getBoolean(ConfigConstants.CONFIG_FETCH_SECTION,
-					null, ConfigConstants.CONFIG_KEY_PRUNE, result);
-			result = config.getBoolean(ConfigConstants.CONFIG_REMOTE_SECTION,
-					remote, ConfigConstants.CONFIG_KEY_PRUNE, result);
-			return result;
-		}
+		return removeDeletedRefs;
 	}
 
 	/**
@@ -222,7 +212,7 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 	 */
 	public FetchCommand setRemoveDeletedRefs(boolean removeDeletedRefs) {
 		checkCallable();
-		this.removeDeletedRefs = Boolean.valueOf(removeDeletedRefs);
+		this.removeDeletedRefs = removeDeletedRefs;
 		return this;
 	}
 

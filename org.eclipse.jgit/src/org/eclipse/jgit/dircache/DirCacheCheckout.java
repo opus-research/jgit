@@ -45,23 +45,19 @@ package org.eclipse.jgit.dircache;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CheckoutConflictException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.IndexWriteException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
-import org.eclipse.jgit.lib.CoreConfig.SymLinks;
 import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectChecker;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
@@ -77,9 +73,6 @@ import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
-import org.eclipse.jgit.util.RawParseUtils;
-import org.eclipse.jgit.util.SystemReader;
-import org.eclipse.jgit.util.io.AutoCRLFOutputStream;
 
 /**
  * This class handles checking out one or two trees merging with the index.
@@ -108,8 +101,6 @@ public class DirCacheCheckout {
 	private boolean failOnConflict = true;
 
 	private ArrayList<String> toBeDeleted = new ArrayList<String>();
-
-	private boolean emptyDirCache;
 
 	/**
 	 * @return a list of updated paths and objectIds
@@ -169,7 +160,6 @@ public class DirCacheCheckout {
 		this.headCommitTree = headCommitTree;
 		this.mergeCommitTree = mergeCommitTree;
 		this.workingTree = workingTree;
-		this.emptyDirCache = (dc == null) || (dc.getEntryCount() == 0);
 	}
 
 	/**
@@ -285,7 +275,7 @@ public class DirCacheCheckout {
 		builder = dc.builder();
 
 		walk = new NameConflictTreeWalk(repo);
-		addTree(walk, mergeCommitTree);
+		walk.addTree(mergeCommitTree);
 		walk.addTree(new DirCacheBuildIterator(builder));
 		walk.addTree(workingTree);
 
@@ -311,7 +301,6 @@ public class DirCacheCheckout {
 	void processEntry(CanonicalTreeParser m, DirCacheBuildIterator i,
 			WorkingTreeIterator f) throws IOException {
 		if (m != null) {
-			checkValidPath(m);
 			// There is an entry in the merge commit. Means: we want to update
 			// what's currently in the index and working-tree to that one
 			if (i == null) {
@@ -330,21 +319,14 @@ public class DirCacheCheckout {
 						m.getEntryFileMode());
 			} else if (i.getDirCacheEntry() != null) {
 				// The index contains a file (and not a folder)
-				if (f.isModified(i.getDirCacheEntry(), true,
-						this.walk.getObjectReader())
+				if (f.isModified(i.getDirCacheEntry(), true)
 						|| i.getDirCacheEntry().getStage() != 0)
 					// The working tree file is dirty or the index contains a
 					// conflict
 					update(m.getEntryPathString(), m.getEntryObjectId(),
 							m.getEntryFileMode());
-				else {
-					// update the timestamp of the index with the one from the
-					// file if not set, as we are sure to be in sync here.
-					DirCacheEntry entry = i.getDirCacheEntry();
-					if (entry.getLastModified() == 0)
-						entry.setLastModified(f.getEntryLastModified());
-					keep(entry);
-				}
+				else
+					keep(i.getDirCacheEntry());
 			} else
 				// The index contains a folder
 				keep(i.getDirCacheEntry());
@@ -403,6 +385,7 @@ public class DirCacheCheckout {
 			MissingObjectException, IncorrectObjectTypeException,
 			CheckoutConflictException, IndexWriteException {
 		toBeDeleted.clear();
+
 		ObjectReader objectReader = repo.getObjectDatabase().newReader();
 		try {
 			if (headCommitTree != null)
@@ -421,23 +404,23 @@ public class DirCacheCheckout {
 			builder.finish();
 
 			File file = null;
-			String last = null;
+			String last = "";
 			// when deleting files process them in the opposite order as they have
 			// been reported. This ensures the files are deleted before we delete
 			// their parent folders
 			for (int i = removed.size() - 1; i >= 0; i--) {
 				String r = removed.get(i);
 				file = new File(repo.getWorkTree(), r);
-				if (!file.delete() && repo.getFS().exists(file)) {
+				if (!file.delete() && file.exists()) {
 					// The list of stuff to delete comes from the index
 					// which will only contain a directory if it is
 					// a submodule, in which case we shall not attempt
 					// to delete it. A submodule is not empty, so it
 					// is safe to check this after a failed delete.
-					if (!repo.getFS().isDirectory(file))
+					if (!file.isDirectory())
 						toBeDeleted.add(r);
 				} else {
-					if (last != null && !isSamePrefix(r, last))
+					if (!isSamePrefix(r, last))
 						removeEmptyParents(new File(repo.getWorkTree(), last));
 					last = r;
 				}
@@ -446,9 +429,19 @@ public class DirCacheCheckout {
 				removeEmptyParents(file);
 
 			for (String path : updated.keySet()) {
+				// ... create/overwrite this file ...
+				file = new File(repo.getWorkTree(), path);
+				if (!file.getParentFile().mkdirs()) {
+					// ignore
+				}
+
 				DirCacheEntry entry = dc.getEntry(path);
-				if (!FileMode.GITLINK.equals(entry.getRawMode()))
-					checkoutEntry(repo, entry, objectReader);
+
+				// submodules are handled with separate operations
+				if (FileMode.GITLINK.equals(entry.getRawMode()))
+					continue;
+
+				checkoutEntry(repo, file, entry, objectReader);
 			}
 
 			// commit the index builder - a new index is persisted
@@ -469,28 +462,11 @@ public class DirCacheCheckout {
 	 private void removeEmptyParents(File f) {
 		File parentFile = f.getParentFile();
 
-		while (parentFile != null && !parentFile.equals(repo.getWorkTree())) {
+		while (!parentFile.equals(repo.getWorkTree())) {
 			if (!parentFile.delete())
 				break;
 			parentFile = parentFile.getParentFile();
 		}
-	}
-
-	/**
-	 * Compares whether two pairs of ObjectId and FileMode are equal.
-	 *
-	 * @param id1
-	 * @param mode1
-	 * @param id2
-	 * @param mode2
-	 * @return <code>true</code> if FileModes and ObjectIds are equal.
-	 *         <code>false</code> otherwise
-	 */
-	private boolean equalIdAndMode(ObjectId id1, FileMode mode1, ObjectId id2,
-			FileMode mode2) {
-		if (!mode1.equals(mode2))
-			return false;
-		return id1 != null ? id1.equals(id2) : id2 == null;
 	}
 
 	/**
@@ -510,14 +486,11 @@ public class DirCacheCheckout {
 	 * @throws IOException
 	 */
 
-	void processEntry(CanonicalTreeParser h, CanonicalTreeParser m,
+	void processEntry(AbstractTreeIterator h, AbstractTreeIterator m,
 			DirCacheBuildIterator i, WorkingTreeIterator f) throws IOException {
-		DirCacheEntry dce = i != null ? i.getDirCacheEntry() : null;
+		DirCacheEntry dce;
 
 		String name = walk.getPathString();
-
-		if (m != null)
-			checkValidPath(m);
 
 		if (i == null && m == null && h == null) {
 			// File/Directory conflict case #20
@@ -532,9 +505,6 @@ public class DirCacheCheckout {
 		ObjectId iId = (i == null ? null : i.getEntryObjectId());
 		ObjectId mId = (m == null ? null : m.getEntryObjectId());
 		ObjectId hId = (h == null ? null : h.getEntryObjectId());
-		FileMode iMode = (i == null ? null : i.getEntryFileMode());
-		FileMode mMode = (m == null ? null : m.getEntryFileMode());
-		FileMode hMode = (h == null ? null : h.getEntryFileMode());
 
 		/**
 		 * <pre>
@@ -546,15 +516,13 @@ public class DirCacheCheckout {
 		 *      ------------------------------------------------------------------
 		 * 1    D        D       F       Y         N       Y       N           Update
 		 * 2    D        D       F       N         N       Y       N           Conflict
-		 * 3    D        F       D                 Y       N       N           Keep
-		 * 4    D        F       D                 N       N       N           Conflict
+		 * 3    D        F       D                 Y       N       N           Update
+		 * 4    D        F       D                 N       N       N           Update
 		 * 5    D        F       F       Y         N       N       Y           Keep
-		 * 5b   D        F       F       Y         N       N       N           Conflict
 		 * 6    D        F       F       N         N       N       Y           Keep
-		 * 6b   D        F       F       N         N       N       N           Conflict
 		 * 7    F        D       F       Y         Y       N       N           Update
 		 * 8    F        D       F       N         Y       N       N           Conflict
-		 * 9    F        D       F                 N       N       N           Conflict
+		 * 9    F        D       F       Y         N       N       N           Update
 		 * 10   F        D       D                 N       N       Y           Keep
 		 * 11   F        D       D                 N       N       N           Conflict
 		 * 12   F        F       D       Y         N       Y       N           Update
@@ -576,8 +544,9 @@ public class DirCacheCheckout {
 		// represents the state for the merge iterator, the second last the
 		// state for the index iterator and the third last represents the state
 		// for the head iterator. The hexadecimal constant "F" stands for
-		// "file", a "D" stands for "directory" (tree), and a "0" stands for
-		// non-existing. Symbolic links and git links are treated as File here.
+		// "file",
+		// an "D" stands for "directory" (tree), and a "0" stands for
+		// non-existing
 		//
 		// Examples:
 		// ffMask == 0xFFD -> Head=File, Index=File, Merge=Tree
@@ -585,11 +554,13 @@ public class DirCacheCheckout {
 
 		int ffMask = 0;
 		if (h != null)
-			ffMask = FileMode.TREE.equals(hMode) ? 0xD00 : 0xF00;
+			ffMask = FileMode.TREE.equals(h.getEntryFileMode()) ? 0xD00 : 0xF00;
 		if (i != null)
-			ffMask |= FileMode.TREE.equals(iMode) ? 0x0D0 : 0x0F0;
+			ffMask |= FileMode.TREE.equals(i.getEntryFileMode()) ? 0x0D0
+					: 0x0F0;
 		if (m != null)
-			ffMask |= FileMode.TREE.equals(mMode) ? 0x00D : 0x00F;
+			ffMask |= FileMode.TREE.equals(m.getEntryFileMode()) ? 0x00D
+					: 0x00F;
 
 		// Check whether we have a possible file/folder conflict. Therefore we
 		// need a least one file and one folder.
@@ -602,99 +573,93 @@ public class DirCacheCheckout {
 			// switch processes all relevant cases.
 			switch (ffMask) {
 			case 0xDDF: // 1 2
-				if (f != null && isModifiedSubtree_IndexWorkingtree(name)) {
-					conflict(name, dce, h, m); // 1
+				if (isModified(name)) {
+					conflict(name, i.getDirCacheEntry(), h, m); // 1
 				} else {
-					update(name, mId, mMode); // 2
+					update(name, m.getEntryObjectId(), m.getEntryFileMode()); // 2
 				}
 
 				break;
 			case 0xDFD: // 3 4
-				keep(dce);
+				// CAUTION: I put it into removed instead of updated, because
+				// that's what our tests expect
+				// updated.put(name, mId);
+				remove(name);
 				break;
 			case 0xF0D: // 18
 				remove(name);
 				break;
-			case 0xDFF: // 5 5b 6 6b
-				if (equalIdAndMode(iId, iMode, mId, mMode))
-					keep(dce); // 5 6
-				else
-					conflict(name, dce, h, m); // 5b 6b
-				break;
+			case 0xDFF: // 5 6
 			case 0xFDD: // 10 11
 				// TODO: make use of tree extension as soon as available in jgit
 				// we would like to do something like
-				// if (!equalIdAndMode(iId, iMode, mId, mMode)
+				// if (!iId.equals(mId))
 				//   conflict(name, i.getDirCacheEntry(), h, m);
 				// But since we don't know the id of a tree in the index we do
 				// nothing here and wait that conflicts between index and merge
 				// are found later
 				break;
 			case 0xD0F: // 19
-				update(name, mId, mMode);
+				update(name, mId, m.getEntryFileMode());
 				break;
 			case 0xDF0: // conflict without a rule
 			case 0x0FD: // 15
-				conflict(name, dce, h, m);
+				conflict(name, (i != null) ? i.getDirCacheEntry() : null, h, m);
 				break;
 			case 0xFDF: // 7 8 9
-				if (equalIdAndMode(hId, hMode, mId, mMode)) {
-					if (isModifiedSubtree_IndexWorkingtree(name))
-						conflict(name, dce, h, m); // 8
+				if (hId.equals(mId)) {
+					if (isModified(name))
+						conflict(name, i.getDirCacheEntry(), h, m); // 8
 					else
-						update(name, mId, mMode); // 7
-				} else
-					conflict(name, dce, h, m); // 9
+						update(name, mId, m.getEntryFileMode()); // 7
+				} else if (!isModified(name))
+					update(name, mId, m.getEntryFileMode());  // 9
+				else
+					// To be confirmed - this case is not in the table.
+					conflict(name, i.getDirCacheEntry(), h, m);
 				break;
 			case 0xFD0: // keep without a rule
-				keep(dce);
+				keep(i.getDirCacheEntry());
 				break;
 			case 0xFFD: // 12 13 14
-				if (equalIdAndMode(hId, hMode, iId, iMode))
-					if (f != null
-							&& f.isModified(dce, true,
-									this.walk.getObjectReader()))
-						conflict(name, dce, h, m); // 13
+				if (hId.equals(iId)) {
+					dce = i.getDirCacheEntry();
+					if (f == null || f.isModified(dce, true))
+						conflict(name, dce, h, m);
 					else
-						remove(name); // 12
-				else
-					conflict(name, dce, h, m); // 14
+						remove(name);
+				} else
+					conflict(name, i.getDirCacheEntry(), h, m);
 				break;
 			case 0x0DF: // 16 17
-				if (!isModifiedSubtree_IndexWorkingtree(name))
-					update(name, mId, mMode);
+				if (!isModified(name))
+					update(name, mId, m.getEntryFileMode());
 				else
-					conflict(name, dce, h, m);
+					conflict(name, i.getDirCacheEntry(), h, m);
 				break;
 			default:
-				keep(dce);
+				keep(i.getDirCacheEntry());
 			}
 			return;
 		}
 
 		// if we have no file at all then there is nothing to do
-		if ((ffMask & 0x222) == 0
-				&& (f == null || FileMode.TREE.equals(f.getEntryFileMode())))
+		if ((ffMask & 0x222) == 0)
 			return;
 
 		if ((ffMask == 0x00F) && f != null && FileMode.TREE.equals(f.getEntryFileMode())) {
 			// File/Directory conflict case #20
 			conflict(name, null, h, m);
-			return;
 		}
 
 		if (i == null) {
-			// Nothing in Index
-			// At least one of Head, Index, Merge is not empty
 			// make sure not to overwrite untracked files
-			if (f != null && !f.isEntryIgnored()) {
+			if (f != null) {
 				// A submodule is not a file. We should ignore it
-				if (!FileMode.GITLINK.equals(mMode)) {
+				if (!FileMode.GITLINK.equals(m.getEntryFileMode())) {
 					// a dirty worktree: the index is empty but we have a
 					// workingtree-file
-					if (mId == null
-							|| !equalIdAndMode(mId, mMode,
-									f.getEntryObjectId(), f.getEntryFileMode())) {
+					if (mId == null || !mId.equals(f.getEntryObjectId())) {
 						conflict(name, null, h, m);
 						return;
 					}
@@ -703,52 +668,24 @@ public class DirCacheCheckout {
 
 			/**
 			 * <pre>
-			 * 	          I (index)     H        M     H==M  Result
-			 * 	        -------------------------------------------
-			 * 	        0 nothing    nothing  nothing        (does not happen)
-			 * 	        1 nothing    nothing  exists         use M
-			 * 	        2 nothing    exists   nothing        remove path from index
-			 * 	        3 nothing    exists   exists   yes   keep index if not in initial checkout
-			 *                                               , otherwise use M
-			 * 	          nothing    exists   exists   no    fail
+			 * 		    I (index)                H        M        Result
+			 * 	        -------------------------------------------------------
+			 * 	        0 nothing             nothing  nothing  (does not happen)
+			 * 	        1 nothing             nothing  exists   use M
+			 * 	        2 nothing             exists   nothing  remove path from index
+			 * 	        3 nothing             exists   exists   use M
 			 * </pre>
 			 */
 
 			if (h == null)
-				// Nothing in Head
-				// Nothing in Index
-				// At least one of Head, Index, Merge is not empty
-				// -> only Merge contains something for this path. Use it!
-				// Potentially update the file
-				update(name, mId, mMode); // 1
+				update(name, mId, m.getEntryFileMode()); // 1
 			else if (m == null)
-				// Nothing in Merge
-				// Something in Head
-				// Nothing in Index
-				// -> only Head contains something for this path and it should
-				// be deleted. Potentially removes the file!
 				remove(name); // 2
-			else { // 3
-				// Something in Merge
-				// Something in Head
-				// Nothing in Index
-				// -> Head and Merge contain something (maybe not the same) and
-				// in the index there is nothing (e.g. 'git rm ...' was
-				// called before). Ignore the cached deletion and use what we
-				// find in Merge. Potentially updates the file.
-				if (equalIdAndMode(hId, hMode, mId, mMode)) {
-					if (emptyDirCache)
-						update(name, mId, mMode);
-					else
-						keep(dce);
-				} else
-					conflict(name, dce, h, m);
-			}
+			else
+				update(name, mId, m.getEntryFileMode()); // 3
 		} else {
-			// Something in Index
+			dce = i.getDirCacheEntry();
 			if (h == null) {
-				// Nothing in Head
-				// Something in Index
 				/**
 				 * <pre>
 				 * 	          clean I==H  I==M       H        M        Result
@@ -763,195 +700,58 @@ public class DirCacheCheckout {
 				 * </pre>
 				 */
 
-				if (m == null
-						|| !isModified_IndexTree(name, iId, iMode, mId, mMode,
-								mergeCommitTree)) {
-					// Merge contains nothing or the same as Index
-					// Nothing in Head
-					// Something in Index
+				if (m == null || mId.equals(iId)) {
 					if (m==null && walk.isDirectoryFileConflict()) {
-						// Nothing in Merge and current path is part of
-						// File/Folder conflict
-						// Nothing in Head
-						// Something in Index
 						if (dce != null
-								&& (f == null || f.isModified(dce, true,
-										this.walk.getObjectReader())))
-							// No file or file is dirty
-							// Nothing in Merge and current path is part of
-							// File/Folder conflict
-							// Nothing in Head
-							// Something in Index
-							// -> File folder conflict and Merge wants this
-							// path to be removed. Since the file is dirty
-							// report a conflict
+								&& (f == null || f.isModified(dce, true)))
 							conflict(name, dce, h, m);
 						else
-							// A file is present and file is not dirty
-							// Nothing in Merge and current path is part of
-							// File/Folder conflict
-							// Nothing in Head
-							// Something in Index
-							// -> File folder conflict and Merge wants this path
-							// to be removed. Since the file is not dirty remove
-							// file and index entry
 							remove(name);
 					} else
-						// Something in Merge or current path is not part of
-						// File/Folder conflict
-						// Merge contains nothing or the same as Index
-						// Nothing in Head
-						// Something in Index
-						// -> Merge contains nothing new. Keep the index.
 						keep(dce);
 				} else
-					// Merge contains something and it is not the same as Index
-					// Nothing in Head
-					// Something in Index
-					// -> Index contains something new (different from Head)
-					// and Merge is different from Index. Report a conflict
 					conflict(name, dce, h, m);
 			} else if (m == null) {
-				// Nothing in Merge
-				// Something in Head
-				// Something in Index
 
 				/**
 				 * <pre>
 				 * 	           clean I==H  I==M       H        M        Result
 				 * 	         -----------------------------------------------------
 				 * 	        10 yes   yes   N/A     exists   nothing  remove path from index
-				 * 	        11 no    yes   N/A     exists   nothing  keep file
+				 * 	        11 no    yes   N/A     exists   nothing  fail
 				 * 	        12 yes   no    N/A     exists   nothing  fail
 				 * 	        13 no    no    N/A     exists   nothing  fail
 				 * </pre>
 				 */
 
-				if (iMode == FileMode.GITLINK) {
-					// A submodule in Index
-					// Nothing in Merge
-					// Something in Head
+				if (dce.getFileMode() == FileMode.GITLINK) {
 					// Submodules that disappear from the checkout must
 					// be removed from the index, but not deleted from disk.
 					remove(name);
 				} else {
-					// Something different from a submodule in Index
-					// Nothing in Merge
-					// Something in Head
-					if (!isModified_IndexTree(name, iId, iMode, hId, hMode,
-							headCommitTree)) {
-						// Index contains the same as Head
-						// Something different from a submodule in Index
-						// Nothing in Merge
-						// Something in Head
-						if (f != null
-								&& f.isModified(dce, true,
-										this.walk.getObjectReader())) {
-							// file is dirty
-							// Index contains the same as Head
-							// Something different from a submodule in Index
-							// Nothing in Merge
-							// Something in Head
-
-							if (!FileMode.TREE.equals(f.getEntryFileMode())
-									&& FileMode.TREE.equals(iMode))
-								// The workingtree contains a file and the index semantically contains a folder.
-								// Git considers the workingtree file as untracked. Just keep the untracked file.
-								return;
-							else
-								// -> file is dirty and tracked but is should be
-								// removed. That's a conflict
-								conflict(name, dce, h, m);
-						} else
-							// file doesn't exist or is clean
-							// Index contains the same as Head
-							// Something different from a submodule in Index
-							// Nothing in Merge
-							// Something in Head
-							// -> Remove from index and delete the file
+					if (hId.equals(iId)) {
+						if (f == null || f.isModified(dce, true))
+							conflict(name, dce, h, m);
+						else
 							remove(name);
 					} else
-						// Index contains something different from Head
-						// Something different from a submodule in Index
-						// Nothing in Merge
-						// Something in Head
-						// -> Something new is in index (and maybe even on the
-						// filesystem). But Merge wants the path to be removed.
-						// Report a conflict
 						conflict(name, dce, h, m);
 				}
 			} else {
-				// Something in Merge
-				// Something in Head
-				// Something in Index
-				if (!equalIdAndMode(hId, hMode, mId, mMode)
-						&& isModified_IndexTree(name, iId, iMode, hId, hMode,
-								headCommitTree)
-						&& isModified_IndexTree(name, iId, iMode, mId, mMode,
-								mergeCommitTree))
-					// All three contents in Head, Merge, Index differ from each
-					// other
-					// -> All contents differ. Report a conflict.
+				if (!hId.equals(mId) && !hId.equals(iId) && !mId.equals(iId))
 					conflict(name, dce, h, m);
-				else
-					// At least two of the contents of Head, Index, Merge
-					// are the same
-					// Something in Merge
-					// Something in Head
-					// Something in Index
-
-				if (!isModified_IndexTree(name, iId, iMode, hId, hMode,
-						headCommitTree)
-						&& isModified_IndexTree(name, iId, iMode, mId, mMode,
-								mergeCommitTree)) {
-						// Head contains the same as Index. Merge differs
-						// Something in Merge
-
+				else if (hId.equals(iId) && !mId.equals(iId)) {
 					// For submodules just update the index with the new SHA-1
 					if (dce != null
 							&& FileMode.GITLINK.equals(dce.getFileMode())) {
-						// Index and Head contain the same submodule. Merge
-						// differs
-						// Something in Merge
-						// -> Nothing new in index. Move to merge.
-						// Potentially updates the file
-
-						// TODO check that we don't overwrite some unsaved
-						// file content
-						update(name, mId, mMode);
+						update(name, mId, m.getEntryFileMode());
 					} else if (dce != null
-							&& (f != null && f.isModified(dce, true,
-									this.walk.getObjectReader()))) {
-						// File exists and is dirty
-						// Head and Index don't contain a submodule
-						// Head contains the same as Index. Merge differs
-						// Something in Merge
-						// -> Merge wants the index and file to be updated
-						// but the file is dirty. Report a conflict
+							&& (f == null || f.isModified(dce, true))) {
 						conflict(name, dce, h, m);
 					} else {
-						// File doesn't exist or is clean
-						// Head and Index don't contain a submodule
-						// Head contains the same as Index. Merge differs
-						// Something in Merge
-						// -> Standard case when switching between branches:
-						// Nothing new in index but something different in
-						// Merge. Update index and file
-						update(name, mId, mMode);
+						update(name, mId, m.getEntryFileMode());
 					}
 				} else {
-					// Head differs from index or merge is same as index
-					// At least two of the contents of Head, Index, Merge
-					// are the same
-					// Something in Merge
-					// Something in Head
-					// Something in Index
-
-					// Can be formulated as: Either all three states are
-					// equal or Merge is equal to Head or Index and differs
-					// to the other one.
-					// -> In all three cases we don't touch index and file.
-
 					keep(dce);
 				}
 			}
@@ -971,7 +771,7 @@ public class DirCacheCheckout {
 		DirCacheEntry entry;
 		if (e != null) {
 			entry = new DirCacheEntry(e.getPathString(), DirCacheEntry.STAGE_1);
-			entry.copyMetaData(e, true);
+			entry.copyMetaData(e);
 			builder.add(entry);
 		}
 
@@ -1045,88 +845,24 @@ public class DirCacheCheckout {
 		}
 	}
 
-	/**
-	 * Checks whether the subtree starting at a given path differs between Index and
-	 * workingtree.
-	 *
-	 * @param path
-	 * @return true if the subtrees differ
-	 * @throws CorruptObjectException
-	 * @throws IOException
-	 */
-	private boolean isModifiedSubtree_IndexWorkingtree(String path)
-			throws CorruptObjectException, IOException {
+	private boolean isModified(String path) throws CorruptObjectException, IOException {
 		NameConflictTreeWalk tw = new NameConflictTreeWalk(repo);
-		try {
-			tw.addTree(new DirCacheIterator(dc));
-			tw.addTree(new FileTreeIterator(repo));
-			tw.setRecursive(true);
-			tw.setFilter(PathFilter.create(path));
-			DirCacheIterator dcIt;
-			WorkingTreeIterator wtIt;
-			while (tw.next()) {
-				dcIt = tw.getTree(0, DirCacheIterator.class);
-				wtIt = tw.getTree(1, WorkingTreeIterator.class);
-				if (dcIt == null || wtIt == null)
-					return true;
-				if (wtIt.isModified(dcIt.getDirCacheEntry(), true,
-						this.walk.getObjectReader())) {
-					return true;
-				}
+		tw.addTree(new DirCacheIterator(dc));
+		tw.addTree(new FileTreeIterator(repo));
+		tw.setRecursive(true);
+		tw.setFilter(PathFilter.create(path));
+		DirCacheIterator dcIt;
+		WorkingTreeIterator wtIt;
+		while(tw.next()) {
+			dcIt = tw.getTree(0, DirCacheIterator.class);
+			wtIt = tw.getTree(1, WorkingTreeIterator.class);
+			if (dcIt == null || wtIt == null)
+				return true;
+			if (wtIt.isModified(dcIt.getDirCacheEntry(), true)) {
+				return true;
 			}
-			return false;
-		} finally {
-			tw.release();
 		}
-	}
-
-	private boolean isModified_IndexTree(String path, ObjectId iId,
-			FileMode iMode, ObjectId tId, FileMode tMode, ObjectId rootTree)
-			throws CorruptObjectException, IOException {
-		if (iMode != tMode)
-			return true;
-		if (FileMode.TREE.equals(iMode)
-				&& (iId == null || ObjectId.zeroId().equals(iId)))
-			return isModifiedSubtree_IndexTree(path, rootTree);
-		else
-			return !equalIdAndMode(iId, iMode, tId, tMode);
-	}
-
-	/**
-	 * Checks whether the subtree starting at a given path differs between Index and
-	 * some tree.
-	 *
-	 * @param path
-	 * @param tree
-	 *            the tree to compare
-	 * @return true if the subtrees differ
-	 * @throws CorruptObjectException
-	 * @throws IOException
-	 */
-	private boolean isModifiedSubtree_IndexTree(String path, ObjectId tree)
-			throws CorruptObjectException, IOException {
-		NameConflictTreeWalk tw = new NameConflictTreeWalk(repo);
-		try {
-			tw.addTree(new DirCacheIterator(dc));
-			tw.addTree(tree);
-			tw.setRecursive(true);
-			tw.setFilter(PathFilter.create(path));
-			while (tw.next()) {
-				AbstractTreeIterator dcIt = tw.getTree(0,
-						DirCacheIterator.class);
-				AbstractTreeIterator treeIt = tw.getTree(1,
-						AbstractTreeIterator.class);
-				if (dcIt == null || treeIt == null)
-					return true;
-				if (dcIt.getEntryRawMode() != treeIt.getEntryRawMode())
-					return true;
-				if (!dcIt.getEntryObjectId().equals(treeIt.getEntryObjectId()))
-					return true;
-			}
-			return false;
-		} finally {
-			tw.release();
-		}
+		return false;
 	}
 
 	/**
@@ -1147,18 +883,17 @@ public class DirCacheCheckout {
 	 *
 	 * @param repository
 	 * @param f
-	 *            this parameter is ignored.
+	 *            the file to be modified. The parent directory for this file
+	 *            has to exist already
 	 * @param entry
 	 *            the entry containing new mode and content
 	 * @throws IOException
-	 * @deprecated Use the overloaded form that accepts {@link ObjectReader}.
 	 */
-	@Deprecated
 	public static void checkoutEntry(final Repository repository, File f,
 			DirCacheEntry entry) throws IOException {
 		ObjectReader or = repository.newObjectReader();
 		try {
-			checkoutEntry(repository, f, entry, or);
+			checkoutEntry(repository, f, entry, repository.newObjectReader());
 		} finally {
 			or.release();
 		}
@@ -1178,77 +913,27 @@ public class DirCacheCheckout {
 	 *
 	 * @param repo
 	 * @param f
-	 *            this parameter is ignored.
+	 *            the file to be modified. The parent directory for this file
+	 *            has to exist already
 	 * @param entry
 	 *            the entry containing new mode and content
 	 * @param or
 	 *            object reader to use for checkout
 	 * @throws IOException
-	 * @deprecated Do not pass File object.
 	 */
-	@Deprecated
 	public static void checkoutEntry(final Repository repo, File f,
 			DirCacheEntry entry, ObjectReader or) throws IOException {
-		if (f == null || repo.getWorkTree() == null)
-			throw new IllegalArgumentException();
-		if (!f.equals(new File(repo.getWorkTree(), entry.getPathString())))
-			throw new IllegalArgumentException();
-		checkoutEntry(repo, entry, or);
-	}
-
-	/**
-	 * Updates the file in the working tree with content and mode from an entry
-	 * in the index. The new content is first written to a new temporary file in
-	 * the same directory as the real file. Then that new file is renamed to the
-	 * final filename.
-	 *
-	 * <p>
-	 * TODO: this method works directly on File IO, we may need another
-	 * abstraction (like WorkingTreeIterator). This way we could tell e.g.
-	 * Eclipse that Files in the workspace got changed
-	 * </p>
-	 *
-	 * @param repo
-	 *            repository managing the destination work tree.
-	 * @param entry
-	 *            the entry containing new mode and content
-	 * @param or
-	 *            object reader to use for checkout
-	 * @throws IOException
-	 * @since 3.6
-	 */
-	public static void checkoutEntry(Repository repo, DirCacheEntry entry,
-			ObjectReader or) throws IOException {
 		ObjectLoader ol = or.open(entry.getObjectId());
-		File f = new File(repo.getWorkTree(), entry.getPathString());
 		File parentDir = f.getParentFile();
-		FileUtils.mkdirs(parentDir, true);
-		FS fs = repo.getFS();
-		WorkingTreeOptions opt = repo.getConfig().get(WorkingTreeOptions.KEY);
-		if (entry.getFileMode() == FileMode.SYMLINK
-				&& opt.getSymLinks() == SymLinks.TRUE) {
-			byte[] bytes = ol.getBytes();
-			String target = RawParseUtils.decode(bytes);
-			fs.createSymLink(f, target);
-			entry.setLength(bytes.length);
-			entry.setLastModified(fs.lastModified(f));
-			return;
-		}
-
-		File tmpFile = File.createTempFile(
-				"._" + f.getName(), null, parentDir); //$NON-NLS-1$
-		OutputStream channel = new FileOutputStream(tmpFile);
-		if (opt.getAutoCRLF() == AutoCRLF.TRUE)
-			channel = new AutoCRLFOutputStream(channel);
+		File tmpFile = File.createTempFile("._" + f.getName(), null, parentDir);
+		FileOutputStream channel = new FileOutputStream(tmpFile);
 		try {
 			ol.copyTo(channel);
 		} finally {
 			channel.close();
 		}
-		entry.setLength(opt.getAutoCRLF() == AutoCRLF.TRUE
-			? f.length() // AutoCRLF wants on-disk-size
-		    : (int) ol.getSize());
-
+		FS fs = repo.getFS();
+		WorkingTreeOptions opt = repo.getConfig().get(WorkingTreeOptions.KEY);
 		if (opt.isFileMode() && fs.supportsExecute()) {
 			if (FileMode.EXECUTABLE_FILE.equals(entry.getRawMode())) {
 				if (!fs.canExecute(tmpFile))
@@ -1258,54 +943,17 @@ public class DirCacheCheckout {
 					fs.setExecute(tmpFile, false);
 			}
 		}
-		try {
-			FileUtils.rename(tmpFile, f);
-		} catch (IOException e) {
-			throw new IOException(MessageFormat.format(
-					JGitText.get().renameFileFailed, tmpFile.getPath(),
-					f.getPath()));
+		if (!tmpFile.renameTo(f)) {
+			// tried to rename which failed. Let' delete the target file and try
+			// again
+			FileUtils.delete(f);
+			if (!tmpFile.renameTo(f)) {
+				throw new IOException(MessageFormat.format(
+						JGitText.get().couldNotWriteFile, tmpFile.getPath(),
+						f.getPath()));
+			}
 		}
 		entry.setLastModified(f.lastModified());
-	}
-
-	private static void checkValidPath(CanonicalTreeParser t)
-			throws InvalidPathException {
-		ObjectChecker chk = new ObjectChecker()
-			.setSafeForWindows(SystemReader.getInstance().isWindows())
-			.setSafeForMacOS(SystemReader.getInstance().isMacOS());
-		for (CanonicalTreeParser i = t; i != null; i = i.getParent())
-			checkValidPathSegment(chk, i);
-	}
-
-	/**
-	 * Check if path is a valid path for a checked out file name or ref name.
-	 *
-	 * @param path
-	 * @throws InvalidPathException
-	 *             if the path is invalid
-	 * @since 3.3
-	 * @deprecated Use {@link SystemReader#checkPath(String)}.
-	 */
-	@Deprecated
-	public static void checkValidPath(String path) throws InvalidPathException {
-		try {
-			SystemReader.getInstance().checkPath(path);
-		} catch (CorruptObjectException e) {
-			throw new InvalidPathException(path);
-		}
-	}
-
-	private static void checkValidPathSegment(ObjectChecker chk,
-			CanonicalTreeParser t) throws InvalidPathException {
-		try {
-			int ptr = t.getNameOffset();
-			int end = ptr + t.getNameLength();
-			chk.checkPathSegment(t.getEntryPathBuffer(), ptr, end);
-		} catch (CorruptObjectException err) {
-			String path = t.getEntryPathString();
-			InvalidPathException i = new InvalidPathException(path);
-			i.initCause(err);
-			throw i;
-		}
+		entry.setLength((int) ol.getSize());
 	}
 }

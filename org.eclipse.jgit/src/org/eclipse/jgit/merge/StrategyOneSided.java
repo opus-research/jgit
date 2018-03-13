@@ -106,10 +106,5 @@ public class StrategyOneSided extends MergeStrategy {
 		public ObjectId getResultTreeId() {
 			return sourceTrees[treeIndex];
 		}
-
-		@Override
-		public ObjectId getBaseCommitId() {
-			return null;
-		}
 	}
 }
