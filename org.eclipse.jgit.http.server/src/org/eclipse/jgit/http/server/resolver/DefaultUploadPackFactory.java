@@ -46,7 +46,6 @@ package org.eclipse.jgit.http.server.resolver;
 import javax.servlet.http.HttpServletRequest;
 
 import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.UploadPack;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
@@ -61,12 +60,6 @@ import org.eclipse.jgit.transport.resolver.UploadPackFactory;
  */
 public class DefaultUploadPackFactory implements
 		UploadPackFactory<HttpServletRequest> {
-	private static final SectionParser<ServiceConfig> CONFIG = new SectionParser<ServiceConfig>() {
-		public ServiceConfig parse(final Config cfg) {
-			return new ServiceConfig(cfg);
-		}
-	};
-
 	private static class ServiceConfig {
 		final boolean enabled;
 
@@ -75,9 +68,10 @@ public class DefaultUploadPackFactory implements
 		}
 	}
 
+	@Override
 	public UploadPack create(final HttpServletRequest req, final Repository db)
 			throws ServiceNotEnabledException, ServiceNotAuthorizedException {
-		if (db.getConfig().get(CONFIG).enabled)
+		if (db.getConfig().get(ServiceConfig::new).enabled)
 			return new UploadPack(db);
 		else
 			throw new ServiceNotEnabledException();

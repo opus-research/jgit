@@ -83,6 +83,7 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
+import org.eclipse.jgit.util.sha1.SHA1;
 
 /**
  * Parses a pack stream and imports it for an {@link ObjectInserter}.
@@ -116,8 +117,7 @@ public abstract class PackParser {
 
 	private byte[] hdrBuf;
 
-	private final MessageDigest objectDigest;
-
+	private final SHA1 objectHasher = SHA1.newInstance();
 	private final MutableObjectId tempObjectId;
 
 	private InputStream in;
@@ -143,7 +143,7 @@ public abstract class PackParser {
 
 	private boolean expectDataAfterPackFooter;
 
-	private long objectCount;
+	private long expectedObjectCount;
 
 	private PackedObjectInfo[] entries;
 
@@ -173,8 +173,8 @@ public abstract class PackParser {
 
 	private LongMap<UnresolvedDelta> baseByPos;
 
-	/** Blobs whose contents need to be double-checked after indexing. */
-	private BlockList<PackedObjectInfo> deferredCheckBlobs;
+	/** Objects need to be double-checked for collision after indexing. */
+	private BlockList<PackedObjectInfo> collisionCheckObjs;
 
 	private MessageDigest packDigest;
 
@@ -206,7 +206,6 @@ public abstract class PackParser {
 		buf = new byte[BUFFER_SIZE];
 		tempBuffer = new byte[BUFFER_SIZE];
 		hdrBuf = new byte[64];
-		objectDigest = Constants.newMessageDigest();
 		tempObjectId = new MutableObjectId();
 		packDigest = Constants.newMessageDigest();
 		checkObjectCollisions = true;
@@ -275,7 +274,7 @@ public abstract class PackParser {
 	 */
 	public void setNeedNewObjectIds(boolean b) {
 		if (b)
-			newObjectIds = new ObjectIdSubclassMap<ObjectId>();
+			newObjectIds = new ObjectIdSubclassMap<>();
 		else
 			newObjectIds = null;
 	}
@@ -333,14 +332,14 @@ public abstract class PackParser {
 	public ObjectIdSubclassMap<ObjectId> getNewObjectIds() {
 		if (newObjectIds != null)
 			return newObjectIds;
-		return new ObjectIdSubclassMap<ObjectId>();
+		return new ObjectIdSubclassMap<>();
 	}
 
 	/** @return set of objects the incoming pack assumed for delta purposes */
 	public ObjectIdSubclassMap<ObjectId> getBaseObjectIds() {
 		if (baseObjectIds != null)
 			return baseObjectIds;
-		return new ObjectIdSubclassMap<ObjectId>();
+		return new ObjectIdSubclassMap<>();
 	}
 
 	/**
@@ -526,15 +525,15 @@ public abstract class PackParser {
 		try {
 			readPackHeader();
 
-			entries = new PackedObjectInfo[(int) objectCount];
-			baseById = new ObjectIdOwnerMap<DeltaChain>();
-			baseByPos = new LongMap<UnresolvedDelta>();
-			deferredCheckBlobs = new BlockList<PackedObjectInfo>();
+			entries = new PackedObjectInfo[(int) expectedObjectCount];
+			baseById = new ObjectIdOwnerMap<>();
+			baseByPos = new LongMap<>();
+			collisionCheckObjs = new BlockList<>();
 
 			receiving.beginTask(JGitText.get().receivingObjects,
-					(int) objectCount);
+					(int) expectedObjectCount);
 			try {
-				for (int done = 0; done < objectCount; done++) {
+				for (int done = 0; done < expectedObjectCount; done++) {
 					indexOneObject();
 					receiving.update(1);
 					if (receiving.isCancelled())
@@ -546,32 +545,12 @@ public abstract class PackParser {
 				receiving.endTask();
 			}
 
-			if (!deferredCheckBlobs.isEmpty())
-				doDeferredCheckBlobs();
+			if (!collisionCheckObjs.isEmpty()) {
+				checkObjectCollision();
+			}
+
 			if (deltaCount > 0) {
-				if (resolving instanceof BatchingProgressMonitor) {
-					((BatchingProgressMonitor) resolving).setDelayStart(
-							1000,
-							TimeUnit.MILLISECONDS);
-				}
-				resolving.beginTask(JGitText.get().resolvingDeltas, deltaCount);
-				resolveDeltas(resolving);
-				if (entryCount < objectCount) {
-					if (!isAllowThin()) {
-						throw new IOException(MessageFormat.format(
-								JGitText.get().packHasUnresolvedDeltas,
-								Long.valueOf(objectCount - entryCount)));
-					}
-
-					resolveDeltasWithExternalBases(resolving);
-
-					if (entryCount < objectCount) {
-						throw new IOException(MessageFormat.format(
-								JGitText.get().packHasUnresolvedDeltas,
-								Long.valueOf(objectCount - entryCount)));
-					}
-				}
-				resolving.endTask();
+				processDeltas(resolving);
 			}
 
 			packDigest = null;
@@ -592,6 +571,31 @@ public abstract class PackParser {
 			}
 		}
 		return null; // By default there is no locking.
+	}
+
+	private void processDeltas(ProgressMonitor resolving) throws IOException {
+		if (resolving instanceof BatchingProgressMonitor) {
+			((BatchingProgressMonitor) resolving).setDelayStart(1000,
+					TimeUnit.MILLISECONDS);
+		}
+		resolving.beginTask(JGitText.get().resolvingDeltas, deltaCount);
+		resolveDeltas(resolving);
+		if (entryCount < expectedObjectCount) {
+			if (!isAllowThin()) {
+				throw new IOException(MessageFormat.format(
+						JGitText.get().packHasUnresolvedDeltas,
+						Long.valueOf(expectedObjectCount - entryCount)));
+			}
+
+			resolveDeltasWithExternalBases(resolving);
+
+			if (entryCount < expectedObjectCount) {
+				throw new IOException(MessageFormat.format(
+						JGitText.get().packHasUnresolvedDeltas,
+						Long.valueOf(expectedObjectCount - entryCount)));
+			}
+		}
+		resolving.endTask();
 	}
 
 	private void resolveDeltas(final ProgressMonitor progress)
@@ -667,18 +671,23 @@ public abstract class PackParser {
 						JGitText.get().corruptionDetectedReReadingAt,
 						Long.valueOf(visit.delta.position)));
 
+			SHA1 objectDigest = objectHasher.reset();
 			objectDigest.update(Constants.encodedTypeString(type));
 			objectDigest.update((byte) ' ');
 			objectDigest.update(Constants.encodeASCII(visit.data.length));
 			objectDigest.update((byte) 0);
 			objectDigest.update(visit.data);
-			tempObjectId.fromRaw(objectDigest.digest(), 0);
+			objectDigest.digest(tempObjectId);
 
 			verifySafeObject(tempObjectId, type, visit.data);
+			if (isCheckObjectCollisions() && readCurs.has(tempObjectId)) {
+				checkObjectCollision(tempObjectId, type, visit.data);
+			}
 
 			PackedObjectInfo oe;
 			oe = newInfo(tempObjectId, visit.delta, visit.parent.id);
 			oe.setOffset(visit.delta.position);
+			oe.setType(type);
 			onInflatedObjectData(oe, type, visit.data);
 			addObjectAndTrack(oe);
 			visit.id = oe;
@@ -826,9 +835,9 @@ public abstract class PackParser {
 		growEntries(baseById.size());
 
 		if (needBaseObjectIds)
-			baseObjectIds = new ObjectIdSubclassMap<ObjectId>();
+			baseObjectIds = new ObjectIdSubclassMap<>();
 
-		final List<DeltaChain> missing = new ArrayList<DeltaChain>(64);
+		final List<DeltaChain> missing = new ArrayList<>(64);
 		for (final DeltaChain baseId : baseById) {
 			if (baseId.head == null)
 				continue;
@@ -849,10 +858,9 @@ public abstract class PackParser {
 			visit.id = baseId;
 			final int typeCode = ldr.getType();
 			final PackedObjectInfo oe = newInfo(baseId, null, null);
-
+			oe.setType(typeCode);
 			if (onAppendBase(typeCode, visit.data, oe))
 				entries[entryCount++] = oe;
-
 			visit.nextChild = firstChildOf(oe);
 			resolveDeltas(visit.next(), typeCode,
 					new ObjectTypeAndSize(), progress);
@@ -873,7 +881,7 @@ public abstract class PackParser {
 	private void growEntries(int extraObjects) {
 		final PackedObjectInfo[] ne;
 
-		ne = new PackedObjectInfo[(int) objectCount + extraObjects];
+		ne = new PackedObjectInfo[(int) expectedObjectCount + extraObjects];
 		System.arraycopy(entries, 0, ne, 0, entryCount);
 		entries = ne;
 	}
@@ -896,9 +904,9 @@ public abstract class PackParser {
 		if (vers != 2 && vers != 3)
 			throw new IOException(MessageFormat.format(
 					JGitText.get().unsupportedPackVersion, Long.valueOf(vers)));
-		objectCount = NB.decodeUInt32(buf, p + 8);
+		final long objectCount = NB.decodeUInt32(buf, p + 8);
 		use(hdrln);
-
+		setExpectedObjectCount(objectCount);
 		onPackHeader(objectCount);
 	}
 
@@ -1024,13 +1032,13 @@ public abstract class PackParser {
 
 	private void whole(final long pos, final int type, final long sz)
 			throws IOException {
+		SHA1 objectDigest = objectHasher.reset();
 		objectDigest.update(Constants.encodedTypeString(type));
 		objectDigest.update((byte) ' ');
 		objectDigest.update(Constants.encodeASCII(sz));
 		objectDigest.update((byte) 0);
 
 		final byte[] data;
-		boolean checkContentLater = false;
 		if (type == Constants.OBJ_BLOB) {
 			byte[] readBuffer = buffer();
 			InputStream inf = inflate(Source.INPUT, sz);
@@ -1043,30 +1051,43 @@ public abstract class PackParser {
 				cnt += r;
 			}
 			inf.close();
-			tempObjectId.fromRaw(objectDigest.digest(), 0);
-			checkContentLater = isCheckObjectCollisions()
-					&& readCurs.has(tempObjectId);
+			objectDigest.digest(tempObjectId);
 			data = null;
-
 		} else {
 			data = inflateAndReturn(Source.INPUT, sz);
 			objectDigest.update(data);
-			tempObjectId.fromRaw(objectDigest.digest(), 0);
+			objectDigest.digest(tempObjectId);
 			verifySafeObject(tempObjectId, type, data);
 		}
 
 		PackedObjectInfo obj = newInfo(tempObjectId, null, null);
 		obj.setOffset(pos);
+		obj.setType(type);
 		onEndWholeObject(obj);
 		if (data != null)
 			onInflatedObjectData(obj, type, data);
 		addObjectAndTrack(obj);
-		if (checkContentLater)
-			deferredCheckBlobs.add(obj);
+
+		if (isCheckObjectCollisions()) {
+			collisionCheckObjs.add(obj);
+		}
 	}
 
-	private void verifySafeObject(final AnyObjectId id, final int type,
-			final byte[] data) throws IOException {
+	/**
+	 * Verify the integrity of the object.
+	 *
+	 * @param id
+	 *            identity of the object to be checked.
+	 * @param type
+	 *            the type of the object.
+	 * @param data
+	 *            raw content of the object.
+	 * @throws CorruptObjectException
+	 * @since 4.9
+	 *
+	 */
+	protected void verifySafeObject(final AnyObjectId id, final int type,
+			final byte[] data) throws CorruptObjectException {
 		if (objCheck != null) {
 			try {
 				objCheck.check(id, type, data);
@@ -1074,65 +1095,73 @@ public abstract class PackParser {
 				if (e.getErrorType() != null) {
 					throw e;
 				}
-				throw new CorruptObjectException(MessageFormat.format(
-						JGitText.get().invalidObject,
-						Constants.typeString(type),
-						readCurs.abbreviate(id, 10).name(),
-						e.getMessage()), e);
-			}
-		}
-
-		if (isCheckObjectCollisions()) {
-			try {
-				final ObjectLoader ldr = readCurs.open(id, type);
-				final byte[] existingData = ldr.getCachedBytes(data.length);
-				if (!Arrays.equals(data, existingData)) {
-					throw new IOException(MessageFormat.format(
-							JGitText.get().collisionOn, id.name()));
-				}
-			} catch (MissingObjectException notLocal) {
-				// This is OK, we don't have a copy of the object locally
-				// but the API throws when we try to read it as usually its
-				// an error to read something that doesn't exist.
+				throw new CorruptObjectException(
+						MessageFormat.format(JGitText.get().invalidObject,
+								Constants.typeString(type), id.name(),
+								e.getMessage()),
+						e);
 			}
 		}
 	}
 
-	private void doDeferredCheckBlobs() throws IOException {
+	private void checkObjectCollision() throws IOException {
+		for (PackedObjectInfo obj : collisionCheckObjs) {
+			if (!readCurs.has(obj)) {
+				continue;
+			}
+			checkObjectCollision(obj);
+		}
+	}
+
+	private void checkObjectCollision(PackedObjectInfo obj)
+			throws IOException {
+		ObjectTypeAndSize info = openDatabase(obj, new ObjectTypeAndSize());
 		final byte[] readBuffer = buffer();
 		final byte[] curBuffer = new byte[readBuffer.length];
-		ObjectTypeAndSize info = new ObjectTypeAndSize();
-
-		for (PackedObjectInfo obj : deferredCheckBlobs) {
-			info = openDatabase(obj, info);
-
-			if (info.type != Constants.OBJ_BLOB)
+		long sz = info.size;
+		InputStream pck = null;
+		try (ObjectStream cur = readCurs.open(obj, info.type).openStream()) {
+			if (cur.getSize() != sz) {
 				throw new IOException(MessageFormat.format(
-						JGitText.get().unknownObjectType,
-						Integer.valueOf(info.type)));
-
-			ObjectStream cur = readCurs.open(obj, info.type).openStream();
-			try {
-				long sz = info.size;
-				if (cur.getSize() != sz)
-					throw new IOException(MessageFormat.format(
-							JGitText.get().collisionOn, obj.name()));
-				InputStream pck = inflate(Source.DATABASE, sz);
-				while (0 < sz) {
-					int n = (int) Math.min(readBuffer.length, sz);
-					IO.readFully(cur, curBuffer, 0, n);
-					IO.readFully(pck, readBuffer, 0, n);
-					for (int i = 0; i < n; i++) {
-						if (curBuffer[i] != readBuffer[i])
-							throw new IOException(MessageFormat.format(JGitText
-									.get().collisionOn, obj.name()));
-					}
-					sz -= n;
-				}
-				pck.close();
-			} finally {
-				cur.close();
+						JGitText.get().collisionOn, obj.name()));
 			}
+			pck = inflate(Source.DATABASE, sz);
+			while (0 < sz) {
+				int n = (int) Math.min(readBuffer.length, sz);
+				IO.readFully(cur, curBuffer, 0, n);
+				IO.readFully(pck, readBuffer, 0, n);
+				for (int i = 0; i < n; i++) {
+					if (curBuffer[i] != readBuffer[i]) {
+						throw new IOException(MessageFormat.format(JGitText
+								.get().collisionOn, obj.name()));
+					}
+				}
+				sz -= n;
+			}
+		} catch (MissingObjectException notLocal) {
+			// This is OK, we don't have a copy of the object locally
+			// but the API throws when we try to read it as usually its
+			// an error to read something that doesn't exist.
+		} finally {
+			if (pck != null) {
+				pck.close();
+			}
+		}
+	}
+
+	private void checkObjectCollision(AnyObjectId obj, int type, byte[] data)
+			throws IOException {
+		try {
+			final ObjectLoader ldr = readCurs.open(obj, type);
+			final byte[] existingData = ldr.getCachedBytes(data.length);
+			if (!Arrays.equals(data, existingData)) {
+				throw new IOException(MessageFormat.format(
+						JGitText.get().collisionOn, obj.name()));
+			}
+		} catch (MissingObjectException notLocal) {
+			// This is OK, we don't have a copy of the object locally
+			// but the API throws when we try to read it as usually its
+			// an error to read something that doesn't exist.
 		}
 	}
 
@@ -1246,6 +1275,23 @@ public abstract class PackParser {
 		if (delta != null)
 			oe.setCRC(delta.crc);
 		return oe;
+	}
+
+	/**
+	 * Set the expected number of objects in the pack stream.
+	 * <p>
+	 * The object count in the pack header is not always correct for some Dfs
+	 * pack files. e.g. INSERT pack always assume 1 object in the header since
+	 * the actual object count is unknown when the pack is written.
+	 * <p>
+	 * If external implementation wants to overwrite the expectedObjectCount,
+	 * they should call this method during {@link #onPackHeader(long)}.
+	 *
+	 * @param expectedObjectCount
+	 * @since 4.9
+	 */
+	protected void setExpectedObjectCount(long expectedObjectCount) {
+		this.expectedObjectCount = expectedObjectCount;
 	}
 
 	/**

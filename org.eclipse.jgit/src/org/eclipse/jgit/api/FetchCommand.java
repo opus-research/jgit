@@ -42,14 +42,18 @@
  */
 package org.eclipse.jgit.api;
 
+import java.io.IOException;
 import java.net.URISyntaxException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.InvalidConfigurationException;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
@@ -57,9 +61,13 @@ import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.StoredConfig;
+import org.eclipse.jgit.lib.SubmoduleConfig.FetchRecurseSubmodulesMode;
+import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.submodule.SubmoduleWalk;
 import org.eclipse.jgit.transport.FetchResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.TagOpt;
@@ -74,7 +82,6 @@ import org.eclipse.jgit.transport.Transport;
  *      >Git documentation about Fetch</a>
  */
 public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
-
 	private String remote = Constants.DEFAULT_REMOTE_NAME;
 
 	private List<RefSpec> refSpecs;
@@ -91,12 +98,111 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 
 	private TagOpt tagOption;
 
+	private FetchRecurseSubmodulesMode submoduleRecurseMode = null;
+
+	private Callback callback;
+
+	/**
+	 * Callback for status of fetch operation.
+	 *
+	 * @since 4.8
+	 *
+	 */
+	public interface Callback {
+		/**
+		 * Notify fetching a submodule.
+		 *
+		 * @param name
+		 *            the submodule name.
+		 */
+		void fetchingSubmodule(String name);
+	}
+
 	/**
 	 * @param repo
 	 */
 	protected FetchCommand(Repository repo) {
 		super(repo);
-		refSpecs = new ArrayList<RefSpec>(3);
+		refSpecs = new ArrayList<>(3);
+	}
+
+	private FetchRecurseSubmodulesMode getRecurseMode(String path) {
+		// Use the caller-specified mode, if set
+		if (submoduleRecurseMode != null) {
+			return submoduleRecurseMode;
+		}
+
+		// Fall back to submodule.name.fetchRecurseSubmodules, if set
+		FetchRecurseSubmodulesMode mode = repo.getConfig().getEnum(
+				FetchRecurseSubmodulesMode.values(),
+				ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
+				ConfigConstants.CONFIG_KEY_FETCH_RECURSE_SUBMODULES, null);
+		if (mode != null) {
+			return mode;
+		}
+
+		// Fall back to fetch.recurseSubmodules, if set
+		mode = repo.getConfig().getEnum(FetchRecurseSubmodulesMode.values(),
+				ConfigConstants.CONFIG_FETCH_SECTION, null,
+				ConfigConstants.CONFIG_KEY_RECURSE_SUBMODULES, null);
+		if (mode != null) {
+			return mode;
+		}
+
+		// Default to on-demand mode
+		return FetchRecurseSubmodulesMode.ON_DEMAND;
+	}
+
+	private void fetchSubmodules(FetchResult results)
+			throws org.eclipse.jgit.api.errors.TransportException,
+			GitAPIException, InvalidConfigurationException {
+		try (SubmoduleWalk walk = new SubmoduleWalk(repo);
+				RevWalk revWalk = new RevWalk(repo)) {
+			// Walk over submodules in the parent repository's FETCH_HEAD.
+			ObjectId fetchHead = repo.resolve(Constants.FETCH_HEAD);
+			if (fetchHead == null) {
+				return;
+			}
+			walk.setTree(revWalk.parseTree(fetchHead));
+			while (walk.next()) {
+				Repository submoduleRepo = walk.getRepository();
+
+				// Skip submodules that don't exist locally (have not been
+				// cloned), are not registered in the .gitmodules file, or
+				// not registered in the parent repository's config.
+				if (submoduleRepo == null || walk.getModulesPath() == null
+						|| walk.getConfigUrl() == null) {
+					continue;
+				}
+
+				FetchRecurseSubmodulesMode recurseMode = getRecurseMode(
+						walk.getPath());
+
+				// When the fetch mode is "yes" we always fetch. When the mode
+				// is "on demand", we only fetch if the submodule's revision was
+				// updated to an object that is not currently present in the
+				// submodule.
+				if ((recurseMode == FetchRecurseSubmodulesMode.ON_DEMAND
+						&& !submoduleRepo.hasObject(walk.getObjectId()))
+						|| recurseMode == FetchRecurseSubmodulesMode.YES) {
+					FetchCommand f = new FetchCommand(submoduleRepo)
+							.setProgressMonitor(monitor).setTagOpt(tagOption)
+							.setCheckFetchedObjects(checkFetchedObjects)
+							.setRemoveDeletedRefs(isRemoveDeletedRefs())
+							.setThin(thin).setRefSpecs(refSpecs)
+							.setDryRun(dryRun)
+							.setRecurseSubmodules(recurseMode);
+					if (callback != null) {
+						callback.fetchingSubmodule(walk.getPath());
+					}
+					results.addSubmodule(walk.getPath(), f.call());
+				}
+			}
+		} catch (IOException e) {
+			throw new JGitInternalException(e.getMessage(), e);
+		} catch (ConfigInvalidException e) {
+			throw new InvalidConfigurationException(e.getMessage(), e);
+		}
 	}
 
 	/**
@@ -112,6 +218,7 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 	 * @throws org.eclipse.jgit.api.errors.TransportException
 	 *             when an error occurs during transport
 	 */
+	@Override
 	public FetchResult call() throws GitAPIException, InvalidRemoteException,
 			org.eclipse.jgit.api.errors.TransportException {
 		checkCallable();
@@ -126,6 +233,10 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 			configure(transport);
 
 			FetchResult result = transport.fetch(monitor, refSpecs);
+			if (!repo.isBare()) {
+				fetchSubmodules(result);
+			}
+
 			return result;
 		} catch (NoRemoteRepositoryException e) {
 			throw new InvalidRemoteException(MessageFormat.format(
@@ -142,6 +253,28 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 					e);
 		}
 
+	}
+
+	/**
+	 * Set the mode to be used for recursing into submodules.
+	 *
+	 * @param recurse
+	 *            corresponds to the
+	 *            --recurse-submodules/--no-recurse-submodules options. If
+	 *            {@code null} use the value of the
+	 *            {@code submodule.name.fetchRecurseSubmodules} option
+	 *            configured per submodule. If not specified there, use the
+	 *            value of the {@code fetch.recurseSubmodules} option configured
+	 *            in git config. If not configured in either, "on-demand" is the
+	 *            built-in default.
+	 * @return {@code this}
+	 * @since 4.7
+	 */
+	public FetchCommand setRecurseSubmodules(
+			@Nullable FetchRecurseSubmodulesMode recurse) {
+		checkCallable();
+		submoduleRecurseMode = recurse;
+		return this;
 	}
 
 	/**
@@ -329,6 +462,19 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 	public FetchCommand setTagOpt(TagOpt tagOpt) {
 		checkCallable();
 		this.tagOption = tagOpt;
+		return this;
+	}
+
+	/**
+	 * Register a progress callback.
+	 *
+	 * @param callback
+	 *            the callback
+	 * @return {@code this}
+	 * @since 4.8
+	 */
+	public FetchCommand setCallback(Callback callback) {
+		this.callback = callback;
 		return this;
 	}
 }

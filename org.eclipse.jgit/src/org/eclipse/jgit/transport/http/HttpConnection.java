@@ -73,6 +73,12 @@ public interface HttpConnection {
 	public static final int HTTP_OK = java.net.HttpURLConnection.HTTP_OK;
 
 	/**
+	 * @see HttpURLConnection#HTTP_MOVED_PERM
+	 * @since 4.7
+	 */
+	public static final int HTTP_MOVED_PERM = java.net.HttpURLConnection.HTTP_MOVED_PERM;
+
+	/**
 	 * @see HttpURLConnection#HTTP_NOT_FOUND
 	 */
 	public static final int HTTP_NOT_FOUND = java.net.HttpURLConnection.HTTP_NOT_FOUND;
@@ -86,18 +92,6 @@ public interface HttpConnection {
 	 * @see HttpURLConnection#HTTP_FORBIDDEN
 	 */
 	public static final int HTTP_FORBIDDEN = java.net.HttpURLConnection.HTTP_FORBIDDEN;
-
-	/**
-	 * @see HttpURLConnection#HTTP_MOVED_PERM
-	 * @since 4.7
-	 */
-	public static final int HTTP_MOVED_PERM = java.net.HttpURLConnection.HTTP_MOVED_PERM;
-
-	/**
-	 * @see HttpURLConnection#HTTP_MOVED_TEMP
-	 * @since 4.7
-	 */
-	public static final int HTTP_MOVED_TEMP = java.net.HttpURLConnection.HTTP_MOVED_TEMP;
 
 	/**
 	 * @see HttpURLConnection#getResponseCode()
@@ -259,7 +253,7 @@ public interface HttpConnection {
 
 	/**
 	 * Configure the connection so that it can be used for https communication.
-	 *
+	 * 
 	 * @param km
 	 *            the keymanager managing the key material used to authenticate
 	 *            the local SSLSocket to its peer

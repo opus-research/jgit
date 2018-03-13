@@ -63,7 +63,6 @@ import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.PackLock;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -250,7 +249,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		super(packTransport);
 
 		if (local != null) {
-			final FetchConfig cfg = local.getConfig().get(FetchConfig.KEY);
+			final FetchConfig cfg = local.getConfig().get(FetchConfig::new);
 			allowOfsDelta = cfg.allowOfsDelta;
 		} else {
 			allowOfsDelta = true;
@@ -260,7 +259,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 		if (local != null) {
 			walk = new RevWalk(local);
-			reachableCommits = new RevCommitList<RevCommit>();
+			reachableCommits = new RevCommitList<>();
 			REACHABLE = walk.newFlag("REACHABLE"); //$NON-NLS-1$
 			COMMON = walk.newFlag("COMMON"); //$NON-NLS-1$
 			STATE = walk.newFlag("STATE"); //$NON-NLS-1$
@@ -279,12 +278,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	}
 
 	private static class FetchConfig {
-		static final SectionParser<FetchConfig> KEY = new SectionParser<FetchConfig>() {
-			public FetchConfig parse(final Config cfg) {
-				return new FetchConfig(cfg);
-			}
-		};
-
 		final boolean allowOfsDelta;
 
 		FetchConfig(final Config c) {
@@ -292,6 +285,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		}
 	}
 
+	@Override
 	public final void fetch(final ProgressMonitor monitor,
 			final Collection<Ref> want, final Set<ObjectId> have)
 			throws TransportException {
@@ -301,6 +295,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	/**
 	 * @since 3.0
 	 */
+	@Override
 	public final void fetch(final ProgressMonitor monitor,
 			final Collection<Ref> want, final Set<ObjectId> have,
 			OutputStream outputStream) throws TransportException {
@@ -308,18 +303,22 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		doFetch(monitor, want, have, outputStream);
 	}
 
+	@Override
 	public boolean didFetchIncludeTags() {
 		return false;
 	}
 
+	@Override
 	public boolean didFetchTestConnectivity() {
 		return false;
 	}
 
+	@Override
 	public void setPackLockMessage(final String message) {
 		lockMessage = message;
 	}
 
+	@Override
 	public Collection<PackLock> getPackLocks() {
 		if (packLock != null)
 			return Collections.singleton(packLock);

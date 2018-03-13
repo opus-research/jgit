@@ -69,7 +69,6 @@ import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.Proxy;
 import java.net.ProxySelector;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.text.MessageFormat;
 import java.util.ArrayList;
@@ -92,7 +91,6 @@ import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.RefDirectory;
 import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
@@ -108,8 +106,6 @@ import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.TemporaryBuffer;
 import org.eclipse.jgit.util.io.DisabledOutputStream;
 import org.eclipse.jgit.util.io.UnionInputStream;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Transport over HTTP and FTP protocols.
@@ -129,9 +125,6 @@ import org.slf4j.LoggerFactory;
  */
 public class TransportHttp extends HttpTransport implements WalkTransport,
 		PackTransport {
-
-	private static final Logger LOG = LoggerFactory
-			.getLogger(TransportHttp.class);
 
 	private static final String SVC_UPLOAD_PACK = "git-upload-pack"; //$NON-NLS-1$
 
@@ -160,73 +153,80 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		private final String[] schemeNames = { "http", "https" }; //$NON-NLS-1$ //$NON-NLS-2$
 
 		private final Set<String> schemeSet = Collections
-				.unmodifiableSet(new LinkedHashSet<String>(Arrays
+				.unmodifiableSet(new LinkedHashSet<>(Arrays
 						.asList(schemeNames)));
 
+		@Override
 		public String getName() {
 			return JGitText.get().transportProtoHTTP;
 		}
 
+		@Override
 		public Set<String> getSchemes() {
 			return schemeSet;
 		}
 
+		@Override
 		public Set<URIishField> getRequiredFields() {
 			return Collections.unmodifiableSet(EnumSet.of(URIishField.HOST,
 					URIishField.PATH));
 		}
 
+		@Override
 		public Set<URIishField> getOptionalFields() {
 			return Collections.unmodifiableSet(EnumSet.of(URIishField.USER,
 					URIishField.PASS, URIishField.PORT));
 		}
 
+		@Override
 		public int getDefaultPort() {
 			return 80;
 		}
 
+		@Override
 		public Transport open(URIish uri, Repository local, String remoteName)
 				throws NotSupportedException {
 			return new TransportHttp(local, uri);
 		}
 
+		@Override
 		public Transport open(URIish uri) throws NotSupportedException {
 			return new TransportHttp(uri);
 		}
 	};
 
 	static final TransportProtocol PROTO_FTP = new TransportProtocol() {
+		@Override
 		public String getName() {
 			return JGitText.get().transportProtoFTP;
 		}
 
+		@Override
 		public Set<String> getSchemes() {
 			return Collections.singleton("ftp"); //$NON-NLS-1$
 		}
 
+		@Override
 		public Set<URIishField> getRequiredFields() {
 			return Collections.unmodifiableSet(EnumSet.of(URIishField.HOST,
 					URIishField.PATH));
 		}
 
+		@Override
 		public Set<URIishField> getOptionalFields() {
 			return Collections.unmodifiableSet(EnumSet.of(URIishField.USER,
 					URIishField.PASS, URIishField.PORT));
 		}
 
+		@Override
 		public int getDefaultPort() {
 			return 21;
 		}
 
+		@Override
 		public Transport open(URIish uri, Repository local, String remoteName)
 				throws NotSupportedException {
 			return new TransportHttp(local, uri);
-		}
-	};
-
-	private static final Config.SectionParser<HttpConfig> HTTP_KEY = new SectionParser<HttpConfig>() {
-		public HttpConfig parse(final Config cfg) {
-			return new HttpConfig(cfg);
 		}
 	};
 
@@ -245,9 +245,9 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 	}
 
-	private URL baseUrl;
+	final URL baseUrl;
 
-	private URL objectsUrl;
+	private final URL objectsUrl;
 
 	final HttpConfig http;
 
@@ -262,17 +262,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 	TransportHttp(final Repository local, final URIish uri)
 			throws NotSupportedException {
 		super(local, uri);
-		setURI(uri);
-		http = local.getConfig().get(HTTP_KEY);
-		proxySelector = ProxySelector.getDefault();
-	}
-
-	/**
-	 * @param uri
-	 * @throws NotSupportedException
-	 * @since 4.7
-	 */
-	protected void setURI(final URIish uri) throws NotSupportedException {
 		try {
 			String uriString = uri.toString();
 			if (!uriString.endsWith("/")) //$NON-NLS-1$
@@ -282,6 +271,8 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		} catch (MalformedURLException e) {
 			throw new NotSupportedException(MessageFormat.format(JGitText.get().invalidURL, uri), e);
 		}
+		http = local.getConfig().get(HttpConfig::new);
+		proxySelector = ProxySelector.getDefault();
 	}
 
 	/**
@@ -292,7 +283,15 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 	 */
 	TransportHttp(final URIish uri) throws NotSupportedException {
 		super(uri);
-		setURI(uri);
+		try {
+			String uriString = uri.toString();
+			if (!uriString.endsWith("/")) //$NON-NLS-1$
+				uriString += "/"; //$NON-NLS-1$
+			baseUrl = new URL(uriString);
+			objectsUrl = new URL(baseUrl, "objects/"); //$NON-NLS-1$
+		} catch (MalformedURLException e) {
+			throw new NotSupportedException(MessageFormat.format(JGitText.get().invalidURL, uri), e);
+		}
 		http = new HttpConfig();
 		proxySelector = ProxySelector.getDefault();
 	}
@@ -462,7 +461,27 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 	private HttpConnection connect(final String service)
 			throws TransportException, NotSupportedException {
-		URL u = getServiceURL(service);
+		final URL u;
+		try {
+			final StringBuilder b = new StringBuilder();
+			b.append(baseUrl);
+
+			if (b.charAt(b.length() - 1) != '/')
+				b.append('/');
+			b.append(Constants.INFO_REFS);
+
+			if (useSmartHttp) {
+				b.append(b.indexOf("?") < 0 ? '?' : '&'); //$NON-NLS-1$
+				b.append("service="); //$NON-NLS-1$
+				b.append(service);
+			}
+
+			u = new URL(b.toString());
+		} catch (MalformedURLException e) {
+			throw new NotSupportedException(MessageFormat.format(JGitText.get().invalidURL, uri), e);
+		}
+
+
 		int authAttempts = 1;
 		Collection<Type> ignoreTypes = null;
 		for (;;) {
@@ -513,24 +532,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 					throw new TransportException(uri, MessageFormat.format(
 							JGitText.get().serviceNotPermitted, service));
 
-				case HttpConnection.HTTP_MOVED_PERM:
-				case HttpConnection.HTTP_MOVED_TEMP:
-					String location = conn.getHeaderField(HDR_LOCATION);
-					try {
-						LOG.info(JGitText.get().redirectHttp, location);
-						int infoRefs = location.indexOf(Constants.INFO_REFS);
-						if (infoRefs != -1) {
-							location = location.substring(0, infoRefs);
-						}
-						setURI(new URIish(location));
-						u = getServiceURL(service);
-						authAttempts = 1;
-					} catch (URISyntaxException e) {
-						throw new TransportException(MessageFormat.format(
-								JGitText.get().invalidRedirectLocation,
-								location), e);
-					}
-					break;
 				default:
 					String err = status + " " + conn.getResponseMessage(); //$NON-NLS-1$
 					throw new TransportException(uri, err);
@@ -542,7 +543,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			} catch (IOException e) {
 				if (authMethod.getType() != HttpAuthMethod.Type.NONE) {
 					if (ignoreTypes == null) {
-						ignoreTypes = new HashSet<Type>();
+						ignoreTypes = new HashSet<>();
 					}
 
 					ignoreTypes.add(authMethod.getType());
@@ -556,28 +557,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 				throw new TransportException(uri, MessageFormat.format(JGitText.get().cannotOpenService, service), e);
 			}
-		}
-	}
-
-	private URL getServiceURL(final String service)
-			throws NotSupportedException {
-		try {
-			final StringBuilder b = new StringBuilder();
-			b.append(baseUrl);
-
-			if (b.charAt(b.length() - 1) != '/')
-				b.append('/');
-			b.append(Constants.INFO_REFS);
-
-			if (useSmartHttp) {
-				b.append(b.indexOf("?") < 0 ? '?' : '&'); //$NON-NLS-1$
-				b.append("service="); //$NON-NLS-1$
-				b.append(service);
-			}
-
-			return new URL(b.toString());
-		} catch (MalformedURLException e) {
-			throw new NotSupportedException(MessageFormat.format(JGitText.get().invalidURL, uri), e);
 		}
 	}
 
@@ -739,7 +718,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		@Override
 		Collection<String> getPackNames() throws IOException {
-			final Collection<String> packs = new ArrayList<String>();
+			final Collection<String> packs = new ArrayList<>();
 			try {
 				final BufferedReader br = openReader(INFO_PACKS);
 				try {
@@ -792,7 +771,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		Map<String, Ref> readAdvertisedImpl(final BufferedReader br)
 				throws IOException, PackProtocolException {
-			final TreeMap<String, Ref> avail = new TreeMap<String, Ref>();
+			final TreeMap<String, Ref> avail = new TreeMap<>();
 			for (;;) {
 				String line = br.readLine();
 				if (line == null)
@@ -890,6 +869,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			readAdvertisedRefs();
 		}
 
+		@Override
 		protected void doPush(final ProgressMonitor monitor,
 				final Map<String, RemoteRefUpdate> refUpdates,
 				OutputStream outputStream) throws TransportException {
@@ -926,9 +906,13 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 
 		void openStream() throws IOException {
+			openStream(null);
+		}
+
+		void openStream(final String redirectUrl) throws IOException {
 			conn = httpOpen(
 					METHOD_POST,
-					new URL(baseUrl, serviceName),
+					redirectUrl == null ? new URL(baseUrl, serviceName) : new URL(redirectUrl),
 					AcceptEncoding.GZIP);
 			conn.setInstanceFollowRedirects(false);
 			conn.setDoOutput(true);
@@ -937,6 +921,10 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 
 		void sendRequest() throws IOException {
+			sendRequest(null);
+		}
+
+		void sendRequest(final String redirectUrl) throws IOException {
 			// Try to compress the content, but only if that is smaller.
 			TemporaryBuffer buf = new TemporaryBuffer.Heap(http.postBuffer);
 			try {
@@ -951,7 +939,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				buf = out;
 			}
 
-			openStream();
+			openStream(redirectUrl);
 			if (buf != out)
 				conn.setRequestProperty(HDR_CONTENT_ENCODING, ENCODING_GZIP);
 			conn.setFixedLengthStreamingMode((int) buf.length());
@@ -961,20 +949,23 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			} finally {
 				httpOut.close();
 			}
+
+			final int status = HttpSupport.response(conn);
+			if (status == HttpConnection.HTTP_MOVED_PERM) {
+				String locationHeader = HttpSupport.responseHeader(conn, HDR_LOCATION);
+				sendRequest(locationHeader);
+			}
 		}
 
 		void openResponse() throws IOException {
 			final int status = HttpSupport.response(conn);
-			if (!((status == HttpConnection.HTTP_OK)
-					|| (status == HttpConnection.HTTP_MOVED_PERM)
-					|| (status == HttpConnection.HTTP_MOVED_TEMP))) {
+			if (status != HttpConnection.HTTP_OK) {
 				throw new TransportException(uri, status + " " //$NON-NLS-1$
 						+ conn.getResponseMessage());
 			}
 
 			final String contentType = conn.getContentType();
-			if ((status == HttpConnection.HTTP_OK)
-					&& !responseType.equals(contentType)) {
+			if (!responseType.equals(contentType)) {
 				conn.getInputStream().close();
 				throw wrongContentType(responseType, contentType);
 			}
@@ -991,16 +982,19 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		abstract void execute() throws IOException;
 
 		class HttpExecuteStream extends InputStream {
+			@Override
 			public int read() throws IOException {
 				execute();
 				return -1;
 			}
 
+			@Override
 			public int read(byte[] b, int off, int len) throws IOException {
 				execute();
 				return -1;
 			}
 
+			@Override
 			public long skip(long n) throws IOException {
 				execute();
 				return 0;

@@ -112,7 +112,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 
 	private boolean all;
 
-	private List<String> only = new ArrayList<String>();
+	private List<String> only = new ArrayList<>();
 
 	private boolean[] onlyProcessed;
 
@@ -124,7 +124,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 * parents this commit should have. The current HEAD will be in this list
 	 * and also all commits mentioned in .git/MERGE_HEAD
 	 */
-	private List<ObjectId> parents = new LinkedList<ObjectId>();
+	private List<ObjectId> parents = new LinkedList<>();
 
 	private String reflogComment;
 
@@ -168,6 +168,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 *             if there are either pre-commit or commit-msg hooks present in
 	 *             the repository and one of them rejects the commit.
 	 */
+	@Override
 	public RevCommit call() throws GitAPIException, NoHeadException,
 			NoMessageException, UnmergedPathsException,
 			ConcurrentRefUpdateException, WrongRepositoryStateException,
@@ -481,7 +482,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 						JGitText.get().entryNotFoundByPath, only.get(i)));
 
 		// there must be at least one change
-		if (emptyCommit)
+		if (emptyCommit && !allowEmpty.booleanValue())
 			// Would like to throw a EmptyCommitException. But this would break the API
 			// TODO(ch): Change this in the next release
 			throw new JGitInternalException(JGitText.get().emptyCommit);

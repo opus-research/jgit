@@ -76,6 +76,7 @@ import org.eclipse.jgit.submodule.SubmoduleWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.FS;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -92,30 +93,37 @@ public class CommitCommandTest extends RepositoryTestCase {
 
 		FS executableFs = new FS() {
 
+			@Override
 			public boolean supportsExecute() {
 				return true;
 			}
 
+			@Override
 			public boolean setExecute(File f, boolean canExec) {
 				return true;
 			}
 
+			@Override
 			public ProcessBuilder runInShell(String cmd, String[] args) {
 				return null;
 			}
 
+			@Override
 			public boolean retryFailedLockFileCommit() {
 				return false;
 			}
 
+			@Override
 			public FS newInstance() {
 				return this;
 			}
 
+			@Override
 			protected File discoverGitExe() {
 				return null;
 			}
 
+			@Override
 			public boolean canExecute(File f) {
 				return true;
 			}
@@ -137,30 +145,37 @@ public class CommitCommandTest extends RepositoryTestCase {
 
 		FS nonExecutableFs = new FS() {
 
+			@Override
 			public boolean supportsExecute() {
 				return false;
 			}
 
+			@Override
 			public boolean setExecute(File f, boolean canExec) {
 				return false;
 			}
 
+			@Override
 			public ProcessBuilder runInShell(String cmd, String[] args) {
 				return null;
 			}
 
+			@Override
 			public boolean retryFailedLockFileCommit() {
 				return false;
 			}
 
+			@Override
 			public FS newInstance() {
 				return this;
 			}
 
+			@Override
 			protected File discoverGitExe() {
 				return null;
 			}
 
+			@Override
 			public boolean canExecute(File f) {
 				return false;
 			}
@@ -291,6 +306,7 @@ public class CommitCommandTest extends RepositoryTestCase {
 		}
 	}
 
+	@Ignore("very flaky when run with Hudson")
 	@Test
 	public void commitUpdatesSmudgedEntries() throws Exception {
 		try (Git git = new Git(db)) {
@@ -347,6 +363,7 @@ public class CommitCommandTest extends RepositoryTestCase {
 		}
 	}
 
+	@Ignore("very flaky when run with Hudson")
 	@Test
 	public void commitIgnoresSmudgedEntryWithDifferentId() throws Exception {
 		try (Git git = new Git(db)) {
@@ -540,6 +557,11 @@ public class CommitCommandTest extends RepositoryTestCase {
 			} catch (EmtpyCommitException e) {
 				// expect this exception
 			}
+
+			// Allow empty commits also when setOnly was set
+			git.commit().setAuthor("New Author", "newauthor@example.org")
+					.setMessage("again no change").setOnly("file1")
+					.setAllowEmpty(true).call();
 		}
 	}
 

@@ -89,12 +89,14 @@ public class SubmoduleUpdateCommand extends
 
 	private MergeStrategy strategy = MergeStrategy.RECURSIVE;
 
+	private CloneCommand.Callback callback;
+
 	/**
 	 * @param repo
 	 */
 	public SubmoduleUpdateCommand(final Repository repo) {
 		super(repo);
-		paths = new ArrayList<String>();
+		paths = new ArrayList<>();
 	}
 
 	/**
@@ -137,6 +139,7 @@ public class SubmoduleUpdateCommand extends
 	 * @throws WrongRepositoryStateException
 	 * @throws GitAPIException
 	 */
+	@Override
 	public Collection<String> call() throws InvalidConfigurationException,
 			NoHeadException, ConcurrentRefUpdateException,
 			CheckoutConflictException, InvalidMergeHeadsException,
@@ -147,7 +150,7 @@ public class SubmoduleUpdateCommand extends
 		try (SubmoduleWalk generator = SubmoduleWalk.forIndex(repo)) {
 			if (!paths.isEmpty())
 				generator.setFilter(PathFilterGroup.createFromStrings(paths));
-			List<String> updated = new ArrayList<String>();
+			List<String> updated = new ArrayList<>();
 			while (generator.next()) {
 				// Skip submodules not registered in .gitmodules file
 				if (generator.getModulesPath() == null)
@@ -160,6 +163,9 @@ public class SubmoduleUpdateCommand extends
 				Repository submoduleRepo = generator.getRepository();
 				// Clone repository is not present
 				if (submoduleRepo == null) {
+					if (callback != null) {
+						callback.cloningSubmodule(generator.getPath());
+					}
 					CloneCommand clone = Git.cloneRepository();
 					configure(clone);
 					clone.setURI(url);
@@ -200,6 +206,10 @@ public class SubmoduleUpdateCommand extends
 								Constants.HEAD, true);
 						refUpdate.setNewObjectId(commit);
 						refUpdate.forceUpdate();
+						if (callback != null) {
+							callback.checkingOut(commit,
+									generator.getPath());
+						}
 					}
 				} finally {
 					submoduleRepo.close();
@@ -222,6 +232,19 @@ public class SubmoduleUpdateCommand extends
 	 */
 	public SubmoduleUpdateCommand setStrategy(MergeStrategy strategy) {
 		this.strategy = strategy;
+		return this;
+	}
+
+	/**
+	 * Set status callback for submodule clone operation.
+	 *
+	 * @param callback
+	 *            the callback
+	 * @return {@code this}
+	 * @since 4.8
+	 */
+	public SubmoduleUpdateCommand setCallback(CloneCommand.Callback callback) {
+		this.callback = callback;
 		return this;
 	}
 }
