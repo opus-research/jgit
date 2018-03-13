@@ -162,9 +162,9 @@ must specify the alignment with the file header's `block_size` field.
 
 Block alignment is not required by the file format.  Unaligned files
 must set `block_size = 0` in the file header, and omit `padding`.
-Unaligned files must include the [ref index](#Ref-index) to support
-fast lookup.  Readers must be able to read both aligned and
-non-aligned files.
+Unaligned files with more than one ref block must include the
+[ref index](#Ref-index) to support fast lookup.  Readers must be
+able to read both aligned and non-aligned files.
 
 Very small files (e.g. 1 only ref block) may omit `padding` and the
 ref index to reduce total file size.
@@ -773,6 +773,9 @@ directory:
 where reftable files are named by a unique name such as produced by
 the function `${update_index}.ref`.
 
+Log-only files use the `.log` extension, while ref-only and mixed ref
+and log files use `.ref`.  extension.
+
 The stack ordering file is `$GIT_DIR/refs` and lists the current
 files, one per line, in order, from oldest (base) to newest (most
 recent):
@@ -858,7 +861,7 @@ is going to compact B and C, leaving A and D alone.
 6.  Verify that `B` and `C` are still in the stack, in that order. This
     should always be the case, assuming that other processes are adhering
     to the locking protocol.
-7.  Rename `${min_update_index}_XXXXXX` to `${min_update_index}.ref`.
+7.  Rename `${min_update_index}_XXXXXX` to `${min_update_index}_2.ref`.
 8.  Write the new stack to `refs.lock`, replacing `B` and `C` with the
     file from (4).
 9.  Rename `refs.lock` to `refs`.
