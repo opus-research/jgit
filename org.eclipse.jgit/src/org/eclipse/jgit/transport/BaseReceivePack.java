@@ -252,35 +252,13 @@ public abstract class BaseReceivePack {
 	/** The size of the received pack, including index size */
 	private Long packSize;
 
-	private PushCertificateParser pushCertificateParser;
-	private SignedPushConfig signedPushConfig;
-	private PushCertificate pushCert;
+	PushCertificateParser pushCertificateParser;
 
 	/**
-	 * Get the push certificate used to verify the pusher's identity.
-	 * <p>
-	 * Only valid after commands are read from the wire.
-	 *
-	 * @return the parsed certificate, or null if push certificates are disabled
-	 *         or no cert was presented by the client.
-	 * @since 4.1
+	 * @return the push certificate used to verify the pushers identity.
 	 */
-	public PushCertificate getPushCertificate() {
-		return pushCert;
-	}
-
-	/**
-	 * Set the push certificate used to verify the pusher's identity.
-	 * <p>
-	 * Should only be called if reconstructing an instance without going through
-	 * the normal {@link #recvCommands()} flow.
-	 *
-	 * @param cert
-	 *            the push certificate to set.
-	 * @since 4.1
-	 */
-	public void setPushCertificate(PushCertificate cert) {
-		pushCert = cert;
+	PushCertificate getPushCertificate() {
+		return pushCertificateParser;
 	}
 
 	/**
@@ -304,7 +282,7 @@ public abstract class BaseReceivePack {
 		refFilter = RefFilter.DEFAULT;
 		advertisedHaves = new HashSet<ObjectId>();
 		clientShallowCommits = new HashSet<ObjectId>();
-		signedPushConfig = cfg.signedPush;
+		pushCertificateParser = new PushCertificateParser(db, cfg);
 	}
 
 	/** Configuration for receive operations. */
@@ -326,7 +304,8 @@ public abstract class BaseReceivePack {
 		final boolean allowNonFastForwards;
 		final boolean allowOfsDelta;
 
-		final SignedPushConfig signedPush;
+		final String certNonceSeed;
+		final int certNonceSlopLimit;
 
 		ReceiveConfig(final Config config) {
 			checkReceivedObjects = config.getBoolean(
@@ -347,7 +326,8 @@ public abstract class BaseReceivePack {
 					"denynonfastforwards", false); //$NON-NLS-1$
 			allowOfsDelta = config.getBoolean("repack", "usedeltabaseoffset", //$NON-NLS-1$ //$NON-NLS-2$
 					true);
-			signedPush = SignedPushConfig.KEY.parse(config);
+			certNonceSeed = config.getString("receive", null, "certnonceseed"); //$NON-NLS-1$ //$NON-NLS-2$
+			certNonceSlopLimit = config.getInt("receive", "certnonceslop", 0); //$NON-NLS-1$ //$NON-NLS-2$
 		}
 
 		ObjectChecker newObjectChecker() {
@@ -804,26 +784,6 @@ public abstract class BaseReceivePack {
 	}
 
 	/**
-	 * Set the configuration for push certificate verification.
-	 *
-	 * @param cfg
-	 *            new configuration; if this object is null or its {@link
-	 *            SignedPushConfig#getCertNonceSeed()} is null, push certificate
-	 *            verification will be disabled.
-	 * @since 4.1
-	 */
-	public void setSignedPushConfig(SignedPushConfig cfg) {
-		signedPushConfig = cfg;
-	}
-
-	private PushCertificateParser getPushCertificateParser() {
-		if (pushCertificateParser == null) {
-			pushCertificateParser = new PushCertificateParser(db, signedPushConfig);
-		}
-		return pushCertificateParser;
-	}
-
-	/**
 	 * Get the user agent of the client.
 	 * <p>
 	 * If the client is new enough to use {@code agent=} capability that value
@@ -1054,10 +1014,9 @@ public abstract class BaseReceivePack {
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
 		if (allowQuiet)
 			adv.advertiseCapability(CAPABILITY_QUIET);
-		String nonce = getPushCertificateParser().getAdvertiseNonce();
-		if (nonce != null) {
-			adv.advertiseCapability(nonce);
-		}
+		if (pushCertificateParser.enabled())
+			adv.advertiseCapability(
+				pushCertificateParser.getAdvertiseNonce());
 		if (db.getRefDatabase().performsAtomicTransactions())
 			adv.advertiseCapability(CAPABILITY_ATOMIC);
 		if (allowOfsDelta)
@@ -1077,88 +1036,56 @@ public abstract class BaseReceivePack {
 	 * @throws IOException
 	 */
 	protected void recvCommands() throws IOException {
-		PushCertificateParser certParser = getPushCertificateParser();
-		FirstLine firstLine = null;
-		try {
-			for (;;) {
-				String line;
-				try {
-					line = pckIn.readString();
-				} catch (EOFException eof) {
-					if (commands.isEmpty())
-						return;
-					throw eof;
-				}
-				if (line == PacketLineIn.END) {
-					break;
-				}
-
-				if (line.length() >= 48 && line.startsWith("shallow ")) { //$NON-NLS-1$
-					clientShallowCommits.add(ObjectId.fromString(line.substring(8, 48)));
-					continue;
-				}
-
-				if (firstLine == null) {
-					firstLine = new FirstLine(line);
-					enabledCapabilities = firstLine.getCapabilities();
-					line = firstLine.getLine();
-
-					if (line.equals(GitProtocolConstants.OPTION_PUSH_CERT)) {
-						certParser.receiveHeader(pckIn, !isBiDirectionalPipe());
-						continue;
-					}
-				}
-
-				if (line.equals(PushCertificateParser.BEGIN_SIGNATURE)) {
-					certParser.receiveSignature(pckIn);
-					continue;
-				}
-
-				ReceiveCommand cmd;
-				try {
-					cmd = parseCommand(line);
-				} catch (PackProtocolException e) {
-					sendError(e.getMessage());
-					throw e;
-				}
-				if (cmd.getRefName().equals(Constants.HEAD)) {
-					cmd.setResult(Result.REJECTED_CURRENT_BRANCH);
-				} else {
-					cmd.setRef(refs.get(cmd.getRefName()));
-				}
-				commands.add(cmd);
-				if (certParser.enabled()) {
-					certParser.addCommand(cmd);
-				}
+		for (;;) {
+			String line;
+			try {
+				line = pckIn.readStringRaw();
+			} catch (EOFException eof) {
+				if (commands.isEmpty())
+					return;
+				throw eof;
 			}
-			pushCert = certParser.build();
-		} catch (PackProtocolException e) {
-			sendError(e.getMessage());
-			throw e;
-		}
-	}
+			if (line == PacketLineIn.END)
+				break;
 
-	static ReceiveCommand parseCommand(String line) throws PackProtocolException {
-          if (line == null || line.length() < 83) {
-			throw new PackProtocolException(
-					JGitText.get().errorInvalidProtocolWantedOldNewRef);
+			if (line.length() >= 48 && line.startsWith("shallow ")) { //$NON-NLS-1$
+				clientShallowCommits.add(ObjectId.fromString(line.substring(8, 48)));
+				continue;
+			}
+
+			if (commands.isEmpty()) {
+				final FirstLine firstLine = new FirstLine(line);
+				enabledCapabilities = firstLine.getCapabilities();
+				line = firstLine.getLine();
+
+				if (line.equals(GitProtocolConstants.OPTION_PUSH_CERT))
+					pushCertificateParser.receiveHeader(pckIn,
+							!isBiDirectionalPipe());
+			}
+
+			if (line.equals("-----BEGIN PGP SIGNATURE-----\n")) //$NON-NLS-1$
+				pushCertificateParser.receiveSignature(pckIn);
+
+			if (pushCertificateParser.enabled())
+				pushCertificateParser.addCommand(line);
+
+			if (line.length() < 83) {
+				final String m = JGitText.get().errorInvalidProtocolWantedOldNewRef;
+				sendError(m);
+				throw new PackProtocolException(m);
+			}
+
+			final ObjectId oldId = ObjectId.fromString(line.substring(0, 40));
+			final ObjectId newId = ObjectId.fromString(line.substring(41, 81));
+			final String name = line.substring(82);
+			final ReceiveCommand cmd = new ReceiveCommand(oldId, newId, name);
+			if (name.equals(Constants.HEAD)) {
+				cmd.setResult(Result.REJECTED_CURRENT_BRANCH);
+			} else {
+				cmd.setRef(refs.get(cmd.getRefName()));
+			}
+			commands.add(cmd);
 		}
-		String oldStr = line.substring(0, 40);
-		String newStr = line.substring(41, 81);
-		ObjectId oldId, newId;
-		try {
-			oldId = ObjectId.fromString(oldStr);
-			newId = ObjectId.fromString(newStr);
-		} catch (IllegalArgumentException e) {
-			throw new PackProtocolException(
-					JGitText.get().errorInvalidProtocolWantedOldNewRef, e);
-		}
-		String name = line.substring(82);
-		if (!Repository.isValidRefName(name)) {
-			throw new PackProtocolException(
-					JGitText.get().errorInvalidProtocolWantedOldNewRef);
-		}
-		return new ReceiveCommand(oldId, newId, name);
 	}
 
 	/** Enable capabilities based on a previously read capabilities line. */
@@ -1505,7 +1432,6 @@ public abstract class BaseReceivePack {
 		batch.setRefLogMessage("push", true); //$NON-NLS-1$
 		batch.addCommand(toApply);
 		try {
-			batch.setPushCertificate(getPushCertificate());
 			batch.execute(walk, updating);
 		} catch (IOException err) {
 			for (ReceiveCommand cmd : toApply) {
