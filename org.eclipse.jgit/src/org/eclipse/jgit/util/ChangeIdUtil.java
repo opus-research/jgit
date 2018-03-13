@@ -161,7 +161,7 @@ public class ChangeIdUtil {
 	 */
 	public static String insertId(String message, ObjectId changeId,
 			boolean replaceExisting) {
-		int indexOfChangeId = indexOfChangeId(message, "\n");
+		int indexOfChangeId = indexOfChangeId(message, "\n"); //$NON-NLS-1$
 		if (indexOfChangeId > 0) {
 			if (!replaceExisting)
 				return message;
@@ -171,7 +171,7 @@ public class ChangeIdUtil {
 				ret.append(CHANGE_ID);
 				ret.append(" I"); //$NON-NLS-1$
 				ret.append(ObjectId.toString(changeId));
-				int indexOfNextLineBreak = message.indexOf("\n",
+				int indexOfNextLineBreak = message.indexOf("\n", //$NON-NLS-1$
 						indexOfChangeId);
 				if (indexOfNextLineBreak > 0)
 					ret.append(message.substring(indexOfNextLineBreak));
