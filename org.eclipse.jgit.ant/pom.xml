@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-   Copyright (C) 2011, Google Inc.
+   Copyright (C) 2011, Ketan Padegaonkar <KetanPadegaonkar@gmail.com>
    and other copyright owners as documented in the project's IP log.
 
    This program and the accompanying materials are made available
@@ -41,61 +41,74 @@
    ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
    ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+	<modelVersion>4.0.0</modelVersion>
 
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
-  <modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>org.eclipse.jgit</groupId>
+		<artifactId>org.eclipse.jgit-parent</artifactId>
+		<version>1.0.0-SNAPSHOT</version>
+	</parent>
 
-  <parent>
-    <groupId>org.eclipse.jgit</groupId>
-    <artifactId>org.eclipse.jgit-parent</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
-  </parent>
+	<artifactId>org.eclipse.jgit.ant</artifactId>
+	<name>JGit - Ant Tasks</name>
 
-  <artifactId>org.eclipse.jgit.storage.dht.test</artifactId>
-  <name>JGit - DHT Storage Tests</name>
+	<description>
+    Ant based user interface for Git
+    </description>
 
-  <description>
-    JUnit tests for Git repository storage on a distributed hashtable
-  </description>
+	<properties>
+		<translate-qualifier />
+	</properties>
 
-  <dependencies>
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <scope>test</scope>
-    </dependency>
+	<dependencies>
+		<dependency>
+			<groupId>org.eclipse.jgit</groupId>
+			<artifactId>org.eclipse.jgit</artifactId>
+			<version>${project.version}</version>
+		</dependency>
 
-    <dependency>
-      <groupId>org.eclipse.jgit</groupId>
-      <artifactId>org.eclipse.jgit</artifactId>
-      <version>${project.version}</version>
-    </dependency>
+		<dependency>
+			<groupId>org.apache.ant</groupId>
+			<artifactId>ant</artifactId>
+			<version>1.7.1</version>
+		</dependency>
+	</dependencies>
 
-    <dependency>
-      <groupId>org.eclipse.jgit</groupId>
-      <artifactId>org.eclipse.jgit.junit</artifactId>
-      <version>${project.version}</version>
-    </dependency>
+	<build>
+		<sourceDirectory>src/</sourceDirectory>
 
-    <dependency>
-      <groupId>org.eclipse.jgit</groupId>
-      <artifactId>org.eclipse.jgit.storage.dht</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-  </dependencies>
+		<resources>
+			<resource>
+				<directory>.</directory>
+				<includes>
+					<include>plugin.properties</include>
+				</includes>
+			</resource>
+			<resource>
+				<directory>resources/</directory>
+			</resource>
+		</resources>
 
-  <build>
-    <testSourceDirectory>tst/</testSourceDirectory>
+		<plugins>
+			<plugin>
+				<artifactId>maven-jar-plugin</artifactId>
+				<configuration>
+					<archive>
+						<manifestFile>${bundle-manifest}</manifestFile>
+					</archive>
+				</configuration>
+			</plugin>
 
-    <plugins>
-      <plugin>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <configuration>
-          <argLine>-Xmx256m -Dfile.encoding=UTF-8</argLine>
-        </configuration>
-      </plugin>
-    </plugins>
-  </build>
+			<plugin>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<source>1.5</source>
+					<target>1.5</target>
+					<encoding>UTF-8</encoding>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
 </project>
