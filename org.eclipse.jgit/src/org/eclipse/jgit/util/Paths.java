@@ -41,58 +41,37 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.reftree;
+package org.eclipse.jgit.util;
 
-import java.io.IOException;
+/**
+ * Utility functions for paths inside of a Git repository.
+ *
+ * @since 4.2
+ */
+public class Paths {
+	/**
+	 * Remove trailing {@code '/'} if present.
+	 *
+	 * @param path
+	 *            input path to potentially remove trailing {@code '/'} from.
+	 * @return null if {@code path == null}; {@code path} after removing a
+	 *         trailing {@code '/'}.
+	 */
+	public static String stripTrailingSeparator(String path) {
+		if (path == null || path.isEmpty()) {
+			return path;
+		}
 
-import org.eclipse.jgit.lib.ObjectIdRef;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.RefDatabase;
-import org.eclipse.jgit.lib.RefUpdate;
-import org.eclipse.jgit.lib.Repository;
-
-/** Update that always rejects with {@code LOCK_FAILURE}. */
-class FailUpdate extends RefUpdate {
-	private final RefTreeDatabase refdb;
-
-	FailUpdate(RefTreeDatabase refdb, String name) {
-		super(new ObjectIdRef.Unpeeled(Ref.Storage.NEW, name, null));
-		this.refdb = refdb;
-		setCheckConflicting(false);
+		int i = path.length();
+		if (path.charAt(path.length() - 1) != '/') {
+			return path;
+		}
+		do {
+			i--;
+		} while (path.charAt(i - 1) == '/');
+		return path.substring(0, i);
 	}
 
-	@Override
-	protected RefDatabase getRefDatabase() {
-		return refdb;
-	}
-
-	@Override
-	protected Repository getRepository() {
-		return refdb.getRepository();
-	}
-
-	@Override
-	protected boolean tryLock(boolean deref) throws IOException {
-		return false;
-	}
-
-	@Override
-	protected void unlock() {
-		// No locks are held here.
-	}
-
-	@Override
-	protected Result doUpdate(Result desiredResult) throws IOException {
-		return Result.LOCK_FAILURE;
-	}
-
-	@Override
-	protected Result doDelete(Result desiredResult) throws IOException {
-		return Result.LOCK_FAILURE;
-	}
-
-	@Override
-	protected Result doLink(String target) throws IOException {
-		return Result.LOCK_FAILURE;
+	private Paths() {
 	}
 }

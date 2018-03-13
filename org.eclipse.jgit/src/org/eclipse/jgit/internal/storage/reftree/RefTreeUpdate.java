@@ -63,13 +63,13 @@ import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.ReceiveCommand;
 
-/** Single reference update to {@link RefTreeDb}. */
-class Update extends RefUpdate {
-	private final RefTreeDb refdb;
+/** Single reference update to {@link RefTreeDatabase}. */
+class RefTreeUpdate extends RefUpdate {
+	private final RefTreeDatabase refdb;
 	private Ref oldRef;
-	private Batch batch;
+	private RefTreeBatch batch;
 
-	Update(RefTreeDb refdb, Ref ref) {
+	RefTreeUpdate(RefTreeDatabase refdb, Ref ref) {
 		super(ref);
 		this.refdb = refdb;
 		setCheckConflicting(false); // Done automatically by doUpdate.
@@ -87,7 +87,7 @@ class Update extends RefUpdate {
 
 	@Override
 	protected boolean tryLock(boolean deref) throws IOException {
-		batch = new Batch(refdb);
+		batch = new RefTreeBatch(refdb);
 		try (RevWalk rw = new RevWalk(getRepository())) {
 			batch.init(rw);
 			oldRef = batch.exactRef(rw.getObjectReader(), getName());
@@ -131,10 +131,10 @@ class Update extends RefUpdate {
 	protected Result doLink(String target) throws IOException {
 		Ref dst = new ObjectIdRef.Unpeeled(NEW, target, null);
 		SymbolicRef n = new SymbolicRef(getName(), dst);
-		Result result = getRef().getStorage() == NEW
+		Result desiredResult = getRef().getStorage() == NEW
 			? Result.NEW
 			: Result.FORCED;
-		return run(n, result);
+		return run(n, desiredResult);
 	}
 
 	private Result run(@Nullable Ref newRef, Result desiredResult)

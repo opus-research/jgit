@@ -43,10 +43,10 @@
 
 package org.eclipse.jgit.internal.storage.reftree;
 
-import static org.eclipse.jgit.internal.storage.reftree.RefTreeDb.R_TXN;
-import static org.eclipse.jgit.internal.storage.reftree.RefTreeDb.R_TXN_COMMITTED;
-import static org.eclipse.jgit.internal.storage.reftree.RefTreeDb.BootstrapBehavior.HIDDEN_REJECT;
-import static org.eclipse.jgit.internal.storage.reftree.RefTreeDb.BootstrapBehavior.UNION;
+import static org.eclipse.jgit.internal.storage.reftree.RefTreeDatabase.R_TXN;
+import static org.eclipse.jgit.internal.storage.reftree.RefTreeDatabase.R_TXN_COMMITTED;
+import static org.eclipse.jgit.internal.storage.reftree.RefTreeDatabase.Layering.REJECT_REFS_TXN;
+import static org.eclipse.jgit.internal.storage.reftree.RefTreeDatabase.Layering.SHOW_ALL;
 import static org.eclipse.jgit.lib.Constants.OBJ_TREE;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.NOT_ATTEMPTED;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.OK;
@@ -62,7 +62,7 @@ import java.util.List;
 
 import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.reftree.RefTreeDb.BootstrapBehavior;
+import org.eclipse.jgit.internal.storage.reftree.RefTreeDatabase.Layering;
 import org.eclipse.jgit.lib.BatchRefUpdate;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.ObjectId;
@@ -78,17 +78,18 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.ReceiveCommand;
 
-/** Batch update a {@link RefTreeDb}. */
-class Batch extends BatchRefUpdate {
-	private final RefTreeDb refdb;
+/** Batch update a {@link RefTreeDatabase}. */
+class RefTreeBatch extends BatchRefUpdate {
+	private final RefTreeDatabase refdb;
 	private Ref src;
-	private ObjectId parentId;
-	private ObjectId parentTree;
+	private ObjectId parentCommitId;
+	private ObjectId parentTreeId;
 	private RefTree tree;
 	private PersonIdent author;
-	private ObjectId nextId;
 
-	Batch(RefTreeDb refdb) {
+	private ObjectId newCommitId;
+
+	RefTreeBatch(RefTreeDatabase refdb) {
 		super(refdb);
 		this.refdb = refdb;
 	}
@@ -99,7 +100,7 @@ class Batch extends BatchRefUpdate {
 		List<Command> forTree = new ArrayList<>(getCommands().size());
 		List<ReceiveCommand> forBootstrap = new ArrayList<>();
 		boolean hasRefsTxnCommitted = false;
-		BootstrapBehavior behavior = refdb.getBehavior();
+		Layering behavior = refdb.getBehavior();
 
 		for (ReceiveCommand c : getCommands()) {
 			if (c.getResult() != NOT_ATTEMPTED) {
@@ -107,7 +108,7 @@ class Batch extends BatchRefUpdate {
 				return;
 			}
 
-			if (behavior == HIDDEN_REJECT && isBootstrapRef(c)) {
+			if (behavior == REJECT_REFS_TXN && isBootstrapRef(c.getRefName())) {
 				c.setResult(REJECTED_OTHER_REASON, MessageFormat
 						.format(JGitText.get().invalidRefName, c.getRefName()));
 				reject(JGitText.get().transactionAborted);
@@ -125,7 +126,7 @@ class Batch extends BatchRefUpdate {
 				}
 			}
 
-			if (behavior == UNION && isBootstrapRef(c)) {
+			if (behavior == SHOW_ALL && isBootstrapRef(c.getRefName())) {
 				hasRefsTxnCommitted |= R_TXN_COMMITTED.equals(c.getRefName());
 				forBootstrap.add(c);
 			} else {
@@ -143,8 +144,9 @@ class Batch extends BatchRefUpdate {
 			if (!apply(forTree)) {
 				reject(JGitText.get().transactionAborted);
 				return;
-			} else if (nextId != null) {
-				commit = new ReceiveCommand(parentId, nextId, R_TXN_COMMITTED);
+			} else if (newCommitId != null) {
+				commit = new ReceiveCommand(parentCommitId, newCommitId,
+						R_TXN_COMMITTED);
 				forBootstrap.add(commit);
 			}
 		}
@@ -177,8 +179,9 @@ class Batch extends BatchRefUpdate {
 			}
 		}
 	}
-	private static boolean isBootstrapRef(ReceiveCommand c) {
-		return c.getRefName().startsWith(R_TXN);
+
+	private static boolean isBootstrapRef(String refName) {
+		return refName.startsWith(R_TXN);
 	}
 
 	private BatchRefUpdate newBootstrapBatch() {
@@ -200,14 +203,14 @@ class Batch extends BatchRefUpdate {
 		src = refdb.getBootstrap().exactRef(R_TXN_COMMITTED);
 		if (src != null && src.getObjectId() != null) {
 			RevCommit c = rw.parseCommit(src.getObjectId());
-			parentId = c;
-			parentTree = c.getTree();
+			parentCommitId = c;
+			parentTreeId = c.getTree();
 			tree = RefTree.read(rw.getObjectReader(), c.getTree());
 		} else {
-			tree = RefTree.newEmptyTree();
-			parentId = ObjectId.zeroId();
-			parentTree = new ObjectInserter.Formatter()
+			parentCommitId = ObjectId.zeroId();
+			parentTreeId = new ObjectInserter.Formatter()
 					.idFor(OBJ_TREE, new byte[] {});
+			tree = RefTree.newEmptyTree();
 		}
 	}
 
@@ -216,8 +219,32 @@ class Batch extends BatchRefUpdate {
 		return tree.exactRef(reader, name);
 	}
 
+	/**
+	 * Execute an update from {@link RefTreeUpdate} or {@link RefTreeRename}.
+	 *
+	 * @param rw
+	 *            current RevWalk handling the update or rename.
+	 * @param todo
+	 *            single command ({@link RefTreeUpdate}) or pair of commands (
+	 *            {@link RefTreeRename}) to execute. Must never be a bootstrap
+	 *            reference name, unless the behavior is
+	 *            {@link Layering#HIDE_REFS_TXN}.
+	 * @throws IOException
+	 *             the storage system is unable to read or write data.
+	 */
 	void execute(RevWalk rw, List<Command> todo) throws IOException {
-		if (apply(todo) && nextId != null) {
+		if (refdb.getBehavior() != Layering.HIDE_REFS_TXN) {
+			for (Command c : todo) {
+				if (isBootstrapRef(c.getRefName())) {
+					c.setResult(REJECTED_OTHER_REASON, MessageFormat.format(
+							JGitText.get().invalidRefName, c.getRefName()));
+					reject(todo, JGitText.get().transactionAborted);
+					return;
+				}
+			}
+		}
+
+		if (apply(todo) && newCommitId != null) {
 			commit(rw, todo);
 		}
 	}
@@ -232,14 +259,14 @@ class Batch extends BatchRefUpdate {
 		try (ObjectInserter ins = repo.newObjectInserter()) {
 			CommitBuilder b = new CommitBuilder();
 			b.setTreeId(tree.writeTree(ins));
-			if (parentTree.equals(b.getTreeId())) {
+			if (parentTreeId.equals(b.getTreeId())) {
 				for (Command c : todo) {
 					c.setResult(OK);
 				}
 				return true;
 			}
-			if (!parentId.equals(ObjectId.zeroId())) {
-				b.setParentId(parentId);
+			if (!parentCommitId.equals(ObjectId.zeroId())) {
+				b.setParentId(parentCommitId);
 			}
 
 			author = getRefLogIdent();
@@ -249,7 +276,7 @@ class Batch extends BatchRefUpdate {
 			b.setAuthor(author);
 			b.setCommitter(author);
 			b.setMessage(getRefLogMessage());
-			nextId = ins.insert(b);
+			newCommitId = ins.insert(b);
 			ins.flush();
 		}
 		return true;
@@ -257,8 +284,8 @@ class Batch extends BatchRefUpdate {
 
 	private void commit(RevWalk rw, List<Command> todo) throws IOException {
 		RefUpdate u = refdb.getBootstrap().newUpdate(R_TXN_COMMITTED, false);
-		u.setExpectedOldObjectId(parentId);
-		u.setNewObjectId(nextId);
+		u.setExpectedOldObjectId(parentCommitId);
+		u.setNewObjectId(newCommitId);
 		u.setRefLogIdent(author);
 		u.setRefLogMessage("commit", false); //$NON-NLS-1$
 
@@ -273,14 +300,17 @@ class Batch extends BatchRefUpdate {
 			break;
 
 		default:
-			String msg = result.name();
-			for (Command c : todo) {
-				if (c.getResult() == NOT_ATTEMPTED) {
-					c.setResult(REJECTED_OTHER_REASON, msg);
-					msg = JGitText.get().transactionAborted;
-				}
-			}
+			reject(todo, result.name());
 			break;
+		}
+	}
+
+	private static void reject(List<Command> todo, String msg) {
+		for (Command c : todo) {
+			if (c.getResult() == NOT_ATTEMPTED) {
+				c.setResult(REJECTED_OTHER_REASON, msg);
+				msg = JGitText.get().transactionAborted;
+			}
 		}
 	}
 }

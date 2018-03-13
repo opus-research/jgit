@@ -43,8 +43,8 @@
 
 package org.eclipse.jgit.internal.storage.reftree;
 
-import static org.eclipse.jgit.internal.storage.reftree.RefTreeDb.BootstrapBehavior.HIDDEN_REJECT;
-import static org.eclipse.jgit.internal.storage.reftree.RefTreeDb.BootstrapBehavior.UNION;
+import static org.eclipse.jgit.internal.storage.reftree.RefTreeDatabase.Layering.REJECT_REFS_TXN;
+import static org.eclipse.jgit.internal.storage.reftree.RefTreeDatabase.Layering.SHOW_ALL;
 import static org.eclipse.jgit.lib.Ref.Storage.LOOSE;
 import static org.eclipse.jgit.lib.Ref.Storage.PACKED;
 
@@ -73,15 +73,20 @@ import org.eclipse.jgit.util.RefMap;
 
 /**
  * Reference database backed by a {@link RefTree}.
- *
- * @since 4.2
+ * <p>
+ * The storage for RefTreeDatabase has two parts. The main part is a native Git
+ * tree object stored under the {@code refs/txn} namespace. To avoid cycles,
+ * references to {@code refs/txn} are not stored in that tree object, but
+ * instead in a "bootstrap" layer, which is a separate {@link RefDatabase} such
+ * as {@link org.eclipse.jgit.internal.storage.file.RefDirectory} using local
+ * reference files inside of {@code $GIT_DIR/refs}.
  */
-public class RefTreeDb extends RefDatabase {
+public class RefTreeDatabase extends RefDatabase {
 	static final String R_TXN = "refs/txn/"; //$NON-NLS-1$
 	static final String R_TXN_COMMITTED = "refs/txn/committed"; //$NON-NLS-1$
 
 	/** How the RefTreeDb should handle the bootstrap layer. */
-	public enum BootstrapBehavior {
+	public enum Layering {
 		/**
 		 * Union the bootstrap references into the same namespace.
 		 * <p>
@@ -89,33 +94,33 @@ public class RefTreeDb extends RefDatabase {
 		 * Some updates may fail, for example {@code refs/heads/master} and
 		 * {@code refs/txn/committed} at the same time is not possible.
 		 */
-		UNION,
+		SHOW_ALL,
 
 		/**
-		 * Hide bootstrap references, but reject updates in namespace.
+		 * Hide bootstrap references and reject updates in its namespace.
 		 * <p>
 		 * Bootstrap references cannot be read through this database, so it is
-		 * as if they do not exist. However updates to the bootstrap namespace
-		 * are rejected with "funny refname" errors to prevent users from
+		 * as if they do not exist. Updates to the bootstrap namespace are
+		 * rejected with "funny refname" errors to prevent users from
 		 * overwriting a bootstrap reference.
 		 */
-		HIDDEN_REJECT,
+		REJECT_REFS_TXN,
 
 		/**
 		 * Hide the bootstrap references and store over them.
 		 * <p>
 		 * This behavior makes the bootstrap invisible to users and requires any
 		 * code that needs to access a bootstrap reference to explicitly do so
-		 * through {@link RefTreeDb#getBootstrap()}. By making the bootstrap
-		 * layer invisible to users, users may use the bootstrap namespace for
-		 * their own data.
+		 * through {@link RefTreeDatabase#getBootstrap()}. By making the
+		 * bootstrap layer invisible to users, users may use the bootstrap
+		 * namespace for their own data.
 		 */
-		HIDDEN;
+		HIDE_REFS_TXN;
 	}
 
 	private final Repository repo;
 	private final RefDatabase bootstrap;
-	private final BootstrapBehavior behavior;
+	private final Layering behavior;
 	private volatile Scanner.Result refs;
 
 	/**
@@ -129,8 +134,8 @@ public class RefTreeDb extends RefDatabase {
 	 * @param behavior
 	 *            how this database should expose the bootstrap references.
 	 */
-	public RefTreeDb(Repository repo, RefDatabase bootstrap,
-			BootstrapBehavior behavior) {
+	public RefTreeDatabase(Repository repo, RefDatabase bootstrap,
+			Layering behavior) {
 		this.repo = repo;
 		this.bootstrap = bootstrap;
 		this.behavior = behavior;
@@ -141,7 +146,7 @@ public class RefTreeDb extends RefDatabase {
 	}
 
 	/** @return how the bootstrap layer is treated by this database. */
-	public BootstrapBehavior getBehavior() {
+	public Layering getBehavior() {
 		return behavior;
 	}
 
@@ -178,14 +183,14 @@ public class RefTreeDb extends RefDatabase {
 
 	@Override
 	public Ref exactRef(String name) throws IOException {
-		if (behavior == UNION && name.startsWith(R_TXN)) {
+		if (behavior == SHOW_ALL && name.startsWith(R_TXN)) {
 			return bootstrap.exactRef(name);
 		}
 
 		boolean partial = false;
 		Ref src = bootstrap.exactRef(R_TXN_COMMITTED);
 		Scanner.Result c = refs;
-		if (c == null || !c.id.equals(idOf(src))) {
+		if (c == null || !c.refTreeId.equals(idOf(src))) {
 			c = Scanner.scanRefTree(repo, src, prefixOf(name), false);
 			partial = true;
 		}
@@ -213,7 +218,7 @@ public class RefTreeDb extends RefDatabase {
 
 	@Override
 	public Map<String, Ref> getRefs(String prefix) throws IOException {
-		if (behavior == UNION && prefix.startsWith(R_TXN)) {
+		if (behavior == SHOW_ALL && prefix.startsWith(R_TXN)) {
 			return bootstrap.getRefs(prefix);
 		}
 		if (!prefix.isEmpty() && prefix.charAt(prefix.length() - 1) != '/') {
@@ -222,7 +227,7 @@ public class RefTreeDb extends RefDatabase {
 
 		RefList<Ref> txn;
 		Ref src;
-		if (behavior == UNION && prefix.isEmpty()) {
+		if (behavior == SHOW_ALL && prefix.isEmpty()) {
 			txn = listRefsTxn();
 			src = txn.get(R_TXN_COMMITTED);
 		} else {
@@ -231,7 +236,7 @@ public class RefTreeDb extends RefDatabase {
 		}
 
 		Scanner.Result c = refs;
-		if (c == null || !c.id.equals(idOf(src))) {
+		if (c == null || !c.refTreeId.equals(idOf(src))) {
 			c = Scanner.scanRefTree(repo, src, prefix, true);
 			if (prefix.isEmpty()) {
 				refs = c;
@@ -257,7 +262,7 @@ public class RefTreeDb extends RefDatabase {
 
 	@Override
 	public List<Ref> getAdditionalRefs() throws IOException {
-		if (behavior == UNION) {
+		if (behavior == SHOW_ALL) {
 			return bootstrap.getAdditionalRefs();
 		}
 		return Collections.emptyList();
@@ -292,7 +297,7 @@ public class RefTreeDb extends RefDatabase {
 
 	@Override
 	public boolean isNameConflicting(String name) throws IOException {
-		if (behavior == UNION && name.startsWith(R_TXN)) {
+		if (behavior == SHOW_ALL && name.startsWith(R_TXN)) {
 			return bootstrap.isNameConflicting(name);
 		}
 		return !getConflictingNames(name).isEmpty();
@@ -300,15 +305,15 @@ public class RefTreeDb extends RefDatabase {
 
 	@Override
 	public BatchRefUpdate newBatchUpdate() {
-		return new Batch(this);
+		return new RefTreeBatch(this);
 	}
 
 	@Override
 	public RefUpdate newUpdate(String name, boolean detach) throws IOException {
 		if (name.startsWith(R_TXN)) {
-			if (behavior == UNION) {
+			if (behavior == SHOW_ALL) {
 				return bootstrap.newUpdate(name, detach);
-			} else if (behavior == HIDDEN_REJECT) {
+			} else if (behavior == REJECT_REFS_TXN) {
 				return new FailUpdate(this, name);
 			}
 		}
@@ -323,7 +328,7 @@ public class RefTreeDb extends RefDatabase {
 			r = new ObjectIdRef.Unpeeled(LOOSE, name, r.getObjectId());
 		}
 
-		Update u = new Update(this, r);
+		RefTreeUpdate u = new RefTreeUpdate(this, r);
 		if (detaching) {
 			u.setDetachingSymbolicRef();
 		}
@@ -333,13 +338,13 @@ public class RefTreeDb extends RefDatabase {
 	@Override
 	public RefRename newRename(String fromName, String toName)
 			throws IOException {
-		if (behavior == UNION && fromName.startsWith(R_TXN)
+		if (behavior == SHOW_ALL && fromName.startsWith(R_TXN)
 				&& toName.startsWith(R_TXN)) {
 			return bootstrap.newRename(fromName, toName);
 		}
 
 		RefUpdate from = newUpdate(fromName, true);
 		RefUpdate to = newUpdate(toName, true);
-		return new Rename(this, from, to);
+		return new RefTreeRename(this, from, to);
 	}
 }

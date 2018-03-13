@@ -66,32 +66,58 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.SymbolicRef;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.util.Paths;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.RefList;
 
-/** Scans a {@link RefTree} to build a {@link RefList}. */
+/** A tree parser that extracts references from a {@link RefTree}. */
 class Scanner {
 	private static final int MAX_SYMLINK_BYTES = 10 << 10;
 	private static final byte[] BINARY_R_REFS = encode(R_REFS);
 	private static final byte[] REFS_DOT_DOT = encode("refs/.."); //$NON-NLS-1$
 
 	static class Result {
-		final ObjectId id;
+		final ObjectId refTreeId;
 		final RefList<Ref> all;
 		final RefList<Ref> sym;
 
 		Result(ObjectId id, RefList<Ref> all, RefList<Ref> sym) {
-			this.id = id;
+			this.refTreeId = id;
 			this.all = all;
 			this.sym = sym;
 		}
 	}
 
-	static Result scanRefTree(Repository repo, @Nullable Ref src,
-			String prefix, boolean recursive)
-					throws IOException, IncorrectObjectTypeException {
+	/**
+	 * Scan a {@link RefTree} and parse entries into {@link Ref} instances.
+	 *
+	 * @param repo
+	 *            source repository containing the commit and tree objects that
+	 *            make up the RefTree.
+	 * @param src
+	 *            bootstrap reference such as {@code refs/txn/committed} to read
+	 *            the reference tree tip from. The current ObjectId will be
+	 *            included in {@link Result#refTreeId}.
+	 * @param prefix
+	 *            if non-empty a reference prefix to scan only a subdirectory.
+	 *            For example {@code prefix = "refs/heads/"} will limit the scan
+	 *            to only the {@code "heads"} directory of the RefTree, avoiding
+	 *            other directories like {@code "tags"}. Empty string reads all
+	 *            entries in the RefTree.
+	 * @param recursive
+	 *            if true recurse into subdirectories of the reference tree;
+	 *            false to read only one level. Callers may use false during an
+	 *            implementation of {@code exactRef(String)} where only one
+	 *            reference is needed out of a specific subtree.
+	 * @return sorted list of references after parsing.
+	 * @throws IOException
+	 *             tree cannot be accessed from the repository.
+	 */
+	static Result scanRefTree(Repository repo, @Nullable Ref src, String prefix,
+			boolean recursive) throws IOException {
 		RefList.Builder<Ref> all = new RefList.Builder<>();
 		RefList.Builder<Ref> sym = new RefList.Builder<>();
 
@@ -143,7 +169,7 @@ class Scanner {
 				continue;
 			}
 
-			if (!isPeelSuffix(p)) {
+			if (!curElementHasPeelSuffix(p)) {
 				Ref r = toRef(reader, mode, p);
 				if (r != null) {
 					all.add(r);
@@ -165,11 +191,8 @@ class Scanner {
 			return new CanonicalTreeParser(BINARY_R_REFS, reader, root);
 		}
 
-		String dir = prefix;
-		if (dir.charAt(dir.length() - 1) == '/') {
-			dir = dir.substring(0, dir.length() - 1);
-		}
-		TreeWalk tw = TreeWalk.forPath(reader, RefTree.refPath(dir), root);
+		String dir = RefTree.refPath(Paths.stripTrailingSeparator(prefix));
+		TreeWalk tw = TreeWalk.forPath(reader, dir, root);
 		if (tw == null || !tw.isSubtree()) {
 			return null;
 		}
@@ -204,9 +227,9 @@ class Scanner {
 		return new RevWalk(reader).parseTree(id);
 	}
 
-	private static boolean isPeelSuffix(CanonicalTreeParser t) {
-		int n = t.getEntryPathLength();
-		byte[] c = t.getEntryPathBuffer();
+	private static boolean curElementHasPeelSuffix(AbstractTreeIterator itr) {
+		int n = itr.getEntryPathLength();
+		byte[] c = itr.getEntryPathBuffer();
 		return n > 3 && c[n - 3] == '^' && c[n - 2] == '{' && c[n - 1] == '}';
 	}
 

@@ -60,19 +60,19 @@ import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.SymbolicRef;
 import org.eclipse.jgit.revwalk.RevWalk;
 
-/** Single reference rename to {@link RefTreeDb}. */
-class Rename extends RefRename {
-	private final RefTreeDb refdb;
+/** Single reference rename to {@link RefTreeDatabase}. */
+class RefTreeRename extends RefRename {
+	private final RefTreeDatabase refdb;
 
-	Rename(RefTreeDb refdb, RefUpdate o, RefUpdate n) {
-		super(o, n);
+	RefTreeRename(RefTreeDatabase refdb, RefUpdate src, RefUpdate dst) {
+		super(src, dst);
 		this.refdb = refdb;
 	}
 
 	@Override
 	protected Result doRename() throws IOException {
 		try (RevWalk rw = new RevWalk(refdb.getRepository())) {
-			Batch batch = new Batch(refdb);
+			RefTreeBatch batch = new RefTreeBatch(refdb);
 			batch.setRefLogIdent(getRefLogIdent());
 			batch.setRefLogMessage(getRefLogMessage(), false);
 			batch.init(rw);
@@ -94,28 +94,28 @@ class Rename extends RefRename {
 					new SymbolicRef(head.getName(), newRef)));
 			}
 			batch.execute(rw, mv);
-			return Update.translate(mv.get(1).getResult(), RENAMED);
+			return RefTreeUpdate.translate(mv.get(1).getResult(), RENAMED);
 		}
 	}
 
-	private Ref asNew(Ref o) {
+	private Ref asNew(Ref src) {
 		String name = destination.getName();
-		if (o.isSymbolic()) {
-			return new SymbolicRef(name, o.getTarget());
+		if (src.isSymbolic()) {
+			return new SymbolicRef(name, src.getTarget());
 		}
 
-		ObjectId peeled = o.getPeeledObjectId();
+		ObjectId peeled = src.getPeeledObjectId();
 		if (peeled != null) {
 			return new ObjectIdRef.PeeledTag(
-					o.getStorage(),
+					src.getStorage(),
 					name,
-					o.getObjectId(),
+					src.getObjectId(),
 					peeled);
 		}
 
 		return new ObjectIdRef.PeeledNonTag(
-				o.getStorage(),
+				src.getStorage(),
 				name,
-				o.getObjectId());
+				src.getObjectId());
 	}
 }

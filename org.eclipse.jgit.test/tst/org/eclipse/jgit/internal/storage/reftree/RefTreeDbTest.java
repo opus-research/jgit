@@ -43,7 +43,7 @@
 
 package org.eclipse.jgit.internal.storage.reftree;
 
-import static org.eclipse.jgit.internal.storage.reftree.RefTreeDb.R_TXN_COMMITTED;
+import static org.eclipse.jgit.internal.storage.reftree.RefTreeDatabase.R_TXN_COMMITTED;
 import static org.eclipse.jgit.lib.Constants.HEAD;
 import static org.eclipse.jgit.lib.Constants.R_HEADS;
 import static org.eclipse.jgit.lib.Constants.R_TAGS;
@@ -73,7 +73,7 @@ import java.util.Map;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
 import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
-import org.eclipse.jgit.internal.storage.reftree.RefTreeDb.BootstrapBehavior;
+import org.eclipse.jgit.internal.storage.reftree.RefTreeDatabase.Layering;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.BatchRefUpdate;
@@ -96,7 +96,7 @@ import org.junit.Test;
 
 public class RefTreeDbTest {
 	private InMemRefTreeRepo repo;
-	private RefTreeDb refdb;
+	private RefTreeDatabase refdb;
 	private RefDatabase bootstrap;
 
 	private TestRepository<InMemRefTreeRepo> testRepo;
@@ -417,7 +417,7 @@ public class RefTreeDbTest {
 
 	@Test
 	public void testUnionBehavior_UpdateGetRefs() throws IOException {
-		repo.setBehavior(BootstrapBehavior.UNION);
+		repo.setBehavior(Layering.SHOW_ALL);
 		update("refs/heads/master", A);
 		ObjectId txnId = txnCommitted();
 
@@ -437,7 +437,7 @@ public class RefTreeDbTest {
 
 	@Test
 	public void testUnionBehavior_OnlyRefsTxnVisible() throws IOException {
-		repo.setBehavior(BootstrapBehavior.UNION);
+		repo.setBehavior(Layering.SHOW_ALL);
 		update("refs/heads/master", A);
 		ObjectId txnId = txnCommitted();
 
@@ -457,7 +457,7 @@ public class RefTreeDbTest {
 
 	@Test
 	public void testUnionBehavior_BatchSuccess() throws IOException {
-		repo.setBehavior(BootstrapBehavior.UNION);
+		repo.setBehavior(Layering.SHOW_ALL);
 		update("refs/heads/master", A);
 		ObjectId txnId = txnCommitted();
 
@@ -477,7 +477,7 @@ public class RefTreeDbTest {
 
 	@Test
 	public void testUnionBehavior_BatchFailure() throws IOException {
-		repo.setBehavior(BootstrapBehavior.UNION);
+		repo.setBehavior(Layering.SHOW_ALL);
 		update("refs/heads/master", A);
 		ObjectId txnId = txnCommitted();
 		txnId = txnCommitted();
@@ -502,7 +502,7 @@ public class RefTreeDbTest {
 	@Test
 	public void testUnionBehavior_BatchCannotAlsoUpdateRefsTxnCommitted()
 			throws IOException {
-		repo.setBehavior(BootstrapBehavior.UNION);
+		repo.setBehavior(Layering.SHOW_ALL);
 		update("refs/heads/master", A);
 		ObjectId txnId = txnCommitted();
 		txnId = txnCommitted();
@@ -544,7 +544,7 @@ public class RefTreeDbTest {
 
 	@Test
 	public void testHiddenBehavior_AllowsRefsTxnNamespace() throws IOException {
-		repo.setBehavior(BootstrapBehavior.HIDDEN);
+		repo.setBehavior(Layering.HIDE_REFS_TXN);
 		ObjectId txnId = txnCommitted();
 
 		RefUpdate u = refdb.newUpdate("refs/txn/tmp", false);
@@ -796,15 +796,15 @@ public class RefTreeDbTest {
 	}
 
 	private class InMemRefTreeRepo extends InMemoryRepository {
-		private RefTreeDb rdb;
+		private RefTreeDatabase rdb;
 
 		InMemRefTreeRepo(DfsRepositoryDescription repoDesc) {
 			super(repoDesc);
-			setBehavior(BootstrapBehavior.HIDDEN_REJECT);
+			setBehavior(Layering.REJECT_REFS_TXN);
 		}
 
-		void setBehavior(BootstrapBehavior behavior) {
-			rdb = new RefTreeDb(this, super.getRefDatabase(), behavior);
+		void setBehavior(Layering behavior) {
+			rdb = new RefTreeDatabase(this, super.getRefDatabase(), behavior);
 			refdb = rdb;
 		}
 
