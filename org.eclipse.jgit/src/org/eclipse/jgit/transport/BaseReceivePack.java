@@ -51,7 +51,6 @@ import static org.eclipse.jgit.transport.SideBandOutputStream.CH_DATA;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_PROGRESS;
 import static org.eclipse.jgit.transport.SideBandOutputStream.MAX_BUF;
 
-import java.io.File;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -773,17 +772,14 @@ public abstract class BaseReceivePack {
 	/**
 	 * Unlock the pack written by this object.
 	 *
-	 * @return the pack file that was unlocked, {@code null} if there was no lock
 	 * @throws IOException
 	 *             the pack could not be unlocked.
 	 */
-	protected File unlockPack() throws IOException {
+	protected void unlockPack() throws IOException {
 		if (packLock != null) {
-			File packFile = packLock.unlock();
+			packLock.unlock();
 			packLock = null;
-			return packFile;
 		}
-		return null;
 	}
 
 	/**
