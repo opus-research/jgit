@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Robin Rosenberg
+ * Copyright (C) 2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,49 +40,30 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util.io;
+package org.eclipse.jgit.pgm;
 
-import java.io.BufferedOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import static org.junit.Assert.assertArrayEquals;
 
-/**
- * A BufferedOutputStream that throws an error if the final flush fails on
- * close.
- * <p>
- * Java's BufferedOutputStream swallows errors that occur when the output stream
- * tries to write the final bytes to the output during close. This may result in
- * corrupted files without notice.
- * </p>
- */
-public class SafeBufferedOutputStream extends BufferedOutputStream {
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.junit.Test;
 
-	/**
-	 * @see BufferedOutputStream#BufferedOutputStream(OutputStream)
-	 * @param out
-	 *            underlying output stream
-	 */
-	public SafeBufferedOutputStream(OutputStream out) {
-		super(out);
-	}
-
-	/**
-	 * @see BufferedOutputStream#BufferedOutputStream(OutputStream, int)
-	 * @param out
-	 *            underlying output stream
-	 * @param size
-	 *            buffer size
-	 */
-	public SafeBufferedOutputStream(OutputStream out, int size) {
-		super(out, size);
-	}
-
-	@Override
-	public void close() throws IOException {
-		try {
-			flush();
-		} finally {
-			super.close();
-		}
+public class CommitAndLogTest extends CLIRepositoryTestCase {
+	@Test
+	public void testCommitAmend() throws Exception {
+		assertArrayEquals(new String[] { // commit
+						"[master 101cffba0364877df1942891eba7f465f628a3d2] first comit", //
+						"", // amend
+						"[master d2169869dadf16549be20dcf8c207349d2ed6c62] first commit", //
+						"", // log
+						"commit d2169869dadf16549be20dcf8c207349d2ed6c62", //
+						"Author: GIT_COMMITTER_NAME <GIT_COMMITTER_EMAIL>", //
+						"Date:   Sat Aug 15 20:12:58 2009 -0330", //
+						"", //
+						"    first commit", //
+						"", //
+						"" //
+				}, execute("git commit -m 'first comit'", //
+						"git commit --amend -m 'first commit'", //
+						"git log"));
 	}
 }

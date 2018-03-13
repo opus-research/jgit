@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Robin Rosenberg
+ * Copyright (C) 2011-2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,49 +40,63 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util.io;
+package org.eclipse.jgit.util;
 
-import java.io.BufferedOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import static org.junit.Assert.assertEquals;
 
-/**
- * A BufferedOutputStream that throws an error if the final flush fails on
- * close.
- * <p>
- * Java's BufferedOutputStream swallows errors that occur when the output stream
- * tries to write the final bytes to the output during close. This may result in
- * corrupted files without notice.
- * </p>
- */
-public class SafeBufferedOutputStream extends BufferedOutputStream {
+import java.util.ArrayList;
+import java.util.List;
 
-	/**
-	 * @see BufferedOutputStream#BufferedOutputStream(OutputStream)
-	 * @param out
-	 *            underlying output stream
-	 */
-	public SafeBufferedOutputStream(OutputStream out) {
-		super(out);
+import org.junit.Before;
+import org.junit.Test;
+
+public class ReadLinesTest {
+	List<String> l = new ArrayList<String>();
+
+	@Before
+	public void clearList() {
+		l.clear();
 	}
 
-	/**
-	 * @see BufferedOutputStream#BufferedOutputStream(OutputStream, int)
-	 * @param out
-	 *            underlying output stream
-	 * @param size
-	 *            buffer size
-	 */
-	public SafeBufferedOutputStream(OutputStream out, int size) {
-		super(out, size);
+	@Test
+	public void testReadLines_singleLine() {
+		l.add("[0]");
+		assertEquals(l, IO.readLines("[0]"));
 	}
 
-	@Override
-	public void close() throws IOException {
-		try {
-			flush();
-		} finally {
-			super.close();
-		}
+	@Test
+	public void testReadLines_LF() {
+		l.add("[0]");
+		l.add("[1]");
+		assertEquals(l, IO.readLines("[0]\n[1]"));
+	}
+
+	@Test
+	public void testReadLines_CRLF() {
+		l.add("[0]");
+		l.add("[1]");
+		assertEquals(l, IO.readLines("[0]\r\n[1]"));
+	}
+
+	@Test
+	public void testReadLines_endLF() {
+		l.add("[0]");
+		l.add("");
+		assertEquals(l, IO.readLines("[0]\n"));
+	}
+
+	@Test
+	public void testReadLines_endCRLF() {
+		l.add("[0]");
+		l.add("");
+		assertEquals(l, IO.readLines("[0]\r\n"));
+	}
+
+	@Test
+	public void testReadLines_mixed() {
+		l.add("[0]");
+		l.add("[1]");
+		l.add("[2]");
+		assertEquals(l, IO.readLines("[0]\r\n[1]\n[2]"));
 	}
 }
