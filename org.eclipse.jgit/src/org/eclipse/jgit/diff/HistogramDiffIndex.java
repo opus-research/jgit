@@ -130,6 +130,8 @@ final class HistogramDiffIndex<S extends Sequence> {
 
 	private int cnt;
 
+	private boolean hasCommon;
+
 	HistogramDiffIndex(int maxChainLength, HashedSequenceComparator<S> cmp,
 			HashedSequence<S> a, HashedSequence<S> b, Edit r) {
 		this.maxChainLength = maxChainLength;
@@ -162,7 +164,7 @@ final class HistogramDiffIndex<S extends Sequence> {
 		for (int bPtr = region.beginB; bPtr < region.endB;)
 			bPtr = tryLongestCommonSequence(bPtr);
 
-		return cnt <= maxChainLength ? lcs : null;
+		return hasCommon && maxChainLength < cnt ? null : lcs;
 	}
 
 	private boolean scanA() {
@@ -220,13 +222,17 @@ final class HistogramDiffIndex<S extends Sequence> {
 			rec = recs[rIdx];
 
 			// If there are more occurrences in A, don't use this chain.
-			if (recCnt(rec) > cnt)
+			if (recCnt(rec) > cnt) {
+				if (!hasCommon)
+					hasCommon = cmp.equals(a, recPtr(rec), b, bPtr);
 				continue;
+			}
 
 			int as = recPtr(rec);
 			if (!cmp.equals(a, as, b, bPtr))
 				continue;
 
+			hasCommon = true;
 			TRY_LOCATIONS: for (;;) {
 				int np = next[as - nextShift];
 				int bs = bPtr;

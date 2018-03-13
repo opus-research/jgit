@@ -122,7 +122,7 @@ public class HistogramDiffTest extends AbstractDiffTestCase {
 		r = hd.diff(cmp, ac, bc);
 		assertEquals(70, r.size());
 
-		// Results go when we add a fallback for the high collision regions.
+		// Results go up when we add a fallback for the high collision regions.
 		hd.setFallbackAlgorithm(MyersDiff.INSTANCE);
 		r = hd.diff(cmp, ac, bc);
 		assertEquals(73, r.size());

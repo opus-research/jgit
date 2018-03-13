@@ -155,8 +155,17 @@ public class HistogramDiff extends DiffAlgorithm {
 			Edit lcs = new HistogramDiffIndex<S>(maxChainLength, cmp, a, b, r)
 					.findLongestCommonSequence();
 			if (lcs != null) {
-				diff(r.before(lcs));
-				diff(r.after(lcs));
+				// If we were given an edit, we can prove a result here.
+				//
+				if (lcs.isEmpty()) {
+					// An empty edit indicates there is nothing in common.
+					// Replace the entire region.
+					//
+					edits.add(r);
+				} else {
+					diff(r.before(lcs));
+					diff(r.after(lcs));
+				}
 
 			} else if (fallback != null) {
 				SubsequenceComparator<HashedSequence<S>> cs = subcmp();
