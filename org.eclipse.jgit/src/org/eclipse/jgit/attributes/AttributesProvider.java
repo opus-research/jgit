@@ -42,6 +42,8 @@
  */
 package org.eclipse.jgit.attributes;
 
+import java.util.Map;
+
 /**
  * Interface for classes which provide git attributes
  *
@@ -49,7 +51,7 @@ package org.eclipse.jgit.attributes;
  */
 public interface AttributesProvider {
 	/**
-	 * @return the currently active attributes
+	 * @return the currently active attributes by attribute key
 	 */
-	public Attributes getAttributes();
+	public Map<String, Attribute> getAttributes();
 }
