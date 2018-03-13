@@ -63,7 +63,6 @@ import org.eclipse.jgit.dircache.DirCacheEditor.DeletePath;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
-import org.eclipse.jgit.errors.CannotLockDirCache;
 import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
@@ -274,9 +273,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 			// which should not be wrapped by a JGitInternalException we
 			// have to catch and re-throw it here
 			throw e;
-		} catch (CannotLockDirCache e) {
-			throw new JGitInternalException(e.getMessage(), e);
-		} catch (Exception e) {
+		} catch (IOException e) {
 			throw new JGitInternalException(
 					JGitText.get().exceptionCaughtDuringExecutionOfCommitCommand, e);
 		}
@@ -385,10 +382,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 					// add to temporary in-core index
 					dcBuilder.add(dcEntry);
 
-					if (emptyCommit
-							&& (hTree == null || !hTree.idEqual(fTree) || hTree
-									.getEntryRawMode() != fTree
-									.getEntryRawMode()))
+					if (emptyCommit && (hTree == null || !hTree.idEqual(fTree)))
 						// this is a change
 						emptyCommit = false;
 				} else {
