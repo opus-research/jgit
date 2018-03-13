@@ -300,6 +300,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String errorListing;
 	/***/ public String errorOccurredDuringUnpackingOnTheRemoteEnd;
 	/***/ public String errorReadingInfoRefs;
+	/***/ public String errorSymlinksNotSupported;
 	/***/ public String exceptionCaughtDuringExecutionOfHook;
 	/***/ public String exceptionCaughtDuringExecutionOfAddCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfArchiveCommand;
@@ -499,7 +500,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String packChecksumMismatch;
 	/***/ public String packCorruptedWhileWritingToFilesystem;
 	/***/ public String packDoesNotMatchIndex;
-	/***/ public String packedRefsHandleIsStale;
 	/***/ public String packetSizeMustBeAtLeast;
 	/***/ public String packetSizeMustBeAtMost;
 	/***/ public String packfileCorruptionDetected;

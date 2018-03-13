@@ -168,7 +168,7 @@ public class FS_Win32 extends FS {
 		try {
 			tempFile = File.createTempFile("tempsymlinktarget", ""); //$NON-NLS-1$ //$NON-NLS-2$
 			File linkName = new File(tempFile.getParentFile(), "tempsymlink"); //$NON-NLS-1$
-			createSymLink(linkName, tempFile.getPath());
+			FileUtil.createSymLink(linkName, tempFile.getPath());
 			supportSymlinks = Boolean.TRUE;
 			linkName.delete();
 		} catch (IOException | UnsupportedOperationException e) {
@@ -199,6 +199,11 @@ public class FS_Win32 extends FS {
 	}
 
 	@Override
+	public void delete(File path) throws IOException {
+		FileUtil.delete(path);
+	}
+
+	@Override
 	public long length(File f) throws IOException {
 		return FileUtil.getLength(f);
 	}
@@ -226,6 +231,16 @@ public class FS_Win32 extends FS {
 	@Override
 	public void setHidden(File path, boolean hidden) throws IOException {
 		FileUtil.setHidden(path, hidden);
+	}
+
+	@Override
+	public String readSymLink(File path) throws IOException {
+		return FileUtil.readSymlink(path);
+	}
+
+	@Override
+	public void createSymLink(File path, String target) throws IOException {
+		FileUtil.createSymLink(path, target);
 	}
 
 	/**
