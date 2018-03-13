@@ -1177,7 +1177,7 @@ public class PackWriter {
 					otp = objectsMap.get(sizeQueue.getObjectId());
 
 				long sz = sizeQueue.getSize();
-				if (40 < sz && sz < limit)
+				if (DeltaIndex.BLKSZ < sz && sz < limit)
 					otp.setWeight((int) sz);
 				else
 					otp.setDoNotDelta(); // too small, or too big
@@ -1244,21 +1244,7 @@ public class PackWriter {
 	}
 
 	private int findObjectsNeedingDelta(ObjectToPack[] list, int cnt, int type) {
-		FIND: for (ObjectToPack otp : objectsLists[type]) {
-			ObjectToPack base = otp.getDeltaBase();
-			if (base != null) {
-				// Reusing existing delta. Make sure all bases have
-				// the length of the longest chain nested below them.
-				int d = 0;
-				do {
-					if (d < base.getChainLength())
-						continue FIND;
-					base.setChainLength(++d);
-					base = base.getDeltaBase();
-				} while (base != null && base != otp);
-				continue;
-			}
-
+		for (ObjectToPack otp : objectsLists[type]) {
 			if (otp.isDoNotDelta()) // delta is disabled for this path
 				continue;
 			if (otp.isDeltaRepresentation()) // already reusing a delta
