@@ -60,7 +60,6 @@ import org.eclipse.jgit.transport.UploadPack.FirstLine;
 class UploadPackRequest {
 	private final PacketLineIn pckIn;
 	private final boolean biDirectionalPipe;
-	private final UploadPackResponse response;
 
 	/** Capabilities requested by the client. */
 	final Set<String> options;
@@ -76,22 +75,18 @@ class UploadPackRequest {
 
 	private UploadPackRequest(
 			PacketLineIn pckIn, boolean biDirectionalPipe,
-			UploadPackResponse response, Set<String> options,
-			Set<ObjectId> wantIds, Set<ObjectId> clientShallowCommits,
-			int depth) {
+			Set<String> options, Set<ObjectId> wantIds,
+			Set<ObjectId> clientShallowCommits, int depth) {
 		this.pckIn = pckIn;
 		this.biDirectionalPipe = biDirectionalPipe;
-		this.response = response;
 		this.options = options;
 		this.wantIds = wantIds;
 		this.clientShallowCommits = clientShallowCommits;
 		this.depth = depth;
 	}
 
-	static UploadPackRequest parse(
-			PacketLineIn pckIn, boolean biDirectionalPipe,
-			UploadPackResponse response)
-			throws IOException {
+	static UploadPackRequest parseWants(
+			PacketLineIn pckIn, boolean biDirectionalPipe) throws IOException {
 		Set<String> options = Collections.emptySet();
 		Set<ObjectId> wantIds = new HashSet<>();
 		Set<ObjectId> clientShallowCommits = new HashSet<>();
@@ -144,16 +139,31 @@ class UploadPackRequest {
 			isFirst = false;
 		}
 
-		return new UploadPackRequest(pckIn, biDirectionalPipe, response,
-				options, wantIds, clientShallowCommits, depth);
+		return new UploadPackRequest(pckIn, biDirectionalPipe, options, wantIds,
+				clientShallowCommits, depth);
 	}
 
 	enum NegotiateState {
+		/** The negotiate request ends with a packet flush. */
 		RECEIVE_END,
+		/** The negotiate request ends with "done" */
 		RECEIVE_DONE,
-		CLIENT_GONE,
+		/**
+		 * There is no negotiate request. No pack file is requested.
+		 * <p>
+		 * If a client wants to know shallow/unshallow data in a non-bidi RPC
+		 * (e.g. smart HTTP), it won't send any "have"s.
+		 */
+		NO_NEGOTIATION,
 	}
 
+	/**
+	 * Parses which object the peer has.
+	 *
+	 * @param peerHas output the parsed {@link ObjectId}s.
+	 * @return how the request ends
+	 * @throws IOException
+	 */
 	NegotiateState parseNegotiateRequest(List<ObjectId> peerHas)
 			throws IOException {
 		for (;;) {
@@ -161,26 +171,18 @@ class UploadPackRequest {
 			try {
 				line = pckIn.readString();
 			} catch (EOFException e) {
-				// EOF on stateless RPC (aka smart HTTP) and non-shallow request
-				// means the client asked for the updated shallow/unshallow
-				// data, disconnected, and will try another request with actual
-				// want/have. Don't report the EOF here, its a bug in the
-				// protocol that the client just disconnects without sending an
-				// END.
 				if (!biDirectionalPipe && depth > 0)
-					return NegotiateState.CLIENT_GONE;
+					return NegotiateState.NO_NEGOTIATION;
 				throw e;
 			}
 
 			if (line == PacketLineIn.END) {
-				response.onParseNegotiateRequestDone();
 				return NegotiateState.RECEIVE_END;
 
 			} else if (line.startsWith("have ") && line.length() == 45) { //$NON-NLS-1$
 				peerHas.add(ObjectId.fromString(line.substring(5)));
 
 			} else if (line.equals("done")) { //$NON-NLS-1$
-				response.onParseNegotiateRequestDone();
 				return NegotiateState.RECEIVE_DONE;
 
 			} else {
