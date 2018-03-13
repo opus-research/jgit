@@ -201,12 +201,10 @@ public class ApplyCommand extends GitCommand<ApplyResult> {
 			oldLines.add(rt.getString(i));
 		List<String> newLines = new ArrayList<String>(oldLines);
 		for (HunkHeader hh : fh.getHunks()) {
-
-			byte[] b = new byte[hh.getEndOffset() - hh.getStartOffset()];
-			System.arraycopy(hh.getBuffer(), hh.getStartOffset(), b, 0,
-					b.length);
-			RawText hrt = new RawText(b);
-
+			StringBuilder hunk = new StringBuilder();
+			for (int j = hh.getStartOffset(); j < hh.getEndOffset(); j++)
+				hunk.append((char) hh.getBuffer()[j]);
+			RawText hrt = new RawText(hunk.toString().getBytes());
 			List<String> hunkLines = new ArrayList<String>(hrt.size());
 			for (int i = 0; i < hrt.size(); i++)
 				hunkLines.add(hrt.getString(i));
