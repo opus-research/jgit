@@ -51,6 +51,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -61,7 +62,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.CorruptObjectException;
@@ -69,19 +69,24 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.errors.RevisionSyntaxException;
+import org.eclipse.jgit.events.IndexChangedEvent;
+import org.eclipse.jgit.events.IndexChangedListener;
 import org.eclipse.jgit.events.ListenerList;
 import org.eclipse.jgit.events.RepositoryEvent;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.storage.file.ReflogEntry;
 import org.eclipse.jgit.storage.file.ReflogReader;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
+import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
  * Represents a Git repository.
@@ -106,8 +111,6 @@ public abstract class Repository {
 
 	/** File abstraction used to resolve paths. */
 	private final FS fs;
-
-	private GitIndex index;
 
 	private final ListenerList myListeners = new ListenerList();
 
@@ -494,14 +497,17 @@ public abstract class Repository {
 					if (!Character.isDigit(rev[l]))
 						break;
 				}
-				String distnum = new String(rev, i + 1, l - i - 1);
 				int dist;
-				try {
-					dist = Integer.parseInt(distnum);
-				} catch (NumberFormatException e) {
-					throw new RevisionSyntaxException(
-							JGitText.get().invalidAncestryLength, revstr);
-				}
+				if (l - i > 1) {
+					String distnum = new String(rev, i + 1, l - i - 1);
+					try {
+						dist = Integer.parseInt(distnum);
+					} catch (NumberFormatException e) {
+						throw new RevisionSyntaxException(
+								JGitText.get().invalidAncestryLength, revstr);
+					}
+				} else
+					dist = 1;
 				while (dist > 0) {
 					RevCommit commit = (RevCommit) ref;
 					if (commit.getParentCount() == 0) {
@@ -524,11 +530,15 @@ public abstract class Repository {
 						break;
 					}
 				}
-				if (time != null)
-					throw new RevisionSyntaxException(
-							JGitText.get().reflogsNotYetSupportedByRevisionParser,
-							revstr);
-				i = m - 1;
+				if (time != null) {
+					String refName = new String(rev, 0, i);
+					Ref resolved = getRefDatabase().getRef(refName);
+					if (resolved == null)
+						return null;
+					ref = resolveReflog(rw, resolved, time);
+					i = m;
+				} else
+					i = m - 1;
 				break;
 			case ':': {
 				RevTree tree;
@@ -550,7 +560,7 @@ public abstract class Repository {
 					tree = rw.parseTree(ref);
 				}
 
-				if (i == rev.length - i)
+				if (i == rev.length - 1)
 					return tree.copy();
 
 				TreeWalk tw = TreeWalk.forPath(rw.getObjectReader(),
@@ -597,7 +607,7 @@ public abstract class Repository {
 			return resolveAbbreviation(revstr);
 
 		int dashg = revstr.indexOf("-g");
-		if (4 < revstr.length() && 0 <= dashg
+		if ((dashg + 5) < revstr.length() && 0 <= dashg
 				&& isHex(revstr.charAt(dashg + 2))
 				&& isHex(revstr.charAt(dashg + 3))
 				&& isAllHex(revstr, dashg + 4)) {
@@ -608,6 +618,29 @@ public abstract class Repository {
 		}
 
 		return null;
+	}
+
+	private RevCommit resolveReflog(RevWalk rw, Ref ref, String time)
+			throws IOException {
+		int number;
+		try {
+			number = Integer.parseInt(time);
+		} catch (NumberFormatException nfe) {
+			throw new RevisionSyntaxException(MessageFormat.format(
+					JGitText.get().invalidReflogRevision, time));
+		}
+		if (number < 0)
+			throw new RevisionSyntaxException(MessageFormat.format(
+					JGitText.get().invalidReflogRevision, time));
+
+		ReflogReader reader = new ReflogReader(this, ref.getName());
+		ReflogEntry entry = reader.getReverseEntry(number);
+		if (entry == null)
+			throw new RevisionSyntaxException(MessageFormat.format(
+					JGitText.get().reflogEntryNotFound,
+					Integer.valueOf(number), ref.getName()));
+
+		return rw.parseCommit(entry.getNewId());
 	}
 
 	private ObjectId resolveAbbreviation(final String revstr) throws IOException,
@@ -807,27 +840,6 @@ public abstract class Repository {
 	}
 
 	/**
-	 * @return a representation of the index associated with this
-	 *         {@link Repository}
-	 * @throws IOException
-	 *             if the index can not be read
-	 * @throws NoWorkTreeException
-	 *             if this is bare, which implies it has no working directory.
-	 *             See {@link #isBare()}.
-	 */
-	public GitIndex getIndex() throws IOException, NoWorkTreeException {
-		if (isBare())
-			throw new NoWorkTreeException();
-		if (index == null) {
-			index = new GitIndex(this);
-			index.read();
-		} else {
-			index.rereadIfNecessary();
-		}
-		return index;
-	}
-
-	/**
 	 * @return the index file location
 	 * @throws NoWorkTreeException
 	 *             if this is bare, which implies it has no working directory.
@@ -883,7 +895,15 @@ public abstract class Repository {
 	 */
 	public DirCache lockDirCache() throws NoWorkTreeException,
 			CorruptObjectException, IOException {
-		return DirCache.lock(getIndexFile(), getFS());
+		// we want DirCache to inform us so that we can inform registered
+		// listeners about index changes
+		IndexChangedListener l = new IndexChangedListener() {
+
+			public void onIndexChanged(IndexChangedEvent event) {
+				notifyIndexChanged();
+			}
+		};
+		return DirCache.lock(getIndexFile(), getFS(), l);
 	}
 
 	static byte[] gitInternalSlash(byte[] bytes) {
@@ -933,7 +953,6 @@ public abstract class Repository {
 				// Can't decide whether unmerged paths exists. Return
 				// MERGING state to be on the safe side (in state MERGING
 				// you are not allow to do anything)
-				e.printStackTrace();
 			}
 			return RepositoryState.MERGING;
 		}
@@ -949,7 +968,6 @@ public abstract class Repository {
 				}
 			} catch (IOException e) {
 				// fall through to CHERRY_PICKING
-				e.printStackTrace();
 			}
 
 			return RepositoryState.CHERRY_PICKING;
@@ -1064,6 +1082,11 @@ public abstract class Repository {
 	 * @throws IOException
 	 */
 	public abstract void scanForRepoChanges() throws IOException;
+
+	/**
+	 * Notify that the index changed
+	 */
+	public abstract void notifyIndexChanged();
 
 	/**
 	 * @param refName
@@ -1255,7 +1278,7 @@ public abstract class Repository {
 			throws FileNotFoundException, IOException {
 		File headsFile = new File(getDirectory(), filename);
 		if (heads != null) {
-			BufferedOutputStream bos = new BufferedOutputStream(
+			BufferedOutputStream bos = new SafeBufferedOutputStream(
 					new FileOutputStream(headsFile));
 			try {
 				for (ObjectId id : heads) {

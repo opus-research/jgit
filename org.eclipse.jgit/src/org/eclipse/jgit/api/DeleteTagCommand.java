@@ -49,8 +49,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefUpdate.Result;
@@ -67,7 +67,7 @@ import org.eclipse.jgit.lib.Repository;
  */
 public class DeleteTagCommand extends GitCommand<List<String>> {
 
-	private final Set<String> tagNames = new HashSet<String>();
+	private final Set<String> tags = new HashSet<String>();
 
 	/**
 	 * @param repo
@@ -76,14 +76,20 @@ public class DeleteTagCommand extends GitCommand<List<String>> {
 		super(repo);
 	}
 
-	public List<String> call() throws Exception {
+	/**
+	 * @throws JGitInternalException
+	 *             when trying to delete a tag that doesn't exist
+	 *
+	 * @return the list with the full names of the deleted tags
+	 */
+	public List<String> call() throws JGitInternalException {
 		checkCallable();
 		List<String> result = new ArrayList<String>();
-		if (tagNames.isEmpty())
+		if (tags.isEmpty())
 			return result;
 		try {
 			setCallable(false);
-			for (String tagName : tagNames) {
+			for (String tagName : tags) {
 				if (tagName == null)
 					continue;
 				Ref currentRef = repo.getRef(tagName);
@@ -91,7 +97,6 @@ public class DeleteTagCommand extends GitCommand<List<String>> {
 					continue;
 				String fullName = currentRef.getName();
 				RefUpdate update = repo.updateRef(fullName);
-				update.setRefLogMessage("tag deleted", false);
 				update.setForceUpdate(true);
 				Result deleteResult = update.delete();
 
@@ -120,16 +125,16 @@ public class DeleteTagCommand extends GitCommand<List<String>> {
 	}
 
 	/**
-	 * @param tagNames
+	 * @param tags
 	 *            the names of the tags to delete; if not set, this will do
 	 *            nothing; invalid tag names will simply be ignored
 	 * @return this instance
 	 */
-	public DeleteTagCommand setTagNames(String... tagNames) {
+	public DeleteTagCommand setTags(String... tags) {
 		checkCallable();
-		this.tagNames.clear();
-		for (String tagName : tagNames)
-			this.tagNames.add(tagName);
+		this.tags.clear();
+		for (String tagName : tags)
+			this.tags.add(tagName);
 		return this;
 	}
 }

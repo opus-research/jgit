@@ -45,17 +45,14 @@ package org.eclipse.jgit.transport;
 
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
@@ -162,30 +159,6 @@ class PushProcess {
 	private Map<String, RemoteRefUpdate> prepareRemoteUpdates()
 			throws TransportException {
 		final Map<String, RemoteRefUpdate> result = new HashMap<String, RemoteRefUpdate>();
-		if (toPush.isEmpty()) {
-			Map<String, Ref> advertisedRefs = connection.getRefsMap();
-			List<RefSpec> specs = new ArrayList<RefSpec>(advertisedRefs.size());
-			for (Iterator it = advertisedRefs.keySet().iterator(); it.hasNext();) {
-				specs.add(new RefSpec((String) it.next()));
-			}
-			Collection<RemoteRefUpdate> remoteRefUpdates = null;
-			try {
-				remoteRefUpdates = transport.findRemoteRefUpdatesFor(specs);
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			if (remoteRefUpdates != null) {
-				// copy-pasted from #PushProcess(Transport, Collection)
-				for (final RemoteRefUpdate rru : remoteRefUpdates) {
-					if (this.toPush.put(rru.getRemoteName(), rru) != null)
-						throw new TransportException(
-								MessageFormat.format(
-										JGitText.get().duplicateRemoteRefUpdateIsIllegal,
-										rru.getRemoteName()));
-				}
-			}
-		}
 		for (final RemoteRefUpdate rru : toPush.values()) {
 			final Ref advertisedRef = connection.getRef(rru.getRemoteName());
 			final ObjectId advertisedOld = (advertisedRef == null ? ObjectId

@@ -52,9 +52,10 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.ReadableByteChannel;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.internal.JGitText;
 
 /**
  * Input/Output utilities
@@ -141,7 +142,7 @@ public class IO {
 				throw new IOException(MessageFormat.format(
 						JGitText.get().fileIsTooLarge, path));
 			final byte[] buf = new byte[(int) sz];
-			IO.readFully(in, buf, 0, buf.length);
+			IO.readFully(in, buf, 0);
 			return buf;
 		} finally {
 			try {
@@ -219,6 +220,62 @@ public class IO {
 			off += r;
 			len -= r;
 		}
+	}
+
+	/**
+	 * Read as much of the array as possible from a channel.
+	 *
+	 * @param channel
+	 *            channel to read data from.
+	 * @param dst
+	 *            buffer that must be fully populated, [off, off+len).
+	 * @param off
+	 *            position within the buffer to start writing to.
+	 * @param len
+	 *            number of bytes that should be read.
+	 * @return number of bytes actually read.
+	 * @throws IOException
+	 *             there was an error reading from the channel.
+	 */
+	public static int read(ReadableByteChannel channel, byte[] dst, int off,
+			int len) throws IOException {
+		if (len == 0)
+			return 0;
+		int cnt = 0;
+		while (0 < len) {
+			int r = channel.read(ByteBuffer.wrap(dst, off, len));
+			if (r <= 0)
+				break;
+			off += r;
+			len -= r;
+			cnt += r;
+		}
+		return cnt != 0 ? cnt : -1;
+	}
+
+	/**
+	 * Read the entire byte array into memory, unless input is shorter
+	 *
+	 * @param fd
+	 *            input stream to read the data from.
+	 * @param dst
+	 *            buffer that must be fully populated, [off, off+len).
+	 * @param off
+	 *            position within the buffer to start writing to.
+	 * @return number of bytes in buffer or stream, whichever is shortest
+	 * @throws IOException
+	 *             there was an error reading from the stream.
+	 */
+	public static int readFully(InputStream fd, byte[] dst, int off)
+			throws IOException {
+		int r;
+		int len = 0;
+		while ((r = fd.read(dst, off, dst.length - off)) >= 0
+				&& len < dst.length) {
+			off += r;
+			len += r;
+		}
+		return len;
 	}
 
 	/**
