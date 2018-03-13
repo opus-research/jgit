@@ -44,7 +44,7 @@
 package org.eclipse.jgit.internal.storage.reftable;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.eclipse.jgit.internal.storage.reftable.BlockReader.decodeIndexSize;
+import static org.eclipse.jgit.internal.storage.reftable.BlockReader.decodeBlockSize;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_FOOTER_LEN;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_HEADER_LEN;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.INDEX_BLOCK_TYPE;
@@ -387,7 +387,7 @@ public class ReftableReader extends Reftable {
 			tmp.flip();
 			tmp.get(buf, 0, 4);
 		}
-		return decodeIndexSize(NB.decodeInt32(buf, 0));
+		return decodeBlockSize(NB.decodeInt32(buf, 0));
 	}
 
 	private BlockReader readBlock(long pos, long end) throws IOException {
@@ -417,17 +417,6 @@ public class ReftableReader extends Reftable {
 	private int blocksIn(long pos, long end) {
 		int blocks = (int) ((end - pos) / blockSize);
 		return end % blockSize == 0 ? blocks : (blocks + 1);
-	}
-
-	/**
-	 * Get size of the reftable, in bytes.
-	 *
-	 * @return size of the reftable, in bytes.
-	 * @throws IOException
-	 *             size cannot be obtained.
-	 */
-	public long size() throws IOException {
-		return src.size();
 	}
 
 	@Override
