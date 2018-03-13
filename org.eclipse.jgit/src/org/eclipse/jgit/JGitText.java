@@ -281,6 +281,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String mergeStrategyDoesNotSupportHeads;
 	/***/ public String mergeUsingStrategyResultedInDescription;
 	/***/ public String missingAccesskey;
+	/***/ public String missingDeltaBase;
 	/***/ public String missingForwardImageInGITBinaryPatch;
 	/***/ public String missingObject;
 	/***/ public String missingPrerequisiteCommits;
@@ -357,6 +358,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String remoteHungUpUnexpectedly;
 	/***/ public String remoteNameCantBeNull;
 	/***/ public String repositoryAlreadyExists;
+	/***/ public String repositoryConfigFileInvalid;
 	/***/ public String repositoryNotFound;
 	/***/ public String requiredHashFunctionNotAvailable;
 	/***/ public String resolvingDeltas;
