@@ -45,8 +45,9 @@ package org.eclipse.jgit.hooks;
 import java.io.PrintStream;
 import java.lang.reflect.Constructor;
 
+import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.util.LfsHelper;
+import org.eclipse.jgit.lib.StoredConfig;
 
 /**
  * Factory class for instantiating supported hooks.
@@ -100,7 +101,9 @@ public class Hooks {
 		try {
 			// TODO: this breaks all use cases except LFS, as it assumes that
 			// LFS is the only pre-push hook that could possibly be there.
-			if (LfsHelper.isAvailable() && LfsHelper.isEnabled(repo)) {
+			StoredConfig cfg = repo.getConfig();
+			if (cfg.getBoolean(ConfigConstants.CONFIG_FILTER_SECTION, "lfs", //$NON-NLS-1$
+					ConfigConstants.CONFIG_KEY_USEJGITBUILTIN, false)) {
 				@SuppressWarnings("unchecked")
 				Class<? extends PrePushHook> cls = (Class<? extends PrePushHook>) Class
 						.forName("org.eclipse.jgit.lfs.LfsPrePushHook"); //$NON-NLS-1$
