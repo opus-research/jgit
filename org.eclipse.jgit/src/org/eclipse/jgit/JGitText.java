@@ -203,7 +203,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String exceptionCaughtDuringExecutionOfAddCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfCommitCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfMergeCommand;
-	/***/ public String exceptionCaughtDuringExecutionOfTagCommand;
 	/***/ public String exceptionOccuredDuringAddingOfOptionToALogCommand;
 	/***/ public String exceptionOccuredDuringReadingOfGIT_DIR;
 	/***/ public String expectedACKNAKFoundEOF;
@@ -386,7 +385,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String shortReadOfBlock;
 	/***/ public String shortReadOfOptionalDIRCExtensionExpectedAnotherBytes;
 	/***/ public String shortSkipOfBlock;
-	/***/ public String signingNotSupportedOnTag;
 	/***/ public String similarityScoreMustBeWithinBounds;
 	/***/ public String smartHTTPPushDisabled;
 	/***/ public String sourceDestinationMustMatch;
@@ -398,8 +396,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String statelessRPCRequiresOptionToBeEnabled;
 	/***/ public String submodulesNotSupported;
 	/***/ public String symlinkCannotBeWrittenAsTheLinkTarget;
-	/***/ public String tagNameInvalid;
-	/***/ public String tagOnRepoWithoutHEADCurrentlyNotSupported;
 	/***/ public String tSizeMustBeGreaterOrEqual1;
 	/***/ public String theFactoryMustNotBeNull;
 	/***/ public String timerAlreadyTerminated;
