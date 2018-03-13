@@ -521,7 +521,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String packedRefsHandleIsStale;
 	/***/ public String packetSizeMustBeAtLeast;
 	/***/ public String packetSizeMustBeAtMost;
-	/***/ public String packedRefsCorruptionDetected;
 	/***/ public String packfileCorruptionDetected;
 	/***/ public String packFileInvalid;
 	/***/ public String packfileIsTruncated;
