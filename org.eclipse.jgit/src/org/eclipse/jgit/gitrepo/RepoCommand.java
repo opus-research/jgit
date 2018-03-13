@@ -49,13 +49,11 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.UnsupportedOperationException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.Git;
@@ -69,7 +67,6 @@ import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.gitrepo.ManifestParser.IncludedFileReader;
 import org.eclipse.jgit.gitrepo.RepoProject.CopyFile;
-import org.eclipse.jgit.gitrepo.RepoProject.LinkFile;
 import org.eclipse.jgit.gitrepo.internal.RepoText;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.CommitBuilder;
@@ -171,6 +168,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 
 	/** A default implementation of {@link RemoteReader} callback. */
 	public static class DefaultRemoteReader implements RemoteReader {
+		@Override
 		public ObjectId sha1(String uri, String ref) throws GitAPIException {
 			Map<String, Ref> map = Git
 					.lsRemoteRepository()
@@ -180,20 +178,14 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			return r != null ? r.getObjectId() : null;
 		}
 
+		@Override
 		public byte[] readFile(String uri, String ref, String path)
 				throws GitAPIException, IOException {
 			File dir = FileUtils.createTempDir("jgit_", ".git", null); //$NON-NLS-1$ //$NON-NLS-2$
-			Repository repo = Git
-					.cloneRepository()
-					.setBare(true)
-					.setDirectory(dir)
-					.setURI(uri)
-					.call()
-					.getRepository();
-			try {
-				return readFileFromRepo(repo, ref, path);
+			try (Git git = Git.cloneRepository().setBare(true).setDirectory(dir)
+					.setURI(uri).call()) {
+				return readFileFromRepo(git.getRepository(), ref, path);
 			} finally {
-				repo.close();
 				FileUtils.delete(dir, FileUtils.RECURSIVE);
 			}
 		}
@@ -472,7 +464,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			}
 
 			if (repo.isBare()) {
-				bareProjects = new ArrayList<RepoProject>();
+				bareProjects = new ArrayList<>();
 				if (author == null)
 					author = new PersonIdent(repo);
 				if (callback == null)
@@ -489,7 +481,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 							proj.getPath(),
 							proj.getRevision(),
 							proj.getCopyFiles(),
-							proj.getLinkFiles(),
 							proj.getGroups(),
 							proj.getRecommendShallow());
 				}
@@ -572,25 +563,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 						dcEntry.setFileMode(FileMode.REGULAR_FILE);
 						builder.add(dcEntry);
 					}
-					for (LinkFile linkfile : proj.getLinkFiles()) {
-						String link;
-						if (linkfile.dest.contains("/")) { //$NON-NLS-1$
-							link = FileUtils.relativize(
-									linkfile.dest.substring(0,
-											linkfile.dest.lastIndexOf('/')),
-									proj.getPath() + "/" + linkfile.src); //$NON-NLS-1$
-						} else {
-							link = proj.getPath() + "/" + linkfile.src; //$NON-NLS-1$
-						}
-
-						objectId = inserter.insert(Constants.OBJ_BLOB,
-								link.getBytes(
-										Constants.CHARACTER_ENCODING));
-						dcEntry = new DirCacheEntry(linkfile.dest);
-						dcEntry.setObjectId(objectId);
-						dcEntry.setFileMode(FileMode.SYMLINK);
-						builder.add(dcEntry);
-					}
 				}
 				String content = cfg.toText();
 
@@ -665,20 +637,13 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	}
 
 	private void addSubmodule(String url, String name, String revision,
-			List<CopyFile> copyfiles, List<LinkFile> linkfiles,
-			Set<String> groups, String recommendShallow)
+			List<CopyFile> copyfiles, Set<String> groups, String recommendShallow)
 			throws GitAPIException, IOException {
 		if (repo.isBare()) {
 			RepoProject proj = new RepoProject(url, name, revision, null, groups, recommendShallow);
 			proj.addCopyFiles(copyfiles);
-			proj.addLinkFiles(linkfiles);
 			bareProjects.add(proj);
 		} else {
-			if (!linkfiles.isEmpty()) {
-				throw new UnsupportedOperationException(
-						JGitText.get().nonBareLinkFilesNotSupported);
-			}
-
 			SubmoduleAddCommand add = git
 				.submoduleAdd()
 				.setPath(name)

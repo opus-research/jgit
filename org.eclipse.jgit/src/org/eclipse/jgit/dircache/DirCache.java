@@ -111,6 +111,7 @@ public class DirCache {
 	private static final byte[] NO_CHECKSUM = {};
 
 	static final Comparator<DirCacheEntry> ENT_CMP = new Comparator<DirCacheEntry>() {
+		@Override
 		public int compare(final DirCacheEntry o1, final DirCacheEntry o2) {
 			final int cr = cmp(o1, o2);
 			if (cr != 0)
@@ -634,9 +635,9 @@ public class DirCache {
 	public void write() throws IOException {
 		final LockFile tmp = myLock;
 		requireLocked(tmp);
-		try {
-			writeTo(liveFile.getParentFile(),
-					new BufferedOutputStream(tmp.getOutputStream()));
+		try (OutputStream o = tmp.getOutputStream();
+				OutputStream bo = new BufferedOutputStream(o)) {
+			writeTo(liveFile.getParentFile(), bo);
 		} catch (IOException err) {
 			tmp.unlock();
 			throw err;
@@ -992,7 +993,7 @@ public class DirCache {
 	 * @throws IOException
 	 */
 	private void updateSmudgedEntries() throws IOException {
-		List<String> paths = new ArrayList<String>(128);
+		List<String> paths = new ArrayList<>(128);
 		try (TreeWalk walk = new TreeWalk(repository)) {
 			walk.setOperationType(OperationType.CHECKIN_OP);
 			for (int i = 0; i < entryCnt; i++)
