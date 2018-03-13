@@ -18,7 +18,7 @@
         <filter comment="Only implementors of Repository are affected. That should be allowed" id="336695337">
             <message_arguments>
                 <message_argument value="org.eclipse.jgit.lib.Repository"/>
-                <message_argument value="newAttributeNodeProvider()"/>
+                <message_argument value="createAttributesNodeProvider()"/>
             </message_arguments>
         </filter>
         <filter id="336695337">

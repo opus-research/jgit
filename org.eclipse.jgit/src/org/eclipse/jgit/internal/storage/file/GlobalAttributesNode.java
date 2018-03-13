@@ -74,11 +74,12 @@ public class GlobalAttributesNode extends AttributesNode {
 				.getAttributesFile();
 		if (path != null) {
 			File attributesFile;
-			if (path.startsWith("~/")) //$NON-NLS-1$
+			if (path.startsWith("~/")) { //$NON-NLS-1$
 				attributesFile = fs.resolve(fs.userHome(),
 						path.substring(2));
-			else
+			} else {
 				attributesFile = fs.resolve(null, path);
+			}
 			FileRepository.AttributesNodeProviderImpl.loadRulesFromFile(r, attributesFile);
 		}
 		return r.getRules().isEmpty() ? null : r;
