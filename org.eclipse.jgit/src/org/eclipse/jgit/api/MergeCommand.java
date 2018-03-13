@@ -300,7 +300,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 						headCommit, srcCommit }, mergeStatus, mergeStrategy,
 						null, msg);
 			} else {
-				if (fastForwardMode == FastForwardMode.FF_ONLY) {
+				if (fastForwardMode == FastForwardMode.NO_FF) {
 					return new MergeResult(headCommit, srcCommit,
 							new ObjectId[] { headCommit, srcCommit },
 							MergeStatus.ABORTED, mergeStrategy, null, null);

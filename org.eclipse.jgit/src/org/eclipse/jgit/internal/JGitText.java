@@ -503,10 +503,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String squashCommitNotUpdatingHEAD;
 	/***/ public String staleRevFlagsOn;
 	/***/ public String startingReadStageWithoutWrittenRequestDataPendingIsNotSupported;
-	/***/ public String stashApplyConflict;
-	/***/ public String stashApplyConflictInIndex;
 	/***/ public String stashApplyFailed;
-	/***/ public String stashApplyWithoutHead;
 	/***/ public String stashApplyOnUnsafeRepository;
 	/***/ public String stashCommitMissingTwoParents;
 	/***/ public String stashDropDeleteRefFailed;
