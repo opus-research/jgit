@@ -48,15 +48,15 @@ public interface AdvertiseRefsHook {
 	 * A simple hook that advertises the default refs.
 	 * <p>
 	 * The method implementations do nothing to preserve the default behavior; see
-	 * {@link UploadSession#setAdvertisedRefs(java.util.Map)} and
-	 * {@link ReceiveSession#setAdvertisedRefs(java.util.Map,java.util.Set)}.
+	 * {@link UploadPack#setAdvertisedRefs(java.util.Map)} and
+	 * {@link ReceivePack#setAdvertisedRefs(java.util.Map,java.util.Set)}.
 	 */
 	public static final AdvertiseRefsHook DEFAULT = new AdvertiseRefsHook() {
-		public void advertiseRefs(UploadSession uploadSession) {
+		public void advertiseRefs(UploadPack uploadPack) {
 			// Do nothing.
 		}
 
-		public void advertiseRefs(ReceiveSession receiveSession) {
+		public void advertiseRefs(ReceivePack receivePack) {
 			// Do nothing.
 		}
 	};
@@ -64,24 +64,24 @@ public interface AdvertiseRefsHook {
 	/**
 	 * Advertise refs for upload-pack.
 	 *
-	 * @param uploadSession instance on which to call
-	 *            {@link UploadSession#setAdvertisedRefs(java.util.Map)}
+	 * @param uploadPack instance on which to call
+	 *            {@link UploadPack#setAdvertisedRefs(java.util.Map)}
 	 *            if necessary.
 	 * @throws ServiceMayNotContinueException
 	 *             abort; the message will be sent to the user.
 	 */
-	public void advertiseRefs(UploadSession uploadSession)
+	public void advertiseRefs(UploadPack uploadPack)
 			throws ServiceMayNotContinueException;
 
 	/**
 	 * Advertise refs for receive-pack.
 	 *
-	 * @param receiveSession instance on which to call
-	 *            {@link ReceiveSession#setAdvertisedRefs(java.util.Map,java.util.Set)}
+	 * @param receivePack instance on which to call
+	 *            {@link ReceivePack#setAdvertisedRefs(java.util.Map,java.util.Set)}
 	 *            if necessary.
 	 * @throws ServiceMayNotContinueException
 	 *             abort; the message will be sent to the user.
 	 */
-	public void advertiseRefs(ReceiveSession receiveSession)
+	public void advertiseRefs(ReceivePack receivePack)
 			throws ServiceMayNotContinueException;
 }

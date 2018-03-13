@@ -176,6 +176,7 @@ public class ReceivePackAdvertiseRefsHookTest extends LocalDiskRepositoryTestCas
 		assertEquals(B, master.getObjectId());
 	}
 
+
 	@Test
 	public void testSuccess() throws Exception {
 		// Manually force a delta of an object so we reuse it later.

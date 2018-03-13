@@ -73,7 +73,6 @@ import org.eclipse.jgit.transport.PreReceiveHook;
 import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.ReceiveCommand;
 import org.eclipse.jgit.transport.ReceivePack;
-import org.eclipse.jgit.transport.ReceiveSession;
 import org.eclipse.jgit.transport.RemoteRefUpdate;
 import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.URIish;
@@ -115,7 +114,7 @@ public class HookMessageTest extends HttpTestCase {
 					ServiceNotAuthorizedException {
 				ReceivePack recv = super.create(req, db);
 				recv.setPreReceiveHook(new PreReceiveHook() {
-					public void onPreReceive(ReceiveSession rp,
+					public void onPreReceive(ReceivePack rp,
 							Collection<ReceiveCommand> commands) {
 						rp.sendMessage("message line 1");
 						rp.sendError("no soup for you!");
