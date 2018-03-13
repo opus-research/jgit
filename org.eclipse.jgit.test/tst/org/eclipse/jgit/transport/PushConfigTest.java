@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2017, David Pursehouse <david.pursehouse@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,55 +40,49 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm;
 
-import java.util.ArrayList;
-import java.util.List;
+package org.eclipse.jgit.transport;
 
-import org.eclipse.jgit.dircache.DirCacheIterator;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.treewalk.CanonicalTreeParser;
-import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
-import org.eclipse.jgit.util.QuotedString;
-import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.StopOptionHandler;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
-@Command(common = true, usage = "usage_LsFiles")
-class LsFiles extends TextBuiltin {
+import org.eclipse.jgit.transport.PushConfig.PushRecurseSubmodulesMode;
+import org.junit.Test;
 
-	@Option(name = "--", metaVar = "metaVar_paths", handler = StopOptionHandler.class)
-	private List<String> paths = new ArrayList<>();
+public class PushConfigTest {
+	@Test
+	public void pushRecurseSubmoduleMatch() throws Exception {
+		assertTrue(PushRecurseSubmodulesMode.CHECK.matchConfigValue("check"));
+		assertTrue(PushRecurseSubmodulesMode.CHECK.matchConfigValue("CHECK"));
 
-	@Override
-	protected void run() throws Exception {
-		try (RevWalk rw = new RevWalk(db);
-				TreeWalk tw = new TreeWalk(db)) {
-			final ObjectId head = db.resolve(Constants.HEAD);
-			if (head == null) {
-				return;
-			}
-			RevCommit c = rw.parseCommit(head);
-			CanonicalTreeParser p = new CanonicalTreeParser();
-			p.reset(rw.getObjectReader(), c.getTree());
-			tw.reset(); // drop the first empty tree, which we do not need here
-			if (paths.size() > 0) {
-				tw.setFilter(PathFilterGroup.createFromStrings(paths));
-			}
-			tw.addTree(p);
-			tw.addTree(new DirCacheIterator(db.readDirCache()));
-			tw.setRecursive(true);
-			while (tw.next()) {
-				if (tw.getFileMode(0) == FileMode.REGULAR_FILE
-						|| tw.getFileMode(1) == FileMode.REGULAR_FILE) {
-					outw.println(
-							QuotedString.GIT_PATH.quote(tw.getPathString()));
-				}
-			}
-		}
+		assertTrue(PushRecurseSubmodulesMode.ON_DEMAND
+				.matchConfigValue("on-demand"));
+		assertTrue(PushRecurseSubmodulesMode.ON_DEMAND
+				.matchConfigValue("ON-DEMAND"));
+		assertTrue(PushRecurseSubmodulesMode.ON_DEMAND
+				.matchConfigValue("on_demand"));
+		assertTrue(PushRecurseSubmodulesMode.ON_DEMAND
+				.matchConfigValue("ON_DEMAND"));
+
+		assertTrue(PushRecurseSubmodulesMode.NO.matchConfigValue("no"));
+		assertTrue(PushRecurseSubmodulesMode.NO.matchConfigValue("NO"));
+		assertTrue(PushRecurseSubmodulesMode.NO.matchConfigValue("false"));
+		assertTrue(PushRecurseSubmodulesMode.NO.matchConfigValue("FALSE"));
+	}
+
+	@Test
+	public void pushRecurseSubmoduleNoMatch() throws Exception {
+		assertFalse(PushRecurseSubmodulesMode.NO.matchConfigValue("N"));
+		assertFalse(PushRecurseSubmodulesMode.ON_DEMAND
+				.matchConfigValue("ONDEMAND"));
+	}
+
+	@Test
+	public void pushRecurseSubmoduleToConfigValue() {
+		assertEquals("on-demand",
+				PushRecurseSubmodulesMode.ON_DEMAND.toConfigValue());
+		assertEquals("check", PushRecurseSubmodulesMode.CHECK.toConfigValue());
+		assertEquals("false", PushRecurseSubmodulesMode.NO.toConfigValue());
 	}
 }

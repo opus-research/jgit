@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2017, David Pursehouse <david.pursehouse@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,46 +40,56 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm;
 
-import static org.junit.Assert.assertArrayEquals;
+package org.eclipse.jgit.transport;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.junit.JGitTestUtil;
-import org.eclipse.jgit.lib.CLIRepositoryTestCase;
-import org.junit.Before;
-import org.junit.Test;
+import org.eclipse.jgit.lib.Config;
+import org.eclipse.jgit.util.StringUtils;
 
-public class LsFilesTest extends CLIRepositoryTestCase {
+/**
+ * Push section of a Git configuration file.
+ *
+ * @since 4.9
+ */
+public class PushConfig {
+	/**
+	 * Config values for push.recurseSubmodules.
+	 */
+	public enum PushRecurseSubmodulesMode implements Config.ConfigEnum {
+		/**
+		 * Verify that all submodule commits that changed in the revisions to be
+		 * pushed are available on at least one remote of the submodule.
+		 */
+		CHECK("check"), //$NON-NLS-1$
 
-	@Before
-	@Override
-	public void setUp() throws Exception {
-		super.setUp();
-		try (Git git = new Git(db)) {
-			JGitTestUtil.writeTrashFile(db, "hello", "world");
-			git.add().addFilepattern("hello").call();
-			git.commit().setMessage("Initial commit").call();
-			JGitTestUtil.writeTrashFile(db, "hello2", "hello");
-			git.add().addFilepattern("hello2").call();
-			git.commit().setMessage("hello2").call();
-			JGitTestUtil.writeTrashFile(db, "staged", "x");
-			git.add().addFilepattern("staged").call();
-			JGitTestUtil.writeTrashFile(db, "untracked", "untracked");
+		/**
+		 * All submodules that changed in the revisions to be pushed will be
+		 * pushed.
+		 */
+		ON_DEMAND("on-demand"), //$NON-NLS-1$
+
+		/** Default behavior of ignoring submodules when pushing is retained. */
+		NO("false"); //$NON-NLS-1$
+
+		private final String configValue;
+
+		private PushRecurseSubmodulesMode(String configValue) {
+			this.configValue = configValue;
 		}
-	}
 
-	@Test
-	public void testHelp() throws Exception {
-		assertArrayEquals(new String[] { "",
-				"jgit ls-files [-- path ...] [--help (-h)]", "",
-				" --help (-h) : display this help text (default: true)", "", "",
-				"" }, execute("git ls-files -h"));
-	}
+		@Override
+		public String toConfigValue() {
+			return configValue;
+		}
 
-	@Test
-	public void testLsFiles() throws Exception {
-		assertArrayEquals(new String[] { "hello", "hello2", "staged", "" },
-				execute("git ls-files"));
+		@Override
+		public boolean matchConfigValue(String s) {
+			if (StringUtils.isEmptyOrNull(s)) {
+				return false;
+			}
+			s = s.replace('-', '_');
+			return name().equalsIgnoreCase(s)
+					|| configValue.equalsIgnoreCase(s);
+		}
 	}
 }

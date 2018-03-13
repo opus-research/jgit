@@ -72,6 +72,9 @@ import java.net.Proxy;
 import java.net.ProxySelector;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.security.cert.CertPathBuilderException;
+import java.security.cert.CertPathValidatorException;
+import java.security.cert.CertificateException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -84,9 +87,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.function.Supplier;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
+
+import javax.net.ssl.SSLHandshakeException;
 
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.errors.NotSupportedException;
@@ -94,16 +98,18 @@ import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.RefDirectory;
-import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.lib.SymbolicRef;
 import org.eclipse.jgit.transport.HttpAuthMethod.Type;
+import org.eclipse.jgit.transport.HttpConfig.HttpRedirectMode;
 import org.eclipse.jgit.transport.http.HttpConnection;
+import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.HttpSupport;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
@@ -139,30 +145,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 	private static final String SVC_UPLOAD_PACK = "git-upload-pack"; //$NON-NLS-1$
 
 	private static final String SVC_RECEIVE_PACK = "git-receive-pack"; //$NON-NLS-1$
-
-	private static final String MAX_REDIRECT_SYSTEM_PROPERTY = "http.maxRedirects"; //$NON-NLS-1$
-
-	private static final int DEFAULT_MAX_REDIRECTS = 5;
-
-	private static final int MAX_REDIRECTS = (new Supplier<Integer>() {
-
-		@Override
-		public Integer get() {
-			String rawValue = SystemReader.getInstance()
-					.getProperty(MAX_REDIRECT_SYSTEM_PROPERTY);
-			Integer value = Integer.valueOf(DEFAULT_MAX_REDIRECTS);
-			if (rawValue != null) {
-				try {
-					value = Integer.valueOf(Integer.parseUnsignedInt(rawValue));
-				} catch (NumberFormatException e) {
-					LOG.warn(MessageFormat.format(
-							JGitText.get().invalidSystemProperty,
-							MAX_REDIRECT_SYSTEM_PROPERTY, rawValue, value));
-				}
-			}
-			return value;
-		}
-	}).get().intValue();
 
 	/**
 	 * Accept-Encoding header in the HTTP request
@@ -265,65 +247,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 	};
 
 	/**
-	 * Config values for http.followRedirect
-	 */
-	private static enum HttpRedirectMode implements Config.ConfigEnum {
-
-		/** Always follow redirects (up to the http.maxRedirects limit). */
-		TRUE("true"), //$NON-NLS-1$
-		/**
-		 * Only follow redirects on the initial GET request. This is the
-		 * default.
-		 */
-		INITIAL("initial"), //$NON-NLS-1$
-		/** Never follow redirects. */
-		FALSE("false"); //$NON-NLS-1$
-
-		private final String configValue;
-
-		private HttpRedirectMode(String configValue) {
-			this.configValue = configValue;
-		}
-
-		@Override
-		public String toConfigValue() {
-			return configValue;
-		}
-
-		@Override
-		public boolean matchConfigValue(String s) {
-			return configValue.equals(s);
-		}
-	}
-
-	private static class HttpConfig {
-		final int postBuffer;
-
-		final boolean sslVerify;
-
-		final HttpRedirectMode followRedirects;
-
-		final int maxRedirects;
-
-		HttpConfig(final Config rc) {
-			postBuffer = rc.getInt("http", "postbuffer", 1 * 1024 * 1024); //$NON-NLS-1$  //$NON-NLS-2$
-			sslVerify = rc.getBoolean("http", "sslVerify", true); //$NON-NLS-1$ //$NON-NLS-2$
-			followRedirects = rc.getEnum(HttpRedirectMode.values(), "http", //$NON-NLS-1$
-					null, "followRedirects", HttpRedirectMode.INITIAL); //$NON-NLS-1$
-			int redirectLimit = rc.getInt("http", "maxRedirects", //$NON-NLS-1$ //$NON-NLS-2$
-					MAX_REDIRECTS);
-			if (redirectLimit < 0) {
-				redirectLimit = MAX_REDIRECTS;
-			}
-			maxRedirects = redirectLimit;
-		}
-
-		HttpConfig() {
-			this(new Config());
-		}
-	}
-
-	/**
 	 * The current URI we're talking to. The inherited (final) field
 	 * {@link #uri} stores the original URI; {@code currentUri} may be different
 	 * after redirects.
@@ -334,7 +257,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 	private URL objectsUrl;
 
-	final HttpConfig http;
+	private final HttpConfig http;
 
 	private final ProxySelector proxySelector;
 
@@ -344,12 +267,17 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 	private Map<String, String> headers;
 
+	private boolean sslVerify;
+
+	private boolean sslFailure = false;
+
 	TransportHttp(final Repository local, final URIish uri)
 			throws NotSupportedException {
 		super(local, uri);
 		setURI(uri);
-		http = local.getConfig().get(HttpConfig::new);
+		http = new HttpConfig(local.getConfig(), uri);
 		proxySelector = ProxySelector.getDefault();
+		sslVerify = http.isSslVerify();
 	}
 
 	private URL toURL(URIish urish) throws MalformedURLException {
@@ -384,8 +312,9 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 	TransportHttp(final URIish uri) throws NotSupportedException {
 		super(uri);
 		setURI(uri);
-		http = new HttpConfig();
+		http = new HttpConfig(uri);
 		proxySelector = ProxySelector.getDefault();
+		sslVerify = http.isSslVerify();
 	}
 
 	/**
@@ -614,7 +543,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 					// SEE_OTHER should actually never be sent by a git server,
 					// and in general should occur only on POST requests. But it
 					// doesn't hurt to accept it here as a redirect.
-					if (http.followRedirects == HttpRedirectMode.FALSE) {
+					if (http.getFollowRedirects() == HttpRedirectMode.FALSE) {
 						throw new TransportException(uri,
 								MessageFormat.format(
 										JGitText.get().redirectsOff,
@@ -634,6 +563,9 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				throw e;
 			} catch (TransportException e) {
 				throw e;
+			} catch (SSLHandshakeException e) {
+				handleSslFailure(e);
+				continue; // Re-try
 			} catch (IOException e) {
 				if (authMethod.getType() != HttpAuthMethod.Type.NONE) {
 					if (ignoreTypes == null) {
@@ -654,6 +586,120 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 	}
 
+	private static class CredentialItems {
+		CredentialItem.InformationalMessage message;
+
+		/** Trust the server for this git operation */
+		CredentialItem.YesNoType now;
+
+		/**
+		 * Trust the server for all git operations from this repository; may be
+		 * {@code null} if the transport was created via
+		 * {@link #TransportHttp(URIish)}.
+		 */
+		CredentialItem.YesNoType forRepo;
+
+		/** Always trust the server from now on. */
+		CredentialItem.YesNoType always;
+
+		public CredentialItem[] items() {
+			if (forRepo == null) {
+				return new CredentialItem[] { message, now, always };
+			} else {
+				return new CredentialItem[] { message, now, forRepo, always };
+			}
+		}
+	}
+
+	private void handleSslFailure(Throwable e) throws TransportException {
+		if (sslFailure || !trustInsecureSslConnection(e.getCause())) {
+			throw new TransportException(uri,
+					MessageFormat.format(
+							JGitText.get().sslFailureExceptionMessage,
+							currentUri.setPass(null)),
+					e);
+		}
+		sslFailure = true;
+	}
+
+	private boolean trustInsecureSslConnection(Throwable cause) {
+		if (cause instanceof CertificateException
+				|| cause instanceof CertPathBuilderException
+				|| cause instanceof CertPathValidatorException) {
+			// Certificate expired or revoked, PKIX path building not
+			// possible, self-signed certificate, host does not match ...
+			CredentialsProvider provider = getCredentialsProvider();
+			if (provider != null) {
+				CredentialItems trust = constructSslTrustItems(cause);
+				CredentialItem[] items = trust.items();
+				if (provider.supports(items)) {
+					boolean answered = provider.get(uri, items);
+					if (answered) {
+						// Not canceled
+						boolean trustNow = trust.now.getValue();
+						boolean trustLocal = trust.forRepo != null
+								&& trust.forRepo.getValue();
+						boolean trustAlways = trust.always.getValue();
+						if (trustNow || trustLocal || trustAlways) {
+							sslVerify = false;
+							if (trustAlways) {
+								updateSslVerify(SystemReader.getInstance()
+										.openUserConfig(null, FS.DETECTED),
+										false);
+							} else if (trustLocal) {
+								updateSslVerify(local.getConfig(), false);
+							}
+							return true;
+						}
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	private CredentialItems constructSslTrustItems(Throwable cause) {
+		CredentialItems items = new CredentialItems();
+		String info = MessageFormat.format(JGitText.get().sslFailureInfo,
+				currentUri.setPass(null));
+		String sslMessage = cause.getLocalizedMessage();
+		if (sslMessage == null) {
+			sslMessage = cause.toString();
+		}
+		sslMessage = MessageFormat.format(JGitText.get().sslFailureCause,
+				sslMessage);
+		items.message = new CredentialItem.InformationalMessage(info + '\n'
+				+ sslMessage + '\n'
+				+ JGitText.get().sslFailureTrustExplanation);
+		items.now = new CredentialItem.YesNoType(JGitText.get().sslTrustNow);
+		if (local != null) {
+			items.forRepo = new CredentialItem.YesNoType(
+					MessageFormat.format(JGitText.get().sslTrustForRepo,
+					local.getDirectory()));
+		}
+		items.always = new CredentialItem.YesNoType(
+				JGitText.get().sslTrustAlways);
+		return items;
+	}
+
+	private void updateSslVerify(StoredConfig config, boolean value) {
+		// Since git uses the original URI for matching, we must also use the
+		// original URI and cannot use the current URI (which might be different
+		// after redirects)
+		String uriPattern = uri.getScheme() + "://" + uri.getHost(); //$NON-NLS-1$
+		int port = uri.getPort();
+		if (port > 0) {
+			uriPattern += ":" + port; //$NON-NLS-1$
+		}
+		config.setBoolean(HttpConfig.HTTP, uriPattern,
+				HttpConfig.SSL_VERIFY_KEY, value);
+		try {
+			config.save();
+		} catch (IOException e) {
+			LOG.error(JGitText.get().sslVerifyCannotSave, e);
+		}
+	}
+
 	private URIish redirect(String location, String checkFor, int redirects)
 			throws TransportException {
 		if (location == null || location.isEmpty()) {
@@ -661,10 +707,11 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 					MessageFormat.format(JGitText.get().redirectLocationMissing,
 							baseUrl));
 		}
-		if (redirects >= http.maxRedirects) {
+		if (redirects >= http.getMaxRedirects()) {
 			throw new TransportException(uri,
 					MessageFormat.format(JGitText.get().redirectLimitExceeded,
-					Integer.valueOf(http.maxRedirects), baseUrl, location));
+							Integer.valueOf(http.getMaxRedirects()), baseUrl,
+							location));
 		}
 		try {
 			if (!isValidRedirect(baseUrl, location, checkFor)) {
@@ -771,7 +818,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		final Proxy proxy = HttpSupport.proxyFor(proxySelector, u);
 		HttpConnection conn = connectionFactory.create(u, proxy);
 
-		if (!http.sslVerify && "https".equals(u.getProtocol())) { //$NON-NLS-1$
+		if (!sslVerify && "https".equals(u.getProtocol())) { //$NON-NLS-1$
 			HttpSupport.disableSslVerify(conn);
 		}
 
@@ -1097,7 +1144,8 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		void sendRequest() throws IOException {
 			// Try to compress the content, but only if that is smaller.
-			TemporaryBuffer buf = new TemporaryBuffer.Heap(http.postBuffer);
+			TemporaryBuffer buf = new TemporaryBuffer.Heap(
+					http.getPostBuffer());
 			try {
 				GZIPOutputStream gzip = new GZIPOutputStream(buf);
 				out.writeTo(gzip, null);
@@ -1117,123 +1165,133 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			int authAttempts = 1;
 			int redirects = 0;
 			for (;;) {
-				// The very first time we will try with the authentication
-				// method used on the initial GET request. This is a hint only;
-				// it may fail. If so, we'll then re-try with proper 401
-				// handling, going through the available authentication schemes.
-				openStream();
-				if (buf != out) {
-					conn.setRequestProperty(HDR_CONTENT_ENCODING, ENCODING_GZIP);
-				}
-				conn.setFixedLengthStreamingMode((int) buf.length());
-				try (OutputStream httpOut = conn.getOutputStream()) {
-					buf.writeTo(httpOut, null);
-				}
+				try {
+					// The very first time we will try with the authentication
+					// method used on the initial GET request. This is a hint
+					// only; it may fail. If so, we'll then re-try with proper
+					// 401 handling, going through the available authentication
+					// schemes.
+					openStream();
+					if (buf != out) {
+						conn.setRequestProperty(HDR_CONTENT_ENCODING,
+								ENCODING_GZIP);
+					}
+					conn.setFixedLengthStreamingMode((int) buf.length());
+					try (OutputStream httpOut = conn.getOutputStream()) {
+						buf.writeTo(httpOut, null);
+					}
 
-				final int status = HttpSupport.response(conn);
-				switch (status) {
-				case HttpConnection.HTTP_OK:
-					// We're done.
-					return;
-
-				case HttpConnection.HTTP_NOT_FOUND:
-					throw new NoRemoteRepositoryException(uri, MessageFormat
-							.format(JGitText.get().uriNotFound, conn.getURL()));
-
-				case HttpConnection.HTTP_FORBIDDEN:
-					throw new TransportException(uri,
-							MessageFormat.format(
-									JGitText.get().serviceNotPermitted,
-									baseUrl, serviceName));
-
-				case HttpConnection.HTTP_MOVED_PERM:
-				case HttpConnection.HTTP_MOVED_TEMP:
-				case HttpConnection.HTTP_11_MOVED_TEMP:
-					// SEE_OTHER after a POST doesn't make sense for a git
-					// server, so we don't handle it here and thus we'll
-					// report an error in openResponse() later on.
-					if (http.followRedirects != HttpRedirectMode.TRUE) {
-						// Let openResponse() issue an error
+					final int status = HttpSupport.response(conn);
+					switch (status) {
+					case HttpConnection.HTTP_OK:
+						// We're done.
 						return;
-					}
-					currentUri = redirect(
-							conn.getHeaderField(HDR_LOCATION),
-							'/' + serviceName, redirects++);
-					try {
-						baseUrl = toURL(currentUri);
-					} catch (MalformedURLException e) {
-						throw new TransportException(uri, MessageFormat.format(
-								JGitText.get().invalidRedirectLocation,
-								baseUrl, currentUri), e);
-					}
-					continue;
 
-				case HttpConnection.HTTP_UNAUTHORIZED:
-					HttpAuthMethod nextMethod = HttpAuthMethod
-							.scanResponse(conn, ignoreTypes);
-					switch (nextMethod.getType()) {
-					case NONE:
+					case HttpConnection.HTTP_NOT_FOUND:
+						throw new NoRemoteRepositoryException(uri,
+								MessageFormat.format(JGitText.get().uriNotFound,
+										conn.getURL()));
+
+					case HttpConnection.HTTP_FORBIDDEN:
 						throw new TransportException(uri,
 								MessageFormat.format(
-										JGitText.get().authenticationNotSupported,
-										conn.getURL()));
-					case NEGOTIATE:
-						// RFC 4559 states "When using the SPNEGO [...] with
-						// [...] POST, the authentication should be complete
-						// [...] before sending the user data." So in theory
-						// the initial GET should have been authenticated
-						// already. (Unless there was a redirect?)
-						//
-						// We try this only once:
-						ignoreTypes.add(HttpAuthMethod.Type.NEGOTIATE);
-						if (authenticator != null) {
-							ignoreTypes.add(authenticator.getType());
+										JGitText.get().serviceNotPermitted,
+										baseUrl, serviceName));
+
+					case HttpConnection.HTTP_MOVED_PERM:
+					case HttpConnection.HTTP_MOVED_TEMP:
+					case HttpConnection.HTTP_11_MOVED_TEMP:
+						// SEE_OTHER after a POST doesn't make sense for a git
+						// server, so we don't handle it here and thus we'll
+						// report an error in openResponse() later on.
+						if (http.getFollowRedirects() != HttpRedirectMode.TRUE) {
+							// Let openResponse() issue an error
+							return;
 						}
-						authAttempts = 1;
-						// We only do the Kerberos part of SPNEGO, which
-						// requires only one attempt. We do *not* to the
-						// NTLM part of SPNEGO; it's a multi-round
-						// negotiation and among other problems it would
-						// be unclear when to stop if no HTTP_OK is
-						// forthcoming. In theory a malicious server
-						// could keep sending requests for another NTLM
-						// round, keeping a client stuck here.
-						break;
-					default:
-						// DIGEST or BASIC. Let's be sure we ignore NEGOTIATE;
-						// if it was available, we have tried it before.
-						ignoreTypes.add(HttpAuthMethod.Type.NEGOTIATE);
-						if (authenticator == null || authenticator
-								.getType() != nextMethod.getType()) {
+						currentUri = redirect(conn.getHeaderField(HDR_LOCATION),
+								'/' + serviceName, redirects++);
+						try {
+							baseUrl = toURL(currentUri);
+						} catch (MalformedURLException e) {
+							throw new TransportException(uri,
+									MessageFormat.format(
+											JGitText.get().invalidRedirectLocation,
+											baseUrl, currentUri),
+									e);
+						}
+						continue;
+
+					case HttpConnection.HTTP_UNAUTHORIZED:
+						HttpAuthMethod nextMethod = HttpAuthMethod
+								.scanResponse(conn, ignoreTypes);
+						switch (nextMethod.getType()) {
+						case NONE:
+							throw new TransportException(uri,
+									MessageFormat.format(
+											JGitText.get().authenticationNotSupported,
+											conn.getURL()));
+						case NEGOTIATE:
+							// RFC 4559 states "When using the SPNEGO [...] with
+							// [...] POST, the authentication should be complete
+							// [...] before sending the user data." So in theory
+							// the initial GET should have been authenticated
+							// already. (Unless there was a redirect?)
+							//
+							// We try this only once:
+							ignoreTypes.add(HttpAuthMethod.Type.NEGOTIATE);
 							if (authenticator != null) {
 								ignoreTypes.add(authenticator.getType());
 							}
 							authAttempts = 1;
+							// We only do the Kerberos part of SPNEGO, which
+							// requires only one attempt. We do *not* to the
+							// NTLM part of SPNEGO; it's a multi-round
+							// negotiation and among other problems it would
+							// be unclear when to stop if no HTTP_OK is
+							// forthcoming. In theory a malicious server
+							// could keep sending requests for another NTLM
+							// round, keeping a client stuck here.
+							break;
+						default:
+							// DIGEST or BASIC. Let's be sure we ignore
+							// NEGOTIATE; if it was available, we have tried it
+							// before.
+							ignoreTypes.add(HttpAuthMethod.Type.NEGOTIATE);
+							if (authenticator == null || authenticator
+									.getType() != nextMethod.getType()) {
+								if (authenticator != null) {
+									ignoreTypes.add(authenticator.getType());
+								}
+								authAttempts = 1;
+							}
+							break;
 						}
-						break;
-					}
-					authMethod = nextMethod;
-					authenticator = nextMethod;
-					CredentialsProvider credentialsProvider = getCredentialsProvider();
-					if (credentialsProvider == null) {
-						throw new TransportException(uri,
-								JGitText.get().noCredentialsProvider);
-					}
-					if (authAttempts > 1) {
-						credentialsProvider.reset(currentUri);
-					}
-					if (3 < authAttempts || !authMethod.authorize(currentUri,
-							credentialsProvider)) {
-						throw new TransportException(uri,
-								JGitText.get().notAuthorized);
-					}
-					authAttempts++;
-					continue;
+						authMethod = nextMethod;
+						authenticator = nextMethod;
+						CredentialsProvider credentialsProvider = getCredentialsProvider();
+						if (credentialsProvider == null) {
+							throw new TransportException(uri,
+									JGitText.get().noCredentialsProvider);
+						}
+						if (authAttempts > 1) {
+							credentialsProvider.reset(currentUri);
+						}
+						if (3 < authAttempts || !authMethod
+								.authorize(currentUri, credentialsProvider)) {
+							throw new TransportException(uri,
+									JGitText.get().notAuthorized);
+						}
+						authAttempts++;
+						continue;
 
-				default:
-					// Just return here; openResponse() will report an appropriate
-					// error.
-					return;
+					default:
+						// Just return here; openResponse() will report an
+						// appropriate error.
+						return;
+					}
+				} catch (SSLHandshakeException e) {
+					handleSslFailure(e);
+					continue; // Re-try
 				}
 			}
 		}
@@ -1284,7 +1342,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		class HttpOutputStream extends TemporaryBuffer {
 			HttpOutputStream() {
-				super(http.postBuffer);
+				super(http.getPostBuffer());
 			}
 
 			@Override
