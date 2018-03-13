@@ -504,13 +504,8 @@ public abstract class FS {
 		return p.value;
 	}
 
-	/** @return the path to the Git executable. */
-	protected abstract File discoverGitExe();
-
 	/** @return the $prefix directory C Git would use. */
-	protected File discoverGitPrefix() {
-		return resolveGrandparentFile(discoverGitExe());
-	}
+	protected abstract File discoverGitPrefix();
 
 	protected static File resolveGrandparentFile(File grandchild) {
 		if (grandchild != null) {
