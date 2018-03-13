@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2013, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,46 +41,23 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.archive.internal;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import org.eclipse.jgit.nls.NLS;
+import org.eclipse.jgit.nls.TranslationBundle;
 
-import java.io.File;
-import java.io.IOException;
-
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-
-public class FileUtils7Test {
-
-	private final File trash = new File(new File("target"), "trash");
-
-	@Before
-	public void setUp() throws Exception {
-		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY | FileUtils.SKIP_MISSING);
-		assertTrue(trash.mkdirs());
+/**
+ * Translation bundle for archivers
+ */
+public class ArchiveText extends TranslationBundle {
+	/**
+	 * @return an instance of this translation bundle
+	 */
+	public static ArchiveText get() {
+		return NLS.getBundleFor(ArchiveText.class);
 	}
 
-	@After
-	public void tearDown() throws Exception {
-		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY);
-	}
-
-	@Test
-	public void testDeleteSymlinkToDirectoryDoesNotDeleteTarget()
-			throws IOException {
-		FS fs = FS.DETECTED;
-		File dir = new File(trash, "dir");
-		File file = new File(dir, "file");
-		File link = new File(trash, "link");
-		FileUtils.mkdirs(dir);
-		FileUtils.createNewFile(file);
-		fs.createSymLink(link, "dir");
-		FileUtils.delete(link, FileUtils.RECURSIVE);
-		assertFalse(link.exists());
-		assertTrue(dir.exists());
-		assertTrue(file.exists());
-	}
+	// @formatter:off
+	/***/ public String pathDoesNotMatchMode;
+	/***/ public String unsupportedMode;
 }
