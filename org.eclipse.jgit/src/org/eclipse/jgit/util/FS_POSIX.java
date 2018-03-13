@@ -168,7 +168,7 @@ public class FS_POSIX extends FS {
 
 	@Override
 	public boolean canExecute(File f) {
-		return FileUtils.canExecute(f);
+		return FileUtil.canExecute(f);
 	}
 
 	@Override
@@ -246,6 +246,46 @@ public class FS_POSIX extends FS {
 	}
 
 	@Override
+	public boolean isSymLink(File path) throws IOException {
+		return FileUtil.isSymlink(path);
+	}
+
+	@Override
+	public long lastModified(File path) throws IOException {
+		return FileUtil.lastModified(path);
+	}
+
+	@Override
+	public void setLastModified(File path, long time) throws IOException {
+		FileUtil.setLastModified(path, time);
+	}
+
+	@Override
+	public long length(File f) throws IOException {
+		return FileUtil.getLength(f);
+	}
+
+	@Override
+	public boolean exists(File path) {
+		return FileUtil.exists(path);
+	}
+
+	@Override
+	public boolean isDirectory(File path) {
+		return FileUtil.isDirectory(path);
+	}
+
+	@Override
+	public boolean isFile(File path) {
+		return FileUtil.isFile(path);
+	}
+
+	@Override
+	public boolean isHidden(File path) throws IOException {
+		return FileUtil.isHidden(path);
+	}
+
+	@Override
 	public void setHidden(File path, boolean hidden) throws IOException {
 		// no action on POSIX
 	}
@@ -255,7 +295,7 @@ public class FS_POSIX extends FS {
 	 */
 	@Override
 	public Attributes getAttributes(File path) {
-		return FileUtils.getFileAttributesPosix(this, path);
+		return FileUtil.getFileAttributesPosix(this, path);
 	}
 
 	/**
@@ -263,7 +303,7 @@ public class FS_POSIX extends FS {
 	 */
 	@Override
 	public File normalize(File file) {
-		return FileUtils.normalize(file);
+		return FileUtil.normalize(file);
 	}
 
 	/**
@@ -271,7 +311,7 @@ public class FS_POSIX extends FS {
 	 */
 	@Override
 	public String normalize(String name) {
-		return FileUtils.normalize(name);
+		return FileUtil.normalize(name);
 	}
 
 	/**
