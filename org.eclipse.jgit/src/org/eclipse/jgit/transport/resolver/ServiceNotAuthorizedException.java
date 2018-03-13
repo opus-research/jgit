@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2009-2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,35 +41,16 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.dht;
+package org.eclipse.jgit.transport.resolver;
 
-/**
- * Key for any row that the DHT will be asked to store.
- * <p>
- * Implementations of this interface know how to encode and decode themselves
- * from a byte array format, expecting the DHT to use the byte array as the row
- * key within the database.
- * <p>
- * It is strongly encouraged to use only row keys that are valid UTF-8 strings,
- * as most DHT systems have client tools that can interact with rows using the
- * UTF-8 encoding.
- */
-public interface RowKey {
-	/** @return key formatted as byte array for storage in the DHT. */
-	public byte[] toBytes();
+import org.eclipse.jgit.JGitText;
 
-	/** @return relatively unique hash code value for in-memory compares. */
-	public int hashCode();
+/** Indicates the request service is not authorized for current user. */
+public class ServiceNotAuthorizedException extends Exception {
+	private static final long serialVersionUID = 1L;
 
-	/**
-	 * Compare this key to another key for equality.
-	 *
-	 * @param other
-	 *            the other key instance, may be null.
-	 * @return true if these keys reference the same row.
-	 */
-	public boolean equals(Object other);
-
-	/** @return pretty printable string for debugging/reporting only. */
-	public String toString();
+	/** Indicates the request service is not available. */
+	public ServiceNotAuthorizedException() {
+		super(JGitText.get().serviceNotPermittedNoName);
+	}
 }

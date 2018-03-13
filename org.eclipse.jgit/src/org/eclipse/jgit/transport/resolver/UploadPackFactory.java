@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2009-2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,82 +41,42 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.dht;
+package org.eclipse.jgit.transport.resolver;
 
-import static org.eclipse.jgit.lib.Constants.encode;
-import static org.eclipse.jgit.storage.dht.KeyUtils.format32;
-import static org.eclipse.jgit.storage.dht.KeyUtils.parse32;
-import static org.eclipse.jgit.util.RawParseUtils.decode;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.UploadPack;
 
-/** Unique identifier of a reference in the DHT. */
-public final class RefKey implements RowKey {
-	/**
-	 * @param repo
-	 * @param name
-	 * @return the key
-	 */
-	public static RefKey create(RepositoryKey repo, String name) {
-		return new RefKey(repo.asInt(), name);
-	}
-
-	/**
-	 * @param key
-	 * @return the key
-	 */
-	public static RefKey fromBytes(byte[] key) {
-		int repo = parse32(key, 0);
-		String name = decode(key, 9, key.length);
-		return new RefKey(repo, name);
-	}
-
-	private final int repo;
-
-	private final String name;
-
-	RefKey(int repo, String name) {
-		this.repo = repo;
-		this.name = name;
-	}
-
-	/** @return the repository this reference lives within. */
-	public RepositoryKey getRepositoryKey() {
-		return RepositoryKey.fromInt(repo);
-	}
-
-	/** @return the name of the reference. */
-	public String getName() {
-		return name;
-	}
-
-	public byte[] toBytes() {
-		byte[] nameRaw = encode(name);
-		byte[] r = new byte[9 + nameRaw.length];
-		format32(r, 0, repo);
-		r[8] = ':';
-		System.arraycopy(nameRaw, 0, r, 9, nameRaw.length);
-		return r;
-	}
-
-	@Override
-	public int hashCode() {
-		return name.hashCode();
-	}
-
-	@Override
-	public boolean equals(Object other) {
-		if (this == other)
-			return true;
-		if (other instanceof RefKey) {
-			RefKey thisRef = this;
-			RefKey otherRef = (RefKey) other;
-			return thisRef.repo == otherRef.repo
-					&& thisRef.name.equals(otherRef.name);
+/**
+ * Create and configure {@link UploadPack} service instance.
+ *
+ * @param <C>
+ *            the connection type
+ */
+public interface UploadPackFactory<C> {
+	/** A factory disabling the UploadPack service for all repositories. */
+	public static final UploadPackFactory<?> DISABLED = new UploadPackFactory<Object>() {
+		public UploadPack create(Object req, Repository db)
+				throws ServiceNotEnabledException {
+			throw new ServiceNotEnabledException();
 		}
-		return false;
-	}
+	};
 
-	@Override
-	public String toString() {
-		return "ref:" + decode(toBytes());
-	}
+	/**
+	 * Create and configure a new UploadPack instance for a repository.
+	 *
+	 * @param req
+	 *            current request, in case information from the request may help
+	 *            configure the UploadPack instance.
+	 * @param db
+	 *            the repository the upload would read from.
+	 * @return the newly configured UploadPack instance, must not be null.
+	 * @throws ServiceNotEnabledException
+	 *             this factory refuses to create the instance because it is not
+	 *             allowed on the target repository, by any user.
+	 * @throws ServiceNotAuthorizedException
+	 *             this factory refuses to create the instance for this HTTP
+	 *             request and repository, such as due to a permission error.
+	 */
+	UploadPack create(C req, Repository db) throws ServiceNotEnabledException,
+			ServiceNotAuthorizedException;
 }

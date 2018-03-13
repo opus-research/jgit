@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2009-2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,45 +41,47 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.dht;
+package org.eclipse.jgit.transport.resolver;
 
-import java.util.concurrent.TimeoutException;
+import org.eclipse.jgit.errors.RepositoryNotFoundException;
+import org.eclipse.jgit.lib.Repository;
 
-import org.eclipse.jgit.storage.dht.spi.Database;
-
-/** Any error caused by a {@link Database} operation. */
-public class DhtTimeoutException extends DhtException {
-	private static final long serialVersionUID = 1L;
-
-	/**
-	 * @param message
-	 */
-	public DhtTimeoutException(String message) {
-		super(message);
-	}
-
-	/**
-	 * @param message
-	 * @param cause
-	 */
-	public DhtTimeoutException(String message, TimeoutException cause) {
-		super(message);
-		initCause(cause);
-	}
+/**
+ * Locate a Git {@link Repository} by name from the URL.
+ *
+ * @param <C>
+ *            type of connection.
+ */
+public interface RepositoryResolver<C> {
+	/** Resolver configured to open nothing. */
+	public static final RepositoryResolver<?> NONE = new RepositoryResolver<Object>() {
+		public Repository open(Object req, String name)
+				throws RepositoryNotFoundException {
+			throw new RepositoryNotFoundException(name);
+		}
+	};
 
 	/**
-	 * @param cause
+	 * Locate and open a reference to a {@link Repository}.
+	 * <p>
+	 * The caller is responsible for closing the returned Repository.
+	 *
+	 * @param req
+	 *            the current request, may be used to inspect session state
+	 *            including cookies or user authentication.
+	 * @param name
+	 *            name of the repository, as parsed out of the URL.
+	 * @return the opened repository instance, never null.
+	 * @throws RepositoryNotFoundException
+	 *             the repository does not exist or the name is incorrectly
+	 *             formatted as a repository name.
+	 * @throws ServiceNotAuthorizedException
+	 *             the repository exists, but HTTP access is not allowed for the
+	 *             current user.
+	 * @throws ServiceNotEnabledException
+	 *             the repository exists, but HTTP access is not allowed on the
+	 *             target repository, by any user.
 	 */
-	public DhtTimeoutException(TimeoutException cause) {
-		super(cause.getMessage());
-		initCause(cause);
-	}
-
-	/**
-	 * @param cause
-	 */
-	public DhtTimeoutException(InterruptedException cause) {
-		super(cause.getMessage());
-		initCause(cause);
-	}
+	Repository open(C req, String name) throws RepositoryNotFoundException,
+			ServiceNotAuthorizedException, ServiceNotEnabledException;
 }

@@ -49,7 +49,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -65,12 +64,14 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.AsyncRevObjectQueue;
+import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevFlagSet;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.revwalk.filter.CommitTimeRevFilter;
 import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.transport.BasePackFetchConnection.MultiAck;
@@ -153,6 +154,9 @@ public class UploadPack {
 	/** Objects on both sides, these don't have to be sent. */
 	private final List<RevObject> commonBase = new ArrayList<RevObject>();
 
+	/** Commit time of the oldest common commit, in seconds. */
+	private int oldestTime;
+
 	/** null if {@link #commonBase} should be examined again. */
 	private Boolean okToGiveUp;
 
@@ -175,6 +179,10 @@ public class UploadPack {
 
 	private MultiAck multiAck = MultiAck.OFF;
 
+	private PackWriter.Statistics statistics;
+
+	private UploadPackLogger logger;
+
 	/**
 	 * Create a new pack upload for an open repository.
 	 *
@@ -195,6 +203,8 @@ public class UploadPack {
 		SAVE = new RevFlagSet();
 		SAVE.add(WANT);
 		SAVE.add(PEER_HAS);
+		SAVE.add(COMMON);
+		SAVE.add(SATISFIED);
 		refFilter = RefFilter.DEFAULT;
 	}
 
@@ -278,6 +288,16 @@ public class UploadPack {
 	}
 
 	/**
+	 * Set the logger.
+	 *
+	 * @param logger
+	 *            the logger instance. If null, no logging occurs.
+	 */
+	public void setLogger(UploadPackLogger logger) {
+		this.logger = logger;
+	}
+
+	/**
 	 * Execute the upload task on the socket.
 	 *
 	 * @param input
@@ -324,6 +344,17 @@ public class UploadPack {
 				}
 			}
 		}
+	}
+
+	/**
+	 * Get the PackWriter's statistics if a pack was sent to the client.
+	 *
+	 * @return statistics about pack output, if a pack was sent. Null if no pack
+	 *         was sent, such as during the negotation phase of a smart HTTP
+	 *         connection, or if the client was already up-to-date.
+	 */
+	public PackWriter.Statistics getPackStatistics() {
+		return statistics;
 	}
 
 	private void service() throws IOException {
@@ -409,6 +440,8 @@ public class UploadPack {
 	}
 
 	private boolean negotiate() throws IOException {
+		okToGiveUp = Boolean.FALSE;
+
 		ObjectId last = ObjectId.zeroId();
 		List<ObjectId> peerHas = new ArrayList<ObjectId>(64);
 		for (;;) {
@@ -497,6 +530,9 @@ public class UploadPack {
 						wantAll.add(obj);
 					}
 
+					if (!(obj instanceof RevCommit))
+						obj.add(SATISFIED);
+
 					if (obj instanceof RevTag) {
 						RevObject target = walk.peel(obj);
 						if (target instanceof RevCommit) {
@@ -512,6 +548,13 @@ public class UploadPack {
 				}
 
 				last = obj;
+
+				if (obj instanceof RevCommit) {
+					RevCommit c = (RevCommit) obj;
+					if (oldestTime == 0 || c.getCommitTime() < oldestTime)
+						oldestTime = c.getCommitTime();
+				}
+
 				if (obj.has(PEER_HAS))
 					continue;
 
@@ -586,7 +629,7 @@ public class UploadPack {
 
 		try {
 			for (RevObject obj : wantAll) {
-				if (wantSatisfied(obj))
+				if (!wantSatisfied(obj))
 					return false;
 			}
 			return true;
@@ -599,13 +642,10 @@ public class UploadPack {
 		if (want.has(SATISFIED))
 			return true;
 
-		if (!(want instanceof RevCommit)) {
-			want.add(SATISFIED);
-			return true;
-		}
-
 		walk.resetRetain(SAVE);
 		walk.markStart((RevCommit) want);
+		if (oldestTime != 0)
+			walk.setRevFilter(CommitTimeRevFilter.after(oldestTime * 1000L));
 		for (;;) {
 			final RevCommit c = walk.next();
 			if (c == null)
@@ -641,10 +681,6 @@ public class UploadPack {
 			}
 		}
 
-		Collection<? extends ObjectId> want = wantAll;
-		if (want.isEmpty())
-			want = wantIds;
-
 		PackConfig cfg = packConfig;
 		if (cfg == null)
 			cfg = new PackConfig(db);
@@ -653,25 +689,47 @@ public class UploadPack {
 			pw.setUseCachedPacks(true);
 			pw.setDeltaBaseAsOffset(options.contains(OPTION_OFS_DELTA));
 			pw.setThin(options.contains(OPTION_THIN_PACK));
-			pw.preparePack(pm, want, commonBase);
+
+			RevWalk rw = walk;
+			if (wantAll.isEmpty()) {
+				pw.preparePack(pm, wantIds, commonBase);
+			} else {
+				walk.reset();
+
+				ObjectWalk ow = walk.toObjectWalkWithSameObjects();
+				pw.preparePack(pm, ow, wantAll, commonBase);
+				rw = ow;
+			}
+
 			if (options.contains(OPTION_INCLUDE_TAG)) {
-				for (final Ref r : refs.values()) {
-					final RevObject o;
-					try {
-						o = walk.parseAny(r.getObjectId());
-					} catch (IOException e) {
-						continue;
+				for (Ref ref : refs.values()) {
+					ObjectId objectId = ref.getObjectId();
+
+					// If the object was already requested, skip it.
+					if (wantAll.isEmpty()) {
+						if (wantIds.contains(objectId))
+							continue;
+					} else {
+						RevObject obj = rw.lookupOrNull(objectId);
+						if (obj != null && obj.has(WANT))
+							continue;
 					}
-					if (o.has(WANT) || !(o instanceof RevTag))
+
+					if (!ref.isPeeled())
+						ref = db.peel(ref);
+
+					ObjectId peeledId = ref.getPeeledObjectId();
+					if (peeledId == null)
 						continue;
-					final RevTag t = (RevTag) o;
-					if (!pw.willInclude(t) && pw.willInclude(t.getObject()))
-						pw.addObject(t);
+
+					objectId = ref.getObjectId();
+					if (pw.willInclude(peeledId) && !pw.willInclude(objectId))
+						pw.addObject(rw.parseAny(objectId));
 				}
 			}
 
 			pw.writePack(pm, NullProgressMonitor.INSTANCE, packOut);
-			packOut.flush();
+			statistics = pw.getStatistics();
 
 			if (msgOut != null) {
 				String msg = pw.getStatistics().getMessage() + '\n';
@@ -685,5 +743,8 @@ public class UploadPack {
 
 		if (sideband)
 			pckOut.end();
+
+		if (logger != null && statistics != null)
+			logger.onPackStatistics(statistics);
 	}
 }

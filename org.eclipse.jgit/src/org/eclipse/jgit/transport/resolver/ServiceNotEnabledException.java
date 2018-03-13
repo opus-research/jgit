@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2009-2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,21 +41,16 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.dht;
+package org.eclipse.jgit.transport.resolver;
 
-import java.io.IOException;
+import org.eclipse.jgit.JGitText;
 
-import org.eclipse.jgit.errors.ConfigInvalidException;
-import org.eclipse.jgit.lib.StoredConfig;
+/** Indicates the request service is not enabled on a repository. */
+public class ServiceNotEnabledException extends Exception {
+	private static final long serialVersionUID = 1L;
 
-final class DhtConfig extends StoredConfig {
-	@Override
-	public void load() throws IOException, ConfigInvalidException {
-		clear();
-	}
-
-	@Override
-	public void save() throws IOException {
-		// TODO actually store this configuration.
+	/** Indicates the request service is not available. */
+	public ServiceNotEnabledException() {
+		super(JGitText.get().serviceNotEnabledNoName);
 	}
 }

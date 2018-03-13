@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2009-2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,45 +41,42 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.dht;
+package org.eclipse.jgit.transport.resolver;
 
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.storage.pack.StoredObjectRepresentation;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.ReceivePack;
 
-final class DhtObjectRepresentation extends StoredObjectRepresentation {
-	private ObjectInfo info;
+/**
+ * Create and configure {@link ReceivePack} service instance.
+ *
+ * @param <C>
+ *            type of connection
+ */
+public interface ReceivePackFactory<C> {
+	/** A factory disabling the ReceivePack service for all repositories */
+	public static final ReceivePackFactory<?> DISABLED = new ReceivePackFactory<Object>() {
+		public ReceivePack create(Object req, Repository db)
+				throws ServiceNotEnabledException {
+			throw new ServiceNotEnabledException();
+		}
+	};
 
-	void set(ObjectInfo link) {
-		this.info = link;
-	}
-
-	ChunkKey getChunkKey() {
-		return info.getChunkKey();
-	}
-
-	int getOffset() {
-		return info.getOffset();
-	}
-
-	long getPackedSize() {
-		return info.getPackedSize();
-	}
-
-	@Override
-	public ObjectId getDeltaBase() {
-		return info.getDeltaBase();
-	}
-
-	@Override
-	public int getFormat() {
-		if (info.getDeltaBase() != null)
-			return PACK_DELTA;
-		return PACK_WHOLE;
-	}
-
-	@Override
-	public int getWeight() {
-		long size = info.getPackedSize();
-		return (int) Math.min(size, Integer.MAX_VALUE);
-	}
+	/**
+	 * Create and configure a new ReceivePack instance for a repository.
+	 *
+	 * @param req
+	 *            current request, in case information from the request may help
+	 *            configure the ReceivePack instance.
+	 * @param db
+	 *            the repository the receive would write into.
+	 * @return the newly configured ReceivePack instance, must not be null.
+	 * @throws ServiceNotEnabledException
+	 *             this factory refuses to create the instance because it is not
+	 *             allowed on the target repository, by any user.
+	 * @throws ServiceNotAuthorizedException
+	 *             this factory refuses to create the instance for this HTTP
+	 *             request and repository, such as due to a permission error.
+	 */
+	ReceivePack create(C req, Repository db) throws ServiceNotEnabledException,
+			ServiceNotAuthorizedException;
 }
