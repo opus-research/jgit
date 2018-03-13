@@ -48,6 +48,7 @@ package org.eclipse.jgit.junit;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
 
@@ -137,7 +138,16 @@ public class MockSystemReader extends SystemReader {
 
 	@Override
 	public int getTimezone(long when) {
-		return TimeZone.getTimeZone("GMT-03:30").getOffset(when) / (60 * 1000);
+		return getTimeZone().getOffset(when) / (60 * 1000);
 	}
 
+	@Override
+	public TimeZone getTimeZone() {
+		return TimeZone.getTimeZone("GMT-03:30");
+	}
+
+	@Override
+	public Locale getLocale() {
+		return Locale.US;
+	}
 }
