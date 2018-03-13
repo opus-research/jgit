@@ -47,7 +47,6 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.StringUtils;
 import org.eclipse.jgit.util.SystemReader;
 import org.kohsuke.args4j.Option;
 
@@ -83,10 +82,7 @@ class Config extends TextBuiltin {
 			list(new FileBasedConfig(configFile, fs));
 			return;
 		}
-		if (system
-				|| (isListAll() && StringUtils.isEmptyOrNull(SystemReader
-						.getInstance()
-						.getenv(Constants.GIT_CONFIG_NOSYSTEM_KEY))))
+		if (system || isListAll())
 			list(SystemReader.getInstance().openSystemConfig(null, fs));
 		if (global || isListAll())
 			list(SystemReader.getInstance().openUserConfig(null, fs));
