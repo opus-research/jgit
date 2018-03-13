@@ -905,7 +905,7 @@ public class TestRepository<R extends Repository> {
 
 	private void writeFile(final File p, final byte[] bin) throws IOException,
 			ObjectWritingException {
-		final LockFile lck = new LockFile(p);
+		final LockFile lck = new LockFile(p, db.getFS());
 		if (!lck.lock())
 			throw new ObjectWritingException("Can't write " + p);
 		try {
@@ -1155,7 +1155,8 @@ public class TestRepository<R extends Repository> {
 			return self;
 		}
 
-		private void insertChangeId(org.eclipse.jgit.lib.CommitBuilder c) {
+		private void insertChangeId(org.eclipse.jgit.lib.CommitBuilder c)
+				throws IOException {
 			if (changeId == null)
 				return;
 			int idx = ChangeIdUtil.indexOfChangeId(message, "\n");

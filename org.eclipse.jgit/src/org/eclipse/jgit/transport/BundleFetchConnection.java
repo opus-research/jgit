@@ -161,23 +161,16 @@ class BundleFetchConnection extends BaseFetchConnection {
 	}
 
 	private String readLine(final byte[] hdrbuf) throws IOException {
-		StringBuilder line = new StringBuilder();
-		boolean done = false;
-		while (!done) {
-			bin.mark(hdrbuf.length);
-			final int cnt = bin.read(hdrbuf);
-			int lf = 0;
-			while (lf < cnt && hdrbuf[lf] != '\n')
-				lf++;
-			bin.reset();
-			IO.skipFully(bin, lf);
-			if (lf < cnt && hdrbuf[lf] == '\n') {
-				IO.skipFully(bin, 1);
-				done = true;
-			}
-			line.append(RawParseUtils.decode(Constants.CHARSET, hdrbuf, 0, lf));
-		}
-		return line.toString();
+		bin.mark(hdrbuf.length);
+		final int cnt = bin.read(hdrbuf);
+		int lf = 0;
+		while (lf < cnt && hdrbuf[lf] != '\n')
+			lf++;
+		bin.reset();
+		IO.skipFully(bin, lf);
+		if (lf < cnt && hdrbuf[lf] == '\n')
+			IO.skipFully(bin, 1);
+		return RawParseUtils.decode(Constants.CHARSET, hdrbuf, 0, lf);
 	}
 
 	public boolean didFetchTestConnectivity() {
