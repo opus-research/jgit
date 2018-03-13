@@ -393,6 +393,10 @@ public class ResolveMerger extends ThreeWayMerger {
 		if (modeB == modeO && tw.idEqual(T_BASE, T_OURS)) {
 			// OURS was not changed compared to BASE. All changes must be in
 			// THEIRS. THEIRS is chosen.
+
+			// Check worktree before checking out THEIRS
+			if (isWorktreeDirty())
+				return false;
 			if (nonTree(modeT)) {
 				DirCacheEntry e = add(tw.getRawPath(), theirs,
 						DirCacheEntry.STAGE_0);
@@ -631,6 +635,17 @@ public class ResolveMerger extends ThreeWayMerger {
 	 */
 	public Map<String, MergeFailureReason> getFailingPaths() {
 		return (failingPaths.size() == 0) ? null : failingPaths;
+	}
+
+	/**
+	 * Returns whether this merge failed abnormally (i.e. not because of a
+	 * conflict)
+	 *
+	 * @return <code>true</code> if an abnormal failure occurred,
+	 *         <code>false</code> otherwise
+	 */
+	public boolean failedAbnormally() {
+		return failingPaths.size() > 0;
 	}
 
 	/**

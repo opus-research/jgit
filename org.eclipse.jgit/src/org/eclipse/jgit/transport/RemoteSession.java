@@ -1,5 +1,10 @@
 /*
- * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2009, Constantine Plotnikov <constantine.plotnikov@gmail.com>
+ * Copyright (C) 2008-2009, Google Inc.
+ * Copyright (C) 2009, Google, Inc.
+ * Copyright (C) 2009, JetBrains s.r.o.
+ * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,31 +46,41 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.pgm;
+package org.eclipse.jgit.transport;
 
-import org.eclipse.jgit.api.CheckoutCommand;
-import org.eclipse.jgit.api.Git;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
+import java.io.IOException;
 
-@Command(common = true, usage = "usage_checkout")
-class Checkout extends TextBuiltin {
+/**
+ * Create a remote "session" for executing remote commands.
+ * <p>
+ * Clients should subclass RemoteSession to create an alternate way for JGit to
+ * execute remote commands. (The client application may already have this
+ * functionality available.) Note that this class is just a factory for creating
+ * remote processes. If the application already has a persistent connection to
+ * the remote machine, RemoteSession may do nothing more than return a new
+ * RemoteProcess when exec is called.
+ */
+public interface RemoteSession {
+	/**
+	 * Generate a new remote process to execute the given command. This function
+	 * should also start execution and may need to create the streams prior to
+	 * execution.
+	 * @param commandName
+	 *            command to execute
+	 * @param timeout
+	 *            timeout value, in seconds, for command execution
+	 * @return a new remote process
+	 * @throws IOException
+	 *             may be thrown in several cases. For example, on problems
+	 *             opening input or output streams or on problems connecting or
+	 *             communicating with the remote host. For the latter two cases,
+	 *             a TransportException may be thrown (a subclass of
+	 *             IOException).
+	 */
+	public Process exec(String commandName, int timeout) throws IOException;
 
-	@Option(name = "-b", usage = "usage_createBranchAndCheckout")
-	private boolean createBranch = false;
-
-	@Option(name = "--force", aliases = { "-f" }, usage = "usage_forceCheckout")
-	private boolean force = false;
-
-	@Argument(required = true, metaVar = "metaVar_name", usage = "usage_checkout")
-	private String name;
-
-	@Override
-	protected void run() throws Exception {
-		CheckoutCommand command = new Git(db).checkout();
-		command.setCreateBranch(createBranch);
-		command.setName(name);
-		command.setForce(force);
-		command.call();
-	}
+	/**
+	 * Disconnect the remote session
+	 */
+	public void disconnect();
 }
