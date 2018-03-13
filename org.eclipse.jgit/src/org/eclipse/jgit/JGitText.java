@@ -92,7 +92,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String base64InputNotProperlyPadded;
 	/***/ public String baseLengthIncorrect;
 	/***/ public String bareRepositoryNoWorkdirAndIndex;
-	/***/ public String blameNotCommittedYet;
 	/***/ public String blobNotFound;
 	/***/ public String blobNotFoundForPath;
 	/***/ public String branchNameInvalid;
@@ -146,7 +145,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String checkoutConflictWithFile;
 	/***/ public String checkoutConflictWithFiles;
 	/***/ public String classCastNotA;
-	/***/ public String cloneNonEmptyDirectory;
 	/***/ public String collisionOn;
 	/***/ public String commandWasCalledInTheWrongState;
 	/***/ public String commitAlreadyExists;
@@ -285,7 +283,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String indexWriteException;
 	/***/ public String integerValueOutOfRange;
 	/***/ public String internalRevisionError;
-	/***/ public String internalServerError;
 	/***/ public String interruptedWriting;
 	/***/ public String inTheFuture;
 	/***/ public String invalidAdvertisementOf;
@@ -532,7 +529,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unsupportedOperationNotAddAtEnd;
 	/***/ public String unsupportedPackIndexVersion;
 	/***/ public String unsupportedPackVersion;
-	/***/ public String updatingReferences;
 	/***/ public String updatingRefFailed;
 	/***/ public String uriNotFound;
 	/***/ public String userConfigFileInvalid;

@@ -54,7 +54,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
@@ -62,7 +61,6 @@ import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.BatchingProgressMonitor;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.InflaterCache;
 import org.eclipse.jgit.lib.MutableObjectId;
@@ -137,8 +135,6 @@ public abstract class PackParser {
 	private boolean checkObjectCollisions;
 
 	private boolean needBaseObjectIds;
-
-	private boolean checkEofAfterPackFooter;
 
 	private long objectCount;
 
@@ -284,21 +280,6 @@ public abstract class PackParser {
 	 */
 	public void setNeedBaseObjectIds(boolean b) {
 		this.needBaseObjectIds = b;
-	}
-
-	/** @return true if the EOF should be read from the input after the footer. */
-	public boolean isCheckEofAfterPackFooter() {
-		return checkEofAfterPackFooter;
-	}
-
-	/**
-	 * Ensure EOF is read from the input stream after the footer.
-	 *
-	 * @param b
-	 *            true if the EOF should be read; false if it is not checked.
-	 */
-	public void setCheckEofAfterPackFooter(boolean b) {
-		checkEofAfterPackFooter = b;
 	}
 
 	/** @return the new objects that were sent by the user */
@@ -480,12 +461,6 @@ public abstract class PackParser {
 			if (!deferredCheckBlobs.isEmpty())
 				doDeferredCheckBlobs();
 			if (deltaCount > 0) {
-				if (resolving instanceof BatchingProgressMonitor) {
-					((BatchingProgressMonitor) resolving).setDelayStart(
-							1000,
-							TimeUnit.MILLISECONDS);
-				}
-				resolving.beginTask(JGitText.get().resolvingDeltas, deltaCount);
 				resolveDeltas(resolving);
 				if (entryCount < objectCount) {
 					if (!isAllowThin()) {
@@ -502,7 +477,6 @@ public abstract class PackParser {
 								(objectCount - entryCount)));
 					}
 				}
-				resolving.endTask();
 			}
 
 			packDigest = null;
@@ -520,6 +494,7 @@ public abstract class PackParser {
 				inflater.release();
 			} finally {
 				inflater = null;
+				objectDatabase.close();
 			}
 		}
 		return null; // By default there is no locking.
@@ -527,17 +502,20 @@ public abstract class PackParser {
 
 	private void resolveDeltas(final ProgressMonitor progress)
 			throws IOException {
+		progress.beginTask(JGitText.get().resolvingDeltas, deltaCount);
 		final int last = entryCount;
 		for (int i = 0; i < last; i++) {
-			resolveDeltas(entries[i], progress);
+			final int before = entryCount;
+			resolveDeltas(entries[i]);
+			progress.update(entryCount - before);
 			if (progress.isCancelled())
 				throw new IOException(
 						JGitText.get().downloadCancelledDuringIndexing);
 		}
+		progress.endTask();
 	}
 
-	private void resolveDeltas(final PackedObjectInfo oe,
-			ProgressMonitor progress) throws IOException {
+	private void resolveDeltas(final PackedObjectInfo oe) throws IOException {
 		UnresolvedDelta children = firstChildOf(oe);
 		if (children == null)
 			return;
@@ -565,14 +543,12 @@ public abstract class PackParser {
 							.getOffset()));
 		}
 
-		resolveDeltas(visit.next(), info.type, info, progress);
+		resolveDeltas(visit.next(), info.type, info);
 	}
 
 	private void resolveDeltas(DeltaVisit visit, final int type,
-			ObjectTypeAndSize info, ProgressMonitor progress)
-			throws IOException {
+			ObjectTypeAndSize info) throws IOException {
 		do {
-			progress.update(1);
 			info = openDatabase(visit.delta, info);
 			switch (info.type) {
 			case Constants.OBJ_OFS_DELTA:
@@ -757,8 +733,7 @@ public abstract class PackParser {
 				entries[entryCount++] = oe;
 
 			visit.nextChild = firstChildOf(oe);
-			resolveDeltas(visit.next(), typeCode,
-					new ObjectTypeAndSize(), progress);
+			resolveDeltas(visit.next(), typeCode, new ObjectTypeAndSize());
 
 			if (progress.isCancelled())
 				throw new IOException(
@@ -806,25 +781,6 @@ public abstract class PackParser {
 		final byte[] srcHash = new byte[20];
 		System.arraycopy(buf, c, srcHash, 0, 20);
 		use(20);
-
-		// The input stream should be at EOF at this point. We do not support
-		// yielding back any remaining buffered data after the pack footer, so
-		// protocols that embed a pack stream are required to either end their
-		// stream with the pack, or embed the pack with a framing system like
-		// the SideBandInputStream does.
-
-		if (bAvail != 0)
-			throw new CorruptObjectException(MessageFormat.format(
-					JGitText.get().expectedEOFReceived,
-					"\\x" + Integer.toHexString(buf[bOffset] & 0xff)));
-
-		if (isCheckEofAfterPackFooter()) {
-			int eof = in.read();
-			if (0 <= eof)
-				throw new CorruptObjectException(MessageFormat.format(
-						JGitText.get().expectedEOFReceived,
-						"\\x" + Integer.toHexString(eof)));
-		}
 
 		if (!Arrays.equals(actHash, srcHash))
 			throw new CorruptObjectException(
