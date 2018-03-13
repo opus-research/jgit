@@ -44,11 +44,7 @@
 package org.eclipse.jgit.api;
 
 import java.io.IOException;
-import java.net.URISyntaxException;
 import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.RebaseCommand.Operation;
@@ -74,10 +70,8 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryState;
+import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.FetchResult;
-import org.eclipse.jgit.transport.RefSpec;
-import org.eclipse.jgit.transport.RemoteConfig;
-import org.eclipse.jgit.transport.URIish;
 
 /**
  * The Pull command
@@ -85,22 +79,30 @@ import org.eclipse.jgit.transport.URIish;
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-pull.html"
  *      >Git documentation about Pull</a>
  */
-public class PullCommand extends TransportCommand<PullCommand, PullResult> {
+public class PullCommand extends GitCommand<PullResult> {
+	private int timeout = 0;
 
 	private final static String DOT = ".";
 
 	private ProgressMonitor monitor = NullProgressMonitor.INSTANCE;
 
-	private final List<RefSpec> refSpecs;
-
-	private String remoteName;
+	private CredentialsProvider credentialsProvider;
 
 	/**
 	 * @param repo
 	 */
 	protected PullCommand(Repository repo) {
 		super(repo);
-		refSpecs = new ArrayList<RefSpec>(3);
+	}
+
+	/**
+	 * @param timeout
+	 *            in seconds
+	 * @return this instance
+	 */
+	public PullCommand setTimeout(int timeout) {
+		this.timeout = timeout;
+		return this;
 	}
 
 	/**
@@ -114,18 +116,14 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 	}
 
 	/**
-	 * The remote (uri or name) used for the pull operation.
-	 * <p>
-	 * The default value of <code>Constants.DEFAULT_REMOTE_NAME</code> will be
-	 * used if no remote is set.
-	 *
-	 * @see Constants#DEFAULT_REMOTE_NAME
-	 * @param remote
-	 * @return {@code this}
+	 * @param credentialsProvider
+	 *            the {@link CredentialsProvider} to use
+	 * @return this instance
 	 */
-	public PullCommand setRemote(String remote) {
+	public PullCommand setCredentialsProvider(
+			CredentialsProvider credentialsProvider) {
 		checkCallable();
-		remoteName = remote;
+		this.credentialsProvider = credentialsProvider;
 		return this;
 	}
 
@@ -168,15 +166,12 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 		// get the configured remote for the currently checked out branch
 		// stored in configuration key branch.<branch name>.remote
 		Config repoConfig = repo.getConfig();
-		String remote = remoteName;
-		if (remote == null) {
-			remote = repoConfig.getString(
-					ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
-					ConfigConstants.CONFIG_KEY_REMOTE);
-			if (remote == null)
-				// fall back to default remote
-				remote = Constants.DEFAULT_REMOTE_NAME;
-		}
+		String remote = repoConfig.getString(
+				ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
+				ConfigConstants.CONFIG_KEY_REMOTE);
+		if (remote == null)
+			// fall back to default remote
+			remote = Constants.DEFAULT_REMOTE_NAME;
 
 		// get the name of the branch in the remote repository
 		// stored in configuration key branch.<branch name>.merge
@@ -199,24 +194,14 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 		String remoteUri;
 		FetchResult fetchRes;
 		if (isRemote) {
-			RemoteConfig config;
-			try {
-				config = new RemoteConfig(repoConfig, remote);
-			} catch (URISyntaxException e) {
+			remoteUri = repoConfig.getString("remote", remote,
+					ConfigConstants.CONFIG_KEY_URL);
+			if (remoteUri == null) {
+				String missingKey = ConfigConstants.CONFIG_REMOTE_SECTION + DOT
+						+ remote + DOT + ConfigConstants.CONFIG_KEY_URL;
 				throw new InvalidConfigurationException(MessageFormat.format(
-						JGitText.get().invalidRemote, remote), e);
+						JGitText.get().missingConfigurationForKey, missingKey));
 			}
-			if (!config.getURIs().isEmpty())
-				remoteUri = config.getURIs().get(0).toString();
-			else
-				try {
-					// Ensure remote is a URI that parses
-					remoteUri = new URIish(remote).toString();
-				} catch (URISyntaxException e) {
-					throw new InvalidConfigurationException(
-							MessageFormat.format(JGitText.get().invalidRemote,
-									remote), e);
-				}
 
 			if (monitor.isCancelled())
 				throw new CanceledException(MessageFormat.format(
@@ -225,9 +210,9 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 
 			FetchCommand fetch = new FetchCommand(repo);
 			fetch.setRemote(remote);
-			fetch.setRefSpecs(refSpecs);
 			fetch.setProgressMonitor(monitor);
-			configure(fetch);
+			fetch.setTimeout(this.timeout);
+			fetch.setCredentialsProvider(credentialsProvider);
 
 			fetchRes = fetch.call();
 		} else {
@@ -319,68 +304,4 @@ public class PullCommand extends TransportCommand<PullCommand, PullResult> {
 		return result;
 	}
 
-	/**
-	 * Add a reference to pull
-	 *
-	 * @param ref
-	 *            the source reference. The remote name will match.
-	 * @return {@code this}.
-	 */
-	public PullCommand add(Ref ref) {
-		refSpecs.add(new RefSpec(ref.getLeaf().getName()));
-		return this;
-	}
-
-	/**
-	 * Add a reference to pull
-	 *
-	 * @param nameOrSpec
-	 *            any reference name, or a reference specification.
-	 * @return {@code this}.
-	 * @throws JGitInternalException
-	 *             the reference name cannot be resolved.
-	 */
-	public PullCommand add(String nameOrSpec) throws JGitInternalException {
-		if (nameOrSpec.indexOf(':') != -1)
-			refSpecs.add(new RefSpec(nameOrSpec));
-		else {
-			Ref src;
-			try {
-				src = repo.getRef(nameOrSpec);
-			} catch (IOException e) {
-				throw new JGitInternalException(
-						JGitText.get().exceptionCaughtDuringExecutionOfPullCommand,
-						e);
-			}
-			if (src != null)
-				add(src);
-		}
-		return this;
-	}
-
-	/**
-	 * The ref specs to be used in the pull operation
-	 *
-	 * @param specs
-	 * @return {@code this}
-	 */
-	public PullCommand setRefSpecs(RefSpec... specs) {
-		checkCallable();
-		refSpecs.clear();
-		Collections.addAll(refSpecs, specs);
-		return this;
-	}
-
-	/**
-	 * The ref specs to be used in the pull operation
-	 *
-	 * @param specs
-	 * @return {@code this}
-	 */
-	public PullCommand setRefSpecs(List<RefSpec> specs) {
-		checkCallable();
-		refSpecs.clear();
-		refSpecs.addAll(specs);
-		return this;
-	}
 }

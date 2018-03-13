@@ -68,15 +68,12 @@ import org.eclipse.jgit.transport.Transport;
  *      href="http://www.kernel.org/pub/software/scm/git/docs/git-ls-remote.html"
  *      >Git documentation about ls-remote</a>
  */
-public class LsRemoteCommand extends
-		TransportCommand<LsRemoteCommand, Collection<Ref>> {
+public class LsRemoteCommand extends GitCommand<Collection<Ref>> {
 
 	private String remote = Constants.DEFAULT_REMOTE_NAME;
 
 	private boolean heads;
-
 	private boolean tags;
-
 	private String uploadPack;
 
 	/**
@@ -121,7 +118,7 @@ public class LsRemoteCommand extends
 
 	/**
 	 * The full path of git-upload-pack on the remote host
-	 *
+	 * 
 	 * @param uploadPack
 	 */
 	public void setUploadPack(String uploadPack) {
@@ -134,31 +131,35 @@ public class LsRemoteCommand extends
 		try {
 			Transport transport = Transport.open(repo, remote);
 			transport.setOptionUploadPack(uploadPack);
-			configure(transport);
 
 			try {
 				Collection<RefSpec> refSpecs = new ArrayList<RefSpec>(1);
-				if (tags)
+				if (tags) {
 					refSpecs.add(new RefSpec(
 							"refs/tags/*:refs/remotes/origin/tags/*"));
-				if (heads)
+				}
+				if (heads) {
 					refSpecs.add(new RefSpec(
 							"refs/heads/*:refs/remotes/origin/*"));
+				}
 				Collection<Ref> refs;
 				Map<String, Ref> refmap = new HashMap<String, Ref>();
 				FetchConnection fc = transport.openFetch();
 				try {
 					refs = fc.getRefs();
-					if (refSpecs.isEmpty())
-						for (Ref r : refs)
+					for (Ref r : refs) {
+						boolean found = refSpecs.isEmpty();
+						for (RefSpec rs : refSpecs) {
+							if (rs.matchSource(r)) {
+								found = true;
+								break;
+							}
+						}
+						if (found) {
 							refmap.put(r.getName(), r);
-					else
-						for (Ref r : refs)
-							for (RefSpec rs : refSpecs)
-								if (rs.matchSource(r)) {
-									refmap.put(r.getName(), r);
-									break;
-								}
+						}
+
+					}
 				} finally {
 					fc.close();
 				}

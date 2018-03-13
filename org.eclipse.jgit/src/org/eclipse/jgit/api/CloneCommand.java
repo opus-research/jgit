@@ -45,12 +45,11 @@ package org.eclipse.jgit.api;
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.Callable;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.dircache.DirCache;
@@ -66,6 +65,7 @@ import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.FetchResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
@@ -78,7 +78,7 @@ import org.eclipse.jgit.transport.URIish;
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-clone.html"
  *      >Git documentation about Clone</a>
  */
-public class CloneCommand extends TransportCommand<CloneCommand, Git> {
+public class CloneCommand implements Callable<Git> {
 
 	private String uri;
 
@@ -92,18 +92,15 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 
 	private ProgressMonitor monitor = NullProgressMonitor.INSTANCE;
 
+	private CredentialsProvider credentialsProvider;
+
+	private int timeout;
+
 	private boolean cloneAllBranches;
 
 	private boolean noCheckout;
 
 	private Collection<String> branchesToClone;
-
-	/**
-	 * Create clone command with no repository set
-	 */
-	public CloneCommand() {
-		super(null);
-	}
 
 	/**
 	 * Executes the {@code Clone} command.
@@ -134,19 +131,16 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 		command.setBare(bare);
 		if (directory == null)
 			directory = new File(u.getHumanishName(), Constants.DOT_GIT);
-		if (directory.exists() && directory.listFiles().length != 0)
-			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().cloneNonEmptyDirectory, directory.getName()));
 		command.setDirectory(directory);
 		return command.call().getRepository();
 	}
 
-	private FetchResult fetch(Repository clonedRepo, URIish u)
+	private FetchResult fetch(Repository repo, URIish u)
 			throws URISyntaxException,
 			JGitInternalException,
 			InvalidRemoteException, IOException {
 		// create the remote config and save it
-		RemoteConfig config = new RemoteConfig(clonedRepo.getConfig(), remote);
+		RemoteConfig config = new RemoteConfig(repo.getConfig(), remote);
 		config.addURI(u);
 
 		final String dst = bare ? Constants.R_HEADS : Constants.R_REMOTES
@@ -156,16 +150,18 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 		refSpec = refSpec.setSourceDestination(Constants.R_HEADS + "*", dst + "/*"); //$NON-NLS-1$ //$NON-NLS-2$
 
 		config.addFetchRefSpec(refSpec);
-		config.update(clonedRepo.getConfig());
+		config.update(repo.getConfig());
 
-		clonedRepo.getConfig().save();
+		repo.getConfig().save();
 
 		// run the fetch command
-		FetchCommand command = new FetchCommand(clonedRepo);
+		FetchCommand command = new FetchCommand(repo);
 		command.setRemote(remote);
 		command.setProgressMonitor(monitor);
 		command.setTagOpt(TagOpt.FETCH_TAGS);
-		configure(command);
+		command.setTimeout(timeout);
+		if (credentialsProvider != null)
+			command.setCredentialsProvider(credentialsProvider);
 
 		List<RefSpec> specs = calculateRefSpecs(dst);
 		command.setRefSpecs(specs);
@@ -189,7 +185,7 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 		return specs;
 	}
 
-	private void checkout(Repository clonedRepo, FetchResult result)
+	private void checkout(Repository repo, FetchResult result)
 			throws JGitInternalException,
 			MissingObjectException, IncorrectObjectTypeException, IOException {
 
@@ -204,22 +200,22 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 			return; // throw exception?
 
 		if (head.getName().startsWith(Constants.R_HEADS)) {
-			final RefUpdate newHead = clonedRepo.updateRef(Constants.HEAD);
+			final RefUpdate newHead = repo.updateRef(Constants.HEAD);
 			newHead.disableRefLog();
 			newHead.link(head.getName());
-			addMergeConfig(clonedRepo, head);
+			addMergeConfig(repo, head);
 		}
 
-		final RevCommit commit = parseCommit(clonedRepo, head);
+		final RevCommit commit = parseCommit(repo, head);
 
 		boolean detached = !head.getName().startsWith(Constants.R_HEADS);
-		RefUpdate u = clonedRepo.updateRef(Constants.HEAD, detached);
+		RefUpdate u = repo.updateRef(Constants.HEAD, detached);
 		u.setNewObjectId(commit.getId());
 		u.forceUpdate();
 
 		if (!bare) {
-			DirCache dc = clonedRepo.lockDirCache();
-			DirCacheCheckout co = new DirCacheCheckout(clonedRepo, dc,
+			DirCache dc = repo.lockDirCache();
+			DirCacheCheckout co = new DirCacheCheckout(repo, dc,
 					commit.getTree());
 			co.checkout();
 		}
@@ -242,20 +238,19 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 		return foundBranch;
 	}
 
-	private void addMergeConfig(Repository clonedRepo, Ref head)
-			throws IOException {
+	private void addMergeConfig(Repository repo, Ref head) throws IOException {
 		String branchName = Repository.shortenRefName(head.getName());
-		clonedRepo.getConfig().setString(ConfigConstants.CONFIG_BRANCH_SECTION,
+		repo.getConfig().setString(ConfigConstants.CONFIG_BRANCH_SECTION,
 				branchName, ConfigConstants.CONFIG_KEY_REMOTE, remote);
-		clonedRepo.getConfig().setString(ConfigConstants.CONFIG_BRANCH_SECTION,
+		repo.getConfig().setString(ConfigConstants.CONFIG_BRANCH_SECTION,
 				branchName, ConfigConstants.CONFIG_KEY_MERGE, head.getName());
-		clonedRepo.getConfig().save();
+		repo.getConfig().save();
 	}
 
-	private RevCommit parseCommit(final Repository clonedRepo, final Ref ref)
+	private RevCommit parseCommit(final Repository repo, final Ref ref)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
-		final RevWalk rw = new RevWalk(clonedRepo);
+		final RevWalk rw = new RevWalk(repo);
 		final RevCommit commit;
 		try {
 			commit = rw.parseCommit(ref.getObjectId());
@@ -301,13 +296,8 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	}
 
 	/**
-	 * The remote name used to keep track of the upstream repository for the
-	 * clone operation. If no remote name is set, the default value of
-	 * <code>Constants.DEFAULT_REMOTE_NAME</code> will be used.
-	 *
-	 * @see Constants#DEFAULT_REMOTE_NAME
 	 * @param remote
-	 *            name that keeps track of the upstream repository
+	 *            the branch to keep track of in the origin repository
 	 * @return this instance
 	 */
 	public CloneCommand setRemote(String remote) {
@@ -336,6 +326,27 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	 */
 	public CloneCommand setProgressMonitor(ProgressMonitor monitor) {
 		this.monitor = monitor;
+		return this;
+	}
+
+	/**
+	 * @param credentialsProvider
+	 *            the {@link CredentialsProvider} to use
+	 * @return {@code this}
+	 */
+	public CloneCommand setCredentialsProvider(
+			CredentialsProvider credentialsProvider) {
+		this.credentialsProvider = credentialsProvider;
+		return this;
+	}
+
+	/**
+	 * @param timeout
+	 *            the timeout used for the fetch step
+	 * @return {@code this}
+	 */
+	public CloneCommand setTimeout(int timeout) {
+		this.timeout = timeout;
 		return this;
 	}
 
@@ -372,4 +383,5 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 		this.noCheckout = noCheckout;
 		return this;
 	}
+
 }

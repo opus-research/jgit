@@ -56,7 +56,6 @@ import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
@@ -151,12 +150,6 @@ public class ResetCommand extends GitCommand<Ref> {
 			final ObjectId commitId;
 			try {
 				commitId = repo.resolve(ref);
-				if (commitId == null) {
-					// @TODO throw an InvalidRefNameException. We can't do that
-					// now because this would break the API
-					throw new JGitInternalException("Invalid ref " + ref
-							+ " specified");
-				}
 			} catch (IOException e) {
 				throw new JGitInternalException(
 						MessageFormat.format(JGitText.get().cannotRead, ref),
@@ -274,7 +267,6 @@ public class ResetCommand extends GitCommand<Ref> {
 			tw.addTree(new DirCacheIterator(dc));
 			tw.addTree(commit.getTree());
 			tw.setFilter(PathFilterGroup.createFromStrings(filepaths));
-			tw.setRecursive(true);
 
 			while (tw.next()) {
 				final String path = tw.getPathString();
@@ -284,18 +276,13 @@ public class ResetCommand extends GitCommand<Ref> {
 				if (tree == null)
 					// file is not in the commit, remove from index
 					edit.add(new DirCacheEditor.DeletePath(path));
-				else { // revert index to commit
-					// it seams that there is concurrent access to tree
-					// variable, therefore we need to keep references to
-					// entryFileMode and entryObjectId in local
-					// variables
-					final FileMode entryFileMode = tree.getEntryFileMode();
-					final ObjectId entryObjectId = tree.getEntryObjectId();
+				else {
+					// revert index to commit
 					edit.add(new DirCacheEditor.PathEdit(path) {
 						@Override
 						public void apply(DirCacheEntry ent) {
-							ent.setFileMode(entryFileMode);
-							ent.setObjectId(entryObjectId);
+							ent.setFileMode(tree.getEntryFileMode());
+							ent.setObjectId(tree.getEntryObjectId());
 							ent.setLastModified(0);
 						}
 					});

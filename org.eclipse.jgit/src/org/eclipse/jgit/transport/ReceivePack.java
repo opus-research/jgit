@@ -62,7 +62,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -947,8 +946,7 @@ public class ReceivePack {
 					// A well behaved client shouldn't have sent us a
 					// create command for a ref we advertised to it.
 					//
-					cmd.setResult(Result.REJECTED_OTHER_REASON, MessageFormat
-							.format(JGitText.get().refAlreadyExists, ref));
+					cmd.setResult(Result.REJECTED_OTHER_REASON, "ref exists");
 					continue;
 				}
 			}
@@ -1028,20 +1026,8 @@ public class ReceivePack {
 
 	private void executeCommands() {
 		preReceive.onPreReceive(this, filterCommands(Result.NOT_ATTEMPTED));
-
-		List<ReceiveCommand> toApply = filterCommands(Result.NOT_ATTEMPTED);
-		ProgressMonitor updating = NullProgressMonitor.INSTANCE;
-		if (sideBand) {
-			SideBandProgressMonitor pm = new SideBandProgressMonitor(msgOut);
-			pm.setDelayStart(250, TimeUnit.MILLISECONDS);
-			updating = pm;
-		}
-		updating.beginTask(JGitText.get().updatingReferences, toApply.size());
-		for (ReceiveCommand cmd : toApply) {
-			updating.update(1);
+		for (final ReceiveCommand cmd : filterCommands(Result.NOT_ATTEMPTED))
 			execute(cmd);
-		}
-		updating.endTask();
 	}
 
 	private void execute(final ReceiveCommand cmd) {

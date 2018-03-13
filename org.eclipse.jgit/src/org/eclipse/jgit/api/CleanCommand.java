@@ -64,8 +64,6 @@ public class CleanCommand extends GitCommand<Set<String>> {
 
 	private Set<String> paths = Collections.emptySet();
 
-	private boolean dryRun;
-
 	/**
 	 * @param repo
 	 */
@@ -88,8 +86,7 @@ public class CleanCommand extends GitCommand<Set<String>> {
 			Status status = command.call();
 			for (String file : status.getUntracked()) {
 				if (paths.isEmpty() || paths.contains(file)) {
-					if (!dryRun)
-						FileUtils.delete(new File(repo.getWorkTree(), file));
+					FileUtils.delete(new File(repo.getWorkTree(), file));
 					files.add(file);
 				}
 			}
@@ -111,15 +108,4 @@ public class CleanCommand extends GitCommand<Set<String>> {
 		return this;
 	}
 
-	/**
-	 * If dryRun is set, the paths in question will not actually be deleted.
-	 * 
-	 * @param dryRun
-	 *            whether to do a dry run or not
-	 * @return {@code this}
-	 */
-	public CleanCommand setDryRun(boolean dryRun) {
-		this.dryRun = dryRun;
-		return this;
-	}
 }
