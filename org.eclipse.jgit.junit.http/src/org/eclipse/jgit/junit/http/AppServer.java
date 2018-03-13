@@ -104,15 +104,6 @@ public class AppServer {
 	private final TestRequestLog log;
 
 	public AppServer() {
-		this(0);
-	}
-
-	/**
-	 * @param port
-	 *            the http port number
-	 * @since 4.2
-	 */
-	public AppServer(int port) {
 		server = new Server();
 
 		HttpConfiguration http_config = new HttpConfiguration();
@@ -122,7 +113,7 @@ public class AppServer {
 
 		connector = new ServerConnector(server,
 				new HttpConnectionFactory(http_config));
-		connector.setPort(port);
+		connector.setPort(0);
 		try {
 			final InetAddress me = InetAddress.getByName("localhost");
 			connector.setHost(me.getHostAddress());

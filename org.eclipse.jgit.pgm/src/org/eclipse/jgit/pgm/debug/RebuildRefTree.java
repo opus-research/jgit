@@ -43,14 +43,11 @@
 
 package org.eclipse.jgit.pgm.debug;
 
-import static org.eclipse.jgit.lib.Constants.HEAD;
-
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.eclipse.jgit.internal.storage.reftree.RefTree;
-import org.eclipse.jgit.internal.storage.reftree.RefTreeDatabase;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
@@ -59,19 +56,15 @@ import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.RefUpdate;
-import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.pgm.Command;
 import org.eclipse.jgit.pgm.TextBuiltin;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.kohsuke.args4j.Option;
+import org.kohsuke.args4j.Argument;
 
 @Command(usage = "usage_RebuildRefTree")
 class RebuildRefTree extends TextBuiltin {
-	@Option(name = "--enable", usage = "set extensions.refsStorage = reftree")
-	boolean enable;
-
-	private String txnNamespace;
-	private String txnCommitted;
+	@Argument(index = 0, required = true, metaVar = "metaVar_ref", usage = "usage_updateRef")
+	String refName;
 
 	@Override
 	protected void run() throws Exception {
@@ -79,25 +72,10 @@ class RebuildRefTree extends TextBuiltin {
 				RevWalk rw = new RevWalk(reader);
 				ObjectInserter inserter = db.newObjectInserter()) {
 			RefDatabase refDb = db.getRefDatabase();
-			if (refDb instanceof RefTreeDatabase) {
-				RefTreeDatabase d = (RefTreeDatabase) refDb;
-				refDb = d.getBootstrap();
-				txnNamespace = d.getTxnNamespace();
-				txnCommitted = d.getTxnCommitted();
-			} else {
-				RefTreeDatabase d = new RefTreeDatabase(db, refDb);
-				txnNamespace = d.getTxnNamespace();
-				txnCommitted = d.getTxnCommitted();
-			}
-
-			errw.format("Rebuilding %s from %s", //$NON-NLS-1$
-					txnCommitted, refDb.getClass().getSimpleName());
-			errw.println();
-			errw.flush();
 
 			CommitBuilder b = new CommitBuilder();
-			Ref ref = refDb.exactRef(txnCommitted);
-			RefUpdate update = refDb.newUpdate(txnCommitted, true);
+			Ref ref = db.getRefDatabase().exactRef(refName);
+			RefUpdate update = db.updateRef(refName);
 			ObjectId oldTreeId;
 
 			if (ref != null && ref.getObjectId() != null) {
@@ -110,7 +88,7 @@ class RebuildRefTree extends TextBuiltin {
 				oldTreeId = ObjectId.zeroId();
 			}
 
-			RefTree tree = rebuild(refDb);
+			RefTree tree = rebuild(refDb.getRefs(RefDatabase.ALL));
 			b.setTreeId(tree.writeTree(inserter));
 			b.setAuthor(new PersonIdent(db));
 			b.setCommitter(b.getAuthor());
@@ -129,35 +107,19 @@ class RebuildRefTree extends TextBuiltin {
 			default:
 				throw die(String.format("%s: %s", update.getName(), result)); //$NON-NLS-1$
 			}
-
-			if (enable && !(db.getRefDatabase() instanceof RefTreeDatabase)) {
-				StoredConfig cfg = db.getConfig();
-				cfg.setInt("core", null, "repositoryformatversion", 1); //$NON-NLS-1$ //$NON-NLS-2$
-				cfg.setString("extensions", null, "refsStorage", "reftree"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
-				cfg.save();
-				errw.println("Enabled reftree."); //$NON-NLS-1$
-				errw.flush();
-			}
 		}
 	}
 
-	private RefTree rebuild(RefDatabase refdb) throws IOException {
+	private RefTree rebuild(Map<String, Ref> refMap) {
 		RefTree tree = RefTree.newEmptyTree();
 		List<org.eclipse.jgit.internal.storage.reftree.Command> cmds
 			= new ArrayList<>();
 
-		Ref head = refdb.exactRef(HEAD);
-		if (head != null) {
-			cmds.add(new org.eclipse.jgit.internal.storage.reftree.Command(
-					null,
-					head));
-		}
-
-		for (Ref r : refdb.getRefs(RefDatabase.ALL).values()) {
-			if (r.getName().equals(txnCommitted)
-					|| r.getName().startsWith(txnNamespace)) {
+		for (Ref r : refMap.values()) {
+			if (refName.equals(r.getName())) {
 				continue;
 			}
+
 			cmds.add(new org.eclipse.jgit.internal.storage.reftree.Command(
 					null,
 					db.peel(r)));

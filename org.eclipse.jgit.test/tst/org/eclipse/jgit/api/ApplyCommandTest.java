@@ -69,24 +69,23 @@ public class ApplyCommandTest extends RepositoryTestCase {
 
 	private ApplyResult init(final String name, final boolean preExists,
 			final boolean postExists) throws Exception {
-		try (Git git = new Git(db)) {
-			if (preExists) {
-				a = new RawText(readFile(name + "_PreImage"));
-				write(new File(db.getDirectory().getParent(), name),
-						a.getString(0, a.size(), false));
+		Git git = new Git(db);
 
-				git.add().addFilepattern(name).call();
-				git.commit().setMessage("PreImage").call();
-			}
+		if (preExists) {
+			a = new RawText(readFile(name + "_PreImage"));
+			write(new File(db.getDirectory().getParent(), name),
+					a.getString(0, a.size(), false));
 
-			if (postExists) {
-				b = new RawText(readFile(name + "_PostImage"));
-			}
-
-			return git
-					.apply()
-					.setPatch(getTestResource(name + ".patch")).call();
+			git.add().addFilepattern(name).call();
+			git.commit().setMessage("PreImage").call();
 		}
+
+		if (postExists)
+			b = new RawText(readFile(name + "_PostImage"));
+
+		return git
+				.apply()
+				.setPatch(getTestResource(name + ".patch")).call();
 	}
 
 	@Test
