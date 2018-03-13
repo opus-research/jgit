@@ -45,7 +45,6 @@
 
 package org.eclipse.jgit.treewalk;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -61,7 +60,6 @@ import java.util.Collections;
 import java.util.Comparator;
 
 import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.errors.CorruptObjectException;
@@ -71,8 +69,6 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.IO;
-import org.eclipse.jgit.util.io.EolCanonicalizingInputStream;
 
 /**
  * Walks a working directory tree as part of a {@link TreeWalk}.
@@ -91,12 +87,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 	/** Size we perform file IO in if we have to read and hash a file. */
 	private static final int BUFFER_SIZE = 2048;
-
-	/**
-	 * Maximum size of files which may be read fully into memory for performance
-	 * reasons.
-	 */
-	private static final long MAXIMUM_FILE_SIZE_TO_READ_FULLY = 65536;
 
 	/** The {@link #idBuffer()} for the current entry. */
 	private byte[] contentId;
@@ -125,19 +115,10 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	/** If there is a .gitignore file present, the parsed rules from it. */
 	private IgnoreNode ignoreNode;
 
-	/** Options used to process the working tree. */
-	private final WorkingTreeOptions options;
-
-	/**
-	 * Create a new iterator with no parent.
-	 *
-	 * @param options
-	 *            working tree options to be used
-	 */
-	protected WorkingTreeIterator(WorkingTreeOptions options) {
+	/** Create a new iterator with no parent. */
+	protected WorkingTreeIterator() {
 		super();
 		nameEncoder = Constants.CHARSET.newEncoder();
-		this.options = options;
 	}
 
 	/**
@@ -154,14 +135,10 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *            may be null or the empty string to indicate the prefix is the
 	 *            root of the repository. A trailing slash ('/') is
 	 *            automatically appended if the prefix does not end in '/'.
-	 * @param options
-	 *            working tree options to be used
 	 */
-	protected WorkingTreeIterator(final String prefix,
-			WorkingTreeOptions options) {
+	protected WorkingTreeIterator(final String prefix) {
 		super(prefix);
 		nameEncoder = Constants.CHARSET.newEncoder();
-		this.options = options;
 	}
 
 	/**
@@ -173,7 +150,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	protected WorkingTreeIterator(final WorkingTreeIterator p) {
 		super(p);
 		nameEncoder = p.nameEncoder;
-		options = p.options;
 	}
 
 	/**
@@ -215,7 +191,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		return zeroid;
 	}
 
-	private void initializeDigestAndReadBuffer() {
+	private void initializeDigest() {
 		if (contentDigest != null)
 			return;
 
@@ -224,7 +200,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			contentDigest = Constants.newMessageDigest();
 		} else {
 			final WorkingTreeIterator p = (WorkingTreeIterator) parent;
-			p.initializeDigestAndReadBuffer();
+			p.initializeDigest();
 			contentReadBuffer = p.contentReadBuffer;
 			contentDigest = p.contentDigest;
 		}
@@ -242,44 +218,37 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			if (is == null)
 				return zeroid;
 			try {
-				initializeDigestAndReadBuffer();
+				initializeDigest();
 
-				final long length = e.getLength();
-				if (!options.isAutoCRLF())
-					return calculateHash(is, length);
+				contentDigest.reset();
+				contentDigest.update(hblob);
+				contentDigest.update((byte) ' ');
 
-				if (length <= MAXIMUM_FILE_SIZE_TO_READ_FULLY) {
-					final byte[] bytes = IO.readFully(is, (int) length);
-					if (RawText.isBinary(bytes))
-						return calculateHash(new ByteArrayInputStream(bytes),
-								length);
-
-					final InputStream lengthIs = new ByteArrayInputStream(bytes);
-					final long canonicalLength = determineCanonicalizedLength(lengthIs);
-
-					final InputStream contentIs = new EolCanonicalizingInputStream(
-							new ByteArrayInputStream(bytes));
-					return calculateHash(contentIs, canonicalLength);
+				final long blobLength = e.getLength();
+				long sz = blobLength;
+				if (sz == 0) {
+					contentDigest.update((byte) '0');
+				} else {
+					final int bufn = contentReadBuffer.length;
+					int p = bufn;
+					do {
+						contentReadBuffer[--p] = digits[(int) (sz % 10)];
+						sz /= 10;
+					} while (sz > 0);
+					contentDigest.update(contentReadBuffer, p, bufn - p);
 				}
+				contentDigest.update((byte) 0);
 
-				final InputStream binaryIs = e.openInputStream();
-				try {
-					if (RawText.isBinary(binaryIs))
-						return calculateHash(is, length);
-				} finally {
-					binaryIs.close();
+				for (;;) {
+					final int r = is.read(contentReadBuffer);
+					if (r <= 0)
+						break;
+					contentDigest.update(contentReadBuffer, 0, r);
+					sz += r;
 				}
-
-				final long canonicalLength;
-				final InputStream lengthIs = e.openInputStream();
-				try {
-					canonicalLength = determineCanonicalizedLength(lengthIs);
-				} finally {
-					lengthIs.close();
-				}
-
-				return calculateHash(new EolCanonicalizingInputStream(is),
-						canonicalLength);
+				if (sz != blobLength)
+					return zeroid;
+				return contentDigest.digest();
 			} finally {
 				try {
 					is.close();
@@ -291,17 +260,9 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			}
 		} catch (IOException err) {
 			// Can't read the file? Don't report the failure either.
+			//
 			return zeroid;
 		}
-	}
-
-	/**
-	 * Returns the working tree options used by this iterator.
-	 *
-	 * @return working tree options
-	 */
-	public WorkingTreeOptions getOptions() {
-		return options;
 	}
 
 	@Override
@@ -596,53 +557,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private long determineCanonicalizedLength(InputStream raw)
-			throws IOException {
-		long length = 0;
-
-		final InputStream is = new EolCanonicalizingInputStream(raw);
-		for (;;) {
-			int r = is.read(contentReadBuffer);
-			if (r <= 0)
-				break;
-			length += r;
-		}
-
-		return length;
-	}
-
-	private byte[] calculateHash(InputStream is, long length)
-			throws IOException {
-		contentDigest.reset();
-		contentDigest.update(hblob);
-		contentDigest.update((byte) ' ');
-
-		long sz = length;
-		if (sz == 0) {
-			contentDigest.update((byte) '0');
-		} else {
-			final int bufn = contentReadBuffer.length;
-			int p = bufn;
-			do {
-				contentReadBuffer[--p] = digits[(int) (sz % 10)];
-				sz /= 10;
-			} while (sz > 0);
-			contentDigest.update(contentReadBuffer, p, bufn - p);
-		}
-		contentDigest.update((byte) 0);
-
-		for (;;) {
-			final int r = is.read(contentReadBuffer);
-			if (r <= 0)
-				break;
-			contentDigest.update(contentReadBuffer, 0, r);
-			sz += r;
-		}
-		if (sz != length)
-			return zeroid;
-		return contentDigest.digest();
-	}
-
 	/** A single entry within a working directory tree. */
 	protected static abstract class Entry {
 		byte[] encodedName;
@@ -655,8 +569,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				b = enc.encode(CharBuffer.wrap(getName()));
 			} catch (CharacterCodingException e) {
 				// This should so never happen.
-				throw new RuntimeException(MessageFormat.format(
-						JGitText.get().unencodeableFile, getName()));
+				throw new RuntimeException(MessageFormat.format(JGitText.get().unencodeableFile, getName()));
 			}
 
 			encodedNameLen = b.limit();

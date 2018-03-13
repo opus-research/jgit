@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
+ * Copyright (C) 2010, Jens Baumgart <jens.baumgart@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,92 +40,53 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-package org.eclipse.jgit.util.io;
+package org.eclipse.jgit.treewalk.filter;
 
 import java.io.IOException;
-import java.io.InputStream;
+
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 
 /**
- * An input stream which canonicalizes EOLs bytes on the fly to '\n'.
- *
- * Note: Make sure to apply this InputStream only to text files!
+ * This filter includes workdir entries that are not ignored. This class is
+ * immutable.
  */
-public class EolCanonicalizingInputStream extends InputStream {
+public class NotIgnoredFilter extends TreeFilter {
 
-	private final byte[] single = new byte[1];
-
-	private final byte[] buf = new byte[8096];
-
-	private final InputStream in;
-
-	private int cnt;
-
-	private int ptr;
+	private final int workdirTreeIndex;
 
 	/**
-	 * Creates a new InputStream, wrapping the specified stream
+	 * constructor
 	 *
-	 * @param in
-	 *            raw input stream
+	 * @param workdirTreeIndex
+	 *            index of the workdir tree in the tree walk
 	 */
-	public EolCanonicalizingInputStream(InputStream in) {
-		this.in = in;
+	public NotIgnoredFilter(final int workdirTreeIndex) {
+		this.workdirTreeIndex = workdirTreeIndex;
 	}
 
 	@Override
-	public int read() throws IOException {
-		final int read = read(single, 0, 1);
-		return read == 1 ? single[0] & 0xff : -1;
-	}
-
-	@Override
-	public int read(byte[] bs, int off, int len) throws IOException {
-		if (len == 0)
-			return 0;
-
-		if (cnt == -1)
-			return -1;
-
-		final int startOff = off;
-		final int end = off + len;
-
-		while (off < end) {
-			if (ptr == cnt && !fillBuffer()) {
-				break;
-			}
-
-			byte b = buf[ptr++];
-			if (b != '\r') {
-				bs[off++] = b;
-				continue;
-			}
-
-			if (ptr == cnt && !fillBuffer()) {
-				bs[off++] = '\r';
-				break;
-			}
-
-			if (buf[ptr] == '\n') {
-				bs[off++] = '\n';
-				ptr++;
-			} else
-				bs[off++] = '\r';
-		}
-
-		return startOff == off ? -1 : off - startOff;
-	}
-
-	@Override
-	public void close() throws IOException {
-		in.close();
-	}
-
-	private boolean fillBuffer() throws IOException {
-		cnt = in.read(buf, 0, buf.length);
-		if (cnt < 1)
-			return false;
-		ptr = 0;
+	public boolean include(TreeWalk walker) throws MissingObjectException,
+			IncorrectObjectTypeException, IOException {
+		WorkingTreeIterator workingTreeIterator = walker.getTree(
+				workdirTreeIndex, WorkingTreeIterator.class);
+		if (workingTreeIterator != null)
+			// do not include ignored entries
+			return !workingTreeIterator.isEntryIgnored();
 		return true;
 	}
+
+	@Override
+	public boolean shouldBeRecursive() {
+		return false;
+	}
+
+	@Override
+	public TreeFilter clone() {
+		// immutable
+		return this;
+	}
+
 }
