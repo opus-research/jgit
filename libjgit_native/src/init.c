@@ -55,9 +55,6 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
 	if (jgit_util_OnLoad(env))
 		return JNI_ERR;
 
-	if (jgit_list_OnLoad(env))
-		return JNI_ERR;
-
 	if (jgit_lstat_OnLoad(env))
 		return JNI_ERR;
 
@@ -73,6 +70,5 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
 
 	env = (JNIEnv *)ppe;
 	jgit_util_OnUnload(env);
-	jgit_list_OnUnload(env);
 	jgit_lstat_OnUnload(env);
 }
