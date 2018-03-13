@@ -1,5 +1,4 @@
 /*
- * Copyright (C) 2008-2010, Google Inc.
  * Copyright (C) 2008, Marek Zawirski <marek.zawirski@gmail.com>
  * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
@@ -47,7 +46,6 @@
 package org.eclipse.jgit.transport;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
@@ -144,13 +142,15 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		return cmd.toString();
 	}
 
-	ChannelExec exec(final String exe) throws TransportException {
+	ChannelExec exec(final String exe, final OutputStream err)
+			throws TransportException {
 		initSession();
 
 		final int tms = getTimeout() > 0 ? getTimeout() * 1000 : 0;
 		try {
 			final ChannelExec channel = (ChannelExec) sock.openChannel("exec");
 			channel.setCommand(commandFor(exe));
+			channel.setErrStream(err);
 			channel.connect(tms);
 			return channel;
 		} catch (JSchException je) {
@@ -224,8 +224,6 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 	class SshFetchConnection extends BasePackFetchConnection {
 		private ChannelExec channel;
 
-		private Thread errorThread;
-
 		private int exitStatus;
 
 		SshFetchConnection() throws TransportException {
@@ -233,16 +231,12 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 			try {
 				final MessageWriter msg = new MessageWriter();
 				setMessageWriter(msg);
+				channel = exec(getOptionUploadPack(), msg.getRawStream());
 
-				channel = exec(getOptionUploadPack());
-				if (!channel.isConnected())
-					throw new TransportException(uri, "connection failed");
-
-				final InputStream upErr = channel.getErrStream();
-				errorThread = new StreamCopyThread(upErr, msg.getRawStream());
-				errorThread.start();
-
-				init(channel.getInputStream(), outputStream(channel));
+				if (channel.isConnected())
+					init(channel.getInputStream(), outputStream(channel));
+				else
+					throw new TransportException(uri, getMessages());
 
 			} catch (TransportException err) {
 				close();
@@ -264,16 +258,6 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 
 		@Override
 		public void close() {
-			if (errorThread != null) {
-				try {
-					errorThread.join();
-				} catch (InterruptedException e) {
-					// Stop waiting and return anyway.
-				} finally {
-					errorThread = null;
-				}
-			}
-
 			super.close();
 
 			if (channel != null) {
@@ -291,8 +275,6 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 	class SshPushConnection extends BasePackPushConnection {
 		private ChannelExec channel;
 
-		private Thread errorThread;
-
 		private int exitStatus;
 
 		SshPushConnection() throws TransportException {
@@ -300,16 +282,12 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 			try {
 				final MessageWriter msg = new MessageWriter();
 				setMessageWriter(msg);
+				channel = exec(getOptionReceivePack(), msg.getRawStream());
 
-				channel = exec(getOptionReceivePack());
-				if (!channel.isConnected())
-					throw new TransportException(uri, "connection failed");
-
-				final InputStream rpErr = channel.getErrStream();
-				errorThread = new StreamCopyThread(rpErr, msg.getRawStream());
-				errorThread.start();
-
-				init(channel.getInputStream(), outputStream(channel));
+				if (channel.isConnected())
+					init(channel.getInputStream(), outputStream(channel));
+				else
+					throw new TransportException(uri, getMessages());
 
 			} catch (TransportException err) {
 				close();
@@ -331,16 +309,6 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 
 		@Override
 		public void close() {
-			if (errorThread != null) {
-				try {
-					errorThread.join();
-				} catch (InterruptedException e) {
-					// Stop waiting and return anyway.
-				} finally {
-					errorThread = null;
-				}
-			}
-
 			super.close();
 
 			if (channel != null) {
