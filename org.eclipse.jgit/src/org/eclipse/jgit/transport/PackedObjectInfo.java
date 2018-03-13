@@ -116,10 +116,22 @@ public class PackedObjectInfo extends ObjectIdOwnerMap.Entry {
 		this.crc = crc;
 	}
 
+	/**
+	 * @return the object type. The default type is OBJ_BAD, which is considered
+	 *         as unknown or invalid type.
+	 * @since 4.9
+	 */
 	public int getType() {
 		return type;
 	}
 
+	/**
+	 * Record the object type if applicable.
+	 *
+	 * @param type
+	 *            the object type.
+	 * @since 4.9
+	 */
 	public void setType(int type) {
 		this.type = type;
 	}

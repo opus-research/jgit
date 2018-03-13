@@ -44,11 +44,9 @@
 package org.eclipse.jgit.internal.storage.dfs;
 
 import java.io.IOException;
-import java.nio.channels.Channels;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.storage.pack.CorruptPackIndexException;
 import org.eclipse.jgit.internal.storage.pack.FsckPackParser;
@@ -59,14 +57,11 @@ import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectChecker;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.revwalk.ObjectWalk;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.transport.PackedObjectInfo;
 
 /**
  * Verify the validity and connectivity of the objects in a dfs repository.
+ * @since 4.9
  */
 public class DfsFsck {
 	private final DfsRepository repo;
@@ -126,15 +121,6 @@ public class DfsFsck {
 							e.getErrorType()));
 				}
 			}
-
-			try (ObjectWalk ow = new ObjectWalk(ctx)) {
-				for (Ref r : repo.getAllRefs().values()) {
-					ow.markStart(ow.parseAny(r.getObjectId()));
-				}
-				ow.checkConnectivity();
-			} catch (MissingObjectException e) {
-				missingObjects.add(e.getObjectId());
-			}
 		} finally {
 			ctx.close();
 		}
@@ -142,7 +128,6 @@ public class DfsFsck {
 
 	/**
 	 * @return corrupted objects from all pack files.
-	 * @since 4.9
 	 */
 	public Set<CorruptObject> getCorruptObjects() {
 		return corruptObjects;
@@ -150,7 +135,6 @@ public class DfsFsck {
 
 	/**
 	 * @return missing objects that should present in pack files.
-	 * @since 4.9
 	 */
 	public Set<ObjectId> getMissingObjects() {
 		return missingObjects;
@@ -158,7 +142,6 @@ public class DfsFsck {
 
 	/**
 	 * @return corrupted index files associated with the packs.
-	 * @since 4.9
 	 */
 	public Set<CorruptIndex> getCorruptIndices() {
 		return corruptIndices;

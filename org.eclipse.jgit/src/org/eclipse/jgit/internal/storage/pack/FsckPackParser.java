@@ -71,6 +71,7 @@ import org.eclipse.jgit.transport.PackedObjectInfo;
 
 /**
  * A read only pack parser for object validity checking.
+ * @since 4.9
  */
 public class FsckPackParser extends PackParser {
 	private final ObjectChecker objCheck;

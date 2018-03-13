@@ -47,6 +47,7 @@ import org.eclipse.jgit.annotations.Nullable;
 
 /**
  * Exception thrown when the pack index file is corrupted.
+ * @since 4.9
  */
 public class CorruptPackIndexException extends Exception {
 	public enum ErrorType {
@@ -56,6 +57,7 @@ public class CorruptPackIndexException extends Exception {
 		MISSING_OBJ,
 		UNKNOWN_OBJ,
 	}
+
 
 	private ErrorType errorType;
 
