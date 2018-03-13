@@ -356,7 +356,8 @@ public class URIishTest extends TestCase {
 
 	public void testGetValidSlashHumanishName()
 			throws IllegalArgumentException, URISyntaxException {
-		String humanishName = new URIish(GIT_SCHEME + "abc/").getHumanishName();
+		String humanishName = new URIish(GIT_SCHEME + "host/abc/")
+				.getHumanishName();
 		assertEquals("abc", humanishName);
 	}
 
@@ -394,7 +395,7 @@ public class URIishTest extends TestCase {
 
 	public void testGetValidDotGitSlashHumanishName()
 			throws IllegalArgumentException, URISyntaxException {
-		String humanishName = new URIish(GIT_SCHEME + "abc.git/")
+		String humanishName = new URIish(GIT_SCHEME + "host.xy/abc.git/")
 				.getHumanishName();
 		assertEquals("abc", humanishName);
 	}
@@ -423,4 +424,33 @@ public class URIishTest extends TestCase {
 		assertEquals("c", humanishName);
 	}
 
+	public void testUserPasswordAndPort() throws URISyntaxException {
+		String str = "http://user:secret@host.xy:80/some/path";
+		URIish u = new URIish(str);
+		assertEquals("http", u.getScheme());
+		assertTrue(u.isRemote());
+		assertEquals("/some/path", u.getPath());
+		assertEquals("host.xy", u.getHost());
+		assertEquals(80, u.getPort());
+		assertEquals("user", u.getUser());
+		assertEquals("secret", u.getPass());
+		assertEquals(u, new URIish(str));
+
+		str = "http://user:secret@pass@host.xy:80/some/path";
+		u = new URIish(str);
+		assertEquals("http", u.getScheme());
+		assertTrue(u.isRemote());
+		assertEquals("/some/path", u.getPath());
+		assertEquals("host.xy", u.getHost());
+		assertEquals(80, u.getPort());
+		assertEquals("user", u.getUser());
+		assertEquals("secret@pass", u.getPass());
+		assertEquals(u, new URIish(str));
+	}
+
+	public void testMissingPort() throws URISyntaxException {
+		final String incorrectSshUrl = "ssh://some-host:/path/to/repository.git";
+		URIish u = new URIish(incorrectSshUrl);
+		assertFalse(TransportGitSsh.canHandle(u));
+	}
 }

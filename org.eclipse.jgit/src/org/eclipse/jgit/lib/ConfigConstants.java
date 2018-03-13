@@ -87,6 +87,4 @@ public class ConfigConstants {
 	/** The "url" key */
 	public static final String CONFIG_KEY_URL = "url";
 
-	/** The "autosetupmerge" key */
-	public static final String CONFIG_KEY_AUTOSETUPMERGE = "autosetupmerge";
 }
