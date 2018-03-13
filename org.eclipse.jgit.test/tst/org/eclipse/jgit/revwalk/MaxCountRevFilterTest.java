@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2011, Tomasz Zarna <Tomasz.Zarna@pl.ibm.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,17 +40,45 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.revwalk;
 
-package org.eclipse.jgit.pgm.debug;
+import static org.junit.Assert.assertNull;
 
-import org.eclipse.jgit.storage.file.FileRepository;
-import org.eclipse.jgit.storage.file.GC;
-import org.eclipse.jgit.lib.TextProgressMonitor;
-import org.eclipse.jgit.pgm.TextBuiltin;
+import org.eclipse.jgit.revwalk.filter.MaxCountRevFilter;
+import org.junit.Test;
 
-class Gc extends TextBuiltin {
-	@Override
-	protected void run() throws Exception {
-		GC.gc(new TextProgressMonitor(), (FileRepository) db);
+public class MaxCountRevFilterTest extends RevWalkTestCase {
+	@Test
+	public void testMaxCountRevFilter() throws Exception {
+		final RevCommit a = commit();
+		final RevCommit b = commit(a);
+		final RevCommit c1 = commit(b);
+		final RevCommit c2 = commit(b);
+		final RevCommit d = commit(c1, c2);
+		final RevCommit e = commit(d);
+
+		rw.reset();
+		rw.setRevFilter(MaxCountRevFilter.create(3));
+		markStart(e);
+		assertCommit(e, rw.next());
+		assertCommit(d, rw.next());
+		assertCommit(c2, rw.next());
+		assertNull(rw.next());
+
+		rw.reset();
+		rw.setRevFilter(MaxCountRevFilter.create(0));
+		markStart(e);
+		assertNull(rw.next());
+	}
+
+	@Test
+	public void testMaxCountRevFilter0() throws Exception {
+		final RevCommit a = commit();
+		final RevCommit b = commit(a);
+
+		rw.reset();
+		rw.setRevFilter(MaxCountRevFilter.create(0));
+		markStart(b);
+		assertNull(rw.next());
 	}
 }
