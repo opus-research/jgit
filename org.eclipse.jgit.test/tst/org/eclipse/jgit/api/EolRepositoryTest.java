@@ -315,7 +315,7 @@ public class EolRepositoryTest extends RepositoryTestCase {
 		checkEntryContent(entryMixed, CONTENT_CRLF, CONTENT_LF);
 
 		// switch to binary for file1
-		createAndAddFile(git, ".gitattributes",
+		dotGitattributes = createAndAddFile(git, Constants.DOT_GIT_ATTRIBUTES,
 				"file1.txt binary\nfile2.txt text\nfile3.txt text");
 		gitCommit(git, "switchedToBinaryFor1");
 		recreateWorktree(git);
@@ -351,13 +351,13 @@ public class EolRepositoryTest extends RepositoryTestCase {
 		checkEntryContent(entryMixed, CONTENT_MIXED, CONTENT_MIXED);
 
 		// switch to text for file1
-		createAndAddFile(git, ".gitattributes",
+		dotGitattributes = createAndAddFile(git, Constants.DOT_GIT_ATTRIBUTES,
 				"file1.txt text\nfile2.txt binary\nfile3.txt binary");
 		gitCommit(git, "switchedToTextFor1");
 		recreateWorktree(git);
 		collectRepositoryState();
 		assertEquals("text", entryCRLF.attrs);
-		checkEntryContent(entryCRLF, CONTENT_LF, CONTENT_LF);
+		checkEntryContent(entryCRLF, CONTENT_CRLF, CONTENT_LF);
 		assertEquals("binary -diff -merge -text", entryLF.attrs);
 		checkEntryContent(entryLF, CONTENT_LF, CONTENT_LF);
 		assertEquals("binary -diff -merge -text", entryMixed.attrs);

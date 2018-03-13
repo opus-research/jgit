@@ -58,6 +58,8 @@ import org.eclipse.jgit.treewalk.WorkingTreeOptions;
  * @since 4.3
  */
 public final class EolStreamTypeUtil {
+	private static final boolean FORCE_EOL_LF_ON_CHECKOUT = false;
+
 	private EolStreamTypeUtil() {
 	}
 
@@ -183,7 +185,8 @@ public final class EolStreamTypeUtil {
 			Attributes attrs) {
 		// old git system
 		if (attrs.isSet("crlf")) {//$NON-NLS-1$
-			return EolStreamType.TEXT_LF;
+			return FORCE_EOL_LF_ON_CHECKOUT ? EolStreamType.TEXT_LF
+					: EolStreamType.DIRECT;
 		} else if (attrs.isUnset("crlf")) {//$NON-NLS-1$
 			return EolStreamType.DIRECT;
 		} else if ("input".equals(attrs.getValue("crlf"))) {//$NON-NLS-1$ //$NON-NLS-2$
@@ -198,7 +201,8 @@ public final class EolStreamTypeUtil {
 		if (eol != null && "crlf".equals(eol)) //$NON-NLS-1$
 			return EolStreamType.TEXT_CRLF;
 		if (eol != null && "lf".equals(eol)) //$NON-NLS-1$
-			return EolStreamType.TEXT_LF;
+			return FORCE_EOL_LF_ON_CHECKOUT ? EolStreamType.TEXT_LF
+					: EolStreamType.DIRECT;
 
 		if (attrs.isSet("text")) { //$NON-NLS-1$
 			switch (options.getAutoCRLF()) {
@@ -211,7 +215,8 @@ public final class EolStreamTypeUtil {
 			case CRLF:
 				return EolStreamType.TEXT_CRLF;
 			case LF:
-				return EolStreamType.TEXT_LF;
+				return FORCE_EOL_LF_ON_CHECKOUT ? EolStreamType.TEXT_LF
+						: EolStreamType.DIRECT;
 			case NATIVE:
 			default:
 				return EolStreamType.DIRECT;
@@ -229,7 +234,8 @@ public final class EolStreamTypeUtil {
 			case CRLF:
 				return EolStreamType.AUTO_CRLF;
 			case LF:
-				return EolStreamType.AUTO_LF;
+				return FORCE_EOL_LF_ON_CHECKOUT ? EolStreamType.TEXT_LF
+						: EolStreamType.DIRECT;
 			case NATIVE:
 			default:
 				return EolStreamType.DIRECT;
