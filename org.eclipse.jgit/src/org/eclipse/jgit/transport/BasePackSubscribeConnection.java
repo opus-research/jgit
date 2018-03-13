@@ -163,9 +163,9 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 					throw new TransportException(MessageFormat.format(
 							JGitText.get().repositoryNotFound, repo));
 				monitor.beginTask(MessageFormat.format(
-						JGitText.get().subscribeNewUpdate, repo),
-						ProgressMonitor.UNKNOWN);
+						JGitText.get().subscribeNewUpdate, repo), 1);
 				receivePublish(db);
+				monitor.update(1);
 				monitor.endTask();
 
 				line = pckIn.readString();
