@@ -51,7 +51,6 @@ import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -65,7 +64,6 @@ import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.filter.NotIgnoredFilter;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FS.ExecutionResult;
-import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.TemporaryBuffer;
 import org.junit.Before;
@@ -98,19 +96,8 @@ public class CGitIgnoreTest extends RepositoryTestCase {
 		}
 	}
 
-	private String toString(TemporaryBuffer b) throws Exception {
-		long length = b.length();
-		int toRead = 10 * 1024;
-		if (length < toRead) {
-			toRead = (int) length;
-		}
-		try (InputStream stream = new BufferedInputStream(
-				b.openInputStream())) {
-			byte[] buffer = new byte[toRead];
-			int read = IO.readFully(stream, buffer, toRead);
-			assertEquals("Read error", toRead, read);
-			return RawParseUtils.decode(buffer);
-		}
+	private String toString(TemporaryBuffer b) throws IOException {
+		return RawParseUtils.decode(b.toByteArray());
 	}
 
 	private String[] cgitIgnored() throws Exception {
