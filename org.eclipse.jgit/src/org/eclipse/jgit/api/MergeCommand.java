@@ -57,11 +57,11 @@ import org.eclipse.jgit.lib.GitIndex;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefUpdate;
+import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.WorkDirCheckout;
-import org.eclipse.jgit.lib.Ref.Storage;
-import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -114,8 +114,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 		try {
 			Ref head = repo.getRef(Constants.HEAD);
 			if (head == null)
-				throw new NoHeadException(
-						JGitText.get().commitOnRepoWithoutHEADCurrentlyNotSupported);
+				throw new NoHeadException(JGitText.get().commitOnRepoWithoutHEADCurrentlyNotSupported);
 			StringBuilder refLogMessage = new StringBuilder("merge ");
 
 			// Check for FAST_FORWARD, ALREADY_UP_TO_DATE
@@ -135,8 +134,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 				RevCommit srcCommit = revWalk.lookupCommit(objectId);
 				if (revWalk.isMergedInto(srcCommit, headCommit)) {
 					setCallable(false);
-					return new MergeResult(headCommit, srcCommit,
-							new ObjectId[] { srcCommit, headCommit },
+					return new MergeResult(headCommit,
 							MergeStatus.ALREADY_UP_TO_DATE, mergeStrategy);
 				} else if (revWalk.isMergedInto(headCommit, srcCommit)) {
 					// FAST_FORWARD detected: skip doing a real merge but only
@@ -145,14 +143,11 @@ public class MergeCommand extends GitCommand<MergeResult> {
 					checkoutNewHead(revWalk, headCommit, srcCommit);
 					updateHead(refLogMessage, srcCommit, head.getObjectId());
 					setCallable(false);
-					return new MergeResult(srcCommit, headCommit,
-							new ObjectId[] { srcCommit, headCommit },
-							MergeStatus.FAST_FORWARD, mergeStrategy);
+					return new MergeResult(srcCommit, MergeStatus.FAST_FORWARD,
+							mergeStrategy);
 				} else {
 					return new MergeResult(
 							headCommit,
-							null,
-							new ObjectId[] { srcCommit, headCommit },
 							MergeResult.MergeStatus.NOT_SUPPORTED,
 							mergeStrategy,
 							JGitText.get().onlyAlreadyUpToDateAndFastForwardMergesAreAvailable);
@@ -169,15 +164,14 @@ public class MergeCommand extends GitCommand<MergeResult> {
 	}
 
 	private void checkoutNewHead(RevWalk revWalk, RevCommit headCommit,
-			RevCommit newHeadCommit) throws IOException,
-			CheckoutConflictException {
+			RevCommit newHeadCommit) throws IOException, CheckoutConflictException {
 		GitIndex index = repo.getIndex();
 
 		File workDir = repo.getWorkTree();
 		if (workDir != null) {
 			WorkDirCheckout workDirCheckout = new WorkDirCheckout(repo,
-					workDir, repo.mapTree(headCommit.getTree()), index,
-					repo.mapTree(newHeadCommit.getTree()));
+					workDir, headCommit.asCommit(revWalk).getTree(), index,
+					newHeadCommit.asCommit(revWalk).getTree());
 			workDirCheckout.setFailOnConflict(true);
 			try {
 				workDirCheckout.checkout();
@@ -190,8 +184,8 @@ public class MergeCommand extends GitCommand<MergeResult> {
 		}
 	}
 
-	private void updateHead(StringBuilder refLogMessage, ObjectId newHeadId,
-			ObjectId oldHeadID) throws IOException,
+	private void updateHead(StringBuilder refLogMessage,
+			ObjectId newHeadId, ObjectId oldHeadID) throws IOException,
 			ConcurrentRefUpdateException {
 		RefUpdate refUpdate = repo.updateRef(Constants.HEAD);
 		refUpdate.setNewObjectId(newHeadId);
@@ -227,7 +221,8 @@ public class MergeCommand extends GitCommand<MergeResult> {
 
 	/**
 	 * @param commit
-	 *            a reference to a commit which is merged with the current head
+	 *            a reference to a commit which is merged with the current
+	 *            head
 	 * @return {@code this}
 	 */
 	public MergeCommand include(Ref commit) {
@@ -246,8 +241,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 	}
 
 	/**
-	 * @param name
-	 *            a name given to the commit
+	 * @param name a name given to the commit
 	 * @param commit
 	 *            the Id of a commit which is merged with the current head
 	 * @return {@code this}
