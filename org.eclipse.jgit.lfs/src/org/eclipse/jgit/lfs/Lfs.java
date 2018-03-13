@@ -49,11 +49,11 @@ import java.nio.file.Path;
 import org.eclipse.jgit.lfs.lib.LongObjectId;
 
 /**
- * Helper class for dealing with LFS issues
+ * Class which represents the lfs folder hierarchy inside a .git folder
  *
  * @since 4.5
  */
-public class LfsUtil {
+public class Lfs {
 	private Path root;
 
 	private Path objDir;
@@ -64,7 +64,7 @@ public class LfsUtil {
 	 * @param root
 	 *            the path to the LFS media directory. Will be "<repo>/.git/lfs"
 	 */
-	public LfsUtil(Path root) {
+	public Lfs(Path root) {
 		this.root = root;
 	}
 
@@ -81,7 +81,7 @@ public class LfsUtil {
 	 */
 	public Path getLfsTmpDir() {
 		if (tmpDir == null) {
-			tmpDir = root.resolve("tmp");
+			tmpDir = root.resolve("tmp"); //$NON-NLS-1$
 		}
 		return tmpDir;
 	}
@@ -92,7 +92,7 @@ public class LfsUtil {
 	 */
 	public Path getLfsObjDir() {
 		if (objDir == null) {
-			objDir = root.resolve("objects");
+			objDir = root.resolve("objects"); //$NON-NLS-1$
 		}
 		return objDir;
 	}
