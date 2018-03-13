@@ -52,7 +52,12 @@ import org.eclipse.jgit.lib.Config.SectionParser;
  * @since 4.1
  */
 public class SignedPushConfig {
-	static final SectionParser<SignedPushConfig> KEY =
+	/**
+	 * Key for {@link Config#get(SectionParser)}.
+	 *
+	 * @since 4.1
+	 */
+	public static final SectionParser<SignedPushConfig> KEY =
 			new SectionParser<SignedPushConfig>() {
 		public SignedPushConfig parse(Config cfg) {
 			return new SignedPushConfig(cfg);
