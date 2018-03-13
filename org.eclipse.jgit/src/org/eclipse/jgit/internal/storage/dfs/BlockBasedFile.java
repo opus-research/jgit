@@ -53,7 +53,7 @@ import org.eclipse.jgit.errors.PackInvalidException;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
 
 /** Block based file stored in {@link DfsBlockCache}. */
-abstract class BlockBasedFile {
+public abstract class BlockBasedFile {
 	/** Cache that owns this file and its data. */
 	final DfsBlockCache cache;
 
@@ -61,7 +61,7 @@ abstract class BlockBasedFile {
 	final DfsStreamKey key;
 
 	/** Description of the associated pack file's storage. */
-	final DfsPackDescription desc;
+	final DfsPackDescription packDesc;
 	final PackExt ext;
 
 	/**
@@ -84,15 +84,16 @@ abstract class BlockBasedFile {
 	/** True once corruption has been detected that cannot be worked around. */
 	volatile boolean invalid;
 
-	BlockBasedFile(DfsBlockCache cache, DfsPackDescription desc, PackExt ext) {
+	BlockBasedFile(DfsBlockCache cache, DfsStreamKey key,
+			DfsPackDescription packDesc, PackExt ext) {
 		this.cache = cache;
-		this.key = desc.getStreamKey(ext);
-		this.desc = desc;
+		this.key = key;
+		this.packDesc = packDesc;
 		this.ext = ext;
 	}
 
 	String getFileName() {
-		return desc.getFileName(ext);
+		return packDesc.getFileName(ext);
 	}
 
 	boolean invalid() {
@@ -129,10 +130,6 @@ abstract class BlockBasedFile {
 		return size;
 	}
 
-	DfsBlock getOrLoadBlock(long pos, DfsReader ctx) throws IOException {
-		return cache.getOrLoad(this, pos, ctx, null);
-	}
-
 	DfsBlock readOneBlock(long pos, DfsReader ctx,
 			@Nullable ReadableChannel fileChannel) throws IOException {
 		if (invalid)
@@ -141,7 +138,7 @@ abstract class BlockBasedFile {
 		ctx.stats.readBlock++;
 		long start = System.nanoTime();
 		ReadableChannel rc = fileChannel != null ? fileChannel
-				: ctx.db.openFile(desc, ext);
+				: ctx.db.openFile(packDesc, ext);
 		try {
 			int size = blockSize(rc);
 			pos = (pos / size) * size;
