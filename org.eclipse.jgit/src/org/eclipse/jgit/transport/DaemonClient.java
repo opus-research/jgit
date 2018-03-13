@@ -51,9 +51,6 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
 
-import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
-import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
-
 /** Active network client of {@link Daemon}. */
 public class DaemonClient {
 	private final Daemon daemon;
@@ -92,8 +89,8 @@ public class DaemonClient {
 		return rawOut;
 	}
 
-	void execute(final Socket sock) throws IOException,
-			ServiceNotEnabledException, ServiceNotAuthorizedException {
+	void execute(final Socket sock)
+			throws IOException {
 		rawIn = new BufferedInputStream(sock.getInputStream());
 		rawOut = new BufferedOutputStream(sock.getOutputStream());
 

@@ -50,23 +50,19 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.Iterator;
-import java.util.List;
 
 import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.RevWalkException;
 import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.AsyncObjectLoaderQueue;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdOwnerMap;
+import org.eclipse.jgit.lib.ObjectIdSubclassMap;
 import org.eclipse.jgit.lib.ObjectLoader;
-import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.revwalk.filter.RevFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 
@@ -95,8 +91,6 @@ import org.eclipse.jgit.treewalk.filter.TreeFilter;
  * {@link #next()} does not.
  */
 public class RevWalk implements Iterable<RevCommit> {
-	private static final int MB = 1 << 20;
-
 	/**
 	 * Set on objects whose important header data has been loaded.
 	 * <p>
@@ -170,7 +164,7 @@ public class RevWalk implements Iterable<RevCommit> {
 
 	final MutableObjectId idBuffer;
 
-	ObjectIdOwnerMap<RevObject> objects;
+	private final ObjectIdSubclassMap<RevObject> objects;
 
 	private int freeFlags = APP_FLAGS;
 
@@ -178,7 +172,7 @@ public class RevWalk implements Iterable<RevCommit> {
 
 	int carryFlags = UNINTERESTING;
 
-	final ArrayList<RevCommit> roots;
+	private final ArrayList<RevCommit> roots;
 
 	AbstractRevQueue queue;
 
@@ -220,7 +214,7 @@ public class RevWalk implements Iterable<RevCommit> {
 		repository = repo;
 		reader = or;
 		idBuffer = new MutableObjectId();
-		objects = new ObjectIdOwnerMap<RevObject>();
+		objects = new ObjectIdSubclassMap<RevObject>();
 		roots = new ArrayList<RevCommit>();
 		queue = new DateRevQueue();
 		pending = new StartGenerator(this);
@@ -690,18 +684,6 @@ public class RevWalk implements Iterable<RevCommit> {
 	}
 
 	/**
-	 * Locate an object that was previously allocated in this walk.
-	 *
-	 * @param id
-	 *            name of the object.
-	 * @return reference to the object if it has been previously located;
-	 *         otherwise null.
-	 */
-	public RevObject lookupOrNull(AnyObjectId id) {
-		return objects.get(id);
-	}
-
-	/**
 	 * Locate a reference to a commit and immediately parse its content.
 	 * <p>
 	 * Unlike {@link #lookupCommit(AnyObjectId)} this method only returns
@@ -807,142 +789,39 @@ public class RevWalk implements Iterable<RevCommit> {
 	public RevObject parseAny(final AnyObjectId id)
 			throws MissingObjectException, IOException {
 		RevObject r = objects.get(id);
-		if (r == null)
-			r = parseNew(id, reader.open(id));
-		else
+		if (r == null) {
+			final ObjectLoader ldr = reader.open(id);
+			final int type = ldr.getType();
+			switch (type) {
+			case Constants.OBJ_COMMIT: {
+				final RevCommit c = createCommit(id);
+				c.parseCanonical(this, ldr.getCachedBytes());
+				r = c;
+				break;
+			}
+			case Constants.OBJ_TREE: {
+				r = new RevTree(id);
+				r.flags |= PARSED;
+				break;
+			}
+			case Constants.OBJ_BLOB: {
+				r = new RevBlob(id);
+				r.flags |= PARSED;
+				break;
+			}
+			case Constants.OBJ_TAG: {
+				final RevTag t = new RevTag(id);
+				t.parseCanonical(this, ldr.getCachedBytes());
+				r = t;
+				break;
+			}
+			default:
+				throw new IllegalArgumentException(MessageFormat.format(JGitText.get().badObjectType, type));
+			}
+			objects.add(r);
+		} else
 			parseHeaders(r);
 		return r;
-	}
-
-	private RevObject parseNew(AnyObjectId id, ObjectLoader ldr)
-			throws LargeObjectException, CorruptObjectException,
-			MissingObjectException, IOException {
-		RevObject r;
-		int type = ldr.getType();
-		switch (type) {
-		case Constants.OBJ_COMMIT: {
-			final RevCommit c = createCommit(id);
-			c.parseCanonical(this, getCachedBytes(c, ldr));
-			r = c;
-			break;
-		}
-		case Constants.OBJ_TREE: {
-			r = new RevTree(id);
-			r.flags |= PARSED;
-			break;
-		}
-		case Constants.OBJ_BLOB: {
-			r = new RevBlob(id);
-			r.flags |= PARSED;
-			break;
-		}
-		case Constants.OBJ_TAG: {
-			final RevTag t = new RevTag(id);
-			t.parseCanonical(this, getCachedBytes(t, ldr));
-			r = t;
-			break;
-		}
-		default:
-			throw new IllegalArgumentException(MessageFormat.format(JGitText
-					.get().badObjectType, type));
-		}
-		objects.add(r);
-		return r;
-	}
-
-	byte[] getCachedBytes(RevObject obj) throws LargeObjectException,
-			MissingObjectException, IncorrectObjectTypeException, IOException {
-		return getCachedBytes(obj, reader.open(obj, obj.getType()));
-	}
-
-	byte[] getCachedBytes(RevObject obj, ObjectLoader ldr)
-			throws LargeObjectException, MissingObjectException, IOException {
-		try {
-			return ldr.getCachedBytes(5 * MB);
-		} catch (LargeObjectException tooBig) {
-			tooBig.setObjectId(obj);
-			throw tooBig;
-		}
-	}
-
-	/**
-	 * Asynchronous object parsing.
-	 *
-	 * @param <T>
-	 *            any ObjectId type.
-	 * @param objectIds
-	 *            objects to open from the object store. The supplied collection
-	 *            must not be modified until the queue has finished.
-	 * @param reportMissing
-	 *            if true missing objects are reported by calling failure with a
-	 *            MissingObjectException. This may be more expensive for the
-	 *            implementation to guarantee. If false the implementation may
-	 *            choose to report MissingObjectException, or silently skip over
-	 *            the object with no warning.
-	 * @return queue to read the objects from.
-	 */
-	public <T extends ObjectId> AsyncRevObjectQueue parseAny(
-			Iterable<T> objectIds, boolean reportMissing) {
-		List<T> need = new ArrayList<T>();
-		List<RevObject> have = new ArrayList<RevObject>();
-		for (T id : objectIds) {
-			RevObject r = objects.get(id);
-			if (r != null && (r.flags & PARSED) != 0)
-				have.add(r);
-			else
-				need.add(id);
-		}
-
-		final Iterator<RevObject> objItr = have.iterator();
-		if (need.isEmpty()) {
-			return new AsyncRevObjectQueue() {
-				public RevObject next() {
-					return objItr.hasNext() ? objItr.next() : null;
-				}
-
-				public boolean cancel(boolean mayInterruptIfRunning) {
-					return true;
-				}
-
-				public void release() {
-					// In-memory only, no action required.
-				}
-			};
-		}
-
-		final AsyncObjectLoaderQueue<T> lItr = reader.open(need, reportMissing);
-		return new AsyncRevObjectQueue() {
-			public RevObject next() throws MissingObjectException,
-					IncorrectObjectTypeException, IOException {
-				if (objItr.hasNext())
-					return objItr.next();
-				if (!lItr.next())
-					return null;
-
-				ObjectId id = lItr.getObjectId();
-				ObjectLoader ldr = lItr.open();
-				RevObject r = objects.get(id);
-				if (r == null)
-					r = parseNew(id, ldr);
-				else if (r instanceof RevCommit) {
-					byte[] raw = ldr.getCachedBytes();
-					((RevCommit) r).parseCanonical(RevWalk.this, raw);
-				} else if (r instanceof RevTag) {
-					byte[] raw = ldr.getCachedBytes();
-					((RevTag) r).parseCanonical(RevWalk.this, raw);
-				} else
-					r.flags |= PARSED;
-				return r;
-			}
-
-			public boolean cancel(boolean mayInterruptIfRunning) {
-				return lItr.cancel(mayInterruptIfRunning);
-			}
-
-			public void release() {
-				lItr.release();
-			}
-		};
 	}
 
 	/**
@@ -1181,6 +1060,7 @@ public class RevWalk implements Iterable<RevCommit> {
 			}
 		}
 
+		reader.release();
 		roots.clear();
 		queue = new DateRevQueue();
 		pending = new StartGenerator(this);
@@ -1269,26 +1149,6 @@ public class RevWalk implements Iterable<RevCommit> {
 
 	private boolean isNotStarted() {
 		return pending instanceof StartGenerator;
-	}
-
-	/**
-	 * Create and return an {@link ObjectWalk} using the same objects.
-	 * <p>
-	 * Prior to using this method, the caller must reset this RevWalk to clean
-	 * any flags that were used during the last traversal.
-	 * <p>
-	 * The returned ObjectWalk uses the same ObjectReader, internal object pool,
-	 * and free RevFlags. Once the ObjectWalk is created, this RevWalk should
-	 * not be used anymore.
-	 *
-	 * @return a new walk, using the exact same object pool.
-	 */
-	public ObjectWalk toObjectWalkWithSameObjects() {
-		ObjectWalk ow = new ObjectWalk(reader);
-		RevWalk rw = ow;
-		rw.objects = objects;
-		rw.freeFlags = freeFlags;
-		return ow;
 	}
 
 	/**

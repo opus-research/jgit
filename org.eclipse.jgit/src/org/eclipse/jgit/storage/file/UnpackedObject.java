@@ -125,12 +125,8 @@ public class UnpackedObject {
 				if (hdr[p.value++] != 0)
 					throw new CorruptObjectException(id,
 							JGitText.get().corruptObjectGarbageAfterSize);
-				if (path == null && Integer.MAX_VALUE < size) {
-					LargeObjectException.ExceedsByteArrayLimit e;
-					e = new LargeObjectException.ExceedsByteArrayLimit();
-					e.setObjectId(id);
-					throw e;
-				}
+				if (path == null && Integer.MAX_VALUE < size)
+					throw new LargeObjectException(id.copy());
 				if (size < wc.getStreamFileThreshold() || path == null) {
 					byte[] data = new byte[(int) size];
 					int n = avail - p.value;
@@ -167,12 +163,8 @@ public class UnpackedObject {
 							JGitText.get().corruptObjectInvalidType);
 				}
 
-				if (path == null && Integer.MAX_VALUE < size) {
-					LargeObjectException.ExceedsByteArrayLimit e;
-					e = new LargeObjectException.ExceedsByteArrayLimit();
-					e.setObjectId(id);
-					throw e;
-				}
+				if (path == null && Integer.MAX_VALUE < size)
+					throw new LargeObjectException(id.copy());
 				if (size < wc.getStreamFileThreshold() || path == null) {
 					in.reset();
 					IO.skipFully(in, p);
@@ -328,7 +320,6 @@ public class UnpackedObject {
 			if (n < 0)
 				break;
 			avail += n;
-			off += n;
 			cnt -= n;
 		}
 		return avail;

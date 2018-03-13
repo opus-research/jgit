@@ -85,8 +85,6 @@ class StartGenerator extends Generator {
 		final TreeFilter tf = w.getTreeFilter();
 		AbstractRevQueue q = walker.queue;
 
-		w.reader.walkAdviceBeginCommits(w, w.roots);
-
 		if (rf == RevFilter.MERGE_BASE) {
 			// Computing for merge bases is a special case and does not
 			// use the bulk of the generator pipeline.
@@ -132,20 +130,14 @@ class StartGenerator extends Generator {
 		}
 
 		walker.queue = q;
+		g = new PendingGenerator(w, pending, rf, pendingOutputType);
 
-		if (walker instanceof DepthWalk) {
-			DepthWalk dw = (DepthWalk) walker;
-			g = new DepthGenerator(dw, pending);
-		} else {
-			g = new PendingGenerator(w, pending, rf, pendingOutputType);
-
-			if (boundary) {
-				// Because the boundary generator may produce uninteresting
-				// commits we cannot allow the pending generator to dispose
-				// of them early.
-				//
-				((PendingGenerator) g).canDispose = false;
-			}
+		if (boundary) {
+			// Because the boundary generator may produce uninteresting
+			// commits we cannot allow the pending generator to dispose
+			// of them early.
+			//
+			((PendingGenerator) g).canDispose = false;
 		}
 
 		if ((g.outputType() & NEEDS_REWRITE) != 0) {

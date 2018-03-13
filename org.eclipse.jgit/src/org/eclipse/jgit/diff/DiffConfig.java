@@ -43,12 +43,8 @@
 
 package org.eclipse.jgit.diff;
 
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Config.SectionParser;
-import org.eclipse.jgit.util.StringUtils;
 
 /** Keeps track of diff related configuration options. */
 public class DiffConfig {
@@ -59,69 +55,14 @@ public class DiffConfig {
 		}
 	};
 
-	/** Permissible values for {@code diff.renames}. */
-	public static enum RenameDetectionType {
-		/** Rename detection is disabled. */
-		FALSE,
-
-		/** Rename detection is enabled. */
-		TRUE,
-
-		/** Copies should be detected too. */
-		COPY
-	}
-
-	private final boolean noPrefix;
-
-	private final RenameDetectionType renameDetectionType;
-
 	private final int renameLimit;
 
 	private DiffConfig(final Config rc) {
-		noPrefix = rc.getBoolean("diff", "noprefix", false);
-		renameDetectionType = parseRenameDetectionType(rc.getString("diff",
-				null, "renames"));
 		renameLimit = rc.getInt("diff", "renamelimit", 200);
-	}
-
-	/** @return true if the prefix "a/" and "b/" should be suppressed. */
-	public boolean isNoPrefix() {
-		return noPrefix;
-	}
-
-	/** @return true if rename detection is enabled by default. */
-	public boolean isRenameDetectionEnabled() {
-		return renameDetectionType != RenameDetectionType.FALSE;
-	}
-
-	/** @return type of rename detection to perform. */
-	public RenameDetectionType getRenameDetectionType() {
-		return renameDetectionType;
 	}
 
 	/** @return limit on number of paths to perform inexact rename detection. */
 	public int getRenameLimit() {
 		return renameLimit;
-	}
-
-	private static RenameDetectionType parseRenameDetectionType(
-			final String renameString) {
-		if (renameString == null)
-			return RenameDetectionType.FALSE;
-		else if (StringUtils.equalsIgnoreCase("copy", renameString)
-				|| StringUtils.equalsIgnoreCase("copies", renameString))
-			return RenameDetectionType.COPY;
-		else {
-			final Boolean renameBoolean = StringUtils
-					.toBooleanOrNull(renameString);
-			if (renameBoolean == null)
-				throw new IllegalArgumentException(MessageFormat.format(
-						JGitText.get().enumValueNotSupported2, "diff",
-						"renames", renameString));
-			else if (renameBoolean.booleanValue())
-				return RenameDetectionType.TRUE;
-			else
-				return RenameDetectionType.FALSE;
-		}
 	}
 }

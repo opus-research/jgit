@@ -65,19 +65,23 @@ import org.eclipse.jgit.lib.ObjectStream;
  * file are discovered.
  */
 class SimilarityIndex {
-	/** A special {@link TableFullException} used in place of OutOfMemoryError. */
-	private static final TableFullException TABLE_FULL_OUT_OF_MEMORY = new TableFullException();
+	/** The {@link #idHash} table stops growing at {@code 1 << MAX_HASH_BITS}. */
+	private static final int MAX_HASH_BITS = 17;
+
+	/** The {@link #idHash} table will not grow bigger than this, ever. */
+	private static final int MAX_HASH_SIZE = 1 << MAX_HASH_BITS;
+
+	/** Prime just before {@link #MAX_HASH_SIZE}. */
+	private static final int P = 131071;
 
 	/**
 	 * Shift to apply before storing a key.
 	 * <p>
 	 * Within the 64 bit table record space, we leave the highest bit unset so
-	 * all values are positive. The lower 32 bits to count bytes.
+	 * all values are positive, and we need {@link #MAX_HASH_BITS} bits for the
+	 * keys. The lower 32 bits are used to count bytes impacted.
 	 */
-	private static final int KEY_SHIFT = 32;
-
-	/** Maximum value of the count field, also mask to extract the count. */
-	private static final long MAX_COUNT = (1L << KEY_SHIFT) - 1;
+	private static final int KEY_SHIFT = 64 - 1 - MAX_HASH_BITS;
 
 	/** Total size of the file we hashed into the structure. */
 	private long fileSize;
@@ -85,27 +89,19 @@ class SimilarityIndex {
 	/** Number of non-zero entries in {@link #idHash}. */
 	private int idSize;
 
-	/** {@link #idSize} that triggers {@link #idHash} to double in size. */
-	private int idGrowAt;
-
 	/**
 	 * Pairings of content keys and counters.
 	 * <p>
 	 * Slots in the table are actually two ints wedged into a single long. The
-	 * upper 32 bits stores the content key, and the remaining lower bits stores
-	 * the number of bytes associated with that key. Empty slots are denoted by
-	 * 0, which cannot occur because the count cannot be 0. Values can only be
-	 * positive, which we enforce during key addition.
+	 * upper {@link #MAX_HASH_BITS} bits stores the content key, and the
+	 * remaining lower bits stores the number of bytes associated with that key.
+	 * Empty slots are denoted by 0, which cannot occur because the count cannot
+	 * be 0. Values can only be positive, which we enforce during key addition.
 	 */
 	private long[] idHash;
 
-	/** {@code idHash.length == 1 << idHashBits}. */
-	private int idHashBits;
-
 	SimilarityIndex() {
-		idHashBits = 8;
-		idHash = new long[1 << idHashBits];
-		idGrowAt = growAt(idHashBits);
+		idHash = new long[256];
 	}
 
 	long getFileSize() {
@@ -116,8 +112,7 @@ class SimilarityIndex {
 		fileSize = size;
 	}
 
-	void hash(ObjectLoader obj) throws MissingObjectException, IOException,
-			TableFullException {
+	void hash(ObjectLoader obj) throws MissingObjectException, IOException {
 		if (obj.isLarge()) {
 			ObjectStream in = obj.openStream();
 			try {
@@ -133,7 +128,7 @@ class SimilarityIndex {
 		}
 	}
 
-	void hash(byte[] raw, int ptr, final int end) throws TableFullException {
+	void hash(byte[] raw, int ptr, final int end) {
 		while (ptr < end) {
 			int hash = 5381;
 			int start = ptr;
@@ -143,14 +138,13 @@ class SimilarityIndex {
 				int c = raw[ptr++] & 0xff;
 				if (c == '\n')
 					break;
-				hash = (hash << 5) + hash + c;
+				hash = (hash << 5) ^ c;
 			} while (ptr < end && ptr - start < 64);
 			add(hash, ptr - start);
 		}
 	}
 
-	void hash(InputStream in, long remaining) throws IOException,
-			TableFullException {
+	void hash(InputStream in, long remaining) throws IOException {
 		byte[] buf = new byte[4096];
 		int ptr = 0;
 		int cnt = 0;
@@ -172,7 +166,7 @@ class SimilarityIndex {
 				int c = buf[ptr++] & 0xff;
 				if (c == '\n')
 					break;
-				hash = (hash << 5) + hash + c;
+				hash = (hash << 5) ^ c;
 			} while (n < 64 && n < remaining);
 			add(hash, n);
 			remaining -= n;
@@ -199,11 +193,11 @@ class SimilarityIndex {
 		return (int) ((common(dst) * maxScore) / max);
 	}
 
-	long common(SimilarityIndex dst) {
+	int common(SimilarityIndex dst) {
 		return common(this, dst);
 	}
 
-	private static long common(SimilarityIndex src, SimilarityIndex dst) {
+	private static int common(SimilarityIndex src, SimilarityIndex dst) {
 		int srcIdx = src.packedIndex(0);
 		int dstIdx = dst.packedIndex(0);
 		long[] srcHash = src.idHash;
@@ -211,12 +205,12 @@ class SimilarityIndex {
 		return common(srcHash, srcIdx, dstHash, dstIdx);
 	}
 
-	private static long common(long[] srcHash, int srcIdx, //
+	private static int common(long[] srcHash, int srcIdx, //
 			long[] dstHash, int dstIdx) {
 		if (srcIdx == srcHash.length || dstIdx == dstHash.length)
 			return 0;
 
-		long common = 0;
+		int common = 0;
 		int srcKey = keyOf(srcHash[srcIdx]);
 		int dstKey = keyOf(dstHash[dstIdx]);
 
@@ -239,8 +233,8 @@ class SimilarityIndex {
 					break;
 				srcKey = keyOf(srcHash[srcIdx]);
 
-			} else /* if (dstKey < srcKey) */{
-				// Regions of dst which do not appear in src.
+			} else /* if (srcKey > dstKey) */{
+				// Regions of dst which do not appear in dst.
 				if (++dstIdx == dstHash.length)
 					break;
 				dstKey = keyOf(dstHash[dstIdx]);
@@ -277,28 +271,25 @@ class SimilarityIndex {
 		return (idHash.length - idSize) + idx;
 	}
 
-	void add(int key, int cnt) throws TableFullException {
-		key = (key * 0x9e370001) >>> 1; // Mix bits and ensure not negative.
-
+	void add(int key, int cnt) {
+		key = hash(key);
 		int j = slot(key);
 		for (;;) {
 			long v = idHash[j];
 			if (v == 0) {
 				// Empty slot in the table, store here.
-				if (idGrowAt <= idSize) {
+				if (shouldGrow()) {
 					grow();
 					j = slot(key);
 					continue;
 				}
-				idHash[j] = pair(key, cnt);
+				idHash[j] = (((long) key) << KEY_SHIFT) | cnt;
 				idSize++;
 				return;
 
 			} else if (keyOf(v) == key) {
-				// Same key, increment the counter. If it overflows, fail
-				// indexing to prevent the key from being impacted.
-				//
-				idHash[j] = pair(key, countOf(v) + cnt);
+				// Same key, increment the counter.
+				idHash[j] = v + cnt;
 				return;
 
 			} else if (++j >= idHash.length) {
@@ -307,40 +298,28 @@ class SimilarityIndex {
 		}
 	}
 
-	private static long pair(int key, long cnt) throws TableFullException {
-		if (MAX_COUNT < cnt)
-			throw new TableFullException();
-		return (((long) key) << KEY_SHIFT) | cnt;
+	private static int hash(int key) {
+		// Make the key fit into our table. Since we have a maximum size
+		// that we cap the table at, all keys get squashed before going
+		// into the table. This prevents overflow.
+		//
+		return (key >>> 1) % P;
 	}
 
 	private int slot(int key) {
-		// We use 31 - idHashBits because the upper bit was already forced
-		// to be 0 and we want the remaining high bits to be used as the
-		// table slot.
-		//
-		return key >>> (31 - idHashBits);
+		return key % idHash.length;
 	}
 
-	private static int growAt(int idHashBits) {
-		return (1 << idHashBits) * (idHashBits - 3) / idHashBits;
+	private boolean shouldGrow() {
+		int n = idHash.length;
+		return n < MAX_HASH_SIZE && n <= idSize * 2;
 	}
 
-	private void grow() throws TableFullException {
-		if (idHashBits == 30)
-			throw new TableFullException();
-
+	private void grow() {
 		long[] oldHash = idHash;
 		int oldSize = idHash.length;
 
-		idHashBits++;
-		idGrowAt = growAt(idHashBits);
-
-		try {
-			idHash = new long[1 << idHashBits];
-		} catch (OutOfMemoryError noMemory) {
-			throw TABLE_FULL_OUT_OF_MEMORY;
-		}
-
+		idHash = new long[2 * oldSize];
 		for (int i = 0; i < oldSize; i++) {
 			long v = oldHash[i];
 			if (v != 0) {
@@ -357,11 +336,7 @@ class SimilarityIndex {
 		return (int) (v >>> KEY_SHIFT);
 	}
 
-	private static long countOf(long v) {
-		return v & MAX_COUNT;
-	}
-
-	static class TableFullException extends Exception {
-		private static final long serialVersionUID = 1L;
+	private static int countOf(long v) {
+		return (int) v;
 	}
 }

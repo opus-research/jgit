@@ -51,7 +51,6 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.ByteBuffer;
 import java.text.MessageFormat;
 
 import org.eclipse.jgit.JGitText;
@@ -78,47 +77,6 @@ public class IO {
 	}
 
 	/**
-	 * Read at most limit bytes from the local file into memory as a byte array.
-	 *
-	 * @param path
-	 *            location of the file to read.
-	 * @param limit
-	 *            maximum number of bytes to read, if the file is larger than
-	 *            only the first limit number of bytes are returned
-	 * @return complete contents of the requested local file. If the contents
-	 *         exceeds the limit, then only the limit is returned.
-	 * @throws FileNotFoundException
-	 *             the file does not exist.
-	 * @throws IOException
-	 *             the file exists, but its contents cannot be read.
-	 */
-	public static final byte[] readSome(final File path, final int limit)
-			throws FileNotFoundException, IOException {
-		FileInputStream in = new FileInputStream(path);
-		try {
-			byte[] buf = new byte[limit];
-			int cnt = 0;
-			for (;;) {
-				int n = in.read(buf, cnt, buf.length - cnt);
-				if (n <= 0)
-					break;
-				cnt += n;
-			}
-			if (cnt == buf.length)
-				return buf;
-			byte[] res = new byte[cnt];
-			System.arraycopy(buf, 0, res, 0, cnt);
-			return res;
-		} finally {
-			try {
-				in.close();
-			} catch (IOException ignored) {
-				// do nothing
-			}
-		}
-	}
-
-	/**
 	 * Read an entire local file into memory as a byte array.
 	 *
 	 * @param path
@@ -138,8 +96,7 @@ public class IO {
 		try {
 			final long sz = in.getChannel().size();
 			if (sz > max)
-				throw new IOException(MessageFormat.format(
-						JGitText.get().fileIsTooLarge, path));
+				throw new IOException(MessageFormat.format(JGitText.get().fileIsTooLarge, path));
 			final byte[] buf = new byte[(int) sz];
 			IO.readFully(in, buf, 0, buf.length);
 			return buf;
@@ -150,48 +107,6 @@ public class IO {
 				// ignore any close errors, this was a read only stream
 			}
 		}
-	}
-
-	/**
-	 * Read an entire input stream into memory as a ByteBuffer.
-	 *
-	 * Note: The stream is read to its end and is not usable after calling this
-	 * method. The caller is responsible for closing the stream.
-	 *
-	 * @param in
-	 *            input stream to be read.
-	 * @param sizeHint
-	 *            a hint on the approximate number of bytes contained in the
-	 *            stream, used to allocate temporary buffers more efficiently
-	 * @return complete contents of the input stream. The ByteBuffer always has
-	 *         a writable backing array, with {@code position() == 0} and
-	 *         {@code limit()} equal to the actual length read. Callers may rely
-	 *         on obtaining the underlying array for efficient data access. If
-	 *         {@code sizeHint} was too large, the array may be over-allocated,
-	 *         resulting in {@code limit() < array().length}.
-	 * @throws IOException
-	 *             there was an error reading from the stream.
-	 */
-	public static ByteBuffer readWholeStream(InputStream in, int sizeHint)
-			throws IOException {
-		byte[] out = new byte[sizeHint];
-		int pos = 0;
-		while (pos < out.length) {
-			int read = in.read(out, pos, out.length - pos);
-			if (read < 0)
-				return ByteBuffer.wrap(out, 0, pos);
-			pos += read;
-		}
-
-		int last = in.read();
-		if (last < 0)
-			return ByteBuffer.wrap(out, 0, pos);
-
-		TemporaryBuffer.Heap tmp = new TemporaryBuffer.Heap(Integer.MAX_VALUE);
-		tmp.write(out);
-		tmp.write(last);
-		tmp.copy(in);
-		return ByteBuffer.wrap(tmp.toByteArray());
 	}
 
 	/**
