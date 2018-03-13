@@ -242,8 +242,8 @@ public class JGitText extends TranslationBundle {
 	/***/ public String errorListing;
 	/***/ public String errorOccurredDuringUnpackingOnTheRemoteEnd;
 	/***/ public String errorReadingInfoRefs;
+	/***/ public String errorSymlinksNotSupported;
 	/***/ public String exceptionCaughtDuringExecutionOfAddCommand;
-	/***/ public String exceptionCaughtDuringExecutionOfArchiveCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfCherryPickCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfCommitCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfFetchCommand;
@@ -358,6 +358,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String mergeUsingStrategyResultedInDescription;
 	/***/ public String mergeRecursiveReturnedNoCommit;
 	/***/ public String mergeRecursiveTooManyMergeBasesFor;
+	/***/ public String messageAndTaggerNotAllowedInUnannotatedTags;
 	/***/ public String minutesAgo;
 	/***/ public String missingAccesskey;
 	/***/ public String missingConfigurationForKey;

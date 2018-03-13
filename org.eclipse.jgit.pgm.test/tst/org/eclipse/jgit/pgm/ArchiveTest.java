@@ -65,15 +65,11 @@ import java.util.concurrent.Future;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-import org.eclipse.jgit.api.ArchiveCommand;
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.archive.TarFormat;
-import org.eclipse.jgit.archive.ZipFormat;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.lib.CLIRepositoryTestCase;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.pgm.CLIGitCommand;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -86,20 +82,9 @@ public class ArchiveTest extends CLIRepositoryTestCase {
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-
-		ArchiveCommand.registerFormat("tar", new TarFormat());
-		ArchiveCommand.registerFormat("zip", new ZipFormat());
-
 		git = new Git(db);
 		git.commit().setMessage("initial commit").call();
 		emptyTree = db.resolve("HEAD^{tree}").abbreviate(12).name();
-	}
-
-	@Override
-	@After
-	public void tearDown() throws Exception {
-		ArchiveCommand.unregisterFormat("zip");
-		ArchiveCommand.unregisterFormat("tar");
 	}
 
 	@Ignore("Some versions of java.util.zip refuse to write an empty ZIP")
@@ -115,6 +100,13 @@ public class ArchiveTest extends CLIRepositoryTestCase {
 		final byte[] result = CLIGitCommand.rawExecute( //
 				"git archive --format=tar " + emptyTree, db);
 		assertArrayEquals(new String[0], listTarEntries(result));
+	}
+
+	@Test
+	public void testUnrecognizedFormat() throws Exception {
+		final String[] expect = new String[] { "fatal: Unknown archive format 'nonsense'" };
+		final String[] actual = execute("git archive --format=nonsense " + emptyTree);
+		assertArrayEquals(expect, actual);
 	}
 
 	@Test
