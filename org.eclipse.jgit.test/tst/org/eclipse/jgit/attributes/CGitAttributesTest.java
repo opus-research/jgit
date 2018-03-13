@@ -50,6 +50,7 @@ import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -64,9 +65,11 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.NotIgnoredFilter;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FS.ExecutionResult;
+import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.TemporaryBuffer;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -98,8 +101,19 @@ public class CGitAttributesTest extends RepositoryTestCase {
 		}
 	}
 
-	private String toString(TemporaryBuffer b) throws IOException {
-		return RawParseUtils.decode(b.toByteArray());
+	private String toString(TemporaryBuffer b) throws Exception {
+		long length = b.length();
+		int toRead = 10 * 1024;
+		if (length < toRead) {
+			toRead = (int) length;
+		}
+		try (InputStream stream = new BufferedInputStream(
+				b.openInputStream())) {
+			byte[] buffer = new byte[toRead];
+			int read = IO.readFully(stream, buffer, toRead);
+			assertEquals("Read error", toRead, read);
+			return RawParseUtils.decode(buffer);
+		}
 	}
 
 	private Attribute fromString(String key, String value) {
@@ -131,9 +145,7 @@ public class CGitAttributesTest extends RepositoryTestCase {
 				toString(result.getStderr()));
 		assertEquals("External git failed", 0, result.getRc());
 		LinkedHashMap<String, Attributes> map = new LinkedHashMap<>();
-		try (BufferedReader r = new BufferedReader(new InputStreamReader(
-				new BufferedInputStream(result.getStdout().openInputStream()),
-				Constants.CHARSET))) {
+		try (BufferedReader r = new BufferedReader(new InputStreamReader(new BufferedInputStream(result.getStdout().openInputStream()), Constants.CHARSET))) {
 			r.lines().forEach(line -> {
 				// Parse the line and add to result map
 				int start = 0;
@@ -315,6 +327,14 @@ public class CGitAttributesTest extends RepositoryTestCase {
 	@Test
 	public void testDirectoryMatchSubRecursive() throws Exception {
 		createFiles("src/new/foo.txt", "foo/src/new/foo.txt", "sub/src/new");
+		writeTrashFile(".gitattributes", "**/src/new/ bar\n");
+		assertSameAsCGit();
+	}
+
+	@Test
+	@Ignore("Re-enable once bug 520920 is fixed")
+	public void testDirectoryMatchSubRecursiveBacktrack() throws Exception {
+		createFiles("src/new/foo.txt", "src/src/new/foo.txt");
 		writeTrashFile(".gitattributes", "**/src/new/ bar\n");
 		assertSameAsCGit();
 	}

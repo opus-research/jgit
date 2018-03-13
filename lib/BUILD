@@ -115,9 +115,9 @@ java_library(
     testonly = 1,
     visibility = ["//visibility:public"],
     exports = [
-        "@hamcrest_core//jar",
-        "@hamcrest_library//jar",
-        "@junit//jar",
+       "@junit//jar",
+       "@hamcrest_core//jar",
+       "@hamcrest_library//jar",
     ],
 )
 

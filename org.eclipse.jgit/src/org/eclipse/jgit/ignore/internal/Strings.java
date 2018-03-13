@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014, 2017 Andrey Loskutov <loskutov@gmx.de>
+ * Copyright (C) 2014, Andrey Loskutov <loskutov@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available

@@ -182,7 +182,6 @@ public class ObjectToPack extends PackedObjectInfo {
 	}
 
 	/** @return the type of this object. */
-	@Override
 	public final int getType() {
 		return (flags >> TYPE_SHIFT) & 0x7;
 	}
