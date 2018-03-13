@@ -47,9 +47,23 @@ import java.io.IOException;
 
 import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.ReflogEntry;
 
 /** Iterator over references. */
 public abstract class RefCursor implements AutoCloseable {
+	/** {@code true} if deletions should be included in results. */
+	protected boolean includeDeletes;
+
+	/**
+	 * @param deletes
+	 *            if {@code true} deleted references will be returned. If
+	 *            {@code false} (default behavior), deleted references will be
+	 *            skipped, and not returned.
+	 */
+	public void setIncludeDeletes(boolean deletes) {
+		includeDeletes = deletes;
+	}
+
 	/**
 	 * Seek to the first reference, to iterate in order.
 	 *
@@ -74,15 +88,39 @@ public abstract class RefCursor implements AutoCloseable {
 	public abstract void seek(String refName) throws IOException;
 
 	/**
-	 * Check if another reference is available.
+	 * Seek reader to read log records.
 	 *
-	 * @return {@code true} if there is another reference.
+	 * @throws IOException
+	 *             logs cannot be read.
+	 */
+	public abstract void seekToFirstLog() throws IOException;
+
+	/**
+	 * Seek to a timestamp in a reference's log.
+	 *
+	 * @param refName
+	 *            exact name of the reference whose log to read.
+	 * @param time
+	 *            time in seconds since the epoch to scan from. Records at this
+	 *            time and older will be returned.
+	 * @throws IOException
+	 *             logs cannot be read.
+	 */
+	public abstract void seekLog(String refName, int time) throws IOException;
+
+	/**
+	 * Check if another reference or log record is available.
+	 *
+	 * @return {@code true} if there is another result.
 	 * @throws IOException
 	 *             references cannot be read.
 	 */
 	public abstract boolean next() throws IOException;
 
-	/** @return reference at the current position. */
+	/** @return name of the current reference. */
+	public abstract String getRefName();
+
+	/** @return reference at the current position,s if scanning references. */
 	public abstract Ref getRef();
 
 	/** @return {@code true} if the current reference was deleted. */
@@ -90,6 +128,9 @@ public abstract class RefCursor implements AutoCloseable {
 		Ref r = getRef();
 		return r.getStorage() == Ref.Storage.NEW && r.getObjectId() == null;
 	}
+
+	/** @return current log entry, if scanning the log. */
+	public abstract ReflogEntry getReflogEntry();
 
 	/**
 	 * Lookup a reference, or null if not found.

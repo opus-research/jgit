@@ -44,36 +44,42 @@
 package org.eclipse.jgit.internal.storage.reftable;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_HEADER_LEN;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.INDEX_MAGIC;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.RAW_IDLEN;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.isFileHeaderMagic;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.isIndexMagic;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.INDEX_BLOCK_TYPE;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_BLOCK_TYPE;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.REF_BLOCK_TYPE;
+import static org.eclipse.jgit.lib.Constants.OBJECT_ID_LENGTH;
 import static org.eclipse.jgit.lib.Ref.Storage.NEW;
 import static org.eclipse.jgit.lib.Ref.Storage.PACKED;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.zip.DataFormatException;
+import java.util.zip.Inflater;
 
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.lib.CheckoutEntry;
+import org.eclipse.jgit.lib.InflaterCache;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
+import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.ReflogEntry;
 import org.eclipse.jgit.lib.SymbolicRef;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.RawParseUtils;
 
 /** Reads a single block for {@link ReftableReader}. */
 class BlockReader {
-	enum BlockType {
-		REF, INDEX, FILE_FOOTER;
-	}
+	private long blockStartPosition;
+	private long blockEndPosition;
+	private byte blockType;
 
-	private long position;
-	private BlockType blockType;
 	private byte[] buf;
 	private int bufLen;
+	private int ptr;
 
 	private int keysStart;
 	private int keysEnd;
@@ -81,43 +87,81 @@ class BlockReader {
 	private int restartCount;
 
 	private byte[] nameBuf = new byte[256];
-	private int ptr;
+	private int nameLen;
+	private int type;
 
-	long position() {
-		return position;
+	byte type() {
+		return blockType;
 	}
 
-	boolean isRefBlock() {
-		return blockType == BlockType.REF;
+	long blockEndPosition() {
+		return blockEndPosition;
 	}
 
 	boolean next() {
 		return ptr < keysEnd;
 	}
 
-	int readIndexBlock() {
+	void parseEntryName() {
+		int pfx = readVarint32();
+		type = readVarint32();
+		int sfx = type >>> 2;
+		if (pfx + sfx > nameBuf.length) {
+			int n = Math.max(pfx + sfx, nameBuf.length * 2);
+			nameBuf = Arrays.copyOf(nameBuf, n);
+		}
+		System.arraycopy(buf, ptr, nameBuf, pfx, sfx);
+		ptr += sfx;
+		nameLen = pfx + sfx;
+	}
+
+	String name() {
+		int len = nameLen;
+		if (blockType == LOG_BLOCK_TYPE) {
+			len -= 5;
+		}
+		return RawParseUtils.decode(UTF_8, nameBuf, 0, len);
+	}
+
+	boolean checkNameMatches(byte[] match) {
+		int len = nameLen;
+		if (blockType == LOG_BLOCK_TYPE) {
+			len -= 5;
+		}
+		if (len < match.length) {
+			return false;
+		}
+
+		boolean isPrefixMatch = match[match.length - 1] == '/';
+		if (isPrefixMatch) {
+			return compare(match, nameBuf, 0, match.length) == 0;
+		}
+		return len == match.length && compare(match, nameBuf, 0, len) == 0;
+	}
+
+	long readIndex() throws IOException {
+		if (blockType != INDEX_BLOCK_TYPE) {
+			throw invalidBlock();
+		}
+
 		readVarint32(); // skip prefix length
-		int nameLen = readVarint32() >>> 2;
-		ptr += nameLen; // skip name
-		return readVarint32();
+		int n = readVarint32() >>> 2;
+		ptr += n; // skip name
+		return readVarint64();
 	}
 
 	Ref readRef() throws IOException {
-		int pfx = readVarint32();
-		int sfxType = readVarint32();
-		int nameLen = readRefName(pfx, sfxType >>> 2);
 		String name = RawParseUtils.decode(UTF_8, nameBuf, 0, nameLen);
-
-		switch (sfxType & 0x03) {
+		switch (type & 0x03) {
 		case 0x00: // delete
 			return newRef(name);
 
 		case 0x01: // single ObjectId
-			return new ObjectIdRef.PeeledNonTag(PACKED, name, readIdValue());
+			return new ObjectIdRef.PeeledNonTag(PACKED, name, readValueId());
 
 		case 0x02: { // annotated tag, two ObjectIds
-			ObjectId id1 = readIdValue();
-			ObjectId id2 = readIdValue();
+			ObjectId id1 = readValueId();
+			ObjectId id2 = readValueId();
 			return new ObjectIdRef.PeeledTag(PACKED, name, id1, id2);
 		}
 
@@ -129,19 +173,46 @@ class BlockReader {
 		}
 	}
 
-	private int readRefName(int pfx, int len) {
-		if (pfx + len > nameBuf.length) {
-			int newsz = Math.max(pfx + len, nameBuf.length * 2);
-			nameBuf = Arrays.copyOf(nameBuf, newsz);
-		}
-		System.arraycopy(buf, ptr, nameBuf, pfx, len);
-		ptr += len;
-		return pfx + len;
+	ReflogEntry readLog() {
+		int when = 0xffffffff - NB.decodeInt32(nameBuf, nameLen - 4);
+		ObjectId oldId = readValueId();
+		ObjectId newId = readValueId();
+		short tz = readInt16();
+		String name = readValueString();
+		String email = readValueString();
+		String comment = readValueString();
+
+		return new ReflogEntry() {
+			@Override
+			public ObjectId getOldId() {
+				return oldId;
+			}
+
+			@Override
+			public ObjectId getNewId() {
+				return newId;
+			}
+
+			@Override
+			public PersonIdent getWho() {
+				return new PersonIdent(name, email, when * 1000L, tz);
+			}
+
+			@Override
+			public String getComment() {
+				return comment;
+			}
+
+			@Override
+			public CheckoutEntry parseCheckout() {
+				return null;
+			}
+		};
 	}
 
-	private ObjectId readIdValue() {
+	private ObjectId readValueId() {
 		ObjectId id = ObjectId.fromRaw(buf, ptr);
-		ptr += RAW_IDLEN;
+		ptr += OBJECT_ID_LENGTH;
 		return id;
 	}
 
@@ -153,14 +224,21 @@ class BlockReader {
 		return s;
 	}
 
-	private void skipValueString() {
-		ptr += readVarint32();
+	void readFrom(BlockSource src, long pos, int estBlockSize)
+			throws IOException {
+		blockStartPosition = pos;
+		blockEndPosition = pos + estBlockSize;
+		loadBlockIntoBuf(src, estBlockSize);
+		parseBlockStart();
 	}
 
-	void readFrom(BlockSource src, long pos, int blockSize)
+	private void loadBlockIntoBuf(BlockSource src, int size)
 			throws IOException {
-		ByteBuffer b = src.read(pos, blockSize);
+		ByteBuffer b = src.read(blockStartPosition, size);
 		bufLen = b.position();
+		if (bufLen <= 0) {
+			throw invalidBlock();
+		}
 		if (b.hasArray() && b.arrayOffset() == 0) {
 			buf = b.array();
 		} else {
@@ -168,37 +246,90 @@ class BlockReader {
 			b.flip();
 			b.get(buf);
 		}
-		if (bufLen <= 0) {
-			throw invalidBlock();
-		}
-		position = pos;
-		parseBlockStart();
 	}
 
 	private void parseBlockStart() throws IOException {
-		ptr = position == 0 ? FILE_HEADER_LEN : 0;
-
-		keysStart = ptr;
-		if (isIndexMagic(buf, ptr, bufLen)) {
-			blockType = BlockType.INDEX;
-			keysStart += INDEX_MAGIC.length;
-		} else if (ptr == bufLen || isFileHeaderMagic(buf, ptr, bufLen)) {
-			blockType = BlockType.FILE_FOOTER;
-		} else if (buf[ptr] == 0) {
-			blockType = BlockType.REF;
-		} else {
-			throw invalidBlock();
+		ptr = 0;
+		if (blockStartPosition == 0) {
+			if (bufLen == FILE_HEADER_LEN) {
+				setupEmptyFileBlock();
+				return;
+			}
+			ptr += FILE_HEADER_LEN; // first block begins with file header
 		}
 
-		if (blockType == BlockType.REF || blockType == BlockType.INDEX) {
-			keysEnd = NB.decodeInt32(buf, bufLen - 8);
-			restartCount = NB.decodeInt32(buf, bufLen - 4);
-			restartIdx = bufLen - (restartCount * 4 + 8);
+		int typeAndSize = NB.decodeInt32(buf, ptr);
+		ptr += 4;
+
+		blockType = (byte) (typeAndSize >>> 24);
+		int blockLen;
+		if ((blockType & INDEX_BLOCK_TYPE) == INDEX_BLOCK_TYPE) {
+			// Index blocks are allowed to grow up to 31-bit blockSize.
+			blockType = INDEX_BLOCK_TYPE;
+			blockLen = typeAndSize & 0x7fffffff;
+		} else {
+			blockLen = typeAndSize & 0xffffff;
+		}
+		if (blockType == LOG_BLOCK_TYPE) {
+			// Log blocks must be inflated after the header.
+			inflateBuf(blockLen);
+		}
+		if (bufLen < blockLen) {
+			throw invalidBlock();
+		} else if (bufLen > blockLen) {
+			bufLen = blockLen;
+		}
+
+		keysStart = ptr;
+		if (blockType != FILE_BLOCK_TYPE) {
+			restartCount = 1 + NB.decodeUInt16(buf, bufLen - 2);
+			restartIdx = bufLen - (restartCount * 4 + 2);
+			keysEnd = restartIdx;
+		} else {
+			keysEnd = keysStart;
 		}
 	}
 
+	private void inflateBuf(int blockLen) throws IOException {
+		byte[] tmp = new byte[4 + blockLen];
+		System.arraycopy(buf, 0, tmp, 0, 4);
+
+		Inflater inf = InflaterCache.get();
+		try {
+			inf.setInput(buf, ptr, bufLen - ptr);
+			for (int o = 4;;) {
+				int n = inf.inflate(tmp, o, tmp.length - o);
+				o += n;
+				if (inf.finished()) {
+					long blockSize = 4 + inf.getBytesRead();
+					blockEndPosition = blockStartPosition + blockSize;
+					break;
+				} else if (n <= 0) {
+					throw invalidBlock();
+				}
+			}
+		} catch (DataFormatException e) {
+			throw invalidBlock(e);
+		} finally {
+			InflaterCache.release(inf);
+		}
+
+		buf = tmp;
+		bufLen = tmp.length;
+	}
+
+	private void setupEmptyFileBlock() {
+		// An empty reftable has only the file header in first block.
+		blockType = FILE_BLOCK_TYPE;
+		ptr = FILE_HEADER_LEN;
+		restartCount = 0;
+		restartIdx = bufLen;
+		keysStart = bufLen;
+		keysEnd = bufLen;
+	}
+
 	void verifyIndex() throws IOException {
-		if (blockType != BlockType.INDEX) {
+		if (blockType != INDEX_BLOCK_TYPE) {
 			throw invalidBlock();
 		}
 	}
@@ -226,7 +357,7 @@ class BlockReader {
 		}
 	}
 
-	private int seekToKey(byte[] name, int p, int rIdx, int rCmp) {
+	private int seekToKey(byte[] name, int rPtr, int rIdx, int rCmp) {
 		if (rCmp < 0) {
 			if (rIdx == 0) {
 				ptr = keysStart;
@@ -234,53 +365,82 @@ class BlockReader {
 			}
 			ptr = NB.decodeInt32(buf, restartIdx + (rIdx - 1) * 4);
 		} else {
-			ptr = p;
+			ptr = rPtr;
 		}
 
-		for (;;) {
+		int cmp;
+		do {
 			int savePtr = ptr;
-			int pfx = readVarint32();
-			int sfxType = readVarint32();
-			int nameLen = readRefName(pfx, sfxType >>> 2);
-			int cmp = compare(name, nameBuf, 0, nameLen);
+			parseEntryName();
+			cmp = compare(name, nameBuf, 0, nameLen);
 			if (cmp <= 0) {
 				// cmp < 0, name should be in this block, but is not.
 				// cmp = 0, block is positioned at name.
 				ptr = savePtr;
 				return cmp < 0 && savePtr == keysStart ? -1 : 0;
 			}
-			skipValue(sfxType);
-			if (ptr == keysEnd) {
-				return cmp;
-			}
-		}
+			skipValue();
+		} while (ptr < keysEnd);
+		return cmp;
 	}
 
-	private void skipValue(int sfxType) {
-		if (blockType == BlockType.REF) {
-			switch (sfxType & 0x03) {
+	void skipValue() {
+		switch (blockType) {
+		case REF_BLOCK_TYPE:
+			switch (type & 0x03) {
 			case 0x00: // deletion
-				break;
+				return;
 			case 0x01:
-				ptr += RAW_IDLEN;
-				break;
+				ptr += OBJECT_ID_LENGTH;
+				return;
 			case 0x02:
-				ptr += RAW_IDLEN * 2;
-				break;
+				ptr += 2 * OBJECT_ID_LENGTH;
+				return;
 			case 0x03:
-				skipValueString();
-				break;
-			default:
-				throw new IllegalStateException();
+				skipString();
+				return;
 			}
-		} else if (blockType == BlockType.INDEX) {
+			break;
+
+		case INDEX_BLOCK_TYPE:
 			readVarint32();
+			return;
+
+		case LOG_BLOCK_TYPE:
+			ptr += 2 * OBJECT_ID_LENGTH + 2; // 2x id, 2-byte tz
+			skipString(); // name
+			skipString(); // email
+			skipString(); // comment
+			return;
 		}
+
+		throw new IllegalStateException();
+	}
+
+	private void skipString() {
+		int n = readVarint32(); // string length
+		ptr += n;
+	}
+
+	private short readInt16() {
+		return (short) NB.decodeUInt16(buf, ptr += 2);
 	}
 
 	private int readVarint32() {
 		byte c = buf[ptr++];
 		int val = c & 0x7f;
+		while ((c & 0x80) != 0) {
+			c = buf[ptr++];
+			val++;
+			val <<= 7;
+			val |= (c & 0x7f);
+		}
+		return val;
+	}
+
+	private long readVarint64() {
+		byte c = buf[ptr++];
+		long val = c & 0x7f;
 		while ((c & 0x80) != 0) {
 			c = buf[ptr++];
 			val++;
@@ -306,6 +466,10 @@ class BlockReader {
 	}
 
 	private static IOException invalidBlock() {
-		return new IOException(JGitText.get().invalidReftableBlock);
+		return invalidBlock(null);
+	}
+
+	private static IOException invalidBlock(Throwable cause) {
+		return new IOException(JGitText.get().invalidReftableBlock, cause);
 	}
 }
