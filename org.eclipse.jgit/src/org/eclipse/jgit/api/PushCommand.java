@@ -42,9 +42,12 @@
  */
 package org.eclipse.jgit.api;
 
+import java.io.IOException;
 import java.net.URISyntaxException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 import org.eclipse.jgit.JGitText;
@@ -56,19 +59,21 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.FetchResult;
+import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.RefSpec;
+import org.eclipse.jgit.transport.RemoteConfig;
+import org.eclipse.jgit.transport.RemoteRefUpdate;
 import org.eclipse.jgit.transport.Transport;
 
 /**
- * A class used to execute a {@code Fetch} command. It has setters for all
+ * A class used to execute a {@code Push} command. It has setters for all
  * supported options and arguments of this command and a {@link #call()} method
  * to finally execute the command.
  *
- * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-fetch.html"
- *      >Git documentation about Fetch</a>
+ * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-push.html"
+ *      >Git documentation about Push</a>
  */
-public class FetchCommand extends GitCommand<FetchResult> {
+public class PushCommand extends GitCommand<Iterable<PushResult>> {
 
 	private String remote = Constants.DEFAULT_REMOTE_NAME;
 
@@ -76,33 +81,31 @@ public class FetchCommand extends GitCommand<FetchResult> {
 
 	private ProgressMonitor monitor = NullProgressMonitor.INSTANCE;
 
-	private boolean checkFetchedObjects;
-
-	private boolean removeDeletedRefs;
+	private String receivePack = RemoteConfig.DEFAULT_RECEIVE_PACK;
 
 	private boolean dryRun;
 
-	private boolean thin = Transport.DEFAULT_FETCH_THIN;
+	private boolean force;
+
+	private boolean thin = Transport.DEFAULT_PUSH_THIN;
 
 	private int timeout;
-
 
 	/**
 	 * @param repo
 	 */
-	protected FetchCommand(Repository repo) {
+	protected PushCommand(Repository repo) {
 		super(repo);
 		refSpecs = new ArrayList<RefSpec>(3);
 	}
 
 	/**
-	 * Executes the {@code fetch} command with all the options and parameters
+	 * Executes the {@code push} command with all the options and parameters
 	 * collected by the setter methods of this class. Each instance of this
 	 * class should only be used for one invocation of the command (means: one
 	 * call to {@link #call()})
 	 *
-	 * @return a {@link FetchResult} object representing the successful fetch
-	 *         result
+	 * @return an iteration over {@link PushResult} objects
 	 * @throws InvalidRemoteException
 	 *             when called with an invalid remote uri
 	 * @throws JGitInternalException
@@ -110,42 +113,65 @@ public class FetchCommand extends GitCommand<FetchResult> {
 	 *             exception can be retrieved by calling
 	 *             {@link Exception#getCause()}.
 	 */
-	public FetchResult call() throws JGitInternalException,
+	public Iterable<PushResult> call() throws JGitInternalException,
 			InvalidRemoteException {
 		checkCallable();
 
+		ArrayList<PushResult> pushResults = new ArrayList<PushResult>(3);
+
 		try {
-			Transport transport = Transport.open(repo, remote);
-			transport.setCheckFetchedObjects(checkFetchedObjects);
-			transport.setRemoveDeletedRefs(removeDeletedRefs);
-			transport.setTimeout(timeout);
-			transport.setDryRun(dryRun);
-			transport.setFetchThin(thin);
-
-			try {
-				FetchResult result = transport.fetch(monitor, refSpecs);
-				return result;
-
-			} catch (TransportException e) {
-				throw new JGitInternalException(
-						JGitText.get().exceptionCaughtDuringExecutionOfFetchCommand,
-						e);
-			} finally {
-				transport.close();
+			if (force) {
+				final List<RefSpec> orig = new ArrayList<RefSpec>(refSpecs);
+				refSpecs.clear();
+				for (final RefSpec spec : orig)
+					refSpecs.add(spec.setForceUpdate(true));
 			}
+
+			final List<Transport> transports;
+			transports = Transport.openAll(repo, remote, Transport.Operation.PUSH);
+			for (final Transport transport : transports) {
+				if (0 <= timeout)
+					transport.setTimeout(timeout);
+				transport.setPushThin(thin);
+				if (receivePack != null)
+					transport.setOptionReceivePack(receivePack);
+				transport.setDryRun(dryRun);
+
+				final Collection<RemoteRefUpdate> toPush = transport
+						.findRemoteRefUpdatesFor(refSpecs);
+
+				try {
+					PushResult result = transport.push(monitor, toPush);
+					pushResults.add(result);
+
+				} catch (TransportException e) {
+					throw new JGitInternalException(
+							JGitText.get().exceptionCaughtDuringExecutionOfPushCommand,
+							e);
+				} finally {
+					transport.close();
+				}
+			}
+
 		} catch (URISyntaxException e) {
 			throw new InvalidRemoteException(MessageFormat.format(
 					JGitText.get().invalidRemote, remote));
 		} catch (NotSupportedException e) {
 			throw new JGitInternalException(
-					JGitText.get().exceptionCaughtDuringExecutionOfFetchCommand,
+					JGitText.get().exceptionCaughtDuringExecutionOfPushCommand,
+					e);
+		} catch (IOException e) {
+			throw new JGitInternalException(
+					JGitText.get().exceptionCaughtDuringExecutionOfPushCommand,
 					e);
 		}
+
+		return pushResults;
 
 	}
 
 	/**
-	 * The remote (uri or name) used for the fetch operation. If no remote is
+	 * The remote (uri or name) used for the push operation. If no remote is
 	 * set, the default value of <code>Constants.DEFAULT_REMOTE_NAME</code> will
 	 * be used.
 	 *
@@ -153,7 +179,7 @@ public class FetchCommand extends GitCommand<FetchResult> {
 	 * @param remote
 	 * @return {@code this}
 	 */
-	public FetchCommand setRemote(String remote) {
+	public PushCommand setRemote(String remote) {
 		checkCallable();
 		this.remote = remote;
 		return this;
@@ -167,78 +193,62 @@ public class FetchCommand extends GitCommand<FetchResult> {
 	}
 
 	/**
-	 * @param timeout
-	 *            the timeout used for the fetch operation
+	 * The remote executable providing receive-pack service for pack transports.
+	 * If no receive-pack is set, the default value of
+	 * <code>RemoteConfig.DEFAULT_RECEIVE_PACK</code> will be used.
+	 *
+	 * @see RemoteConfig#DEFAULT_RECEIVE_PACK
+	 * @param receivePack
 	 * @return {@code this}
 	 */
-	public FetchCommand setTimeout(int timeout) {
+	public PushCommand setReceivePack(String receivePack) {
+		checkCallable();
+		this.receivePack = receivePack;
+		return this;
+	}
+
+	/**
+	 * @return the receive-pack used for the remote operation
+	 */
+	public String getReceivePack() {
+		return receivePack;
+	}
+
+	/**
+	 * @param timeout
+	 *            the timeout used for the push operation
+	 * @return {@code this}
+	 */
+	public PushCommand setTimeout(int timeout) {
 		checkCallable();
 		this.timeout = timeout;
 		return this;
 	}
 
 	/**
-	 * @return the timeout used for the fetch operation
+	 * @return the timeout used for the push operation
 	 */
 	public int getTimeout() {
 		return timeout;
 	}
 
 	/**
-	 * @return whether to check received objects checked for validity
-	 */
-	public boolean isCheckFetchedObjects() {
-		return checkFetchedObjects;
-	}
-
-	/**
-	 * If set to true, objects received will be checked for validity
-	 *
-	 * @param checkFetchedObjects
-	 * @return {@code this}
-	 */
-	public FetchCommand setCheckFetchedObjects(boolean checkFetchedObjects) {
-		checkCallable();
-		this.checkFetchedObjects = checkFetchedObjects;
-		return this;
-	}
-
-	/**
-	 * @return whether or not to remove refs which no longer exist in the source
-	 */
-	public boolean isRemoveDeletedRefs() {
-		return removeDeletedRefs;
-	}
-
-	/**
-	 * If set to true, refs are removed which no longer exist in the source
-	 *
-	 * @param removeDeletedRefs
-	 * @return {@code this}
-	 */
-	public FetchCommand setRemoveDeletedRefs(boolean removeDeletedRefs) {
-		checkCallable();
-		this.removeDeletedRefs = removeDeletedRefs;
-		return this;
-	}
-
-	/**
-	 * @return the progress monitor for the fetch operation
+	 * @return the progress monitor for the push operation
 	 */
 	public ProgressMonitor getProgressMonitor() {
 		return monitor;
 	}
 
 	/**
-	 * The progress monitor associated with the fetch operation. By default,
-	 * this is set to <code>NullProgressMonitor</code>
+	 * The progress monitor associated with the push operation. By default, this
+	 * is set to <code>NullProgressMonitor</code>
 	 *
 	 * @see NullProgressMonitor
 	 *
 	 * @param monitor
 	 * @return {@code this}
 	 */
-	public FetchCommand setProgressMonitor(ProgressMonitor monitor) {
+	public PushCommand setProgressMonitor(ProgressMonitor monitor) {
 		checkCallable();
 		this.monitor = monitor;
 		return this;
@@ -252,26 +262,25 @@ public class FetchCommand extends GitCommand<FetchResult> {
 	}
 
 	/**
-	 * The ref specs to be used in the fetch operation
+	 * The ref specs to be used in the push operation
 	 *
 	 * @param specs
 	 * @return {@code this}
 	 */
-	public FetchCommand setRefSpecs(RefSpec... specs) {
+	public PushCommand setRefSpecs(RefSpec... specs) {
 		checkCallable();
 		this.refSpecs.clear();
-		for (RefSpec spec : specs)
-			refSpecs.add(spec);
+		Collections.addAll(refSpecs, specs);
 		return this;
 	}
 
 	/**
-	 * The ref specs to be used in the fetch operation
+	 * The ref specs to be used in the push operation
 	 *
 	 * @param specs
 	 * @return {@code this}
 	 */
-	public FetchCommand setRefSpecs(List<RefSpec> specs) {
+	public PushCommand setRefSpecs(List<RefSpec> specs) {
 		checkCallable();
 		this.refSpecs.clear();
 		this.refSpecs.addAll(specs);
@@ -279,42 +288,61 @@ public class FetchCommand extends GitCommand<FetchResult> {
 	}
 
 	/**
-	 * @return the dry run preference for the fetch operation
+	 * @return the dry run preference for the push operation
 	 */
 	public boolean isDryRun() {
 		return dryRun;
 	}
 
 	/**
-	 * Sets whether the fetch operation should be a dry run
+	 * Sets whether the push operation should be a dry run
 	 *
 	 * @param dryRun
 	 * @return {@code this}
 	 */
-	public FetchCommand setDryRun(boolean dryRun) {
+	public PushCommand setDryRun(boolean dryRun) {
 		checkCallable();
 		this.dryRun = dryRun;
 		return this;
 	}
 
 	/**
-	 * @return the thin-pack preference for fetch operation
+	 * @return the thin-pack preference for push operation
 	 */
 	public boolean isThin() {
 		return thin;
 	}
 
 	/**
-	 * Sets the thin-pack preference for fetch operation.
+	 * Sets the thin-pack preference for push operation.
 	 *
-	 * Default setting is Transport.DEFAULT_FETCH_THIN
+	 * Default setting is Transport.DEFAULT_PUSH_THIN
 	 *
 	 * @param thin
 	 * @return {@code this}
 	 */
-	public FetchCommand setThin(boolean thin) {
+	public PushCommand setThin(boolean thin) {
 		checkCallable();
 		this.thin = thin;
+		return this;
+	}
+
+	/**
+	 * @return the force preference for push operation
+	 */
+	public boolean isForce() {
+		return force;
+	}
+
+	/**
+	 * Sets the force preference for push operation.
+	 *
+	 * @param force
+	 * @return {@code this}
+	 */
+	public PushCommand setForce(boolean force) {
+		checkCallable();
+		this.force = force;
 		return this;
 	}
 

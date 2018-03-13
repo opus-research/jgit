@@ -78,6 +78,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String atLeastOnePathIsRequired;
 	/***/ public String atLeastOnePatternIsRequired;
 	/***/ public String atLeastTwoFiltersNeeded;
+	/***/ public String authenticationNotSupported;
 	/***/ public String badBase64InputCharacterAt;
 	/***/ public String badEntryDelimiter;
 	/***/ public String badEntryName;
@@ -115,6 +116,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotMovePackTo;
 	/***/ public String cannotOpenService;
 	/***/ public String cannotParseGitURIish;
+	/***/ public String cannotPullOnARepoWithState;
 	/***/ public String cannotRead;
 	/***/ public String cannotReadBlob;
 	/***/ public String cannotReadCommit;
@@ -180,6 +182,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String daemonAlreadyRunning;
 	/***/ public String deletingNotSupported;
 	/***/ public String destinationIsNotAWildcard;
+	/***/ public String detachedHeadDetected;
 	/***/ public String dirCacheDoesNotHaveABackingFile;
 	/***/ public String dirCacheFileIsNotLocked;
 	/***/ public String dirCacheIsNotLocked;
@@ -211,6 +214,8 @@ public class JGitText extends TranslationBundle {
 	/***/ public String exceptionCaughtDuringExecutionOfCommitCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfFetchCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfMergeCommand;
+	/***/ public String exceptionCaughtDuringExecutionOfPushCommand;
+	/***/ public String exceptionCaughtDuringExecutionOfPullCommand;
 	/***/ public String exceptionCaughtDuringExecutionOfTagCommand;
 	/***/ public String exceptionOccuredDuringAddingOfOptionToALogCommand;
 	/***/ public String exceptionOccuredDuringReadingOfGIT_DIR;
@@ -299,6 +304,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String mergeStrategyDoesNotSupportHeads;
 	/***/ public String mergeUsingStrategyResultedInDescription;
 	/***/ public String missingAccesskey;
+	/***/ public String missingConfigurationForKey;
 	/***/ public String missingDeltaBase;
 	/***/ public String missingForwardImageInGITBinaryPatch;
 	/***/ public String missingObject;
@@ -325,6 +331,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String notAPACKFile;
 	/***/ public String notARef;
 	/***/ public String notASCIIString;
+	/***/ public String notAuthorized;
 	/***/ public String notAValidPack;
 	/***/ public String notFound;
 	/***/ public String notValid;
@@ -341,6 +348,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String onlyOneOperationCallPerConnectionIsSupported;
 	/***/ public String openFilesMustBeAtLeast1;
 	/***/ public String openingConnection;
+	/***/ public String operationCanceled;
 	/***/ public String outputHasAlreadyBeenStarted;
 	/***/ public String packChecksumMismatch;
 	/***/ public String packCorruptedWhileWritingToFilesystem;
@@ -361,6 +369,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String problemWithResolvingPushRefSpecsLocally;
 	/***/ public String progressMonUploading;
 	/***/ public String propertyIsAlreadyNonNull;
+	/***/ public String pullTaskName;
 	/***/ public String pushCancelled;
 	/***/ public String pushIsNotSupportedForBundleTransport;
 	/***/ public String pushNotPermitted;
@@ -395,8 +404,9 @@ public class JGitText extends TranslationBundle {
 	/***/ public String repositoryState_rebaseWithMerge;
 	/***/ public String requiredHashFunctionNotAvailable;
 	/***/ public String resolvingDeltas;
+	/***/ public String resultLengthIncorrect;
 	/***/ public String searchForReuse;
-	/***/ public String sequenceTooLargeForDiffAlgorithm;	
+	/***/ public String sequenceTooLargeForDiffAlgorithm;
 	/***/ public String serviceNotPermitted;
 	/***/ public String shortCompressedStreamAt;
 	/***/ public String shortReadOfBlock;
@@ -460,6 +470,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unsupportedPackIndexVersion;
 	/***/ public String unsupportedPackVersion;
 	/***/ public String updatingRefFailed;
+	/***/ public String uriNotFound;
 	/***/ public String userConfigFileInvalid;
 	/***/ public String walkFailure;
 	/***/ public String windowSizeMustBeLesserThanLimit;
