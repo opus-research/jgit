@@ -142,28 +142,32 @@ public class GitDateParser {
 	 * @throws ParseException
 	 *             if the given dateStr was not recognized
 	 */
+	@SuppressWarnings("null")
 	public static Date parse(String dateStr, Calendar now)
 			throws ParseException {
 		dateStr = dateStr.trim();
 		Date ret;
+		StringBuilder allFormats = null;
 		ret = parse_relative(dateStr, now);
 		if (ret != null)
 			return ret;
 		for (ParseableSimpleDateFormat f : ParseableSimpleDateFormat.values()) {
 			try {
-				return parse_simple(dateStr, f);
+				ret = parse_simple(dateStr, f);
+				if (ret != null)
+					return ret;
 			} catch (ParseException e) {
-				// simply proceed with the next parser
+				if (allFormats == null)
+					allFormats = new StringBuilder(f.formatStr);
+				else {
+					allFormats.append(", ");
+					allFormats.append(f.formatStr);
+				}
 			}
 		}
-		ParseableSimpleDateFormat[] values = ParseableSimpleDateFormat.values();
-		StringBuilder allFormats = new StringBuilder("\"")
-				.append(values[0].formatStr);
-		for (int i = 1; i < values.length; i++)
-			allFormats.append("\", \"").append(values[i].formatStr);
-		allFormats.append("\"");
-		throw new ParseException(MessageFormat.format(
-				JGitText.get().cannotParseDate, dateStr, allFormats.toString()), 0);
+		throw new ParseException(
+				MessageFormat.format(JGitText.get().cannotParseDate, dateStr,
+						allFormats.toString()), 0);
 	}
 
 	// tries to parse a string with the formats supported by SimpleDateFormat
