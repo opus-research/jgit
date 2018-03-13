@@ -640,13 +640,15 @@ public abstract class FS {
 	 * @param hook
 	 *            The particular hook we wish to execute.
 	 * @param args
-	 *            Arguments to pass to this hook.
+	 *            Arguments to pass to this hook. Cannot be <code>null</code>,
+	 *            but can be an empty array.
 	 * @return The exit value of the hook. Defaults to <code>0</code> if the
 	 *         hook has no exit value, does not exist or cannot be run on this
 	 *         {@link FS}.
 	 * @throws JGitInternalException
 	 *             if we fail to run the hook somehow. Causes may include an
 	 *             interrupted process or I/O errors.
+	 * @since 3.6
 	 */
 	public int runIfPresent(Repository repository, final Hook hook,
 			String[] args) throws JGitInternalException {
@@ -663,7 +665,8 @@ public abstract class FS {
 	 * @param hook
 	 *            The particular hook we wish to execute.
 	 * @param args
-	 *            Arguments to pass to this hook.
+	 *            Arguments to pass to this hook. Cannot be <code>null</code>,
+	 *            but can be an empty array.
 	 * @param outRedirect
 	 *            A print stream on which to redirect the hook's stdout. Can be
 	 *            <code>null</code>, in which case the hook's standard output
@@ -681,6 +684,7 @@ public abstract class FS {
 	 * @throws JGitInternalException
 	 *             if we fail to run the hook somehow. Causes may include an
 	 *             interrupted process or I/O errors.
+	 * @since 3.6
 	 */
 	public int runIfPresent(Repository repository, final Hook hook,
 			String[] args, PrintStream outRedirect, PrintStream errRedirect,
@@ -697,6 +701,7 @@ public abstract class FS {
 	 *            The hook we're trying to find.
 	 * @return The {@link File} containing this particular hook if it exists in
 	 *         the given repository, <code>null</code> otherwise.
+	 * @since 3.6
 	 */
 	public File tryFindHook(Repository repository, final Hook hook) {
 		final File gitDir = repository.getDirectory();
@@ -706,7 +711,7 @@ public abstract class FS {
 						&& pathname.getName().equals("hooks"); //$NON-NLS-1$
 			}
 		});
-		if (hookDirCandidates.length < 1)
+		if (hookDirCandidates == null || hookDirCandidates.length < 1)
 			return null;
 
 		final File[] matchingHooks = hookDirCandidates[0]
@@ -716,7 +721,7 @@ public abstract class FS {
 								&& pathname.getName().equals(hook.getName());
 					}
 				});
-		if (matchingHooks.length < 1)
+		if (matchingHooks == null || matchingHooks.length < 1)
 			return null;
 		return matchingHooks[0];
 	}
@@ -744,6 +749,7 @@ public abstract class FS {
 	 * @throws InterruptedException
 	 *             if the current thread is interrupted while waiting for the
 	 *             process to end.
+	 * @since 3.6
 	 */
 	protected int runHook(ProcessBuilder hookProcessBuilder, OutputStream outRedirect, OutputStream errRedirect, String stdinArgs) throws IOException, InterruptedException {
 		final ExecutorService executor = Executors.newFixedThreadPool(2);

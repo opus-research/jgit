@@ -128,6 +128,9 @@ public abstract class FS_POSIX extends FS {
 		return proc;
 	}
 
+	/**
+	 * @since 3.6
+	 */
 	@Override
 	public int runIfPresent(Repository repository, Hook hook, String[] args,
 			PrintStream outRedirect, PrintStream errRedirect, String stdinArgs)
