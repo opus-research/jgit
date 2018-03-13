@@ -156,7 +156,7 @@ public class ObjectDirectory extends ObjectDatabase {
 
 	/**
 	 * Add a single existing pack to the list of available pack files.
-	 * 
+	 *
 	 * @param pack
 	 *            path of the pack file to open.
 	 * @param idx
