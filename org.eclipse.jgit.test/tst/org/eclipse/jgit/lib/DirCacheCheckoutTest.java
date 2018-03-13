@@ -62,6 +62,7 @@ import org.eclipse.jgit.api.MergeResult.MergeStatus;
 import org.eclipse.jgit.api.ResetCommand.ResetType;
 import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
@@ -261,10 +262,11 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 
 		merge = buildTree(mkmap("foo", "a"));
 		tw = TreeWalk.forPath(db, "foo", merge);
+		ObjectId anotherId = tw.getObjectId(0);
 
 		prescanTwoTrees(head, merge);
 
-		assertConflict("foo");
+		assertEquals(anotherId, getUpdated().get("foo"));
 	}
 
 	void setupCase(HashMap<String, String> headEntries, HashMap<String, String> mergeEntries, HashMap<String, String> indexEntries) throws IOException {
@@ -463,8 +465,8 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 	 *     ------------------------------------------------------------------
 	 *1    D        D       F       Y         N       Y       N           Update
 	 *2    D        D       F       N         N       Y       N           Conflict
-	 *3    D        F       D                 Y       N       N           Keep
-	 *4    D        F       D                 N       N       N           Conflict
+	 *3    D        F       D                 Y       N       N           Update
+	 *4    D        F       D                 N       N       N           Update
 	 *5    D        F       F       Y         N       N       Y           Keep
 	 *6    D        F       F       N         N       N       Y           Keep
 	 *7    F        D       F       Y         Y       N       N           Update
@@ -521,16 +523,18 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 
 	@Test
 	public void testDirectoryFileConflicts_3() throws Exception {
-		// 3
+		// 3 - the first to break!
 		doit(mk("DF/DF"), mk("DF/DF"), mk("DF"));
-		assertNoConflicts();
+		assertUpdated("DF/DF");
+		assertRemoved("DF");
 	}
 
 	@Test
 	public void testDirectoryFileConflicts_4() throws Exception {
 		// 4 (basically same as 3, just with H and M different)
 		doit(mk("DF/DF"), mkmap("DF/DF", "foo"), mk("DF"));
-		assertConflict("DF/DF");
+		assertUpdated("DF/DF");
+		assertRemoved("DF");
 
 	}
 
@@ -935,7 +939,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		} catch (CheckoutConflictException e) {
 			assertIndex(mk("foo"));
 			assertWorkDir(mkmap("foo", "different"));
-			assertEquals(Arrays.asList("foo"), getConflicts());
+			assertTrue(getConflicts().equals(Arrays.asList("foo")));
 			assertTrue(new File(trash, "foo").isFile());
 		}
 	}
@@ -1011,7 +1015,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		try {
 			checkout.call();
 			fail("Checkout exception not thrown");
-		} catch (org.eclipse.jgit.api.errors.CheckoutConflictException e) {
+		} catch (JGitInternalException e) {
 			CheckoutResult result = checkout.getResult();
 			assertNotNull(result);
 			assertNotNull(result.getConflictList());

@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static java.lang.Integer.valueOf;
-import static java.lang.Long.valueOf;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_DATA;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_ERROR;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_PROGRESS;
@@ -59,7 +57,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.junit.Before;
 import org.junit.Test;
@@ -238,9 +236,7 @@ public class SideBandOutputStreamTest {
 			new SideBandOutputStream(CH_DATA, Integer.MAX_VALUE, rawOut);
 			fail("Accepted " + Integer.MAX_VALUE + " for buffer size");
 		} catch (IllegalArgumentException e) {
-			assertEquals(MessageFormat.format(
-					JGitText.get().packetSizeMustBeAtMost,
-					valueOf(Integer.MAX_VALUE), valueOf(65520)), e.getMessage());
+			assertEquals(MessageFormat.format(JGitText.get().packetSizeMustBeAtMost, Integer.MAX_VALUE, 65520), e.getMessage());
 		}
 	}
 

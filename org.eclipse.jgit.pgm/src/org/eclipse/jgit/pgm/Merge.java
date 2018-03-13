@@ -72,7 +72,7 @@ class Merge extends TextBuiltin {
 			mergeStrategy = MergeStrategy.get(strategyName);
 			if (mergeStrategy == null)
 				throw die(MessageFormat.format(
-						CLIText.get().unknownMergeStrategy, strategyName));
+						CLIText.get().unknownMergeStratey, strategyName));
 		}
 
 		// determine the other revision we want to merge with HEAD
@@ -87,16 +87,14 @@ class Merge extends TextBuiltin {
 
 		switch (result.getMergeStatus()) {
 		case ALREADY_UP_TO_DATE:
-			out.println(CLIText.get().alreadyUpToDate);
-			break;
 		case FAST_FORWARD:
-			outw.println(result.getMergeStatus().toString());
+			out.println(result.getMergeStatus().toString());
 			break;
 		case CONFLICTING:
 			for (String collidingPath : result.getConflicts().keySet())
-				outw.println(MessageFormat.format(CLIText.get().mergeConflict,
+				out.println(MessageFormat.format(CLIText.get().mergeConflict,
 						collidingPath));
-			outw.println(CLIText.get().mergeFailed);
+			out.println(CLIText.get().mergeFailed);
 			break;
 		case FAILED:
 			for (Map.Entry<String, MergeFailureReason> entry : result
@@ -104,21 +102,21 @@ class Merge extends TextBuiltin {
 				switch (entry.getValue()) {
 				case DIRTY_WORKTREE:
 				case DIRTY_INDEX:
-					outw.println(CLIText.get().dontOverwriteLocalChanges);
-					outw.println("        " + entry.getKey());
+					out.println(CLIText.get().dontOverwriteLocalChanges);
+					out.println("        " + entry.getKey());
 					break;
 				case COULD_NOT_DELETE:
-					outw.println(CLIText.get().cannotDeleteFile);
-					outw.println("        " + entry.getKey());
+					out.println(CLIText.get().cannotDeleteFile);
+					out.println("        " + entry.getKey());
 					break;
 				}
 			break;
 		case MERGED:
-			outw.println(MessageFormat.format(CLIText.get().mergeMadeBy,
+			out.println(MessageFormat.format(CLIText.get().mergeMadeBy,
 					mergeStrategy.getName()));
 			break;
 		case NOT_SUPPORTED:
-			outw.println(MessageFormat.format(
+			out.println(MessageFormat.format(
 					CLIText.get().unsupportedOperation, result.toString()));
 		}
 	}

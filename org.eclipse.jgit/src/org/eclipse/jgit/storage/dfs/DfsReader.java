@@ -65,10 +65,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.AsyncObjectLoaderQueue;
@@ -90,13 +90,7 @@ import org.eclipse.jgit.storage.pack.PackOutputStream;
 import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.util.BlockList;
 
-/**
- * Reader to access repository content through.
- * <p>
- * See the base {@link ObjectReader} documentation for details. Notably, a
- * reader is not thread safe.
- */
-public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
+final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 	/** Temporary buffer large enough for at least one raw object id. */
 	final byte[] tempId = new byte[OBJECT_ID_LENGTH];
 
@@ -547,6 +541,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		}
 	}
 
+	@SuppressWarnings("unchecked")
 	public Collection<CachedPack> getCachedPacks() throws IOException {
 		DfsPackFile[] packList = db.getPacks();
 		List<CachedPack> cached = new ArrayList<CachedPack>(packList.length);

@@ -44,17 +44,19 @@
 
 package org.eclipse.jgit.storage.file;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Arrays;
+
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.AnyObjectId;
@@ -197,7 +199,7 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 		assertNotNull(data2);
 		assertNotNull(data1);
 		assertNotSame(data1, data2); // cache should be per-pack, not per object
-		assertArrayEquals(data1, data2);
+		assertTrue(Arrays.equals(data1, data2));
 		assertEquals(load2.getType(), load1.getType());
 	}
 
