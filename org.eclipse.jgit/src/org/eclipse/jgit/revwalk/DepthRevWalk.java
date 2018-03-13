@@ -60,10 +60,13 @@ import org.eclipse.jgit.lib.Repository;
  * Walks a commit graph down a certain number of commits and no further.
  */
 public class DepthRevWalk extends RevWalk {
-	/** The number of commits to walk down */
-	private int depth;
-
-	/** A flag for commits whose parents are too deep to include */
+	/**
+	 * The number of commits to walk down
+	 */
+        private int depth;
+	/**
+	 * A flag for commits whose parents are too deep to include
+	 */
 	final RevFlag SHALLOW;
 
 	/**
@@ -75,35 +78,38 @@ public class DepthRevWalk extends RevWalk {
 	 *            released by the caller.
 	 * @param depth
 	 *            how many commits to walk down
+	 * @param shallow
+	 *            the shallow flag to use; one will be created if it's null
 	 */
-	public DepthRevWalk(final Repository repo, int depth) {
+	public DepthRevWalk(final Repository repo, int depth, final RevFlag shallow) {
 		super(repo);
 
 		this.depth = depth;
-		this.SHALLOW = newFlag("SHALLOW");
+		SHALLOW = shallow == null? newFlag("SHALLOW") : shallow;
 	}
 
 	/**
 	 * Create a new depth revision walker for a given repository.
 	 *
 	 * @param or
-	 *            the reader the walker will obtain data from. The reader
-	 *            should be released by the caller when the walker is no
-	 *            longer required.
+	 *            the reader the walker will obtain data from. The reader should
+	 *            be released by the caller when the walker is no longer
+	 *            required.
 	 * @param depth
 	 *            how many commits to walk down
+	 * @param shallow
+	 *            the shallow flag to use; one will be created if it's null
 	 */
-	public DepthRevWalk(ObjectReader or, int depth) {
+	public DepthRevWalk(ObjectReader or, int depth, final RevFlag shallow) {
 		super(or);
 
 		this.depth = depth;
-		this.SHALLOW = newFlag("SHALLOW");
+		SHALLOW = shallow == null? newFlag("SHALLOW") : shallow;
 	}
 
 	@Override
 	public void markUninteresting(final RevCommit c)
-			throws MissingObjectException,
-			IncorrectObjectTypeException,
+			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
 		// This walk is just going down a desired depth and skip nothing
 	}
@@ -113,20 +119,21 @@ public class DepthRevWalk extends RevWalk {
 		return new DepthCommit(id);
 	}
 
-	/** Get the commit history depth this walk goes to */
 	public int getDepth() {
 		return depth;
 	}
 
 	// For unit testing
-	void setDepth(int depth) {
+	public void setDepth(int depth) {
 		this.depth = depth;
 	}
 
 	@Override
 	public ObjectWalk toObjectWalkWithSameObjects() {
-		DepthObjectWalk dow = new DepthObjectWalk(reader, depth,
-				SHALLOW, null);
-		return super.toObjectWalkWithSameObjects(dow);
+		DepthObjectWalk dow = new DepthObjectWalk(reader, depth, SHALLOW, null);
+		RevWalk rw = dow;
+		rw.objects = objects;
+		rw.freeFlags = freeFlags;
+		return dow;
 	}
 }

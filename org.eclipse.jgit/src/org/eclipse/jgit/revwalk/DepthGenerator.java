@@ -50,21 +50,21 @@ import java.io.IOException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 
-import static org.eclipse.jgit.revwalk.RevWalk.UNINTERESTING;
-
 /**
  * Only produce commits which are below a specified depth. Also find boundary
  * points where ancestry becomes uninteresting.
  */
 class DepthGenerator extends Generator {
+	final static int UNINTERESTING = RevWalk.UNINTERESTING;
+
 	private final FIFORevQueue pending;
 	private final int depth;
 	// Should be a DepthRevWalk or a DepthObjectWalk
 	private final RevWalk walk;
-
-	/** A flag for commits whose parents are too deep to include */
+	/**
+	 * A flag for commits whose parents are too deep to include
+	 */
 	final RevFlag SHALLOW;
-
 	/**
 	 * A flag for uninteresting commits that are direct parents of
 	 * interesting commits
@@ -73,22 +73,21 @@ class DepthGenerator extends Generator {
 
 	/**
 	 * @param w
-	 *                The walk that's using this generator
+	 *		The walk that's using this generator
 	 * @param d
-	 *                The maximum commit depth to generate
+			The maximum commit depth to generate
 	 * @param shallow
-	 *                The flag that denotes maximum depth
+			The flag that denotes maximum depth
 	 * @param boundary
-	 *                The flag that denotes the edge of an uninteresting area
+			The flag that denotes the edge of an uninteresting area
 	 * @param s
-	 *                A queue of commits to begin with whose depth will be 0
+	 *		A queue of commits to begin with whose depth will be 0
 	 * @throws MissingObjectException
 	 * @throws IncorrectObjectTypeException
 	 * @throws IOException
 	 */
-	DepthGenerator(RevWalk w, int d, final RevFlag shallow,
-			final RevFlag boundary, final DateRevQueue s)
-			throws MissingObjectException,
+	DepthGenerator(RevWalk w, int d, final RevFlag shallow, final RevFlag boundary,
+			final DateRevQueue s) throws MissingObjectException,
 			IncorrectObjectTypeException, IOException {
 		pending = new FIFORevQueue();
 		walk = w;
@@ -158,13 +157,12 @@ class DepthGenerator extends Generator {
 					add = true;
 				}
 
-				// Detect boundaries and flag appropriately. Queue
+				// Detect boundaries and flag appropriate. Queue
 				// them for output, in case a shorter path where
 				// they aren't boundaries reached them already.
 				if ((c.flags & UNINTERESTING) == 0
 						&& ((p.flags & UNINTERESTING) != 0)
-						&& (BOUNDARY != null)
-						&& !p.has(BOUNDARY)) {
+						&& (!p.has(BOUNDARY))) {
 					p.add(BOUNDARY);
 					add = true;
 				}

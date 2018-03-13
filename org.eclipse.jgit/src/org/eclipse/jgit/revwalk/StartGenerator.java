@@ -134,13 +134,15 @@ class StartGenerator extends Generator {
 				depth = ((DepthRevWalk)w).getDepth();
 				SHALLOW = ((DepthRevWalk)w).SHALLOW;
 				BOUNDARY = null;
-			} else {
+			}
+			else {
 				depth = ((DepthObjectWalk)w).getDepth();
 				SHALLOW = ((DepthObjectWalk)w).SHALLOW;
 				BOUNDARY = ((DepthObjectWalk)w).BOUNDARY;
 			}
 			g = new DepthGenerator(w, depth, SHALLOW, BOUNDARY, pending);
-		} else {
+		}
+		else {
 			if (tf != TreeFilter.ALL) {
 				rf = AndRevFilter.create(rf, new RewriteTreeFilter(w, tf));
 				pendingOutputType |= HAS_REWRITE | NEEDS_REWRITE;

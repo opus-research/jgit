@@ -91,18 +91,14 @@ public class ObjectWalk extends RevWalk {
 
 	private List<RevObject> rootObjects;
 
-	private BlockObjQueue pendingObjects;
+	protected BlockObjQueue pendingObjects;
 
-	/** The tree currently being walked */
 	protected RevTree currentTree;
 
-	/** The last object that's been produced */
 	protected RevObject last;
 
-	/** The first commit that's been produced */
 	protected RevCommit firstCommit;
 
-	/** The last commit that's been produced */
 	protected RevCommit lastCommit;
 
 	/**

@@ -49,17 +49,17 @@ import org.eclipse.jgit.lib.AnyObjectId;
  * Wrapper object for RevCommit which adds a depth tag.
  */
 public class DepthCommit extends RevCommit {
-	/** Depth of this commit in the graph */
-	int depth;
 
-	/**
-	 * Create a new depth-aware commit reference
-	 *
-	 * @param id
-	 *             object name for this new commit
-	 */
-	protected DepthCommit(AnyObjectId id) {
-		super(id);
-		depth = -1;
-	}
+    /**
+     * Depth of this commit in the graph
+     */
+    int depth;
+
+    /**
+     * @param id
+     */
+    protected DepthCommit(AnyObjectId id) {
+        super(id);
+        depth = -1;
+    }
 }
