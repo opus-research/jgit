@@ -173,10 +173,10 @@ the next file's `min_update_index`.
 
 The first ref block shares the same block as the file header, and is
 24 bytes smaller than all other blocks in the file.  The first block
-immediately begins after the file header, at offset 24.
+immediately begins after the file header, at position 24.
 
 If the first block is a log block (a log-only file), its block header
-begins immediately at offset 24.
+begins immediately at position 24.
 
 ### Ref block format
 
@@ -184,9 +184,9 @@ A ref block is written as:
 
     'r'
     uint24( block_len )
-    ref_record+
-    uint24( restart_offset )+
     uint16( restart_count )
+    uint24( restart_offset )+
+    ref_record+
     padding?
 
 Blocks begin with `block_type = 'r'` and a 3-byte `block_len` which
@@ -195,29 +195,23 @@ optional `padding`.  This is almost always shorter than the file's
 `block_size`.  In the first ref block, `block_len` includes 24 bytes
 for the file header.
 
-The 4-byte block header is followed by a variable number of
-`ref_record`, describing reference names and values.  The format
-is described below.
+The 2-byte `restart_count` stores the number of entries in the
+`restart_offset` list, which must not be empty.  Readers can use
+`restart_count` to binary search between restarts before starting a
+linear scan.
 
-A variable number of 3-byte `restart_offset` values follow the
-records.  Offsets are relative to the start of the block and refer to
-the first byte of any `ref_record` whose name has not been prefix
-compressed.  Entries in the `restart_offset` list must be sorted,
-ascending.  Readers can start linear scans from any of these records.
+A variable number of 3-byte `restart_offset` follows.  Offsets are
+relative to the start of the block and refer to the first byte of any
+`ref_record` whose name has not been prefix compressed.  Entries in
+the `restart_offset` list must be sorted, ascending.  Readers can
+start linear scans from any of these records.
+
+A variable number of `ref_record` fill the remainder of the block,
+describing reference names and values.  The format is described below.
 
 As the first ref block shares the first file block with the file
-header, offsets in the first block are relative to the start of the
-file (position 0), and include the file header.  This requires the
-first restart in the first block to be at offset 24.  Restarts in
-subsequent ref blocks are relative to the start of the ref block.
-
-The 2-byte `restart_count` stores the number of entries in the
-`restart_offset` list, which must not be empty.
-
-Readers can use the restart count to binary search between restarts
-before starting a linear scan.  The `restart_count` field must be
-the last 2 bytes of the block as specified by `block_len` from the
-block header.
+header, all `restart_offset` in the first block are relative to the
+start of the file (position 0), and include the file header.
 
 The end of the block may be filled with `padding` NUL bytes to fill
 out the block to the common `block_size` as specified in the file
@@ -288,9 +282,9 @@ saves space.
 Index block format:
 
     uint32( (0x80 << 24) | block_len )
-    index_record+
-    uint24( restart_offset )+
     uint16( restart_count )
+    uint24( restart_offset )+
+    index_record+
     padding?
 
 The index block header starts with the high bit set.  This identifies
@@ -333,7 +327,7 @@ begin reading the block header.
 #### Reading the index
 
 Readers loading the ref index must first read the footer (below) to
-obtain `ref_index_offset`. If not present, the offset will be 0.
+obtain `ref_index_position`. If not present, the position will be 0.
 
 ### Obj block format
 
@@ -351,9 +345,9 @@ An object block is written as:
 
     'o'
     uint24( block_len )
-    obj_record+
-    uint24( restart_offset )+
     uint16( restart_count )
+    uint24( restart_offset )+
+    obj_record+
     padding?
 
 Fields are identical to ref block.  Binary search using the restart
@@ -377,7 +371,7 @@ containing references using that unique abbreviation:
     varint( (suffix_length << 3) | cnt_3 )
     suffix
     varint( cnt_large )?
-    varint( block_delta )+
+    varint( block_delta )*
 
 Like in reference blocks, abbreviations are prefix compressed within
 an obj block.  On large reftables with many unique objects, higher
@@ -393,8 +387,16 @@ The use of `cnt_3` bets most objects are pointed to by only a single
 reference, some may be pointed to be a couple of references, and very
 few (if any) are pointed to by more than 7 references.
 
+A special case exists when `cnt_3 = 0` and `cnt_large = 0`: there
+are no `block_delta`, but at least one reference starts with this
+abbreviation.  A reader that needs exact reference names must scan all
+references to find which specific references have the desired object.
+Writers should use this format when the `block_delta` list would have
+overflowed the file's `block_size` due to a high number of references
+pointing to the same object.
+
 The first `block_delta` is the absolute block identifier counting from
-the start of the file.  The offset of that block can be obtained by
+the start of the file.  The position of that block can be obtained by
 `block_delta[0] * block_size`.  Additional `block_delta` entries are
 sorted ascending and relative to the prior entry, e.g.  a reader would
 perform:
@@ -407,7 +409,7 @@ perform:
     }
 
 With a `block_id` in hand, a reader must linearly scan the ref block
-at `block_id * block_size` offset in the file, starting from the first
+at `block_id * block_size` position in the file, starting from the first
 `ref_record`, testing each reference's SHA-1s (for `value_type = 0x1`
 or `0x2`) for full equality.  Faster searching by SHA-1 within a
 single ref block is not supported by the reftable format.  Smaller
@@ -428,7 +430,7 @@ the file header.  This requires padding the last obj block to maintain
 alignment.
 
 Readers loading the obj index must first read the footer (below) to
-obtain `obj_index_offset`.  If not present, the offset will be 0.
+obtain `obj_index_position`.  If not present, the position will be 0.
 
 ### Log block format
 
@@ -442,9 +444,9 @@ A log block is written as:
     'g'
     uint24( block_len )
     zlib_deflate {
-      log_record+
-      uint24( restart_offset )+
       uint16( restart_count )
+      uint24( restart_offset )+
+      log_record+
     }
 
 Log blocks look similar to ref blocks, except `block_type = 'g'`.
@@ -502,18 +504,19 @@ log record key described above.
 
     old_id
     new_id
-    varint( time_seconds )
     sint16( tz_offset )
+    varint( time_seconds )
     varint( name_length    )  name
     varint( email_length   )  email
     varint( message_length )  message
 ```
 
-The value data following the key suffix is complex:
+Log records follow [git update-ref][update-ref] logging, and include
+the following values:
 
 - two 20-byte SHA-1s (old id, new id)
-- varint time in seconds since epoch (Jan 1, 1970)
 - 2-byte timezone offset in minutes (signed)
+- varint time in seconds since epoch (Jan 1, 1970)
 - varint string of committer's name
 - varint string of committer's email
 - varint string of message
@@ -528,18 +531,25 @@ normally found between the `<>` in a git commit object header.
 The `message_length` may be 0, in which case there was no message
 supplied for the update.
 
+[update-ref]: https://git-scm.com/docs/git-update-ref#_logging_updates
+
 #### Reading the log
 
 Readers accessing the log must first read the footer (below) to
-determine the `log_offset`.  The first block of the log begins at
-`log_offset` bytes since the start of the file.  The `log_offset` is
-not block aligned.
+determine the `log_position`.  The first block of the log begins at
+`log_position` bytes since the start of the file.  The `log_position`
+is not block aligned.
 
 #### Importing logs
 
 When importing from `$GIT_DIR/logs` writers should globally order all
 log records roughly by timestamp while preserving file order, and
 assign unique, increasing `update_index` values for each log line.
+Newer log records get higher `update_index` values.
+
+Although an import may write only a single reftable file, the reftable
+file must span many unique `update_index`, as each log line requires
+its own `update_index` to preserve semantics.
 
 ### Log index
 
@@ -560,7 +570,7 @@ refer to the start of a log block.
 #### Reading the index
 
 Readers loading the log index must first read the footer (below) to
-obtain `log_index_offset`. If not present, the offset will be 0.
+obtain `log_index_position`. If not present, the position will be 0.
 
 ### Footer
 
@@ -576,24 +586,24 @@ A 68-byte footer appears at the end:
     uint64( min_update_index )
     uint64( max_update_index )
 
-    uint64( ref_index_offset )
-    uint64( obj_offset )
-    uint64( obj_index_offset )
+    uint64( ref_index_position )
+    uint64( obj_position )
+    uint64( obj_index_position )
 
-    uint64( log_offset )
-    uint64( log_index_offset )
+    uint64( log_position )
+    uint64( log_index_position )
 
     uint32( CRC-32 of above )
 ```
 
-If a section is missing (e.g. ref index) the corresponding offset
-field (e.g. `ref_index_offset`) will be 0.
+If a section is missing (e.g. ref index) the corresponding position
+field (e.g. `ref_index_position`) will be 0.
 
-- `obj_offset`: byte offset for the first obj block.
-- `log_offset`: byte offset for the first log block.
-- `ref_index_offset`: byte offset for the start of the ref index.
-- `obj_index_offset`: byte offset for the start of the obj index.
-- `log_index_offset`: byte offset for the start of the log index.
+- `obj_position`: byte position for the first obj block.
+- `log_position`: byte position for the first log block.
+- `ref_index_position`: byte position for the start of the ref index.
+- `obj_index_position`: byte position for the start of the obj index.
+- `log_index_position`: byte position for the start of the log index.
 
 #### Reading the footer
 
