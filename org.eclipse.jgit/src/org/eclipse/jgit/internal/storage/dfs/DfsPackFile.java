@@ -516,9 +516,7 @@ public final class DfsPackFile {
 	private long copyPackBypassCache(PackOutputStream out, DfsReader ctx,
 			MessageDigest md) throws IOException {
 		try (ReadableChannel rc = ctx.db.openFile(packDesc, PACK)) {
-			ByteBuffer buf = newCopyBuffer(out, rc);
-			if (ctx.getOptions().getStreamPackBufferSize() > 0)
-				rc.readAheadBuffer(ctx.getOptions().getStreamPackBufferSize());
+			ByteBuffer buf = newCopyBuffer(out, rc, ctx);
 			long position = 12;
 			long remaining = length - (12 + 20);
 			while (0 < remaining) {
@@ -549,8 +547,13 @@ public final class DfsPackFile {
 		}
 	}
 
-	private ByteBuffer newCopyBuffer(PackOutputStream out, ReadableChannel rc) {
+	private ByteBuffer newCopyBuffer(PackOutputStream out, ReadableChannel rc,
+			DfsReader ctx) {
 		int bs = blockSize(rc);
+		int bufferSize = ctx.getOptions().getStreamPackBufferSize();
+		if (bufferSize > bs)
+			bs = (bufferSize / bs) * bs;
+
 		byte[] copyBuf = out.getCopyBuffer();
 		if (bs > copyBuf.length)
 			copyBuf = new byte[bs];
