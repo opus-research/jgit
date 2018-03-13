@@ -96,6 +96,7 @@ import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
+import org.eclipse.jgit.util.ChangeIdUtil;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
@@ -435,6 +436,72 @@ public class TestRepository<R extends Repository> {
 	}
 
 	/**
+	 * Amend an existing ref.
+	 *
+	 * @param ref
+	 *            the name of the reference to amend, which must already exist.
+	 *            If {@code ref} does not start with {@code refs/} and is not the
+	 *            magic names {@code HEAD} {@code FETCH_HEAD} or {@code
+	 *            MERGE_HEAD}, then {@code refs/heads/} will be prefixed in front
+	 *            of the given name, thereby assuming it is a branch.
+	 * @return commit builder that amends the branch on commit.
+	 * @throws Exception
+	 */
+	public CommitBuilder amendRef(String ref) throws Exception {
+		String name = normalizeRef(ref);
+		Ref r = db.getRef(name);
+		if (r == null)
+			throw new IOException("Not a ref: " + ref);
+		return amend(pool.parseCommit(r.getObjectId()), branch(name).commit());
+	}
+
+	/**
+	 * Amend an existing commit.
+	 *
+	 * @param id
+	 *            the id of the commit to amend.
+	 * @return commit builder.
+	 * @throws Exception
+	 */
+	public CommitBuilder amend(AnyObjectId id) throws Exception {
+		return amend(pool.parseCommit(id), commit());
+	}
+
+	private CommitBuilder amend(RevCommit old, CommitBuilder b) throws Exception {
+		pool.parseBody(old);
+		b.author(old.getAuthorIdent());
+		b.committer(old.getCommitterIdent());
+		b.message(old.getFullMessage());
+		// Use the committer name from the old commit, but update it after ticking
+		// the clock in CommitBuilder#create().
+		b.updateCommitterTime = true;
+
+		// Reset parents to original parents.
+		b.noParents();
+		for (int i = 0; i < old.getParentCount(); i++)
+			b.parent(old.getParent(i));
+
+		// Reset tree to original tree; resetting parents reset tree contents to the
+		// first parent.
+		b.tree.clear();
+		try (TreeWalk tw = new TreeWalk(db)) {
+			tw.reset(old.getTree());
+			tw.setRecursive(true);
+			while (tw.next()) {
+				b.edit(new PathEdit(tw.getPathString()) {
+					@Override
+					public void apply(DirCacheEntry ent) {
+						ent.setFileMode(tw.getFileMode(0));
+						ent.setObjectId(tw.getObjectId(0));
+					}
+				});
+			}
+		}
+
+		return b;
+	}
+
+	/**
 	 * Update a reference to point to an object.
 	 *
 	 * @param <T>
@@ -451,17 +518,7 @@ public class TestRepository<R extends Repository> {
 	 * @throws Exception
 	 */
 	public <T extends AnyObjectId> T update(String ref, T obj) throws Exception {
-		if (Constants.HEAD.equals(ref)) {
-			// nothing
-		} else if ("FETCH_HEAD".equals(ref)) {
-			// nothing
-		} else if ("MERGE_HEAD".equals(ref)) {
-			// nothing
-		} else if (ref.startsWith(Constants.R_REFS)) {
-			// nothing
-		} else
-			ref = Constants.R_HEADS + ref;
-
+		ref = normalizeRef(ref);
 		RefUpdate u = db.updateRef(ref);
 		u.setNewObjectId(obj);
 		switch (u.forceUpdate()) {
@@ -474,6 +531,75 @@ public class TestRepository<R extends Repository> {
 
 		default:
 			throw new IOException("Cannot write " + ref + " " + u.getResult());
+		}
+	}
+
+	private static String normalizeRef(String ref) {
+		if (Constants.HEAD.equals(ref)) {
+			// nothing
+		} else if ("FETCH_HEAD".equals(ref)) {
+			// nothing
+		} else if ("MERGE_HEAD".equals(ref)) {
+			// nothing
+		} else if (ref.startsWith(Constants.R_REFS)) {
+			// nothing
+		} else
+			ref = Constants.R_HEADS + ref;
+		return ref;
+	}
+
+	/**
+	 * Soft-reset HEAD to a detached state.
+	 * <p>
+	 * @param id
+	 *            ID of detached head.
+	 * @throws Exception
+	 * @see #reset(String)
+	 */
+	public void reset(AnyObjectId id) throws Exception {
+		RefUpdate ru = db.updateRef(Constants.HEAD, true);
+		ru.setNewObjectId(id);
+		RefUpdate.Result result = ru.forceUpdate();
+		switch (result) {
+			case FAST_FORWARD:
+			case FORCED:
+			case NEW:
+			case NO_CHANGE:
+				break;
+			default:
+				throw new IOException(String.format(
+						"Checkout \"%s\" failed: %s", id.name(), result));
+		}
+	}
+
+	/**
+	 * Soft-reset HEAD to a different commit.
+	 * <p>
+	 * This is equivalent to {@code git reset --soft} in that it modifies HEAD but
+	 * not the index or the working tree of a non-bare repository.
+	 *
+	 * @param name
+	 *            revision string; either an existing ref name, or something that
+	 *            can be parsed to an object ID.
+	 * @throws Exception
+	 */
+	public void reset(String name) throws Exception {
+		RefUpdate.Result result;
+		ObjectId id = db.resolve(name);
+		if (id == null)
+			throw new IOException("Not a revision: " + name);
+		RefUpdate ru = db.updateRef(Constants.HEAD, false);
+		ru.setNewObjectId(id);
+		result = ru.forceUpdate();
+		switch (result) {
+			case FAST_FORWARD:
+			case FORCED:
+			case NEW:
+			case NO_CHANGE:
+				break;
+			default:
+				throw new IOException(String.format(
+						"Checkout \"%s\" failed: %s", name, result));
 		}
 	}
 
@@ -749,6 +875,10 @@ public class TestRepository<R extends Repository> {
 		private PersonIdent author;
 		private PersonIdent committer;
 
+		private String changeId;
+
+		private boolean updateCommitterTime;
+
 		CommitBuilder() {
 			branch = null;
 		}
@@ -757,9 +887,8 @@ public class TestRepository<R extends Repository> {
 			branch = b;
 
 			Ref ref = db.getRef(branch.ref);
-			if (ref != null) {
+			if (ref != null && ref.getObjectId() != null)
 				parent(pool.parseCommit(ref.getObjectId()));
-			}
 		}
 
 		CommitBuilder(CommitBuilder prior) throws Exception {
@@ -783,6 +912,10 @@ public class TestRepository<R extends Repository> {
 			}
 			parents.add(p);
 			return this;
+		}
+
+		public List<RevCommit> parents() {
+			return Collections.unmodifiableList(parents);
 		}
 
 		public CommitBuilder noParents() {
@@ -835,6 +968,10 @@ public class TestRepository<R extends Repository> {
 			return this;
 		}
 
+		public String message() {
+			return message;
+		}
+
 		public CommitBuilder tick(int secs) {
 			tick = secs;
 			return this;
@@ -851,8 +988,28 @@ public class TestRepository<R extends Repository> {
 			return this;
 		}
 
+		public PersonIdent author() {
+			return author;
+		}
+
 		public CommitBuilder committer(PersonIdent c) {
 			committer = c;
+			return this;
+		}
+
+		public PersonIdent committer() {
+			return committer;
+		}
+
+		public CommitBuilder insertChangeId() {
+			changeId = "";
+			return this;
+		}
+
+		public CommitBuilder insertChangeId(String c) {
+			// Validate, but store as a string so we can use "" as a sentinel.
+			ObjectId.fromString(c);
+			changeId = c;
 			return this;
 		}
 
@@ -867,9 +1024,11 @@ public class TestRepository<R extends Repository> {
 				setAuthorAndCommitter(c);
 				if (author != null)
 					c.setAuthor(author);
-				if (committer != null)
+				if (committer != null) {
+					if (updateCommitterTime)
+						committer = new PersonIdent(committer, new Date(now));
 					c.setCommitter(committer);
-				c.setMessage(message);
+				}
 
 				ObjectId commitId;
 				try (ObjectInserter ins = inserter) {
@@ -877,6 +1036,8 @@ public class TestRepository<R extends Repository> {
 						c.setTreeId(topLevelTree);
 					else
 						c.setTreeId(tree.writeTree(ins));
+					insertChangeId(c);
+					c.setMessage(message);
 					commitId = ins.insert(c);
 					ins.flush();
 				}
@@ -886,6 +1047,31 @@ public class TestRepository<R extends Repository> {
 					branch.update(self);
 			}
 			return self;
+		}
+
+		private void insertChangeId(org.eclipse.jgit.lib.CommitBuilder c)
+				throws IOException {
+			if (changeId == null)
+				return;
+			int idx = ChangeIdUtil.indexOfChangeId(message, "\n");
+			if (idx >= 0)
+				return;
+
+			ObjectId firstParentId = null;
+			if (!parents.isEmpty())
+				firstParentId = parents.get(0);
+
+			ObjectId cid;
+			if (changeId.equals(""))
+				cid = ChangeIdUtil.computeChangeId(c.getTreeId(), firstParentId,
+						c.getAuthor(), c.getCommitter(), message);
+			else
+				cid = ObjectId.fromString(changeId);
+			message = ChangeIdUtil.insertId(message, cid);
+			if (cid != null)
+				message = message.replaceAll("\nChange-Id: I" //$NON-NLS-1$
+						+ ObjectId.zeroId().getName() + "\n", "\nChange-Id: I" //$NON-NLS-1$ //$NON-NLS-2$
+						+ cid.getName() + "\n"); //$NON-NLS-1$
 		}
 
 		public CommitBuilder child() throws Exception {
