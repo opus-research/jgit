@@ -43,7 +43,6 @@
 package org.eclipse.jgit.api;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -116,30 +115,6 @@ public class FetchCommandTest extends RepositoryTestCase {
 				.setTagOpt(TagOpt.AUTO_FOLLOW).call();
 
 		assertEquals(tagRef.getObjectId(), db.resolve("foo"));
-	}
-
-	@Test
-	public void fetchShouldAutoFollowTagForFetchedObjects() throws Exception {
-		remoteGit.commit().setMessage("commit").call();
-		Ref tagRef = remoteGit.tag().setName("foo").call();
-		remoteGit.commit().setMessage("commit2").call();
-		RefSpec spec = new RefSpec("refs/heads/*:refs/remotes/origin/*");
-		git.fetch().setRemote("test").setRefSpecs(spec)
-				.setTagOpt(TagOpt.AUTO_FOLLOW).call();
-		assertEquals(tagRef.getObjectId(), db.resolve("foo"));
-	}
-
-	@Test
-	public void fetchShouldNotFetchTagsFromOtherBranches() throws Exception {
-		remoteGit.commit().setMessage("commit").call();
-		remoteGit.checkout().setName("other").setCreateBranch(true).call();
-		remoteGit.commit().setMessage("commit2").call();
-		remoteGit.tag().setName("foo").call();
-		RefSpec spec = new RefSpec(
-				"refs/heads/master:refs/remotes/origin/master");
-		git.fetch().setRemote("test").setRefSpecs(spec)
-				.setTagOpt(TagOpt.AUTO_FOLLOW).call();
-		assertNull(db.resolve("foo"));
 	}
 
 	@Test
