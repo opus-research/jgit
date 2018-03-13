@@ -62,7 +62,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.storage.file.LockFile;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FileUtils;
 
 /**
  * Manages the {@code .eclipse_iplog} file in a project.
@@ -188,7 +187,8 @@ public class IpLogMeta {
 	 */
 	public void syncCQs(File file, FS fs, URL base, String username,
 			String password) throws IOException, ConfigInvalidException {
-		FileUtils.mkdirs(file.getParentFile(), true);
+		if (!file.getParentFile().exists())
+			file.getParentFile().mkdirs();
 
 		LockFile lf = new LockFile(file, fs);
 		if (!lf.lock())
