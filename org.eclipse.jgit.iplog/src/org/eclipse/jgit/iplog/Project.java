@@ -48,10 +48,6 @@ import java.util.Comparator;
 import java.util.Set;
 import java.util.TreeSet;
 
-import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdSubclassMap;
-
 /** Description of a project. */
 class Project {
 	/** Sorts projects by unique identities. */
@@ -68,8 +64,6 @@ class Project {
 	private String comments;
 
 	private final Set<String> licenses = new TreeSet<String>();
-
-	private final ObjectIdSubclassMap<ObjectId> skipCommits = new ObjectIdSubclassMap<ObjectId>();
 
 	private String version;
 
@@ -108,14 +102,6 @@ class Project {
 
 	void addLicense(String licenseName) {
 		licenses.add(licenseName);
-	}
-
-	void addSkipCommit(AnyObjectId commit) {
-		skipCommits.add(commit.copy());
-	}
-
-	boolean isSkippedCommit(AnyObjectId commit) {
-		return skipCommits.contains(commit);
 	}
 
 	String getVersion() {
