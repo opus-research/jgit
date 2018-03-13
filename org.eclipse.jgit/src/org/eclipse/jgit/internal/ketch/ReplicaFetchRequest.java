@@ -41,49 +41,56 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.reftree;
+package org.eclipse.jgit.internal.ketch;
 
-import org.eclipse.jgit.lib.RefDatabase;
+import java.util.Map;
+import java.util.Set;
 
-/** Magic reference name logic for RefTrees. */
-public class RefTreeNames {
-	/**
-	 * Suffix used on a {@link RefTreeDatabase#getTxnNamespace()} for user data.
-	 * <p>
-	 * A {@link RefTreeDatabase}'s namespace may include a subspace (e.g.
-	 * {@code "refs/txn/stage/"}) containing commit objects from the usual user
-	 * portion of the repository (e.g. {@code "refs/heads/"}). These should be
-	 * packed by the garbage collector alongside other user content rather than
-	 * with the RefTree.
-	 */
-	private static final String STAGE = "stage/"; //$NON-NLS-1$
+import org.eclipse.jgit.annotations.Nullable;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.Ref;
+
+/** A fetch request to obtain objects from a replica, and its result. */
+public class ReplicaFetchRequest {
+	private final Set<String> wantRefs;
+	private final Set<ObjectId> wantObjects;
+	private Map<String, Ref> refs;
 
 	/**
-	 * Determine if the reference is likely to be a RefTree.
+	 * Construct a new fetch request for a replica.
 	 *
-	 * @param refdb
-	 *            database instance.
-	 * @param ref
-	 *            reference name.
-	 * @return {@code true} if the reference is a RefTree.
+	 * @param wantRefs
+	 *            named references to be fetched.
+	 * @param wantObjects
+	 *            specific objects to be fetched.
 	 */
-	public static boolean isRefTree(RefDatabase refdb, String ref) {
-		if (refdb instanceof RefTreeDatabase) {
-			RefTreeDatabase b = (RefTreeDatabase) refdb;
-			if (ref.equals(b.getTxnCommitted())) {
-				return true;
-			}
-
-			String namespace = b.getTxnNamespace();
-			if (namespace != null
-					&& ref.startsWith(namespace)
-					&& !ref.startsWith(namespace + STAGE)) {
-				return true;
-			}
-		}
-		return false;
+	public ReplicaFetchRequest(Set<String> wantRefs,
+			Set<ObjectId> wantObjects) {
+		this.wantRefs = wantRefs;
+		this.wantObjects = wantObjects;
 	}
 
-	private RefTreeNames() {
+	/** @return references to be fetched. */
+	public Set<String> getWantRefs() {
+		return wantRefs;
+	}
+
+	/** @return objects to be fetched. */
+	public Set<ObjectId> getWantObjects() {
+		return wantObjects;
+	}
+
+	/** @return remote references, usually from the advertisement. */
+	@Nullable
+	public Map<String, Ref> getRefs() {
+		return refs;
+	}
+
+	/**
+	 * @param refs
+	 *            references observed from the replica.
+	 */
+	public void setRefs(Map<String, Ref> refs) {
+		this.refs = refs;
 	}
 }

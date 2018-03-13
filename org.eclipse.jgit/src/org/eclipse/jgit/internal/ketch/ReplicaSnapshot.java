@@ -41,49 +41,69 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.reftree;
+package org.eclipse.jgit.internal.ketch;
 
-import org.eclipse.jgit.lib.RefDatabase;
+import java.util.Date;
 
-/** Magic reference name logic for RefTrees. */
-public class RefTreeNames {
-	/**
-	 * Suffix used on a {@link RefTreeDatabase#getTxnNamespace()} for user data.
-	 * <p>
-	 * A {@link RefTreeDatabase}'s namespace may include a subspace (e.g.
-	 * {@code "refs/txn/stage/"}) containing commit objects from the usual user
-	 * portion of the repository (e.g. {@code "refs/heads/"}). These should be
-	 * packed by the garbage collector alongside other user content rather than
-	 * with the RefTree.
-	 */
-	private static final String STAGE = "stage/"; //$NON-NLS-1$
+import org.eclipse.jgit.annotations.Nullable;
+import org.eclipse.jgit.lib.ObjectId;
 
-	/**
-	 * Determine if the reference is likely to be a RefTree.
-	 *
-	 * @param refdb
-	 *            database instance.
-	 * @param ref
-	 *            reference name.
-	 * @return {@code true} if the reference is a RefTree.
-	 */
-	public static boolean isRefTree(RefDatabase refdb, String ref) {
-		if (refdb instanceof RefTreeDatabase) {
-			RefTreeDatabase b = (RefTreeDatabase) refdb;
-			if (ref.equals(b.getTxnCommitted())) {
-				return true;
-			}
+/**
+ * A snapshot of a replica.
+ *
+ * @see LeaderSnapshot
+ */
+public class ReplicaSnapshot {
+	final KetchReplica replica;
+	ObjectId accepted;
+	ObjectId committed;
+	KetchReplica.State state;
+	String error;
+	long retryAtMillis;
 
-			String namespace = b.getTxnNamespace();
-			if (namespace != null
-					&& ref.startsWith(namespace)
-					&& !ref.startsWith(namespace + STAGE)) {
-				return true;
-			}
-		}
-		return false;
+	ReplicaSnapshot(KetchReplica replica) {
+		this.replica = replica;
 	}
 
-	private RefTreeNames() {
+	/** @return the replica this snapshot describes the state of. */
+	public KetchReplica getReplica() {
+		return replica;
+	}
+
+	/** @return current state of the replica. */
+	public KetchReplica.State getState() {
+		return state;
+	}
+
+	/** @return last known Git commit at {@code refs/txn/accepted}. */
+	@Nullable
+	public ObjectId getAccepted() {
+		return accepted;
+	}
+
+	/** @return last known Git commit at {@code refs/txn/committed}. */
+	@Nullable
+	public ObjectId getCommitted() {
+		return committed;
+	}
+
+	/**
+	 * @return if {@link #getState()} == {@link KetchReplica.State#OFFLINE} an
+	 *         optional human-readable message from the transport system
+	 *         explaining the failure.
+	 */
+	@Nullable
+	public String getErrorMessage() {
+		return error;
+	}
+
+	/**
+	 * @return time (usually in the future) when the leader will retry
+	 *         communication with the offline or lagging replica; null if no
+	 *         retry is scheduled or necessary.
+	 */
+	@Nullable
+	public Date getRetryAt() {
+		return retryAtMillis > 0 ? new Date(retryAtMillis) : null;
 	}
 }

@@ -41,49 +41,42 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.reftree;
+package org.eclipse.jgit.internal.ketch;
 
-import org.eclipse.jgit.lib.RefDatabase;
+import org.eclipse.jgit.revwalk.FooterKey;
 
-/** Magic reference name logic for RefTrees. */
-public class RefTreeNames {
+/** Frequently used constants in a Ketch system. */
+public class KetchConstants {
 	/**
-	 * Suffix used on a {@link RefTreeDatabase#getTxnNamespace()} for user data.
-	 * <p>
-	 * A {@link RefTreeDatabase}'s namespace may include a subspace (e.g.
-	 * {@code "refs/txn/stage/"}) containing commit objects from the usual user
-	 * portion of the repository (e.g. {@code "refs/heads/"}). These should be
-	 * packed by the garbage collector alongside other user content rather than
-	 * with the RefTree.
+	 * Default reference namespace holding {@link #ACCEPTED} and
+	 * {@link #COMMITTED} references and the {@link #STAGE} sub-namespace.
 	 */
-	private static final String STAGE = "stage/"; //$NON-NLS-1$
+	public static final String DEFAULT_TXN_NAMESPACE = "refs/txn/"; //$NON-NLS-1$
 
-	/**
-	 * Determine if the reference is likely to be a RefTree.
-	 *
-	 * @param refdb
-	 *            database instance.
-	 * @param ref
-	 *            reference name.
-	 * @return {@code true} if the reference is a RefTree.
-	 */
-	public static boolean isRefTree(RefDatabase refdb, String ref) {
-		if (refdb instanceof RefTreeDatabase) {
-			RefTreeDatabase b = (RefTreeDatabase) refdb;
-			if (ref.equals(b.getTxnCommitted())) {
-				return true;
-			}
+	/** Reference name holding the RefTree accepted by a follower. */
+	public static final String ACCEPTED = "accepted"; //$NON-NLS-1$
 
-			String namespace = b.getTxnNamespace();
-			if (namespace != null
-					&& ref.startsWith(namespace)
-					&& !ref.startsWith(namespace + STAGE)) {
-				return true;
-			}
-		}
-		return false;
-	}
+	/** Reference name holding the RefTree known to be committed. */
+	public static final String COMMITTED = "committed"; //$NON-NLS-1$
 
-	private RefTreeNames() {
+	/** Reference subdirectory holding proposed heads. */
+	public static final String STAGE = "stage/"; //$NON-NLS-1$
+
+	/** Footer containing the current term. */
+	public static final FooterKey TERM = new FooterKey("Term"); //$NON-NLS-1$
+
+	/** Section for Ketch configuration ({@code ketch}). */
+	public static final String CONFIG_SECTION_KETCH = "ketch"; //$NON-NLS-1$
+
+	/** Behavior for a replica ({@code remote.$name.ketch-type}) */
+	public static final String CONFIG_KEY_TYPE = "ketch-type"; //$NON-NLS-1$
+
+	/** Behavior for a replica ({@code remote.$name.ketch-commit}) */
+	public static final String CONFIG_KEY_COMMIT = "ketch-commit"; //$NON-NLS-1$
+
+	/** Behavior for a replica ({@code remote.$name.ketch-speed}) */
+	public static final String CONFIG_KEY_SPEED = "ketch-speed"; //$NON-NLS-1$
+
+	private KetchConstants() {
 	}
 }
