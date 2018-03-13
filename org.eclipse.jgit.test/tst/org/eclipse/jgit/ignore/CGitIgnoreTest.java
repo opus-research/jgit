@@ -69,7 +69,6 @@ import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.TemporaryBuffer;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -116,12 +115,17 @@ public class CGitIgnoreTest extends RepositoryTestCase {
 
 	private String[] cgitIgnored() throws Exception {
 		FS fs = db.getFS();
-		ProcessBuilder builder = fs.runInShell("git", new String[] {"ls-files", "--ignored", "--exclude-standard", "-o"});
+		ProcessBuilder builder = fs.runInShell("git", new String[] { "ls-files",
+				"--ignored", "--exclude-standard", "-o" });
 		builder.directory(db.getWorkTree());
-		ExecutionResult result = fs.execute(builder, new ByteArrayInputStream(new byte[0]));
+		ExecutionResult result = fs.execute(builder,
+				new ByteArrayInputStream(new byte[0]));
 		assertEquals("External git failed", 0, result.getRc());
-		assertEquals("External git reported errors", "", toString(result.getStderr()));
-		try (BufferedReader r = new BufferedReader(new InputStreamReader(new BufferedInputStream(result.getStdout().openInputStream()), Constants.CHARSET))) {
+		assertEquals("External git reported errors", "",
+				toString(result.getStderr()));
+		try (BufferedReader r = new BufferedReader(new InputStreamReader(
+				new BufferedInputStream(result.getStdout().openInputStream()),
+				Constants.CHARSET))) {
 			return r.lines().toArray(String[]::new);
 		}
 	}
@@ -212,13 +216,4 @@ public class CGitIgnoreTest extends RepositoryTestCase {
 		writeTrashFile(".gitignore", "**/src/new/");
 		assertSameAsCGit();
 	}
-
-	@Test
-	@Ignore("Re-enable once bug 520920 is fixed")
-	public void testDirectoryMatchSubRecursiveBacktrack() throws Exception {
-		createFiles("src/new/foo.txt", "src/src/new/foo.txt");
-		writeTrashFile(".gitignore", "**/src/new/");
-		assertSameAsCGit();
-	}
-
 }
