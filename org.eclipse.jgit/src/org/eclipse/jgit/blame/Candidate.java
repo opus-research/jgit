@@ -120,7 +120,7 @@ class Candidate {
 		return sourceCommit.getParent(idx);
 	}
 
-	Candidate getNextCandidate(int idx) {
+	Candidate getNextCandidate(@SuppressWarnings("unused") int idx) {
 		return null;
 	}
 
@@ -145,6 +145,7 @@ class Candidate {
 		r.sourceBlob = sourceBlob;
 		r.sourceText = sourceText;
 		r.regionList = regionList;
+		r.renameScore = renameScore;
 		return r;
 	}
 

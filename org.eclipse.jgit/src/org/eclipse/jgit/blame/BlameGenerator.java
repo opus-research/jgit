@@ -344,6 +344,13 @@ public class BlameGenerator {
 	 * {@link #push(String, AnyObjectId)} to begin blame traversal from the
 	 * commit named by {@code start} walking forwards through history until
 	 * {@code end} blaming line deletions.
+	 * <p>
+	 * A reverse blame may produce multiple sources for the same result line,
+	 * each of these is a descendant commit that removed the line, typically
+	 * this occurs when the same deletion appears in multiple side branches such
+	 * as due to a cherry-pick. Applications relying on reverse should use
+	 * {@link BlameResult} as it filters these duplicate sources and only
+	 * remembers the first (oldest) deletion.
 	 *
 	 * @param start
 	 *            oldest commit to traverse from. The result file will be loaded
@@ -369,6 +376,13 @@ public class BlameGenerator {
 	 * {@link #push(String, AnyObjectId)} to begin blame traversal from the
 	 * commit named by {@code start} walking forwards through history until
 	 * {@code end} blaming line deletions.
+	 * <p>
+	 * A reverse blame may produce multiple sources for the same result line,
+	 * each of these is a descendant commit that removed the line, typically
+	 * this occurs when the same deletion appears in multiple side branches such
+	 * as due to a cherry-pick. Applications relying on reverse should use
+	 * {@link BlameResult} as it filters these duplicate sources and only
+	 * remembers the first (oldest) deletion.
 	 *
 	 * @param start
 	 *            oldest commit to traverse from. The result file will be loaded
@@ -443,6 +457,10 @@ public class BlameGenerator {
 				currentSource.regionList = n;
 				return true;
 			}
+
+			if (currentSource.queueNext != null)
+				return result(currentSource.queueNext);
+
 			currentSource = null;
 		}
 
@@ -489,10 +507,22 @@ public class BlameGenerator {
 		return true;
 	}
 
+	private boolean reverseResult(Candidate parent, Candidate source)
+			throws IOException {
+		// On a reverse blame present the application the parent
+		// (as this is what did the removals), however the region
+		// list to enumerate is the source's surviving list.
+		Candidate res = parent.copy(parent.sourceCommit);
+		res.regionList = source.regionList;
+		return result(res);
+	}
+
 	private Candidate pop() {
 		Candidate n = queue;
-		if (n != null)
+		if (n != null) {
 			queue = n.queueNext;
+			n.queueNext = null;
+		}
 		return n;
 	}
 
@@ -576,6 +606,30 @@ public class BlameGenerator {
 		return split(next, n);
 	}
 
+	private boolean split(Candidate parent, Candidate source)
+			throws IOException {
+		EditList editList = diffAlgorithm.diff(textComparator,
+				parent.sourceText, source.sourceText);
+		if (editList.isEmpty()) {
+			// Ignoring whitespace (or some other special comparator) can
+			// cause non-identical blobs to have an empty edit list. In
+			// a case like this push the parent alone.
+			parent.regionList = source.regionList;
+			push(parent);
+			return false;
+		}
+
+		parent.takeBlame(editList, source);
+		if (parent.regionList != null)
+			push(parent);
+		if (source.regionList != null) {
+			if (source instanceof ReverseCandidate)
+				return reverseResult(parent, source);
+			return result(source);
+		}
+		return false;
+	}
+
 	private boolean processMerge(Candidate n) throws IOException {
 		int pCnt = n.getParentCount();
 
@@ -595,7 +649,7 @@ public class BlameGenerator {
 				continue;
 			if (!find(parent, n.sourcePath))
 				continue;
-			if (idBuf.equals(n.sourceBlob)) {
+			if (!(n instanceof ReverseCandidate) && idBuf.equals(n.sourceBlob)) {
 				n.sourceCommit = parent;
 				push(n);
 				return false;
@@ -620,7 +674,11 @@ public class BlameGenerator {
 				if (r == null)
 					continue;
 
-				if (0 == r.getOldId().prefixCompare(n.sourceBlob)) {
+				if (n instanceof ReverseCandidate) {
+					if (ids == null)
+						ids = new ObjectId[pCnt];
+					ids[pCnt] = r.getOldId().toObjectId();
+				} else if (0 == r.getOldId().prefixCompare(n.sourceBlob)) {
 					// A 100% rename without any content change can also
 					// skip directly to the parent. Note this bypasses an
 					// earlier parent that had the path (above) but did not
@@ -656,14 +714,28 @@ public class BlameGenerator {
 			} else {
 				continue;
 			}
-			p.loadText(reader);
 
-			EditList editList = diffAlgorithm.diff(textComparator,
-					p.sourceText, n.sourceText);
+			EditList editList;
+			if (n instanceof ReverseCandidate
+					&& p.sourceBlob.equals(n.sourceBlob)) {
+				// This special case happens on ReverseCandidate forks.
+				p.sourceText = n.sourceText;
+				editList = new EditList(0);
+			} else {
+				p.loadText(reader);
+				editList = diffAlgorithm.diff(textComparator,
+						p.sourceText, n.sourceText);
+			}
+
 			if (editList.isEmpty()) {
 				// Ignoring whitespace (or some other special comparator) can
 				// cause non-identical blobs to have an empty edit list. In
 				// a case like this push the parent alone.
+				if (n instanceof ReverseCandidate) {
+					parents[pIdx] = p;
+					continue;
+				}
+
 				p.regionList = n.regionList;
 				push(p);
 				return false;
@@ -673,8 +745,52 @@ public class BlameGenerator {
 
 			// Only remember this parent candidate if there is at least
 			// one region that was blamed on the parent.
-			if (p.regionList != null)
+			if (p.regionList != null) {
+				// Reverse blame requires inverting the regions. This puts
+				// the regions the parent deleted from us into the parent,
+				// and retains the common regions to look at other parents
+				// for deletions.
+				if (n instanceof ReverseCandidate) {
+					Region r = p.regionList;
+					p.regionList = n.regionList;
+					n.regionList = r;
+				}
+
 				parents[pIdx] = p;
+			}
+		}
+
+		if (n instanceof ReverseCandidate) {
+			// On a reverse blame report all deletions found in the children,
+			// and pass on to them a copy of our region list.
+			Candidate resultHead = null;
+			Candidate resultTail = null;
+
+			for (int pIdx = 0; pIdx < pCnt; pIdx++) {
+				Candidate p = parents[pIdx];
+				if (p == null)
+					continue;
+
+				if (p.regionList != null) {
+					Candidate r = p.copy(p.sourceCommit);
+					if (resultTail != null) {
+						resultTail.queueNext = r;
+						resultTail = r;
+					} else {
+						resultHead = r;
+						resultTail = r;
+					}
+				}
+
+				if (n.regionList != null) {
+					p.regionList = n.regionList.deepCopy();
+					push(p);
+				}
+			}
+
+			if (resultHead != null)
+				return result(resultHead);
+			return false;
 		}
 
 		// Push any parents that are still candidates.
@@ -683,31 +799,8 @@ public class BlameGenerator {
 				push(parents[pIdx]);
 		}
 
-		// If there are any regions surviving, they do not exist in any
-		// parent and thus belong to the merge itself.
 		if (n.regionList != null)
 			return result(n);
-		return false;
-	}
-
-	private boolean split(Candidate parent, Candidate source)
-			throws IOException {
-		EditList editList = diffAlgorithm.diff(textComparator,
-				parent.sourceText, source.sourceText);
-		if (editList.isEmpty()) {
-			// Ignoring whitespace (or some other special comparator) can
-			// cause non-identical blobs to have an empty edit list. In
-			// a case like this push the parent alone.
-			parent.regionList = source.regionList;
-			push(parent);
-			return false;
-		}
-
-		parent.takeBlame(editList, source);
-		if (parent.regionList != null)
-			push(parent);
-		if (source.regionList != null)
-			return result(source);
 		return false;
 	}
 

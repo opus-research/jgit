@@ -105,6 +105,17 @@ class Region {
 		length -= d;
 	}
 
+	Region deepCopy() {
+		Region head = new Region(resultStart, sourceStart, length);
+		Region tail = head;
+		for (Region n = next; n != null; n = n.next) {
+			Region q = new Region(n.resultStart, n.sourceStart, n.length);
+			tail.next = q;
+			tail = q;
+		}
+		return head;
+	}
+
 	@Override
 	public String toString() {
 		StringBuilder buf = new StringBuilder();
