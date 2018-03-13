@@ -71,6 +71,8 @@ class FileUtil {
 	public static void createSymLink(File path, String target)
 			throws IOException {
 		Path nioPath = path.toPath();
+		if (Files.exists(nioPath, LinkOption.NOFOLLOW_LINKS))
+			Files.delete(nioPath);
 		if (SystemReader.getInstance().isWindows())
 			target = target.replace('/', '\\');
 		Path nioTarget = new File(target).toPath();
