@@ -47,7 +47,6 @@ import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -159,8 +158,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 
 	private boolean createBranch = false;
 
-	private boolean orphan = false;
-
 	private CreateBranchCommand.SetupUpstreamMode upstreamMode;
 
 	private String startPoint = null;
@@ -200,8 +197,8 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			RefNotFoundException, InvalidRefNameException,
 			CheckoutConflictException {
 		checkCallable();
+		processOptions();
 		try {
-			processOptions();
 			if (checkoutAllPaths || !paths.isEmpty()) {
 				checkoutPaths();
 				status = new CheckoutResult(Status.OK, paths);
@@ -222,26 +219,10 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			Ref headRef = repo.getRef(Constants.HEAD);
 			String shortHeadRef = getShortBranchName(headRef);
 			String refLogMessage = "checkout: moving from " + shortHeadRef; //$NON-NLS-1$
-			ObjectId branch;
-			if (orphan) {
-				if (startPoint == null && startCommit == null) {
-					Result r = repo.updateRef(Constants.HEAD).link(
-							getBranchName());
-					if (!EnumSet.of(Result.NEW, Result.FORCED).contains(r))
-						throw new RefAlreadyExistsException(
-								MessageFormat.format(
-										JGitText.get().refAlreadyExists,
-										r.name()));
-					this.status = CheckoutResult.NOT_TRIED_RESULT;
-					return repo.getRef(Constants.HEAD);
-				}
-				branch = getStartPoint();
-			} else {
-				branch = repo.resolve(name);
-				if (branch == null)
-					throw new RefNotFoundException(MessageFormat.format(
-							JGitText.get().refNotResolved, name));
-			}
+			ObjectId branch = repo.resolve(name);
+			if (branch == null)
+				throw new RefNotFoundException(MessageFormat.format(JGitText
+						.get().refNotResolved, name));
 
 			RevWalk revWalk = new RevWalk(repo);
 			AnyObjectId headId = headRef.getObjectId();
@@ -275,8 +256,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			Result updateResult;
 			if (ref != null)
 				updateResult = refUpdate.link(ref.getName());
-			else if (orphan)
-				updateResult = refUpdate.link(getBranchName());
 			else {
 				refUpdate.setNewObjectId(newCommit);
 				updateResult = refUpdate.forceUpdate();
@@ -486,27 +465,12 @@ public class CheckoutCommand extends GitCommand<Ref> {
 		return result;
 	}
 
-	private void processOptions() throws InvalidRefNameException,
-			RefAlreadyExistsException, IOException {
-		if (((!checkoutAllPaths && paths.isEmpty()) || orphan)
+	private void processOptions() throws InvalidRefNameException {
+		if ((!checkoutAllPaths && paths.isEmpty())
 				&& (name == null || !Repository
 						.isValidRefName(Constants.R_HEADS + name)))
 			throw new InvalidRefNameException(MessageFormat.format(JGitText
 					.get().branchNameInvalid, name == null ? "<null>" : name)); //$NON-NLS-1$
-
-		if (orphan) {
-			Ref refToCheck = repo.getRef(getBranchName());
-			if (refToCheck != null)
-				throw new RefAlreadyExistsException(MessageFormat.format(
-						JGitText.get().refAlreadyExists, name));
-		}
-	}
-
-	private String getBranchName() {
-		if (name.startsWith(Constants.R_REFS))
-			return name;
-
-		return Constants.R_HEADS + name;
 	}
 
 	/**
@@ -549,25 +513,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	public CheckoutCommand setCreateBranch(boolean createBranch) {
 		checkCallable();
 		this.createBranch = createBranch;
-		return this;
-	}
-
-	/**
-	 * Specify whether to create a new orphan branch.
-	 * <p>
-	 * If <code>true</code> is used, the name of the new orphan branch must be
-	 * set using {@link #setName(String)}. The commit at which to start the new
-	 * orphan branch can be set using {@link #setStartPoint(String)} or
-	 * {@link #setStartPoint(RevCommit)}; if not specified, HEAD is used.
-	 *
-	 * @param orphan
-	 *            if <code>true</code> a orphan branch will be created as part
-	 *            of the checkout to the specified start point
-	 * @return this instance
-	 */
-	public CheckoutCommand setOrphan(boolean orphan) {
-		checkCallable();
-		this.orphan = orphan;
 		return this;
 	}
 
