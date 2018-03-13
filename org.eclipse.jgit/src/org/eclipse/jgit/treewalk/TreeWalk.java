@@ -76,6 +76,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
+import org.eclipse.jgit.util.QuotedString;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.io.EolStreamTypeUtil;
 
@@ -1374,7 +1375,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 
 	/**
 	 * Inspect config and attributes to return a filtercommand applicable for
-	 * the current path, but without expanding %f occurences
+	 * the current path
 	 *
 	 * @param filterCommandType
 	 *            which type of filterCommand should be executed. E.g. "clean",
@@ -1401,7 +1402,8 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 		if (filterCommand == null) {
 			return null;
 		}
-		return filterCommand;
+		return filterCommand.replaceAll("%f", //$NON-NLS-1$
+				QuotedString.BOURNE.quote((getPathString())));
 	}
 
 	/**
