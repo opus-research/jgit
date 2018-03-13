@@ -43,8 +43,13 @@
 
 package org.eclipse.jgit.http.server;
 
+import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
+import static org.eclipse.jgit.http.server.ServletUtils.nocache;
+import static org.eclipse.jgit.http.server.ServletUtils.sendPlainText;
+
 import java.io.IOException;
 
+import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -53,7 +58,7 @@ import org.eclipse.jgit.lib.ObjectDirectory;
 import org.eclipse.jgit.lib.PackFile;
 
 /** Sends the current list of pack files, sorted most recent first. */
-class InfoPacksServlet extends RepositoryServlet {
+class InfoPacksServlet extends HttpServlet {
 	private static final long serialVersionUID = 1L;
 
 	public void doGet(final HttpServletRequest req,

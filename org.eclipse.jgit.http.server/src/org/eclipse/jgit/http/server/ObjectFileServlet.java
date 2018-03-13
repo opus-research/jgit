@@ -53,14 +53,17 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 
 import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.lib.ObjectDirectory;
+import org.eclipse.jgit.lib.Repository;
+import static javax.servlet.http.HttpServletResponse.*;
+import static org.eclipse.jgit.http.server.ServletUtils.*;
 
 /** Sends any object from {@code GIT_DIR/objects/??/0 38}, or any pack file. */
-abstract class ObjectFileServlet extends RepositoryServlet {
+abstract class ObjectFileServlet extends HttpServlet {
 	private static final long serialVersionUID = 1L;
 
 	static class Loose extends ObjectFileServlet {
@@ -71,7 +74,7 @@ abstract class ObjectFileServlet extends RepositoryServlet {
 		}
 
 		@Override
-		String etag(final Sender.FileSender sender) throws IOException {
+		String etag(final FileSender sender) throws IOException {
 			return Long.toHexString(sender.getLastModified());
 		}
 	}
@@ -84,7 +87,7 @@ abstract class ObjectFileServlet extends RepositoryServlet {
 		}
 
 		@Override
-		String etag(final Sender.FileSender sender) throws IOException {
+		String etag(final FileSender sender) throws IOException {
 			return sender.getTailChecksum();
 		}
 	}
@@ -111,7 +114,7 @@ abstract class ObjectFileServlet extends RepositoryServlet {
 		this.contentType = contentType;
 	}
 
-	abstract String etag(Sender.FileSender sender) throws IOException;
+	abstract String etag(FileSender sender) throws IOException;
 
 	@Override
 	public void doGet(final HttpServletRequest req,
@@ -128,11 +131,13 @@ abstract class ObjectFileServlet extends RepositoryServlet {
 	private void serve(final HttpServletRequest req,
 			final HttpServletResponse rsp, final boolean sendBody)
 			throws IOException {
-		final String fileName = req.getPathInfo();
-		final Sender.FileSender sender = createSender(req, fileName);
-		if (sender == null) {
+		final File obj = new File(objects(req), req.getPathInfo());
+		final FileSender sender;
+		try {
+			sender = new FileSender(obj);
+		} catch (FileNotFoundException e) {
 			nocache(rsp);
-			rsp.sendError(HttpServletResponse.SC_NOT_FOUND);
+			rsp.sendError(SC_NOT_FOUND);
 			return;
 		}
 
@@ -141,47 +146,31 @@ abstract class ObjectFileServlet extends RepositoryServlet {
 			final long lastModified = sender.getLastModified() / 1000 * 1000;
 
 			String ifNoneMatch = req.getHeader(HDR_IF_NONE_MATCH);
-			if (etag.equals(ifNoneMatch)) {
-				rsp.sendError(HttpServletResponse.SC_NOT_MODIFIED);
+			if (etag != null && etag.equals(ifNoneMatch)) {
+				rsp.sendError(SC_NOT_MODIFIED);
 				return;
 			}
 
 			long ifModifiedSince = req.getDateHeader(HDR_IF_MODIFIED_SINCE);
-			if (lastModified < ifModifiedSince) {
-				rsp.sendError(HttpServletResponse.SC_NOT_MODIFIED);
+			if (0 < lastModified && lastModified < ifModifiedSince) {
+				rsp.sendError(SC_NOT_MODIFIED);
 				return;
 			}
 
 			cacheForever(rsp);
-			rsp.setHeader(HDR_ETAG, etag);
-			rsp.setDateHeader(HDR_LAST_MODIFIED, lastModified);
+			if (etag != null)
+				rsp.setHeader(HDR_ETAG, etag);
+			if (0 < lastModified)
+				rsp.setDateHeader(HDR_LAST_MODIFIED, lastModified);
 			rsp.setContentType(contentType);
-			rsp.setContentLength(sender.getContentLength());
-			if (sendBody)
-				sender.sendBody(rsp);
+			sender.serve(req, rsp, sendBody);
 		} finally {
 			sender.close();
 		}
 	}
 
-	private Sender.FileSender createSender(final HttpServletRequest req,
-			final String fileName) {
-		final ObjectDatabase db = getRepository(req).getObjectDatabase();
-		if (db instanceof ObjectDirectory) {
-			final File dir = ((ObjectDirectory) db).getDirectory();
-			final File obj = new File(dir, fileName);
-			try {
-				return new Sender.FileSender(obj);
-			} catch (FileNotFoundException e) {
-				return null;
-			}
-
-		} else {
-			// TODO For loose object service, unpack the object & serve as loose
-			// For pack services, we are forced to return null as other
-			// database types might not support pack files.
-			//
-			return null;
-		}
+	private static File objects(final HttpServletRequest req) {
+		final Repository db = getRepository(req);
+		return ((ObjectDirectory) db.getObjectDatabase()).getDirectory();
 	}
 }

@@ -62,9 +62,12 @@ public interface RepositoryResolver {
 	 *            name of the repository, as parsed out of the URL.
 	 * @return the opened repository instance, never null.
 	 * @throws RepositoryNotFoundException
-	 *             the repository does not exist or is not accessible over HTTP
-	 *             for the current request.
+	 *             the repository does not exist or the name is incorrectly
+	 *             formatted as a repository name.
+	 * @throws ServiceNotEnabledException
+	 *             the repository exists, but the current request is not
+	 *             authorized to access it.
 	 */
 	Repository open(HttpServletRequest req, String name)
-			throws RepositoryNotFoundException;
+			throws RepositoryNotFoundException, ServiceNotEnabledException;
 }
