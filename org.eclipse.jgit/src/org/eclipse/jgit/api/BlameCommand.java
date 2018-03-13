@@ -188,7 +188,7 @@ public class BlameCommand extends GitCommand<BlameResult> {
 	public BlameCommand reverse(AnyObjectId start, Collection<ObjectId> end)
 			throws IOException {
 		startCommit = start.toObjectId();
-		reverseEndCommits = new ArrayList<ObjectId>(end);
+		reverseEndCommits = new ArrayList<>(end);
 		return this;
 	}
 
@@ -198,6 +198,7 @@ public class BlameCommand extends GitCommand<BlameResult> {
 	 *
 	 * @return list of lines
 	 */
+	@Override
 	public BlameResult call() throws GitAPIException {
 		checkCallable();
 		try (BlameGenerator gen = new BlameGenerator(repo, path)) {
@@ -248,11 +249,12 @@ public class BlameCommand extends GitCommand<BlameResult> {
 			rawText = new RawText(inTree);
 			break;
 		case TRUE:
-			AutoLFInputStream in = new AutoLFInputStream(
-					new FileInputStream(inTree), true);
-			// Canonicalization should lead to same or shorter length
-			// (CRLF to LF), so the file size on disk is an upper size bound
-			rawText = new RawText(toByteArray(in, (int) inTree.length()));
+			try (AutoLFInputStream in = new AutoLFInputStream(
+					new FileInputStream(inTree), true)) {
+				// Canonicalization should lead to same or shorter length
+				// (CRLF to LF), so the file size on disk is an upper size bound
+				rawText = new RawText(toByteArray(in, (int) inTree.length()));
+			}
 			break;
 		default:
 			throw new IllegalArgumentException(

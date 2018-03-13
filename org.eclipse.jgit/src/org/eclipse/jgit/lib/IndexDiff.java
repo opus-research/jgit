@@ -65,7 +65,6 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StopWalkException;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.submodule.SubmoduleWalk;
 import org.eclipse.jgit.submodule.SubmoduleWalk.IgnoreSubmoduleMode;
@@ -248,25 +247,25 @@ public class IndexDiff {
 
 	private final Repository repository;
 
-	private final RevTree tree;
+	private final AnyObjectId tree;
 
 	private TreeFilter filter = null;
 
 	private final WorkingTreeIterator initialWorkingTreeIterator;
 
-	private Set<String> added = new HashSet<String>();
+	private Set<String> added = new HashSet<>();
 
-	private Set<String> changed = new HashSet<String>();
+	private Set<String> changed = new HashSet<>();
 
-	private Set<String> removed = new HashSet<String>();
+	private Set<String> removed = new HashSet<>();
 
-	private Set<String> missing = new HashSet<String>();
+	private Set<String> missing = new HashSet<>();
 
-	private Set<String> modified = new HashSet<String>();
+	private Set<String> modified = new HashSet<>();
 
-	private Set<String> untracked = new HashSet<String>();
+	private Set<String> untracked = new HashSet<>();
 
-	private Map<String, StageState> conflicts = new HashMap<String, StageState>();
+	private Map<String, StageState> conflicts = new HashMap<>();
 
 	private Set<String> ignored;
 
@@ -276,11 +275,11 @@ public class IndexDiff {
 
 	private IndexDiffFilter indexDiffFilter;
 
-	private Map<String, IndexDiff> submoduleIndexDiffs = new HashMap<String, IndexDiff>();
+	private Map<String, IndexDiff> submoduleIndexDiffs = new HashMap<>();
 
 	private IgnoreSubmoduleMode ignoreSubmoduleMode = null;
 
-	private Map<FileMode, Set<String>> fileModes = new HashMap<FileMode, Set<String>>();
+	private Map<FileMode, Set<String>> fileModes = new HashMap<>();
 
 	/**
 	 * Construct an IndexDiff
@@ -311,10 +310,13 @@ public class IndexDiff {
 	public IndexDiff(Repository repository, ObjectId objectId,
 			WorkingTreeIterator workingTreeIterator) throws IOException {
 		this.repository = repository;
-		if (objectId != null)
-			tree = new RevWalk(repository).parseTree(objectId);
-		else
+		if (objectId != null) {
+			try (RevWalk rw = new RevWalk(repository)) {
+				tree = rw.parseTree(objectId);
+			}
+		} else {
 			tree = null;
+		}
 		this.initialWorkingTreeIterator = workingTreeIterator;
 	}
 
@@ -340,6 +342,7 @@ public class IndexDiff {
 	}
 
 	private WorkingTreeIteratorFactory wTreeIt = new WorkingTreeIteratorFactory() {
+		@Override
 		public WorkingTreeIterator getWorkingTreeIterator(Repository repo) {
 			return new FileTreeIterator(repo);
 		}
@@ -414,7 +417,7 @@ public class IndexDiff {
 			treeWalk.addTree(new DirCacheIterator(dirCache));
 			treeWalk.addTree(initialWorkingTreeIterator);
 			initialWorkingTreeIterator.setDirCacheIterator(treeWalk, 1);
-			Collection<TreeFilter> filters = new ArrayList<TreeFilter>(4);
+			Collection<TreeFilter> filters = new ArrayList<>(4);
 
 			if (monitor != null) {
 				// Get the maximum size of the work tree and index
@@ -515,7 +518,7 @@ public class IndexDiff {
 					String path = treeWalk.getPathString();
 					if (path != null) {
 						if (values == null)
-							values = new HashSet<String>();
+							values = new HashSet<>();
 						values.add(path);
 						fileModes.put(treeWalk.getFileMode(i), values);
 					}
@@ -684,7 +687,7 @@ public class IndexDiff {
 	 */
 	public Set<String> getAssumeUnchanged() {
 		if (assumeUnchanged == null) {
-			HashSet<String> unchanged = new HashSet<String>();
+			HashSet<String> unchanged = new HashSet<>();
 			for (int i = 0; i < dirCache.getEntryCount(); i++)
 				if (dirCache.getEntry(i).isAssumeValid())
 					unchanged.add(dirCache.getEntry(i).getPathString());
@@ -698,7 +701,7 @@ public class IndexDiff {
 	 */
 	public Set<String> getUntrackedFolders() {
 		return ((indexDiffFilter == null) ? Collections.<String> emptySet()
-				: new HashSet<String>(indexDiffFilter.getUntrackedFolders()));
+				: new HashSet<>(indexDiffFilter.getUntrackedFolders()));
 	}
 
 	/**
@@ -724,7 +727,7 @@ public class IndexDiff {
 	public Set<String> getPathsWithIndexMode(final FileMode mode) {
 		Set<String> paths = fileModes.get(mode);
 		if (paths == null)
-			paths = new HashSet<String>();
+			paths = new HashSet<>();
 		return paths;
 	}
 }

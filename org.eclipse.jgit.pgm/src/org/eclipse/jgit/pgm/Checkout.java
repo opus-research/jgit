@@ -77,8 +77,8 @@ class Checkout extends TextBuiltin {
 	@Argument(required = false, index = 0, metaVar = "metaVar_name", usage = "usage_checkout")
 	private String name;
 
-	@Option(name = "--", metaVar = "metaVar_paths", handler = RestOfArgumentsHandler.class)
-	private List<String> paths = new ArrayList<String>();
+	@Option(name = "--", metaVar = "metaVar_paths", multiValued = true, handler = RestOfArgumentsHandler.class)
+	private List<String> paths = new ArrayList<>();
 
 	@Override
 	protected void run() throws Exception {
