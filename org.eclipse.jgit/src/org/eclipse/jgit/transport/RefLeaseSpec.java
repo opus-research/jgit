@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2017 Two Sigma Open Source
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,51 +40,60 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm;
 
-import static org.junit.Assert.assertEquals;
+package org.eclipse.jgit.transport;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.io.Serializable;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.lib.CLIRepositoryTestCase;
-import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.SystemReader;
-import org.junit.Before;
-import org.junit.Test;
+/**
+ * Describes the expected value for a ref being pushed.
+ * @since 4.7
+ */
+public class RefLeaseSpec implements Serializable {
+	private static final long serialVersionUID = 1L;
 
-public class ConfigTest extends CLIRepositoryTestCase {
-	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
-		try (Git git = new Git(db)) {
-			git.commit().setMessage("initial commit").call();
-		}
+	/** Name of the ref whose value we want to check. */
+	private final String ref;
+
+	/** Local commitish to get expected value from. */
+	private final String expected;
+
+	/**
+	 *
+	 * @param ref
+	 *            ref being pushed
+	 * @param expected
+	 *            the expected value of the ref
+	 */
+	public RefLeaseSpec(String ref, String expected) {
+		this.ref = ref;
+		this.expected = expected;
 	}
 
-	@Test
-	public void testListConfig() throws Exception {
-		boolean isWindows = SystemReader.getInstance().getProperty("os.name")
-				.startsWith("Windows");
-		boolean isMac = SystemReader.getInstance().getProperty("os.name")
-				.equals("Mac OS X");
-
-		String[] output = execute("git config --list");
-		List<String> expect = new ArrayList<String>();
-		expect.add("core.filemode=" + !isWindows);
-		expect.add("core.logallrefupdates=true");
-		if (isMac)
-			expect.add("core.precomposeunicode=true");
-		expect.add("core.repositoryformatversion=0");
-		if (!FS.DETECTED.supportsSymlinks())
-			expect.add("core.symlinks=false");
-		expect.add(""); // ends with LF (last line empty)
-		assertEquals("expected default configuration",
-				Arrays.asList(expect.toArray()).toString(),
-				Arrays.asList(output).toString());
+	/**
+	 * Get the ref to protect.
+	 *
+	 * @return name of ref to check.
+	 */
+	public String getRef() {
+		return ref;
 	}
 
+	/**
+	 * Get the expected value of the ref, in the form
+	 * of a local committish
+	 *
+	 * @return expected ref value.
+	 */
+	public String getExpected() {
+		return expected;
+	}
+
+	public String toString() {
+		final StringBuilder r = new StringBuilder();
+		r.append(getRef());
+		r.append(':');
+		r.append(getExpected());
+		return r.toString();
+	}
 }
