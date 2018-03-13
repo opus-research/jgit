@@ -124,7 +124,7 @@ public class ObjectToPack extends PackedObjectInfo {
 	 *         representation; null otherwise - if going to be packed as a
 	 *         whole object.
 	 */
-	public ObjectId getDeltaBaseId() {
+	public final ObjectId getDeltaBaseId() {
 		return deltaBase;
 	}
 
@@ -134,7 +134,7 @@ public class ObjectToPack extends PackedObjectInfo {
 	 *         pack; null otherwise - if going to be packed as a whole
 	 *         object or delta base is specified only as id.
 	 */
-	public ObjectToPack getDeltaBase() {
+	public final ObjectToPack getDeltaBase() {
 		if (deltaBase instanceof ObjectToPack)
 			return (ObjectToPack) deltaBase;
 		return null;
@@ -150,22 +150,22 @@ public class ObjectToPack extends PackedObjectInfo {
 	 *            whole object.
 	 *
 	 */
-	void setDeltaBase(ObjectId deltaBase) {
+	final void setDeltaBase(ObjectId deltaBase) {
 		this.deltaBase = deltaBase;
 	}
 
-	void setCachedDelta(DeltaCache.Ref data){
+	final void setCachedDelta(DeltaCache.Ref data) {
 		cachedDelta = data;
 	}
 
-	DeltaCache.Ref popCachedDelta() {
+	final DeltaCache.Ref popCachedDelta() {
 		DeltaCache.Ref r = cachedDelta;
 		if (r != null)
 			cachedDelta = null;
 		return r;
 	}
 
-	void clearDeltaBase() {
+	final void clearDeltaBase() {
 		this.deltaBase = null;
 
 		if (cachedDelta != null) {
@@ -179,7 +179,7 @@ public class ObjectToPack extends PackedObjectInfo {
 	 * @return true if object is going to be written as delta; false
 	 *         otherwise.
 	 */
-	public boolean isDeltaRepresentation() {
+	public final boolean isDeltaRepresentation() {
 		return deltaBase != null;
 	}
 
@@ -189,28 +189,28 @@ public class ObjectToPack extends PackedObjectInfo {
 	 *
 	 * @return true if object is already written; false otherwise.
 	 */
-	public boolean isWritten() {
+	public final boolean isWritten() {
 		return getOffset() != 0;
 	}
 
 	/** @return the type of this object. */
-	public int getType() {
+	public final int getType() {
 		return (flags >> TYPE_SHIFT) & 0x7;
 	}
 
-	int getDeltaDepth() {
+	final int getDeltaDepth() {
 		return flags >>> DELTA_SHIFT;
 	}
 
-	void setDeltaDepth(int d) {
+	final void setDeltaDepth(int d) {
 		flags = (d << DELTA_SHIFT) | (flags & NON_DELTA_MASK);
 	}
 
-	boolean wantWrite() {
+	final boolean wantWrite() {
 		return (flags & WANT_WRITE) != 0;
 	}
 
-	void markWantWrite() {
+	final void markWantWrite() {
 		flags |= WANT_WRITE;
 	}
 
@@ -218,11 +218,11 @@ public class ObjectToPack extends PackedObjectInfo {
 	 * @return true if an existing representation was selected to be reused
 	 *         as-is into the pack stream.
 	 */
-	public boolean isReuseAsIs() {
+	public final boolean isReuseAsIs() {
 		return (flags & REUSE_AS_IS) != 0;
 	}
 
-	void setReuseAsIs() {
+	final void setReuseAsIs() {
 		flags |= REUSE_AS_IS;
 	}
 
@@ -237,35 +237,28 @@ public class ObjectToPack extends PackedObjectInfo {
 		flags &= ~REUSE_AS_IS;
 	}
 
-	boolean isDoNotDelta() {
+	final boolean isDoNotDelta() {
 		return (flags & DO_NOT_DELTA) != 0;
 	}
 
-	void setDoNotDelta(boolean noDelta) {
-		if (noDelta)
-			flags |= DO_NOT_DELTA;
-		else
-			flags &= ~DO_NOT_DELTA;
+	final void setDoNotDelta() {
+		flags |= DO_NOT_DELTA;
 	}
 
-	boolean isEdge() {
+	final boolean isEdge() {
 		return (flags & EDGE) != 0;
 	}
 
-	void setEdge() {
+	final void setEdge() {
 		flags |= EDGE;
 	}
 
-	boolean doNotAttemptDelta() {
+	final boolean doNotAttemptDelta() {
 		// Do not attempt if delta attempted and object reuse.
 		return (flags & ATTEMPT_DELTA_MASK) == ATTEMPT_DELTA_MASK;
 	}
 
-	boolean isDeltaAttempted() {
-		return (flags & DELTA_ATTEMPTED) != 0;
-	}
-
-	void setDeltaAttempted(boolean deltaAttempted) {
+	final void setDeltaAttempted(boolean deltaAttempted) {
 		if (deltaAttempted)
 			flags |= DELTA_ATTEMPTED;
 		else
@@ -273,7 +266,7 @@ public class ObjectToPack extends PackedObjectInfo {
 	}
 
 	/** @return the extended flags on this object, in the range [0x0, 0xf]. */
-	protected int getExtendedFlags() {
+	protected final int getExtendedFlags() {
 		return (flags >>> EXT_SHIFT) & EXT_MASK;
 	}
 
@@ -287,7 +280,7 @@ public class ObjectToPack extends PackedObjectInfo {
 	 *            the flag mask to test, must be between 0x0 and 0xf.
 	 * @return true if any of the bits matching the mask are non-zero.
 	 */
-	protected boolean isExtendedFlag(int flag) {
+	protected final boolean isExtendedFlag(int flag) {
 		return (flags & (flag << EXT_SHIFT)) != 0;
 	}
 
@@ -300,7 +293,7 @@ public class ObjectToPack extends PackedObjectInfo {
 	 * @param flag
 	 *            the bits to set, must be between 0x0 and 0xf.
 	 */
-	protected void setExtendedFlag(int flag) {
+	protected final void setExtendedFlag(int flag) {
 		flags |= (flag & EXT_MASK) << EXT_SHIFT;
 	}
 
@@ -313,7 +306,7 @@ public class ObjectToPack extends PackedObjectInfo {
 	 * @param flag
 	 *            the bits to clear, must be between 0x0 and 0xf.
 	 */
-	protected void clearExtendedFlag(int flag) {
+	protected final void clearExtendedFlag(int flag) {
 		flags &= ~((flag & EXT_MASK) << EXT_SHIFT);
 	}
 
@@ -327,11 +320,11 @@ public class ObjectToPack extends PackedObjectInfo {
 	 *            additional flag bits to store in the flags field. Due to space
 	 *            constraints only values [0x0, 0xf] are permitted.
 	 */
-	protected void setExtendedFlags(int extFlags) {
+	protected final void setExtendedFlags(int extFlags) {
 		flags = ((extFlags & EXT_MASK) << EXT_SHIFT) | (flags & NON_EXT_MASK);
 	}
 
-	int getFormat() {
+	final int getFormat() {
 		if (isReuseAsIs()) {
 			if (isDeltaRepresentation())
 				return StoredObjectRepresentation.PACK_DELTA;
@@ -341,27 +334,27 @@ public class ObjectToPack extends PackedObjectInfo {
 	}
 
 	// Overload weight into CRC since we don't need them at the same time.
-	int getWeight() {
+	final int getWeight() {
 		return getCRC();
 	}
 
-	void setWeight(int weight) {
+	final void setWeight(int weight) {
 		setCRC(weight);
 	}
 
-	int getPathHash() {
+	final int getPathHash() {
 		return pathHash;
 	}
 
-	void setPathHash(int hc) {
+	final void setPathHash(int hc) {
 		pathHash = hc;
 	}
 
-	int getCachedSize() {
+	final int getCachedSize() {
 		return pathHash;
 	}
 
-	void setCachedSize(int sz) {
+	final void setCachedSize(int sz) {
 		pathHash = sz;
 	}
 
