@@ -43,10 +43,6 @@
 
 package org.eclipse.jgit.lfs.errors;
 
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.lfs.internal.LfsText;
-
 /**
  * Thrown when the user has read, but not write access. Only applicable when the
  * operation in the request is "upload".
@@ -58,9 +54,8 @@ public class LfsRepositoryReadOnly extends LfsException {
 
 	/**
 	 * @param name
-	 *            the repository name.
 	 */
 	public LfsRepositoryReadOnly(String name) {
-		super(MessageFormat.format(LfsText.get().repositoryReadOnly, name));
+		super("repository " + name + "is read-only"); //$NON-NLS-1$ //$NON-NLS-2$
 	}
 }

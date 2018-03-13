@@ -545,6 +545,8 @@ public class RefDirectory extends RefDatabase {
 			ref = new ObjectIdRef.Unpeeled(NEW, name, null);
 		else {
 			detachingSymbolicRef = detach && ref.isSymbolic();
+			if (detachingSymbolicRef)
+				ref = new ObjectIdRef.Unpeeled(LOOSE, name, ref.getObjectId());
 		}
 		RefDirectoryUpdate refDirUpdate = new RefDirectoryUpdate(this, ref);
 		if (detachingSymbolicRef)
@@ -577,7 +579,7 @@ public class RefDirectory extends RefDatabase {
 	}
 
 	void delete(RefDirectoryUpdate update) throws IOException {
-		Ref dst = update.getRef();
+		Ref dst = update.getRef().getLeaf();
 		String name = dst.getName();
 
 		// Write the packed-refs file using an atomic update. We might

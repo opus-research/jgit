@@ -69,7 +69,6 @@ import java.util.zip.Inflater;
 import java.util.zip.InflaterInputStream;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.PackIndex;
@@ -571,9 +570,6 @@ public class DfsInserter extends ObjectInserter {
 			if (type == OBJ_OFS_DELTA || type == OBJ_REF_DELTA)
 				throw new IOException(MessageFormat.format(
 						DfsText.get().cannotReadBackDelta, Integer.toString(type)));
-			if (typeHint != OBJ_ANY && type != typeHint) {
-				throw new IncorrectObjectTypeException(objectId.copy(), typeHint);
-			}
 
 			long sz = c & 0x0f;
 			int ptr = 1;
