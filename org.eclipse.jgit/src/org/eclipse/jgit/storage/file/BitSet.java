@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2012, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,42 +41,75 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.dfs;
+package org.eclipse.jgit.storage.file;
 
-import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.storage.pack.ObjectToPack;
-import org.eclipse.jgit.storage.pack.StoredObjectRepresentation;
+import javaewah.EWAHCompressedBitmap;
 
-/** {@link ObjectToPack} for {@link DfsObjDatabase}. */
-class DfsObjectToPack extends ObjectToPack {
-	/** Pack to reuse compressed data from, otherwise null. */
-	DfsPackFile pack;
+/**
+ * A random access BitSet to supports efficient conversions to
+ * EWAHCompressedBitmap.
+ */
+final class BitSet {
 
-	/** Position of the pack in the reader's pack list. */
-	int packIndex;
+	private long[] words;
 
-	/** Offset of the object's header in {@link #pack}. */
-	long offset;
-
-	/** Length of the data section of the object. */
-	long length;
-
-	DfsObjectToPack(AnyObjectId src, final int type) {
-		super(src, type);
+	BitSet(int initialCapacity) {
+		words = new long[block(initialCapacity) + 1];
 	}
 
-	@Override
-	protected void clearReuseAsIs() {
-		super.clearReuseAsIs();
-		pack = null;
+	final void set(int position) {
+		int block = block(position);
+		if (block >= words.length) {
+			long[] buf = new long[2 * block(position)];
+			System.arraycopy(words, 0, buf, 0, words.length);
+			words = buf;
+		}
+		words[block] |= mask(position);
 	}
 
-	@Override
-	public void select(StoredObjectRepresentation ref) {
-		DfsObjectRepresentation ptr = (DfsObjectRepresentation) ref;
-		this.pack = ptr.pack;
-		this.packIndex = ptr.packIndex;
-		this.offset = ptr.offset;
-		this.length = ptr.length;
+	final void clear(int position) {
+		int block = block(position);
+		if (block < words.length)
+			words[block] &= ~mask(position);
+	}
+
+	final boolean get(int position) {
+		int block = block(position);
+		return block < words.length && (words[block] & mask(position)) != 0;
+	}
+
+	final EWAHCompressedBitmap toEWAHCompressedBitmap() {
+		EWAHCompressedBitmap compressed = new EWAHCompressedBitmap(
+				words.length);
+		int runningEmptyWords = 0;
+		long lastNonEmptyWord = 0;
+		for (long word : words) {
+			if (word == 0) {
+				runningEmptyWords++;
+				continue;
+			}
+
+			if (lastNonEmptyWord != 0)
+				compressed.add(lastNonEmptyWord);
+
+			if (runningEmptyWords > 0) {
+				compressed.addStreamOfEmptyWords(false, runningEmptyWords);
+				runningEmptyWords = 0;
+			}
+
+			lastNonEmptyWord = word;
+		}
+		int bitsThatMatter = 64 - Long.numberOfLeadingZeros(lastNonEmptyWord);
+		if (bitsThatMatter > 0)
+			compressed.add(lastNonEmptyWord, bitsThatMatter);
+		return compressed;
+	}
+
+	private static final int block(int position) {
+		return position >> 6;
+	}
+
+	private static final long mask(int position) {
+		return 1L << position;
 	}
 }

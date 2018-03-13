@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2012, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,42 +41,21 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.dfs;
+package org.eclipse.jgit.lib;
 
-import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.storage.pack.ObjectToPack;
-import org.eclipse.jgit.storage.pack.StoredObjectRepresentation;
+/** Base object type accessed during bitmap expansion. */
+public abstract class BitmapObject {
+	/**
+	 * Get Git object type. See {@link Constants}.
+	 *
+	 * @return object type
+	 */
+	public abstract int getType();
 
-/** {@link ObjectToPack} for {@link DfsObjDatabase}. */
-class DfsObjectToPack extends ObjectToPack {
-	/** Pack to reuse compressed data from, otherwise null. */
-	DfsPackFile pack;
-
-	/** Position of the pack in the reader's pack list. */
-	int packIndex;
-
-	/** Offset of the object's header in {@link #pack}. */
-	long offset;
-
-	/** Length of the data section of the object. */
-	long length;
-
-	DfsObjectToPack(AnyObjectId src, final int type) {
-		super(src, type);
-	}
-
-	@Override
-	protected void clearReuseAsIs() {
-		super.clearReuseAsIs();
-		pack = null;
-	}
-
-	@Override
-	public void select(StoredObjectRepresentation ref) {
-		DfsObjectRepresentation ptr = (DfsObjectRepresentation) ref;
-		this.pack = ptr.pack;
-		this.packIndex = ptr.packIndex;
-		this.offset = ptr.offset;
-		this.length = ptr.length;
-	}
+	/**
+	 * Get the name of this object.
+	 *
+	 * @return unique hash of this object.
+	 */
+	public abstract ObjectId getObjectId();
 }

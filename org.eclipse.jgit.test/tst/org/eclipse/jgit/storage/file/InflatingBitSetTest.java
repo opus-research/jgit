@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2012, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,42 +41,66 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.dfs;
+package org.eclipse.jgit.storage.file;
 
-import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.storage.pack.ObjectToPack;
-import org.eclipse.jgit.storage.pack.StoredObjectRepresentation;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
-/** {@link ObjectToPack} for {@link DfsObjDatabase}. */
-class DfsObjectToPack extends ObjectToPack {
-	/** Pack to reuse compressed data from, otherwise null. */
-	DfsPackFile pack;
+import javaewah.EWAHCompressedBitmap;
 
-	/** Position of the pack in the reader's pack list. */
-	int packIndex;
+import org.junit.Test;
 
-	/** Offset of the object's header in {@link #pack}. */
-	long offset;
+public class InflatingBitSetTest {
 
-	/** Length of the data section of the object. */
-	long length;
+	@Test
+	public void testMaybeContains() {
+		EWAHCompressedBitmap ecb = new EWAHCompressedBitmap();
+		ecb.set(63);
+		ecb.set(64);
+		ecb.set(128);
 
-	DfsObjectToPack(AnyObjectId src, final int type) {
-		super(src, type);
+		InflatingBitSet ibs = new InflatingBitSet(ecb);
+		assertTrue(ibs.maybeContains(0));
+		assertFalse(ibs.contains(0)); // Advance
+		assertFalse(ibs.maybeContains(0));
+		assertTrue(ibs.maybeContains(63));
+		assertTrue(ibs.maybeContains(64));
+		assertTrue(ibs.maybeContains(65));
+		assertFalse(ibs.maybeContains(129));
 	}
 
-	@Override
-	protected void clearReuseAsIs() {
-		super.clearReuseAsIs();
-		pack = null;
+	@Test
+	public void testContainsMany() {
+		EWAHCompressedBitmap ecb = new EWAHCompressedBitmap();
+		ecb.set(64);
+		ecb.set(65);
+		ecb.set(1024);
+
+		InflatingBitSet ibs = new InflatingBitSet(ecb);
+		assertFalse(ibs.contains(0));
+		assertTrue(ibs.contains(64));
+		assertTrue(ibs.contains(65));
+		assertFalse(ibs.contains(66));
+		assertTrue(ibs.contains(1024));
+		assertFalse(ibs.contains(1025));
 	}
 
-	@Override
-	public void select(StoredObjectRepresentation ref) {
-		DfsObjectRepresentation ptr = (DfsObjectRepresentation) ref;
-		this.pack = ptr.pack;
-		this.packIndex = ptr.packIndex;
-		this.offset = ptr.offset;
-		this.length = ptr.length;
+	@Test
+	public void testContainsOne() {
+		EWAHCompressedBitmap ecb = new EWAHCompressedBitmap();
+		ecb.set(64);
+
+		InflatingBitSet ibs = new InflatingBitSet(ecb);
+		assertTrue(ibs.contains(64));
+		assertTrue(ibs.contains(64));
+		assertFalse(ibs.contains(65));
+		assertFalse(ibs.contains(63));
+	}
+
+	@Test
+	public void testContainsEmpty() {
+		InflatingBitSet ibs = new InflatingBitSet(new EWAHCompressedBitmap());
+		assertFalse(ibs.maybeContains(0));
+		assertFalse(ibs.contains(0));
 	}
 }

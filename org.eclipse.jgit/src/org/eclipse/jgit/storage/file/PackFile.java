@@ -45,6 +45,7 @@
 
 package org.eclipse.jgit.storage.file;
 
+import static org.eclipse.jgit.storage.pack.PackExt.BITMAP_INDEX;
 import static org.eclipse.jgit.storage.pack.PackExt.INDEX;
 
 import java.io.EOFException;
@@ -54,10 +55,12 @@ import java.io.RandomAccessFile;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel.MapMode;
 import java.text.MessageFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
 import java.util.zip.CRC32;
 import java.util.zip.DataFormatException;
@@ -97,6 +100,8 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 	private final File packFile;
 
+	private final List<PackExt> extensions;
+
 	private File keepFile;
 
 	private volatile String packName;
@@ -124,6 +129,8 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 	private PackReverseIndex reverseIdx;
 
+	private PackBitmapIndex bitmapIdx;
+
 	/**
 	 * Objects we have tried to read, and discovered to be corrupt.
 	 * <p>
@@ -138,10 +145,16 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	 *
 	 * @param packFile
 	 *            path of the <code>.pack</code> file holding the data.
+	 * @param extensions
+	 *            additional pakc file extensions with the same base as the pack
 	 */
-	public PackFile(final File packFile) {
+	public PackFile(final File packFile, Iterable<PackExt> extensions) {
 		this.packFile = packFile;
 		this.packLastModified = (int) (packFile.lastModified() >> 10);
+		this.extensions = new ArrayList<PackExt>(PackExt.values().length);
+		for (PackExt ext : extensions) {
+			this.extensions.add(ext);
+		}
 
 		// Multiply by 31 here so we can more directly combine with another
 		// value in WindowCache.hash(), without doing the multiply there.
@@ -1046,6 +1059,22 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			throws IOException, CorruptObjectException {
 		final long maxOffset = length - 20;
 		return getReverseIdx().findNextOffset(startOffset, maxOffset);
+	}
+
+	synchronized PackBitmapIndex getBitmapIndex() throws IOException {
+		if (extensions.contains(BITMAP_INDEX) && bitmapIdx == null) {
+			final PackBitmapIndex idx = PackBitmapIndex.open(
+					extFile(BITMAP_INDEX), idx(), getReverseIdx());
+
+			if (packChecksum == null)
+				packChecksum = idx.packChecksum;
+			else if (!Arrays.equals(packChecksum, idx.packChecksum))
+				throw new PackMismatchException(
+						JGitText.get().packChecksumMismatch);
+
+			bitmapIdx = idx;
+		}
+		return bitmapIdx;
 	}
 
 	private synchronized PackReverseIndex getReverseIdx() throws IOException {
