@@ -60,7 +60,6 @@ import java.util.Set;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.RevisionSyntaxException;
@@ -96,8 +95,6 @@ public class Repository {
 	private final AtomicInteger useCnt = new AtomicInteger(1);
 
 	private final File gitDir;
-
-	private final FileBasedConfig userConfig;
 
 	private final RepositoryConfig config;
 
@@ -194,11 +191,26 @@ public class Repository {
 				throw new IllegalArgumentException("Either GIT_DIR or GIT_WORK_TREE must be passed to Repository constructor");
 		}
 
+		final FileBasedConfig userConfig;
 		userConfig = SystemReader.getInstance().openUserConfig();
+		try {
+			userConfig.load();
+		} catch (ConfigInvalidException e1) {
+			IOException e2 = new IOException("User config file "
+					+ userConfig.getFile().getAbsolutePath() + " invalid: "
+					+ e1);
+			e2.initCause(e1);
+			throw e2;
+		}
 		config = new RepositoryConfig(userConfig, FS.resolve(gitDir, "config"));
 
-		loadUserConfig();
-		loadConfig();
+		try {
+			getConfig().load();
+		} catch (ConfigInvalidException e1) {
+			IOException e2 = new IOException("Unknown repository format");
+			e2.initCause(e1);
+			throw e2;
+		}
 
 		if (workDir == null) {
 			String workTreeConfig = getConfig().getString("core", null, "worktree");
@@ -231,29 +243,6 @@ public class Repository {
 			}
 		}
 	}
-
-	private void loadUserConfig() throws IOException {
-		try {
-			userConfig.load();
-		} catch (ConfigInvalidException e1) {
-			IOException e2 = new IOException("User config file "
-					+ userConfig.getFile().getAbsolutePath() + " invalid: "
-					+ e1);
-			e2.initCause(e1);
-			throw e2;
-		}
-	}
-
-	private void loadConfig() throws IOException {
-		try {
-			config.load();
-		} catch (ConfigInvalidException e1) {
-			IOException e2 = new IOException("Unknown repository format");
-			e2.initCause(e1);
-			throw e2;
-		}
-	}
-
 
 	/**
 	 * Create a new Git repository initializing the necessary files and
@@ -331,20 +320,6 @@ public class Repository {
 	 * @return the configuration of this repository
 	 */
 	public RepositoryConfig getConfig() {
-		if (userConfig.isOutdated()) {
-			try {
-				loadUserConfig();
-			} catch (IOException e) {
-				throw new RuntimeException(e);
-			}
-		}
-		if (config.isOutdated()) {
-				try {
-					loadConfig();
-				} catch (IOException e) {
-					throw new RuntimeException(e);
-				}
-		}
 		return config;
 	}
 
@@ -1118,22 +1093,8 @@ public class Repository {
 			return RepositoryState.REBASING_MERGE;
 
 		// Both versions
-		if (new File(gitDir, "MERGE_HEAD").exists()) {
-			// we are merging - now check whether we have unmerged paths
-			try {
-				if (!DirCache.read(this).hasUnmergedPaths()) {
-					// no unmerged paths -> return the MERGING_RESOLVED state
-					return RepositoryState.MERGING_RESOLVED;
-				}
-			} catch (IOException e) {
-				// Can't decide whether unmerged paths exists. Return
-				// MERGING state to be on the safe side (in state MERGING
-				// you are not allow to do anything)
-				e.printStackTrace();
-			}
+		if (new File(gitDir,"MERGE_HEAD").exists())
 			return RepositoryState.MERGING;
-		}
-
 		if (new File(gitDir,"BISECT_LOG").exists())
 			return RepositoryState.BISECTING;
 

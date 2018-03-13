@@ -282,10 +282,8 @@ abstract class BasePackConnection extends BaseConnection {
 	public void close() {
 		if (out != null) {
 			try {
-				if (outNeedsEnd) {
-					outNeedsEnd = false;
+				if (outNeedsEnd)
 					pckOut.end();
-				}
 				out.close();
 			} catch (IOException err) {
 				// Ignore any close errors.
@@ -313,25 +311,6 @@ abstract class BasePackConnection extends BaseConnection {
 				myTimer = null;
 				timeoutIn = null;
 				timeoutOut = null;
-			}
-		}
-	}
-
-	/** Tell the peer we are disconnecting, if it cares to know. */
-	protected void endOut() {
-		if (outNeedsEnd && out != null) {
-			try {
-				outNeedsEnd = false;
-				pckOut.end();
-			} catch (IOException e) {
-				try {
-					out.close();
-				} catch (IOException err) {
-					// Ignore any close errors.
-				} finally {
-					out = null;
-					pckOut = null;
-				}
 			}
 		}
 	}
