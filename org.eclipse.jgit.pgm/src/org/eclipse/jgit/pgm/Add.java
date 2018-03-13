@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
+ * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,44 +40,32 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
 
-/**
- * The result of a {@link RebaseCommand} execution
- */
-public class RebaseResult {
-	/**
-	 * The overall status
-	 */
-	public enum Status {
-		/**
-		 * Rebase was successful, HEAD points to the new commit
-		 */
-		OK,
-		/**
-		 * Aborted; the original HEAD was restored
-		 */
-		ABORTED,
-		/**
-		 * Stopped due to a conflict; must either abort or resolve or skip
-		 */
-		STOPPED,
-		/**
-		 * Already up-to-date
-		 */
-		UP_TO_DATE;
-	}
+package org.eclipse.jgit.pgm;
 
-	private Status mySatus;
+import java.util.ArrayList;
+import java.util.List;
 
-	RebaseResult(Status status) {
-		this.mySatus = status;
-	}
+import org.eclipse.jgit.api.AddCommand;
+import org.eclipse.jgit.api.Git;
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.Option;
 
-	/**
-	 * @return the overall status
-	 */
-	public Status getStatus() {
-		return mySatus;
+@Command(common = true, usage = "usage_addFileContentsToTheIndex")
+class Add extends TextBuiltin {
+
+	@Option(name = "--update", aliases = { "-u" }, usage = "usage_onlyMatchAgainstAlreadyTrackedFiles")
+	private boolean update = false;
+
+	@Argument(required = true, metaVar = "metavar_filepattern", usage = "usage_filesToAddContentFrom")
+	private List<String> filepatterns = new ArrayList<String>();
+
+	@Override
+	protected void run() throws Exception {
+		AddCommand addCmd = new Git(db).add();
+		addCmd.setUpdate(update);
+		for (String p : filepatterns)
+			addCmd.addFilepattern(p);
+		addCmd.call();
 	}
 }
