@@ -166,7 +166,6 @@ public class UnionInputStreamTest {
 		assertEquals(-1, u.read());
 
 		u.add(new ByteArrayInputStream(new byte[] { 20, 30 }) {
-			@Override
 			public long skip(long n) {
 				return 0;
 			}
@@ -181,13 +180,11 @@ public class UnionInputStreamTest {
 		final UnionInputStream u = new UnionInputStream();
 		final boolean closed[] = new boolean[2];
 		u.add(new ByteArrayInputStream(new byte[] { 1 }) {
-			@Override
 			public void close() {
 				closed[0] = true;
 			}
 		});
 		u.add(new ByteArrayInputStream(new byte[] { 2 }) {
-			@Override
 			public void close() {
 				closed[1] = true;
 			}
@@ -214,13 +211,11 @@ public class UnionInputStreamTest {
 		final UnionInputStream u = new UnionInputStream();
 		final boolean closed[] = new boolean[2];
 		u.add(new ByteArrayInputStream(new byte[] { 1 }) {
-			@Override
 			public void close() {
 				closed[0] = true;
 			}
 		});
 		u.add(new ByteArrayInputStream(new byte[] { 2 }) {
-			@Override
 			public void close() {
 				closed[1] = true;
 			}
@@ -239,7 +234,6 @@ public class UnionInputStreamTest {
 	public void testExceptionDuringClose() {
 		final UnionInputStream u = new UnionInputStream();
 		u.add(new ByteArrayInputStream(new byte[] { 1 }) {
-			@Override
 			public void close() throws IOException {
 				throw new IOException("I AM A TEST");
 			}

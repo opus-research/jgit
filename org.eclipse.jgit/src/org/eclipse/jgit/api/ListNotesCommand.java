@@ -77,10 +77,9 @@ public class ListNotesCommand extends GitCommand<List<Note>> {
 	/**
 	 * @return the requested notes
 	 */
-	@Override
 	public List<Note> call() throws GitAPIException {
 		checkCallable();
-		List<Note> notes = new ArrayList<>();
+		List<Note> notes = new ArrayList<Note>();
 		NoteMap map = NoteMap.newEmptyMap();
 		try (RevWalk walk = new RevWalk(repo)) {
 			Ref ref = repo.findRef(notesRef);

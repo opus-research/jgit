@@ -218,7 +218,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 	public B addAlternateObjectDirectory(File other) {
 		if (other != null) {
 			if (alternateObjectDirectories == null)
-				alternateObjectDirectories = new LinkedList<>();
+				alternateObjectDirectories = new LinkedList<File>();
 			alternateObjectDirectories.add(other);
 		}
 		return self();
@@ -429,7 +429,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 	public B addCeilingDirectory(File root) {
 		if (root != null) {
 			if (ceilingDirectories == null)
-				ceilingDirectories = new LinkedList<>();
+				ceilingDirectories = new LinkedList<File>();
 			ceilingDirectories.add(root);
 		}
 		return self();

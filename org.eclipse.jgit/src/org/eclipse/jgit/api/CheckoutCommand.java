@@ -180,7 +180,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	 */
 	protected CheckoutCommand(Repository repo) {
 		super(repo);
-		this.paths = new LinkedList<>();
+		this.paths = new LinkedList<String>();
 	}
 
 	/**
@@ -196,7 +196,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	 *             if the checkout results in a conflict
 	 * @return the newly created branch
 	 */
-	@Override
 	public Ref call() throws GitAPIException, RefAlreadyExistsException,
 			RefNotFoundException, InvalidRefNameException,
 			CheckoutConflictException {
@@ -319,11 +318,9 @@ public class CheckoutCommand extends GitCommand<Ref> {
 
 			if (!dco.getToBeDeleted().isEmpty()) {
 				status = new CheckoutResult(Status.NONDELETED,
-						dco.getToBeDeleted(),
-						new ArrayList<>(dco.getUpdated().keySet()),
-						dco.getRemoved());
+						dco.getToBeDeleted());
 			} else
-				status = new CheckoutResult(new ArrayList<>(dco
+				status = new CheckoutResult(new ArrayList<String>(dco
 						.getUpdated().keySet()), dco.getRemoved());
 
 			return ref;
@@ -364,26 +361,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	public CheckoutCommand addPath(String path) {
 		checkCallable();
 		this.paths.add(path);
-		return this;
-	}
-
-	/**
-	 * Add multiple slash-separated paths to the list of paths to check out. To
-	 * check out all paths, use {@link #setAllPaths(boolean)}.
-	 * <p>
-	 * If this option is set, neither the {@link #setCreateBranch(boolean)} nor
-	 * {@link #setName(String)} option is considered. In other words, these
-	 * options are exclusive.
-	 *
-	 * @param p
-	 *            paths to update in the working tree and index (with
-	 *            <code>/</code> as separator)
-	 * @return {@code this}
-	 * @since 4.6
-	 */
-	public CheckoutCommand addPaths(List<String> p) {
-		checkCallable();
-		this.paths.addAll(p);
 		return this;
 	}
 
@@ -456,7 +433,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			final String filterCommand = treeWalk
 					.getFilterCommand(Constants.ATTR_FILTER_TYPE_SMUDGE);
 			editor.add(new PathEdit(path) {
-				@Override
 				public void apply(DirCacheEntry ent) {
 					int stage = ent.getStage();
 					if (stage > DirCacheEntry.STAGE_0) {
@@ -493,7 +469,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			final String filterCommand = treeWalk
 					.getFilterCommand(Constants.ATTR_FILTER_TYPE_SMUDGE);
 			editor.add(new PathEdit(treeWalk.getPathString()) {
-				@Override
 				public void apply(DirCacheEntry ent) {
 					ent.setObjectId(blobId);
 					ent.setFileMode(mode);

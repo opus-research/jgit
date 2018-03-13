@@ -96,7 +96,7 @@ final class BitSet {
 			}
 
 			if (lastNonEmptyWord != 0)
-				compressed.addWord(lastNonEmptyWord);
+				compressed.add(lastNonEmptyWord);
 
 			if (runningEmptyWords > 0) {
 				compressed.addStreamOfEmptyWords(false, runningEmptyWords);
@@ -107,7 +107,7 @@ final class BitSet {
 		}
 		int bitsThatMatter = 64 - Long.numberOfLeadingZeros(lastNonEmptyWord);
 		if (bitsThatMatter > 0)
-			compressed.addWord(lastNonEmptyWord, bitsThatMatter);
+			compressed.add(lastNonEmptyWord, bitsThatMatter);
 		return compressed;
 	}
 

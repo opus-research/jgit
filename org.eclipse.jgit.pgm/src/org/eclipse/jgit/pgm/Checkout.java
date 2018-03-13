@@ -78,7 +78,7 @@ class Checkout extends TextBuiltin {
 	private String name;
 
 	@Option(name = "--", metaVar = "metaVar_paths", multiValued = true, handler = RestOfArgumentsHandler.class)
-	private List<String> paths = new ArrayList<>();
+	private List<String> paths = new ArrayList<String>();
 
 	@Override
 	protected void run() throws Exception {
@@ -92,11 +92,8 @@ class Checkout extends TextBuiltin {
 			CheckoutCommand command = git.checkout();
 			if (paths.size() > 0) {
 				command.setStartPoint(name);
-				if (paths.size() == 1 && paths.get(0).equals(".")) { //$NON-NLS-1$
-					command.setAllPaths(true);
-				} else {
-					command.addPaths(paths);
-				}
+				for (String path : paths)
+					command.addPath(path);
 			} else {
 				command.setCreateBranch(createBranch);
 				command.setName(name);
