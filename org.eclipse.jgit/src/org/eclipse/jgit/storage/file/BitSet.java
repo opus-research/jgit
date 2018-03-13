@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.storage.file;
 
-import java.util.Arrays;
-
 import javaewah.EWAHCompressedBitmap;
 
 /**
@@ -57,10 +55,6 @@ final class BitSet {
 
 	BitSet(int initialCapacity) {
 		words = new long[block(initialCapacity) + 1];
-	}
-
-	final void clear() {
-		Arrays.fill(words, 0);
 	}
 
 	final void set(int position) {
