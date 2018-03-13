@@ -64,6 +64,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -116,6 +117,8 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	/** Maximum number of candidates offered as resolutions of abbreviation. */
 	private static final int RESOLVE_ABBREV_LIMIT = 256;
+
+	private final AlternateHandle handle = new AlternateHandle(this);
 
 	private final Config config;
 
@@ -294,26 +297,38 @@ public class ObjectDirectory extends FileObjectDatabase {
 	@Override
 	public boolean has(AnyObjectId objectId) {
 		return unpackedObjectCache.isUnpacked(objectId)
-				|| hasPackedInSelfOrAlternate(objectId)
-				|| hasLooseInSelfOrAlternate(objectId);
+				|| hasPackedInSelfOrAlternate(objectId, null)
+				|| hasLooseInSelfOrAlternate(objectId, null);
 	}
 
-	private boolean hasPackedInSelfOrAlternate(AnyObjectId objectId) {
-		if (hasPackedObject(objectId))
+	private boolean hasPackedInSelfOrAlternate(AnyObjectId objectId,
+			Set<AlternateHandle.Id> skips) {
+		if (hasPackedObject(objectId)) {
 			return true;
+		}
+		skips = addMe(skips);
 		for (AlternateHandle alt : myAlternates()) {
-			if (alt.db.hasPackedInSelfOrAlternate(objectId))
-				return true;
+			if (!skips.contains(alt.getId())) {
+				if (alt.db.hasPackedInSelfOrAlternate(objectId, skips)) {
+					return true;
+				}
+			}
 		}
 		return false;
 	}
 
-	private boolean hasLooseInSelfOrAlternate(AnyObjectId objectId) {
-		if (fileFor(objectId).exists())
+	private boolean hasLooseInSelfOrAlternate(AnyObjectId objectId,
+			Set<AlternateHandle.Id> skips) {
+		if (fileFor(objectId).exists()) {
 			return true;
+		}
+		skips = addMe(skips);
 		for (AlternateHandle alt : myAlternates()) {
-			if (alt.db.hasLooseInSelfOrAlternate(objectId))
-				return true;
+			if (!skips.contains(alt.getId())) {
+				if (alt.db.hasLooseInSelfOrAlternate(objectId, skips)) {
+					return true;
+				}
+			}
 		}
 		return false;
 	}
@@ -340,6 +355,12 @@ public class ObjectDirectory extends FileObjectDatabase {
 	@Override
 	void resolve(Set<ObjectId> matches, AbbreviatedObjectId id)
 			throws IOException {
+		resolve(matches, id, null);
+	}
+
+	private void resolve(Set<ObjectId> matches, AbbreviatedObjectId id,
+			Set<AlternateHandle.Id> skips)
+			throws IOException {
 		// Go through the packs once. If we didn't find any resolutions
 		// scan for new packs and check once more.
 		int oldSize = matches.size();
@@ -349,6 +370,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 			for (PackFile p : pList.packs) {
 				try {
 					p.resolve(matches, id, RESOLVE_ABBREV_LIMIT);
+					p.resetTransientErrorCount();
 				} catch (IOException e) {
 					handlePackError(e, p);
 				}
@@ -375,10 +397,14 @@ public class ObjectDirectory extends FileObjectDatabase {
 			}
 		}
 
+		skips = addMe(skips);
 		for (AlternateHandle alt : myAlternates()) {
-			alt.db.resolve(matches, id);
-			if (matches.size() > RESOLVE_ABBREV_LIMIT)
-				return;
+			if (!skips.contains(alt.getId())) {
+				alt.db.resolve(matches, id, skips);
+				if (matches.size() > RESOLVE_ABBREV_LIMIT) {
+					return;
+				}
+			}
 		}
 	}
 
@@ -387,37 +413,50 @@ public class ObjectDirectory extends FileObjectDatabase {
 			throws IOException {
 		if (unpackedObjectCache.isUnpacked(objectId)) {
 			ObjectLoader ldr = openLooseObject(curs, objectId);
-			if (ldr != null)
+			if (ldr != null) {
 				return ldr;
+			}
 		}
-		ObjectLoader ldr = openPackedFromSelfOrAlternate(curs, objectId);
-		if (ldr != null)
+		ObjectLoader ldr = openPackedFromSelfOrAlternate(curs, objectId, null);
+		if (ldr != null) {
 			return ldr;
-		return openLooseFromSelfOrAlternate(curs, objectId);
+		}
+		return openLooseFromSelfOrAlternate(curs, objectId, null);
 	}
 
 	private ObjectLoader openPackedFromSelfOrAlternate(WindowCursor curs,
-			AnyObjectId objectId) {
+			AnyObjectId objectId, Set<AlternateHandle.Id> skips) {
 		ObjectLoader ldr = openPackedObject(curs, objectId);
-		if (ldr != null)
+		if (ldr != null) {
 			return ldr;
+		}
+		skips = addMe(skips);
 		for (AlternateHandle alt : myAlternates()) {
-			ldr = alt.db.openPackedFromSelfOrAlternate(curs, objectId);
-			if (ldr != null)
-				return ldr;
+			if (!skips.contains(alt.getId())) {
+				ldr = alt.db.openPackedFromSelfOrAlternate(curs, objectId, skips);
+				if (ldr != null) {
+					return ldr;
+				}
+			}
 		}
 		return null;
 	}
 
 	private ObjectLoader openLooseFromSelfOrAlternate(WindowCursor curs,
-			AnyObjectId objectId) throws IOException {
+			AnyObjectId objectId, Set<AlternateHandle.Id> skips)
+					throws IOException {
 		ObjectLoader ldr = openLooseObject(curs, objectId);
-		if (ldr != null)
+		if (ldr != null) {
 			return ldr;
+		}
+		skips = addMe(skips);
 		for (AlternateHandle alt : myAlternates()) {
-			ldr = alt.db.openLooseFromSelfOrAlternate(curs, objectId);
-			if (ldr != null)
-				return ldr;
+			if (!skips.contains(alt.getId())) {
+				ldr = alt.db.openLooseFromSelfOrAlternate(curs, objectId, skips);
+				if (ldr != null) {
+					return ldr;
+				}
+			}
 		}
 		return null;
 	}
@@ -430,6 +469,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 				for (PackFile p : pList.packs) {
 					try {
 						ObjectLoader ldr = p.get(curs, objectId);
+						p.resetTransientErrorCount();
 						if (ldr != null)
 							return ldr;
 					} catch (PackMismatchException e) {
@@ -467,37 +507,49 @@ public class ObjectDirectory extends FileObjectDatabase {
 			throws IOException {
 		if (unpackedObjectCache.isUnpacked(id)) {
 			long len = getLooseObjectSize(curs, id);
-			if (0 <= len)
+			if (0 <= len) {
 				return len;
+			}
 		}
-		long len = getPackedSizeFromSelfOrAlternate(curs, id);
-		if (0 <= len)
+		long len = getPackedSizeFromSelfOrAlternate(curs, id, null);
+		if (0 <= len) {
 			return len;
-		return getLooseSizeFromSelfOrAlternate(curs, id);
+		}
+		return getLooseSizeFromSelfOrAlternate(curs, id, null);
 	}
 
 	private long getPackedSizeFromSelfOrAlternate(WindowCursor curs,
-			AnyObjectId id) {
+			AnyObjectId id, Set<AlternateHandle.Id> skips) {
 		long len = getPackedObjectSize(curs, id);
-		if (0 <= len)
+		if (0 <= len) {
 			return len;
+		}
+		skips = addMe(skips);
 		for (AlternateHandle alt : myAlternates()) {
-			len = alt.db.getPackedSizeFromSelfOrAlternate(curs, id);
-			if (0 <= len)
-				return len;
+			if (!skips.contains(alt.getId())) {
+				len = alt.db.getPackedSizeFromSelfOrAlternate(curs, id, skips);
+				if (0 <= len) {
+					return len;
+				}
+			}
 		}
 		return -1;
 	}
 
 	private long getLooseSizeFromSelfOrAlternate(WindowCursor curs,
-			AnyObjectId id) throws IOException {
+			AnyObjectId id, Set<AlternateHandle.Id> skips) throws IOException {
 		long len = getLooseObjectSize(curs, id);
-		if (0 <= len)
+		if (0 <= len) {
 			return len;
+		}
+		skips = addMe(skips);
 		for (AlternateHandle alt : myAlternates()) {
-			len = alt.db.getLooseSizeFromSelfOrAlternate(curs, id);
-			if (0 <= len)
-				return len;
+			if (!skips.contains(alt.getId())) {
+				len = alt.db.getLooseSizeFromSelfOrAlternate(curs, id, skips);
+				if (0 <= len) {
+					return len;
+				}
+			}
 		}
 		return -1;
 	}
@@ -510,6 +562,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 				for (PackFile p : pList.packs) {
 					try {
 						long len = p.getObjectSize(curs, id);
+						p.resetTransientErrorCount();
 						if (0 <= len)
 							return len;
 					} catch (PackMismatchException e) {
@@ -543,12 +596,18 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	@Override
 	void selectObjectRepresentation(PackWriter packer, ObjectToPack otp,
-			WindowCursor curs) throws IOException {
+																	WindowCursor curs) throws IOException {
+		selectObjectRepresentation(packer, otp, curs, null);
+	}
+
+	private void selectObjectRepresentation(PackWriter packer, ObjectToPack otp,
+			WindowCursor curs, Set<AlternateHandle.Id> skips) throws IOException {
 		PackList pList = packList.get();
 		SEARCH: for (;;) {
 			for (final PackFile p : pList.packs) {
 				try {
 					LocalObjectRepresentation rep = p.representation(curs, otp);
+					p.resetTransientErrorCount();
 					if (rep != null)
 						packer.select(otp, rep);
 				} catch (PackMismatchException e) {
@@ -563,12 +622,18 @@ public class ObjectDirectory extends FileObjectDatabase {
 			break SEARCH;
 		}
 
-		for (AlternateHandle h : myAlternates())
-			h.db.selectObjectRepresentation(packer, otp, curs);
+		skips = addMe(skips);
+		for (AlternateHandle h : myAlternates()) {
+			if (!skips.contains(h.getId())) {
+				h.db.selectObjectRepresentation(packer, otp, curs, skips);
+			}
+		}
 	}
 
 	private void handlePackError(IOException e, PackFile p) {
 		String warnTmpl = null;
+		int transientErrorCount = 0;
+		String errTmpl = JGitText.get().exceptionWhileReadingPack;
 		if ((e instanceof CorruptObjectException)
 				|| (e instanceof PackInvalidException)) {
 			warnTmpl = JGitText.get().corruptPack;
@@ -576,14 +641,17 @@ public class ObjectDirectory extends FileObjectDatabase {
 			removePack(p);
 		} else if (e instanceof FileNotFoundException) {
 			if (p.getPackFile().exists()) {
-				warnTmpl = JGitText.get().packInaccessible;
+				errTmpl = JGitText.get().packInaccessible;
+				transientErrorCount = p.incrementTransientErrorCount();
 			} else {
 				warnTmpl = JGitText.get().packWasDeleted;
+				removePack(p);
 			}
-			removePack(p);
 		} else if (FileUtils.isStaleFileHandleInCausalChain(e)) {
 			warnTmpl = JGitText.get().packHandleIsStale;
 			removePack(p);
+		} else {
+			transientErrorCount = p.incrementTransientErrorCount();
 		}
 		if (warnTmpl != null) {
 			if (LOG.isDebugEnabled()) {
@@ -594,12 +662,23 @@ public class ObjectDirectory extends FileObjectDatabase {
 						p.getPackFile().getAbsolutePath()));
 			}
 		} else {
-			// Don't remove the pack from the list, as the error may be
-			// transient.
-			LOG.error(MessageFormat.format(
-					JGitText.get().exceptionWhileReadingPack, p.getPackFile()
-							.getAbsolutePath()), e);
+			if (doLogExponentialBackoff(transientErrorCount)) {
+				// Don't remove the pack from the list, as the error may be
+				// transient.
+				LOG.error(MessageFormat.format(errTmpl,
+						p.getPackFile().getAbsolutePath()),
+						Integer.valueOf(transientErrorCount), e);
+			}
 		}
+	}
+
+	/**
+	 * @param n
+	 *            count of consecutive failures
+	 * @return @{code true} if i is a power of 2
+	 */
+	private boolean doLogExponentialBackoff(int n) {
+		return (n & (n - 1)) == 0;
 	}
 
 	@Override
@@ -910,6 +989,14 @@ public class ObjectDirectory extends FileObjectDatabase {
 		return alt;
 	}
 
+	Set<AlternateHandle.Id> addMe(Set<AlternateHandle.Id> skips) {
+		if (skips == null) {
+			skips = new HashSet<>();
+		}
+		skips.add(handle.getId());
+		return skips;
+	}
+
 	private AlternateHandle[] loadAlternates() throws IOException {
 		final List<AlternateHandle> l = new ArrayList<>(4);
 		final BufferedReader br = open(alternatesFile);
@@ -976,6 +1063,38 @@ public class ObjectDirectory extends FileObjectDatabase {
 	}
 
 	static class AlternateHandle {
+		static class Id {
+			String alternateId;
+
+			public Id(File object) {
+				try {
+					this.alternateId = object.getCanonicalPath();
+				} catch (Exception e) {
+					alternateId = null;
+				}
+			}
+
+			@Override
+			public boolean equals(Object o) {
+				if (o == this) {
+					return true;
+				}
+				if (o == null || !(o instanceof Id)) {
+					return false;
+				}
+				Id aId = (Id) o;
+				return Objects.equals(alternateId, aId.alternateId);
+			}
+
+			@Override
+			public int hashCode() {
+				if (alternateId == null) {
+					return 1;
+				}
+				return alternateId.hashCode();
+			}
+		}
+
 		final ObjectDirectory db;
 
 		AlternateHandle(ObjectDirectory db) {
@@ -984,6 +1103,10 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 		void close() {
 			db.close();
+		}
+
+		public Id getId(){
+			return db.getAlternateId();
 		}
 	}
 
@@ -1008,5 +1131,9 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	CachedObjectDirectory newCachedFileObjectDatabase() {
 		return new CachedObjectDirectory(this);
+	}
+
+	AlternateHandle.Id getAlternateId() {
+		return new AlternateHandle.Id(objects);
 	}
 }
