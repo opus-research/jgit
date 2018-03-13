@@ -856,8 +856,10 @@ public class ConfigTest {
 		assertEquals("bar", parsed.getString("other", null, "more"));
 	}
 
-	private static String pathToString(File more) {
-		return more.toPath().toString().replace(File.separatorChar, '/');
+	private static String pathToString(File file) {
+		final String path = file.getPath();
+		return SystemReader.getInstance().isWindows() ? path.replace('\\', '/')
+				: path;
 	}
 
 	private static void assertReadLong(long exp) throws ConfigInvalidException {
