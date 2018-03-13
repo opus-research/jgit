@@ -53,10 +53,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeSet;
 
 import org.eclipse.jgit.dircache.DirCache;
@@ -108,7 +106,7 @@ public abstract class LocalDiskRepositoryTestCase {
 	 */
 	protected MockSystemReader mockSystemReader;
 
-	private final Set<Repository> toClose = new HashSet<>();
+	private final List<Repository> toClose = new ArrayList<Repository>();
 	private File tmp;
 
 	@Before
@@ -359,32 +357,12 @@ public abstract class LocalDiskRepositoryTestCase {
 	 * @throws IOException
 	 *             the repository could not be created in the temporary area
 	 */
-	private FileRepository createRepository(boolean bare)
-			throws IOException {
-		return createRepository(bare, true);
-	}
-
-	/**
-	 * Creates a new empty repository.
-	 *
-	 * @param bare
-	 *            true to create a bare repository; false to make a repository
-	 *            within its working directory
-	 * @param autoClose
-	 *            auto close the repository in #tearDown
-	 * @return the newly created repository, opened for access
-	 * @throws IOException
-	 *             the repository could not be created in the temporary area
-	 */
-	public FileRepository createRepository(boolean bare, boolean autoClose)
-			throws IOException {
+	private FileRepository createRepository(boolean bare) throws IOException {
 		File gitdir = createUniqueTestGitDir(bare);
 		FileRepository db = new FileRepository(gitdir);
 		assertFalse(gitdir.exists());
 		db.create(bare);
-		if (autoClose) {
-			addRepoToClose(db);
-		}
+		toClose.add(db);
 		return db;
 	}
 
