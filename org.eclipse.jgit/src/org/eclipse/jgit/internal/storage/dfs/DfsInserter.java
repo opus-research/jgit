@@ -81,6 +81,7 @@ import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ObjectStream;
+import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.PackedObjectInfo;
 import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.IO;
@@ -120,7 +121,7 @@ public class DfsInserter extends ObjectInserter {
 	}
 
 	@Override
-	public ObjectReader newReader() {
+	public ObjectReader newReader(Repository notUsed) {
 		return new Reader();
 	}
 
