@@ -79,7 +79,6 @@ public class RepoCommandTest extends RepositoryTestCase {
 
 	private ObjectId oldCommitId;
 
-	@Override
 	public void setUp() throws Exception {
 		super.setUp();
 

@@ -77,7 +77,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class ConcurrentRepackTest extends RepositoryTestCase {
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		WindowCacheConfig windowCacheConfig = new WindowCacheConfig();
@@ -86,7 +85,6 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 		super.setUp();
 	}
 
-	@Override
 	@After
 	public void tearDown() throws Exception {
 		super.tearDown();

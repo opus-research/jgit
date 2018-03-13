@@ -286,7 +286,6 @@ public abstract class RevFilter {
 	 *
 	 * @return another copy of this filter, suitable for another thread.
 	 */
-	@Override
 	public abstract RevFilter clone();
 
 	@Override

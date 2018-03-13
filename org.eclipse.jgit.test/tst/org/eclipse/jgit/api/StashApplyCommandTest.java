@@ -77,7 +77,6 @@ public class StashApplyCommandTest extends RepositoryTestCase {
 
 	private File committedFile;
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
