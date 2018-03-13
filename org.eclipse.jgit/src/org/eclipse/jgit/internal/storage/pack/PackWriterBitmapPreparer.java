@@ -114,7 +114,6 @@ class PackWriterBitmapPreparer {
 			IOException {
 		pm.beginTask(JGitText.get().selectingCommits, ProgressMonitor.UNKNOWN);
 		RevWalk rw = new RevWalk(reader);
-		rw.setRetainBody(false);
 		WalkResult result = findPaths(rw, expectedNumCommits);
 		pm.endTask();
 
