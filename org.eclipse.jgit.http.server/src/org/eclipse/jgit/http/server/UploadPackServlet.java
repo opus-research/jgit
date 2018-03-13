@@ -74,7 +74,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.InternalHttpServerGlue;
 import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 import org.eclipse.jgit.transport.UploadPack;
 import org.eclipse.jgit.transport.UploadPackInternalServerErrorException;
@@ -101,9 +100,6 @@ class UploadPackServlet extends HttpServlet {
 				throws IOException, ServiceNotEnabledException,
 				ServiceNotAuthorizedException {
 			UploadPack up = uploadPackFactory.create(req, db);
-			InternalHttpServerGlue.setPeerUserAgent(
-					up,
-					req.getHeader(HDR_USER_AGENT));
 			req.setAttribute(ATTRIBUTE_HANDLER, up);
 		}
 
