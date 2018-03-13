@@ -78,6 +78,8 @@ public class ObjectWriter {
 
 	private final MessageDigest md;
 
+	private final Deflater def;
+
 	/**
 	 * Construct an Object writer for the specified repository
 	 * @param d
@@ -86,6 +88,7 @@ public class ObjectWriter {
 		r = d;
 		buf = new byte[8192];
 		md = Constants.newMessageDigest();
+		def = new Deflater(r.getConfig().getCore().getCompression());
 	}
 
 	/**
@@ -306,7 +309,6 @@ public class ObjectWriter {
 		final DeflaterOutputStream deflateStream;
 		final FileOutputStream fileStream;
 		ObjectId id = null;
-		Deflater def = null;
 
 		if (store) {
 			t = File.createTempFile("noz", null, r.getObjectsDirectory());
@@ -318,7 +320,7 @@ public class ObjectWriter {
 
 		md.reset();
 		if (store) {
-			def = new Deflater(r.getConfig().getCore().getCompression());
+			def.reset();
 			deflateStream = new DeflaterOutputStream(fileStream, def);
 		} else
 			deflateStream = null;
@@ -371,9 +373,6 @@ public class ObjectWriter {
 				} finally {
 					t.delete();
 				}
-			}
-			if (def != null) {
-				def.end();
 			}
 		}
 
