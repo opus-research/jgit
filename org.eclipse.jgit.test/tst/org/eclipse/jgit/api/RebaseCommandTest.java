@@ -1526,11 +1526,9 @@ public class RebaseCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testRebaseIteractiveEditAction() throws Exception {
-		String emptyLine = "\n";
-		String todo = "pick 1111111 Commit 1\n" + emptyLine
-				+ "reword 2222222 Commit 2\n" + emptyLine
-				+ "# Comment line at end\n";
+	public void testParseRewordCommand() throws Exception {
+		String todo = "pick 1111111 Commit 1\n"
+				+ "reword 2222222 Commit 2\n";
 		write(getTodoFile(), todo);
 
 		RebaseCommand rebaseCommand = git.rebase();
@@ -1581,58 +1579,6 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		logIterator.next(); // skip first commit;
 		String actualCommitMag = logIterator.next().getShortMessage();
 		assertEquals("rewritten commit message", actualCommitMag);
-	}
-
-	@Test
-	public void testRebaseInteractiveEdit() throws Exception {
-		// create file1 on master
-		writeTrashFile(FILE1, FILE1);
-		git.add().addFilepattern(FILE1).call();
-		git.commit().setMessage("Add file1").call();
-		assertTrue(new File(db.getWorkTree(), FILE1).exists());
-
-		// create file2 on master
-		writeTrashFile("file2", "file2");
-		git.add().addFilepattern("file2").call();
-		git.commit().setMessage("Add file2").call();
-		assertTrue(new File(db.getWorkTree(), "file2").exists());
-
-		// update FILE1 on master
-		writeTrashFile(FILE1, "blah");
-		git.add().addFilepattern(FILE1).call();
-		git.commit().setMessage("updated file1 on master").call();
-
-		writeTrashFile("file2", "more change");
-		git.add().addFilepattern("file2").call();
-		git.commit().setMessage("update file2 on side").call();
-
-		RebaseResult res = git.rebase().setUpstream("HEAD~2")
-				.runInteractively(new InteractiveHandler() {
-					public void prepareSteps(List<Step> steps) {
-						steps.get(0).action = Action.EDIT;
-					}
-
-					public String modifyCommitMessage(String commit) {
-						return ""; // not used
-					}
-				}).call();
-		assertEquals(Status.STOPPED, res.getStatus());
-		RevCommit toBeEditted = git.log().call().iterator().next();
-		assertEquals("updated file1 on master", toBeEditted.getFullMessage());
-
-		// change file and commit with new commit message
-		writeTrashFile("file1", "edited");
-		git.commit().setAll(true).setAmend(true)
-				.setMessage("edited commit message").call();
-		// resume rebase
-		res = git.rebase().setOperation(Operation.CONTINUE).call();
-
-		checkFile(new File(db.getWorkTree(), "file1"), "edited");
-		assertEquals(Status.OK, res.getStatus());
-		Iterator<RevCommit> logIterator = git.log().all().call().iterator();
-		logIterator.next(); // skip first commit;
-		String actualCommitMag = logIterator.next().getShortMessage();
-		assertEquals("edited commit message", actualCommitMag);
 	}
 
 	private File getTodoFile() {

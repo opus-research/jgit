@@ -143,8 +143,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 	private static final String REBASE_HEAD = "head";
 
-	private static final String AMEND = "amend";
-
 	/**
 	 * The available operations
 	 */
@@ -242,12 +240,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			if (operation == Operation.CONTINUE) {
 				newHead = continueRebase();
 
-				File amendFile = new File(rebaseDir, AMEND);
-				boolean ammendExists = amendFile.exists();
-				if (ammendExists) {
-					FileUtils.delete(amendFile);
-				}
-				if (newHead == null && !ammendExists) {
+				if (newHead == null) {
 					// continueRebase() returns null only if no commit was
 					// neccessary. This means that no changes where left over
 					// after resolving all conflicts. In this case, cgit stops
@@ -269,7 +262,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 						new OutputStreamWriter(new FileOutputStream(new File(
 								rebaseDir, GIT_REBASE_TODO)),
 								Constants.CHARACTER_ENCODING));
-				fw.write("# Created by EGit: rebasing " + upstreamCommit.name());
 				fw.newLine();
 				try {
 					StringBuilder sb = new StringBuilder();
@@ -279,7 +271,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 						sb.append(" ");
 						sb.append(step.commit.name());
 						sb.append(" ");
-						sb.append(new String(step.shortMessage).trim());
+						sb.append(new String(step.shortMessage,
+								Constants.CHARACTER_ENCODING).trim());
 						fw.write(sb.toString());
 						fw.newLine();
 					}
@@ -338,9 +331,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 						newHead = new Git(repo).commit().setMessage(newMessage)
 								.setAmend(true).call();
 						continue;
-					case EDIT:
-						createFile(rebaseDir, AMEND, commitToPick.name());
-						return stop(commitToPick);
 					}
 				} finally {
 					monitor.endTask();
@@ -539,6 +529,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				String popCandidate = br.readLine();
 				if (popCandidate == null)
 					break;
+				if (popCandidate.length() == 0)
+					continue;
 				if (popCandidate.charAt(0) == '#')
 					continue;
 				int spaceIndex = popCandidate.indexOf(' ');
@@ -1078,9 +1070,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		/** Use commit */
 		PICK("pick", "p"),
 		/** Use commit, but edit the commit message */
-		REWORD("reword", "r"),
-		/** Use commit, but stop for amending */
-		EDIT("edit", "e"); // later add SQUASH, FIXUP, etc.
+		REWORD("reword", "r"); // later add SQUASH, EDIT, etc.
 
 		private final String token;
 
@@ -1104,14 +1094,13 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		}
 
 		static Action parse(String token) {
-			for (Action action : Action.values()) {
-				if (action.token.equals(token)
-						|| action.shortToken.equals(token))
-					return action;
-			}
+			if (token.equals(PICK.token) || token.equals(PICK.shortToken))
+				return PICK;
+			if (token.equals(REWORD.token) || token.equals(REWORD.shortToken))
+				return REWORD;
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().unknownOrUnsupportedCommand, token,
-					Action.values()));
+					PICK.toToken()));
 		}
 	}
 
