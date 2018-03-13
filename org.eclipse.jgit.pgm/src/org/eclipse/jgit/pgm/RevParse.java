@@ -57,7 +57,6 @@ import org.kohsuke.args4j.Option;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.pgm.internal.CLIText;
-import org.eclipse.jgit.pgm.opt.CmdLineParser;
 
 @Command(usage = "usage_RevParse")
 class RevParse extends TextBuiltin {
@@ -79,8 +78,7 @@ class RevParse extends TextBuiltin {
 			}
 		} else {
 			if (verify && commits.size() > 1) {
-				final CmdLineParser clp = new CmdLineParser(this);
-				throw new CmdLineException(clp, CLIText.get().needSingleRevision);
+				throw new CmdLineException(CLIText.get().needSingleRevision);
 			}
 
 			for (final ObjectId o : commits) {
