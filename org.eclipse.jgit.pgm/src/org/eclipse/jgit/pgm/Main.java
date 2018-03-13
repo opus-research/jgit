@@ -44,11 +44,8 @@
 
 package org.eclipse.jgit.pgm;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-
 import java.io.File;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
@@ -195,7 +192,7 @@ public class Main {
 	}
 
 	PrintWriter createErrorWriter() {
-		return new PrintWriter(new OutputStreamWriter(System.err, UTF_8));
+		return new PrintWriter(System.err);
 	}
 
 	private void execute(final String[] argv) throws Exception {
