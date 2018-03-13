@@ -112,23 +112,18 @@ import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
  *            type of Repository the test data is stored on.
  */
 public class TestRepository<R extends Repository> {
-	private static final PersonIdent defaultAuthor;
 
-	private static final PersonIdent defaultCommitter;
+	public static final String AUTHOR = "J. Author";
 
-	static {
-		final MockSystemReader m = new MockSystemReader();
-		final long now = m.getCurrentTime();
-		final int tz = m.getTimezone(now);
+	public static final String AUTHOR_EMAIL = "jauthor@example.com";
 
-		final String an = "J. Author";
-		final String ae = "jauthor@example.com";
-		defaultAuthor = new PersonIdent(an, ae, now, tz);
+	public static final String COMMITTER = "J. Committer";
 
-		final String cn = "J. Committer";
-		final String ce = "jcommitter@example.com";
-		defaultCommitter = new PersonIdent(cn, ce, now, tz);
-	}
+	public static final String COMMITTER_EMAIL = "jcommitter@example.com";
+
+	private final PersonIdent defaultAuthor;
+
+	private final PersonIdent defaultCommitter;
 
 	private final R db;
 
@@ -184,6 +179,10 @@ public class TestRepository<R extends Repository> {
 		this.pool = rw;
 		this.inserter = db.newObjectInserter();
 		this.mockSystemReader = reader;
+		long now = mockSystemReader.getCurrentTime();
+		int tz = mockSystemReader.getTimezone(now);
+		defaultAuthor = new PersonIdent(AUTHOR, AUTHOR_EMAIL, now, tz);
+		defaultCommitter = new PersonIdent(COMMITTER, COMMITTER_EMAIL, now, tz);
 	}
 
 	/** @return the repository this helper class operates against. */
@@ -587,6 +586,31 @@ public class TestRepository<R extends Repository> {
 		}
 	}
 
+	/**
+	 * Delete a reference.
+	 *
+	 * @param ref
+	 *	      the name of the reference to delete. This is normalized
+	 *	      in the same way as {@link #update(String, AnyObjectId)}.
+	 * @throws Exception
+	 * @since 4.4
+	 */
+	public void delete(String ref) throws Exception {
+		ref = normalizeRef(ref);
+		RefUpdate u = db.updateRef(ref);
+		switch (u.delete()) {
+		case FAST_FORWARD:
+		case FORCED:
+		case NEW:
+		case NO_CHANGE:
+			updateServerInfo();
+			return;
+
+		default:
+			throw new IOException("Cannot delete " + ref + " " + u.getResult());
+		}
+	}
+
 	private static String normalizeRef(String ref) {
 		if (Constants.HEAD.equals(ref)) {
 			// nothing
@@ -822,7 +846,7 @@ public class TestRepository<R extends Repository> {
 					break;
 
 				final byte[] bin = db.open(o, o.getType()).getCachedBytes();
-				oc.checkCommit(bin);
+				oc.checkCommit(o, bin);
 				assertHash(o, bin);
 			}
 
@@ -832,7 +856,7 @@ public class TestRepository<R extends Repository> {
 					break;
 
 				final byte[] bin = db.open(o, o.getType()).getCachedBytes();
-				oc.check(o.getType(), bin);
+				oc.check(o, o.getType(), bin);
 				assertHash(o, bin);
 			}
 		}
@@ -866,7 +890,7 @@ public class TestRepository<R extends Repository> {
 				Set<ObjectId> all = new HashSet<ObjectId>();
 				for (Ref r : db.getAllRefs().values())
 					all.add(r.getObjectId());
-				pw.preparePack(m, all, Collections.<ObjectId> emptySet());
+				pw.preparePack(m, all, PackWriter.NONE);
 
 				final ObjectId name = pw.computeName();
 
@@ -905,7 +929,7 @@ public class TestRepository<R extends Repository> {
 
 	private void writeFile(final File p, final byte[] bin) throws IOException,
 			ObjectWritingException {
-		final LockFile lck = new LockFile(p, db.getFS());
+		final LockFile lck = new LockFile(p);
 		if (!lck.lock())
 			throw new ObjectWritingException("Can't write " + p);
 		try {
@@ -959,6 +983,15 @@ public class TestRepository<R extends Repository> {
 		 */
 		public RevCommit update(RevCommit to) throws Exception {
 			return TestRepository.this.update(ref, to);
+		}
+
+		/**
+		 * Delete this branch.
+		 * @throws Exception
+		 * @since 4.4
+		 */
+		public void delete() throws Exception {
+			TestRepository.this.delete(ref);
 		}
 	}
 
@@ -1155,8 +1188,7 @@ public class TestRepository<R extends Repository> {
 			return self;
 		}
 
-		private void insertChangeId(org.eclipse.jgit.lib.CommitBuilder c)
-				throws IOException {
+		private void insertChangeId(org.eclipse.jgit.lib.CommitBuilder c) {
 			if (changeId == null)
 				return;
 			int idx = ChangeIdUtil.indexOfChangeId(message, "\n");

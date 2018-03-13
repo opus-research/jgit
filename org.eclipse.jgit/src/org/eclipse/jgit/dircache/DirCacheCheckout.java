@@ -46,6 +46,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.StandardCopyOption;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -61,6 +62,7 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
+import org.eclipse.jgit.lib.CoreConfig.EolStreamType;
 import org.eclipse.jgit.lib.CoreConfig.SymLinks;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -83,16 +85,43 @@ import org.eclipse.jgit.util.FS.ExecutionResult;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.SystemReader;
-import org.eclipse.jgit.util.io.AutoCRLFOutputStream;
+import org.eclipse.jgit.util.io.EolStreamTypeUtil;
 
 /**
  * This class handles checking out one or two trees merging with the index.
  */
 public class DirCacheCheckout {
 	private static final int MAX_EXCEPTION_TEXT_SIZE = 10 * 1024;
+
+	/**
+	 * Metadata used in checkout process
+	 *
+	 * @since 4.3
+	 */
+	public static class CheckoutMetadata {
+		/** git attributes */
+		public final EolStreamType eolStreamType;
+
+		/** filter command to apply */
+		public final String smudgeFilterCommand;
+
+		/**
+		 * @param eolStreamType
+		 * @param smudgeFilterCommand
+		 */
+		public CheckoutMetadata(EolStreamType eolStreamType,
+				String smudgeFilterCommand) {
+			this.eolStreamType = eolStreamType;
+			this.smudgeFilterCommand = smudgeFilterCommand;
+		}
+
+		static CheckoutMetadata EMPTY = new CheckoutMetadata(
+				EolStreamType.DIRECT, null);
+	}
+
 	private Repository repo;
 
-	private HashMap<String, String> updated = new HashMap<String, String>();
+	private HashMap<String, CheckoutMetadata> updated = new HashMap<String, CheckoutMetadata>();
 
 	private ArrayList<String> conflicts = new ArrayList<String>();
 
@@ -119,7 +148,7 @@ public class DirCacheCheckout {
 	/**
 	 * @return a list of updated paths and smudgeFilterCommands
 	 */
-	public Map<String, String> getUpdated() {
+	public Map<String, CheckoutMetadata> getUpdated() {
 		return updated;
 	}
 
@@ -251,8 +280,9 @@ public class DirCacheCheckout {
 
 		addTree(walk, headCommitTree);
 		addTree(walk, mergeCommitTree);
-		walk.addTree(new DirCacheBuildIterator(builder));
+		int dciPos = walk.addTree(new DirCacheBuildIterator(builder));
 		walk.addTree(workingTree);
+		workingTree.setDirCacheIterator(walk, dciPos);
 
 		while (walk.next()) {
 			processEntry(walk.getTree(0, CanonicalTreeParser.class),
@@ -291,8 +321,9 @@ public class DirCacheCheckout {
 
 		walk = new NameConflictTreeWalk(repo);
 		addTree(walk, mergeCommitTree);
-		walk.addTree(new DirCacheBuildIterator(builder));
+		int dciPos = walk.addTree(new DirCacheBuildIterator(builder));
 		walk.addTree(workingTree);
+		workingTree.setDirCacheIterator(walk, dciPos);
 
 		while (walk.next()) {
 			processEntry(walk.getTree(0, CanonicalTreeParser.class),
@@ -323,16 +354,8 @@ public class DirCacheCheckout {
 				// The index entry is missing
 				if (f != null && !FileMode.TREE.equals(f.getEntryFileMode())
 						&& !f.isEntryIgnored()) {
-					if (failOnConflict) {
-						// don't overwrite an untracked and not ignored file
-						conflicts.add(walk.getPathString());
-					} else {
-						// failOnConflict is false. Putting something to conflicts
-						// would mean we delete it. Instead we want the mergeCommit
-						// content to be checked out.
-						update(m.getEntryPathString(), m.getEntryObjectId(),
-								m.getEntryFileMode());
-					}
+					// don't overwrite an untracked and not ignored file
+					conflicts.add(walk.getPathString());
 				} else
 					update(m.getEntryPathString(), m.getEntryObjectId(),
 						m.getEntryFileMode());
@@ -367,9 +390,6 @@ public class DirCacheCheckout {
 			if (f != null) {
 				// There is a file/folder for that path in the working tree
 				if (walk.isDirectoryFileConflict()) {
-					// We put it in conflicts. Even if failOnConflict is false
-					// this would cause the path to be deleted. Thats exactly what
-					// we want in this situation
 					conflicts.add(walk.getPathString());
 				} else {
 					// No file/folder conflict exists. All entries are files or
@@ -460,11 +480,12 @@ public class DirCacheCheckout {
 			if (file != null)
 				removeEmptyParents(file);
 
-			for (String path : updated.keySet()) {
+			for (Map.Entry<String, CheckoutMetadata> e : updated.entrySet()) {
+				String path = e.getKey();
+				CheckoutMetadata meta = e.getValue();
 				DirCacheEntry entry = dc.getEntry(path);
 				if (!FileMode.GITLINK.equals(entry.getRawMode()))
-					checkoutEntry(repo, entry, objectReader, false,
-							updated.get(path));
+					checkoutEntry(repo, entry, objectReader, false, meta);
 			}
 
 			// commit the index builder - a new index is persisted
@@ -1016,8 +1037,8 @@ public class DirCacheCheckout {
 	private void update(String path, ObjectId mId, FileMode mode)
 			throws IOException {
 		if (!FileMode.TREE.equals(mode)) {
-			updated.put(path,
-					walk.getFilterCommand(Constants.ATTR_FILTER_TYPE_SMUDGE));
+			updated.put(path, new CheckoutMetadata(walk.getEolStreamType(),
+					walk.getFilterCommand(Constants.ATTR_FILTER_TYPE_SMUDGE)));
 
 			DirCacheEntry entry = new DirCacheEntry(path, DirCacheEntry.STAGE_0);
 			entry.setObjectId(mId);
@@ -1074,8 +1095,10 @@ public class DirCacheCheckout {
 	private boolean isModifiedSubtree_IndexWorkingtree(String path)
 			throws CorruptObjectException, IOException {
 		try (NameConflictTreeWalk tw = new NameConflictTreeWalk(repo)) {
-			tw.addTree(new DirCacheIterator(dc));
-			tw.addTree(new FileTreeIterator(repo));
+			int dciPos = tw.addTree(new DirCacheIterator(dc));
+			FileTreeIterator fti = new FileTreeIterator(repo);
+			tw.addTree(fti);
+			fti.setDirCacheIterator(tw, dciPos);
 			tw.setRecursive(true);
 			tw.setFilter(PathFilter.create(path));
 			DirCacheIterator dcIt;
@@ -1200,52 +1223,22 @@ public class DirCacheCheckout {
 	 * @param deleteRecursive
 	 *            true to recursively delete final path if it exists on the file
 	 *            system
-	 *
-	 * @throws IOException
-	 * @since 4.2
-	 */
-	public static void checkoutEntry(Repository repo, DirCacheEntry entry,
-			ObjectReader or, boolean deleteRecursive) throws IOException {
-		checkoutEntry(repo, entry, or, deleteRecursive, null);
-	}
-
-	/**
-	 * Updates the file in the working tree with content and mode from an entry
-	 * in the index. The new content is first written to a new temporary file in
-	 * the same directory as the real file. Then that new file is renamed to the
-	 * final filename.
-	 *
-	 * <p>
-	 * <b>Note:</b> if the entry path on local file system exists as a file, it
-	 * will be deleted and if it exists as a directory, it will be deleted
-	 * recursively, independently if has any content.
-	 * </p>
-	 *
-	 * <p>
-	 * TODO: this method works directly on File IO, we may need another
-	 * abstraction (like WorkingTreeIterator). This way we could tell e.g.
-	 * Eclipse that Files in the workspace got changed
-	 * </p>
-	 *
-	 * @param repo
-	 *            repository managing the destination work tree.
-	 * @param entry
-	 *            the entry containing new mode and content
-	 * @param or
-	 *            object reader to use for checkout
-	 * @param deleteRecursive
-	 *            true to recursively delete final path if it exists on the file
-	 *            system
-	 * @param smudgeFilterCommand
-	 *            the filter command to be run for smudging the entry to be
-	 *            checked out
+	 * @param checkoutMetadata
+	 *            containing
+	 *            <ul>
+	 *            <li>smudgeFilterCommand to be run for smudging the entry to be
+	 *            checked out</li>
+	 *            <li>eolStreamType used for stream conversion</li>
+	 *            </ul>
 	 *
 	 * @throws IOException
 	 * @since 4.2
 	 */
 	public static void checkoutEntry(Repository repo, DirCacheEntry entry,
 			ObjectReader or, boolean deleteRecursive,
-			String smudgeFilterCommand) throws IOException {
+			CheckoutMetadata checkoutMetadata) throws IOException {
+		if (checkoutMetadata == null)
+			checkoutMetadata = CheckoutMetadata.EMPTY;
 		ObjectLoader ol = or.open(entry.getObjectId());
 		File f = new File(repo.getWorkTree(), entry.getPathString());
 		File parentDir = f.getParentFile();
@@ -1267,12 +1260,19 @@ public class DirCacheCheckout {
 
 		File tmpFile = File.createTempFile(
 				"._" + f.getName(), null, parentDir); //$NON-NLS-1$
-		OutputStream channel = new FileOutputStream(tmpFile);
-		if (opt.getAutoCRLF() == AutoCRLF.TRUE)
-			channel = new AutoCRLFOutputStream(channel);
-		if (smudgeFilterCommand != null) {
-			ProcessBuilder filterProcessBuilder = fs
-					.runInShell(smudgeFilterCommand, new String[0]);
+		EolStreamType nonNullEolStreamType;
+		if (checkoutMetadata.eolStreamType != null) {
+			nonNullEolStreamType = checkoutMetadata.eolStreamType;
+		} else if (opt.getAutoCRLF() == AutoCRLF.TRUE) {
+			nonNullEolStreamType = EolStreamType.AUTO_CRLF;
+		} else {
+			nonNullEolStreamType = EolStreamType.DIRECT;
+		}
+		OutputStream channel = EolStreamTypeUtil.wrapOutputStream(
+				new FileOutputStream(tmpFile), nonNullEolStreamType);
+		if (checkoutMetadata.smudgeFilterCommand != null) {
+			ProcessBuilder filterProcessBuilder = fs.runInShell(
+					checkoutMetadata.smudgeFilterCommand, new String[0]);
 			filterProcessBuilder.directory(repo.getWorkTree());
 			filterProcessBuilder.environment().put(Constants.GIT_DIR_KEY,
 					repo.getDirectory().getAbsolutePath());
@@ -1288,14 +1288,16 @@ public class DirCacheCheckout {
 				}
 			} catch (IOException | InterruptedException e) {
 				throw new IOException(new FilterFailedException(e,
-						smudgeFilterCommand, entry.getPathString()));
+						checkoutMetadata.smudgeFilterCommand,
+						entry.getPathString()));
 
 			} finally {
 				channel.close();
 			}
 			if (rc != 0) {
 				throw new IOException(new FilterFailedException(rc,
-						smudgeFilterCommand, entry.getPathString(),
+						checkoutMetadata.smudgeFilterCommand,
+						entry.getPathString(),
 						result.getStdout().toByteArray(MAX_EXCEPTION_TEXT_SIZE),
 						RawParseUtils.decode(result.getStderr()
 								.toByteArray(MAX_EXCEPTION_TEXT_SIZE))));
@@ -1311,10 +1313,11 @@ public class DirCacheCheckout {
 		// was filtered (either by autocrlf handling or smudge filters) ask the
 		// filesystem again for the length. Otherwise the objectloader knows the
 		// size
-		if (opt.getAutoCRLF() == AutoCRLF.TRUE || smudgeFilterCommand != null) {
-			entry.setLength(tmpFile.length());
-		} else {
+		if (checkoutMetadata.eolStreamType == EolStreamType.DIRECT
+				&& checkoutMetadata.smudgeFilterCommand == null) {
 			entry.setLength(ol.getSize());
+		} else {
+			entry.setLength(tmpFile.length());
 		}
 
 		if (opt.isFileMode() && fs.supportsExecute()) {
@@ -1330,11 +1333,12 @@ public class DirCacheCheckout {
 			if (deleteRecursive && f.isDirectory()) {
 				FileUtils.delete(f, FileUtils.RECURSIVE);
 			}
-			FileUtils.rename(tmpFile, f);
+			FileUtils.rename(tmpFile, f, StandardCopyOption.ATOMIC_MOVE);
 		} catch (IOException e) {
-			throw new IOException(MessageFormat.format(
-					JGitText.get().renameFileFailed, tmpFile.getPath(),
-					f.getPath()));
+			throw new IOException(
+					MessageFormat.format(JGitText.get().renameFileFailed,
+							tmpFile.getPath(), f.getPath()),
+					e);
 		} finally {
 			if (tmpFile.exists()) {
 				FileUtils.delete(tmpFile);

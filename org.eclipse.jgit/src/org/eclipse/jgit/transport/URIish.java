@@ -83,7 +83,7 @@ public class URIish implements Serializable {
 	 * capturing groups: the first containing the user and the second containing
 	 * the password
 	 */
-	private static final String OPT_USER_PWD_P = "(?:([^/:@]+)(?::([^\\\\/]+))?@)?"; //$NON-NLS-1$
+	private static final String OPT_USER_PWD_P = "(?:([^/:]+)(?::([^\\\\/]+))?@)?"; //$NON-NLS-1$
 
 	/**
 	 * Part of a pattern which matches the host part of URIs. Defines one
@@ -376,8 +376,10 @@ public class URIish implements Serializable {
 	public URIish(final URL u) {
 		scheme = u.getProtocol();
 		path = u.getPath();
+		path = cleanLeadingSlashes(path, scheme);
 		try {
 			rawPath = u.toURI().getRawPath();
+			rawPath = cleanLeadingSlashes(rawPath, scheme);
 		} catch (URISyntaxException e) {
 			throw new RuntimeException(e); // Impossible
 		}
@@ -715,7 +717,7 @@ public class URIish implements Serializable {
 	 */
 	public String getHumanishName() throws IllegalArgumentException {
 		String s = getPath();
-		if ("/".equals(s) || "".equals(s)) //$NON-NLS-1$
+		if ("/".equals(s) || "".equals(s)) //$NON-NLS-1$ //$NON-NLS-2$
 			s = getHost();
 		if (s == null) // $NON-NLS-1$
 			throw new IllegalArgumentException();

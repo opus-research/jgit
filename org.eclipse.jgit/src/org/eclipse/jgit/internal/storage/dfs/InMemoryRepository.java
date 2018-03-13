@@ -16,7 +16,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.eclipse.jgit.lib.BatchRefUpdate;
 import org.eclipse.jgit.lib.ObjectId;
@@ -24,6 +23,7 @@ import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
+import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.SymbolicRef;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
@@ -54,7 +54,7 @@ public class InMemoryRepository extends DfsRepository {
 	static final AtomicInteger packId = new AtomicInteger();
 
 	private final DfsObjDatabase objdb;
-	private final DfsRefDatabase refdb;
+	private final RefDatabase refdb;
 	private boolean performsAtomicTransactions = true;
 
 	/**
@@ -80,7 +80,7 @@ public class InMemoryRepository extends DfsRepository {
 	}
 
 	@Override
-	public DfsRefDatabase getRefDatabase() {
+	public RefDatabase getRefDatabase() {
 		return refdb;
 	}
 
@@ -252,11 +252,20 @@ public class InMemoryRepository extends DfsRepository {
 		}
 	}
 
-	private class MemRefDatabase extends DfsRefDatabase {
+	/**
+	 * A ref database storing all refs in-memory.
+	 * <p>
+	 * This class is protected (and not private) to facilitate testing using
+	 * subclasses of InMemoryRepository.
+	 */
+    protected class MemRefDatabase extends DfsRefDatabase {
 		private final ConcurrentMap<String, Ref> refs = new ConcurrentHashMap<String, Ref>();
 		private final ReadWriteLock lock = new ReentrantReadWriteLock(true /* fair */);
 
-		MemRefDatabase() {
+		/**
+		 * Initialize a new in-memory ref database.
+		 */
+		protected MemRefDatabase() {
 			super(InMemoryRepository.this);
 		}
 
@@ -271,10 +280,10 @@ public class InMemoryRepository extends DfsRepository {
 				@Override
 				public void execute(RevWalk walk, ProgressMonitor monitor)
 						throws IOException {
-					if (performsAtomicTransactions()) {
+					if (performsAtomicTransactions() && isAtomic()) {
 						try {
 							lock.writeLock().lock();
-							batch(walk, getCommands());
+							batch(getCommands());
 						} finally {
 							lock.writeLock().unlock();
 						}
@@ -304,12 +313,17 @@ public class InMemoryRepository extends DfsRepository {
 			return new RefCache(ids.toRefList(), sym.toRefList());
 		}
 
-		private void batch(RevWalk walk, List<ReceiveCommand> cmds) {
+		private void batch(List<ReceiveCommand> cmds) {
 			// Validate that the target exists in a new RevWalk, as the RevWalk
 			// from the RefUpdate might be reading back unflushed objects.
 			Map<ObjectId, ObjectId> peeled = new HashMap<>();
 			try (RevWalk rw = new RevWalk(getRepository())) {
 				for (ReceiveCommand c : cmds) {
+					if (c.getResult() != ReceiveCommand.Result.NOT_ATTEMPTED) {
+						ReceiveCommand.abort(cmds);
+						return;
+					}
+
 					if (!ObjectId.zeroId().equals(c.getNewId())) {
 						try {
 							RevObject o = rw.parseAny(c.getNewId());
@@ -318,7 +332,7 @@ public class InMemoryRepository extends DfsRepository {
 							}
 						} catch (IOException e) {
 							c.setResult(ReceiveCommand.Result.REJECTED_MISSING_OBJECT);
-							reject(cmds);
+							ReceiveCommand.abort(cmds);
 							return;
 						}
 					}
@@ -331,7 +345,7 @@ public class InMemoryRepository extends DfsRepository {
 				if (r == null) {
 					if (c.getType() != ReceiveCommand.Type.CREATE) {
 						c.setResult(ReceiveCommand.Result.LOCK_FAILURE);
-						reject(cmds);
+						ReceiveCommand.abort(cmds);
 						return;
 					}
 				} else {
@@ -339,7 +353,7 @@ public class InMemoryRepository extends DfsRepository {
 					if (r.isSymbolic() || objectId == null
 							|| !objectId.equals(c.getOldId())) {
 						c.setResult(ReceiveCommand.Result.LOCK_FAILURE);
-						reject(cmds);
+						ReceiveCommand.abort(cmds);
 						return;
 					}
 				}
@@ -366,15 +380,6 @@ public class InMemoryRepository extends DfsRepository {
 				c.setResult(ReceiveCommand.Result.OK);
 			}
 			clearCache();
-		}
-
-		private void reject(List<ReceiveCommand> cmds) {
-			for (ReceiveCommand c : cmds) {
-				if (c.getResult() == ReceiveCommand.Result.NOT_ATTEMPTED) {
-					c.setResult(ReceiveCommand.Result.REJECTED_OTHER_REASON,
-							JGitText.get().transactionAborted);
-				}
-			}
 		}
 
 		@Override

@@ -633,12 +633,13 @@ public class Config {
 	private String getRawString(final String section, final String subsection,
 			final String name) {
 		String[] lst = getRawStringList(section, subsection, name);
-		if (lst != null)
-			return lst[0];
-		else if (baseConfig != null)
+		if (lst != null) {
+			return lst[lst.length - 1];
+		} else if (baseConfig != null) {
 			return baseConfig.getRawString(section, subsection, name);
-		else
+		} else {
 			return null;
+		}
 	}
 
 	private String[] getRawStringList(String section, String subsection,
@@ -855,7 +856,8 @@ public class Config {
 	 *
 	 * <pre>
 	 * [section &quot;subsection&quot;]
-	 *         name = value
+	 *         name = value1
+	 *         name = value2
 	 * </pre>
 	 *
 	 * @param section
@@ -1105,6 +1107,19 @@ public class Config {
 	 */
 	protected void clear() {
 		state.set(newState());
+	}
+
+	/**
+	 * Check if bytes should be treated as UTF-8 or not.
+	 *
+	 * @param bytes
+	 *            the bytes to check encoding for.
+	 * @return true if bytes should be treated as UTF-8, false otherwise.
+	 * @since 4.4
+	 */
+	protected boolean isUtf8(final byte[] bytes) {
+		return bytes.length >= 3 && bytes[0] == (byte) 0xEF
+				&& bytes[1] == (byte) 0xBB && bytes[2] == (byte) 0xBF;
 	}
 
 	private static String readSectionName(final StringReader in)
