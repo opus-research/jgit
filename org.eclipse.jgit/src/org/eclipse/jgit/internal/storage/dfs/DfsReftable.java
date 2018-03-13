@@ -43,7 +43,6 @@
 
 package org.eclipse.jgit.internal.storage.dfs;
 
-import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.INSERT;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.REFTABLE;
 
 import java.io.IOException;
@@ -101,13 +100,6 @@ public class DfsReftable extends BlockBasedFile {
 	 *             table cannot be opened.
 	 */
 	public ReftableReader open(DfsReader ctx) throws IOException {
-		if (desc.getPackSource() == INSERT   ) {
-			long min = desc.getMinUpdateIndex();
-			long max = desc.getMaxUpdateIndex();
-			if (min == max && min > 0) {
-				return new ReftableReader(new CacheSource(this, cache, ctx), min, max);
-			}
-		}
 		return new ReftableReader(new CacheSource(this, cache, ctx));
 	}
 
