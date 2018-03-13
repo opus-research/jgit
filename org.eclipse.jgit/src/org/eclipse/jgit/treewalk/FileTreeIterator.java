@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008, Google Inc.
- * Copyright (C) 2007-2010, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * Copyright (C) 2009, Tor Arne Vestbø <torarnv@gmail.com>
  * and other copyright owners as documented in the project's IP log.
@@ -52,7 +52,6 @@ import java.io.IOException;
 import java.io.InputStream;
 
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.FS;
@@ -125,7 +124,7 @@ public class FileTreeIterator extends WorkingTreeIterator {
 			file = f;
 
 			if (f.isDirectory()) {
-				if (new File(f, Constants.DOT_GIT).isDirectory())
+				if (new File(f, ".git").isDirectory())
 					mode = FileMode.GITLINK;
 				else
 					mode = FileMode.TREE;

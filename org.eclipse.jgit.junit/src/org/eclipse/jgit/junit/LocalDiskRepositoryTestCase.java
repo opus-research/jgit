@@ -286,7 +286,7 @@ public abstract class LocalDiskRepositoryTestCase extends TestCase {
 	 */
 	private Repository createRepository(boolean bare) throws IOException {
 		String uniqueId = System.currentTimeMillis() + "_" + (testCount++);
-		String gitdirName = "test" + uniqueId + (bare ? "" : "/") + Constants.DOT_GIT;
+		String gitdirName = "test" + uniqueId + (bare ? "" : "/") + ".git";
 		File gitdir = new File(trash, gitdirName).getCanonicalFile();
 		Repository db = new Repository(gitdir);
 
