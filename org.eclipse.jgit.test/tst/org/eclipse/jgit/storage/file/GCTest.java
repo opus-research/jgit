@@ -45,10 +45,12 @@ package org.eclipse.jgit.storage.file;
 import static org.junit.Assert.assertEquals;
 
 import java.io.File;
+import java.util.Collections;
 
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.junit.TestRepository.BranchBuilder;
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.storage.file.GC.RepoStatistics;
 import org.eclipse.jgit.util.FileUtils;
@@ -236,5 +238,23 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		assertEquals(0, stats.nrOfLooseObjects);
 		assertEquals(8, stats.nrOfPackedObjects);
 		assertEquals(1, stats.nrOfPackFiles);
+	}
+
+	@Test
+	public void testPruneNone() throws Exception {
+		BranchBuilder bb = tr.branch("refs/heads/master");
+		bb.commit().add("A", "A").add("B", "B").create();
+		bb.commit().add("A", "A2").add("B", "B2").create();
+		stats = gc.getStatistics();
+		assertEquals(8, stats.nrOfLooseObjects);
+		gc.prune(Collections.<ObjectId> emptySet(), 0);
+		stats = gc.getStatistics();
+		assertEquals(8, stats.nrOfLooseObjects);
+		tr.blob("x");
+		stats = gc.getStatistics();
+		assertEquals(9, stats.nrOfLooseObjects);
+		gc.prune(Collections.<ObjectId> emptySet(), 0);
+		stats = gc.getStatistics();
+		assertEquals(8, stats.nrOfLooseObjects);
 	}
 }
