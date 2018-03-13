@@ -109,7 +109,7 @@ public class DfsInserterTest {
 	@Test
 	public void testReadFromInserterLargerObjects() throws IOException {
 		db.getObjectDatabase().getReaderOptions().setStreamFileThreshold(512);
-		DefaultDfsBlockCache.reconfigure(new DefaultDfsBlockCacheConfig()
+		DfsBlockCache.reconfigure(new DfsBlockCacheConfig()
 			.setBlockSize(512)
 			.setBlockLimit(2048));
 
