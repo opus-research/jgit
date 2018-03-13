@@ -57,7 +57,7 @@ import org.eclipse.jgit.lfs.internal.LfsText;
 public final class Constants {
 	/**
 	 * lfs folder
-	 * 
+	 *
 	 * @since 4.6
 	 */
 	public static final String LFS = "lfs";
