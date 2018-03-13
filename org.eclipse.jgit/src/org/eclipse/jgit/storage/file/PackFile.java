@@ -1057,22 +1057,17 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	}
 
 	synchronized PackBitmapIndex getBitmapIndex() throws IOException {
-		if (bitmapIdx == null) {
-			PackIndex packIndex = idx();
-			if (packIndex.hasBitmapIndex()) {
-				return packIndex.getBitmapIndex(getReverseIdx());
-			} else if (hasExt(BITMAP_INDEX)) {
-				final PackBitmapIndex idx = PackBitmapIndex.open(
-						extFile(BITMAP_INDEX), idx(), getReverseIdx());
+		if (bitmapIdx == null && hasExt(BITMAP_INDEX)) {
+			final PackBitmapIndex idx = PackBitmapIndex.open(
+					extFile(BITMAP_INDEX), idx(), getReverseIdx());
 
-				if (packChecksum == null)
-					packChecksum = idx.packChecksum;
-				else if (!Arrays.equals(packChecksum, idx.packChecksum))
-					throw new PackMismatchException(
-							JGitText.get().packChecksumMismatch);
+			if (packChecksum == null)
+				packChecksum = idx.packChecksum;
+			else if (!Arrays.equals(packChecksum, idx.packChecksum))
+				throw new PackMismatchException(
+						JGitText.get().packChecksumMismatch);
 
-				bitmapIdx = idx;
-			}
+			bitmapIdx = idx;
 		}
 		return bitmapIdx;
 	}
@@ -1116,7 +1111,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	}
 
 	private boolean hasExt(PackExt ext) {
-		int bit = 1 << ext.getPosition();
-		return (extensions & bit) == bit;
+		return (extensions & ext.getBit()) == ext.getBit();
 	}
 }
