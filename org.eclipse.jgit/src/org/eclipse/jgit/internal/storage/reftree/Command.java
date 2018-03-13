@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Google Inc.
+ * Copyright (C) 2016, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -66,9 +66,17 @@ import org.eclipse.jgit.transport.ReceiveCommand;
 import org.eclipse.jgit.transport.ReceiveCommand.Result;
 
 /**
- * Command with peeled reference information and symref support.
+ * Command to create, update or delete an entry inside a {@link RefTree}.
  * <p>
- * Commands should be passed to {@link RefTree#apply(java.util.Collection)}.
+ * Unlike {@link ReceiveCommand} (which can only update a reference to an
+ * {@link ObjectId}), a RefTree Command can also create, modify or delete
+ * symbolic references to a target reference.
+ * <p>
+ * RefTree Commands may wrap a {@code ReceiveCommand} to allow callers to
+ * process an existing ReceiveCommand against a RefTree.
+ * <p>
+ * Commands should be passed into {@link RefTree#apply(java.util.Collection)}
+ * for processing.
  */
 public class Command {
 	private final Ref oldRef;
@@ -239,11 +247,19 @@ public class Command {
 		}
 	}
 
-	boolean checkRef(@Nullable DirCacheEntry cur) {
-		if (cur != null && cur.getRawMode() == 0) {
-			cur = null;
+	/**
+	 * Check the entry is consistent with either the old or the new ref.
+	 *
+	 * @param entry
+	 *            current entry; null if the entry does not exist.
+	 * @return true if entry matches {@link #getOldRef()} or
+	 *         {@link #getNewRef()}; otherwise false.
+	 */
+	boolean checkRef(@Nullable DirCacheEntry entry) {
+		if (entry != null && entry.getRawMode() == 0) {
+			entry = null;
 		}
-		return check(cur, oldRef) || check(cur, newRef);
+		return check(entry, oldRef) || check(entry, newRef);
 	}
 
 	private static boolean check(@Nullable DirCacheEntry cur,

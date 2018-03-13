@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Google Inc.
+ * Copyright (C) 2016, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -73,7 +73,6 @@ import org.eclipse.jgit.errors.DirCacheNameConflictException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
@@ -81,7 +80,6 @@ import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.SymbolicRef;
-import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.util.RawParseUtils;
 
@@ -128,31 +126,6 @@ public class RefTree {
 	 *            reader to scan the reference tree with. This reader may be
 	 *            retained by the RefTree for the life of the tree in order to
 	 *            support lazy loading of entries.
-	 * @param commit
-	 *            the revision of the ref tree to read.
-	 * @return the ref tree read from the commit.
-	 * @throws IOException
-	 *             the repository cannot be accessed through the reader.
-	 * @throws CorruptObjectException
-	 *             a tree object is corrupt and cannot be read.
-	 * @throws IncorrectObjectTypeException
-	 *             a tree object wasn't actually a tree.
-	 * @throws MissingObjectException
-	 *             a reference tree object doesn't exist.
-	 */
-	public static RefTree read(ObjectReader reader, RevCommit commit)
-			throws MissingObjectException, IncorrectObjectTypeException,
-			CorruptObjectException, IOException {
-		return read(reader, commit.getTree());
-	}
-
-	/**
-	 * Load a reference tree.
-	 *
-	 * @param reader
-	 *            reader to scan the reference tree with. This reader may be
-	 *            retained by the RefTree for the life of the tree in order to
-	 *            support lazy loading of entries.
 	 * @param tree
 	 *            the tree to read.
 	 * @return the ref tree read from the commit.
@@ -168,32 +141,7 @@ public class RefTree {
 	public static RefTree read(ObjectReader reader, RevTree tree)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			CorruptObjectException, IOException {
-		return readTree(reader, tree);
-	}
-
-	/**
-	 * Load a reference tree.
-	 *
-	 * @param reader
-	 *            reader to scan the reference tree with. This reader may be
-	 *            retained by the RefTree for the life of the tree in order to
-	 *            support lazy loading of entries.
-	 * @param treeId
-	 *            the tree to read.
-	 * @return the ref tree read from the commit.
-	 * @throws IOException
-	 *             the repository cannot be accessed through the reader.
-	 * @throws CorruptObjectException
-	 *             a tree object is corrupt and cannot be read.
-	 * @throws IncorrectObjectTypeException
-	 *             a tree object wasn't actually a tree.
-	 * @throws MissingObjectException
-	 *             a reference tree object doesn't exist.
-	 */
-	public static RefTree readTree(ObjectReader reader, AnyObjectId treeId)
-			throws MissingObjectException, IncorrectObjectTypeException,
-			CorruptObjectException, IOException {
-		return new RefTree(reader, DirCache.read(reader, treeId));
+		return new RefTree(reader, DirCache.read(reader, tree));
 	}
 
 	/** Borrowed reader to access the repository. */
@@ -295,9 +243,10 @@ public class RefTree {
 		} catch (DirCacheNameConflictException e) {
 			String r1 = refName(e.getPath1());
 			String r2 = refName(e.getPath2());
-			for (Command c : cmdList) {
-				if (r1.equals(c.getRefName()) || r2.equals(c.getRefName())) {
-					c.setResult(LOCK_FAILURE);
+			for (Command cmd : cmdList) {
+				if (r1.equals(cmd.getRefName())
+						|| r2.equals(cmd.getRefName())) {
+					cmd.setResult(LOCK_FAILURE);
 					break;
 				}
 			}

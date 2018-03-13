@@ -295,7 +295,10 @@ public class DirCacheEntry {
 	}
 
 	/**
-	 * Duplicate DirCacheEntry with same path but different info.
+	 * Duplicate DirCacheEntry with same path and copied info.
+	 * <p>
+	 * The same path buffer is reused (avoiding copying), however a new info
+	 * buffer is created and its contents are copied.
 	 *
 	 * @param src
 	 *            entry to clone.
