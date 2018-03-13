@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
- * Copyright (C) 2008, Marek Zawirski <marek.zawirski@gmail.com>
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,45 +41,48 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.revwalk;
+package org.eclipse.jgit.errors;
 
 import java.io.IOException;
+import java.text.MessageFormat;
+import java.util.Collection;
 
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.lib.AbbreviatedObjectId;
+import org.eclipse.jgit.lib.ObjectId;
 
-/** A binary file, or a symbolic link. */
-public class RevBlob extends RevObject {
+/** An {@link AbbreviatedObjectId} cannot be extended. */
+public class AmbiguousObjectException extends IOException {
+	private static final long serialVersionUID = 1L;
+
+	private final AbbreviatedObjectId missing;
+
+	private final Collection<ObjectId> candidates;
+
 	/**
-	 * Create a new blob reference.
+	 * Construct a MissingObjectException for the specified object id. Expected
+	 * type is reported to simplify tracking down the problem.
 	 *
 	 * @param id
-	 *            object name for the blob.
+	 *            SHA-1
+	 * @param candidates
+	 *            the candidate matches returned by the ObjectReader.
 	 */
-	protected RevBlob(final AnyObjectId id) {
-		super(id);
+	public AmbiguousObjectException(final AbbreviatedObjectId id,
+			final Collection<ObjectId> candidates) {
+		super(MessageFormat.format(JGitText.get().ambiguousObjectAbbreviation,
+				id.name()));
+		this.missing = id;
+		this.candidates = candidates;
 	}
 
-	@Override
-	public final int getType() {
-		return Constants.OBJ_BLOB;
+	/** @return the AbbreviatedObjectId that has more than one result. */
+	public AbbreviatedObjectId getAbbreviatedObjectId() {
+		return missing;
 	}
 
-	@Override
-	void parseHeaders(RevWalk walk) throws MissingObjectException,
-			IncorrectObjectTypeException, IOException {
-		if (walk.reader.has(this))
-			flags |= PARSED;
-		else
-			throw new MissingObjectException(this, getType());
-	}
-
-	@Override
-	void parseBody(RevWalk walk) throws MissingObjectException,
-			IncorrectObjectTypeException, IOException {
-		if ((flags & PARSED) == 0)
-			parseHeaders(walk);
+	/** @return the matching candidates (or at least a subset of them). */
+	public Collection<ObjectId> getCandidates() {
+		return candidates;
 	}
 }
