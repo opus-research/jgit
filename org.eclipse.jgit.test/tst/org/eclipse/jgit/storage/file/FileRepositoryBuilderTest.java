@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,61 +40,20 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
+
+package org.eclipse.jgit.storage.file;
 
 import java.io.File;
-import java.io.IOException;
 
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 
-public class InitCommandTest extends RepositoryTestCase {
+public class FileRepositoryBuilderTest extends LocalDiskRepositoryTestCase {
+	public void testShouldAutomagicallyDetectGitDirectory() throws Exception {
+		FileRepository r = createWorkRepository();
+		File d = new File(r.getDirectory(), "sub-dir");
+		d.mkdir();
 
-	@Override
-	protected void setUp() throws Exception {
-		super.setUp();
+		assertEquals(r.getDirectory(), new FileRepositoryBuilder()
+				.findGitDir(d).getGitDir());
 	}
-
-	public void testInitRepository() {
-		try {
-			File directory = createTempDirectory("testInitRepository");
-			InitCommand command = new InitCommand();
-			command.setDirectory(directory);
-			Repository repository = command.call().getRepository();
-			assertNotNull(repository);
-		} catch (Exception e) {
-			fail(e.getMessage());
-		}
-	}
-
-	public void testInitBareRepository() {
-		try {
-			File directory = createTempDirectory("testInitBareRepository");
-			InitCommand command = new InitCommand();
-			command.setDirectory(directory);
-			command.setBare(true);
-			Repository repository = command.call().getRepository();
-			assertNotNull(repository);
-			assertTrue(repository.isBare());
-		} catch (Exception e) {
-			fail(e.getMessage());
-		}
-	}
-
-	public static File createTempDirectory(String name) throws IOException {
-		final File temp;
-		temp = File.createTempFile(name, Long.toString(System.nanoTime()));
-
-		if (!(temp.delete())) {
-			throw new IOException("Could not delete temp file: "
-					+ temp.getAbsolutePath());
-		}
-
-		if (!(temp.mkdir())) {
-			throw new IOException("Could not create temp directory: "
-					+ temp.getAbsolutePath());
-		}
-		return temp;
-	}
-
 }
