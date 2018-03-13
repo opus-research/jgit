@@ -164,19 +164,10 @@ public abstract class SystemReader {
 		// Creating ObjectChecker must be deferred. Unit tests change
 		// behavior of is{Windows,MacOS} in constructor of subclass.
 		if (platformChecker == null) {
-			setPlatformChecker();
+			platformChecker = new ObjectChecker()
+				.setSafeForWindows(isWindows())
+				.setSafeForMacOS(isMacOS());
 		}
-	}
-
-	/**
-	 * Should be used in tests when the platform is explicitly changed.
-	 *
-	 * @since 3.6
-	 */
-	protected final void setPlatformChecker() {
-		platformChecker = new ObjectChecker()
-			.setSafeForWindows(isWindows())
-			.setSafeForMacOS(isMacOS());
 	}
 
 	/**
