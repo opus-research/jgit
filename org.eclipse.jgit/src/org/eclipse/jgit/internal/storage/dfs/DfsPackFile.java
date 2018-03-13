@@ -739,6 +739,10 @@ public final class DfsPackFile extends BlockBasedFile {
 			throw new EOFException();
 	}
 
+	DfsBlock getOrLoadBlock(long pos, DfsReader ctx) throws IOException {
+		return cache.getOrLoad(this, pos, ctx, null);
+	}
+
 	ObjectLoader load(DfsReader ctx, long pos)
 			throws IOException {
 		try {

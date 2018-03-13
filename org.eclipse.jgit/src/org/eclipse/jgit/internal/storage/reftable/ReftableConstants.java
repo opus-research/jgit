@@ -60,11 +60,12 @@ class ReftableConstants {
 	static final int VALUE_NONE = 0x0;
 	static final int VALUE_1ID = 0x1;
 	static final int VALUE_2ID = 0x2;
-	static final int VALUE_SYMREF = 0x3;
-	static final int VALUE_LEN_SPECIFIED = 0x4;
+	static final int VALUE_TEXT = 0x3;
+	static final int VALUE_INDEX_RECORD = 0x4;
+	static final int VALUE_LOG_RECORD = 0x5;
 	static final int VALUE_TYPE_MASK = 0x7;
 
-	static final int MAX_RESTARTS = 65536;
+	static final int MAX_RESTARTS = 65535;
 
 	static boolean isFileHeaderMagic(byte[] buf, int o, int n) {
 		return (n - o) >= FILE_HEADER_MAGIC.length
