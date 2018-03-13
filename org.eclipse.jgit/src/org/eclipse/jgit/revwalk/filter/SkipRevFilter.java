@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
+ * Copyright (C) 2011, Tomasz Zarna <Tomasz.Zarna@pl.ibm.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,37 +40,55 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.treewalk;
+package org.eclipse.jgit.revwalk.filter;
 
-import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.Config.SectionParser;
-import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
+import java.io.IOException;
 
-/** Options used by the {@link WorkingTreeIterator}. */
-public class WorkingTreeOptions {
-	/** Key for {@link Config#get(SectionParser)}. */
-	public static final Config.SectionParser<WorkingTreeOptions> KEY = new SectionParser<WorkingTreeOptions>() {
-		public WorkingTreeOptions parse(final Config cfg) {
-			return new WorkingTreeOptions(cfg);
-		}
-	};
+import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.errors.StopWalkException;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevWalk;
 
-	private final boolean fileMode;
+/**
+ * Filter that includes commits after a configured number are skipped.
+ */
+public class SkipRevFilter extends RevFilter {
 
-	private final AutoCRLF autoCRLF;
+	private final int skip;
 
-	private WorkingTreeOptions(final Config rc) {
-		fileMode = rc.getBoolean("core", "filemode", true);
-		autoCRLF = rc.getEnum("core", null, "autocrlf", AutoCRLF.FALSE);
+	private int count;
+
+	/**
+	 * Create a new skip filter.
+	 *
+	 * @param skip
+	 *            the number of commits to skip
+	 * @return a new filter
+	 */
+	public static RevFilter create(int skip) {
+		if (skip < 0)
+			throw new IllegalArgumentException(
+					JGitText.get().skipMustBeNonNegative);
+		return new SkipRevFilter(skip);
 	}
 
-	/** @return true if the execute bit on working files should be trusted. */
-	public boolean isFileMode() {
-		return fileMode;
+	private SkipRevFilter(int skip) {
+		this.skip = skip;
 	}
 
-	/** @return how automatic CRLF conversion has been configured. */
-	public AutoCRLF getAutoCRLF() {
-		return autoCRLF;
+	@Override
+	public boolean include(RevWalk walker, RevCommit cmit)
+			throws StopWalkException, MissingObjectException,
+			IncorrectObjectTypeException, IOException {
+		if (skip > count++)
+			return false;
+		return true;
+	}
+
+	@Override
+	public RevFilter clone() {
+		return new SkipRevFilter(skip);
 	}
 }

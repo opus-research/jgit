@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
+ * Copyright (C) 2011, GitHub Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,37 +40,25 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.treewalk;
+package org.eclipse.jgit.submodule;
 
-import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.Config.SectionParser;
-import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
+/**
+ * Enumeration of different statuses that a submodule can be in
+ */
+public enum SubmoduleStatusType {
 
-/** Options used by the {@link WorkingTreeIterator}. */
-public class WorkingTreeOptions {
-	/** Key for {@link Config#get(SectionParser)}. */
-	public static final Config.SectionParser<WorkingTreeOptions> KEY = new SectionParser<WorkingTreeOptions>() {
-		public WorkingTreeOptions parse(final Config cfg) {
-			return new WorkingTreeOptions(cfg);
-		}
-	};
+	/** Submodule's configuration is missing */
+	MISSING,
 
-	private final boolean fileMode;
+	/** Submodule's Git repository is not initialized */
+	UNINITIALIZED,
 
-	private final AutoCRLF autoCRLF;
+	/** Submodule's Git repository is initialized */
+	INITIALIZED,
 
-	private WorkingTreeOptions(final Config rc) {
-		fileMode = rc.getBoolean("core", "filemode", true);
-		autoCRLF = rc.getEnum("core", null, "autocrlf", AutoCRLF.FALSE);
-	}
-
-	/** @return true if the execute bit on working files should be trusted. */
-	public boolean isFileMode() {
-		return fileMode;
-	}
-
-	/** @return how automatic CRLF conversion has been configured. */
-	public AutoCRLF getAutoCRLF() {
-		return autoCRLF;
-	}
+	/**
+	 * Submodule commit checked out is different than the commit referenced in
+	 * the index tree
+	 */
+	REV_CHECKED_OUT;
 }

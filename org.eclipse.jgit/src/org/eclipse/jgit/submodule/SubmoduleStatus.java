@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
+ * Copyright (C) 2011, GitHub Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,37 +40,76 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.treewalk;
+package org.eclipse.jgit.submodule;
 
-import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.Config.SectionParser;
-import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
+import org.eclipse.jgit.lib.ObjectId;
 
-/** Options used by the {@link WorkingTreeIterator}. */
-public class WorkingTreeOptions {
-	/** Key for {@link Config#get(SectionParser)}. */
-	public static final Config.SectionParser<WorkingTreeOptions> KEY = new SectionParser<WorkingTreeOptions>() {
-		public WorkingTreeOptions parse(final Config cfg) {
-			return new WorkingTreeOptions(cfg);
-		}
-	};
+/**
+ * Status class containing the type, path, and commit id of the submodule.
+ */
+public class SubmoduleStatus {
 
-	private final boolean fileMode;
+	private final SubmoduleStatusType type;
 
-	private final AutoCRLF autoCRLF;
+	private final String path;
 
-	private WorkingTreeOptions(final Config rc) {
-		fileMode = rc.getBoolean("core", "filemode", true);
-		autoCRLF = rc.getEnum("core", null, "autocrlf", AutoCRLF.FALSE);
+	private final ObjectId indexId;
+
+	private final ObjectId headId;
+
+	/**
+	 * Create submodule status
+	 *
+	 * @param type
+	 * @param path
+	 * @param indexId
+	 */
+	public SubmoduleStatus(final SubmoduleStatusType type, final String path,
+			final ObjectId indexId) {
+		this(type, path, indexId, null);
 	}
 
-	/** @return true if the execute bit on working files should be trusted. */
-	public boolean isFileMode() {
-		return fileMode;
+	/**
+	 * Create submodule status
+	 *
+	 * @param type
+	 * @param path
+	 * @param indexId
+	 * @param headId
+	 */
+	public SubmoduleStatus(final SubmoduleStatusType type, final String path,
+			final ObjectId indexId, final ObjectId headId) {
+		this.type = type;
+		this.path = path;
+		this.indexId = indexId;
+		this.headId = headId;
 	}
 
-	/** @return how automatic CRLF conversion has been configured. */
-	public AutoCRLF getAutoCRLF() {
-		return autoCRLF;
+	/**
+	 * @return type
+	 */
+	public SubmoduleStatusType getType() {
+		return type;
+	}
+
+	/**
+	 * @return path
+	 */
+	public String getPath() {
+		return path;
+	}
+
+	/**
+	 * @return index object id
+	 */
+	public ObjectId getIndexId() {
+		return indexId;
+	}
+
+	/**
+	 * @return HEAD object id
+	 */
+	public ObjectId getHeadId() {
+		return headId;
 	}
 }
