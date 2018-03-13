@@ -498,9 +498,4 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 				Constants.OBJ_BLOB, Constants.encode(content)));
 		return entry;
 	}
-
-	public static void assertEqualsFile(File expected, File actual)
-			throws IOException {
-		assertEquals(expected.getCanonicalFile(), actual.getCanonicalFile());
-	}
 }

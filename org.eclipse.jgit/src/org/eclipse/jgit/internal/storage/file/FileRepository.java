@@ -46,8 +46,6 @@
 
 package org.eclipse.jgit.internal.storage.file;
 
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
-
 import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
@@ -384,7 +382,7 @@ public class FileRepository extends Repository {
 
 	@Override
 	public void scanForRepoChanges() throws IOException {
-		getRefDatabase().getRefs(ALL); // This will look for changes to refs
+		getAllRefs(); // This will look for changes to refs
 		detectIndexChanges();
 	}
 
