@@ -172,18 +172,9 @@ public class FSTest {
 		FS fs = FS.DETECTED.newInstance();
 		assumeTrue(fs instanceof FS_POSIX);
 
-		FS.readPipe(fs.userHome(),
-				new String[] { "/bin/sh", "-c", "exit 1" },
+		String r = FS.readPipe(fs.userHome(),
+				new String[] { "bash", "--login", "-c", "foobar" },
 				Charset.defaultCharset().name());
-	}
-
-	@Test(expected = CommandFailedException.class)
-	public void testReadPipePosixCommandStartFailure()
-			throws CommandFailedException {
-		FS fs = FS.DETECTED.newInstance();
-
-		FS.readPipe(fs.userHome(),
-				  new String[] { "this-command-does-not-exist" },
-				  Charset.defaultCharset().name());
+		System.out.println(r);
 	}
 }
