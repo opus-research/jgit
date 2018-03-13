@@ -214,7 +214,6 @@ public class DiffFormatter {
 	 * @param alg
 	 *            the algorithm to produce text file differences.
 	 * @see PatienceDiff
-	 * @see MyersDiff#INSTANCE
 	 */
 	public void setDiffAlgorithm(DiffAlgorithm alg) {
 		diffAlgorithm = alg;
