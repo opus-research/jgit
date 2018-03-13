@@ -363,9 +363,8 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		writeLooseRef("refs/heads/A", A);
 		write(new File(diskRepo.getDirectory(), "refs/heads/bad"), "FAIL\n");
 
-		Ref a = refdir.getObjectDatabase()
-				.firstExactRef("refs/heads/bad", "refs/heads/A");
-		assertEquals("refs/heads/A", a.getName();
+		Ref a = refdir.firstExactRef("refs/heads/bad", "refs/heads/A");
+		assertEquals("refs/heads/A", a.getName());
 		assertEquals(A, a.getObjectId());
 	}
 
@@ -374,13 +373,13 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		writeLooseRef("refs/heads/A", A);
 		write(new File(diskRepo.getDirectory(), "refs/heads/bad"), "FAIL\n");
 
-		Map<String, Ref> refs = refdir.getObjectDatabase()
-				.exactRef("refs/heads/bad", "refs/heads/A");
+		Map<String, Ref> refs =
+				refdir.exactRef("refs/heads/bad", "refs/heads/A");
 
 		assertNull("no refs/heads/bad", refs.get("refs/heads/bad"));
 
 		Ref a = refs.get("refs/heads/A");
-		assertEquals("refs/heads/A", a.getName();
+		assertEquals("refs/heads/A", a.getName());
 		assertEquals(A, a.getObjectId());
 
 		assertEquals(1, refs.size());
