@@ -85,6 +85,7 @@ import org.eclipse.jgit.lib.Sets;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
+import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.transport.URIish;
 import org.eclipse.jgit.util.FileUtils;
@@ -430,8 +431,8 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 			config.save();
 
 			// fetch from first repository
-			git2.fetch().setRemote("origin")
-					.setRefSpecs("+refs/heads/*:refs/remotes/origin/*").call();
+			RefSpec spec = new RefSpec("+refs/heads/*:refs/remotes/origin/*");
+			git2.fetch().setRemote("origin").setRefSpecs(spec).call();
 			return db2;
 		}
 	}
