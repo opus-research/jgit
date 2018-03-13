@@ -199,7 +199,7 @@ public final class DfsPackFile {
 		return key.cachedSize.get();
 	}
 
-	String getPackName() {
+	private String getPackName() {
 		return packDesc.getFileName(PACK);
 	}
 
@@ -214,17 +214,7 @@ public final class DfsPackFile {
 		index = cache.put(key, POS_INDEX, sz, idx);
 	}
 
-	/**
-	 * Get the PackIndex for this PackFile.
-	 *
-	 * @param ctx
-	 *            reader context to support reading from the backing store if
-	 *            the index is not already loaded in memory.
-	 * @return the PackIndex.
-	 * @throws IOException
-	 *             the pack index is not available, or is corrupt.
-	 */
-	public PackIndex getPackIndex(DfsReader ctx) throws IOException {
+	PackIndex getPackIndex(DfsReader ctx) throws IOException {
 		return idx(ctx);
 	}
 

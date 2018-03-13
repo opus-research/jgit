@@ -140,8 +140,7 @@ public class GitConstructionTest extends RepositoryTestCase {
 	public void testClose() throws IOException, JGitInternalException,
 			GitAPIException {
 		File workTree = db.getWorkTree();
-		db.close();
-		Git git = Git.open(workTree);
+		Git git = Git.wrap(db);
 		git.gc().setExpire(null).call();
 		git.checkout().setName(git.getRepository().resolve("HEAD^").getName())
 				.call();

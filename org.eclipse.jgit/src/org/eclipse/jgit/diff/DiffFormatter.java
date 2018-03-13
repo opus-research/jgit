@@ -104,7 +104,7 @@ import org.eclipse.jgit.util.io.DisabledOutputStream;
 /**
  * Format a Git style patch script.
  */
-public class DiffFormatter implements AutoCloseable {
+public class DiffFormatter {
 	private static final int DEFAULT_BINARY_FILE_THRESHOLD = PackConfig.DEFAULT_BIG_FILE_THRESHOLD;
 
 	private static final byte[] noNewLine = encodeASCII("\\ No newline at end of file\n"); //$NON-NLS-1$
@@ -380,23 +380,10 @@ public class DiffFormatter implements AutoCloseable {
 		out.flush();
 	}
 
-	/**
-	 * Release the internal ObjectReader state. Use {@link #close()} instead.
-	 */
-	@Deprecated
+	/** Release the internal ObjectReader state. */
 	public void release() {
-		close();
-	}
-
-	/**
-	 * Release the internal ObjectReader state.
-	 *
-	 * @since 4.0
-	 */
-	@Override
-	public void close() {
 		if (reader != null)
-			reader.close();
+			reader.release();
 	}
 
 	/**
@@ -750,10 +737,10 @@ public class DiffFormatter implements AutoCloseable {
 			final int endIdx = findCombinedEnd(edits, curIdx);
 			final Edit endEdit = edits.get(endIdx);
 
-			int aCur = (int) Math.max(0, (long) curEdit.getBeginA() - context);
-			int bCur = (int) Math.max(0, (long) curEdit.getBeginB() - context);
-			final int aEnd = (int) Math.min(a.size(), (long) endEdit.getEndA() + context);
-			final int bEnd = (int) Math.min(b.size(), (long) endEdit.getEndB() + context);
+			int aCur = Math.max(0, curEdit.getBeginA() - context);
+			int bCur = Math.max(0, curEdit.getBeginB() - context);
+			final int aEnd = Math.min(a.size(), endEdit.getEndA() + context);
+			final int bEnd = Math.min(b.size(), endEdit.getEndB() + context);
 
 			writeHunkHeader(aCur, aEnd, bCur, bEnd);
 

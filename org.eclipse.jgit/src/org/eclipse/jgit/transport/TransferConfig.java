@@ -48,10 +48,8 @@ import java.util.Map;
 
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Config.SectionParser;
-import org.eclipse.jgit.lib.ObjectChecker;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.util.SystemReader;
 
 /**
  * The standard "transfer", "fetch", "receive", and "uploadpack" configuration
@@ -65,10 +63,7 @@ public class TransferConfig {
 		}
 	};
 
-	private final boolean checkReceivedObjects;
-	private final boolean allowLeadingZeroFileMode;
-	private final boolean safeForWindows;
-	private final boolean safeForMacOS;
+	private final boolean fetchFsck;
 	private final boolean allowTipSha1InWant;
 	private final String[] hideRefs;
 
@@ -77,17 +72,9 @@ public class TransferConfig {
 	}
 
 	private TransferConfig(final Config rc) {
-		checkReceivedObjects = rc.getBoolean(
+		fetchFsck = rc.getBoolean(
 				"fetch", "fsckobjects", //$NON-NLS-1$ //$NON-NLS-2$
 				rc.getBoolean("transfer", "fsckobjects", false)); //$NON-NLS-1$ //$NON-NLS-2$
-		allowLeadingZeroFileMode = checkReceivedObjects
-				&& rc.getBoolean("fsck", "allowLeadingZeroFileMode", false); //$NON-NLS-1$ //$NON-NLS-2$
-		safeForWindows = checkReceivedObjects
-				&& rc.getBoolean("fsck", "safeForWindows", //$NON-NLS-1$ //$NON-NLS-2$
-						SystemReader.getInstance().isWindows());
-		safeForMacOS = checkReceivedObjects
-				&& rc.getBoolean("fsck", "safeForMacOS", //$NON-NLS-1$ //$NON-NLS-2$
-						SystemReader.getInstance().isMacOS());
 
 		allowTipSha1InWant = rc.getBoolean(
 				"uploadpack", "allowtipsha1inwant", false); //$NON-NLS-1$ //$NON-NLS-2$
@@ -96,25 +83,9 @@ public class TransferConfig {
 
 	/**
 	 * @return strictly verify received objects?
-	 * @deprecated use {@link #newObjectChecker()} instead.
 	 */
-	@Deprecated
 	public boolean isFsckObjects() {
-		return checkReceivedObjects;
-	}
-
-	/**
-	 * @return checker to verify fetched objects, or null if checking is not
-	 *         enabled in the repository configuration.
-	 * @since 3.6
-	 */
-	public ObjectChecker newObjectChecker() {
-		if (!checkReceivedObjects)
-			return null;
-		return new ObjectChecker()
-			.setAllowLeadingZeroFileMode(allowLeadingZeroFileMode)
-			.setSafeForWindows(safeForWindows)
-			.setSafeForMacOS(safeForMacOS);
+		return fetchFsck;
 	}
 
 	/**

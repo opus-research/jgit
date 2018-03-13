@@ -43,6 +43,7 @@
  */
 package org.eclipse.jgit.api;
 
+import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
@@ -80,6 +81,7 @@ import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
+import org.eclipse.jgit.util.FileUtils;
 
 /**
  * Checkout a branch to the working tree.
@@ -405,17 +407,14 @@ public class CheckoutCommand extends GitCommand<Ref> {
 		DirCacheIterator dci = new DirCacheIterator(dc);
 		treeWalk.addTree(dci);
 
-		String previousPath = null;
-
 		final ObjectReader r = treeWalk.getObjectReader();
 		DirCacheEditor editor = dc.editor();
 		while (treeWalk.next()) {
-			String path = treeWalk.getPathString();
+			DirCacheEntry entry = dci.getDirCacheEntry();
 			// Only add one edit per path
-			if (path.equals(previousPath))
+			if (entry != null && entry.getStage() > DirCacheEntry.STAGE_1)
 				continue;
-
-			editor.add(new PathEdit(path) {
+			editor.add(new PathEdit(treeWalk.getPathString()) {
 				public void apply(DirCacheEntry ent) {
 					int stage = ent.getStage();
 					if (stage > DirCacheEntry.STAGE_0) {
@@ -432,8 +431,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 					}
 				}
 			});
-
-			previousPath = path;
 		}
 		editor.commit();
 	}
@@ -458,8 +455,11 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	}
 
 	private void checkoutPath(DirCacheEntry entry, ObjectReader reader) {
+		File file = new File(repo.getWorkTree(), entry.getPathString());
+		File parentDir = file.getParentFile();
 		try {
-			DirCacheCheckout.checkoutEntry(repo, entry, reader);
+			FileUtils.mkdirs(parentDir, true);
+			DirCacheCheckout.checkoutEntry(repo, file, entry, reader);
 		} catch (IOException e) {
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().checkoutConflictWithFile,

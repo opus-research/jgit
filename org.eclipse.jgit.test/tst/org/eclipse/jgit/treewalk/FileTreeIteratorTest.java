@@ -281,7 +281,7 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 
 	@Test
 	public void testIsModifiedSymlinkAsFile() throws Exception {
-		writeTrashFile("symlink", "content");
+		File f = writeTrashFile("symlink", "content");
 		Git git = new Git(db);
 		db.getConfig().setString(ConfigConstants.CONFIG_CORE_SECTION, null,
 				ConfigConstants.CONFIG_KEY_SYMLINKS, "false");
@@ -291,13 +291,13 @@ public class FileTreeIteratorTest extends RepositoryTestCase {
 		// Modify previously committed DirCacheEntry and write it back to disk
 		DirCacheEntry dce = db.readDirCache().getEntry("symlink");
 		dce.setFileMode(FileMode.SYMLINK);
-		ObjectReader objectReader = db.newObjectReader();
-		DirCacheCheckout.checkoutEntry(db, dce, objectReader);
+		DirCacheCheckout.checkoutEntry(db, f, dce);
 
 		FileTreeIterator fti = new FileTreeIterator(trash, db.getFS(), db
 				.getConfig().get(WorkingTreeOptions.KEY));
 		while (!fti.getEntryPathString().equals("symlink"))
 			fti.next(1);
+		ObjectReader objectReader = db.newObjectReader();
 		assertFalse(fti.isModified(dce, false, objectReader));
 		objectReader.release();
 	}

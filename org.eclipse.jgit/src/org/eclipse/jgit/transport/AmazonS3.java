@@ -115,6 +115,8 @@ public class AmazonS3 {
 
 	private static final String HMAC = "HmacSHA1"; //$NON-NLS-1$
 
+	private static final String DOMAIN = "s3.amazonaws.com"; //$NON-NLS-1$
+
 	private static final String X_AMZ_ACL = "x-amz-acl"; //$NON-NLS-1$
 
 	private static final String X_AMZ_META = "x-amz-meta-"; //$NON-NLS-1$
@@ -180,12 +182,6 @@ public class AmazonS3 {
 	/** Encryption algorithm, may be a null instance that provides pass-through. */
 	private final WalkEncryption encryption;
 
-	/** Directory for locally buffered content. */
-	private final File tmpDir;
-
-	/** S3 Bucket Domain. */
-	private final String domain;
-
 	/**
 	 * Create a new S3 client for the supplied user information.
 	 * <p>
@@ -202,10 +198,6 @@ public class AmazonS3 {
 	 * # PRIVATE, PUBLIC_READ (defaults to PRIVATE).
 	 * acl: PRIVATE
 	 *
-	 * # S3 Domain
-	 * # AWS S3 Region Domain (defaults to s3.amazonaws.com)
-	 * domain: s3.amazonaws.com
-	 *
 	 * # Number of times to retry after internal error from S3.
 	 * httpclient.retry-max: 3
 	 *
@@ -219,7 +211,6 @@ public class AmazonS3 {
 	 *
 	 */
 	public AmazonS3(final Properties props) {
-		domain = props.getProperty("domain", "s3.amazonaws.com"); //$NON-NLS-1$ //$NON-NLS-2$
 		publicKey = props.getProperty("accesskey"); //$NON-NLS-1$
 		if (publicKey == null)
 			throw new IllegalArgumentException(JGitText.get().missingAccesskey);
@@ -260,9 +251,6 @@ public class AmazonS3 {
 		maxAttempts = Integer.parseInt(props.getProperty(
 				"httpclient.retry-max", "3")); //$NON-NLS-1$ //$NON-NLS-2$
 		proxySelector = ProxySelector.getDefault();
-
-		String tmp = props.getProperty("tmpdir"); //$NON-NLS-1$
-		tmpDir = tmp != null && tmp.length() > 0 ? new File(tmp) : null;
 	}
 
 	/**
@@ -464,7 +452,7 @@ public class AmazonS3 {
 			final ProgressMonitor monitor, final String monitorTask)
 			throws IOException {
 		final MessageDigest md5 = newMD5();
-		final TemporaryBuffer buffer = new TemporaryBuffer.LocalFile(tmpDir) {
+		final TemporaryBuffer buffer = new TemporaryBuffer.LocalFile() {
 			@Override
 			public void close() throws IOException {
 				super.close();
@@ -564,7 +552,7 @@ public class AmazonS3 {
 		urlstr.append("http://"); //$NON-NLS-1$
 		urlstr.append(bucket);
 		urlstr.append('.');
-		urlstr.append(domain);
+		urlstr.append(DOMAIN);
 		urlstr.append('/');
 		if (key.length() > 0)
 			HttpSupport.encode(urlstr, key);
@@ -625,7 +613,7 @@ public class AmazonS3 {
 
 		final String host = c.getURL().getHost();
 		s.append('/');
-		s.append(host.substring(0, host.length() - domain.length() - 1));
+		s.append(host.substring(0, host.length() - DOMAIN.length() - 1));
 		s.append(c.getURL().getPath());
 
 		final String sec;

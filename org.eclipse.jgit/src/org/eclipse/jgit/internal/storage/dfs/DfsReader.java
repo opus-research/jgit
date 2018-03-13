@@ -556,8 +556,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 			pin(pack, 0);
 			if (block.copy(0, buf, 0, 12) != 12) {
 				pack.setInvalid();
-				throw new IOException(MessageFormat.format(
-						JGitText.get().packfileIsTruncated, pack.getPackName()));
+				throw new IOException(JGitText.get().packfileIsTruncated);
 			}
 			md.update(buf, 0, 12);
 		}
@@ -581,8 +580,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 			pin(pack, position);
 			if (block.copy(position, buf, 0, 20) != 20) {
 				pack.setInvalid();
-				throw new IOException(MessageFormat.format(
-						JGitText.get().packfileIsTruncated, pack.getPackName()));
+				throw new IOException(JGitText.get().packfileIsTruncated);
 			}
 			if (!Arrays.equals(actHash, buf)) {
 				pack.setInvalid();
