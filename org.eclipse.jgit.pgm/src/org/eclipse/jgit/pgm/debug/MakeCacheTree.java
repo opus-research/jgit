@@ -54,7 +54,7 @@ import org.eclipse.jgit.pgm.TextBuiltin;
 class MakeCacheTree extends TextBuiltin {
 	@Override
 	protected void run() throws Exception {
-		final DirCache cache = db.readDirCache();
+		final DirCache cache = DirCache.read(db);
 		final DirCacheTree tree = cache.getCacheTree(true);
 		show(tree);
 	}

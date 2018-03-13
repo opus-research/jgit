@@ -83,12 +83,7 @@ class UploadPackServlet extends HttpServlet {
 		protected void advertise(HttpServletRequest req, Repository db,
 				PacketLineOutRefAdvertiser pck) throws IOException,
 				ServiceNotEnabledException, ServiceNotAuthorizedException {
-			UploadPack up = uploadPackFactory.create(req, db);
-			try {
-				up.sendAdvertisedRefs(pck);
-			} finally {
-				up.getRevWalk().release();
-			}
+			uploadPackFactory.create(req, db).sendAdvertisedRefs(pck);
 		}
 	}
 
@@ -112,12 +107,7 @@ class UploadPackServlet extends HttpServlet {
 			up.setBiDirectionalPipe(false);
 			rsp.setContentType(RSP_TYPE);
 
-			final SmartOutputStream out = new SmartOutputStream(req, rsp) {
-				@Override
-				public void flush() throws IOException {
-					doFlush();
-				}
-			};
+			final SmartOutputStream out = new SmartOutputStream(req, rsp);
 			up.upload(getInputStream(req), out, null);
 			out.close();
 

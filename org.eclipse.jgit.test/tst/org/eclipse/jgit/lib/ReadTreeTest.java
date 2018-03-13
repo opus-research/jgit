@@ -45,9 +45,11 @@
  */
 package org.eclipse.jgit.lib;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -56,6 +58,7 @@ import org.eclipse.jgit.errors.CheckoutConflictException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.util.FS;
 
 public abstract class ReadTreeTest extends RepositoryTestCase {
 	protected Tree theHead;
@@ -129,15 +132,13 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 	}
 
 	ObjectId genSha1(String data) {
-		ObjectInserter w = db.newObjectInserter();
+		InputStream is = new ByteArrayInputStream(data.getBytes());
+		ObjectWriter objectWriter = new ObjectWriter(db);
 		try {
-			ObjectId id = w.insert(Constants.OBJ_BLOB, data.getBytes());
-			w.flush();
-			return id;
+			return objectWriter.writeObject(Constants.OBJ_BLOB, data
+					.getBytes().length, is, true);
 		} catch (IOException e) {
 			fail(e.toString());
-		} finally {
-			w.release();
 		}
 		return null;
 	}
@@ -612,7 +613,7 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		TreeWalk walk = new TreeWalk(db);
 		walk.reset();
 		walk.setRecursive(true);
-		walk.addTree(new FileTreeIterator(db));
+		walk.addTree(new FileTreeIterator(db.getWorkDir(), FS.DETECTED));
 		String expectedValue;
 		String path;
 		int nrFiles = 0;
@@ -623,7 +624,7 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 			expectedValue = i.get(path);
 			assertNotNull("found unexpected file for path "
 					+ path + " in workdir", expectedValue);
-			File file = new File(db.getWorkTree(), path);
+			File file = new File(db.getWorkDir(), path);
 			assertTrue(file.exists());
 			if (file.isFile()) {
 				FileInputStream is = new FileInputStream(file);
@@ -661,8 +662,8 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 			assertTrue("unexpected content for path " + path
 					+ " in index. Expected: <" + expectedValue + ">",
 					Arrays.equals(
-							db.open(theIndex.getMembers()[j].getObjectId())
-									.getCachedBytes(), i.get(path).getBytes()));
+							db.openBlob(theIndex.getMembers()[j].getObjectId())
+									.getBytes(), i.get(path).getBytes()));
 		}
 	}
 
