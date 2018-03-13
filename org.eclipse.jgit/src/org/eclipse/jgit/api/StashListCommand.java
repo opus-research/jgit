@@ -96,8 +96,10 @@ public class StashListCommand extends GitCommand<Collection<RevCommit>> {
 
 		final List<RevCommit> stashCommits = new ArrayList<RevCommit>(
 				stashEntries.size());
-		try (RevWalk walk = new RevWalk(repo)) {
-			for (ReflogEntry entry : stashEntries) {
+		final RevWalk walk = new RevWalk(repo);
+		walk.setRetainBody(true);
+		try {
+			for (ReflogEntry entry : stashEntries)
 				try {
 					stashCommits.add(walk.parseCommit(entry.getNewId()));
 				} catch (IOException e) {
@@ -105,7 +107,8 @@ public class StashListCommand extends GitCommand<Collection<RevCommit>> {
 							JGitText.get().cannotReadCommit, entry.getNewId()),
 							e);
 				}
-			}
+		} finally {
+			walk.dispose();
 		}
 		return stashCommits;
 	}
