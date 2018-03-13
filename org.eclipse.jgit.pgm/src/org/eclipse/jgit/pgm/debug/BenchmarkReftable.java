@@ -56,8 +56,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
-import org.eclipse.jgit.internal.storage.io.BlockSource;
-import org.eclipse.jgit.internal.storage.reftable.RefCursor;
+import org.eclipse.jgit.internal.storage.reftable.BlockSource;
 import org.eclipse.jgit.internal.storage.reftable.ReftableReader;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
@@ -72,9 +71,7 @@ import org.kohsuke.args4j.Option;
 @Command
 class BenchmarkReftable extends TextBuiltin {
 	enum Test {
-		SCAN,
-		SEEK_COLD, SEEK_HOT,
-		BY_ID_COLD, BY_ID_HOT;
+		SCAN, SEEK;
 	}
 
 	@Option(name = "--tries")
@@ -86,9 +83,6 @@ class BenchmarkReftable extends TextBuiltin {
 	@Option(name = "--ref")
 	private String ref;
 
-	@Option(name = "--object-id")
-	private String objectId;
-
 	@Argument(index = 0)
 	private String lsRemotePath;
 
@@ -97,24 +91,10 @@ class BenchmarkReftable extends TextBuiltin {
 
 	@Override
 	protected void run() throws Exception {
-		switch (test) {
-		case SCAN:
+		if (test == Test.SCAN) {
 			scan();
-			break;
-
-		case SEEK_COLD:
-			seekCold(ref);
-			break;
-		case SEEK_HOT:
-			seekHot(ref);
-			break;
-
-		case BY_ID_COLD:
-			byIdCold(ObjectId.fromString(objectId));
-			break;
-		case BY_ID_HOT:
-			byIdHot(ObjectId.fromString(objectId));
-			break;
+		} else if (test == Test.SEEK) {
+			seek(ref);
 		}
 	}
 
@@ -138,10 +118,9 @@ class BenchmarkReftable extends TextBuiltin {
 			try (FileInputStream in = new FileInputStream(reftablePath);
 					BlockSource src = BlockSource.from(in);
 					ReftableReader reader = new ReftableReader(src)) {
-				try (RefCursor rc = reader.allRefs()) {
-					while (rc.next()) {
-						rc.getRef();
-					}
+				reader.seekToFirstRef();
+				while (reader.next()) {
+					reader.getRef();
 				}
 			}
 		}
@@ -180,7 +159,7 @@ class BenchmarkReftable extends TextBuiltin {
 	}
 
 	@SuppressWarnings({ "nls", "boxing" })
-	private void seekCold(String refName) throws Exception {
+	private void seek(String refName) throws Exception {
 		long start, tot;
 
 		int lsTries = Math.min(tries, 64);
@@ -199,10 +178,9 @@ class BenchmarkReftable extends TextBuiltin {
 			try (FileInputStream in = new FileInputStream(reftablePath);
 					BlockSource src = BlockSource.from(in);
 					ReftableReader reader = new ReftableReader(src)) {
-				try (RefCursor rc = reader.seekRef(refName)) {
-					while (rc.next()) {
-						rc.getRef();
-					}
+				reader.seek(refName);
+				while (reader.next()) {
+					reader.getRef();
 				}
 			}
 		}
@@ -211,105 +189,5 @@ class BenchmarkReftable extends TextBuiltin {
 				tot / 1000,
 				(((double) tot) / tries) / 1000,
 				tries);
-	}
-
-	@SuppressWarnings({ "nls", "boxing" })
-	private void seekHot(String refName) throws Exception {
-		long start, tot;
-
-		int lsTries = Math.min(tries, 64);
-		start = System.nanoTime();
-		RefList<Ref> lsRemote = readLsRemote();
-		for (int i = 0; i < lsTries; i++) {
-			lsRemote.get(refName);
-		}
-		tot = System.nanoTime() - start;
-		printf("%12s %10d usec  %9.1f usec/run  %5d runs", "packed-refs",
-				tot / 1000, (((double) tot) / lsTries) / 1000, lsTries);
-
-		start = System.nanoTime();
-		try (FileInputStream in = new FileInputStream(reftablePath);
-				BlockSource src = BlockSource.from(in);
-				ReftableReader reader = new ReftableReader(src)) {
-			for (int i = 0; i < tries; i++) {
-				try (RefCursor rc = reader.seekRef(refName)) {
-					while (rc.next()) {
-						rc.getRef();
-					}
-				}
-			}
-		}
-		tot = System.nanoTime() - start;
-		printf("%12s %10d usec  %9.1f usec/run  %5d runs", "reftable",
-				tot / 1000, (((double) tot) / tries) / 1000, tries);
-	}
-
-	@SuppressWarnings({ "nls", "boxing" })
-	private void byIdCold(ObjectId id) throws Exception {
-		long start, tot;
-
-		int lsTries = Math.min(tries, 64);
-		start = System.nanoTime();
-		for (int i = 0; i < lsTries; i++) {
-			for (Ref r : readLsRemote()) {
-				if (id.equals(r.getObjectId())) {
-					continue;
-				}
-			}
-		}
-		tot = System.nanoTime() - start;
-		printf("%12s %10d usec  %9.1f usec/run  %5d runs", "packed-refs",
-				tot / 1000, (((double) tot) / lsTries) / 1000, lsTries);
-
-		start = System.nanoTime();
-		for (int i = 0; i < tries; i++) {
-			try (FileInputStream in = new FileInputStream(reftablePath);
-					BlockSource src = BlockSource.from(in);
-					ReftableReader reader = new ReftableReader(src)) {
-				try (RefCursor rc = reader.byObjectId(id)) {
-					while (rc.next()) {
-						rc.getRef();
-					}
-				}
-			}
-		}
-		tot = System.nanoTime() - start;
-		printf("%12s %10d usec  %9.1f usec/run  %5d runs", "reftable",
-				tot / 1000, (((double) tot) / tries) / 1000, tries);
-	}
-
-	@SuppressWarnings({ "nls", "boxing" })
-	private void byIdHot(ObjectId id) throws Exception {
-		long start, tot;
-
-		int lsTries = Math.min(tries, 64);
-		start = System.nanoTime();
-		RefList<Ref> lsRemote = readLsRemote();
-		for (int i = 0; i < lsTries; i++) {
-			for (Ref r : lsRemote) {
-				if (id.equals(r.getObjectId())) {
-					continue;
-				}
-			}
-		}
-		tot = System.nanoTime() - start;
-		printf("%12s %10d usec  %9.1f usec/run  %5d runs", "packed-refs",
-				tot / 1000, (((double) tot) / lsTries) / 1000, lsTries);
-
-		start = System.nanoTime();
-		try (FileInputStream in = new FileInputStream(reftablePath);
-				BlockSource src = BlockSource.from(in);
-				ReftableReader reader = new ReftableReader(src)) {
-			for (int i = 0; i < tries; i++) {
-				try (RefCursor rc = reader.byObjectId(id)) {
-					while (rc.next()) {
-						rc.getRef();
-					}
-				}
-			}
-		}
-		tot = System.nanoTime() - start;
-		printf("%12s %10d usec  %9.1f usec/run  %5d runs", "reftable",
-				tot / 1000, (((double) tot) / tries) / 1000, tries);
 	}
 }
