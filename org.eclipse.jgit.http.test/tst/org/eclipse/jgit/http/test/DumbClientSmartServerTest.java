@@ -43,7 +43,10 @@
 
 package org.eclipse.jgit.http.test;
 
+import static org.eclipse.jgit.util.HttpSupport.HDR_ACCEPT;
 import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_TYPE;
+import static org.eclipse.jgit.util.HttpSupport.HDR_PRAGMA;
+import static org.eclipse.jgit.util.HttpSupport.HDR_USER_AGENT;
 
 import java.io.IOException;
 import java.util.List;
@@ -159,6 +162,11 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 		assertEquals(join(remoteURI, "info/refs"), info.getPath());
 		assertEquals(0, info.getParameters().size());
 		assertNull("no service parameter", info.getParameter("service"));
+		assertEquals("no-cache", info.getRequestHeader(HDR_PRAGMA));
+		assertNotNull("has user-agent", info.getRequestHeader(HDR_USER_AGENT));
+		assertTrue("is jgit agent", info.getRequestHeader(HDR_USER_AGENT)
+				.startsWith("JGit/"));
+		assertEquals("*/*", info.getRequestHeader(HDR_ACCEPT));
 		assertEquals(200, info.getStatus());
 		assertEquals("text/plain;charset=UTF-8", info
 				.getResponseHeader(HDR_CONTENT_TYPE));
