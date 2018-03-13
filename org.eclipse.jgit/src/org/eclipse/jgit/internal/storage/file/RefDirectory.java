@@ -580,9 +580,6 @@ public class RefDirectory extends RefDatabase {
 
 	void delete(RefDirectoryUpdate update) throws IOException {
 		Ref dst = update.getRef();
-		if (!update.isDetachingSymbolicRef()) {
-			dst = dst.getLeaf();
-		}
 		String name = dst.getName();
 
 		// Write the packed-refs file using an atomic update. We might
@@ -650,32 +647,16 @@ public class RefDirectory extends RefDatabase {
 			RefList<Ref> cur = readPackedRefs();
 
 			// Iterate over all refs to be packed
-			boolean dirty = false;
 			for (String refName : refs) {
-				Ref oldRef = readRef(refName, cur);
-				if (oldRef.isSymbolic()) {
+				Ref ref = readRef(refName, cur);
+				if (ref.isSymbolic())
 					continue; // can't pack symbolic refs
-				}
 				// Add/Update it to packed-refs
-				Ref newRef = peeledPackedRef(oldRef);
-				if (newRef == oldRef) {
-					// No-op; peeledPackedRef returns the input ref only if it's already
-					// packed, and readRef returns a packed ref only if there is no loose
-					// ref.
-					continue;
-				}
-
-				dirty = true;
 				int idx = cur.find(refName);
-				if (idx >= 0) {
-					cur = cur.set(idx, newRef);
-				} else {
-					cur = cur.add(idx, newRef);
-				}
-			}
-			if (!dirty) {
-				// All requested refs were already packed accurately
-				return;
+				if (idx >= 0)
+					cur = cur.set(idx, peeledPackedRef(ref));
+				else
+					cur = cur.add(idx, peeledPackedRef(ref));
 			}
 
 			// The new content for packed-refs is collected. Persist it.
@@ -917,24 +898,8 @@ public class RefDirectory extends RefDatabase {
 					throw new ObjectWritingException(MessageFormat.format(JGitText.get().unableToWrite, name));
 
 				byte[] digest = Constants.newMessageDigest().digest(content);
-				PackedRefList newPackedList = new PackedRefList(
-						refs, lck.getCommitSnapshot(), ObjectId.fromRaw(digest));
-
-				// This thread holds the file lock, so no other thread or process should
-				// be able to modify the packed-refs file on disk. If the list changed,
-				// it means something is very wrong, so throw an exception.
-				//
-				// However, we can't use a naive compareAndSet to check whether the
-				// update was successful, because another thread might _read_ the
-				// packed refs file that was written out by this thread while holding
-				// the lock, and update the packedRefs reference to point to that. So
-				// compare the actual contents instead.
-				PackedRefList afterUpdate = packedRefs.updateAndGet(
-						p -> p.id.equals(oldPackedList.id) ? newPackedList : p);
-				if (!afterUpdate.id.equals(newPackedList.id)) {
-					throw new ObjectWritingException(
-							MessageFormat.format(JGitText.get().unableToWrite, name));
-				}
+				packedRefs.compareAndSet(oldPackedList, new PackedRefList(refs,
+						lck.getCommitSnapshot(), ObjectId.fromRaw(digest)));
 			}
 		}.writePackedRefs();
 	}
