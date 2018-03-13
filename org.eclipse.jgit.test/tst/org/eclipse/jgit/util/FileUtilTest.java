@@ -92,7 +92,7 @@ public class FileUtilTest {
 	@Test
 	public void testDeleteRecursive() throws IOException {
 		File f1 = new File(trash, "test/test/a");
-		assertTrue(f1.mkdirs());
+		f1.mkdirs();
 		f1.createNewFile();
 		File f2 = new File(trash, "test/test/b");
 		f2.createNewFile();
@@ -173,21 +173,6 @@ public class FileUtilTest {
 			// expected
 		}
 		assertTrue(f.delete());
-	}
-
-	public void testCreateNewFile() throws IOException {
-		File f = new File(trash, "x");
-		FileUtils.createNewFile(f);
-		assertTrue(f.exists());
-
-		try {
-			FileUtils.createNewFile(f);
-			fail("creation of already existing file must fail");
-		} catch (IOException e) {
-			// expected
-		}
-
-		FileUtils.delete(f);
 	}
 
 }
