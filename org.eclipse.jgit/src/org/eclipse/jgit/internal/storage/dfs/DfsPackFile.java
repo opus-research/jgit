@@ -341,7 +341,7 @@ public final class DfsPackFile {
 		}
 	}
 
-	PackReverseIndex getReverseIdx(DfsReader ctx) throws IOException {
+	private PackReverseIndex getReverseIdx(DfsReader ctx) throws IOException {
 		DfsBlockCache.Ref<PackReverseIndex> revref = reverseIndex;
 		if (revref != null) {
 			PackReverseIndex revidx = revref.get();
@@ -429,6 +429,22 @@ public final class DfsPackFile {
 	 */
 	long getObjectCount(DfsReader ctx) throws IOException {
 		return idx(ctx).getObjectCount();
+	}
+
+	/**
+	 * Search for object id with the specified start offset in associated pack
+	 * (reverse) index.
+	 *
+	 * @param ctx
+	 *            current reader for the calling thread.
+	 * @param offset
+	 *            start offset of object to find
+	 * @return object id for this offset, or null if no object was found
+	 * @throws IOException
+	 *             the index file cannot be loaded into memory.
+	 */
+	ObjectId findObjectForOffset(DfsReader ctx, long offset) throws IOException {
+		return getReverseIdx(ctx).findObject(offset);
 	}
 
 	private byte[] decompress(long position, int sz, DfsReader ctx)
@@ -680,6 +696,7 @@ public final class DfsPackFile {
 		if (invalid)
 			throw new PackInvalidException(getPackName());
 
+		boolean close = true;
 		ReadableChannel rc = ctx.db.openFile(packDesc, PACK);
 		try {
 			// If the block alignment is not yet known, discover it. Prefer the
@@ -738,9 +755,12 @@ public final class DfsPackFile {
 			}
 
 			DfsBlock v = new DfsBlock(key, pos, buf);
+			if (v.end < len)
+				close = !cache.readAhead(rc, key, size, v.end, len, ctx);
 			return v;
 		} finally {
-			rc.close();
+			if (close)
+				rc.close();
 		}
 	}
 
@@ -1033,10 +1053,9 @@ public final class DfsPackFile {
 		}
 	}
 
-	void representation(DfsObjectRepresentation r, final long pos,
-			DfsReader ctx, PackReverseIndex rev)
+	void representation(DfsReader ctx, DfsObjectRepresentation r)
 			throws IOException {
-		r.offset = pos;
+		final long pos = r.offset;
 		final byte[] ib = ctx.tempId;
 		readFully(pos, ib, 0, 20, ctx);
 		int c = ib[0] & 0xff;
@@ -1045,14 +1064,13 @@ public final class DfsPackFile {
 		while ((c & 0x80) != 0)
 			c = ib[p++] & 0xff;
 
-		long len = rev.findNextOffset(pos, length - 20) - pos;
+		long len = (getReverseIdx(ctx).findNextOffset(pos, length - 20) - pos);
 		switch (typeCode) {
 		case Constants.OBJ_COMMIT:
 		case Constants.OBJ_TREE:
 		case Constants.OBJ_BLOB:
 		case Constants.OBJ_TAG:
 			r.format = StoredObjectRepresentation.PACK_WHOLE;
-			r.baseId = null;
 			r.length = len - p;
 			return;
 
@@ -1065,17 +1083,21 @@ public final class DfsPackFile {
 				ofs <<= 7;
 				ofs += (c & 127);
 			}
+			ofs = pos - ofs;
 			r.format = StoredObjectRepresentation.PACK_DELTA;
-			r.baseId = rev.findObject(pos - ofs);
+			r.baseId = findObjectForOffset(ctx, ofs);
 			r.length = len - p;
 			return;
 		}
 
 		case Constants.OBJ_REF_DELTA: {
+			len -= p;
+			len -= Constants.OBJECT_ID_LENGTH;
 			readFully(pos + p, ib, 0, 20, ctx);
+			ObjectId id = ObjectId.fromRaw(ib);
 			r.format = StoredObjectRepresentation.PACK_DELTA;
-			r.baseId = ObjectId.fromRaw(ib);
-			r.length = len - p - 20;
+			r.baseId = id;
+			r.length = len;
 			return;
 		}
 
