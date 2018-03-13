@@ -65,6 +65,12 @@ public class ConfigConstants {
 	/** The "dfs" section */
 	public static final String CONFIG_DFS_SECTION = "dfs";
 
+	/**
+	 * The "receive" section
+	 * @since 4.6
+	 */
+	public static final String CONFIG_RECEIVE_SECTION = "receive";
+
 	/** The "user" section */
 	public static final String CONFIG_USER_SECTION = "user";
 
@@ -101,17 +107,29 @@ public class ConfigConstants {
 	 */
 	public static final String CONFIG_PULL_SECTION = "pull";
 
-	/**
-	 * The "filter" section
-	 * @since 4.6
-	 */
-	public static final String CONFIG_FILTER_SECTION = "filter";
-
 	/** The "algorithm" key */
 	public static final String CONFIG_KEY_ALGORITHM = "algorithm";
 
 	/** The "autocrlf" key */
 	public static final String CONFIG_KEY_AUTOCRLF = "autocrlf";
+
+	/**
+	 * The "auto" key
+	 * @since 4.6
+	 */
+	public static final String CONFIG_KEY_AUTO = "auto";
+
+	/**
+	 * The "autogc" key
+	 * @since 4.6
+	 */
+	public static final String CONFIG_KEY_AUTOGC = "autogc";
+
+	/**
+	 * The "autopacklimit" key
+	 * @since 4.6
+	 */
+	public static final String CONFIG_KEY_AUTOPACKLIMIT = "autopacklimit";
 
 	/**
 	 * The "eol" key
@@ -343,11 +361,4 @@ public class ConfigConstants {
 	 * @since 4.0
 	 */
 	public static final String CONFIG_KEY_STREAM_RATIO = "streamRatio";
-
-	/**
-	 * Flag in the filter section whether to use JGit's implementations of
-	 * filters and hooks
-	 * @since 4.6
-	 */
-	public static final String CONFIG_KEY_USEJGITBUILTIN = "useJGitBuiltin";
 }
