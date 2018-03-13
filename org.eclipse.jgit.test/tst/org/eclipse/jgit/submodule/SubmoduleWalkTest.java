@@ -169,7 +169,6 @@ public class SubmoduleWalkTest extends RepositoryTestCase {
 		assertNull(gen.getModulesUpdate());
 		assertNull(gen.getModulesUrl());
 		Repository subRepo = gen.getRepository();
-		addRepoToClose(subRepo);
 		assertNotNull(subRepo);
 		assertEquals(modulesGitDir, subRepo.getDirectory());
 		assertEquals(new File(db.getWorkTree(), path), subRepo.getWorkTree());
@@ -218,7 +217,6 @@ public class SubmoduleWalkTest extends RepositoryTestCase {
 		assertNull(gen.getModulesUpdate());
 		assertNull(gen.getModulesUrl());
 		Repository subRepo = gen.getRepository();
-		addRepoToClose(subRepo);
 		assertNotNull(subRepo);
 		assertEquals(modulesGitDir, subRepo.getDirectory());
 		assertEquals(new File(db.getWorkTree(), path), subRepo.getWorkTree());
