@@ -103,9 +103,6 @@ public class FileAccessJava extends FileAccess {
 	@Override
 	public String readlink(File file) throws UnsupportedOperationException,
 			NoSuchFileException, AccessDeniedException {
-		// TODO Does it make sense to simulate symbolic links here?
-		// This is basically what Git does on Win32.
-
 		try {
 			return RawParseUtils.decode(IO.readFully(file));
 		} catch (FileNotFoundException e) {
@@ -118,9 +115,6 @@ public class FileAccessJava extends FileAccess {
 	@Override
 	public void symlink(File file, String target)
 			throws UnsupportedOperationException, FileExistsException {
-		// TODO Does it make sense to simulate symbolic links here?
-		// This is basically what Git does on Win32.
-
 		if (file.exists())
 			throw new FileExistsException(file.getPath());
 
@@ -146,17 +140,5 @@ public class FileAccessJava extends FileAccess {
 		} catch (IOException err) {
 			throw new NativeException(err.getMessage(), err);
 		}
-	}
-
-	@Override
-	public DirEnt[] list(File dir) throws AccessDeniedException {
-		String[] names = dir.list();
-		if (names == null)
-			throw new AccessDeniedException(dir.getPath());
-
-		DirEnt[] r = new DirEnt[names.length];
-		for (int i = 0; i < names.length; i++)
-			r[i] = new DirEnt(names[i]);
-		return r;
 	}
 }
