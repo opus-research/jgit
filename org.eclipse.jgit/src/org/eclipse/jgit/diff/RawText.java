@@ -44,12 +44,14 @@
 
 package org.eclipse.jgit.diff;
 
+import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
 import org.eclipse.jgit.annotations.Nullable;
+import org.eclipse.jgit.errors.BinaryBlobException;
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.util.IO;
@@ -306,35 +308,37 @@ public class RawText extends Sequence {
 	 *   the ObjectLoader for the blob
 	 * @param threshold
 	 *   if the blob is larger than this size, it is always assumed to be binary.
-	 * @return the bytes representing the blob, or null if the blob is suspected to be binary.
+	 *   This threshold is assumed to be larger than FIRST_FEW_BYTES.
+	 * @return the RawText representing the blob.
+	 * @throws BinaryBlobException if the blob contains binary data.
 	 */
 	@Nullable
-	public static RawText load(ObjectLoader ldr, int threshold) throws IOException {
+	public static RawText load(ObjectLoader ldr, int threshold) throws IOException, BinaryBlobException {
 		long sz = ldr.getSize();
 
 		if (threshold < FIRST_FEW_BYTES) {
 			threshold = FIRST_FEW_BYTES;
 		}
 		if (sz > threshold) {
-			return null;
+			throw new BinaryBlobException();
 		}
 
 		if (sz <= FIRST_FEW_BYTES) {
-			byte []data = ldr.getCachedBytes(FIRST_FEW_BYTES);
+			byte[] data = ldr.getCachedBytes(FIRST_FEW_BYTES);
 			if (isBinary(data)) {
-				return null;
+				throw new BinaryBlobException();
 			}
 			return new RawText(data);
 		}
 
-		byte head[] = new byte[FIRST_FEW_BYTES];
+		byte[] head = new byte[FIRST_FEW_BYTES];
 		try (InputStream stream = ldr.openStream()) {
 			int off = 0;
 			int left = head.length;
 			while (left > 0) {
 				int n = stream.read(head, off, left);
 				if (n < 0) {
-					throw new IllegalStateException("negative read");
+					throw new EOFException();
 				}
 
 				left -= n;
@@ -342,7 +346,7 @@ public class RawText extends Sequence {
 			}
 
 			if (isBinary(head)) {
-				return null;
+				throw new BinaryBlobException();
 			}
 
 			byte data[];

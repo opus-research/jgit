@@ -66,6 +66,7 @@ import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
+import org.eclipse.jgit.errors.BinaryBlobException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -950,44 +951,49 @@ public class DiffFormatter implements AutoCloseable {
 			// Content not changed (e.g. only mode, pure rename)
 			editList = new EditList();
 			type = PatchType.UNIFIED;
+			res.header = new FileHeader(buf.toByteArray(), editList, type);
+			return res;
+		}
 
+		assertHaveReader();
+
+		RawText aRaw = null;
+		RawText bRaw = null;
+		if (ent.getOldMode() == GITLINK || ent.getNewMode() == GITLINK) {
+			aRaw = new RawText(writeGitLinkText(ent.getOldId()));
+			bRaw = new RawText(writeGitLinkText(ent.getNewId()));
 		} else {
-			assertHaveReader();
-
-			RawText aRaw;
-			RawText bRaw;
-			if (ent.getOldMode() == GITLINK || ent.getNewMode() == GITLINK) {
-				aRaw = new RawText(writeGitLinkText(ent.getOldId()));
-				bRaw = new RawText(writeGitLinkText(ent.getNewId()));
-			} else {
+			try {
 				aRaw = open(OLD, ent);
 				bRaw = open(NEW, ent);
-			}
-
-			if (aRaw == null || bRaw == null) {
+			} catch (BinaryBlobException e) {
+				// Do nothing; we check for null below.
 				formatOldNewPaths(buf, ent);
 				buf.write(encodeASCII("Binary files differ\n")); //$NON-NLS-1$
 				editList = new EditList();
 				type = PatchType.BINARY;
-			} else {
-				res.a = aRaw;
-				res.b = bRaw;
-				editList = diff(res.a, res.b);
-				type = PatchType.UNIFIED;
-
-				switch (ent.getChangeType()) {
-				case RENAME:
-				case COPY:
-					if (!editList.isEmpty())
-						formatOldNewPaths(buf, ent);
-					break;
-
-				default:
-					formatOldNewPaths(buf, ent);
-					break;
-				}
+				res.header = new FileHeader(buf.toByteArray(), editList, type);
+				return res;
 			}
 		}
+
+		res.a = aRaw;
+		res.b = bRaw;
+		editList = diff(res.a, res.b);
+		type = PatchType.UNIFIED;
+
+		switch (ent.getChangeType()) {
+			case RENAME:
+			case COPY:
+				if (!editList.isEmpty())
+					formatOldNewPaths(buf, ent);
+				break;
+
+			default:
+				formatOldNewPaths(buf, ent);
+				break;
+		}
+
 
 		res.header = new FileHeader(buf.toByteArray(), editList, type);
 		return res;
@@ -1004,7 +1010,7 @@ public class DiffFormatter implements AutoCloseable {
 	}
 
 	private RawText open(DiffEntry.Side side, DiffEntry entry)
-			throws IOException {
+			throws IOException, BinaryBlobException {
 		if (entry.getMode(side) == FileMode.MISSING)
 			return RawText.EMPTY_TEXT;
 
