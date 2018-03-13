@@ -66,7 +66,6 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.junit.TestRepository.BranchBuilder;
-import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
@@ -78,7 +77,6 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.PackIndex.MutableEntry;
 import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.storage.pack.PackWriter;
-import org.eclipse.jgit.storage.pack.PackWriter.ObjectIdSet;
 import org.eclipse.jgit.transport.PackParser;
 import org.junit.After;
 import org.junit.Before;
@@ -465,7 +463,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		RevCommit c1 = bb.commit().add("f", contentA).create();
 		testRepo.getRevWalk().parseHeaders(c1);
 		PackIndex pf1 = writePack(repo, Collections.singleton(c1),
-				Collections.<ObjectIdSet> emptySet());
+				Collections.<PackIndex> emptySet());
 		assertContent(
 				pf1,
 				Arrays.asList(c1.getId(), c1.getTree().getId(),
@@ -474,7 +472,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		RevCommit c2 = bb.commit().add("f", contentB).create();
 		testRepo.getRevWalk().parseHeaders(c2);
 		PackIndex pf2 = writePack(repo, Collections.singleton(c2),
-				Collections.singleton(objectIdSet(pf1)));
+				Collections.singleton(pf1));
 		assertContent(
 				pf2,
 				Arrays.asList(c2.getId(), c2.getTree().getId(),
@@ -492,12 +490,12 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	}
 
 	private static PackIndex writePack(FileRepository repo,
-			Set<? extends ObjectId> want, Set<ObjectIdSet> excludeObjects)
+			Set<? extends ObjectId> want, Set<PackIndex> excludeObjects)
 			throws IOException {
 		PackWriter pw = new PackWriter(repo);
 		pw.setDeltaBaseAsOffset(true);
 		pw.setReuseDeltaCommits(false);
-		for (ObjectIdSet idx : excludeObjects)
+		for (PackIndex idx : excludeObjects)
 			pw.excludeObjects(idx);
 		pw.preparePack(NullProgressMonitor.INSTANCE, want,
 				Collections.<ObjectId> emptySet());
@@ -669,13 +667,5 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		for (MutableEntry me : entries) {
 			assertEquals(objectsOrder[i++].toObjectId(), me.toObjectId());
 		}
-	}
-
-	private static ObjectIdSet objectIdSet(final PackIndex idx) {
-		return new ObjectIdSet() {
-			public boolean contains(AnyObjectId objectId) {
-				return idx.hasObject(objectId);
-			}
-		};
 	}
 }
