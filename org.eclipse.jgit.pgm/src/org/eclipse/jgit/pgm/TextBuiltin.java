@@ -253,7 +253,15 @@ public abstract class TextBuiltin {
 		throw die(true);
 	}
 
-	private void printUsage(final String message, final CmdLineParser clp)
+	/**
+	 * @param message
+	 *            non null
+	 * @param clp
+	 *            parser used to print options
+	 * @throws IOException
+	 * @since 4.2
+	 */
+	protected void printUsage(final String message, final CmdLineParser clp)
 			throws IOException {
 		errw.println(message);
 		errw.print("jgit "); //$NON-NLS-1$
