@@ -53,6 +53,7 @@ import java.text.MessageFormat;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.PackBitmapIndexBuilder.StoredEntry;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 import com.googlecode.javaewah.EWAHCompressedBitmap;
 
@@ -73,7 +74,7 @@ public class PackBitmapIndexWriterV1 {
 	 */
 	public PackBitmapIndexWriterV1(final OutputStream dst) {
 		out = new DigestOutputStream(dst instanceof BufferedOutputStream ? dst
-				: new BufferedOutputStream(dst),
+				: new SafeBufferedOutputStream(dst),
 				Constants.newMessageDigest());
 		dataOutput = new SimpleDataOutput(out);
 	}
