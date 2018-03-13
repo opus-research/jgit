@@ -60,7 +60,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.errors.MissingBundlePrerequisiteException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
@@ -108,9 +107,6 @@ class BundleFetchConnection extends BaseFetchConnection {
 			default:
 				throw new TransportException(transport.uri, JGitText.get().notABundle);
 			}
-		} catch (InvalidRefNameException err) {
-			close();
-			throw new TransportException(transport.uri, err.getMessage(), err);
 		} catch (TransportException err) {
 			close();
 			throw err;
@@ -130,7 +126,7 @@ class BundleFetchConnection extends BaseFetchConnection {
 		throw new TransportException(transport.uri, JGitText.get().notABundle);
 	}
 
-	private void readBundleV2() throws IOException, InvalidRefNameException {
+	private void readBundleV2() throws IOException {
 		final byte[] hdrbuf = new byte[1024];
 		final LinkedHashMap<String, Ref> avail = new LinkedHashMap<String, Ref>();
 		for (;;) {
