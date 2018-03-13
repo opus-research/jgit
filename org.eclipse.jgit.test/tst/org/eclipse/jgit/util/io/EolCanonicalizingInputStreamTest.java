@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2015, Ivan Motsch <ivan.motsch@bsiag.com>
+ * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
+ * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -51,7 +52,7 @@ import java.io.UnsupportedEncodingException;
 
 import org.junit.Test;
 
-public class AutoLFInputStreamTest {
+public class EolCanonicalizingInputStreamTest {
 
 	@Test
 	public void testLF() throws IOException {
@@ -96,7 +97,7 @@ public class AutoLFInputStreamTest {
 	private static void test(byte[] input, byte[] expected,
 			boolean detectBinary) throws IOException {
 		final InputStream bis1 = new ByteArrayInputStream(input);
-		final InputStream cis1 = new AutoLFInputStream(bis1, detectBinary);
+		final InputStream cis1 = new EolCanonicalizingInputStream(bis1, detectBinary);
 		int index1 = 0;
 		for (int b = cis1.read(); b != -1; b = cis1.read()) {
 			assertEquals(expected[index1], (byte) b);
@@ -108,7 +109,7 @@ public class AutoLFInputStreamTest {
 		for (int bufferSize = 1; bufferSize < 10; bufferSize++) {
 			final byte[] buffer = new byte[bufferSize];
 			final InputStream bis2 = new ByteArrayInputStream(input);
-			final InputStream cis2 = new AutoLFInputStream(bis2, detectBinary);
+			final InputStream cis2 = new EolCanonicalizingInputStream(bis2, detectBinary);
 
 			int read = 0;
 			for (int readNow = cis2.read(buffer, 0, buffer.length); readNow != -1

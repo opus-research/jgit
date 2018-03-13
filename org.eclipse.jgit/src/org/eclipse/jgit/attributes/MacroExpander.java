@@ -41,6 +41,7 @@
  */
 package org.eclipse.jgit.attributes;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ListIterator;
@@ -48,6 +49,13 @@ import java.util.Map;
 
 import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.attributes.Attribute.State;
+import org.eclipse.jgit.dircache.DirCacheIterator;
+import org.eclipse.jgit.lib.FileMode;
+import org.eclipse.jgit.treewalk.AbstractTreeIterator;
+import org.eclipse.jgit.treewalk.CanonicalTreeParser;
+import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.treewalk.WorkingTreeIterator;
+import org.eclipse.jgit.treewalk.TreeWalk.OperationType;
 
 /**
  * Attributes macro expander as described in
@@ -65,6 +73,8 @@ public class MacroExpander {
 			MACRO_PREFIX + BINARY_RULE_KEY, "-diff -merge -text") //$NON-NLS-1$
 					.getAttributes();
 
+	private final TreeWalk treeWalk;
+
 	private final AttributesNode globalNode;
 
 	private final AttributesNode infoNode;
@@ -75,24 +85,35 @@ public class MacroExpander {
 	 * Create a {@link MacroExpander} with only the default rules
 	 */
 	public MacroExpander() {
-		expansions.put(BINARY_RULE_KEY, BINARY_RULE_ATTRIBUTES);
+		treeWalk = null;
 		globalNode = null;
 		infoNode = null;
+		expansions.put(BINARY_RULE_KEY, BINARY_RULE_ATTRIBUTES);
 	}
 
 	/**
 	 * Create a {@link MacroExpander} with the default rules and merged rules
 	 * from global, info and worktree root attributes
 	 *
-	 * @param globalNode
-	 * @param infoNode
-	 * @param rootNode
+	 * @param treeWalk
+	 * @throws IOException
 	 */
-	public MacroExpander(@Nullable AttributesNode globalNode,
-			@Nullable AttributesNode infoNode,
-			@Nullable AttributesNode rootNode) {
-		this.globalNode = globalNode;
-		this.infoNode = infoNode;
+	public MacroExpander(TreeWalk treeWalk) throws IOException {
+		this.treeWalk = treeWalk;
+		AttributesNodeProvider attributesNodeProvider =treeWalk.getAttributesNodeProvider();
+		this.globalNode = attributesNodeProvider != null
+				? attributesNodeProvider.getGlobalAttributesNode() : null;
+		this.infoNode = attributesNodeProvider != null
+				? attributesNodeProvider.getInfoAttributesNode() : null;
+
+		AttributesNode rootNode = attributesNode(treeWalk,
+				rootOf(
+						treeWalk.getTree(WorkingTreeIterator.class)),
+				rootOf(
+						treeWalk.getTree(DirCacheIterator.class)),
+				rootOf(treeWalk
+						.getTree(CanonicalTreeParser.class)));
+
 		expansions.put(BINARY_RULE_KEY, BINARY_RULE_ATTRIBUTES);
 		for (AttributesNode node : new AttributesNode[] { globalNode, rootNode,
 				infoNode }) {
@@ -110,6 +131,41 @@ public class MacroExpander {
 	}
 
 	/**
+	 * see {@link TreeWalk#getAttributes()}
+	 *
+	 * @return the {@link Attributes} for the current path represented by the
+	 *         {@link TreeWalk}
+	 * @throws IOException
+	 */
+	public Attributes getAttributes() throws IOException {
+		String entryPath = treeWalk.getPathString();
+		boolean isDirectory = (treeWalk.getFileMode() == FileMode.TREE);
+		Attributes attributes = new Attributes();
+
+		// Gets the info attributes
+		mergeInfoAttributes(entryPath, isDirectory, attributes);
+
+		// Gets the attributes located on the current entry path
+		mergePerDirectoryEntryAttributes(entryPath, isDirectory,
+				treeWalk.getTree(WorkingTreeIterator.class),
+				treeWalk.getTree(DirCacheIterator.class),
+				treeWalk.getTree(CanonicalTreeParser.class),
+				attributes);
+
+		// Gets the attributes located in the global attribute file
+		mergeGlobalAttributes(entryPath, isDirectory, attributes);
+
+		// now after all attributes are collected - in the correct hierarchy
+		// order - remove all unspecified entries (the ! marker)
+		for (Attribute a : attributes.getAll()) {
+			if (a.getState() == State.UNSPECIFIED)
+				attributes.remove(a.getKey());
+		}
+
+		return attributes;
+	}
+
+	/**
 	 * Merges the matching GLOBAL attributes for an entry path.
 	 *
 	 * @param entryPath
@@ -122,7 +178,7 @@ public class MacroExpander {
 	 *            that will hold the attributes matching this entry path. This
 	 *            method will NOT override any existing entry in attributes.
 	 */
-	public void mergeGlobalAttributes(String entryPath, boolean isDirectory,
+	private void mergeGlobalAttributes(String entryPath, boolean isDirectory,
 			Attributes result) {
 		mergeAttributes(globalNode, entryPath, isDirectory, result);
 	}
@@ -140,9 +196,46 @@ public class MacroExpander {
 	 *            that will hold the attributes matching this entry path. This
 	 *            method will NOT override any existing entry in attributes.
 	 */
-	public void mergeInfoAttributes(String entryPath, boolean isDirectory,
+	private void mergeInfoAttributes(String entryPath, boolean isDirectory,
 			Attributes result) {
 		mergeAttributes(infoNode, entryPath, isDirectory, result);
+	}
+
+	/**
+	 * Merges the matching working directory attributes for an entry path.
+	 *
+	 * @param entryPath
+	 *            the path to test. The path must be relative to this attribute
+	 *            node's own repository path, and in repository path format
+	 *            (uses '/' and not '\').
+	 * @param isDirectory
+	 *            true if the target item is a directory.
+	 * @param workingTreeIterator
+	 * @param dirCacheIterator
+	 * @param otherTree
+	 * @param result
+	 *            that will hold the attributes matching this entry path. This
+	 *            method will NOT override any existing entry in attributes.
+	 * @throws IOException
+	 */
+	private void mergePerDirectoryEntryAttributes(String entryPath,
+			boolean isDirectory,
+			@Nullable WorkingTreeIterator workingTreeIterator,
+			@Nullable DirCacheIterator dirCacheIterator,
+			@Nullable CanonicalTreeParser otherTree, Attributes result)
+					throws IOException {
+		// Prevents infinite recurrence
+		if (workingTreeIterator != null || dirCacheIterator != null
+				|| otherTree != null) {
+			AttributesNode attributesNode = attributesNode(
+					treeWalk, workingTreeIterator, dirCacheIterator, otherTree);
+			if (attributesNode != null) {
+				mergeAttributes(attributesNode, entryPath, isDirectory, result);
+			}
+			mergePerDirectoryEntryAttributes(entryPath, isDirectory,
+					parentOf(workingTreeIterator), parentOf(dirCacheIterator),
+					parentOf(otherTree), result);
+		}
 	}
 
 	/**
@@ -160,7 +253,8 @@ public class MacroExpander {
 	 *            that will hold the attributes matching this entry path. This
 	 *            method will NOT override any existing entry in attributes.
 	 */
-	public void mergeAttributes(@Nullable AttributesNode node, String entryPath,
+	protected void mergeAttributes(@Nullable AttributesNode node,
+			String entryPath,
 			boolean isDirectory, Attributes result) {
 		if (node == null)
 			return;
@@ -253,4 +347,90 @@ public class MacroExpander {
 			break;
 		}
 	}
+
+	/**
+	 * Get the {@link AttributesNode} for the current entry.
+	 * <p>
+	 * This method implements the fallback mechanism between the index and the
+	 * working tree depending on the operation type
+	 * </p>
+	 *
+	 * @param treeWalk
+	 * @param workingTreeIterator
+	 * @param dirCacheIterator
+	 * @param otherTree
+	 * @return a {@link AttributesNode} of the current entry,
+	 *         {@link NullPointerException} otherwise.
+	 * @throws IOException
+	 *             It raises an {@link IOException} if a problem appears while
+	 *             parsing one on the attributes file.
+	 */
+	private static AttributesNode attributesNode(TreeWalk treeWalk,
+			@Nullable WorkingTreeIterator workingTreeIterator,
+			@Nullable DirCacheIterator dirCacheIterator,
+			@Nullable CanonicalTreeParser otherTree) throws IOException {
+		AttributesNode attributesNode = null;
+		switch (treeWalk.getOperationType()) {
+		case CHECKIN_OP:
+			if (workingTreeIterator != null) {
+				attributesNode = workingTreeIterator.getEntryAttributesNode();
+			}
+			if (attributesNode == null && dirCacheIterator != null) {
+				attributesNode = dirCacheIterator
+						.getEntryAttributesNode(treeWalk.getObjectReader());
+			}
+			if (attributesNode == null && otherTree != null) {
+				attributesNode = otherTree
+						.getEntryAttributesNode(treeWalk.getObjectReader());
+			}
+			break;
+		case CHECKOUT_OP:
+			if (otherTree != null) {
+				attributesNode = otherTree
+						.getEntryAttributesNode(treeWalk.getObjectReader());
+			}
+			if (attributesNode == null && dirCacheIterator != null) {
+				attributesNode = dirCacheIterator
+						.getEntryAttributesNode(treeWalk.getObjectReader());
+			}
+			if (attributesNode == null && workingTreeIterator != null) {
+				attributesNode = workingTreeIterator.getEntryAttributesNode();
+			}
+			break;
+		default:
+			throw new IllegalStateException(
+					"The only supported operation types are:" //$NON-NLS-1$
+							+ OperationType.CHECKIN_OP + "," //$NON-NLS-1$
+							+ OperationType.CHECKOUT_OP);
+		}
+
+		return attributesNode;
+	}
+
+	private static <T extends AbstractTreeIterator> T parentOf(@Nullable T node) {
+		if(node==null) return null;
+		@SuppressWarnings("unchecked")
+		Class<T> type = (Class<T>) node.getClass();
+		AbstractTreeIterator parent = node.parent;
+		if (type.isInstance(parent)) {
+			return type.cast(parent);
+		}
+		return null;
+	}
+
+	private static <T extends AbstractTreeIterator> T rootOf(
+			@Nullable T node) {
+		if(node==null) return null;
+		AbstractTreeIterator t=node;
+		while (t!= null && t.parent != null) {
+			t= t.parent;
+		}
+		@SuppressWarnings("unchecked")
+		Class<T> type = (Class<T>) node.getClass();
+		if (type.isInstance(t)) {
+			return type.cast(t);
+		}
+		return null;
+	}
+
 }

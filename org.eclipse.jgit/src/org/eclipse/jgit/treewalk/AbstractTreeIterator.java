@@ -50,6 +50,7 @@ import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 
 import org.eclipse.jgit.attributes.AttributesNode;
+import org.eclipse.jgit.attributes.MacroExpander;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -87,8 +88,14 @@ public abstract class AbstractTreeIterator {
 	/** A dummy object id buffer that matches the zero ObjectId. */
 	protected static final byte[] zeroid = new byte[Constants.OBJECT_ID_LENGTH];
 
-	/** Iterator for the parent tree; null if we are the root iterator. */
-	final AbstractTreeIterator parent;
+	/**
+	 * Iterator for the parent tree; null if we are the root iterator.
+	 * <p>
+	 * Used by {@link TreeWalk} and {@link MacroExpander}
+	 *
+	 * @since 4.2
+	 */
+	public final AbstractTreeIterator parent;
 
 	/** The iterator this current entry is path equal to. */
 	AbstractTreeIterator matches;
@@ -325,6 +332,42 @@ public abstract class AbstractTreeIterator {
 		//
 		int cPos = alreadyMatch(this, p);
 		return pathCompare(p.path, cPos, p.pathLen, pMode, cPos);
+	}
+
+	/**
+	 * Seek the iterator on a file, if present.
+	 *
+	 * @param name
+	 *            file name to find (will not find a directory).
+	 * @return true if the file exists in this tree; false otherwise.
+	 * @throws CorruptObjectException
+	 *             tree is invalid.
+	 * @since 4.2
+	 */
+	public boolean findFile(String name) throws CorruptObjectException {
+		return findFile(Constants.encode(name));
+	}
+
+	/**
+	 * Seek the iterator on a file, if present.
+	 *
+	 * @param name
+	 *            file name to find (will not find a directory).
+	 * @return true if the file exists in this tree; false otherwise.
+	 * @throws CorruptObjectException
+	 *             tree is invalid.
+	 * @since 4.2
+	 */
+	public boolean findFile(byte[] name) throws CorruptObjectException {
+		for (; !eof(); next(1)) {
+			int cmp = pathCompare(name, 0, name.length, 0, pathOffset);
+			if (cmp == 0) {
+				return true;
+			} else if (cmp > 0) {
+				return false;
+			}
+		}
+		return false;
 	}
 
 	/**
