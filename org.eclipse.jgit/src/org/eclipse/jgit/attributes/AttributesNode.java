@@ -156,7 +156,7 @@ public class AttributesNode {
 					Attribute raw = attributeIte.previous();
 					for (Attribute attr : macroExpander.expandMacro(raw)) {
 						if (!attributes.containsKey(attr.getKey()))
-							attributes.putAttribute(attr);
+							attributes.put(attr);
 					}
 				}
 			}

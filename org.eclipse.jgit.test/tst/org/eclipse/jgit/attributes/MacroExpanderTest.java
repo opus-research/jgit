@@ -272,7 +272,7 @@ public class MacroExpanderTest extends RepositoryTestCase {
 
 		if (expectedAttrs != null) {
 			assertEquals(new ArrayList<>(expectedAttrs),
-					new ArrayList<>(walk.getAttributes().getAttributes()));
+					new ArrayList<>(walk.getAttributes().getAll()));
 		}
 
 		if (D.equals(type))

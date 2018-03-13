@@ -29,12 +29,6 @@
                 <message_argument value="createAttributesNodeProvider()"/>
             </message_arguments>
         </filter>
-        <filter id="336695337">
-            <message_arguments>
-                <message_argument value="org.eclipse.jgit.lib.Repository"/>
-                <message_argument value="newAttributesNodeProvider()"/>
-            </message_arguments>
-        </filter>
     </resource>
     <resource path="src/org/eclipse/jgit/transport/PushCertificate.java" type="org.eclipse.jgit.transport.PushCertificate">
         <filter comment="PushCertificate wasn't really usable in 4.0" id="338722907">
@@ -54,13 +48,6 @@
         <filter comment="PushCertificates haven't been really usable in 4.0" id="338849923">
             <message_arguments>
                 <message_argument value="org.eclipse.jgit.transport.PushCertificateParser"/>
-            </message_arguments>
-        </filter>
-    </resource>
-    <resource path="src/org/eclipse/jgit/treewalk/TreeWalk.java" type="org.eclipse.jgit.treewalk.TreeWalk">
-        <filter comment="added support for handling stream CRLF / LF using gitattributes and core config" id="1143996420">
-            <message_arguments>
-                <message_argument value="getStreamType()"/>
             </message_arguments>
         </filter>
     </resource>

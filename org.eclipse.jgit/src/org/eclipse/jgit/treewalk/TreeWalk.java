@@ -61,10 +61,8 @@ import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StopWalkException;
-import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.CoreConfig.StreamType;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
@@ -74,8 +72,6 @@ import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.RawParseUtils;
-import org.eclipse.jgit.util.io.StreamTypeProvider;
-import org.eclipse.jgit.util.io.StreamTypeUtil;
 
 /**
  * Walks one or more {@link AbstractTreeIterator}s in parallel.
@@ -97,8 +93,7 @@ import org.eclipse.jgit.util.io.StreamTypeUtil;
  * Multiple simultaneous TreeWalk instances per {@link Repository} are
  * permitted, even from concurrent threads.
  */
-public class TreeWalk
-		implements AutoCloseable, AttributesProvider, StreamTypeProvider {
+public class TreeWalk implements AutoCloseable, AttributesProvider {
 	private static final AbstractTreeIterator[] NO_TREES = {};
 
 	/**
@@ -260,8 +255,6 @@ public class TreeWalk
 
 	private AttributesNodeProvider attributesNodeProvider;
 
-	private StreamTypeProvider streamTypeProvider;
-
 	private final MacroExpanderImpl macroExpander = new MacroExpanderImpl();
 
 	AbstractTreeIterator currentHead;
@@ -280,8 +273,6 @@ public class TreeWalk
 	public TreeWalk(final Repository repo) {
 		this(repo.newObjectReader(), true);
 		attributesNodeProvider = repo.createAttributesNodeProvider();
-		streamTypeProvider = new StreamTypeProviderImpl(repo, operationType,
-				this);
 	}
 
 	/**
@@ -431,23 +422,6 @@ public class TreeWalk
 	 */
 	public void setAttributesNodeProvider(AttributesNodeProvider provider) {
 		attributesNodeProvider = provider;
-	}
-
-	/**
-	 * Sets the {@link StreamTypeProvider} for this {@link TreeWalk}.
-	 * <p>
-	 * This is a requirement for a correct computation of
-	 * {@link #getStreamType()}. If this {@link TreeWalk} has been built using
-	 * {@link #TreeWalk(Repository)} constructor, the {@link StreamTypeProvider}
-	 * has already been set. Otherwise you should provide one with
-	 * {@link #setStreamTypeProvider(StreamTypeProvider)}.
-	 * </p>
-	 *
-	 * @param provider
-	 * @since 4.2
-	 */
-	public void setStreamTypeProvider(StreamTypeProvider provider) {
-		streamTypeProvider = provider;
 	}
 
 	/** Reset this walker so new tree iterators can be added to it. */
@@ -1207,19 +1181,11 @@ public class TreeWalk
 		}
 		// now after all attributes are collected - in the correct hierarchy
 		// order - remove all unspecified entries (the ! marker)
-		for (Attribute a : attributes.getAttributes()) {
+		for (Attribute a : attributes.getAll()) {
 			if (a.getState() == State.UNSPECIFIED)
-				attributes.removeAttribute(a.getKey());
+				attributes.remove(a.getKey());
 		}
 		return attributes;
-	}
-
-	@Override
-	public StreamType getStreamType() {
-		if (streamTypeProvider == null)
-			throw new IllegalStateException(
-					"cannot detect the stream type with a null StreamTypeProvider"); //$NON-NLS-1$
-		return streamTypeProvider.getStreamType();
 	}
 
 	/**
@@ -1448,29 +1414,5 @@ public class TreeWalk
 							+ OperationType.CHECKOUT_OP);
 		}
 		return attributesNode;
-	}
-
-	/**
-	 * Implementation a {@link StreamTypeProvider} for a {@link FileRepository}.
-	 */
-	private static class StreamTypeProviderImpl implements StreamTypeProvider {
-		private final WorkingTreeOptions options;
-
-		private final OperationType op;
-
-		private final AttributesProvider attributesProvider;
-
-		StreamTypeProviderImpl(Repository repo, OperationType op,
-				AttributesProvider attributesProvider) {
-			this.options = repo.getConfig().get(WorkingTreeOptions.KEY);
-			this.op = op;
-			this.attributesProvider = attributesProvider;
-		}
-
-		@Override
-		public StreamType getStreamType() {
-			return StreamTypeUtil.detectStreamType(op, options,
-					attributesProvider.getAttributes());
-		}
 	}
 }
