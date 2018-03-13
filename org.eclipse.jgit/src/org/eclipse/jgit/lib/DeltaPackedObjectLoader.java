@@ -57,9 +57,9 @@ abstract class DeltaPackedObjectLoader extends PackedObjectLoader {
 
 	private final int deltaSize;
 
-	DeltaPackedObjectLoader(final PackFile pr, final long objectOffset,
-			final int headerSize, final int deltaSz) {
-		super(pr, objectOffset, headerSize);
+	DeltaPackedObjectLoader(final PackFile pr, final long dataOffset,
+			final long objectOffset, final int deltaSz) {
+		super(pr, dataOffset, objectOffset);
 		objectType = -1;
 		deltaSize = deltaSz;
 	}
@@ -71,7 +71,7 @@ abstract class DeltaPackedObjectLoader extends PackedObjectLoader {
 		}
 
 		if (objectType != OBJ_COMMIT) {
-			UnpackedObjectCache.Entry cache = pack.readCache(objectOffset);
+			final UnpackedObjectCache.Entry cache = pack.readCache(dataOffset);
 			if (cache != null) {
 				curs.release();
 				objectType = cache.type;
@@ -84,17 +84,17 @@ abstract class DeltaPackedObjectLoader extends PackedObjectLoader {
 		try {
 			final PackedObjectLoader baseLoader = getBaseLoader(curs);
 			baseLoader.materialize(curs);
-			cachedBytes = BinaryDelta.apply(baseLoader.getCachedBytes(), pack
-					.decompress(objectOffset + headerSize, deltaSize, curs));
+			cachedBytes = BinaryDelta.apply(baseLoader.getCachedBytes(),
+					pack.decompress(dataOffset, deltaSize, curs));
 			curs.release();
 			objectType = baseLoader.getType();
 			objectSize = cachedBytes.length;
 			if (objectType != OBJ_COMMIT)
-				pack.saveCache(objectOffset, cachedBytes, objectType);
+				pack.saveCache(dataOffset, cachedBytes, objectType);
 		} catch (DataFormatException dfe) {
 			final CorruptObjectException coe;
-			coe = new CorruptObjectException("Object at " + objectOffset
-					+ " in " + pack.getPackFile() + " has bad zlib stream");
+			coe = new CorruptObjectException("Object at " + dataOffset + " in "
+					+ pack.getPackFile() + " has bad zlib stream");
 			coe.initCause(dfe);
 			throw coe;
 		}

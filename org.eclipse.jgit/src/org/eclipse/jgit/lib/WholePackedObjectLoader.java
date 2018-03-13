@@ -54,9 +54,9 @@ import org.eclipse.jgit.errors.CorruptObjectException;
 class WholePackedObjectLoader extends PackedObjectLoader {
 	private static final int OBJ_COMMIT = Constants.OBJ_COMMIT;
 
-	WholePackedObjectLoader(final PackFile pr, final long objectOffset,
-			final int headerSize, final int type, final int size) {
-		super(pr, objectOffset, headerSize);
+	WholePackedObjectLoader(final PackFile pr, final long dataOffset,
+			final long objectOffset, final int type, final int size) {
+		super(pr, dataOffset, objectOffset);
 		objectType = type;
 		objectSize = size;
 	}
@@ -68,7 +68,7 @@ class WholePackedObjectLoader extends PackedObjectLoader {
 		}
 
 		if (objectType != OBJ_COMMIT) {
-			UnpackedObjectCache.Entry cache = pack.readCache(objectOffset);
+			final UnpackedObjectCache.Entry cache = pack.readCache(dataOffset);
 			if (cache != null) {
 				curs.release();
 				cachedBytes = cache.data;
@@ -77,15 +77,14 @@ class WholePackedObjectLoader extends PackedObjectLoader {
 		}
 
 		try {
-			cachedBytes = pack.decompress(objectOffset + headerSize,
-					objectSize, curs);
+			cachedBytes = pack.decompress(dataOffset, objectSize, curs);
 			curs.release();
 			if (objectType != OBJ_COMMIT)
-				pack.saveCache(objectOffset, cachedBytes, objectType);
+				pack.saveCache(dataOffset, cachedBytes, objectType);
 		} catch (DataFormatException dfe) {
 			final CorruptObjectException coe;
-			coe = new CorruptObjectException("Object at " + objectOffset
-					+ " in " + pack.getPackFile() + " has bad zlib stream");
+			coe = new CorruptObjectException("Object at " + dataOffset + " in "
+					+ pack.getPackFile() + " has bad zlib stream");
 			coe.initCause(dfe);
 			throw coe;
 		}
