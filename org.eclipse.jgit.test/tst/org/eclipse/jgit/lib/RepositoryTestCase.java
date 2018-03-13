@@ -147,13 +147,13 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 	 * sha1 = ", sha1:" hex-sha1 .
 	 *
 	 * 'stage' is only presented when the stage is different from 0. All
-	 * reported time stamps are mapped to strings like "t0", "t1", ... "tn". The
+	 * reported timestamps are mapped to strings like "t0", "t1", ... "tn". The
 	 * smallest reported time-stamp will be called "t0". This allows to write
 	 * assertions against the string although the concrete value of the
-	 * time stamps is unknown.
+	 * timestamps is unknown.
 	 *
 	 * @param includedOptions
-	 *            a bitmask constructed out of the constants {@link #MOD_TIME},
+	 *            a bitmask constructed out of the contants {@link #MOD_TIME},
 	 *            {@link #SMUDGE}, {@link #LENGTH} and {@link #CONTENT_ID}
 	 *            controlling which info is present in the resulting string.
 	 * @return a string encoding the index state
@@ -166,7 +166,7 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 		StringBuilder sb = new StringBuilder();
 		TreeSet<Long> timeStamps = null;
 
-		// iterate once over the dircache just to collect all time stamps
+		// iterate once of the dircache just to collect all timestamps
 		if (0 != (includedOptions & MOD_TIME)) {
 			timeStamps = new TreeSet<Long>();
 			for (int i=0; i<dc.getEntryCount(); ++i)
@@ -220,7 +220,7 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 	 * @param lookupTable
 	 *            a table storing object-name mappings.
 	 * @return a name of that object. Is not guaranteed to be unique. Use
-	 *         nameTemplates containing "%n" to always have unique names
+	 *         nameTemplates containing "%n" to always have uniqe names
 	 */
 	public static String lookup(Object l, String nameTemplate,
 			Map<Object, String> lookupTable) {
