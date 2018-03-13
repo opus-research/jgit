@@ -91,15 +91,15 @@ public class ObjectWalk extends RevWalk {
 
 	private List<RevObject> rootObjects;
 
-	protected BlockObjQueue pendingObjects;
+	private BlockObjQueue pendingObjects;
 
-	protected RevTree currentTree;
+	private RevTree currentTree;
 
-	protected RevObject last;
+	private RevObject last;
 
-	protected RevCommit firstCommit;
+	private RevCommit firstCommit;
 
-	protected RevCommit lastCommit;
+	private RevCommit lastCommit;
 
 	/**
 	 * Create a new revision and object walker for a given repository.
@@ -345,7 +345,7 @@ public class ObjectWalk extends RevWalk {
 		return p;
 	}
 
-	protected boolean shouldSkipObject(final RevObject o) {
+	private final boolean shouldSkipObject(final RevObject o) {
 		return (o.flags & UNINTERESTING) != 0 && !hasRevSort(RevSort.BOUNDARY);
 	}
 
@@ -453,7 +453,7 @@ public class ObjectWalk extends RevWalk {
 		lastCommit = null;
 	}
 
-	protected void addObject(final RevObject o) {
+	private void addObject(final RevObject o) {
 		if ((o.flags & IN_PENDING) == 0) {
 			o.flags |= IN_PENDING;
 			rootObjects.add(o);
@@ -461,7 +461,7 @@ public class ObjectWalk extends RevWalk {
 		}
 	}
 
-	protected void markTreeUninteresting(final RevTree tree)
+	private void markTreeUninteresting(final RevTree tree)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
 		if ((tree.flags & UNINTERESTING) != 0)
