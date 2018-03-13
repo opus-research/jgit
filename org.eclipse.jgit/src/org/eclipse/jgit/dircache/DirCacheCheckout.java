@@ -447,9 +447,19 @@ public class DirCacheCheckout {
 				removeEmptyParents(file);
 
 			for (String path : updated.keySet()) {
+				// ... create/overwrite this file ...
+				file = new File(repo.getWorkTree(), path);
+				if (!file.getParentFile().mkdirs()) {
+					// ignore
+				}
+
 				DirCacheEntry entry = dc.getEntry(path);
-				if (!FileMode.GITLINK.equals(entry.getRawMode()))
-					checkoutEntry(repo, entry, objectReader);
+
+				// submodules are handled with separate operations
+				if (FileMode.GITLINK.equals(entry.getRawMode()))
+					continue;
+
+				checkoutEntry(repo, file, entry, objectReader);
 			}
 
 			// commit the index builder - a new index is persisted
@@ -688,7 +698,7 @@ public class DirCacheCheckout {
 			// Nothing in Index
 			// At least one of Head, Index, Merge is not empty
 			// make sure not to overwrite untracked files
-			if (f != null && !f.isEntryIgnored()) {
+			if (f != null) {
 				// A submodule is not a file. We should ignore it
 				if (!FileMode.GITLINK.equals(mMode)) {
 					// a dirty worktree: the index is empty but we have a
@@ -1148,18 +1158,17 @@ public class DirCacheCheckout {
 	 *
 	 * @param repository
 	 * @param f
-	 *            this parameter is ignored.
+	 *            the file to be modified. The parent directory for this file
+	 *            has to exist already
 	 * @param entry
 	 *            the entry containing new mode and content
 	 * @throws IOException
-	 * @deprecated Use the overloaded form that accepts {@link ObjectReader}.
 	 */
-	@Deprecated
 	public static void checkoutEntry(final Repository repository, File f,
 			DirCacheEntry entry) throws IOException {
 		ObjectReader or = repository.newObjectReader();
 		try {
-			checkoutEntry(repository, f, entry, or);
+			checkoutEntry(repository, f, entry, repository.newObjectReader());
 		} finally {
 			or.release();
 		}
@@ -1179,51 +1188,19 @@ public class DirCacheCheckout {
 	 *
 	 * @param repo
 	 * @param f
-	 *            this parameter is ignored.
+	 *            the file to be modified. The parent directory for this file
+	 *            has to exist already
 	 * @param entry
 	 *            the entry containing new mode and content
 	 * @param or
 	 *            object reader to use for checkout
 	 * @throws IOException
-	 * @deprecated Do not pass File object.
 	 */
-	@Deprecated
 	public static void checkoutEntry(final Repository repo, File f,
 			DirCacheEntry entry, ObjectReader or) throws IOException {
-		if (f == null || repo.getWorkTree() == null)
-			throw new IllegalArgumentException();
-		if (!f.equals(new File(repo.getWorkTree(), entry.getPathString())))
-			throw new IllegalArgumentException();
-		checkoutEntry(repo, entry, or);
-	}
-
-	/**
-	 * Updates the file in the working tree with content and mode from an entry
-	 * in the index. The new content is first written to a new temporary file in
-	 * the same directory as the real file. Then that new file is renamed to the
-	 * final filename.
-	 *
-	 * <p>
-	 * TODO: this method works directly on File IO, we may need another
-	 * abstraction (like WorkingTreeIterator). This way we could tell e.g.
-	 * Eclipse that Files in the workspace got changed
-	 * </p>
-	 *
-	 * @param repo
-	 *            repository managing the destination work tree.
-	 * @param entry
-	 *            the entry containing new mode and content
-	 * @param or
-	 *            object reader to use for checkout
-	 * @throws IOException
-	 * @since 3.6
-	 */
-	public static void checkoutEntry(Repository repo, DirCacheEntry entry,
-			ObjectReader or) throws IOException {
 		ObjectLoader ol = or.open(entry.getObjectId());
-		File f = new File(repo.getWorkTree(), entry.getPathString());
 		File parentDir = f.getParentFile();
-		FileUtils.mkdirs(parentDir, true);
+		parentDir.mkdirs();
 		FS fs = repo.getFS();
 		WorkingTreeOptions opt = repo.getConfig().get(WorkingTreeOptions.KEY);
 		if (entry.getFileMode() == FileMode.SYMLINK
@@ -1233,40 +1210,42 @@ public class DirCacheCheckout {
 			fs.createSymLink(f, target);
 			entry.setLength(bytes.length);
 			entry.setLastModified(fs.lastModified(f));
-			return;
-		}
-
-		File tmpFile = File.createTempFile(
-				"._" + f.getName(), null, parentDir); //$NON-NLS-1$
-		OutputStream channel = new FileOutputStream(tmpFile);
-		if (opt.getAutoCRLF() == AutoCRLF.TRUE)
-			channel = new AutoCRLFOutputStream(channel);
-		try {
-			ol.copyTo(channel);
-		} finally {
-			channel.close();
-		}
-		entry.setLength(opt.getAutoCRLF() == AutoCRLF.TRUE
-			? f.length() // AutoCRLF wants on-disk-size
-		    : (int) ol.getSize());
-
-		if (opt.isFileMode() && fs.supportsExecute()) {
-			if (FileMode.EXECUTABLE_FILE.equals(entry.getRawMode())) {
-				if (!fs.canExecute(tmpFile))
-					fs.setExecute(tmpFile, true);
-			} else {
-				if (fs.canExecute(tmpFile))
-					fs.setExecute(tmpFile, false);
+		} else {
+			File tmpFile = File.createTempFile(
+					"._" + f.getName(), null, parentDir); //$NON-NLS-1$
+			FileOutputStream rawChannel = new FileOutputStream(tmpFile);
+			OutputStream channel;
+			if (opt.getAutoCRLF() == AutoCRLF.TRUE)
+				channel = new AutoCRLFOutputStream(rawChannel);
+			else
+				channel = rawChannel;
+			try {
+				ol.copyTo(channel);
+			} finally {
+				channel.close();
+			}
+			if (opt.isFileMode() && fs.supportsExecute()) {
+				if (FileMode.EXECUTABLE_FILE.equals(entry.getRawMode())) {
+					if (!fs.canExecute(tmpFile))
+						fs.setExecute(tmpFile, true);
+				} else {
+					if (fs.canExecute(tmpFile))
+						fs.setExecute(tmpFile, false);
+				}
+			}
+			try {
+				FileUtils.rename(tmpFile, f);
+			} catch (IOException e) {
+				throw new IOException(MessageFormat.format(
+						JGitText.get().renameFileFailed, tmpFile.getPath(),
+						f.getPath()));
 			}
 		}
-		try {
-			FileUtils.rename(tmpFile, f);
-		} catch (IOException e) {
-			throw new IOException(MessageFormat.format(
-					JGitText.get().renameFileFailed, tmpFile.getPath(),
-					f.getPath()));
-		}
 		entry.setLastModified(f.lastModified());
+		if (opt.getAutoCRLF() != AutoCRLF.FALSE)
+			entry.setLength(f.length()); // AutoCRLF wants on-disk-size
+		else
+			entry.setLength((int) ol.getSize());
 	}
 
 	private static void checkValidPath(CanonicalTreeParser t)

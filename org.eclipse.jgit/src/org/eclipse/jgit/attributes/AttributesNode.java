@@ -40,7 +40,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.ignore;
+package org.eclipse.jgit.attributes;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -49,33 +49,22 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import org.eclipse.jgit.lib.Constants;
 
 /**
- * Represents a bundle of ignore rules inherited from a base directory.
+ * Represents a bundle of attributes inherited from a base directory.
  *
  * This class is not thread safe, it maintains state about the last match.
  */
-public class IgnoreNode {
-	/** Result from {@link IgnoreNode#isIgnored(String, boolean)}. */
-	public static enum MatchResult {
-		/** The file is not ignored, due to a rule saying its not ignored. */
-		NOT_IGNORED,
-
-		/** The file is ignored due to a rule in this node. */
-		IGNORED,
-
-		/** The ignore status is unknown, check inherited rules. */
-		CHECK_PARENT;
-	}
-
+public class AttributesNode {
 	/** The rules that have been parsed into this node. */
-	private final List<IgnoreRule> rules;
+	private final List<AttributesRule> rules;
 
 	/** Create an empty ignore node with no rules. */
-	public IgnoreNode() {
-		rules = new ArrayList<IgnoreRule>();
+	public AttributesNode() {
+		rules = new ArrayList<AttributesRule>();
 	}
 
 	/**
@@ -84,7 +73,7 @@ public class IgnoreNode {
 	 * @param rules
 	 *            list of rules.
 	 **/
-	public IgnoreNode(List<IgnoreRule> rules) {
+	public AttributesNode(List<AttributesRule> rules) {
 		this.rules = rules;
 	}
 
@@ -102,8 +91,12 @@ public class IgnoreNode {
 		String txt;
 		while ((txt = br.readLine()) != null) {
 			txt = txt.trim();
-			if (txt.length() > 0 && !txt.startsWith("#") && !txt.equals("/")) //$NON-NLS-1$ //$NON-NLS-2$
-				rules.add(new IgnoreRule(txt));
+			if (txt.length() > 0 && !txt.startsWith("#")) { //$NON-NLS-1$
+				int patternEnd = txt.indexOf(' '); // TODO: clarify handling to tabs and escaping
+				if (patternEnd > -1)
+					rules.add(new AttributesRule(txt.substring(0, patternEnd),
+							txt.substring(patternEnd + 1).trim()));
+			}
 		}
 	}
 
@@ -112,35 +105,41 @@ public class IgnoreNode {
 	}
 
 	/** @return list of all ignore rules held by this node. */
-	public List<IgnoreRule> getRules() {
+	public List<AttributesRule> getRules() {
 		return Collections.unmodifiableList(rules);
 	}
 
 	/**
-	 * Determine if an entry path matches an ignore rule.
+	 * Returns the matching attributes for an entry path.
 	 *
 	 * @param entryPath
-	 *            the path to test. The path must be relative to this ignore
+	 *            the path to test. The path must be relative to this attribute
 	 *            node's own repository path, and in repository path format
 	 *            (uses '/' and not '\').
 	 * @param isDirectory
 	 *            true if the target item is a directory.
-	 * @return status of the path.
+	 * @param attributes
+	 *            Map that will hold the attributes matching this entry path. If
+	 *            it is not empty, this method will NOT override any
+	 *            existing entry.
 	 */
-	public MatchResult isIgnored(String entryPath, boolean isDirectory) {
-		if (rules.isEmpty())
-			return MatchResult.CHECK_PARENT;
-
-		// Parse rules in the reverse order that they were read
-		for (int i = rules.size() - 1; i > -1; i--) {
-			IgnoreRule rule = rules.get(i);
+	public void getAttributes(String entryPath, boolean isDirectory,
+			Map<String, Attribute> attributes) {
+		// Parse rules in the reverse order that they were read since the last
+		// entry should be used
+		for (int i = rules.size() - 1; i >= 0; i--) {
+			AttributesRule rule = rules.get(i);
 			if (rule.isMatch(entryPath, isDirectory)) {
-				if (rule.getResult())
-					return MatchResult.IGNORED;
-				else
-					return MatchResult.NOT_IGNORED;
+				List<Attribute> attrs = rule.getAttributes();
+				// Parses the attributes in the reverse order that they were
+				// read since the last entry should be used
+				for (int attrIndex = attrs.size() - 1; attrIndex >= 0; attrIndex--) {
+					Attribute attr = attrs.get(attrIndex);
+					if (!attributes.containsKey(attr.getKey())) {
+						attributes.put(attr.getKey(), attr);
+					}
+				}
 			}
 		}
-		return MatchResult.CHECK_PARENT;
 	}
 }
