@@ -106,24 +106,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 
 	private Collection<String> branchesToClone;
 
-	private Callback callback;
-
-	/**
-	 * Callback for status of clone operation.
-	 *
-	 * @since 4.8
-	 */
-	public interface Callback {
-		/**
-		 * Notify initialized submodules.
-		 *
-		 * @param submodules
-		 *            the submodules
-		 *
-		 */
-		void initializedSubmodules(Collection<String> submodules);
-	}
-
 	/**
 	 * Create clone command with no repository set
 	 */
@@ -298,13 +280,8 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	private void cloneSubmodules(Repository clonedRepo) throws IOException,
 			GitAPIException {
 		SubmoduleInitCommand init = new SubmoduleInitCommand(clonedRepo);
-		Collection<String> submodules = init.call();
-		if (submodules.isEmpty()) {
+		if (init.call().isEmpty())
 			return;
-		}
-		if (callback != null) {
-			callback.initializedSubmodules(submodules);
-		}
 
 		SubmoduleUpdateCommand update = new SubmoduleUpdateCommand(clonedRepo);
 		configure(update);
@@ -544,17 +521,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	public CloneCommand setNoCheckout(boolean noCheckout) {
 		this.noCheckout = noCheckout;
 		return this;
-	}
-
-	/**
-	 * Register a progress callback.
-	 *
-	 * @param callback
-	 *            the callback
-	 * @since 4.8
-	 */
-	public void setCallback(Callback callback) {
-		this.callback = callback;
 	}
 
 	private static void validateDirs(File directory, File gitDir, boolean bare)
