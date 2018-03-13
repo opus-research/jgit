@@ -624,7 +624,7 @@ public class DirCacheCheckout {
 				if (hId.equals(iId)) {
 					dce = i.getDirCacheEntry();
 					if (f == null || f.isModified(dce, true))
-						conflict(name, dce, h, m);
+						conflict(name, i.getDirCacheEntry(), h, m);
 					else
 						remove(name);
 				} else
@@ -700,13 +700,13 @@ public class DirCacheCheckout {
 					if (m==null && walk.isDirectoryFileConflict()) {
 						if (dce != null
 								&& (f == null || f.isModified(dce, true)))
-							conflict(name, dce, h, m);
+							conflict(name, i.getDirCacheEntry(), h, m);
 						else
 							remove(name);
 					} else
-						keep(dce);
+						keep(i.getDirCacheEntry());
 				} else
-					conflict(name, dce, h, m);
+					conflict(name, i.getDirCacheEntry(), h, m);
 			} else if (m == null) {
 
 				/**
@@ -722,21 +722,21 @@ public class DirCacheCheckout {
 
 				if (hId.equals(iId)) {
 					if (f == null || f.isModified(dce, true))
-						conflict(name, dce, h, m);
+						conflict(name, i.getDirCacheEntry(), h, m);
 					else
 						remove(name);
 				} else
-					conflict(name, dce, h, m);
+					conflict(name, i.getDirCacheEntry(), h, m);
 			} else {
 				if (!hId.equals(mId) && !hId.equals(iId) && !mId.equals(iId))
-					conflict(name, dce, h, m);
+					conflict(name, i.getDirCacheEntry(), h, m);
 				else if (hId.equals(iId) && !mId.equals(iId)) {
 					if (dce != null && (f == null || f.isModified(dce, true)))
-						conflict(name, dce, h, m);
+						conflict(name, i.getDirCacheEntry(), h, m);
 					else
 						update(name, mId, m.getEntryFileMode());
 				} else {
-					keep(dce);
+					keep(i.getDirCacheEntry());
 				}
 			}
 		}
