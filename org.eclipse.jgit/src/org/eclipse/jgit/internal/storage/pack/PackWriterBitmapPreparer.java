@@ -265,8 +265,8 @@ class PackWriterBitmapPreparer {
 				for (AnyObjectId objectId : selectionHelper.reusedCommits) {
 					rw.markUninteresting(rw.parseCommit(objectId));
 				}
-				rw.setRevFilter(PackWriterBitmapWalker.newRevFilter(
-						selectionHelper.reusedCommitsBitmap, fullBitmap));
+				rw.setRevFilter(
+						PackWriterBitmapWalker.newRevFilter(null, fullBitmap));
 
 				while (rw.next() != null) {
 					// The RevFilter adds the reachable commits from this
@@ -314,23 +314,19 @@ class PackWriterBitmapPreparer {
 		return revCommit.getCommitTime() > inactiveBranchTimestamp;
 	}
 
+	/**
+	 * A RevFilter that excludes the commits named in a bitmap from the walk.
+	 * <p>
+	 * If a commit is in {@code bitmap} then that commit is not emitted by the
+	 * walk and its parents are marked as SEEN so the walk can skip them.  The
+	 * bitmaps passed in have the property that the parents of any commit in
+	 * {@code bitmap} are also in {@code bitmap}, so marking the parents as
+	 * SEEN speeds up the RevWalk by saving it from walking down blind alleys
+	 * and does not change the commits emitted.
+	 */
 	private static class NotInBitmapFilter extends RevFilter {
 		private final BitmapBuilder bitmap;
 
-		/**
-		 * A RevFilter that excludes the commits named in a bitmap
-		 * from the walk.
-		 * <p>
-		 * If a commit is in {@code bitmap} then that commit
-		 * is not emitted by the walk and its parents are
-		 * marked as SEEN so the walk can skip them.  The
-		 * bitmaps passed in have the property that the
-		 * parents of any commit in {@code bitmap} are also in
-		 * {@code bitmap}, so marking the parents as SEEN
-		 * speeds up the RevWalk by saving it from walking
-		 * down blind alleys and does not change the commits
-		 * emitted.
-		 */
 		NotInBitmapFilter(BitmapBuilder bitmap) {
 			this.bitmap = bitmap;
 		}
@@ -348,7 +344,7 @@ class PackWriterBitmapPreparer {
 
 		@Override
 		public final NotInBitmapFilter clone() {
-			return this;
+			throw new UnsupportedOperationException();
 		}
 
 		@Override
@@ -468,7 +464,7 @@ class PackWriterBitmapPreparer {
 		}
 
 		return new CommitSelectionHelper(peeledWant, commits, pos,
-				orderedTipCommitBitmaps, reuse, reuseCommits);
+				orderedTipCommitBitmaps, reuseCommits);
 	}
 
 	/*-
@@ -569,8 +565,6 @@ class PackWriterBitmapPreparer {
 	private static final class CommitSelectionHelper implements Iterable<RevCommit> {
 		final Set<? extends ObjectId> peeledWants;
 		final List<BitmapBuilderEntry> tipCommitBitmaps;
-
-		final BitmapBuilder reusedCommitsBitmap;
 		final Iterable<BitmapCommit> reusedCommits;
 		final RevCommit[] commitsByOldest;
 		final int commitStartPos;
@@ -578,13 +572,11 @@ class PackWriterBitmapPreparer {
 		CommitSelectionHelper(Set<? extends ObjectId> peeledWant,
 				RevCommit[] commitsByOldest, int commitStartPos,
 				List<BitmapBuilderEntry> bitmapEntries,
-				BitmapBuilder reusedCommitsBitmap,
 				Iterable<BitmapCommit> reuse) {
 			this.peeledWants = peeledWant;
 			this.commitsByOldest = commitsByOldest;
 			this.commitStartPos = commitStartPos;
 			this.tipCommitBitmaps = bitmapEntries;
-			this.reusedCommitsBitmap = reusedCommitsBitmap;
 			this.reusedCommits = reuse;
 		}
 
