@@ -73,7 +73,7 @@ import org.eclipse.jgit.util.QuotedString;
 import org.eclipse.jgit.util.io.DisabledOutputStream;
 
 /**
- * Format an {@link EditList} as a Git style unified patch script.
+ * Format a Git style patch script.
  */
 public class DiffFormatter {
 	private static final byte[] noNewLine = encodeASCII("\\ No newline at end of file\n");
@@ -82,9 +82,9 @@ public class DiffFormatter {
 
 	private Repository db;
 
-	private int context;
+	private int context = 3;
 
-	private int abbreviationLength;
+	private int abbreviationLength = 7;
 
 	private RawText.Factory rawTextFactory = RawText.FACTORY;
 
@@ -100,8 +100,6 @@ public class DiffFormatter {
 	 */
 	public DiffFormatter(OutputStream out) {
 		this.out = out;
-		setContext(3);
-		setAbbreviationLength(7);
 	}
 
 	/** @return the stream we are outputting data to. */
