@@ -578,8 +578,7 @@ public class ReceivePack {
 	 * <p>
 	 * When possible, prefer {@link #sendMessage(String)} or
 	 * {@link #sendError(String)}; this method is intended only for callers who
-	 * need to do their own
-	 * encoding.
+	 * need to do their own encoding.
 	 *
 	 * @param what
 	 *            bytes to send.
