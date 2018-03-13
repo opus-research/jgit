@@ -130,6 +130,6 @@ public class FS_Win32_Java7Cygwin extends FS_Win32_Cygwin {
 
 	@Override
 	public Attributes getAttributes(File path) {
-		return FileUtil.getFileAttributes(this, path);
+		return FileUtil.getFileAttributesBasic(this, path);
 	}
 }

@@ -49,6 +49,8 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributeView;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
 import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFileAttributes;
@@ -61,12 +63,10 @@ import org.eclipse.jgit.util.FS.Attributes;
 
 class FileUtil {
 
-	static class Java7PosixAttributes extends Attributes {
+	static class Java7BasicAttributes extends Attributes {
 
-		Java7PosixAttributes(FS fs, File fPath, Path pPath,
-				boolean exists,
-				boolean isDirectory,
-				boolean isExecutable,
+		Java7BasicAttributes(FS fs, File fPath, boolean exists,
+				boolean isDirectory, boolean isExecutable,
 				boolean isSymbolicLink, boolean isRegularFile,
 				long creationTime, long lastModifiedTime, long length) {
 			super(fs, fPath, exists, isDirectory, isExecutable, isSymbolicLink,
@@ -163,7 +163,34 @@ class FileUtil {
 		Files.delete(nioPath);
 	}
 
-	static Attributes getFileAttributes(FS fs, File path) {
+	static Attributes getFileAttributesBasic(FS fs, File path) {
+		try {
+			Path nioPath = path.toPath();
+			BasicFileAttributes readAttributes = nioPath
+					.getFileSystem()
+					.provider()
+					.getFileAttributeView(nioPath,
+							BasicFileAttributeView.class,
+							LinkOption.NOFOLLOW_LINKS).readAttributes();
+			Attributes attributes = new FileUtil.Java7BasicAttributes(fs, path,
+					true,
+					readAttributes.isDirectory(),
+					fs.supportsExecute() ? path.canExecute() : false,
+					readAttributes.isSymbolicLink(),
+					readAttributes.isRegularFile(), //
+					readAttributes.creationTime().toMillis(), //
+					readAttributes.lastModifiedTime().toMillis(),
+					readAttributes.size());
+			return attributes;
+		} catch (NoSuchFileException e) {
+			return new FileUtil.Java7BasicAttributes(fs, path, false, false,
+					false, false, false, 0L, 0L, 0L);
+		} catch (IOException e) {
+			return new Attributes(path, fs);
+		}
+	}
+
+	static Attributes getFileAttributesPosix(FS fs, File path) {
 		try {
 			Path nioPath = path.toPath();
 			PosixFileAttributes readAttributes = nioPath
@@ -172,42 +199,25 @@ class FileUtil {
 					.getFileAttributeView(nioPath,
 							PosixFileAttributeView.class,
 							LinkOption.NOFOLLOW_LINKS).readAttributes();
-			Attributes attributes = new FileUtil.Java7PosixAttributes(fs, path,
-					nioPath, true, readAttributes.isDirectory(), readAttributes
-							.permissions().contains(
-									PosixFilePermission.OWNER_EXECUTE),
+			Attributes attributes = new FileUtil.Java7BasicAttributes(
+					fs,
+					path,
+					true, //
+					readAttributes.isDirectory(), //
+					readAttributes.permissions().contains(
+							PosixFilePermission.OWNER_EXECUTE),
 					readAttributes.isSymbolicLink(),
-					readAttributes.isRegularFile(), readAttributes
-							.creationTime().toMillis(), readAttributes
-							.lastModifiedTime().toMillis(),
+					readAttributes.isRegularFile(), //
+					readAttributes.creationTime().toMillis(), //
+					readAttributes.lastModifiedTime().toMillis(),
 					readAttributes.size());
 			return attributes;
 		} catch (NoSuchFileException e) {
-			return new FileUtil.Java7PosixAttributes(fs, path, null, false,
-					false, false, false, false, 0L, 0L, 0L);
+			return new FileUtil.Java7BasicAttributes(fs, path, false, false,
+					false, false, false, 0L, 0L, 0L);
 		} catch (IOException e) {
 			return new Attributes(path, fs);
 		}
-	}
-
-	public static File normalize(File file) {
-		if (SystemReader.getInstance().isMacOS()) {
-			// TODO: Would it be faster to check with isNormalized first
-			// assuming normalized paths are much more common
-			String normalized = Normalizer.normalize(file.getPath(),
-					Normalizer.Form.NFC);
-			return new File(normalized);
-		}
-		return file;
-	}
-
-	public static String normalize(String name) {
-		if (SystemReader.getInstance().isMacOS()) {
-			if (name == null)
-				return null;
-			return Normalizer.normalize(name, Normalizer.Form.NFC);
-		}
-		return name;
 	}
 
 }

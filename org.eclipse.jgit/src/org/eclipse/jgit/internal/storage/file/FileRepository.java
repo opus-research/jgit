@@ -307,8 +307,9 @@ public class FileRepository extends Repository {
 			try {
 				getFS().createSymLink(tmp, "target"); //$NON-NLS-1$
 				symLinks = null;
-			} finally {
 				FileUtils.delete(tmp);
+			} catch (IOException e) {
+				// Normally a java.nio.file.FileSystemException
 			}
 		}
 		if (symLinks != null)
