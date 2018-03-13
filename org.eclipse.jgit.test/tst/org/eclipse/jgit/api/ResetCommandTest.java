@@ -46,7 +46,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
@@ -155,22 +154,6 @@ public class ResetCommandTest extends RepositoryTestCase {
 		assertFalse(inHead(fileInIndexPath));
 		assertFalse(inIndex(indexFile.getName()));
 		assertReflog(prevHead, head);
-	}
-
-	@Test
-	public void testResetToNonexistingHEAD() throws JGitInternalException,
-			AmbiguousObjectException, IOException {
-
-		// create a file in the working tree of a fresh repo
-		git = new Git(db);
-		writeTrashFile("f", "content");
-
-		try {
-			git.reset().setRef(Constants.HEAD).call();
-			fail("Excpected JGitInternalException didn't occured");
-		} catch (JGitInternalException e) {
-			// got the expected execption
-		}
 	}
 
 	@Test
