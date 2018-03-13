@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Research In Motion Limited
+ * Copyright (C) 2012, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,27 +41,42 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.merge;
+package org.eclipse.jgit.storage.dfs;
 
-import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.events.RepositoryEvent;
 
 /**
- * A three-way merge strategy performing a content-merge if necessary
+ * Describes the {@link DfsPackFile} just before its index is loaded. Currently,
+ * DfsPackFile directly dispatches the event on
+ * {@link org.eclipse.jgit.lib.Repository#getGlobalListenerList}. Which means
+ * the call to {@link #getRepository} will always return null.
  */
-public class StrategyRecursive extends StrategyResolve {
+public class BeforeDfsPackIndexLoadedEvent
+		extends RepositoryEvent<BeforeDfsPackIndexLoadedListener> {
+	private final DfsPackFile pack;
 
-	@Override
-	public ThreeWayMerger newMerger(Repository db) {
-		return new RecursiveMerger(db, false);
+	/**
+	 * A new event triggered before a PackFile index is loaded.
+	 *
+	 * @param pack
+	 *            the pack
+	 */
+	public BeforeDfsPackIndexLoadedEvent(DfsPackFile pack) {
+		this.pack = pack;
+	}
+
+	/** @return the PackFile containing the index that will be loaded. */
+	public DfsPackFile getPackFile() {
+		return pack;
 	}
 
 	@Override
-	public ThreeWayMerger newMerger(Repository db, boolean inCore) {
-		return new RecursiveMerger(db, inCore);
+	public Class<BeforeDfsPackIndexLoadedListener> getListenerType() {
+		return BeforeDfsPackIndexLoadedListener.class;
 	}
 
 	@Override
-	public String getName() {
-		return "recursive";
+	public void dispatch(BeforeDfsPackIndexLoadedListener listener) {
+		listener.onBeforeDfsPackIndexLoaded(this);
 	}
 }
