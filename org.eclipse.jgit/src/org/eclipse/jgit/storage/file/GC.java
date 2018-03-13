@@ -77,34 +77,34 @@ import org.eclipse.jgit.util.FileUtils;
  * Additionally the index is taken into account and reflogs will be handled.
  */
 public class GC {
-	private FileRepository repo;
-
-	private ObjectDirectory objdb;
-
 	/**
-	 * @param repo
-	 */
-	public GC(FileRepository repo) {
-		this.repo = repo;
-		objdb = repo.getObjectDatabase();
-	}
-
-	/**
+	 * Runs a garbage collector on a {@link FileRepository}. It will
+	 * <ul>
+	 * <li>repack all reachable objects into two packfiles and delete the old
+	 * packfiles</li>
+	 * <li>prunes all loose objects which are now reachable by packs</li>
+	 * </ul>
+	 *
 	 * @param pm
+	 *            a progressmonitor
+	 * @param repo
+	 *            the repo to work on
+	 * @return the collection of {@link PackFile}'s which are created newly
 	 * @throws IOException
 	 *
 	 */
-	public void gc(ProgressMonitor pm) throws IOException {
+	public static Collection<PackFile> gc(ProgressMonitor pm,
+			FileRepository repo)
+			throws IOException {
 		if (pm == null)
 			pm = NullProgressMonitor.INSTANCE;
 
-		pack_refs(pm);
-		reflog_expire(pm);
-		Collection<PackFile> toBeDeleted = objdb.getPacks();
-		Collection<PackFile> newPacks = repack(pm);
-		prunePacked(pm, Collections.<ObjectId> emptySet());
-		deleteOldPacks(pm, toBeDeleted, newPacks);
-		// rerere_gc(pm);
+		// TODO: implement pack_refs(pm, repo);
+		// TODO: implment reflog_expire(pm, repo);
+		Collection<PackFile> newPacks = repack(pm, repo);
+		prunePacked(pm, repo, Collections.<ObjectId> emptySet());
+		// TODO: implement rerere_gc(pm);
+		return newPacks;
 	}
 
 	/**
@@ -115,22 +115,25 @@ public class GC {
 	 * should not be deleted although it existed before gc.
 	 *
 	 * @param pm
+	 *            a progressmonitor
+	 * @param repo
+	 *            the repo to work on
 	 * @param oldPacks
 	 * @param newPacks
 	 * @throws IOException
 	 */
-	private void deleteOldPacks(ProgressMonitor pm,
-			Collection<PackFile> oldPacks, Collection<PackFile> newPacks) throws IOException {
-		oldPackLoop:
-		for (PackFile oldPack : oldPacks) {
+	private static void deleteOldPacks(ProgressMonitor pm, FileRepository repo,
+			Collection<PackFile> oldPacks, Collection<PackFile> newPacks)
+			throws IOException {
+		oldPackLoop: for (PackFile oldPack : oldPacks) {
 			String oldName = oldPack.getPackName();
 			// check whether an old Packfile is also among the list of new
 			// packfiles. Then we shouldn't delete it.
 			for (PackFile newPack : newPacks)
 				if (oldName.equals(newPack.getPackName()))
 					continue oldPackLoop;
-			FileUtils.delete(nameFor(objdb, oldName, ".pack"));
-			FileUtils.delete(nameFor(objdb, oldName, ".idx"));
+			FileUtils.delete(nameFor(repo, oldName, ".pack"));
+			FileUtils.delete(nameFor(repo, oldName, ".idx"));
 		}
 	}
 
@@ -139,12 +142,18 @@ public class GC {
 	 * found in packs.
 	 *
 	 * @param pm
+	 *            a progressmonitor
+	 * @param repo
+	 *            the repo to work on
 	 * @param objectsToKeep
+	 *            a set of objects which should explicitly not be pruned
 	 * @throws IOException
 	 *
 	 */
-	public void prunePacked(ProgressMonitor pm, Set<ObjectId> objectsToKeep)
+	public static void prunePacked(ProgressMonitor pm, FileRepository repo,
+			Set<ObjectId> objectsToKeep)
 			throws IOException {
+		ObjectDirectory objdb = repo.getObjectDatabase();
 		Collection<PackFile> packs = objdb.getPacks();
 		File objects = repo.getObjectsDirectory();
 		String[] fanout = objects.list();
@@ -174,7 +183,7 @@ public class GC {
 						found = true;
 						break;
 					}
-				if (found || objectsToKeep.contains(id))
+				if (found && !objectsToKeep.contains(id))
 					FileUtils.delete(objdb.fileFor(id));
 			}
 		}
@@ -182,12 +191,25 @@ public class GC {
 	}
 
 	/**
+	 * Packs all objects which reachable from any of the heads into one
+	 * packfile. Additionally all objects which are not reachable from any head
+	 * but which are reachable from any of the other refs (e.g. tags), special
+	 * refs (e.g. FETCH_HEAD) or index are packed into a separate packfile. All
+	 * old packfiles which existed before are deleted.
+	 *
 	 * @param pm
-	 * @return todo
+	 *            a progressmonitor
+	 * @param repo
+	 *            the repo to work on
+	 * @return a collection of the newly created packfiles
 	 * @throws IOException
 	 *
 	 */
-	public Collection<PackFile> repack(ProgressMonitor pm) throws IOException {
+	public static Collection<PackFile> repack(ProgressMonitor pm,
+			FileRepository repo)
+			throws IOException {
+		Collection<PackFile> toBeDeleted = repo.getObjectDatabase().getPacks();
+
 		PackConfig packConfig = new PackConfig(repo);
 		if (packConfig.getIndexVersion() != 2)
 			throw new IllegalStateException("Only index version 2");
@@ -196,15 +218,15 @@ public class GC {
 		for (Ref ref : repo.getRefDatabase().getAdditionalRefs())
 			refsBefore.put(ref.getName(), ref);
 
-		HashSet<ObjectId> allHeads = new HashSet<ObjectId>();
-		HashSet<ObjectId> nonHeads = new HashSet<ObjectId>();
-		HashSet<ObjectId> tagTargets = new HashSet<ObjectId>();
-		HashSet<ObjectId> indexObjects = listNonHEADIndexObjects();
+		Set<ObjectId> allHeads = new HashSet<ObjectId>();
+		Set<ObjectId> nonHeads = new HashSet<ObjectId>();
+		Set<ObjectId> tagTargets = new HashSet<ObjectId>();
+		Set<ObjectId> indexObjects = listNonHEADIndexObjects(repo);
 
 		for (Ref ref : refsBefore.values()) {
 			if (ref.isSymbolic() || ref.getObjectId() == null)
 				continue;
-			if (isHead(ref))
+			if (ref.getName().startsWith(Constants.R_HEADS))
 				allHeads.add(ref.getObjectId());
 			else
 				nonHeads.add(ref.getObjectId());
@@ -215,12 +237,23 @@ public class GC {
 		nonHeads.addAll(indexObjects);
 
 		List<PackFile> ret = new ArrayList<PackFile>(2);
-		ret.add(packHeads(pm, allHeads));
+		if (!allHeads.isEmpty())
+			ret.add(writePack(pm, repo, allHeads,
+					Collections.<ObjectId> emptySet()));
 		if (!nonHeads.isEmpty()) {
-			PackFile rest = packRest(pm, nonHeads, allHeads);
+			// DfsGarbageCollector calls here pw.excludeObjects(idx).
+			// Is there the need to explicitly exclude the objects
+			// in the newly created pack file? We are already telling the
+			// packwriter that we have already allHeads and that he should
+			// stop traversing when he finds a head?
+			// My problem: I don't have the PackIndex anymore and PackFile
+			// doesn't expose it.
+			PackFile rest = writePack(pm, repo, nonHeads, allHeads);
 			if (rest!=null)
 				ret.add(rest);
 		}
+		deleteOldPacks(pm, repo, toBeDeleted, ret);
+
 		// packGarbage(pm);
 		return ret;
 	}
@@ -229,13 +262,15 @@ public class GC {
 	 * Return a list of those objects in the index which differ from whats in
 	 * HEAD
 	 *
+	 * @param repo
+	 *
 	 * @return a set of ObjectIds of changed objects in the index
 	 * @throws IOException
 	 * @throws CorruptObjectException
 	 * @throws NoWorkTreeException
 	 */
-	@SuppressWarnings("unchecked")
-	HashSet<ObjectId> listNonHEADIndexObjects() throws CorruptObjectException,
+	private static Set<ObjectId> listNonHEADIndexObjects(FileRepository repo)
+			throws CorruptObjectException,
 			IOException {
 		RevWalk revWalk = null;
 		DirCache dc = null;
@@ -243,9 +278,9 @@ public class GC {
 			// Even bare repos may have an index check for the existance of an
 			// index file. Only checking for isBare() is wrong.
 			if (repo.getIndexFile() == null)
-				return ((HashSet<ObjectId>) Collections.EMPTY_SET);
+				return (Collections.emptySet());
 		} catch (NoWorkTreeException e) {
-			return ((HashSet<ObjectId>) Collections.EMPTY_SET);
+			return (Collections.emptySet());
 		}
 		TreeWalk treeWalk = new TreeWalk(repo);
 		try {
@@ -260,7 +295,7 @@ public class GC {
 
 			treeWalk.setFilter(TreeFilter.ANY_DIFF);
 			treeWalk.setRecursive(true);
-			HashSet<ObjectId> ret = new HashSet<ObjectId>();
+			Set<ObjectId> ret = new HashSet<ObjectId>();
 			while (treeWalk.next()) {
 				ObjectId objectId = treeWalk.getObjectId(0);
 				if (objectId != ObjectId.zeroId())
@@ -274,22 +309,15 @@ public class GC {
 		}
 	}
 
-	private PackFile packHeads(ProgressMonitor pm, HashSet<ObjectId> allHeads)
-			throws IOException {
-		if (allHeads.isEmpty())
-			return null;
-		return writePack(pm, allHeads, Collections.<ObjectId> emptySet());
-	}
-
-	private PackFile writePack(ProgressMonitor pm,
+	private static PackFile writePack(ProgressMonitor pm, FileRepository repo,
 			Set<? extends ObjectId> want, Set<? extends ObjectId> have)
 			throws IOException {
 		PackWriter pw = new PackWriter(repo);
 		try {
 			pw.preparePack(pm, want, have);
 			if (0 < pw.getObjectCount()) {
-				ObjectId id = pw.computeName();
-				File pack = nameFor(objdb, id, ".pack");
+				String id = pw.computeName().getName();
+				File pack = nameFor(repo, id, ".pack");
 				BufferedOutputStream out = new BufferedOutputStream(
 						new FileOutputStream(pack));
 				try {
@@ -299,7 +327,7 @@ public class GC {
 				}
 				pack.setReadOnly();
 
-				File idx = nameFor(objdb, id, ".idx");
+				File idx = nameFor(repo, id, ".idx");
 				out = new BufferedOutputStream(new FileOutputStream(idx));
 				try {
 					pw.writeIndex(out);
@@ -307,7 +335,7 @@ public class GC {
 					out.close();
 				}
 				idx.setReadOnly();
-				return objdb.openPack(pack, idx);
+				return repo.getObjectDatabase().openPack(pack, idx);
 			} else
 				return null;
 		} finally {
@@ -315,50 +343,8 @@ public class GC {
 		}
 	}
 
-	private PackFile packRest(ProgressMonitor pm, Set<ObjectId> nonHeads,
-			Set<ObjectId> allHeads) throws IOException {
-		PackWriter pw = new PackWriter(repo);
-		try {
-			// DfsGarbageCollector calls here pw.excludeObjects(idx).
-			// Is there the need to explicitly exclude the objects
-			// in the newly created pack file? We are already telling the
-			// packwriter that we have already allHeads and that he should
-			// stop traversing when he finds a head?
-			// My problem: I don't have the PackIndex anymore and PackFile
-			// doesn't expose it.
-			return writePack(pm, nonHeads, allHeads);
-		} finally {
-			pw.release();
-		}
-	}
-
-	/**
-	 * @param pm
-	 *
-	 */
-	public void reflog_expire(ProgressMonitor pm) {
-		// TODO Auto-generated method stub
-	}
-
-	/**
-	 * @param pm
-	 *
-	 */
-	public void pack_refs(ProgressMonitor pm) {
-		// TODO Auto-generated method stub
-	}
-
-	private static boolean isHead(Ref ref) {
-		return ref.getName().startsWith(Constants.R_HEADS);
-	}
-
-	private static File nameFor(ObjectDirectory odb, ObjectId name, String t) {
-		File packdir = new File(odb.getDirectory(), "pack");
-		return new File(packdir, "pack-" + name.name() + t);
-	}
-
-	private static File nameFor(ObjectDirectory odb, String name, String t) {
-		File packdir = new File(odb.getDirectory(), "pack");
+	private static File nameFor(FileRepository repo, String name, String t) {
+		File packdir = new File(repo.getObjectsDirectory(), "pack");
 		return new File(packdir, "pack-" + name + t);
 	}
 }
