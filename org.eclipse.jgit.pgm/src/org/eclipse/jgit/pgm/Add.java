@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,37 +41,31 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.diff;
+package org.eclipse.jgit.pgm;
 
-import org.eclipse.jgit.diff.DiffPerformanceTest.CharArray;
-import org.eclipse.jgit.diff.DiffPerformanceTest.CharCmp;
+import java.util.ArrayList;
+import java.util.List;
 
-public class PatienceDiffTest extends AbstractDiffTestCase {
+import org.eclipse.jgit.api.AddCommand;
+import org.eclipse.jgit.api.Git;
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.Option;
+
+@Command(common = true, usage = "usage_addFileContentsToTheIndex")
+class Add extends TextBuiltin {
+
+	@Option(name = "--update", aliases = { "-u" }, usage = "usage_onlyMatchAgainstAlreadyTrackedFiles")
+	private boolean update = false;
+
+	@Argument(required = true, metaVar = "metavar_filepattern", usage = "usage_filesToAddContentFrom")
+	private List<String> filepatterns = new ArrayList<String>();
+
 	@Override
-	protected DiffAlgorithm algorithm() {
-		PatienceDiff pd = new PatienceDiff();
-		pd.setFallbackAlgorithm(null);
-		return pd;
-	}
-
-	public void testEdit_NoUniqueMiddleSideA() {
-		EditList r = diff(t("aRRSSz"), t("aSSRRz"));
-		assertEquals(1, r.size());
-		assertEquals(new Edit(1, 5, 1, 5), r.get(0));
-	}
-
-	public void testEdit_NoUniqueMiddleSideB() {
-		EditList r = diff(t("aRSz"), t("aSSRRz"));
-		assertEquals(1, r.size());
-		assertEquals(new Edit(1, 3, 1, 5), r.get(0));
-	}
-
-	public void testPerformanceTestDeltaLength() {
-		String a = DiffTestDataGenerator.generateSequence(40000, 971, 3);
-		String b = DiffTestDataGenerator.generateSequence(40000, 1621, 5);
-		CharArray ac = new CharArray(a);
-		CharArray bc = new CharArray(b);
-		EditList r = algorithm().diff(new CharCmp(), ac, bc);
-		assertEquals(25, r.size());
+	protected void run() throws Exception {
+		AddCommand addCmd = new Git(db).add();
+		addCmd.setUpdate(update);
+		for (String p : filepatterns)
+			addCmd.addFilepattern(p);
+		addCmd.call();
 	}
 }

@@ -134,6 +134,51 @@ public class Git {
 	}
 
 	/**
+	 * Returns a command object to execute a {@code Pull} command
+	 *
+	 * @return a {@link PullCommand}
+	 */
+	public PullCommand pull() {
+		return new PullCommand(repo);
+	}
+
+	/**
+	 * Returns a command object used to create branches
+	 *
+	 * @return a {@link CreateBranchCommand}
+	 */
+	public CreateBranchCommand branchCreate() {
+		return new CreateBranchCommand(repo);
+	}
+
+	/**
+	 * Returns a command object used to delete branches
+	 *
+	 * @return a {@link DeleteBranchCommand}
+	 */
+	public DeleteBranchCommand branchDelete() {
+		return new DeleteBranchCommand(repo);
+	}
+
+	/**
+	 * Returns a command object used to list branches
+	 *
+	 * @return a {@link ListBranchCommand}
+	 */
+	public ListBranchCommand branchList() {
+		return new ListBranchCommand(repo);
+	}
+
+	/**
+	 * Returns a command object used to rename branches
+	 *
+	 * @return a {@link RenameBranchCommand}
+	 */
+	public RenameBranchCommand branchRename() {
+		return new RenameBranchCommand(repo);
+	}
+
+	/**
 	 * Returns a command object to execute a {@code Add} command
 	 *
 	 * @see <a
@@ -170,6 +215,32 @@ public class Git {
 	 */
 	public FetchCommand fetch() {
 		return new FetchCommand(repo);
+	}
+
+	/**
+	 * Returns a command object to execute a {@code Push} command
+	 *
+	 * @see <a
+	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-push.html"
+	 *      >Git documentation about Push</a>
+	 * @return a {@link PushCommand} used to collect all optional parameters and
+	 *         to finally execute the {@code Push} command
+	 */
+	public PushCommand push() {
+		return new PushCommand(repo);
+	}
+
+	/**
+	 * Returns a command object to execute a {@code cherry-pick} command
+	 *
+	 * @see <a
+	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-cherry-pick.html"
+	 *      >Git documentation about cherry-pick</a>
+	 * @return a {@link CherryPickCommand} used to collect all optional
+	 *         parameters and to finally execute the {@code cherry-pick} command
+	 */
+	public CherryPickCommand cherryPick() {
+		return new CherryPickCommand(repo);
 	}
 
 	/**

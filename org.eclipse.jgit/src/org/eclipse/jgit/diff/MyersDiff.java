@@ -107,15 +107,18 @@ import org.eclipse.jgit.util.LongList;
  */
 public class MyersDiff<S extends Sequence> {
 	/** Singleton instance of MyersDiff. */
-	public static final DiffAlgorithm INSTANCE = new DiffAlgorithm() {
-		public <S extends Sequence> EditList diffNonCommon(
-				SequenceComparator<? super S> cmp, S a, S b) {
-			return new MyersDiff<S>(cmp, a, b).edits;
+	public static final DiffAlgorithm INSTANCE = new LowLevelDiffAlgorithm() {
+		@Override
+		public <S extends Sequence> void diffNonCommon(EditList edits,
+				HashedSequenceComparator<S> cmp, HashedSequence<S> a,
+				HashedSequence<S> b, Edit region) {
+			new MyersDiff<S>(edits, cmp, a, b, region);
 		}
 	};
 
 	/**
-	 * The list of edits found during the last call to {@link #calculateEdits()}
+	 * The list of edits found during the last call to
+	 * {@link #calculateEdits(Edit)}
 	 */
 	protected EditList edits;
 
@@ -132,15 +135,13 @@ public class MyersDiff<S extends Sequence> {
 	 */
 	protected HashedSequence<S> b;
 
-	private MyersDiff(SequenceComparator<? super S> cmp, S a, S b) {
-		HashedSequencePair<S> pair;
-
-		pair = new HashedSequencePair<S>(cmp, a, b);
-		this.cmp = pair.getComparator();
-		this.a = pair.getA();
-		this.b = pair.getB();
-
-		calculateEdits();
+	private MyersDiff(EditList edits, HashedSequenceComparator<S> cmp,
+			HashedSequence<S> a, HashedSequence<S> b, Edit region) {
+		this.edits = edits;
+		this.cmp = cmp;
+		this.a = a;
+		this.b = b;
+		calculateEdits(region);
 	}
 
 	// TODO: use ThreadLocal for future multi-threaded operations
@@ -149,11 +150,10 @@ public class MyersDiff<S extends Sequence> {
 	/**
 	 * Entrypoint into the algorithm this class is all about. This method triggers that the
 	 * differences between A and B are calculated in form of a list of edits.
+	 * @param r portion of the sequences to examine.
 	 */
-	protected void calculateEdits() {
-		edits = new EditList();
-
-		middle.initialize(0, a.size(), 0, b.size());
+	private void calculateEdits(Edit r) {
+		middle.initialize(r.beginA, r.endA, r.beginB, r.endB);
 		if (middle.beginA >= middle.endA &&
 				middle.beginB >= middle.endB)
 			return;
@@ -300,7 +300,7 @@ public class MyersDiff<S extends Sequence> {
 
 			final int getIndex(int d, int k) {
 // TODO: remove
-if (((d + k - middleK) % 2) == 1)
+if (((d + k - middleK) % 2) != 0)
 	throw new RuntimeException(MessageFormat.format(JGitText.get().unexpectedOddResult, d, k, middleK));
 				return (d + k - middleK) / 2;
 			}
@@ -472,7 +472,7 @@ if (k < beginK || k > endK)
 				if (k < backward.beginK || k > backward.endK)
 					return false;
 				// TODO: move out of loop
-				if (((d - 1 + k - backward.middleK) % 2) == 1)
+				if (((d - 1 + k - backward.middleK) % 2) != 0)
 					return false;
 				if (x < backward.getX(d - 1, k))
 					return false;
@@ -514,7 +514,7 @@ if (k < beginK || k > endK)
 				if (k < forward.beginK || k > forward.endK)
 					return false;
 				// TODO: move out of loop
-				if (((d + k - forward.middleK) % 2) == 1)
+				if (((d + k - forward.middleK) % 2) != 0)
 					return false;
 				if (x > forward.getX(d, k))
 					return false;

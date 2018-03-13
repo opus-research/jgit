@@ -85,9 +85,9 @@ abstract class HttpAuthMethod {
 			return NONE;
 
 		String type = hdr.substring(0, sp);
-		if (Basic.NAME.equals(type))
+		if (Basic.NAME.equalsIgnoreCase(type))
 			return new Basic();
-		else if (Digest.NAME.equals(type))
+		else if (Digest.NAME.equalsIgnoreCase(type))
 			return new Digest(hdr.substring(sp + 1));
 		else
 			return NONE;
@@ -98,32 +98,9 @@ abstract class HttpAuthMethod {
 	 *
 	 * @param uri
 	 *            the URI used to create the connection.
-	 * @param credentialsProvider
-	 *            the credentials provider, or null. If provided,
-	 *            {@link URIish#getPass() credentials in the URI} are ignored.
-	 *
-	 * @return true if the authentication method is able to provide
-	 *         authorization for the given URI
 	 */
-	boolean authorize(URIish uri, CredentialsProvider credentialsProvider) {
-		String username = null;
-		String password = null;
-		if (credentialsProvider != null) {
-			Credentials credentials = credentialsProvider.getCredentials(uri);
-			if (credentials instanceof UsernamePasswordCredentials) {
-				UsernamePasswordCredentials usernamePasswordCredentials = (UsernamePasswordCredentials) credentials;
-				username = usernamePasswordCredentials.getUsername();
-				password = usernamePasswordCredentials.getPassword();
-			} // else unsupported credentials type
-		} else {
-			username = uri.getUser();
-			password = uri.getPass();
-		}
-		if (username != null) {
-			authorize(username, password);
-			return true;
-		}
-		return false;
+	void authorize(URIish uri) {
+		authorize(uri.getUser(), uri.getPass());
 	}
 
 	/**
@@ -226,7 +203,7 @@ abstract class HttpAuthMethod {
 			final String expect;
 			if ("auth".equals(qop)) {
 				final String c = p.get("cnonce");
-				final String nc = String.format("%8.8x", ++requestCount);
+				final String nc = String.format("%08x", ++requestCount);
 				p.put("nc", nc);
 				expect = KD(H(A1), nonce + ":" + nc + ":" + c + ":" + qop + ":"
 						+ H(A2));

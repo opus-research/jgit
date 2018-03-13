@@ -559,12 +559,6 @@ public abstract class Transport {
 	private PackConfig packConfig;
 
 	/**
-	 * A means of providing credentials for this transport. may be null if not
-	 * configured
-	 */
-	protected CredentialsProvider credentialsProvider;
-
-	/**
 	 * Create a new transport instance.
 	 *
 	 * @param local
@@ -1000,24 +994,4 @@ public abstract class Transport {
 	 * any open file handles used to read the "remote" repository.
 	 */
 	public abstract void close();
-
-	/**
-	 * A credentials provider can provide credentials for connections.
-	 *
-	 * @param credentialsProvider
-	 *            the credentials provider, or null if there is none
-	 */
-	public void setCredentialsProvider(CredentialsProvider credentialsProvider) {
-		this.credentialsProvider = credentialsProvider;
-	}
-
-	/**
-	 * The configured credentials provider.
-	 *
-	 * @return the credentials provider, or null if no credentials provider is
-	 *         associated with this transport.
-	 */
-	public CredentialsProvider getCredentialsProvider() {
-		return credentialsProvider;
-	}
 }

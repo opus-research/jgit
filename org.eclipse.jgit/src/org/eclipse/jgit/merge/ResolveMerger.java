@@ -93,7 +93,9 @@ public class ResolveMerger extends ThreeWayMerger {
 		/** the merge failed because of a dirty index */
 		DIRTY_INDEX,
 		/** the merge failed because of a dirty workingtree */
-		DIRTY_WORKTREE
+		DIRTY_WORKTREE,
+		/** the merge failed because of a file could not be deleted */
+		COULD_NOT_DELETE
 	}
 
 	private NameConflictTreeWalk tw;
@@ -132,7 +134,7 @@ public class ResolveMerger extends ThreeWayMerger {
 
 	private DirCache dircache;
 
-	private WorkingTreeIterator workingTreeIt;
+	private WorkingTreeIterator workingTreeIterator;
 
 
 	/**
@@ -176,8 +178,8 @@ public class ResolveMerger extends ThreeWayMerger {
 			tw.addTree(sourceTrees[0]);
 			tw.addTree(sourceTrees[1]);
 			tw.addTree(buildIt);
-			if (workingTreeIt != null)
-				tw.addTree(workingTreeIt);
+			if (workingTreeIterator != null)
+				tw.addTree(workingTreeIterator);
 
 			while (tw.next()) {
 				if (!processEntry(
@@ -185,7 +187,7 @@ public class ResolveMerger extends ThreeWayMerger {
 						tw.getTree(T_OURS, CanonicalTreeParser.class),
 						tw.getTree(T_THEIRS, CanonicalTreeParser.class),
 						tw.getTree(T_INDEX, DirCacheBuildIterator.class),
-						(workingTreeIt == null) ? null : tw.getTree(T_FILE, WorkingTreeIterator.class))) {
+						(workingTreeIterator == null) ? null : tw.getTree(T_FILE, WorkingTreeIterator.class))) {
 					cleanUp();
 					return false;
 				}
@@ -229,10 +231,16 @@ public class ResolveMerger extends ThreeWayMerger {
 	private void checkout() throws NoWorkTreeException, IOException {
 		for (Map.Entry<String, DirCacheEntry> entry : toBeCheckedOut.entrySet()) {
 			File f = new File(db.getWorkTree(), entry.getKey());
-			createDir(f.getParentFile());
-			DirCacheCheckout.checkoutEntry(db,
-					f,
-					entry.getValue(), true);
+			if (entry.getValue() != null) {
+				createDir(f.getParentFile());
+				DirCacheCheckout.checkoutEntry(db,
+						f,
+						entry.getValue(), true);
+			} else {
+				if (!f.delete())
+					failingPathes.put(entry.getKey(),
+							MergeFailureReason.COULD_NOT_DELETE);
+			}
 			modifiedFiles.add(entry.getKey());
 		}
 	}
@@ -373,13 +381,21 @@ public class ResolveMerger extends ThreeWayMerger {
 			return true;
 		}
 
-		if (nonTree(modeT) && modeB == modeO && tw.idEqual(T_BASE, T_OURS)) {
+		if (modeB == modeO && tw.idEqual(T_BASE, T_OURS)) {
 			// OURS was not changed compared to base. All changes must be in
 			// THEIRS. Choose THEIRS.
-			DirCacheEntry e=add(tw.getRawPath(), theirs, DirCacheEntry.STAGE_0);
-			if (e!=null)
-				toBeCheckedOut.put(tw.getPathString(), e);
-			return true;
+			if (nonTree(modeT)) {
+				DirCacheEntry e = add(tw.getRawPath(), theirs,
+						DirCacheEntry.STAGE_0);
+				if (e != null)
+					toBeCheckedOut.put(tw.getPathString(), e);
+				return true;
+			} else if (modeT == 0) {
+				// we want THEIRS ... but THEIRS contains the deletion of the
+				// file
+				toBeCheckedOut.put(tw.getPathString(), null);
+				return true;
+			}
 		}
 
 		if (tw.isSubtree()) {
@@ -612,10 +628,10 @@ public class ResolveMerger extends ThreeWayMerger {
 	 * TODO: enhance WorkingTreeIterator to support write operations. Then this
 	 * merger will be able to merge with a different working tree abstraction.
 	 *
-	 * @param workingTreeIt
+	 * @param workingTreeIterator
 	 *            the workingTreeIt to set
 	 */
-	public void setWorkingTreeIt(WorkingTreeIterator workingTreeIt) {
-		this.workingTreeIt = workingTreeIt;
+	public void setWorkingTreeIterator(WorkingTreeIterator workingTreeIterator) {
+		this.workingTreeIterator = workingTreeIterator;
 	}
 }
