@@ -142,11 +142,11 @@ class SimilarityIndex {
 		Arrays.sort(idHash);
 	}
 
-	int score(SimilarityIndex dst, int maxScore) {
+	int score(SimilarityIndex dst) {
 		long max = Math.max(fileSize, dst.fileSize);
 		if (max == 0)
-			return maxScore;
-		return (int) ((common(dst) * maxScore) / max);
+			return 100;
+		return (int) ((common(dst) * 100L) / max);
 	}
 
 	int common(SimilarityIndex dst) {
