@@ -1079,7 +1079,7 @@ public class UploadPack {
 
 	private boolean reportInternalServerErrorOverSideband() {
 		try {
-			@SuppressWarnings("resource")
+			@SuppressWarnings("resource" /* java 7 */)
 			SideBandOutputStream err = new SideBandOutputStream(
 					SideBandOutputStream.CH_ERROR,
 					SideBandOutputStream.SMALL_BUF,
@@ -1121,7 +1121,7 @@ public class UploadPack {
 		} catch (ServiceMayNotContinueException noPack) {
 			if (sideband && noPack.getMessage() != null) {
 				noPack.setOutput();
-				@SuppressWarnings("resource")
+				@SuppressWarnings("resource" /* java 7 */)
 				SideBandOutputStream err = new SideBandOutputStream(
 						SideBandOutputStream.CH_ERROR,
 						SideBandOutputStream.SMALL_BUF, rawOut);
@@ -1137,7 +1137,6 @@ public class UploadPack {
 		final PackWriter pw = new PackWriter(cfg, walk.getObjectReader());
 		try {
 			pw.setUseCachedPacks(true);
-			pw.setUseBitmaps(true);
 			pw.setReuseDeltaCommits(true);
 			pw.setDeltaBaseAsOffset(options.contains(OPTION_OFS_DELTA));
 			pw.setThin(options.contains(OPTION_THIN_PACK));
