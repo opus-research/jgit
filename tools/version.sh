@@ -133,14 +133,7 @@ perl -pi~ -e '
 	' org.eclipse.jgit.packaging/org.*.feature/feature.xml
 
 perl -pi~ -e '
-	if ($ARGV ne $old_argv) {
-		$seen_version = 0;
-		$old_argv = $ARGV;
-	}
-	if (!$seen_version) {
-		$seen_version = 1 if
-		s{<(version)>.*</\1>}{<${1}>'"$POM_V"'</${1}>};
-	}
+	s{<(version)>.*</\1>}{<${1}>'"$POM_V"'</${1}>};
 	' org.eclipse.jgit.packaging/org.*.feature/pom.xml
 
 perl -pi~ -e '
@@ -159,8 +152,8 @@ perl -pi~ -e '
 		$seen_version = 0;
 		$old_argv = $ARGV;
 	}
-	if (!$seen_version) {
-		$seen_version = 1 if
+	if ($seen_version < 2) {
+		$seen_version++ if
 		s{<(version)>.*</\1>}{<${1}>'"$POM_V"'</${1}>};
 	}
 	' org.eclipse.jgit.packaging/pom.xml
