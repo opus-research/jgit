@@ -347,7 +347,7 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 		Result update = updateRef.update();
 		assertEquals(Result.FORCED, update);
 		assertEquals(ppid, db.resolve("HEAD"));
-		Ref ref = db.getRef("HEAD");
+		Ref ref = db.exactRef("HEAD");
 		assertEquals("HEAD", ref.getName());
 		assertTrue("is detached", !ref.isSymbolic());
 
@@ -377,7 +377,7 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 		Result update = updateRef.update();
 		assertEquals(Result.NEW, update);
 		assertEquals(ppid, db.resolve("HEAD"));
-		Ref ref = db.getRef("HEAD");
+		Ref ref = db.exactRef("HEAD");
 		assertEquals("HEAD", ref.getName());
 		assertTrue("is detached", !ref.isSymbolic());
 
@@ -610,6 +610,82 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 	}
 
 	@Test
+	public void testLink_NoticesNoop() throws IOException {
+		Result update = db.updateRef("refs/heads/symref")
+				.link("refs/heads/target");
+		assertEquals(Result.NEW, update);
+
+		Ref ref = db.getRefDatabase().exactRef("refs/heads/symref");
+		assertTrue(ref.isSymbolic());
+		assertEquals("refs/heads/target", ref.getTarget().getName());
+
+		update = db.updateRef("refs/heads/symref")
+				.link("refs/heads/target");
+		assertEquals(Result.NO_CHANGE, update);
+	}
+
+	@Test
+	public void testLink_OldAndNewObjectId() throws IOException {
+		RefUpdate ru = db.updateRef("refs/heads/target1");
+		ru.setNewObjectId(db.resolve("refs/heads/master"));
+		ru.update();
+
+		ru = db.updateRef("refs/heads/target2");
+		ru.setNewObjectId(db.resolve("refs/heads/master^"));
+		ru.update();
+
+		ru = db.updateRef("refs/heads/changingsymref");
+		ru.link("refs/heads/target1");
+
+		ru = db.updateRef("refs/heads/changingsymref");
+		Result update = ru.link("refs/heads/target2");
+		assertEquals(Result.FORCED, update);
+
+		assertEquals(db.resolve("refs/heads/master"), ru.getOldObjectId());
+		assertEquals(db.resolve("refs/heads/master^"), ru.getNewObjectId());
+	}
+
+	@Test
+	public void testLink_NotConfusedByRefsHeadsRefsHeadsTarget() throws IOException {
+		RefUpdate ru = db.updateRef("refs/heads/refs/heads/confusingtarget");
+		ru.setNewObjectId(db.resolve("refs/heads/master"));
+		ru.update();
+
+		ru = db.updateRef("refs/heads/confusingtargetsymref");
+		ru.link("refs/heads/refs/heads/confusingtarget");
+
+		ru = db.updateRef("refs/heads/confusingtargetsymref");
+		Result update = ru.link("refs/heads/confusingtarget");
+		assertEquals(Result.FORCED, update);
+
+		Ref ref = db.getRefDatabase().exactRef("refs/heads/confusingtargetsymref");
+		assertTrue(ref.isSymbolic());
+		assertEquals("refs/heads/confusingtarget", ref.getTarget().getName());
+
+		assertNull(ru.getNewObjectId());
+	}
+
+	@Test
+	public void testLink_NotConfusedByRefsHeadsRefsHeadsSrc() throws IOException {
+		RefUpdate ru = db.updateRef("refs/heads/target");
+		ru.setNewObjectId(db.resolve("refs/heads/master"));
+		ru.update();
+
+		ru = db.updateRef("refs/heads/refs/heads/confusingsrc");
+		ru.link("refs/heads/target");
+
+		ru = db.updateRef("refs/heads/confusingsrc");
+		Result update = ru.link("refs/heads/target");
+		assertEquals(Result.NEW, update);
+
+		Ref ref = db.getRefDatabase().exactRef("refs/heads/confusingsrc");
+		assertTrue(ref.isSymbolic());
+		assertEquals("refs/heads/target", ref.getTarget().getName());
+
+		assertNull(ru.getOldObjectId());
+	}
+
+	@Test
 	public void testRenameBranchNoPreviousLog() throws IOException {
 		assertFalse("precondition, no log on old branchg", new File(db
 				.getDirectory(), "logs/refs/heads/b").exists());
@@ -681,13 +757,13 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 	public void testRenameBranchAlsoInPack() throws IOException {
 		ObjectId rb = db.resolve("refs/heads/b");
 		ObjectId rb2 = db.resolve("refs/heads/b~1");
-		assertEquals(Ref.Storage.PACKED, db.getRef("refs/heads/b").getStorage());
+		assertEquals(Ref.Storage.PACKED, db.exactRef("refs/heads/b").getStorage());
 		RefUpdate updateRef = db.updateRef("refs/heads/b");
 		updateRef.setNewObjectId(rb2);
 		updateRef.setForceUpdate(true);
 		Result update = updateRef.update();
 		assertEquals("internal check new ref is loose", Result.FORCED, update);
-		assertEquals(Ref.Storage.LOOSE, db.getRef("refs/heads/b").getStorage());
+		assertEquals(Ref.Storage.LOOSE, db.exactRef("refs/heads/b").getStorage());
 		writeReflog(db, rb, "Just a message", "refs/heads/b");
 		assertTrue("log on old branch", new File(db.getDirectory(),
 				"logs/refs/heads/b").exists());

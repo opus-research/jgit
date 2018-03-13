@@ -73,6 +73,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.InvalidObjectIdException;
 import org.eclipse.jgit.errors.LockFailedException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -261,15 +262,14 @@ public class RefDirectory extends RefDatabase {
 		return loose;
 	}
 
-	@Override
-	public Ref exactRef(String name) throws IOException {
-		RefList<Ref> packed = getPackedRefs();
-		Ref ref;
+	@Nullable
+	private Ref readAndResolve(String name, RefList<Ref> packed) throws IOException {
 		try {
-			ref = readRef(name, packed);
+			Ref ref = readRef(name, packed);
 			if (ref != null) {
 				ref = resolve(ref, 0, null, null, packed);
 			}
+			return ref;
 		} catch (IOException e) {
 			if (name.contains("/") //$NON-NLS-1$
 					|| !(e.getCause() instanceof InvalidObjectIdException)) {
@@ -279,32 +279,33 @@ public class RefDirectory extends RefDatabase {
 			// While looking for a ref outside of refs/ (e.g., 'config'), we
 			// found a non-ref file (e.g., a config file) instead.  Treat this
 			// as a ref-not-found condition.
-			ref = null;
+			return null;
 		}
-		fireRefsChanged();
-		return ref;
+	}
+
+	@Override
+	public Ref exactRef(String name) throws IOException {
+		try {
+			return readAndResolve(name, getPackedRefs());
+		} finally {
+			fireRefsChanged();
+		}
 	}
 
 	@Override
 	public Ref getRef(final String needle) throws IOException {
-		final RefList<Ref> packed = getPackedRefs();
-		Ref ref = null;
-		for (String prefix : SEARCH_PATH) {
-			try {
-				ref = readRef(prefix + needle, packed);
+		try {
+			RefList<Ref> packed = getPackedRefs();
+			for (String prefix : SEARCH_PATH) {
+				Ref ref = readAndResolve(prefix + needle, packed);
 				if (ref != null) {
-					ref = resolve(ref, 0, null, null, packed);
-					break;
-				}
-			} catch (IOException e) {
-				if (!(!needle.contains("/") && "".equals(prefix) && e //$NON-NLS-1$ //$NON-NLS-2$
-						.getCause() instanceof InvalidObjectIdException)) {
-					throw e;
+					return ref;
 				}
 			}
+			return null;
+		} finally {
+			fireRefsChanged();
 		}
-		fireRefsChanged();
-		return ref;
 	}
 
 	@Override
@@ -351,7 +352,7 @@ public class RefDirectory extends RefDatabase {
 	public List<Ref> getAdditionalRefs() throws IOException {
 		List<Ref> ret = new LinkedList<Ref>();
 		for (String name : additionalRefsNames) {
-			Ref r = getRef(name);
+			Ref r = exactRef(name);
 			if (r != null)
 				ret.add(r);
 		}
