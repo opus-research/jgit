@@ -62,9 +62,6 @@ import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.SystemReader;
 
-/**
- * Mock {@link SystemReader} for tests.
- */
 public class MockSystemReader extends SystemReader {
 	private final class MockConfig extends FileBasedConfig {
 		private MockConfig(File cfgLocation, FS fs) {
@@ -81,8 +78,6 @@ public class MockSystemReader extends SystemReader {
 			return false;
 		}
 	}
-
-	long now = 1250379778668L; // Sat Aug 15 20:12:58 GMT-03:30 2009
 
 	final Map<String, String> values = new HashMap<String, String>();
 
@@ -143,18 +138,7 @@ public class MockSystemReader extends SystemReader {
 
 	@Override
 	public long getCurrentTime() {
-		return now;
-	}
-
-	/**
-	 * Adjusts the current time in seconds.
-	 *
-	 * @param secDelta
-	 *            number of seconds to add to the current time.
-	 * @since 4.2
-	 */
-	public void tick(final int secDelta) {
-		now += secDelta * 1000L;
+		return 1250379778668L; // Sat Aug 15 20:12:58 GMT-03:30 2009
 	}
 
 	@Override

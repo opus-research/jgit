@@ -43,20 +43,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.UTF_8;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.cryptoCipherListPBE;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.cryptoCipherListTrans;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.folderDelete;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.permitLongTests;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.policySetup;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.product;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.proxySetup;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.publicAddress;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.reportPolicy;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.securityProviderName;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.textWrite;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.transferStream;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.verifyFileContent;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -73,10 +59,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.net.SocketTimeoutException;
 import java.net.URL;
-import java.net.URLConnection;
-import java.net.UnknownHostException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.security.GeneralSecurityException;
@@ -93,12 +76,14 @@ import java.util.UUID;
 import javax.crypto.Cipher;
 import javax.crypto.SecretKeyFactory;
 
+import org.apache.log4j.Logger;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.test.resources.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.util.FileUtils;
 import org.junit.After;
 import org.junit.AfterClass;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.FixMethodOrder;
@@ -108,8 +93,8 @@ import org.junit.runners.MethodSorters;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 import org.junit.runners.Suite;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.*;
 
 /**
  * Amazon S3 encryption pipeline test.
@@ -135,7 +120,7 @@ public class WalkEncryptionTest {
 	/**
 	 * Logger setup: ${project_loc}/tst-rsrc/log4j.properties
 	 */
-	static final Logger logger = LoggerFactory.getLogger(WalkEncryptionTest.class);
+	static final Logger logger = Logger.getLogger(WalkEncryptionTest.class);
 
 	/**
 	 * Property names used in test session.
@@ -190,7 +175,6 @@ public class WalkEncryptionTest {
 		// Test properties file in [project test source directory] of CI.
 		String TEST_CONFIG_FILE = System.getProperty("user.dir")
 				+ File.separator + "tst-rsrc" + File.separator + CONFIG_FILE;
-
 	}
 
 	/**
@@ -343,9 +327,8 @@ public class WalkEncryptionTest {
 						"Using test properties from hard coded ${project.source} file.");
 				return props;
 			}
-			throw new Error("Can not load test properties form any source.");
+			throw new Error("Can not load test properteis form any source.");
 		}
-
 	}
 
 	/**
@@ -416,22 +399,14 @@ public class WalkEncryptionTest {
 		 * @throws Exception
 		 */
 		static String publicAddress() throws Exception {
+			String service = "http://checkip.amazonaws.com";
+			URL url = new URL(service);
+			BufferedReader reader = new BufferedReader(
+					new InputStreamReader(url.openStream()));
 			try {
-				String service = "http://checkip.amazonaws.com";
-				URL url = new URL(service);
-				URLConnection c = url.openConnection();
-				c.setConnectTimeout(500);
-				c.setReadTimeout(500);
-				BufferedReader reader = new BufferedReader(
-						new InputStreamReader(c.getInputStream()));
-				try {
-					return reader.readLine();
-				} finally {
-					reader.close();
-				}
-			} catch (UnknownHostException | SocketTimeoutException e) {
-				return "Can't reach http://checkip.amazonaws.com to"
-						+ " determine public address";
+				return reader.readLine();
+			} finally {
+				reader.close();
 			}
 		}
 
@@ -439,10 +414,14 @@ public class WalkEncryptionTest {
 		 * Discover Password-Based Encryption (PBE) engines providing both
 		 * [SecretKeyFactory] and [AlgorithmParameters].
 		 *
+		 * @see <a href="https://www.bouncycastle.org/specifications.html">
+		 *      Bouncycastle Specification</a>
+		 * @see <a href=
+		 *      "https://docs.oracle.com/javase/8/docs/technotes/guides/security/SunProviders.html">
+		 *      Java 8 SunProviders</a>
+		 *
 		 * @return result
 		 */
-		// https://www.bouncycastle.org/specifications.html
-		// https://docs.oracle.com/javase/8/docs/technotes/guides/security/SunProviders.html
 		static List<String> cryptoCipherListPBE() {
 			return cryptoCipherList(WalkEncryption.Vals.REGEX_PBE);
 		}
@@ -495,10 +474,14 @@ public class WalkEncryptionTest {
 		/**
 		 * Setup proxy during CI build.
 		 *
+		 * @see <a href=
+		 *      "https://wiki.eclipse.org/Hudson#Accessing_the_Internet_using_Proxy">
+		 *      Accessing the internet using proxy</a>
+		 * @see <a href=
+		 *      "http://docs.oracle.com/javase/7/docs/api/java/net/doc-files/net-properties.html">
+		 *      Java net properties</a>
 		 * @throws Exception
 		 */
-		// https://wiki.eclipse.org/Hudson#Accessing_the_Internet_using_Proxy
-		// http://docs.oracle.com/javase/7/docs/api/java/net/doc-files/net-properties.html
 		static void proxySetup() throws Exception {
 			String keyNoProxy = "no_proxy";
 			String keyHttpProxy = "http_proxy";
@@ -536,12 +519,21 @@ public class WalkEncryptionTest {
 		}
 
 		/**
+		 * Permit s3 tests.
+		 *
+		 * @return result
+		 */
+		static boolean permitTests() {
+			return Boolean.parseBoolean(System.getProperty("jgit.s3.test"));
+		}
+
+		/**
 		 * Permit long tests on CI or with manual activation.
 		 *
 		 * @return result
 		 */
 		static boolean permitLongTests() {
-			return isBuildCI() || isProfileActive();
+			return permitTests() || isBuildCI() || isProfileActive();
 		}
 
 		/**
@@ -967,10 +959,20 @@ public class WalkEncryptionTest {
 		}
 
 		static void reportLongTests() {
+			if (permitTests()) {
+				logger.info("S3 encryption tests are enabled.");
+			} else {
+				logger.info("S3 encryption tests are disabled."
+						+ " Set Maven profile s3.test "
+						+ "or -Djgit.s3.test=true to enable them");
+
+			}
+			Assume.assumeTrue(permitTests());
 			if (permitLongTests()) {
 				logger.info("Long running tests are enabled.");
 			} else {
-				logger.warn("Long running tests are disabled.");
+				logger.warn("Long running tests are disabled."
+						+ " Set -Djgit.test.long=true to enable them");
 			}
 		}
 
@@ -1227,7 +1229,6 @@ public class WalkEncryptionTest {
 			policySetup(false);
 			cryptoTestIfCan(props);
 		}
-
 	}
 
 	/**

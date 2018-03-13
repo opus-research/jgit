@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2014, Arthur Daussy <arthur.daussy@obeo.fr>
- * Copyright (C) 2015, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,47 +41,75 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.internal.storage.file;
 
-import java.io.File;
+package org.eclipse.jgit.lib;
+
 import java.io.IOException;
 
-import org.eclipse.jgit.attributes.AttributesNode;
-import org.eclipse.jgit.lib.CoreConfig;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.util.FS;
-
-/** Attribute node loaded from global system-wide file. */
-public class GlobalAttributesNode extends AttributesNode {
-	final Repository repository;
+/**
+ * A representation of a file (blob) object in a {@link Tree}.
+ *
+ * @deprecated To look up information about a single path, use
+ * {@link org.eclipse.jgit.treewalk.TreeWalk#forPath(Repository, String, org.eclipse.jgit.revwalk.RevTree)}.
+ * To lookup information about multiple paths at once, use a
+ * {@link org.eclipse.jgit.treewalk.TreeWalk} and obtain the current entry's
+ * information from its getter methods.
+ */
+@Deprecated
+public class FileTreeEntry extends TreeEntry {
+	private FileMode mode;
 
 	/**
-	 * @param repository
+	 * Constructor for a File (blob) object.
+	 *
+	 * @param parent
+	 *            The {@link Tree} holding this object (or null)
+	 * @param id
+	 *            the SHA-1 of the blob (or null for a yet unhashed file)
+	 * @param nameUTF8
+	 *            raw object name in the parent tree
+	 * @param execute
+	 *            true if the executable flag is set
 	 */
-	public GlobalAttributesNode(Repository repository) {
-		this.repository = repository;
+	public FileTreeEntry(final Tree parent, final ObjectId id,
+			final byte[] nameUTF8, final boolean execute) {
+		super(parent, id, nameUTF8);
+		setExecutable(execute);
+	}
+
+	public FileMode getMode() {
+		return mode;
 	}
 
 	/**
-	 * @return the attributes node
+	 * @return true if this file is executable
+	 */
+	public boolean isExecutable() {
+		return getMode().equals(FileMode.EXECUTABLE_FILE);
+	}
+
+	/**
+	 * @param execute set/reset the executable flag
+	 */
+	public void setExecutable(final boolean execute) {
+		mode = execute ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE;
+	}
+
+	/**
+	 * @return an {@link ObjectLoader} that will return the data
 	 * @throws IOException
 	 */
-	public AttributesNode load() throws IOException {
-		AttributesNode r = new AttributesNode();
+	public ObjectLoader openReader() throws IOException {
+		return getRepository().open(getId(), Constants.OBJ_BLOB);
+	}
 
-		FS fs = repository.getFS();
-		String path = repository.getConfig().get(CoreConfig.KEY)
-				.getAttributesFile();
-		if (path != null) {
-			File attributesFile;
-			if (path.startsWith("~/")) { //$NON-NLS-1$
-				attributesFile = fs.resolve(fs.userHome(),
-						path.substring(2));
-			} else {
-				attributesFile = fs.resolve(null, path);
-			}
-			FileRepository.AttributesNodeProviderImpl.loadRulesFromFile(r, attributesFile);
-		}
-		return r.getRules().isEmpty() ? null : r;
+	public String toString() {
+		final StringBuilder r = new StringBuilder();
+		r.append(ObjectId.toString(getId()));
+		r.append(' ');
+		r.append(isExecutable() ? 'X' : 'F');
+		r.append(' ');
+		r.append(getFullName());
+		return r.toString();
 	}
 }
