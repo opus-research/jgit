@@ -65,10 +65,6 @@ public class RebaseResult {
 		 */
 		STOPPED,
 		/**
-		 * Failed; the original HEAD was restored
-		 */
-		FAILED,
-		/**
 		 * Already up-to-date
 		 */
 		UP_TO_DATE,
@@ -83,22 +79,16 @@ public class RebaseResult {
 
 	private final Status mySatus;
 
-	private RevCommit currentCommit;
-
-	private Throwable cause;
+	private final RevCommit currentCommit;
 
 	RebaseResult(Status status) {
 		this.mySatus = status;
+		currentCommit = null;
 	}
 
 	RebaseResult(RevCommit commit) {
 		this.mySatus = Status.STOPPED;
 		currentCommit = commit;
-	}
-
-	RebaseResult(Throwable cause) {
-		this.mySatus = Status.FAILED;
-		this.cause = cause;
 	}
 
 	/**
@@ -114,13 +104,5 @@ public class RebaseResult {
 	 */
 	public RevCommit getCurrentCommit() {
 		return currentCommit;
-	}
-
-	/**
-	 * @return the cause if status is {@link Status#FAILED}, otherwise
-	 *         <code>null</code>
-	 */
-	public Throwable getCause() {
-		return cause;
 	}
 }

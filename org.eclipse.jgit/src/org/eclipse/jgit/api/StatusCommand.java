@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2007, Dave Watson <dwatson@mimvista.com>
- * Copyright (C) 2007-2008, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2011, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,66 +40,64 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.api;
 
-package org.eclipse.jgit.lib;
-
-import java.io.File;
 import java.io.IOException;
 
-import org.eclipse.jgit.lib.GitIndex.Entry;
+import org.eclipse.jgit.errors.NoWorkTreeException;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.IndexDiff;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.treewalk.FileTreeIterator;
+import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 
 /**
- * Visitor interface for traversing the index and two trees in parallel.
+ * A class used to execute a {@code Status} command. It has setters for all
+ * supported options and arguments of this command and a {@link #call()} method
+ * to finally execute the command. Each instance of this class should only be
+ * used for one invocation of the command (means: one call to {@link #call()})
  *
- * When merging we deal with up to two tree nodes and a base node. Then
- * we figure out what to do.
- *
- * A File argument is supplied to allow us to check for modifications in
- * a work tree or update the file.
- *
- * @deprecated Use {@link org.eclipse.jgit.treewalk.TreeWalk} instead, with
- * a {@link org.eclipse.jgit.dircache.DirCacheIterator} as a member.
+ * @see <a
+ *      href="http://www.kernel.org/pub/software/scm/git/docs/git-status.html"
+ *      >Git documentation about Status</a>
  */
-@Deprecated
-public interface IndexTreeVisitor {
-	/**
-	 * Visit a blob, and corresponding tree and index entries.
-	 *
-	 * @param treeEntry
-	 * @param indexEntry
-	 * @param file
-	 * @throws IOException
-	 */
-	public void visitEntry(TreeEntry treeEntry, Entry indexEntry, File file) throws IOException;
+public class StatusCommand extends GitCommand<Status> {
+	private WorkingTreeIterator workingTreeIt;
 
 	/**
-	 * Visit a blob, and corresponding tree nodes and associated index entry.
-	 *
-	 * @param treeEntry
-	 * @param auxEntry
-	 * @param indexEntry
-	 * @param file
-	 * @throws IOException
+	 * @param repo
 	 */
-	public void visitEntry(TreeEntry treeEntry, TreeEntry auxEntry, Entry indexEntry, File file) throws IOException;
+	protected StatusCommand(Repository repo) {
+		super(repo);
+		// TODO Auto-generated constructor stub
+	}
 
 	/**
-	 * Invoked after handling all child nodes of a tree, during a three way merge
+	 * Executes the {@code Status} command with all the options and parameters
+	 * collected by the setter methods of this class. Each instance of this
+	 * class should only be used for one invocation of the command. Don't call
+	 * this method twice on an instance.
 	 *
-	 * @param tree
-	 * @param auxTree
-	 * @param curDir
-	 * @throws IOException
+	 * @return a {@link Status} object telling about each path where working
+	 *         tree, index or HEAD differ from each other.
 	 */
-	public void finishVisitTree(Tree tree, Tree auxTree, String curDir) throws IOException;
+	public Status call() throws IOException, NoWorkTreeException {
+		if (workingTreeIt == null)
+			workingTreeIt = new FileTreeIterator(repo);
+
+		IndexDiff diff = new IndexDiff(repo, Constants.HEAD, workingTreeIt);
+		diff.diff();
+
+		return new Status(diff);
+	}
 
 	/**
-	 * Invoked after handling all child nodes of a tree, during two way merge.
+	 * To set the {@link WorkingTreeIterator} which should be used. If this
+	 * method is not called a standard {@link FileTreeIterator} is used.
 	 *
-	 * @param tree
-	 * @param i
-	 * @param curDir
-	 * @throws IOException
+	 * @param workingTreeIt
 	 */
-	public void finishVisitTree(Tree tree, int i, String curDir) throws IOException;
+	public void setWorkingTreeIt(WorkingTreeIterator workingTreeIt) {
+		this.workingTreeIt = workingTreeIt;
+	}
 }

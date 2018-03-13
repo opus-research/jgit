@@ -83,7 +83,7 @@ import org.eclipse.jgit.lib.AsyncObjectSizeQueue;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdSubclassMap;
+import org.eclipse.jgit.lib.ObjectIdOwnerMap;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
@@ -99,6 +99,7 @@ import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.storage.file.PackIndexWriter;
+import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.TemporaryBuffer;
 
 /**
@@ -141,16 +142,16 @@ public class PackWriter {
 	private final List<ObjectToPack> objectsLists[] = new List[Constants.OBJ_TAG + 1];
 	{
 		objectsLists[0] = Collections.<ObjectToPack> emptyList();
-		objectsLists[Constants.OBJ_COMMIT] = new ArrayList<ObjectToPack>();
-		objectsLists[Constants.OBJ_TREE] = new ArrayList<ObjectToPack>();
-		objectsLists[Constants.OBJ_BLOB] = new ArrayList<ObjectToPack>();
-		objectsLists[Constants.OBJ_TAG] = new ArrayList<ObjectToPack>();
+		objectsLists[Constants.OBJ_COMMIT] = new BlockList<ObjectToPack>();
+		objectsLists[Constants.OBJ_TREE] = new BlockList<ObjectToPack>();
+		objectsLists[Constants.OBJ_BLOB] = new BlockList<ObjectToPack>();
+		objectsLists[Constants.OBJ_TAG] = new BlockList<ObjectToPack>();
 	}
 
-	private final ObjectIdSubclassMap<ObjectToPack> objectsMap = new ObjectIdSubclassMap<ObjectToPack>();
+	private final ObjectIdOwnerMap<ObjectToPack> objectsMap = new ObjectIdOwnerMap<ObjectToPack>();
 
 	// edge objects for thin packs
-	private List<ObjectToPack> edgeObjects = new ArrayList<ObjectToPack>();
+	private List<ObjectToPack> edgeObjects = new BlockList<ObjectToPack>();
 
 	private List<CachedPack> cachedPacks = new ArrayList<CachedPack>(2);
 
@@ -166,6 +167,8 @@ public class PackWriter {
 	private final PackConfig config;
 
 	private final Statistics stats;
+
+	private Statistics.ObjectType typeStats;
 
 	private List<ObjectToPack> sortedByName;
 
@@ -401,8 +404,18 @@ public class PackWriter {
 	 * Returns objects number in a pack file that was created by this writer.
 	 *
 	 * @return number of objects in pack.
+	 * @throws IOException
+	 *             a cached pack cannot supply its object count.
 	 */
-	public long getObjectsNumber() {
+	public long getObjectCount() throws IOException {
+		if (stats.totalObjects == 0) {
+			long objCnt = 0;
+			for (List<ObjectToPack> list : objectsLists)
+				objCnt += list.size();
+			for (CachedPack pack : cachedPacks)
+				objCnt += pack.getObjectCount();
+			return objCnt;
+		}
 		return stats.totalObjects;
 	}
 
@@ -586,11 +599,9 @@ public class PackWriter {
 			int cnt = 0;
 			for (List<ObjectToPack> list : objectsLists)
 				cnt += list.size();
-			sortedByName = new ArrayList<ObjectToPack>(cnt);
-			for (List<ObjectToPack> list : objectsLists) {
-				for (ObjectToPack otp : list)
-					sortedByName.add(otp);
-			}
+			sortedByName = new BlockList<ObjectToPack>(cnt);
+			for (List<ObjectToPack> list : objectsLists)
+				sortedByName.addAll(list);
 			Collections.sort(sortedByName);
 		}
 		return sortedByName;
@@ -636,24 +647,22 @@ public class PackWriter {
 		final PackOutputStream out = new PackOutputStream(writeMonitor,
 				packStream, this);
 
-		long objCnt = 0;
-		for (List<ObjectToPack> list : objectsLists)
-			objCnt += list.size();
-		for (CachedPack pack : cachedPacks)
-			objCnt += pack.getObjectCount();
+		long objCnt = getObjectCount();
 		stats.totalObjects = objCnt;
-
 		writeMonitor.beginTask(JGitText.get().writingObjects, (int) objCnt);
 		long writeStart = System.currentTimeMillis();
 
-		long headerStart = out.length();
 		out.writeFileHeader(PACK_VERSION_GENERATED, objCnt);
 		out.flush();
-		long headerEnd = out.length();
 
 		writeObjects(out);
-		if (!edgeObjects.isEmpty() || !cachedPacks.isEmpty())
-			stats.thinPackBytes = out.length() - (headerEnd - headerStart);
+		if (!edgeObjects.isEmpty() || !cachedPacks.isEmpty()) {
+			for (Statistics.ObjectType typeStat : stats.objectTypes) {
+				if (typeStat == null)
+					continue;
+				stats.thinPackBytes += typeStat.bytes;
+			}
+		}
 
 		for (CachedPack pack : cachedPacks) {
 			long deltaCnt = pack.getDeltaCount();
@@ -667,6 +676,16 @@ public class PackWriter {
 		stats.timeWriting = System.currentTimeMillis() - writeStart;
 		stats.totalBytes = out.length();
 		stats.reusedPacks = Collections.unmodifiableList(cachedPacks);
+
+		for (Statistics.ObjectType typeStat : stats.objectTypes) {
+			if (typeStat == null)
+				continue;
+			typeStat.cntDeltas += typeStat.reusedDeltas;
+
+			stats.reusedObjects += typeStat.reusedObjects;
+			stats.reusedDeltas += typeStat.reusedDeltas;
+			stats.totalDeltas += typeStat.cntDeltas;
+		}
 
 		reader.release();
 		writeMonitor.endTask();
@@ -1011,12 +1030,21 @@ public class PackWriter {
 
 	private void writeObjects(PackOutputStream out, List<ObjectToPack> list)
 			throws IOException {
+		if (list.isEmpty())
+			return;
+
+		typeStats = stats.objectTypes[list.get(0).getType()];
+		long beginOffset = out.length();
+
 		if (reuseSupport != null) {
 			reuseSupport.writeObjects(out, list);
 		} else {
 			for (ObjectToPack otp : list)
 				out.writeObject(otp);
 		}
+
+		typeStats.bytes += out.length() - beginOffset;
+		typeStats.cntObjects = list.size();
 	}
 
 	void writeObject(PackOutputStream out, ObjectToPack otp) throws IOException {
@@ -1035,10 +1063,10 @@ public class PackWriter {
 				reuseSupport.copyObjectAsIs(out, otp, reuseValidate);
 				out.endObject();
 				otp.setCRC(out.getCRC32());
-				stats.reusedObjects++;
+				typeStats.reusedObjects++;
 				if (otp.isDeltaRepresentation()) {
-					stats.totalDeltas++;
-					stats.reusedDeltas++;
+					typeStats.reusedDeltas++;
+					typeStats.deltaBytes += out.length() - otp.getOffset();
 				}
 				return;
 			} catch (StoredObjectRepresentationNotAvailableException gone) {
@@ -1134,7 +1162,8 @@ public class PackWriter {
 		DeflaterOutputStream dst = new DeflaterOutputStream(out, deflater);
 		delta.writeTo(dst, null);
 		dst.finish();
-		stats.totalDeltas++;
+		typeStats.cntDeltas++;
+		typeStats.deltaBytes += out.length() - otp.getOffset();
 	}
 
 	private TemporaryBuffer.Heap delta(final ObjectToPack otp)
@@ -1298,7 +1327,7 @@ public class PackWriter {
 		int typesToPrune = 0;
 		final int maxBases = config.getDeltaSearchWindowSize();
 		Set<RevTree> baseTrees = new HashSet<RevTree>();
-		List<RevCommit> commits = new ArrayList<RevCommit>();
+		BlockList<RevCommit> commits = new BlockList<RevCommit>();
 		RevCommit c;
 		while ((c = walker.next()) != null) {
 			if (c.has(inCachedPack)) {
@@ -1306,7 +1335,7 @@ public class PackWriter {
 				if (includesAllTips(pack, include, walker)) {
 					useCachedPack(walker, keepOnRestart, //
 							wantObjs, haveObjs, pack);
-					commits = new ArrayList<RevCommit>();
+					commits = new BlockList<RevCommit>();
 
 					countingMonitor.endTask();
 					countingMonitor.beginTask(JGitText.get().countingObjects,
@@ -1323,11 +1352,6 @@ public class PackWriter {
 
 			commits.add(c);
 			countingMonitor.update(1);
-		}
-
-		if (objectsLists[Constants.OBJ_COMMIT] instanceof ArrayList) {
-			ArrayList<ObjectToPack> list = (ArrayList<ObjectToPack>) objectsLists[Constants.OBJ_COMMIT];
-			list.ensureCapacity(list.size() + commits.size());
 		}
 
 		int commitCnt = 0;
@@ -1436,7 +1460,7 @@ public class PackWriter {
 		}
 
 		while (dst < list.size())
-			list.remove(dst);
+			list.remove(list.size() - 1);
 	}
 
 	private void useCachedPack(ObjectWalk walker, RevFlagSet keepOnRestart,
@@ -1580,6 +1604,74 @@ public class PackWriter {
 
 	/** Summary of how PackWriter created the pack. */
 	public static class Statistics {
+		/** Statistics about a single class of object. */
+		public static class ObjectType {
+			long cntObjects;
+
+			long cntDeltas;
+
+			long reusedObjects;
+
+			long reusedDeltas;
+
+			long bytes;
+
+			long deltaBytes;
+
+			/**
+			 * @return total number of objects output. This total includes the
+			 *         value of {@link #getDeltas()}.
+			 */
+			public long getObjects() {
+				return cntObjects;
+			}
+
+			/**
+			 * @return total number of deltas output. This may be lower than the
+			 *         actual number of deltas if a cached pack was reused.
+			 */
+			public long getDeltas() {
+				return cntDeltas;
+			}
+
+			/**
+			 * @return number of objects whose existing representation was
+			 *         reused in the output. This count includes
+			 *         {@link #getReusedDeltas()}.
+			 */
+			public long getReusedObjects() {
+				return reusedObjects;
+			}
+
+			/**
+			 * @return number of deltas whose existing representation was reused
+			 *         in the output, as their base object was also output or
+			 *         was assumed present for a thin pack. This may be lower
+			 *         than the actual number of reused deltas if a cached pack
+			 *         was reused.
+			 */
+			public long getReusedDeltas() {
+				return reusedDeltas;
+			}
+
+			/**
+			 * @return total number of bytes written. This size includes the
+			 *         object headers as well as the compressed data. This size
+			 *         also includes all of {@link #getDeltaBytes()}.
+			 */
+			public long getBytes() {
+				return bytes;
+			}
+
+			/**
+			 * @return number of delta bytes written. This size includes the
+			 *         object headers for the delta objects.
+			 */
+			public long getDeltaBytes() {
+				return deltaBytes;
+			}
+		}
+
 		Set<ObjectId> interestingObjects;
 
 		Set<ObjectId> uninterestingObjects;
@@ -1611,6 +1703,16 @@ public class PackWriter {
 		long timeCompressing;
 
 		long timeWriting;
+
+		ObjectType[] objectTypes;
+
+		{
+			objectTypes = new ObjectType[5];
+			objectTypes[Constants.OBJ_COMMIT] = new ObjectType();
+			objectTypes[Constants.OBJ_TREE] = new ObjectType();
+			objectTypes[Constants.OBJ_BLOB] = new ObjectType();
+			objectTypes[Constants.OBJ_TAG] = new ObjectType();
+		}
 
 		/**
 		 * @return unmodifiable collection of objects to be included in the
@@ -1707,6 +1809,15 @@ public class PackWriter {
 		 */
 		public long getThinPackBytes() {
 			return thinPackBytes;
+		}
+
+		/**
+		 * @param typeCode
+		 *            object type code, e.g. OBJ_COMMIT or OBJ_TREE.
+		 * @return information about this type of object in the pack.
+		 */
+		public ObjectType byObjectType(int typeCode) {
+			return objectTypes[typeCode];
 		}
 
 		/**

@@ -53,7 +53,7 @@ import java.util.Arrays;
 import java.util.List;
 
 class FS_Win32 extends FS {
-	static boolean detect() {
+	static boolean isWin32() {
 		final String osDotName = AccessController
 				.doPrivileged(new PrivilegedAction<String>() {
 					public String run() {
@@ -62,6 +62,18 @@ class FS_Win32 extends FS {
 				});
 		return osDotName != null
 				&& StringUtils.toLowerCase(osDotName).indexOf("windows") != -1;
+	}
+
+	FS_Win32() {
+		super();
+	}
+
+	FS_Win32(FS src) {
+		super(src);
+	}
+
+	public FS newInstance() {
+		return new FS_Win32(this);
 	}
 
 	public boolean supportsExecute() {
@@ -82,7 +94,7 @@ class FS_Win32 extends FS {
 	}
 
 	@Override
-	public File gitPrefix() {
+	protected File discoverGitPrefix() {
 		String path = SystemReader.getInstance().getenv("PATH");
 		File gitExe = searchPath(path, "git.exe", "git.cmd");
 		if (gitExe != null)
@@ -96,7 +108,6 @@ class FS_Win32 extends FS {
 				Charset.defaultCharset().name());
 		if (w != null)
 			return new File(w).getParentFile().getParentFile();
-
 		return null;
 	}
 
