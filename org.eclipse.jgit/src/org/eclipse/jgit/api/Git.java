@@ -242,16 +242,6 @@ public class Git {
 	}
 
 	/**
-	 *
-	 * Returns a command object used to list tags
-	 * 
-	 * @return a {@link ListTagCommand}
-	 */
-	public ListTagCommand tagList() {
-		return new ListTagCommand(repo);
-	}
-
-	/**
 	 * Returns a command object used to rename branches
 	 *
 	 * @return a {@link RenameBranchCommand}
@@ -437,6 +427,19 @@ public class Git {
 	 */
 	public ShowNoteCommand notesShow() {
 		return new ShowNoteCommand(repo);
+	}
+
+	/**
+	 * Returns a command object to execute a {@code ls-remote} command
+	 *
+	 * @see <a
+	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-ls-remote.html"
+	 *      >Git documentation about ls-remote</a>
+	 * @return a {@link LsRemoteCommand} used to collect all optional parameters
+	 *         and to finally execute the {@code status} command
+	 */
+	public LsRemoteCommand lsRemote() {
+		return new LsRemoteCommand(repo);
 	}
 
 	/**
