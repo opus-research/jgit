@@ -80,6 +80,7 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.AsyncObjectSizeQueue;
+import org.eclipse.jgit.lib.BatchingProgressMonitor;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
@@ -476,10 +477,90 @@ public class PackWriter {
 	 *            points of graph traversal).
 	 * @throws IOException
 	 *             when some I/O problem occur during reading objects.
+	 * @deprecated to be removed in 2.0; use the Set version of this method.
 	 */
+	@Deprecated
 	public void preparePack(ProgressMonitor countingMonitor,
 			final Collection<? extends ObjectId> want,
 			final Collection<? extends ObjectId> have) throws IOException {
+		preparePack(countingMonitor, ensureSet(want), ensureSet(have));
+	}
+
+	/**
+	 * Prepare the list of objects to be written to the pack stream.
+	 * <p>
+	 * Basing on these 2 sets, another set of objects to put in a pack file is
+	 * created: this set consists of all objects reachable (ancestors) from
+	 * interesting objects, except uninteresting objects and their ancestors.
+	 * This method uses class {@link ObjectWalk} extensively to find out that
+	 * appropriate set of output objects and their optimal order in output pack.
+	 * Order is consistent with general git in-pack rules: sort by object type,
+	 * recency, path and delta-base first.
+	 * </p>
+	 *
+	 * @param countingMonitor
+	 *            progress during object enumeration.
+	 * @param walk
+	 *            ObjectWalk to perform enumeration.
+	 * @param interestingObjects
+	 *            collection of objects to be marked as interesting (start
+	 *            points of graph traversal).
+	 * @param uninterestingObjects
+	 *            collection of objects to be marked as uninteresting (end
+	 *            points of graph traversal).
+	 * @throws IOException
+	 *             when some I/O problem occur during reading objects.
+	 * @deprecated to be removed in 2.0; use the Set version of this method.
+	 */
+	@Deprecated
+	public void preparePack(ProgressMonitor countingMonitor,
+			final ObjectWalk walk,
+			final Collection<? extends ObjectId> interestingObjects,
+			final Collection<? extends ObjectId> uninterestingObjects)
+			throws IOException {
+		preparePack(countingMonitor, walk,
+				ensureSet(interestingObjects),
+				ensureSet(uninterestingObjects));
+	}
+
+	@SuppressWarnings("unchecked")
+	private static Set<ObjectId> ensureSet(Collection<? extends ObjectId> objs) {
+		Set<ObjectId> set;
+		if (objs instanceof Set<?>)
+			set = (Set<ObjectId>) objs;
+		else if (objs == null)
+			set = Collections.emptySet();
+		else
+			set = new HashSet<ObjectId>(objs);
+		return set;
+	}
+
+	/**
+	 * Prepare the list of objects to be written to the pack stream.
+	 * <p>
+	 * Basing on these 2 sets, another set of objects to put in a pack file is
+	 * created: this set consists of all objects reachable (ancestors) from
+	 * interesting objects, except uninteresting objects and their ancestors.
+	 * This method uses class {@link ObjectWalk} extensively to find out that
+	 * appropriate set of output objects and their optimal order in output pack.
+	 * Order is consistent with general git in-pack rules: sort by object type,
+	 * recency, path and delta-base first.
+	 * </p>
+	 *
+	 * @param countingMonitor
+	 *            progress during object enumeration.
+	 * @param want
+	 *            collection of objects to be marked as interesting (start
+	 *            points of graph traversal).
+	 * @param have
+	 *            collection of objects to be marked as uninteresting (end
+	 *            points of graph traversal).
+	 * @throws IOException
+	 *             when some I/O problem occur during reading objects.
+	 */
+	public void preparePack(ProgressMonitor countingMonitor,
+			Set<? extends ObjectId> want,
+			Set<? extends ObjectId> have) throws IOException {
 		ObjectWalk ow = new ObjectWalk(reader);
 		preparePack(countingMonitor, ow, want, have);
 	}
@@ -511,8 +592,8 @@ public class PackWriter {
 	 */
 	public void preparePack(ProgressMonitor countingMonitor,
 			final ObjectWalk walk,
-			final Collection<? extends ObjectId> interestingObjects,
-			final Collection<? extends ObjectId> uninterestingObjects)
+			final Set<? extends ObjectId> interestingObjects,
+			final Set<? extends ObjectId> uninterestingObjects)
 			throws IOException {
 		if (countingMonitor == null)
 			countingMonitor = NullProgressMonitor.INSTANCE;
@@ -565,10 +646,10 @@ public class PackWriter {
 	/**
 	 * Create an index file to match the pack file just written.
 	 * <p>
-	 * This method can only be invoked after {@link #preparePack(Iterator)} or
-	 * {@link #preparePack(ProgressMonitor, Collection, Collection)} has been
-	 * invoked and completed successfully. Writing a corresponding index is an
-	 * optional feature that not all pack users may require.
+	 * This method can only be invoked after
+	 * {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)} has
+	 * been invoked and completed successfully. Writing a corresponding index is
+	 * an optional feature that not all pack users may require.
 	 *
 	 * @param indexStream
 	 *            output for the index data. Caller is responsible for closing
@@ -640,10 +721,21 @@ public class PackWriter {
 		if (writeMonitor == null)
 			writeMonitor = NullProgressMonitor.INSTANCE;
 
-		if (reuseSupport != null && (
+		boolean needSearchForReuse = reuseSupport != null && (
 				   reuseDeltas
 				|| config.isReuseObjects()
-				|| !cachedPacks.isEmpty()))
+				|| !cachedPacks.isEmpty());
+
+		if (compressMonitor instanceof BatchingProgressMonitor) {
+			long delay = 1000;
+			if (needSearchForReuse && config.isDeltaCompress())
+				delay = 500;
+			((BatchingProgressMonitor) compressMonitor).setDelayStart(
+					delay,
+					TimeUnit.MILLISECONDS);
+		}
+
+		if (needSearchForReuse)
 			searchForReuse(compressMonitor);
 		if (config.isDeltaCompress())
 			searchForDeltas(compressMonitor);
@@ -897,9 +989,9 @@ public class PackWriter {
 
 	private int findObjectsNeedingDelta(ObjectToPack[] list, int cnt, int type) {
 		for (ObjectToPack otp : objectsLists[type]) {
-			if (otp.isReuseAsIs()) // already reusing a representation
-				continue;
 			if (otp.isDoNotDelta()) // delta is disabled for this path
+				continue;
+			if (otp.isDeltaRepresentation()) // already reusing a delta
 				continue;
 			otp.setWeight(0);
 			list[cnt++] = otp;
@@ -1244,8 +1336,8 @@ public class PackWriter {
 	}
 
 	private void findObjectsToPack(final ProgressMonitor countingMonitor,
-			final ObjectWalk walker, final Collection<? extends ObjectId> want,
-			Collection<? extends ObjectId> have)
+			final ObjectWalk walker, final Set<? extends ObjectId> want,
+			Set<? extends ObjectId> have)
 			throws MissingObjectException, IOException,
 			IncorrectObjectTypeException {
 		final long countingStart = System.currentTimeMillis();
@@ -1425,20 +1517,29 @@ public class PackWriter {
 		}
 		commits = null;
 
-		BaseSearch bases = new BaseSearch(countingMonitor, baseTrees, //
-				objectsMap, edgeObjects, reader);
-		RevObject o;
-		while ((o = walker.nextObject()) != null) {
-			if (o.has(RevFlag.UNINTERESTING))
-				continue;
+		if (thin && !baseTrees.isEmpty()) {
+			BaseSearch bases = new BaseSearch(countingMonitor, baseTrees, //
+					objectsMap, edgeObjects, reader);
+			RevObject o;
+			while ((o = walker.nextObject()) != null) {
+				if (o.has(RevFlag.UNINTERESTING))
+					continue;
 
-			int pathHash = walker.getPathHashCode();
-			byte[] pathBuf = walker.getPathBuffer();
-			int pathLen = walker.getPathLength();
-
-			bases.addBase(o.getType(), pathBuf, pathLen, pathHash);
-			addObject(o, pathHash);
-			countingMonitor.update(1);
+				int pathHash = walker.getPathHashCode();
+				byte[] pathBuf = walker.getPathBuffer();
+				int pathLen = walker.getPathLength();
+				bases.addBase(o.getType(), pathBuf, pathLen, pathHash);
+				addObject(o, pathHash);
+				countingMonitor.update(1);
+			}
+		} else {
+			RevObject o;
+			while ((o = walker.nextObject()) != null) {
+				if (o.has(RevFlag.UNINTERESTING))
+					continue;
+				addObject(o, walker.getPathHashCode());
+				countingMonitor.update(1);
+			}
 		}
 
 		for (CachedPack pack : cachedPacks)

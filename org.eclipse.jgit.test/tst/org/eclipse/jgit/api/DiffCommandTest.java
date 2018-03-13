@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Ketan Padegaonkar <ketanpadegaonkar@gmail.com>
+ * Copyright (C) 2011, Tomasz Zarna <Tomasz.Zarna@pl.ibm.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -44,53 +44,54 @@ package org.eclipse.jgit.api;
 
 import static org.junit.Assert.assertEquals;
 
-import java.util.Arrays;
+import java.io.File;
 import java.util.List;
 
-import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.diff.DiffEntry;
+import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.junit.Before;
 import org.junit.Test;
 
-public class ListTagCommandTest extends RepositoryTestCase {
+public class DiffCommandTest extends RepositoryTestCase {
+	@Test
+	public void testDiffModified() throws Exception {
+		write(new File(db.getDirectory().getParent(), "test.txt"), "test");
+		File folder = new File(db.getDirectory().getParent(), "folder");
+		folder.mkdir();
+		write(new File(folder, "folder.txt"), "folder");
+		Git git = new Git(db);
+		git.add().addFilepattern(".").call();
+		git.commit().setMessage("Initial commit").call();
+		write(new File(folder, "folder.txt"), "folder change");
 
-	private Git git;
-
-	@Before
-	public void before() {
-		git = new Git(db);
+		List<DiffEntry> entries = git.diff().call();
+		assertEquals(1, entries.size());
+		assertEquals(ChangeType.MODIFY, entries.get(0)
+				.getChangeType());
+		assertEquals("folder/folder.txt", entries.get(0)
+				.getOldPath());
+		assertEquals("folder/folder.txt", entries.get(0)
+				.getNewPath());
 	}
 
 	@Test
-	public void shouldNotBlowUpIfThereAreNoTagsInRepository() throws Exception {
-		git.add().addFilepattern("*").call();
-		git.commit().setMessage("initial commit").call();
-		List<Ref> list = git.tagList().call();
-		assertEquals(0, list.size());
-	}
+	public void testDiffCached() throws Exception {
+		write(new File(db.getDirectory().getParent(), "test.txt"), "test");
+		File folder = new File(db.getDirectory().getParent(), "folder");
+		folder.mkdir();
+		Git git = new Git(db);
+		git.add().addFilepattern(".").call();
+		git.commit().setMessage("Initial commit").call();
+		write(new File(folder, "folder.txt"), "folder");
+		git.add().addFilepattern(".").call();
 
-	@Test
-	public void shouldNotBlowUpIfThereAreNoCommitsInRepository()
-			throws Exception {
-		List<Ref> list = git.tagList().call();
-		assertEquals(0, list.size());
-	}
-
-	@Test
-	public void shouldListAllTagsInRepositoryInOrder() throws Exception {
-		git.add().addFilepattern("*").call();
-		git.commit().setMessage("initial commit").call();
-
-		git.tag().setName("v3").call();
-		git.tag().setName("v2").call();
-		git.tag().setName("v10").call();
-
-		List<Ref> list = git.tagList().call();
-
-		assertEquals(3, list.size());
-		assertEquals(
-				Arrays.asList(db.getRef("refs/tags/v10"),
-						db.getRef("refs/tags/v2"), db.getRef("refs/tags/v3")),
-				list);
+		List<DiffEntry> entries = git.diff().setCached(true).call();
+		assertEquals(1, entries.size());
+		assertEquals(ChangeType.ADD, entries.get(0)
+				.getChangeType());
+		assertEquals("/dev/null", entries.get(0)
+				.getOldPath());
+		assertEquals("folder/folder.txt", entries.get(0)
+				.getNewPath());
 	}
 }
