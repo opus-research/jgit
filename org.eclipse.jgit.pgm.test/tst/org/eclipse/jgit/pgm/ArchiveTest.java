@@ -528,7 +528,7 @@ public class ArchiveTest extends CLIRepositoryTestCase {
 
 	@Test
 	public void testArchiveWithLongFilename() throws Exception {
-		StringBuilder filename = new StringBuilder();
+		StringBuilder filename = new StringBuilder("");
 		List<String> l = new ArrayList<String>();
 		for (int i = 0; i < 20; i++) {
 			filename.append("1234567890/");
@@ -548,7 +548,7 @@ public class ArchiveTest extends CLIRepositoryTestCase {
 
 	@Test
 	public void testTarWithLongFilename() throws Exception {
-		StringBuilder filename = new StringBuilder();
+		StringBuilder filename = new StringBuilder("");
 		List<String> l = new ArrayList<String>();
 		for (int i = 0; i < 20; i++) {
 			filename.append("1234567890/");
