@@ -115,7 +115,6 @@ public class PlotCommitList<L extends PlotLane> extends
 	 * @param result
 	 *            collection to add the passing lanes into.
 	 */
-	@SuppressWarnings("unchecked")
 	public void findPassingThrough(final PlotCommit<L> currCommit,
 			final Collection<L> result) {
 		for (final PlotLane p : currCommit.passingLanes)
@@ -344,7 +343,6 @@ public class PlotCommitList<L extends PlotLane> extends
 		}
 	}
 
-	@SuppressWarnings("unchecked")
 	private void closeLane(PlotLane lane) {
 		if (activeLanes.remove(lane)) {
 			recycleLane((L) lane);
@@ -397,7 +395,6 @@ public class PlotCommitList<L extends PlotLane> extends
 	/**
 	 * @return a new Lane appropriate for this particular PlotList.
 	 */
-	@SuppressWarnings("unchecked")
 	protected L createLane() {
 		return (L) new PlotLane();
 	}
