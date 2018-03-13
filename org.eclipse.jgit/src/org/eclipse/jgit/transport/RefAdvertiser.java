@@ -300,7 +300,7 @@ public abstract class RefAdvertiser {
 			}
 		}
 		tmpLine.append('\n');
-		writeOne(tmpLine.toString());
+		writeOne(tmpLine);
 	}
 
 	/**
