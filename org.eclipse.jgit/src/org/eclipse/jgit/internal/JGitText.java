@@ -317,7 +317,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String initFailedBareRepoDifferentDirs;
 	/***/ public String initFailedNonBareRepoSameDirs;
 	/***/ public String inMemoryBufferLimitExceeded;
-	/***/ public String inputDidntMatchLength;
 	/***/ public String inputStreamMustSupportMark;
 	/***/ public String integerValueOutOfRange;
 	/***/ public String internalRevisionError;
@@ -596,7 +595,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String truncatedHunkOldLinesMissing;
 	/***/ public String tSizeMustBeGreaterOrEqual1;
 	/***/ public String unableToCheckConnectivity;
-	/***/ public String unableToCreateNewObject;
 	/***/ public String unableToStore;
 	/***/ public String unableToWrite;
 	/***/ public String unencodeableFile;
