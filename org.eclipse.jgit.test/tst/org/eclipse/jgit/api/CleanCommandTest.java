@@ -44,6 +44,7 @@ package org.eclipse.jgit.api;
 
 import static org.junit.Assert.assertTrue;
 
+import java.io.IOException;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -75,7 +76,8 @@ public class CleanCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testClean() throws NoWorkTreeException, GitAPIException {
+	public void testClean() throws NoWorkTreeException, IOException,
+			GitAPIException {
 		// create status
 		StatusCommand command = git.status();
 		Status status = command.call();
@@ -94,7 +96,7 @@ public class CleanCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testCleanWithPaths() throws NoWorkTreeException,
+	public void testCleanWithPaths() throws NoWorkTreeException, IOException,
 			GitAPIException {
 		// create status
 		StatusCommand command = git.status();
@@ -115,7 +117,7 @@ public class CleanCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testCleanWithDryRun() throws NoWorkTreeException,
+	public void testCleanWithDryRun() throws NoWorkTreeException, IOException,
 			GitAPIException {
 		// create status
 		StatusCommand command = git.status();

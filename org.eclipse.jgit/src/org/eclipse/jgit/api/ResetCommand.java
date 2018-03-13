@@ -134,7 +134,7 @@ public class ResetCommand extends GitCommand<Ref> {
 	 *
 	 * @return the Ref after reset
 	 */
-	public Ref call() throws GitAPIException {
+	public Ref call() throws GitAPIException, IOException {
 		checkCallable();
 
 		Ref r;
@@ -217,7 +217,7 @@ public class ResetCommand extends GitCommand<Ref> {
 
 			setCallable(false);
 			r = ru.getRef();
-		} catch (Exception e) {
+		} catch (IOException e) {
 			throw new JGitInternalException(
 					JGitText.get().exceptionCaughtDuringExecutionOfResetCommand,
 					e);

@@ -129,7 +129,7 @@ public class LsRemoteCommand extends
 		this.uploadPack = uploadPack;
 	}
 
-	public Collection<Ref> call() throws GitAPIException {
+	public Collection<Ref> call() throws GitAPIException, Exception {
 		checkCallable();
 
 		try {
@@ -176,10 +176,6 @@ public class LsRemoteCommand extends
 			throw new InvalidRemoteException(MessageFormat.format(
 					JGitText.get().invalidRemote, remote));
 		} catch (NotSupportedException e) {
-			throw new JGitInternalException(
-					JGitText.get().exceptionCaughtDuringExecutionOfLsRemoteCommand,
-					e);
-		} catch (Exception e) {
 			throw new JGitInternalException(
 					JGitText.get().exceptionCaughtDuringExecutionOfLsRemoteCommand,
 					e);
