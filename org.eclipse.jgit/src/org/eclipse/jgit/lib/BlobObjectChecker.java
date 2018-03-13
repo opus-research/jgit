@@ -41,68 +41,52 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.dfs;
+package org.eclipse.jgit.lib;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import org.eclipse.jgit.errors.CorruptObjectException;
 
-import org.eclipse.jgit.internal.storage.reftable.Reftable;
+/**
+ * Verifies that a blob object is a valid object.
+ * <p>
+ * Unlike trees, commits and tags, there's no validity of blobs. Implementers
+ * can optionally implement this blob checker to reject certain blobs.
+ *
+ * @since 4.9
+ */
+public interface BlobObjectChecker {
+	/** No-op implementation of {@link BlobObjectChecker}. */
+	public static final BlobObjectChecker NULL_CHECKER =
+			new BlobObjectChecker() {
+				@Override
+				public void update(byte[] in, int p, int len) {
+					// Empty implementation.
+				}
 
-/** Tracks multiple open {@link Reftable} instances. */
-public class ReftableStack implements AutoCloseable {
+				@Override
+				public void endBlob(AnyObjectId id) {
+					// Empty implementation.
+				}
+			};
+
 	/**
-	 * Opens a stack of tables for reading.
+	 * Check a new fragment of the blob.
 	 *
-	 * @param ctx
-	 *            context to read the tables with. This {@code ctx} will be
-	 *            retained by the stack and each of the table readers.
-	 * @param tables
-	 *            the tables to open.
-	 * @return stack reference to close the tables.
-	 * @throws IOException
-	 *             a table could not be opened
+	 * @param in
+	 *            input array of bytes.
+	 * @param offset
+	 *            offset to start at from {@code in}.
+	 * @param len
+	 *            length of the fragment to check.
 	 */
-	public static ReftableStack open(DfsReader ctx, List<DfsReftable> tables)
-			throws IOException {
-		ReftableStack stack = new ReftableStack(tables.size());
-		boolean close = true;
-		try {
-			for (DfsReftable t : tables) {
-				stack.tables.add(t.open(ctx));
-			}
-			close = false;
-			return stack;
-		} finally {
-			if (close) {
-				stack.close();
-			}
-		}
-	}
-
-	private final List<Reftable> tables;
-
-	private ReftableStack(int tableCnt) {
-		this.tables = new ArrayList<>(tableCnt);
-	}
+	void update(byte[] in, int offset, int len);
 
 	/**
-	 * @return unmodifiable list of tables, in the same order the files were
-	 *         passed to {@link #open(DfsReader, List)}.
+	 * Finalize the blob checking.
+	 *
+	 * @param id
+	 *            identity of the object being checked.
+	 * @throws CorruptObjectException
+	 *             if any error was detected.
 	 */
-	public List<Reftable> readers() {
-		return Collections.unmodifiableList(tables);
-	}
-
-	@Override
-	public void close() {
-		for (Reftable t : tables) {
-			try {
-				t.close();
-			} catch (IOException e) {
-				// Ignore close failures.
-			}
-		}
-	}
+	void endBlob(AnyObjectId id) throws CorruptObjectException;
 }
