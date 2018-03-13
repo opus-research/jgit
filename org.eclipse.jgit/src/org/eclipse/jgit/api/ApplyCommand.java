@@ -43,7 +43,6 @@
 package org.eclipse.jgit.api;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -148,14 +147,10 @@ public class ApplyCommand extends GitCommand<ApplyResult> {
 				case COPY:
 					f = getFile(fh.getOldPath(), false);
 					byte[] bs = IO.readFully(f);
-					FileOutputStream fos = new FileOutputStream(getFile(
-							fh.getNewPath(),
+					FileWriter fw = new FileWriter(getFile(fh.getNewPath(),
 							true));
-					try {
-						fos.write(bs);
-					} finally {
-						fos.close();
-					}
+					fw.write(new String(bs));
+					fw.close();
 				}
 				r.addUpdatedFile(f);
 			}
@@ -232,14 +227,14 @@ public class ApplyCommand extends GitCommand<ApplyResult> {
 			}
 		}
 		if (!isNoNewlineAtEndOfFile(fh))
-			newLines.add("");
+			newLines.add(""); //$NON-NLS-1$
 		if (!rt.isMissingNewlineAtEnd())
-			oldLines.add("");
+			oldLines.add(""); //$NON-NLS-1$
 		if (!isChanged(oldLines, newLines))
 			return; // don't touch the file
 		StringBuilder sb = new StringBuilder();
 		final String eol = rt.size() == 0
-				|| (rt.size() == 1 && rt.isMissingNewlineAtEnd()) ? "\n" : rt
+				|| (rt.size() == 1 && rt.isMissingNewlineAtEnd()) ? "\n" : rt //$NON-NLS-1$
 				.getLineDelimiter();
 		for (String l : newLines) {
 			sb.append(l);
