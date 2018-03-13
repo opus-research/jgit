@@ -282,6 +282,5 @@
     <module>org.eclipse.jgit.test</module>
 
     <module>org.eclipse.jgit-feature</module>
-    <module>org.eclipse.jgit.site</module>
   </modules>
 </project>
