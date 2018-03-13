@@ -91,7 +91,6 @@ class PackWriterBitmapPreparer {
 	private static final int DAY_IN_SECONDS = 24 * 60 * 60;
 
 	private static final Comparator<BitmapBuilderEntry> ORDER_BY_CARDINALITY = new Comparator<BitmapBuilderEntry>() {
-		@Override
 		public int compare(BitmapBuilderEntry a, BitmapBuilderEntry b) {
 			return Integer.signum(a.getBuilder().cardinality()
 					- b.getBuilder().cardinality());
@@ -168,7 +167,7 @@ class PackWriterBitmapPreparer {
 		pm.endTask();
 
 		int totCommits = selectionHelper.getCommitCount();
-		BlockList<BitmapCommit> selections = new BlockList<>(
+		BlockList<BitmapCommit> selections = new BlockList<BitmapCommit>(
 				totCommits / recentCommitSpan + 1);
 		for (BitmapCommit reuse : selectionHelper.reusedCommits) {
 			selections.add(reuse);
@@ -195,7 +194,7 @@ class PackWriterBitmapPreparer {
 			// better compression/on the run-length encoding of the XORs between
 			// them.
 			List<List<BitmapCommit>> chains =
-					new ArrayList<>();
+					new ArrayList<List<BitmapCommit>>();
 
 			// Mark the current branch as inactive if its tip commit isn't
 			// recent and there are an excessive number of branches, to
@@ -287,7 +286,7 @@ class PackWriterBitmapPreparer {
 				}
 
 				if (longestAncestorChain == null) {
-					longestAncestorChain = new ArrayList<>();
+					longestAncestorChain = new ArrayList<BitmapCommit>();
 					chains.add(longestAncestorChain);
 				}
 				longestAncestorChain.add(new BitmapCommit(
@@ -376,7 +375,7 @@ class PackWriterBitmapPreparer {
 			int expectedCommitCount) throws IncorrectObjectTypeException,
 					IOException, MissingObjectException {
 		BitmapBuilder reuse = commitBitmapIndex.newBitmapBuilder();
-		List<BitmapCommit> reuseCommits = new ArrayList<>();
+		List<BitmapCommit> reuseCommits = new ArrayList<BitmapCommit>();
 		for (PackBitmapIndexRemapper.Entry entry : bitmapRemapper) {
 			// More recent commits did not have the reuse flag set, so skip them
 			if ((entry.getFlags() & FLAG_REUSE) != FLAG_REUSE) {
@@ -398,9 +397,9 @@ class PackWriterBitmapPreparer {
 
 		// Add branch tips that are not represented in old bitmap indices. Set
 		// up the RevWalk to walk the new commits not in the old packs.
-		List<BitmapBuilderEntry> tipCommitBitmaps = new ArrayList<>(
+		List<BitmapBuilderEntry> tipCommitBitmaps = new ArrayList<BitmapBuilderEntry>(
 				want.size());
-		Set<RevCommit> peeledWant = new HashSet<>(want.size());
+		Set<RevCommit> peeledWant = new HashSet<RevCommit>(want.size());
 		for (AnyObjectId objectId : want) {
 			RevObject ro = rw.peel(rw.parseAny(objectId));
 			if (!(ro instanceof RevCommit) || reuse.contains(ro)) {
@@ -580,24 +579,20 @@ class PackWriterBitmapPreparer {
 			this.reusedCommits = reuse;
 		}
 
-		@Override
 		public Iterator<RevCommit> iterator() {
 			// Member variables referenced by this iterator will have synthetic
 			// accessors generated for them if they are made private.
 			return new Iterator<RevCommit>() {
 				int pos = commitStartPos;
 
-				@Override
 				public boolean hasNext() {
 					return pos < commitsByOldest.length;
 				}
 
-				@Override
 				public RevCommit next() {
 					return commitsByOldest[pos++];
 				}
 
-				@Override
 				public void remove() {
 					throw new UnsupportedOperationException();
 				}

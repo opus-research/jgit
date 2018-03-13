@@ -48,7 +48,6 @@
 package org.eclipse.jgit.transport;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -68,6 +67,7 @@ import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
 import org.eclipse.jgit.transport.resolver.UploadPackFactory;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.io.MessageWriter;
+import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 import org.eclipse.jgit.util.io.StreamCopyThread;
 
 /**
@@ -100,7 +100,6 @@ class TransportLocal extends Transport implements PackTransport {
 			return JGitText.get().transportProtoLocal;
 		}
 
-		@Override
 		public Set<String> getSchemes() {
 			return Collections.singleton("file"); //$NON-NLS-1$
 		}
@@ -133,7 +132,6 @@ class TransportLocal extends Transport implements PackTransport {
 			return new TransportLocal(local, uri, gitDir);
 		}
 
-		@Override
 		public Transport open(URIish uri) throws NotSupportedException,
 				TransportException {
 			File path = FS.DETECTED.resolve(new File("."), uri.getPath()); //$NON-NLS-1$
@@ -191,7 +189,7 @@ class TransportLocal extends Transport implements PackTransport {
 				return createUploadPack(db);
 			}
 		};
-		return new InternalFetchConnection<>(this, upf, null, openRepo());
+		return new InternalFetchConnection<Void>(this, upf, null, openRepo());
 	}
 
 	@Override
@@ -207,7 +205,7 @@ class TransportLocal extends Transport implements PackTransport {
 				return createReceivePack(db);
 			}
 		};
-		return new InternalPushConnection<>(this, rpf, null, openRepo());
+		return new InternalPushConnection<Void>(this, rpf, null, openRepo());
 	}
 
 	@Override
@@ -260,7 +258,7 @@ class TransportLocal extends Transport implements PackTransport {
 			OutputStream upOut = uploadPack.getOutputStream();
 
 			upIn = new BufferedInputStream(upIn);
-			upOut = new BufferedOutputStream(upOut);
+			upOut = new SafeBufferedOutputStream(upOut);
 
 			init(upIn, upOut);
 			readAdvertisedRefs();
@@ -313,7 +311,7 @@ class TransportLocal extends Transport implements PackTransport {
 			OutputStream rpOut = receivePack.getOutputStream();
 
 			rpIn = new BufferedInputStream(rpIn);
-			rpOut = new BufferedOutputStream(rpOut);
+			rpOut = new SafeBufferedOutputStream(rpOut);
 
 			init(rpIn, rpOut);
 			readAdvertisedRefs();

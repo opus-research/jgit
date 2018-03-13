@@ -101,12 +101,11 @@ public class ListBranchCommand extends GitCommand<List<Ref>> {
 		super(repo);
 	}
 
-	@Override
 	public List<Ref> call() throws GitAPIException {
 		checkCallable();
 		List<Ref> resultRefs;
 		try {
-			Collection<Ref> refs = new ArrayList<>();
+			Collection<Ref> refs = new ArrayList<Ref>();
 
 			// Also return HEAD if it's detached
 			Ref head = repo.exactRef(Constants.HEAD);
@@ -121,13 +120,12 @@ public class ListBranchCommand extends GitCommand<List<Ref>> {
 				refs.addAll(getRefs(Constants.R_HEADS));
 				refs.addAll(getRefs(Constants.R_REMOTES));
 			}
-			resultRefs = new ArrayList<>(filterRefs(refs));
+			resultRefs = new ArrayList<Ref>(filterRefs(refs));
 		} catch (IOException e) {
 			throw new JGitInternalException(e.getMessage(), e);
 		}
 
 		Collections.sort(resultRefs, new Comparator<Ref>() {
-			@Override
 			public int compare(Ref o1, Ref o2) {
 				return o1.getName().compareTo(o2.getName());
 			}

@@ -346,7 +346,6 @@ public class PullCommandTest extends RepositoryTestCase {
 	/** global rebase config should be respected */
 	public void testPullWithRebasePreserve1Config() throws Exception {
 		Callable<PullResult> setup = new Callable<PullResult>() {
-			@Override
 			public PullResult call() throws Exception {
 				StoredConfig config = dbTarget.getConfig();
 				config.setString("pull", null, "rebase", "preserve");
@@ -361,7 +360,6 @@ public class PullCommandTest extends RepositoryTestCase {
 	/** the branch-local config should win over the global config */
 	public void testPullWithRebasePreserveConfig2() throws Exception {
 		Callable<PullResult> setup = new Callable<PullResult>() {
-			@Override
 			public PullResult call() throws Exception {
 				StoredConfig config = dbTarget.getConfig();
 				config.setString("pull", null, "rebase", "false");
@@ -377,7 +375,6 @@ public class PullCommandTest extends RepositoryTestCase {
 	/** the branch-local config should be respected */
 	public void testPullWithRebasePreserveConfig3() throws Exception {
 		Callable<PullResult> setup = new Callable<PullResult>() {
-			@Override
 			public PullResult call() throws Exception {
 				StoredConfig config = dbTarget.getConfig();
 				config.setString("branch", "master", "rebase", "preserve");
@@ -392,7 +389,6 @@ public class PullCommandTest extends RepositoryTestCase {
 	/** global rebase config should be respected */
 	public void testPullWithRebaseConfig1() throws Exception {
 		Callable<PullResult> setup = new Callable<PullResult>() {
-			@Override
 			public PullResult call() throws Exception {
 				StoredConfig config = dbTarget.getConfig();
 				config.setString("pull", null, "rebase", "true");
@@ -407,7 +403,6 @@ public class PullCommandTest extends RepositoryTestCase {
 	/** the branch-local config should win over the global config */
 	public void testPullWithRebaseConfig2() throws Exception {
 		Callable<PullResult> setup = new Callable<PullResult>() {
-			@Override
 			public PullResult call() throws Exception {
 				StoredConfig config = dbTarget.getConfig();
 				config.setString("pull", null, "rebase", "preserve");
@@ -423,7 +418,6 @@ public class PullCommandTest extends RepositoryTestCase {
 	/** the branch-local config should be respected */
 	public void testPullWithRebaseConfig3() throws Exception {
 		Callable<PullResult> setup = new Callable<PullResult>() {
-			@Override
 			public PullResult call() throws Exception {
 				StoredConfig config = dbTarget.getConfig();
 				config.setString("branch", "master", "rebase", "true");
@@ -438,7 +432,6 @@ public class PullCommandTest extends RepositoryTestCase {
 	/** without config it should merge */
 	public void testPullWithoutConfig() throws Exception {
 		Callable<PullResult> setup = new Callable<PullResult>() {
-			@Override
 			public PullResult call() throws Exception {
 				return target.pull().call();
 			}
@@ -450,7 +443,6 @@ public class PullCommandTest extends RepositoryTestCase {
 	/** the branch local config should win over the global config */
 	public void testPullWithMergeConfig() throws Exception {
 		Callable<PullResult> setup = new Callable<PullResult>() {
-			@Override
 			public PullResult call() throws Exception {
 				StoredConfig config = dbTarget.getConfig();
 				config.setString("pull", null, "rebase", "true");
@@ -466,7 +458,6 @@ public class PullCommandTest extends RepositoryTestCase {
 	/** the branch local config should win over the global config */
 	public void testPullWithMergeConfig2() throws Exception {
 		Callable<PullResult> setup = new Callable<PullResult>() {
-			@Override
 			public PullResult call() throws Exception {
 				StoredConfig config = dbTarget.getConfig();
 				config.setString("pull", null, "rebase", "false");

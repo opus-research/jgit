@@ -59,7 +59,6 @@ import com.jcraft.jsch.Session;
  * connection will immediately fail.
  */
 class DefaultSshSessionFactory extends JschConfigSessionFactory {
-	@Override
 	protected void configure(final OpenSshConfig.Host hc, final Session session) {
 		// No additional configuration required.
 	}

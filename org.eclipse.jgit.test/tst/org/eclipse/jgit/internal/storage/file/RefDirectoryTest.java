@@ -73,8 +73,8 @@ import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.BatchRefUpdate;
-import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ProgressMonitor;
+import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefDatabase;
@@ -100,7 +100,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 
 	private RevTag v1_0;
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
@@ -108,7 +107,7 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		diskRepo = createBareRepository();
 		refdir = (RefDirectory) diskRepo.getRefDatabase();
 
-		repo = new TestRepository<>(diskRepo);
+		repo = new TestRepository<Repository>(diskRepo);
 		A = repo.commit().create();
 		B = repo.commit(repo.getRevWalk().parseCommit(A));
 		v1_0 = repo.tag("v1_0", B);
@@ -548,7 +547,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		ListenerHandle listener = Repository.getGlobalListenerList()
 				.addRefsChangedListener(new RefsChangedListener() {
 
-					@Override
 					public void onRefsChanged(RefsChangedEvent event) {
 						count[0]++;
 					}
@@ -1023,7 +1021,7 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(v0_1.getId(), all.get("refs/tags/v0.1").getObjectId());
 
 		all = refdir.getRefs(RefDatabase.ALL);
-		refdir.pack(new ArrayList<>(all.keySet()));
+		refdir.pack(new ArrayList<String>(all.keySet()));
 
 		all = refdir.getRefs(RefDatabase.ALL);
 		assertEquals(5, all.size());
@@ -1267,13 +1265,12 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		final RefDatabase refDb = newRepo.getRefDatabase();
 		File packedRefs = new File(newRepo.getDirectory(), "packed-refs");
 		assertTrue(packedRefs.createNewFile());
-		final AtomicReference<StackOverflowError> error = new AtomicReference<>();
-		final AtomicReference<IOException> exception = new AtomicReference<>();
+		final AtomicReference<StackOverflowError> error = new AtomicReference<StackOverflowError>();
+		final AtomicReference<IOException> exception = new AtomicReference<IOException>();
 		final AtomicInteger changeCount = new AtomicInteger();
 		newRepo.getListenerList().addRefsChangedListener(
 				new RefsChangedListener() {
 
-					@Override
 					public void onRefsChanged(RefsChangedEvent event) {
 						try {
 							refDb.getRefs("ref");
@@ -1443,28 +1440,23 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 	private static final class StrictWorkMonitor implements ProgressMonitor {
 		private int lastWork, totalWork;
 
-		@Override
 		public void start(int totalTasks) {
 			// empty
 		}
 
-		@Override
 		public void beginTask(String title, int total) {
 			this.totalWork = total;
 			lastWork = 0;
 		}
 
-		@Override
 		public void update(int completed) {
 			lastWork += completed;
 		}
 
-		@Override
 		public void endTask() {
 			assertEquals("Units of work recorded", totalWork, lastWork);
 		}
 
-		@Override
 		public boolean isCancelled() {
 			return false;
 		}
