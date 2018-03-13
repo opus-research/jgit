@@ -137,10 +137,8 @@ class PendingGenerator extends Generator {
 				final boolean produce;
 				if ((c.flags & UNINTERESTING) != 0)
 					produce = false;
-				else {
-					c.parseBody(walker);
+				else
 					produce = filter.include(walker, c);
-				}
 
 				for (final RevCommit p : c.parents) {
 					if ((p.flags & SEEN) != 0)

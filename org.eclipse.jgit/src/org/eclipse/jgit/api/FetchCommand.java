@@ -56,7 +56,6 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.FetchResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.Transport;
@@ -86,8 +85,6 @@ public class FetchCommand extends GitCommand<FetchResult> {
 	private boolean thin = Transport.DEFAULT_FETCH_THIN;
 
 	private int timeout;
-
-	private CredentialsProvider credentialsProvider;
 
 
 	/**
@@ -124,7 +121,6 @@ public class FetchCommand extends GitCommand<FetchResult> {
 			transport.setTimeout(timeout);
 			transport.setDryRun(dryRun);
 			transport.setFetchThin(thin);
-			transport.setCredentialsProvider(credentialsProvider);
 
 			try {
 				FetchResult result = transport.fetch(monitor, refSpecs);
@@ -322,11 +318,4 @@ public class FetchCommand extends GitCommand<FetchResult> {
 		return this;
 	}
 
-	/**
-	 * @param credentialsProvider
-	 *            the {@link CredentialsProvider} to use
-	 */
-	public void setCredentialsProvider(CredentialsProvider credentialsProvider) {
-		this.credentialsProvider = credentialsProvider;
-	}
 }
