@@ -51,6 +51,7 @@ import java.util.List;
 
 import org.eclipse.jgit.api.CheckoutResult.Status;
 import org.eclipse.jgit.api.errors.CheckoutConflictException;
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
@@ -77,6 +78,7 @@ import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
+import org.eclipse.jgit.util.FileUtils;
 
 /**
  * Checkout a branch to the working tree
@@ -121,9 +123,11 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	 * @throws InvalidRefNameException
 	 *             if the provided name is <code>null</code> or otherwise
 	 *             invalid
+	 * @throws CheckoutConflictException
+	 *             if the checkout results in a conflict
 	 * @return the newly created branch
 	 */
-	public Ref call() throws JGitInternalException, RefAlreadyExistsException,
+	public Ref call() throws GitAPIException, RefAlreadyExistsException,
 			RefNotFoundException, InvalidRefNameException,
 			CheckoutConflictException {
 		checkCallable();
@@ -253,6 +257,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	 * @param all
 	 *            true to checkout all paths, false otherwise
 	 * @return {@code this}
+	 * @since 2.0
 	 */
 	public CheckoutCommand setAllPaths(boolean all) {
 		checkoutAllPaths = all;
@@ -293,9 +298,11 @@ public class CheckoutCommand extends GitCommand<Ref> {
 						public void apply(DirCacheEntry ent) {
 							ent.setObjectId(blobId);
 							ent.setFileMode(mode);
+							File file = new File(workTree, ent.getPathString());
+							File parentDir = file.getParentFile();
 							try {
-								DirCacheCheckout.checkoutEntry(repo, new File(
-										workTree, ent.getPathString()), ent, r);
+								FileUtils.mkdirs(parentDir, true);
+								DirCacheCheckout.checkoutEntry(repo, file, ent, r);
 							} catch (IOException e) {
 								throw new JGitInternalException(
 										MessageFormat.format(

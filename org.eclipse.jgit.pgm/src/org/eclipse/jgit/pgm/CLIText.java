@@ -59,7 +59,6 @@ public class CLIText extends TranslationBundle {
 	}
 
 	/***/ public String IPZillaPasswordPrompt;
-	/***/ public String alreadyOnBranch;
 	/***/ public String authorInfo;
 	/***/ public String averageMSPerRead;
 	/***/ public String branchAlreadyExists;
@@ -170,9 +169,8 @@ public class CLIText extends TranslationBundle {
 	/***/ public String notAnObject;
 	/***/ public String notFound;
 	/***/ public String noteObjectTooLargeToPrint;
-	/***/ public String onBranchToBeBorn;
 	/***/ public String onlyOneMetaVarExpectedIn;
-	/***/ public String pathspecDidNotMatch;
+	/***/ public String onlyOneOfIncludeOnlyAllInteractiveCanBeUsed;
 	/***/ public String pushTo;
 	/***/ public String pathsRequired;
 	/***/ public String refDoesNotExistOrNoCommit;
@@ -182,11 +180,9 @@ public class CLIText extends TranslationBundle {
 	/***/ public String repaint;
 	/***/ public String serviceNotSupported;
 	/***/ public String skippingObject;
-	/***/ public String switchedToNewBranch;
-	/***/ public String switchedToBranch;
 	/***/ public String timeInMilliSeconds;
 	/***/ public String tooManyRefsGiven;
-	/***/ public String unknownMergeStratey;
+	/***/ public String unknownMergeStrategy;
 	/***/ public String unsupportedOperation;
 	/***/ public String warningNoCommitGivenOnCommandLine;
 }

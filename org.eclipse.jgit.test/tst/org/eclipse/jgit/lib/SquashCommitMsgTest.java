@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2009, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2007, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,24 +40,38 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.lib;
 
-package org.eclipse.jgit.errors;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 
-/**
- * An exception thrown when a gitlink entry is found and cannot be
- * handled.
- */
-public class GitlinksNotSupportedException extends IOException {
-	private static final long serialVersionUID = 1L;
+import org.junit.Test;
 
-	/**
-	 * Construct a GitlinksNotSupportedException for the specified link
-	 *
-	 * @param s name of link in tree or workdir
-	 */
-	public GitlinksNotSupportedException(final String s) {
-		super(s);
+public class SquashCommitMsgTest extends RepositoryTestCase {
+	private static final String squashMsg = "squashed commit";
+
+	@Test
+	public void testReadWriteMergeMsg() throws IOException {
+		assertEquals(db.readSquashCommitMsg(), null);
+		assertFalse(new File(db.getDirectory(), Constants.SQUASH_MSG).exists());
+		db.writeSquashCommitMsg(squashMsg);
+		assertEquals(squashMsg, db.readSquashCommitMsg());
+		assertEquals(read(new File(db.getDirectory(), Constants.SQUASH_MSG)),
+				squashMsg);
+		db.writeSquashCommitMsg(null);
+		assertEquals(db.readSquashCommitMsg(), null);
+		assertFalse(new File(db.getDirectory(), Constants.SQUASH_MSG).exists());
+		FileOutputStream fos = new FileOutputStream(new File(db.getDirectory(),
+				Constants.SQUASH_MSG));
+		try {
+			fos.write(squashMsg.getBytes(Constants.CHARACTER_ENCODING));
+		} finally {
+			fos.close();
+		}
+		assertEquals(db.readSquashCommitMsg(), squashMsg);
 	}
 }

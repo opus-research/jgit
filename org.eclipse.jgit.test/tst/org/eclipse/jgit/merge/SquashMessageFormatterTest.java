@@ -40,62 +40,50 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm;
+package org.eclipse.jgit.merge;
+
+import static org.junit.Assert.assertEquals;
+
+import java.util.Arrays;
 
 import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.lib.CLIRepositoryTestCase;
-import org.junit.Assert;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.util.GitDateFormatter;
+import org.eclipse.jgit.util.GitDateFormatter.Format;
+import org.junit.Before;
 import org.junit.Test;
 
-public class CheckoutTest extends CLIRepositoryTestCase {
+/**
+ * Test construction of squash message by {@link SquashMessageFormatterTest}.
+ */
+public class SquashMessageFormatterTest extends SampleDataRepositoryTestCase {
+	private GitDateFormatter dateFormatter;
+	private SquashMessageFormatter msgFormatter;
+	private RevCommit revCommit;
 
-	@Test
-	public void testCheckoutSelf() throws Exception {
-		new Git(db).commit().setMessage("initial commit").call();
-
-		assertEquals("Already on 'master'", execute("git checkout master"));
+	@Override
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		dateFormatter = new GitDateFormatter(Format.DEFAULT);
+		msgFormatter = new SquashMessageFormatter();
 	}
 
 	@Test
-	public void testCheckoutBranch() throws Exception {
-		new Git(db).commit().setMessage("initial commit").call();
-		new Git(db).branchCreate().setName("side").call();
+	public void testCommit() throws Exception {
+		Git git = new Git(db);
+		revCommit = git.commit().setMessage("squash_me").call();
 
-		assertEquals("Switched to branch 'side'", execute("git checkout side"));
-	}
-
-	@Test
-	public void testCheckoutNewBranch() throws Exception {
-		new Git(db).commit().setMessage("initial commit").call();
-
-		assertEquals("Switched to a new branch 'side'",
-				execute("git checkout -b side"));
-	}
-
-	@Test
-	public void testCheckoutNonExistingBranch() throws Exception {
+		Ref master = db.getRef("refs/heads/master");
+		String message = msgFormatter.format(Arrays.asList(revCommit), master);
 		assertEquals(
-				"error: pathspec 'side' did not match any file(s) known to git.",
-				execute("git checkout side"));
-	}
-
-	@Test
-	public void testCheckoutNewBranchThatAlreadyExists() throws Exception {
-		new Git(db).commit().setMessage("initial commit").call();
-
-		assertEquals("A branch named 'master' already exists.",
-				execute("git checkout -b master"));
-	}
-
-	@Test
-	public void testCheckoutNewBranchOnBranchToBeBorn() throws Exception {
-		assertEquals("You are on a branch yet to be born",
-				execute("git checkout -b side"));
-	}
-
-	static private void assertEquals(String expected, String[] actual) {
-		Assert.assertEquals(actual[actual.length - 1].equals("") ? 2 : 1,
-				actual.length); // ignore last line if empty
-		Assert.assertEquals(expected, actual[0]);
+				"Squashed commit of the following:\n\ncommit "
+						+ revCommit.getName() + "\nAuthor: "
+						+ revCommit.getAuthorIdent().getName() + " <"
+						+ revCommit.getAuthorIdent().getEmailAddress()
+						+ ">\nDate:   " + dateFormatter.formatDate(author)
+						+ "\n\n\tsquash_me\n", message);
 	}
 }
