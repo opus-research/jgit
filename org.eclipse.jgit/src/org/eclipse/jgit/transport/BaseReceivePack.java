@@ -1372,21 +1372,16 @@ public abstract class BaseReceivePack {
 				}
 			}
 
-			if (cmd.getType() == ReceiveCommand.Type.DELETE && ref != null) {
-				ObjectId id = ref.getObjectId();
-				if (id == null) {
-					id = ObjectId.zeroId();
-				}
-				if (!ObjectId.zeroId().equals(cmd.getOldId())
-						&& !id.equals(cmd.getOldId())) {
-					// Delete commands can be sent with the old id matching our
-					// advertised value, *OR* with the old id being 0{40}. Any
-					// other requested old id is invalid.
-					//
-					cmd.setResult(Result.REJECTED_OTHER_REASON,
-							JGitText.get().invalidOldIdSent);
-					continue;
-				}
+			if (cmd.getType() == ReceiveCommand.Type.DELETE && ref != null
+					&& !ObjectId.zeroId().equals(cmd.getOldId())
+					&& !ref.getObjectId().equals(cmd.getOldId())) {
+				// Delete commands can be sent with the old id matching our
+				// advertised value, *OR* with the old id being 0{40}. Any
+				// other requested old id is invalid.
+				//
+				cmd.setResult(Result.REJECTED_OTHER_REASON,
+						JGitText.get().invalidOldIdSent);
+				continue;
 			}
 
 			if (cmd.getType() == ReceiveCommand.Type.UPDATE) {
@@ -1396,15 +1391,8 @@ public abstract class BaseReceivePack {
 					cmd.setResult(Result.REJECTED_OTHER_REASON, JGitText.get().noSuchRef);
 					continue;
 				}
-				ObjectId id = ref.getObjectId();
-				if (id == null) {
-					// We cannot update unborn branch
-					cmd.setResult(Result.REJECTED_OTHER_REASON,
-							JGitText.get().cannotUpdateUnbornBranch);
-					continue;
-				}
 
-				if (!id.equals(cmd.getOldId())) {
+				if (!ref.getObjectId().equals(cmd.getOldId())) {
 					// A properly functioning client will send the same
 					// object id we advertised.
 					//
