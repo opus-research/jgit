@@ -497,7 +497,6 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	 * @param options
 	 *            archive format options (e.g., level=9 for zip compression).
 	 * @return this
-	 * @since 4.0
 	 */
 	public ArchiveCommand setFormatOptions(Map<String, Object> options) {
 		this.formatOptions = options;

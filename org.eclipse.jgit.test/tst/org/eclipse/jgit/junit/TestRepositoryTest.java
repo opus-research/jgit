@@ -43,20 +43,28 @@
 
 package org.eclipse.jgit.junit;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
+import java.util.Date;
 import java.util.regex.Pattern;
 
 import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
 import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
-import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.ObjectLoader;
+import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.junit.After;
+import org.eclipse.jgit.treewalk.TreeWalk;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -73,12 +81,6 @@ public class TestRepositoryTest {
 		rw = tr.getRevWalk();
 	}
 
-	@After
-	public void tearDown() {
-		rw.close();
-		tr.getRepository().close();
-	}
-
 	@Test
 	public void insertChangeId() throws Exception {
 		RevCommit c1 = tr.commit().message("message").insertChangeId().create();
@@ -93,52 +95,47 @@ public class TestRepositoryTest {
 	}
 
 	@Test
-	public void resetFromSymref() throws Exception {
-		repo.updateRef("HEAD").link("refs/heads/master");
-		Ref head = repo.getRef("HEAD");
-		RevCommit master = tr.branch("master").commit().create();
-		RevCommit branch = tr.branch("branch").commit().create();
-		RevCommit detached = tr.commit().create();
+	public void amend() throws Exception {
+		RevCommit root = tr.commit()
+				.add("todelete", "to be deleted")
+				.create();
+		RevCommit orig = tr.commit().parent(root)
+				.rm("todelete")
+				.add("foo", "foo contents")
+				.add("bar", "bar contents")
+				.add("dir/baz", "baz contents")
+				.create();
+		rw.parseBody(orig);
+		tr.branch("master").update(orig);
+		assertEquals("foo contents", blobAsString(orig, "foo"));
+		assertEquals("bar contents", blobAsString(orig, "bar"));
+		assertEquals("baz contents", blobAsString(orig, "dir/baz"));
 
-		assertTrue(head.isSymbolic());
-		assertEquals("refs/heads/master", head.getTarget().getName());
-		assertEquals(master, repo.getRef("refs/heads/master").getObjectId());
-		assertEquals(branch, repo.getRef("refs/heads/branch").getObjectId());
+		RevCommit amended = tr.amend("master")
+				.tick(3)
+				.add("bar", "fixed bar contents")
+				.create();
+		assertEquals(amended, repo.getRef("refs/heads/master").getObjectId());
+		rw.parseBody(amended);
 
-		// Reset to branches preserves symref.
-		tr.reset("master");
-		head = repo.getRef("HEAD");
-		assertEquals(master, head.getObjectId());
-		assertTrue(head.isSymbolic());
-		assertEquals("refs/heads/master", head.getTarget().getName());
+		assertEquals(1, amended.getParentCount());
+		assertEquals(root, amended.getParent(0));
+		assertEquals(orig.getFullMessage(), amended.getFullMessage());
+		assertEquals(orig.getAuthorIdent(), amended.getAuthorIdent());
 
-		tr.reset("branch");
-		head = repo.getRef("HEAD");
-		assertEquals(branch, head.getObjectId());
-		assertTrue(head.isSymbolic());
-		assertEquals("refs/heads/master", head.getTarget().getName());
-		ObjectId lastHeadBeforeDetach = head.getObjectId().copy();
+		// Committer name/email is the same, but time was incremented.
+		assertEquals(new PersonIdent(orig.getCommitterIdent(), new Date(0)),
+				new PersonIdent(amended.getCommitterIdent(), new Date(0)));
+		assertTrue(orig.getCommitTime() < amended.getCommitTime());
 
-		// Reset to a SHA-1 detaches.
-		tr.reset(detached);
-		head = repo.getRef("HEAD");
-		assertEquals(detached, head.getObjectId());
-		assertFalse(head.isSymbolic());
-
-		tr.reset(detached.name());
-		head = repo.getRef("HEAD");
-		assertEquals(detached, head.getObjectId());
-		assertFalse(head.isSymbolic());
-
-		// Reset back to a branch remains detached.
-		tr.reset("master");
-		head = repo.getRef("HEAD");
-		assertEquals(lastHeadBeforeDetach, head.getObjectId());
-		assertFalse(head.isSymbolic());
+		assertEquals("foo contents", blobAsString(amended, "foo"));
+		assertEquals("fixed bar contents", blobAsString(amended, "bar"));
+		assertEquals("baz contents", blobAsString(amended, "dir/baz"));
+		assertNull(TreeWalk.forPath(repo, "todelete", amended.getTree()));
 	}
 
 	@Test
-	public void resetFromDetachedHead() throws Exception {
+	public void checkout() throws Exception {
 		Ref head = repo.getRef("HEAD");
 		RevCommit master = tr.branch("master").commit().create();
 		RevCommit branch = tr.branch("branch").commit().create();
@@ -148,24 +145,34 @@ public class TestRepositoryTest {
 		assertEquals(master, repo.getRef("refs/heads/master").getObjectId());
 		assertEquals(branch, repo.getRef("refs/heads/branch").getObjectId());
 
-		tr.reset("master");
+		tr.checkout("master");
 		head = repo.getRef("HEAD");
 		assertEquals(master, head.getObjectId());
-		assertFalse(head.isSymbolic());
+		assertTrue(head.isSymbolic());
+		assertEquals("refs/heads/master", head.getTarget().getName());
 
-		tr.reset("branch");
+		tr.checkout("branch");
 		head = repo.getRef("HEAD");
 		assertEquals(branch, head.getObjectId());
-		assertFalse(head.isSymbolic());
+		assertTrue(head.isSymbolic());
+		assertEquals("refs/heads/branch", head.getTarget().getName());
 
-		tr.reset(detached);
+		tr.checkout(detached);
 		head = repo.getRef("HEAD");
 		assertEquals(detached, head.getObjectId());
 		assertFalse(head.isSymbolic());
 
-		tr.reset(detached.name());
+		tr.checkout(detached.name());
 		head = repo.getRef("HEAD");
 		assertEquals(detached, head.getObjectId());
 		assertFalse(head.isSymbolic());
+	}
+
+	private String blobAsString(AnyObjectId treeish, String path)
+			throws Exception {
+		RevObject obj = tr.get(rw.parseTree(treeish), path);
+		assertSame(RevBlob.class, obj.getClass());
+		ObjectLoader loader = rw.getObjectReader().open(obj);
+		return new String(loader.getCachedBytes(), UTF_8);
 	}
 }
