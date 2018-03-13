@@ -49,9 +49,9 @@ import java.util.Collection;
 import java.util.Collections;
 
 import org.eclipse.jgit.lib.RepositoryConfig;
-import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 
-public class TransportTest extends SampleDataRepositoryTestCase {
+public class TransportTest extends RepositoryTestCase {
 	private Transport transport;
 
 	private RemoteConfig remoteConfig;

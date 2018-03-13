@@ -51,7 +51,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.eclipse.jgit.util.IO;
+import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.RawParseUtils;
 
 /**
@@ -72,12 +72,12 @@ public class ReflogReader {
 
 		Entry(byte[] raw, int pos) {
 			oldId = ObjectId.fromString(raw, pos);
-			pos += Constants.OBJECT_ID_STRING_LENGTH;
+			pos += Constants.OBJECT_ID_LENGTH * 2;
 			if (raw[pos++] != ' ')
 				throw new IllegalArgumentException(
 						"Raw log message does not parse as log entry");
 			newId = ObjectId.fromString(raw, pos);
-			pos += Constants.OBJECT_ID_STRING_LENGTH;
+			pos += Constants.OBJECT_ID_LENGTH * 2;
 			if (raw[pos++] != ' ') {
 				throw new IllegalArgumentException(
 						"Raw log message does not parse as log entry");
@@ -166,7 +166,7 @@ public class ReflogReader {
 	public List<Entry> getReverseEntries(int max) throws IOException {
 		final byte[] log;
 		try {
-			log = IO.readFully(logName);
+			log = NB.readFully(logName);
 		} catch (FileNotFoundException e) {
 			return Collections.emptyList();
 		}
