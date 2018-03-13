@@ -50,7 +50,6 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
 
 import org.eclipse.jgit.api.CheckoutResult.Status;
 import org.eclipse.jgit.api.errors.CheckoutConflictException;
@@ -59,7 +58,6 @@ import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
-import org.eclipse.jgit.attributes.Attribute;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.dircache.DirCacheEditor;
@@ -81,9 +79,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.treewalk.TreeWalk.OperationType;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 import org.eclipse.jgit.util.FileUtils;
 
@@ -386,9 +382,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 		DirCache dc = repo.lockDirCache();
 		try {
 			TreeWalk treeWalk = new TreeWalk(revWalk.getObjectReader());
-			// Required to compute the list of attribute for each entry
-			treeWalk.addTree(new FileTreeIterator(repo));
-			treeWalk.addTree(new DirCacheIterator(repo.readDirCache()));
 			treeWalk.setRecursive(true);
 			if (!checkoutAllPaths)
 				treeWalk.setFilter(PathFilterGroup.createFromStrings(paths));
@@ -417,8 +410,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 		final ObjectReader r = treeWalk.getObjectReader();
 		DirCacheEditor editor = dc.editor();
 		while (treeWalk.next()) {
-			final Set<Attribute> attributes = treeWalk
-					.getAttributes(OperationType.CHECKOUT_OP);
 			DirCacheEntry entry = dci.getDirCacheEntry();
 			// Only add one edit per path
 			if (entry != null && entry.getStage() > DirCacheEntry.STAGE_1)
@@ -429,15 +420,14 @@ public class CheckoutCommand extends GitCommand<Ref> {
 					if (stage > DirCacheEntry.STAGE_0) {
 						if (checkoutStage != null) {
 							if (stage == checkoutStage.number)
-								checkoutPath(
-										ent, r, attributes);
+								checkoutPath(ent, r);
 						} else {
 							UnmergedPathException e = new UnmergedPathException(
 									ent);
 							throw new JGitInternalException(e.getMessage(), e);
 						}
 					} else {
-						checkoutPath(ent, r, attributes);
+						checkoutPath(ent, r);
 					}
 				}
 			});
@@ -447,33 +437,29 @@ public class CheckoutCommand extends GitCommand<Ref> {
 
 	private void checkoutPathsFromCommit(TreeWalk treeWalk, DirCache dc,
 			RevCommit commit) throws IOException {
-		int commmitTreeIndex = treeWalk.addTree(commit.getTree());
+		treeWalk.addTree(commit.getTree());
 		final ObjectReader r = treeWalk.getObjectReader();
 		DirCacheEditor editor = dc.editor();
 		while (treeWalk.next()) {
-			final Set<Attribute> attributes = treeWalk
-					.getAttributes(OperationType.CHECKOUT_OP);
-			final ObjectId blobId = treeWalk.getObjectId(commmitTreeIndex);
-			final FileMode mode = treeWalk.getFileMode(commmitTreeIndex);
+			final ObjectId blobId = treeWalk.getObjectId(0);
+			final FileMode mode = treeWalk.getFileMode(0);
 			editor.add(new PathEdit(treeWalk.getPathString()) {
 				public void apply(DirCacheEntry ent) {
 					ent.setObjectId(blobId);
 					ent.setFileMode(mode);
-					checkoutPath(ent, r, attributes);
+					checkoutPath(ent, r);
 				}
 			});
 		}
 		editor.commit();
 	}
 
-	private void checkoutPath(DirCacheEntry entry, ObjectReader reader,
-			Set<Attribute> attributes) {
+	private void checkoutPath(DirCacheEntry entry, ObjectReader reader) {
 		File file = new File(repo.getWorkTree(), entry.getPathString());
 		File parentDir = file.getParentFile();
 		try {
 			FileUtils.mkdirs(parentDir, true);
-			DirCacheCheckout.checkoutEntry(repo, file, entry, reader,
-					attributes);
+			DirCacheCheckout.checkoutEntry(repo, file, entry, reader);
 		} catch (IOException e) {
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().checkoutConflictWithFile,
