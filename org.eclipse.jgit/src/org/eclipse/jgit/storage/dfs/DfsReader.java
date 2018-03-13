@@ -541,6 +541,7 @@ final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		}
 	}
 
+	@SuppressWarnings("unchecked")
 	public Collection<CachedPack> getCachedPacks() throws IOException {
 		DfsPackFile[] packList = db.getPacks();
 		List<CachedPack> cached = new ArrayList<CachedPack>(packList.length);
