@@ -52,8 +52,6 @@ import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 import org.eclipse.jetty.security.AbstractLoginService;
 import org.eclipse.jetty.security.Authenticator;
@@ -68,7 +66,8 @@ import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.util.security.Constraint;
-import org.eclipse.jetty.util.security.Password;
+import org.eclipse.jetty.util.security.Credential;
+import org.eclipse.jetty.util.security.Credential.Crypt;
 import org.eclipse.jgit.transport.URIish;
 
 /**
@@ -168,41 +167,29 @@ public class AppServer {
 		return ctx;
 	}
 
-	static class TestMappedLoginService extends AbstractLoginService {
+	static class TestLoginService extends AbstractLoginService {
+
 		private String role;
 
-		protected final ConcurrentMap<String, UserPrincipal> users = new ConcurrentHashMap<>();
-
-		TestMappedLoginService(String role) {
+		TestLoginService(String role) {
 			this.role = role;
 		}
-
-		@Override
-		protected void doStart() throws Exception {
-			UserPrincipal p = new UserPrincipal(username,
-					new Password(password));
-			users.put(username, p);
-			super.doStart();
-		}
-
 		@Override
 		protected String[] loadRoleInfo(UserPrincipal user) {
-			if (users.get(user.getName()) == null)
-				return null;
-			else
-				return new String[] { role };
+			return new String[] { role };
 		}
 
 		@Override
-		protected UserPrincipal loadUserInfo(String user) {
-			return users.get(user);
+		protected UserPrincipal loadUserInfo(String name) {
+			return new UserPrincipal(username,
+					Credential.getCredential(Crypt.crypt(username, password)));
 		}
 	}
 
 	private void auth(ServletContextHandler ctx, Authenticator authType) {
 		final String role = "can-access";
 
-		AbstractLoginService users = new TestMappedLoginService(role);
+		TestLoginService users = new TestLoginService(role);
 		ConstraintMapping cm = new ConstraintMapping();
 		cm.setConstraint(new Constraint());
 		cm.getConstraint().setAuthenticate(true);
@@ -242,6 +229,7 @@ public class AppServer {
 	public void tearDown() throws Exception {
 		RecordingLogger.clear();
 		log.clear();
+		server.setStopTimeout(0);
 		server.stop();
 	}
 

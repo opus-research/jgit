@@ -490,7 +490,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String noHMACsupport;
 	/***/ public String noMergeBase;
 	/***/ public String noMergeHeadSpecified;
-	/***/ public String nonBareLinkFilesNotSupported;
 	/***/ public String noSuchRef;
 	/***/ public String notABoolean;
 	/***/ public String notABundle;
@@ -598,7 +597,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String renamesRejoiningModifies;
 	/***/ public String repositoryAlreadyExists;
 	/***/ public String repositoryConfigFileInvalid;
-	/***/ public String repositoryIsRequired;
 	/***/ public String repositoryNotFound;
 	/***/ public String repositoryState_applyMailbox;
 	/***/ public String repositoryState_bare;

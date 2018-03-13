@@ -49,6 +49,7 @@ import java.util.Collections;
 import java.util.List;
 
 import org.eclipse.jetty.util.log.Logger;
+import org.slf4j.helpers.MessageFormatter;
 
 /** Logs warnings into an array for later inspection. */
 public class RecordingLogger implements Logger {
@@ -161,13 +162,8 @@ public class RecordingLogger implements Logger {
 	@Override
 	public void warn(String msg, Object... args) {
 		synchronized (warnings) {
-			int i = 0;
-			int index = msg.indexOf("{}");
-			while (index >= 0) {
-				msg = msg.replaceFirst("\\{\\}", "{" + i++ + "}");
-				index = msg.indexOf("{}");
-			}
-			warnings.add(new Warning(MessageFormat.format(msg, args)));
+			warnings.add(new Warning(
+					MessageFormatter.format(msg, args).getMessage()));
 		}
 	}
 
