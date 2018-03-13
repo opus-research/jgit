@@ -218,12 +218,14 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			if (this.operation == Operation.CONTINUE)
 				newHead = continueRebase();
 
-			if (this.operation == Operation.SKIP)
-				newHead = checkoutCurrentHead();
+			List<Step> steps = loadSteps();
+
+			if (this.operation == Operation.SKIP && !steps.isEmpty())
+				checkoutCurrentHead();
 
 			ObjectReader or = repo.newObjectReader();
+			int stepsToPop = 0;
 
-			List<Step> steps = loadSteps();
 			for (Step step : steps) {
 				if (step.action != Action.PICK)
 					continue;
@@ -248,32 +250,22 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				if (newHead == null) {
 					return stop(commitToPick);
 				}
+				stepsToPop++;
 			}
-			if (newHead != null) {
+			if (newHead != null || steps.isEmpty()) {
 				// point the previous head (if any) to the new commit
 				String headName = readFile(rebaseDir, HEAD_NAME);
 				if (headName.startsWith(Constants.R_REFS)) {
 					RefUpdate rup = repo.updateRef(headName);
-					rup.setNewObjectId(newHead);
-					Result res = rup.forceUpdate();
-					switch (res) {
-					case FAST_FORWARD:
-					case FORCED:
-					case NO_CHANGE:
-						break;
-					default:
-						throw new JGitInternalException("Updating HEAD failed");
+					if (newHead != null) {
+						rup.setNewObjectId(newHead);
+						rup.forceUpdate();
 					}
 					rup = repo.updateRef(Constants.HEAD);
-					res = rup.link(headName);
-					switch (res) {
-					case FAST_FORWARD:
-					case FORCED:
-					case NO_CHANGE:
-						break;
-					default:
-						throw new JGitInternalException("Updating HEAD failed");
-					}
+					rup.link(headName);
+				}
+				if (this.operation == Operation.SKIP && steps.isEmpty()) {
+					checkoutCurrentHead();
 				}
 				FileUtils.delete(rebaseDir, FileUtils.RECURSIVE);
 				return new RebaseResult(Status.OK);
@@ -284,8 +276,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		}
 	}
 
-	private RevCommit checkoutCurrentHead() throws IOException,
-			NoHeadException, JGitInternalException {
+	private void checkoutCurrentHead() throws IOException, NoHeadException,
+			JGitInternalException {
 		ObjectId headTree = repo.resolve(Constants.HEAD + "^{tree}");
 		if (headTree == null)
 			throw new NoHeadException(
@@ -307,10 +299,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		} finally {
 			dc.unlock();
 		}
-		RevWalk rw = new RevWalk(repo);
-		RevCommit commit = rw.parseCommit(repo.resolve(Constants.HEAD));
-		rw.release();
-		return commit;
 	}
 
 	/**
