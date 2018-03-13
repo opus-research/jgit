@@ -55,7 +55,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.generated.storage.dht.proto.GitStore.RefData;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef.PeeledNonTag;
@@ -69,7 +68,6 @@ import org.eclipse.jgit.lib.SymbolicRef;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.dht.RefDataUtil.IdWithChunk;
 import org.eclipse.jgit.storage.dht.spi.Context;
 import org.eclipse.jgit.storage.dht.spi.Database;
 import org.eclipse.jgit.util.RefList;
@@ -96,7 +94,7 @@ public class DhtRefDatabase extends RefDatabase {
 	ChunkKey findChunk(AnyObjectId id) {
 		RefCache c = cache.get();
 		if (c != null) {
-			IdWithChunk i = c.hints.get(id);
+			RefData.IdWithChunk i = c.hints.get(id);
 			if (i != null)
 				return i.getChunkKey();
 		}
@@ -192,8 +190,8 @@ public class DhtRefDatabase extends RefDatabase {
 		try {
 			RepositoryKey repo = repository.getRepositoryKey();
 			RefKey key = RefKey.create(repo, newLeaf.getName());
-			RefData oldData = RefDataUtil.fromRef(oldLeaf);
-			RefData newData = RefDataUtil.fromRef(newLeaf);
+			RefData oldData = RefData.fromRef(oldLeaf);
+			RefData newData = RefData.fromRef(newLeaf);
 			db.ref().compareAndPut(key, oldData, newData);
 		} catch (TimeoutException e) {
 			// Ignore a timeout here, we were only trying to update
@@ -216,12 +214,13 @@ public class DhtRefDatabase extends RefDatabase {
 
 			ChunkKey key = ctx.findChunk(oId);
 			if (key != null)
-				oId = new IdWithChunk(oId, key);
+				oId = new RefData.IdWithChunk(oId, key);
 
 			if (obj instanceof RevTag) {
 				ObjectId pId = rw.peel(obj);
 				key = ctx.findChunk(pId);
-				pId = key != null ? new IdWithChunk(pId, key) : pId.copy();
+				pId = key != null ? new RefData.IdWithChunk(pId, key) : pId
+						.copy();
 				return new PeeledTag(leaf.getStorage(), name, oId, pId);
 			} else {
 				return new PeeledNonTag(leaf.getStorage(), name, oId);
@@ -354,7 +353,7 @@ public class DhtRefDatabase extends RefDatabase {
 	private RefCache read() throws DhtException, TimeoutException {
 		RefList.Builder<Ref> id = new RefList.Builder<Ref>();
 		RefList.Builder<Ref> sym = new RefList.Builder<Ref>();
-		ObjectIdSubclassMap<IdWithChunk> hints = new ObjectIdSubclassMap<IdWithChunk>();
+		ObjectIdSubclassMap<RefData.IdWithChunk> hints = new ObjectIdSubclassMap<RefData.IdWithChunk>();
 
 		for (Map.Entry<RefKey, RefData> e : scan()) {
 			Ref ref = fromData(e.getKey().getName(), e.getValue());
@@ -363,12 +362,12 @@ public class DhtRefDatabase extends RefDatabase {
 				sym.add(ref);
 			id.add(ref);
 
-			if (ref.getObjectId() instanceof IdWithChunk
+			if (ref.getObjectId() instanceof RefData.IdWithChunk
 					&& !hints.contains(ref.getObjectId()))
-				hints.add((IdWithChunk) ref.getObjectId());
-			if (ref.getPeeledObjectId() instanceof IdWithChunk
+				hints.add((RefData.IdWithChunk) ref.getObjectId());
+			if (ref.getPeeledObjectId() instanceof RefData.IdWithChunk
 					&& !hints.contains(ref.getPeeledObjectId()))
-				hints.add((IdWithChunk) ref.getPeeledObjectId());
+				hints.add((RefData.IdWithChunk) ref.getPeeledObjectId());
 		}
 
 		id.sort();
@@ -378,20 +377,40 @@ public class DhtRefDatabase extends RefDatabase {
 	}
 
 	private static Ref fromData(String name, RefData data) {
-		if (data.hasSymref()) {
-			Ref leaf = new Unpeeled(NEW, data.getSymref(), null);
-			return new SymbolicRef(name, leaf);
+		ObjectId oId = null;
+		boolean peeled = false;
+		ObjectId pId = null;
+
+		TinyProtobuf.Decoder d = data.decode();
+		DECODE: for (;;) {
+			switch (d.next()) {
+			case 0:
+				break DECODE;
+
+			case RefData.TAG_SYMREF: {
+				String symref = d.string();
+				Ref leaf = new Unpeeled(NEW, symref, null);
+				return new SymbolicRef(name, leaf);
+			}
+
+			case RefData.TAG_TARGET:
+				oId = RefData.IdWithChunk.decode(d.message());
+				continue;
+			case RefData.TAG_IS_PEELED:
+				peeled = d.bool();
+				continue;
+			case RefData.TAG_PEELED:
+				pId = RefData.IdWithChunk.decode(d.message());
+				continue;
+			default:
+				d.skip();
+				continue;
+			}
 		}
 
-		if (!data.hasTarget())
-			return new Unpeeled(LOOSE, name, null);
-
-		ObjectId oId = IdWithChunk.create(data.getTarget());
-		if (data.getIsPeeled() && data.hasPeeled()) {
-			ObjectId pId = IdWithChunk.create(data.getPeeled());
+		if (peeled && pId != null)
 			return new PeeledTag(LOOSE, name, oId, pId);
-		}
-		if (data.getIsPeeled())
+		if (peeled)
 			return new PeeledNonTag(LOOSE, name, oId);
 		return new Unpeeled(LOOSE, name, oId);
 	}
@@ -408,10 +427,10 @@ public class DhtRefDatabase extends RefDatabase {
 
 		final RefList<Ref> sym;
 
-		final ObjectIdSubclassMap<IdWithChunk> hints;
+		final ObjectIdSubclassMap<RefData.IdWithChunk> hints;
 
 		RefCache(RefList<Ref> ids, RefList<Ref> sym,
-				ObjectIdSubclassMap<IdWithChunk> hints) {
+				ObjectIdSubclassMap<RefData.IdWithChunk> hints) {
 			this.ids = ids;
 			this.sym = sym;
 			this.hints = hints;
