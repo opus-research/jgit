@@ -55,8 +55,10 @@ import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.dircache.DirCacheIterator;
+import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
@@ -82,6 +84,14 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 
 	private OutputStream out;
 
+	private int contextLines = -1;
+
+	private String sourcePrefix;
+
+	private String destinationPrefix;
+
+	private ProgressMonitor monitor = NullProgressMonitor.INSTANCE;
+
 	/**
 	 * @param repo
 	 */
@@ -101,6 +111,7 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 		final DiffFormatter diffFmt = new DiffFormatter(
 				new BufferedOutputStream(out));
 		diffFmt.setRepository(repo);
+		diffFmt.setProgressMonitor(monitor);
 		try {
 			if (cached) {
 				if (oldTree == null) {
@@ -125,6 +136,12 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 			}
 
 			diffFmt.setPathFilter(pathFilter);
+			if (contextLines >= 0)
+				diffFmt.setContext(contextLines);
+			if (destinationPrefix != null)
+				diffFmt.setNewPrefix(destinationPrefix);
+			if (sourcePrefix != null)
+				diffFmt.setOldPrefix(sourcePrefix);
 
 			List<DiffEntry> result = diffFmt.scan(oldTree, newTree);
 			if (showNameAndStatusOnly) {
@@ -197,6 +214,57 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 	 */
 	public DiffCommand setOutputStream(OutputStream out) {
 		this.out = out;
+		return this;
+	}
+
+	/**
+	 * Set number of context lines instead of the usual three.
+	 *
+	 * @param contextLines
+	 *            the number of context lines
+	 * @return this instance
+	 */
+	public DiffCommand setContextLines(int contextLines) {
+		this.contextLines = contextLines;
+		return this;
+	}
+
+	/**
+	 * Set the given source prefix instead of "a/".
+	 *
+	 * @param sourcePrefix
+	 *            the prefix
+	 * @return this instance
+	 */
+	public DiffCommand setSourcePrefix(String sourcePrefix) {
+		this.sourcePrefix = sourcePrefix;
+		return this;
+	}
+
+	/**
+	 * Set the given destination prefix instead of "b/".
+	 *
+	 * @param destinationPrefix
+	 *            the prefix
+	 * @return this instance
+	 */
+	public DiffCommand setDestinationPrefix(String destinationPrefix) {
+		this.destinationPrefix = destinationPrefix;
+		return this;
+	}
+
+	/**
+	 * The progress monitor associated with the diff operation. By default, this
+	 * is set to <code>NullProgressMonitor</code>
+	 *
+	 * @see NullProgressMonitor
+	 *
+	 * @param monitor
+	 *            a progress monitor
+	 * @return this instance
+	 */
+	public DiffCommand setProgressMonitor(ProgressMonitor monitor) {
+		this.monitor = monitor;
 		return this;
 	}
 }

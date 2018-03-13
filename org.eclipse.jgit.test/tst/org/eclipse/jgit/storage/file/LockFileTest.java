@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
+ * Copyright (C) 2012, GitHub Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,40 +40,44 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.treewalk;
+package org.eclipse.jgit.storage.file;
 
-import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.ConfigConstants;
-import org.eclipse.jgit.lib.Config.SectionParser;
-import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
-/** Options used by the {@link WorkingTreeIterator}. */
-public class WorkingTreeOptions {
-	/** Key for {@link Config#get(SectionParser)}. */
-	public static final Config.SectionParser<WorkingTreeOptions> KEY = new SectionParser<WorkingTreeOptions>() {
-		public WorkingTreeOptions parse(final Config cfg) {
-			return new WorkingTreeOptions(cfg);
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.errors.LockFailedException;
+import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.junit.Test;
+
+/**
+ * Unit tests of {@link LockFile}
+ */
+public class LockFileTest extends RepositoryTestCase {
+
+	@Test
+	public void lockFailedExceptionRecovery() throws Exception {
+		Git git = new Git(db);
+		writeTrashFile("file.txt", "content");
+		git.add().addFilepattern("file.txt").call();
+		RevCommit commit1 = git.commit().setMessage("create file").call();
+
+		assertNotNull(commit1);
+		writeTrashFile("file.txt", "content2");
+		git.add().addFilepattern("file.txt").call();
+		assertNotNull(git.commit().setMessage("edit file").call());
+
+		assertTrue(new LockFile(db.getIndexFile(), db.getFS()).lock());
+		try {
+			git.checkout().setName(commit1.name()).call();
+			fail("JGitInternalException not thrown");
+		} catch (JGitInternalException e) {
+			assertTrue(e.getCause() instanceof LockFailedException);
+			LockFile.unlock(((LockFailedException) e.getCause()).getFile());
+			git.checkout().setName(commit1.name()).call();
 		}
-	};
-
-	private final boolean fileMode;
-
-	private final AutoCRLF autoCRLF;
-
-	private WorkingTreeOptions(final Config rc) {
-		fileMode = rc.getBoolean(ConfigConstants.CONFIG_CORE_SECTION,
-				ConfigConstants.CONFIG_KEY_FILEMODE, true);
-		autoCRLF = rc.getEnum(ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_AUTOCRLF, AutoCRLF.FALSE);
-	}
-
-	/** @return true if the execute bit on working files should be trusted. */
-	public boolean isFileMode() {
-		return fileMode;
-	}
-
-	/** @return how automatic CRLF conversion has been configured. */
-	public AutoCRLF getAutoCRLF() {
-		return autoCRLF;
 	}
 }
