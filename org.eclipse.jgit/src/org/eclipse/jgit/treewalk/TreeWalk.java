@@ -51,6 +51,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.attributes.Attribute;
 import org.eclipse.jgit.attributes.AttributesNode;
@@ -1263,8 +1264,9 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 *             parsing one on the attributes file.
 	 */
 	private AttributesNode getCurrentAttributesNode(OperationType opType,
-			WorkingTreeIterator workingTreeIterator,
-			DirCacheIterator dirCacheIterator, CanonicalTreeParser other)
+			@Nullable WorkingTreeIterator workingTreeIterator,
+			@Nullable DirCacheIterator dirCacheIterator,
+			@Nullable CanonicalTreeParser other)
 					throws IOException {
 		AttributesNode attributesNode = null;
 		switch (opType) {
