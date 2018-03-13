@@ -1168,7 +1168,8 @@ public class DirCacheCheckout {
 	private static void checkValidPath(CanonicalTreeParser t)
 			throws InvalidPathException {
 		ObjectChecker chk = new ObjectChecker()
-			.setSafeForWindows(SystemReader.getInstance().isWindows());
+			.setSafeForWindows(SystemReader.getInstance().isWindows())
+			.setSafeForMacOS(SystemReader.getInstance().isMacOS());
 		for (CanonicalTreeParser i = t; i != null; i = i.getParent())
 			checkValidPathSegment(chk, i);
 	}
@@ -1183,7 +1184,8 @@ public class DirCacheCheckout {
 	 */
 	public static void checkValidPath(String path) throws InvalidPathException {
 		ObjectChecker chk = new ObjectChecker()
-			.setSafeForWindows(SystemReader.getInstance().isWindows());
+			.setSafeForWindows(SystemReader.getInstance().isWindows())
+			.setSafeForMacOS(SystemReader.getInstance().isMacOS());
 
 		byte[] bytes = Constants.encode(path);
 		int segmentStart = 0;
