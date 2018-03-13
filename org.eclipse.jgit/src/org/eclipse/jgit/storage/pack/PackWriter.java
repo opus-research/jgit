@@ -80,7 +80,6 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.AsyncObjectSizeQueue;
-import org.eclipse.jgit.lib.BatchingProgressMonitor;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
@@ -641,21 +640,10 @@ public class PackWriter {
 		if (writeMonitor == null)
 			writeMonitor = NullProgressMonitor.INSTANCE;
 
-		boolean needSearchForReuse = reuseSupport != null && (
+		if (reuseSupport != null && (
 				   reuseDeltas
 				|| config.isReuseObjects()
-				|| !cachedPacks.isEmpty());
-
-		if (compressMonitor instanceof BatchingProgressMonitor) {
-			long delay = 1000;
-			if (needSearchForReuse && config.isDeltaCompress())
-				delay = 500;
-			((BatchingProgressMonitor) compressMonitor).setDelayStart(
-					delay,
-					TimeUnit.MILLISECONDS);
-		}
-
-		if (needSearchForReuse)
+				|| !cachedPacks.isEmpty()))
 			searchForReuse(compressMonitor);
 		if (config.isDeltaCompress())
 			searchForDeltas(compressMonitor);
@@ -909,9 +897,9 @@ public class PackWriter {
 
 	private int findObjectsNeedingDelta(ObjectToPack[] list, int cnt, int type) {
 		for (ObjectToPack otp : objectsLists[type]) {
-			if (otp.isDoNotDelta()) // delta is disabled for this path
+			if (otp.isReuseAsIs()) // already reusing a representation
 				continue;
-			if (otp.isDeltaRepresentation()) // already reusing a delta
+			if (otp.isDoNotDelta()) // delta is disabled for this path
 				continue;
 			otp.setWeight(0);
 			list[cnt++] = otp;
@@ -1437,29 +1425,20 @@ public class PackWriter {
 		}
 		commits = null;
 
-		if (thin && !baseTrees.isEmpty()) {
-			BaseSearch bases = new BaseSearch(countingMonitor, baseTrees, //
-					objectsMap, edgeObjects, reader);
-			RevObject o;
-			while ((o = walker.nextObject()) != null) {
-				if (o.has(RevFlag.UNINTERESTING))
-					continue;
+		BaseSearch bases = new BaseSearch(countingMonitor, baseTrees, //
+				objectsMap, edgeObjects, reader);
+		RevObject o;
+		while ((o = walker.nextObject()) != null) {
+			if (o.has(RevFlag.UNINTERESTING))
+				continue;
 
-				int pathHash = walker.getPathHashCode();
-				byte[] pathBuf = walker.getPathBuffer();
-				int pathLen = walker.getPathLength();
-				bases.addBase(o.getType(), pathBuf, pathLen, pathHash);
-				addObject(o, pathHash);
-				countingMonitor.update(1);
-			}
-		} else {
-			RevObject o;
-			while ((o = walker.nextObject()) != null) {
-				if (o.has(RevFlag.UNINTERESTING))
-					continue;
-				addObject(o, walker.getPathHashCode());
-				countingMonitor.update(1);
-			}
+			int pathHash = walker.getPathHashCode();
+			byte[] pathBuf = walker.getPathBuffer();
+			int pathLen = walker.getPathLength();
+
+			bases.addBase(o.getType(), pathBuf, pathLen, pathHash);
+			addObject(o, pathHash);
+			countingMonitor.update(1);
 		}
 
 		for (CachedPack pack : cachedPacks)

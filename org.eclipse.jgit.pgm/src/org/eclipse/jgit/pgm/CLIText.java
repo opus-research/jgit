@@ -104,7 +104,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String fatalError;
 	/***/ public String fatalErrorTagExists;
 	/***/ public String fatalThisProgramWillDestroyTheRepository;
-	/***/ public String fileIsRequired;
 	/***/ public String forcedUpdate;
 	/***/ public String fromURI;
 	/***/ public String initializedEmptyGitRepositoryIn;
