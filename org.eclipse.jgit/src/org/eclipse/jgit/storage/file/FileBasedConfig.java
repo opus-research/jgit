@@ -97,8 +97,6 @@ public class FileBasedConfig extends StoredConfig {
 	 */
 	public FileBasedConfig(Config base, File cfgLocation, FS fs) {
 		super(base);
-		// we will notify listeners upon save()
-		notifyUponTransientChanges = false;
 		configFile = cfgLocation;
 		this.fs = fs;
 	}
@@ -161,8 +159,6 @@ public class FileBasedConfig extends StoredConfig {
 			lf.unlock();
 		}
 		lastModified = lf.getCommitLastModified();
-		// notify the listeners
-		changed();
 	}
 
 	@Override

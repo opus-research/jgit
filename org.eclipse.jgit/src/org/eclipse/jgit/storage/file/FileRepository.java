@@ -49,13 +49,11 @@ package org.eclipse.jgit.storage.file;
 import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.EventObject;
 import java.util.HashSet;
 import java.util.Set;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.ConfigInvalidException;
-import org.eclipse.jgit.events.ConfigChangedEvent;
 import org.eclipse.jgit.lib.BaseRepositoryBuilder;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
@@ -64,7 +62,6 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.Config.ChangeListener;
 import org.eclipse.jgit.storage.file.FileObjectDatabase.AlternateHandle;
 import org.eclipse.jgit.storage.file.FileObjectDatabase.AlternateRepository;
 import org.eclipse.jgit.util.SystemReader;
@@ -102,8 +99,6 @@ public class FileRepository extends Repository {
 	private final RefDatabase refs;
 
 	private final ObjectDirectory objectDatabase;
-
-	private final ChangeListener configChangeListener;
 
 	/**
 	 * Construct a representation of a Git repository.
@@ -148,14 +143,6 @@ public class FileRepository extends Repository {
 		loadUserConfig();
 		loadRepoConfig();
 
-		configChangeListener = new ChangeListener() {
-			public void onChange(EventObject event) {
-				fireEvent(new ConfigChangedEvent());
-			}
-		};
-
-		getConfig().addChangeListener(configChangeListener);
-
 		refs = new RefDirectory(this);
 		objectDatabase = new ObjectDirectory(repoConfig, //
 				options.getObjectDirectory(), //
@@ -173,12 +160,6 @@ public class FileRepository extends Repository {
 						repositoryFormatVersion));
 			}
 		}
-	}
-
-	@Override
-	protected void doClose() {
-		getConfig().removeChangeListener(configChangeListener);
-		super.doClose();
 	}
 
 	private void loadUserConfig() throws IOException {
