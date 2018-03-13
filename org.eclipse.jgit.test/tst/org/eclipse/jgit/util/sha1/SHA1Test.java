@@ -68,7 +68,7 @@ public class SHA1Test {
 		m.update(new byte[] {});
 		ObjectId m1 = ObjectId.fromRaw(m.digest());
 
-		SHA1 s = SHA1.newInstance();
+		SHA1 s = new SHA1();
 		s.update(new byte[] {});
 		ObjectId s1 = ObjectId.fromRaw(s.digest());
 
@@ -82,11 +82,11 @@ public class SHA1Test {
 				.fromString("a9993e364706816aba3e25717850c26c9cd0d89d");
 
 		MessageDigest m = MessageDigest.getInstance("SHA-1");
-		m.update(TEST1.getBytes(StandardCharsets.UTF_8));
+		m.update(TEST1.getBytes(StandardCharsets.ISO_8859_1));
 		ObjectId m1 = ObjectId.fromRaw(m.digest());
 
-		SHA1 s = SHA1.newInstance();
-		s.update(TEST1.getBytes(StandardCharsets.UTF_8));
+		SHA1 s = new SHA1();
+		s.update(TEST1.getBytes(StandardCharsets.ISO_8859_1));
 		ObjectId s1 = ObjectId.fromRaw(s.digest());
 
 		assertEquals(m1, s1);
@@ -99,11 +99,11 @@ public class SHA1Test {
 				.fromString("84983e441c3bd26ebaae4aa1f95129e5e54670f1");
 
 		MessageDigest m = MessageDigest.getInstance("SHA-1");
-		m.update(TEST2.getBytes(StandardCharsets.UTF_8));
+		m.update(TEST2.getBytes(StandardCharsets.ISO_8859_1));
 		ObjectId m1 = ObjectId.fromRaw(m.digest());
 
-		SHA1 s = SHA1.newInstance();
-		s.update(TEST2.getBytes(StandardCharsets.UTF_8));
+		SHA1 s = new SHA1();
+		s.update(TEST2.getBytes(StandardCharsets.ISO_8859_1));
 		ObjectId s1 = ObjectId.fromRaw(s.digest());
 
 		assertEquals(m1, s1);

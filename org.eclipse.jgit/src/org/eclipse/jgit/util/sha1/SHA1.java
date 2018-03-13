@@ -56,11 +56,6 @@ import org.eclipse.jgit.util.NB;
  * @since 4.7
  */
 public class SHA1 {
-	/** @return a new context to compute a SHA-1 hash of data. */
-	public static SHA1 newInstance() {
-		return new SHA1();
-	}
-
 	// Magic initialization constants defined by FIPS180.
 	private int h0 = 0x67452301;
 	private int h1 = 0xEFCDAB89;
@@ -74,23 +69,6 @@ public class SHA1 {
 
 	/** Total number of bytes in the message. */
 	private long length;
-
-	private SHA1() {
-	}
-
-	/**
-	 * Update the digest computation by adding a byte.
-	 *
-	 * @param b
-	 */
-	public void update(byte b) {
-		int bufferLen = (int) (length & 63);
-		length++;
-		buffer[bufferLen] = b;
-		if (bufferLen == 63) {
-			compress(buffer, 0);
-		}
-	}
 
 	/**
 	 * Update the digest computation by adding bytes to the message.
@@ -231,11 +209,6 @@ public class SHA1 {
 			buffer[bufferLen++] = (byte) 0x80;
 			Arrays.fill(buffer, bufferLen, 56, (byte) 0);
 		}
-
-		// SHA-1 appends the length of the message in bits after the
-		// padding block (above). Here length is in bytes. Multiply by
-		// 8 by shifting by 3 as part of storing the 64 bit byte length
-		// into the two words expected in the trailer.
 		NB.encodeInt32(buffer, 56, (int) (length >>> (32 - 3)));
 		NB.encodeInt32(buffer, 60, (int) (length << 3));
 		compress(buffer, 0);
