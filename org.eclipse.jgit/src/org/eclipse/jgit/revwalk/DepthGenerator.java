@@ -44,11 +44,6 @@
 
 package org.eclipse.jgit.revwalk;
 
-import static org.eclipse.jgit.revwalk.PendingGenerator.OVER_SCAN;
-import static org.eclipse.jgit.revwalk.RevWalk.PARSED;
-import static org.eclipse.jgit.revwalk.RevWalk.SEEN;
-import static org.eclipse.jgit.revwalk.RevWalk.UNINTERESTING;
-
 import java.io.IOException;
 
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -61,8 +56,6 @@ import org.eclipse.jgit.errors.MissingObjectException;
  */
 class DepthGenerator extends Generator {
 	private final FIFORevQueue pending;
-
-	private final DateRevQueue uninteresting;
 
 	private final int depth;
 
@@ -95,7 +88,6 @@ class DepthGenerator extends Generator {
 	DepthGenerator(DepthWalk w, Generator s) throws MissingObjectException,
 			IncorrectObjectTypeException, IOException {
 		pending = new FIFORevQueue();
-		uninteresting = new DateRevQueue();
 		walk = (RevWalk)w;
 
 		this.depth = w.getDepth();
@@ -108,15 +100,10 @@ class DepthGenerator extends Generator {
 		// adding them to the pending queue
 		for (;;) {
 			RevCommit c = s.next();
-			if (c == null) {
+			if (c == null)
 				break;
-			}
-			if (((DepthWalk.Commit) c).getDepth() == 0) {
+			if (((DepthWalk.Commit) c).getDepth() == 0)
 				pending.add(c);
-			}
-			if ((c.flags & RevWalk.UNINTERESTING) != 0) {
-				uninteresting.add(c);
-			}
 		}
 	}
 
@@ -130,37 +117,6 @@ class DepthGenerator extends Generator {
 		pending.shareFreeList(q);
 	}
 
-	private void propagateUninteresting(int stoppingPoint)
-			throws MissingObjectException, IncorrectObjectTypeException,
-				   IOException {
-		for (int overScan = OVER_SCAN; overScan > 0; overScan--) {
-			DepthWalk.Commit c = (DepthWalk.Commit) uninteresting.next();
-			if (c == null) {
-				return;
-			}
-			if ((c.flags & UNINTERESTING) == 0) {
-				throw new IllegalStateException("found interesting commit in uninteresting walk");
-			}
-			for (RevCommit p : c.parents) {
-				DepthWalk.Commit dp = (DepthWalk.Commit) p;
-
-				if ((p.flags & SEEN) != 0) {
-					continue;
-				}
-				if ((p.flags & PARSED) == 0) {
-					p.parseHeaders(walk);
-				}
-				p.flags |= SEEN;
-				uninteresting.add(p);
-			}
-			walk.carryFlagsImpl(c);
-
-			if (c.commitTime >= stoppingPoint) {
-				overScan = OVER_SCAN + 1;
-			}
-		}
-	}
-
 	@Override
 	RevCommit next() throws MissingObjectException,
 			IncorrectObjectTypeException, IOException {
@@ -172,8 +128,6 @@ class DepthGenerator extends Generator {
 			final DepthWalk.Commit c = (DepthWalk.Commit) pending.next();
 			if (c == null)
 				return null;
-
-			propagateUninteresting(c.commitTime);
 
 			if ((c.flags & RevWalk.PARSED) == 0)
 				c.parseHeaders(walk);
