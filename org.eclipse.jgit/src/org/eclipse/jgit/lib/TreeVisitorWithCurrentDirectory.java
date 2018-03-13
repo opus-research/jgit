@@ -1,7 +1,7 @@
 /*
- * Copyright (C) 2009, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2007, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2007-2009, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2009, Vasyl' Vavrychuk <vvavrychuk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -45,55 +45,38 @@
 
 package org.eclipse.jgit.lib;
 
+import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 
 /**
- * A tree entry representing a gitlink entry used for submodules.
+ * Abstract TreeVisitor for visiting all files known by a Tree.
  *
- * Note. Java cannot really handle these as file system objects.
- *
- * @deprecated To look up information about a single path, use
- * {@link org.eclipse.jgit.treewalk.TreeWalk#forPath(Repository, String, org.eclipse.jgit.revwalk.RevTree)}.
- * To lookup information about multiple paths at once, use a
- * {@link org.eclipse.jgit.treewalk.TreeWalk} and obtain the current entry's
- * information from its getter methods.
+ * @deprecated Use {@link org.eclipse.jgit.treewalk.TreeWalk} instead, with a
+ * {@link org.eclipse.jgit.treewalk.FileTreeIterator} as one of its members.
  */
 @Deprecated
-public class GitlinkTreeEntry extends TreeEntry {
-	private static final long serialVersionUID = 1L;
+public abstract class TreeVisitorWithCurrentDirectory implements TreeVisitor {
+	private final ArrayList<File> stack = new ArrayList<File>(16);
 
-	/**
-	 * Construct a {@link GitlinkTreeEntry} with the specified name and SHA-1 in
-	 * the specified parent
-	 *
-	 * @param parent
-	 * @param id
-	 * @param nameUTF8
-	 */
-	public GitlinkTreeEntry(final Tree parent, final ObjectId id,
-			final byte[] nameUTF8) {
-		super(parent, id, nameUTF8);
+	private File currentDirectory;
+
+	TreeVisitorWithCurrentDirectory(final File rootDirectory) {
+		currentDirectory = rootDirectory;
 	}
 
-	public FileMode getMode() {
-		return FileMode.GITLINK;
+	File getCurrentDirectory() {
+		return currentDirectory;
 	}
 
-	public void accept(final TreeVisitor tv, final int flags)
-			throws IOException {
-		if ((MODIFIED_ONLY & flags) == MODIFIED_ONLY && !isModified()) {
-			return;
+	public void startVisitTree(final Tree t) throws IOException {
+		stack.add(currentDirectory);
+		if (!t.isRoot()) {
+			currentDirectory = new File(currentDirectory, t.getName());
 		}
-
-		tv.visitGitlink(this);
 	}
 
-	@Override
-	public String toString() {
-		final StringBuilder r = new StringBuilder();
-		r.append(ObjectId.toString(getId()));
-		r.append(" G ");
-		r.append(getFullName());
-		return r.toString();
+	public void endVisitTree(final Tree t) throws IOException {
+		currentDirectory = stack.remove(stack.size() - 1);
 	}
 }
