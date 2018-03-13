@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010, Google Inc.
+ * Copyright (C) 2008-2009, Google Inc.
  * Copyright (C) 2008, Marek Zawirski <marek.zawirski@gmail.com>
  * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
@@ -127,23 +127,6 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 			cmd.append(QuotedString.BOURNE.quote(val));
 	}
 
-	private String commandFor(final String exe) {
-		String path = uri.getPath();
-		if (uri.getScheme() != null && uri.getPath().startsWith("/~"))
-			path = (uri.getPath().substring(1));
-
-		final StringBuilder cmd = new StringBuilder();
-		final int gitspace = exe.indexOf("git ");
-		if (gitspace >= 0) {
-			sqMinimal(cmd, exe.substring(0, gitspace + 3));
-			cmd.append(' ');
-			sqMinimal(cmd, exe.substring(gitspace + 4));
-		} else
-			sqMinimal(cmd, exe);
-		cmd.append(' ');
-		sqAlways(cmd, path);
-		return cmd.toString();
-	}
 
 	ChannelExec exec(final String exe) throws TransportException {
 		initSession();
@@ -151,24 +134,27 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		final int tms = getTimeout() > 0 ? getTimeout() * 1000 : 0;
 		try {
 			final ChannelExec channel = (ChannelExec) sock.openChannel("exec");
-			channel.setCommand(commandFor(exe));
+			String path = uri.getPath();
+			if (uri.getScheme() != null && uri.getPath().startsWith("/~"))
+				path = (uri.getPath().substring(1));
+
+			final StringBuilder cmd = new StringBuilder();
+			final int gitspace = exe.indexOf("git ");
+			if (gitspace >= 0) {
+				sqMinimal(cmd, exe.substring(0, gitspace + 3));
+				cmd.append(' ');
+				sqMinimal(cmd, exe.substring(gitspace + 4));
+			} else
+				sqMinimal(cmd, exe);
+			cmd.append(' ');
+			sqAlways(cmd, path);
+			channel.setCommand(cmd.toString());
 			errStream = createErrorStream();
 			channel.setErrStream(errStream, true);
 			channel.connect(tms);
 			return channel;
 		} catch (JSchException je) {
 			throw new TransportException(uri, je.getMessage(), je);
-		}
-	}
-
-	void checkExecFailure(int status, String exe) throws TransportException {
-		if (status == 127) {
-			String why = errStream.toString();
-			IOException cause = null;
-			if (why != null && why.length() > 0)
-				cause = new IOException(why);
-			throw new TransportException(uri, "cannot execute: "
-					+ commandFor(exe), cause);
 		}
 	}
 
@@ -319,8 +305,6 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 	class SshFetchConnection extends BasePackFetchConnection {
 		private ChannelExec channel;
 
-		private int exitStatus;
-
 		SshFetchConnection() throws TransportException {
 			super(TransportGitSsh.this);
 			try {
@@ -343,8 +327,6 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 			try {
 				readAdvertisedRefs();
 			} catch (NoRemoteRepositoryException notFound) {
-				close();
-				checkExecFailure(exitStatus, getOptionUploadPack());
 				throw cleanNotFound(notFound);
 			}
 		}
@@ -355,7 +337,6 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 
 			if (channel != null) {
 				try {
-					exitStatus = channel.getExitStatus();
 					if (channel.isConnected())
 						channel.disconnect();
 				} finally {
@@ -367,8 +348,6 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 
 	class SshPushConnection extends BasePackPushConnection {
 		private ChannelExec channel;
-
-		private int exitStatus;
 
 		SshPushConnection() throws TransportException {
 			super(TransportGitSsh.this);
@@ -392,8 +371,6 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 			try {
 				readAdvertisedRefs();
 			} catch (NoRemoteRepositoryException notFound) {
-				close();
-				checkExecFailure(exitStatus, getOptionReceivePack());
 				throw cleanNotFound(notFound);
 			}
 		}
@@ -404,7 +381,6 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 
 			if (channel != null) {
 				try {
-					exitStatus = channel.getExitStatus();
 					if (channel.isConnected())
 						channel.disconnect();
 				} finally {
