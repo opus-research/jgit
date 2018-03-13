@@ -94,12 +94,7 @@ class Commit extends TextBuiltin {
 		commitCmd.setAmend(amend);
 		commitCmd.setAll(all);
 		Ref head = db.getRef(Constants.HEAD);
-		RevCommit commit;
-		try {
-			commit = commitCmd.call();
-		} catch (JGitInternalException e) {
-			throw die(e.getMessage());
-		}
+		RevCommit commit = commitCmd.call();
 
 		String branchName;
 		if (!head.isSymbolic())
