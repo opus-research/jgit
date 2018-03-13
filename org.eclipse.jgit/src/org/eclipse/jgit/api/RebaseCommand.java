@@ -60,6 +60,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.RebaseResult.Status;
 import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -74,7 +75,6 @@ import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.dircache.DirCacheIterator;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
@@ -955,9 +955,11 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		static Action parse(String token) {
 			if (token.equals("pick") || token.equals("p"))
 				return PICK;
-			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().unknownOrUnsupportedCommand, token,
-					PICK.toToken()));
+			throw new JGitInternalException(
+					MessageFormat
+							.format(
+									"Unknown or unsupported command \"{0}\", only  \"pick\" is allowed",
+									token));
 		}
 	}
 

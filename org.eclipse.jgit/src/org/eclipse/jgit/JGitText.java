@@ -41,7 +41,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal;
+package org.eclipse.jgit;
 
 import org.eclipse.jgit.nls.NLS;
 import org.eclipse.jgit.nls.TranslationBundle;
@@ -489,9 +489,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String stashApplyFailed;
 	/***/ public String stashApplyOnUnsafeRepository;
 	/***/ public String stashCommitMissingTwoParents;
-	/***/ public String stashDropDeleteRefFailed;
-	/***/ public String stashDropFailed;
-	/***/ public String stashDropMissingReflog;
 	/***/ public String stashFailed;
 	/***/ public String stashResolveFailed;
 	/***/ public String statelessRPCRequiresOptionToBeEnabled;
@@ -536,7 +533,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unexpectedRefReport;
 	/***/ public String unexpectedReportLine;
 	/***/ public String unexpectedReportLine2;
-	/***/ public String unknownOrUnsupportedCommand;
 	/***/ public String unknownDIRCVersion;
 	/***/ public String unknownHost;
 	/***/ public String unknownIndexVersionOrCorruptIndex;

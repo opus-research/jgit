@@ -48,6 +48,7 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.ResetCommand.ResetType;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
@@ -58,7 +59,6 @@ import org.eclipse.jgit.dircache.DirCacheEditor.DeletePath;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
@@ -85,7 +85,6 @@ import org.eclipse.jgit.treewalk.filter.SkipWorkTreeFilter;
  *
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-stash.html"
  *      >Git documentation about Stash</a>
- * @since 2.0
  */
 public class StashCreateCommand extends GitCommand<RevCommit> {
 
@@ -255,11 +254,11 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 						entry.setLength(wtIter.getEntryLength());
 						entry.setLastModified(wtIter.getEntryLastModified());
 						entry.setFileMode(wtIter.getEntryFileMode());
-						long contentLength = wtIter.getEntryContentLength();
 						InputStream in = wtIter.openEntryStream();
 						try {
 							entry.setObjectId(inserter.insert(
-									Constants.OBJ_BLOB, contentLength, in));
+									Constants.OBJ_BLOB,
+									wtIter.getEntryLength(), in));
 						} finally {
 							in.close();
 						}

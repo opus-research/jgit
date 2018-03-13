@@ -45,11 +45,7 @@ package org.eclipse.jgit.transport;
 
 import java.io.IOException;
 
-/**
- * Indicates a transport service may not continue execution.
- *
- * @since 2.0
- */
+/** Indicates a transport service may not continue execution. */
 public class ServiceMayNotContinueException extends IOException {
 	private static final long serialVersionUID = 1L;
 
