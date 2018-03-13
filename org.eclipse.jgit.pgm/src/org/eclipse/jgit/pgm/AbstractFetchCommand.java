@@ -90,9 +90,6 @@ abstract class AbstractFetchCommand extends TextBuiltin {
 			}
 		}
 		showRemoteMessages(errw, r.getMessages());
-		for (FetchResult submoduleResult : r.submoduleResults().values()) {
-			showFetchResult(submoduleResult);
-		}
 	}
 
 	static void showRemoteMessages(ThrowingPrintWriter writer, String pkt) throws IOException {

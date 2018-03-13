@@ -240,11 +240,9 @@ public class SubmoduleUpdateCommand extends
 	 *
 	 * @param callback
 	 *            the callback
-	 * @return {@code this}
 	 * @since 4.8
 	 */
-	public SubmoduleUpdateCommand setCallback(CloneCommand.Callback callback) {
+	public void setCallback(CloneCommand.Callback callback) {
 		this.callback = callback;
-		return this;
 	}
 }
