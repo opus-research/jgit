@@ -253,7 +253,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	 * @param all
 	 *            true to checkout all paths, false otherwise
 	 * @return {@code this}
-	 * @since 2.0
 	 */
 	public CheckoutCommand setAllPaths(boolean all) {
 		checkoutAllPaths = all;

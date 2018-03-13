@@ -105,7 +105,6 @@ public class TagCommand extends GitCommand<Ref> {
 	 *             exception can be retrieved by calling
 	 *             {@link Exception#getCause()}. Expect only
 	 *             {@code IOException's} to be wrapped.
-	 * @since 2.0
 	 */
 	public Ref call() throws JGitInternalException,
 			ConcurrentRefUpdateException, InvalidTagNameException, NoHeadException {
