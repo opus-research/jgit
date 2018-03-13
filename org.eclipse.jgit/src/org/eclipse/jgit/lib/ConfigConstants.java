@@ -47,6 +47,7 @@ package org.eclipse.jgit.lib;
  * Constants for use with the Configuration classes: section names,
  * configuration keys
  */
+@SuppressWarnings("nls")
 public class ConfigConstants {
 	/** The "core" section */
 	public static final String CONFIG_CORE_SECTION = "core";
@@ -184,9 +185,6 @@ public class ConfigConstants {
 
 	/** The "indexversion" key */
 	public static final String CONFIG_KEY_INDEXVERSION = "indexversion";
-
-	/** The "hidedotfiles" key */
-	public static final String CONFIG_KEY_HIDEDOTFILES = "hidedotfiles";
 
 	/** The "precomposeunicode" key */
 	public static final String CONFIG_KEY_PRECOMPOSEUNICODE = "precomposeunicode";
