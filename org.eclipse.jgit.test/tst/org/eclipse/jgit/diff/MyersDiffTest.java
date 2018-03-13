@@ -1,7 +1,6 @@
 /*
- * Copyright (C) 2008, Google Inc.
- * Copyright (C) 2008-2009, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2009, Johannes E. Schindelin
+ * Copyright (C) 2009, Johannes Schindelin <johannes.schindelin@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,61 +42,68 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.transport;
+package org.eclipse.jgit.diff;
 
-import java.io.IOException;
-import java.io.OutputStream;
+import junit.framework.TestCase;
 
-import org.eclipse.jgit.lib.Constants;
-
-class PacketLineOut {
-	private final OutputStream out;
-
-	private final byte[] lenbuffer;
-
-	PacketLineOut(final OutputStream i) {
-		out = i;
-		lenbuffer = new byte[5];
+public class MyersDiffTest extends TestCase {
+	public void testAtEnd() {
+		assertDiff("HELLO", "HELL", " -4,1 +4,0");
 	}
 
-	void writeString(final String s) throws IOException {
-		writePacket(Constants.encode(s));
+	public void testAtStart() {
+		assertDiff("Git", "JGit", " -0,0 +0,1");
 	}
 
-	void writePacket(final byte[] packet) throws IOException {
-		formatLength(packet.length + 4);
-		out.write(lenbuffer, 0, 4);
-		out.write(packet);
+	public void testSimple() {
+		assertDiff("HELLO WORLD", "LOW",
+			" -0,3 +0,0 -5,1 +2,0 -7,4 +3,0");
+		// is ambiguous, could be this, too:
+		// " -0,2 +0,0 -3,1 +1,0 -5,1 +2,0 -7,4 +3,0"
 	}
 
-	void writeChannelPacket(final int channel, final byte[] buf, int off,
-			int len) throws IOException {
-		formatLength(len + 5);
-		lenbuffer[4] = (byte) channel;
-		out.write(lenbuffer, 0, 5);
-		out.write(buf, off, len);
+	public void assertDiff(String a, String b, String edits) {
+		MyersDiff diff = new MyersDiff(toCharArray(a), toCharArray(b));
+		assertEquals(edits, toString(diff.getEdits()));
 	}
 
-	void end() throws IOException {
-		formatLength(0);
-		out.write(lenbuffer, 0, 4);
-		flush();
+	private static String toString(EditList list) {
+		StringBuilder builder = new StringBuilder();
+		for (Edit e : list)
+			builder.append(" -" + e.beginA
+					+ "," + (e.endA - e.beginA)
+				+ " +" + e.beginB + "," + (e.endB - e.beginB));
+		return builder.toString();
 	}
 
-	void flush() throws IOException {
-		out.flush();
+	private static CharArray toCharArray(String s) {
+		return new CharArray(s);
 	}
 
-	private static final byte[] hexchar = { '0', '1', '2', '3', '4', '5', '6',
-			'7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
+	protected static String toString(Sequence seq, int begin, int end) {
+		CharArray a = (CharArray)seq;
+		return new String(a.array, begin, end - begin);
+	}
 
-	private void formatLength(int w) {
-		int o = 3;
-		while (o >= 0 && w != 0) {
-			lenbuffer[o--] = hexchar[w & 0xf];
-			w >>>= 4;
+	protected static String toString(CharArray a, CharArray b,
+			int x, int k) {
+		return "(" + x + "," + (k + x)
+			+ (x < 0 ? '<' :
+					(x >= a.array.length ?
+					 '>' : a.array[x]))
+			+ (k + x < 0 ? '<' :
+					(k + x >= b.array.length ?
+					 '>' : b.array[k + x]))
+			+ ")";
+	}
+
+	private static class CharArray implements Sequence {
+		char[] array;
+		public CharArray(String s) { array = s.toCharArray(); }
+		public int size() { return array.length; }
+		public boolean equals(int i, Sequence other, int j) {
+			CharArray o = (CharArray)other;
+			return array[i] == o.array[j];
 		}
-		while (o >= 0)
-			lenbuffer[o--] = '0';
 	}
 }

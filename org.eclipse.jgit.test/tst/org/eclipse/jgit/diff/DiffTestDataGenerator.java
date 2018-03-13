@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2008, Google Inc.
- * Copyright (C) 2008-2009, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2009, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,61 +41,50 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.transport;
+package org.eclipse.jgit.diff;
 
-import java.io.IOException;
-import java.io.OutputStream;
-
-import org.eclipse.jgit.lib.Constants;
-
-class PacketLineOut {
-	private final OutputStream out;
-
-	private final byte[] lenbuffer;
-
-	PacketLineOut(final OutputStream i) {
-		out = i;
-		lenbuffer = new byte[5];
+public class DiffTestDataGenerator {
+	/**
+	 * Generate sequence of characters in ascending order. The first character
+	 * is a space. All subsequent characters have an ASCII code one greater then
+	 * the ASCII code of the preceding character. On exception: the character
+	 * following which follows '~' is again a ' '.
+	 *
+	 * @param len
+	 *            length of the String to be returned
+	 * @return the sequence of characters as String
+	 */
+	public static String generateSequence(int len) {
+		return generateSequence(len, 0, 0);
 	}
 
-	void writeString(final String s) throws IOException {
-		writePacket(Constants.encode(s));
-	}
-
-	void writePacket(final byte[] packet) throws IOException {
-		formatLength(packet.length + 4);
-		out.write(lenbuffer, 0, 4);
-		out.write(packet);
-	}
-
-	void writeChannelPacket(final int channel, final byte[] buf, int off,
-			int len) throws IOException {
-		formatLength(len + 5);
-		lenbuffer[4] = (byte) channel;
-		out.write(lenbuffer, 0, 5);
-		out.write(buf, off, len);
-	}
-
-	void end() throws IOException {
-		formatLength(0);
-		out.write(lenbuffer, 0, 4);
-		flush();
-	}
-
-	void flush() throws IOException {
-		out.flush();
-	}
-
-	private static final byte[] hexchar = { '0', '1', '2', '3', '4', '5', '6',
-			'7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
-
-	private void formatLength(int w) {
-		int o = 3;
-		while (o >= 0 && w != 0) {
-			lenbuffer[o--] = hexchar[w & 0xf];
-			w >>>= 4;
+	/**
+	 * Generate sequence of characters similar to the one returned by
+	 * {@link #generateSequence(int)}. But this time in each chunk of
+	 * <skipPeriod> characters the last <skipLength> characters are left out. By
+	 * calling this method twice with two different prime skipPeriod values and
+	 * short skipLength values you create test data which is similar to what
+	 * programmers do to their source code - huge files with only few
+	 * insertions/deletions/changes.
+	 *
+	 * @param len
+	 *            length of the String to be returned
+	 * @param skipPeriod
+	 * @param skipLength
+	 * @return the sequence of characters as String
+	 */
+	public static String generateSequence(int len, int skipPeriod,
+			int skipLength) {
+		StringBuilder text = new StringBuilder(len);
+		int skipStart = skipPeriod - skipLength;
+		int skippedChars = 0;
+		for (int i = 0; i - skippedChars < len; ++i) {
+			if (skipPeriod == 0 || i % skipPeriod < skipStart) {
+				text.append((char) (32 + i % 95));
+			} else {
+				skippedChars++;
+			}
 		}
-		while (o >= 0)
-			lenbuffer[o--] = '0';
+		return text.toString();
 	}
 }
