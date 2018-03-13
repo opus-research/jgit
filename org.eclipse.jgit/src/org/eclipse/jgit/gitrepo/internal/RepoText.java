@@ -63,5 +63,4 @@ public class RepoText extends TranslationBundle {
 	/***/ public String errorNoDefault;
 	/***/ public String errorParsingManifestFile;
 	/***/ public String invalidManifest;
-	/***/ public String repoCommitMessage;
 }
