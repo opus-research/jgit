@@ -75,7 +75,7 @@ class Merge extends TextBuiltin {
 	@Option(name = "--no-commit", usage = "usage_noCommit")
 	private boolean noCommit = false;
 
-	private MergeStrategy mergeStrategy = MergeStrategy.RESOLVE;
+	private MergeStrategy mergeStrategy = MergeStrategy.RECURSIVE;
 
 	@Argument(required = true)
 	private String ref;
@@ -182,6 +182,7 @@ class Merge extends TextBuiltin {
 		case FAST_FORWARD_SQUASHED:
 		case MERGED_SQUASHED_NOT_COMMITTED:
 			outw.println(CLIText.get().mergedSquashed);
+			outw.println(CLIText.get().mergeWentWellStoppedBeforeCommitting);
 			break;
 		case ABORTED:
 			throw die(CLIText.get().ffNotPossibleAborting);
