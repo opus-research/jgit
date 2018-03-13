@@ -45,6 +45,8 @@ package org.eclipse.jgit.dircache;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -57,10 +59,12 @@ import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.IndexWriteException;
 import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.EmptyTreeIterator;
@@ -71,7 +75,6 @@ import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FileUtils;
 
 /**
  * This class handles checking out one or two trees merging with the index. This
@@ -107,7 +110,7 @@ public class DirCacheCheckout {
 	private ArrayList<String> toBeDeleted = new ArrayList<String>();
 
 	/**
-	 * @return a list of updated paths and objectIds
+	 * @return a list of updated pathes and objectIds
 	 */
 	public Map<String, ObjectId> getUpdated() {
 		return updated;
@@ -130,7 +133,7 @@ public class DirCacheCheckout {
 	 *         {@link DirCacheCheckout}.
 	 */
 	public List<String> getToBeDeleted() {
-		return toBeDeleted;
+		return conflicts;
 	}
 
 	/**
@@ -183,7 +186,9 @@ public class DirCacheCheckout {
 	 */
 	public DirCacheCheckout(Repository repo, ObjectId headCommitTree,
 			DirCache dc, ObjectId mergeCommitTree) throws IOException {
-		this(repo, headCommitTree, dc, mergeCommitTree, new FileTreeIterator(repo));
+		this(repo, headCommitTree, dc, mergeCommitTree, new FileTreeIterator(
+				repo.getWorkTree(), repo.getFS(),
+				WorkingTreeOptions.createDefaultInstance()));
 	}
 
 	/**
@@ -221,7 +226,9 @@ public class DirCacheCheckout {
 	 */
 	public DirCacheCheckout(Repository repo, DirCache dc,
 			ObjectId mergeCommitTree) throws IOException {
-		this(repo, null, dc, mergeCommitTree, new FileTreeIterator(repo));
+		this(repo, null, dc, mergeCommitTree, new FileTreeIterator(
+				repo.getWorkTree(), repo.getFS(),
+				WorkingTreeOptions.createDefaultInstance()));
 	}
 
 	/**
@@ -238,6 +245,7 @@ public class DirCacheCheckout {
 		walk = new NameConflictTreeWalk(repo);
 		builder = dc.builder();
 
+		walk.reset();
 		addTree(walk, headCommitTree);
 		addTree(walk, mergeCommitTree);
 		walk.addTree(new DirCacheBuildIterator(builder));
@@ -279,6 +287,7 @@ public class DirCacheCheckout {
 		builder = dc.builder();
 
 		walk = new NameConflictTreeWalk(repo);
+		walk.reset();
 		walk.addTree(mergeCommitTree);
 		walk.addTree(new DirCacheBuildIterator(builder));
 		walk.addTree(workingTree);
@@ -300,69 +309,33 @@ public class DirCacheCheckout {
 	 * @param m the tree to merge
 	 * @param i the index
 	 * @param f the working tree
-	 * @throws IOException
 	 */
 	void processEntry(CanonicalTreeParser m, DirCacheBuildIterator i,
-			WorkingTreeIterator f) throws IOException {
+			WorkingTreeIterator f) {
 		if (m != null) {
-			// There is an entry in the merge commit. Means: we want to update
-			// what's currently in the index and working-tree to that one
-			if (i == null) {
-				// The index entry is missing
-				if (f != null && !FileMode.TREE.equals(f.getEntryFileMode())
-						&& !f.isEntryIgnored()) {
-					// don't overwrite an untracked and not ignored file
-					conflicts.add(walk.getPathString());
-				} else
-					update(m.getEntryPathString(), m.getEntryObjectId(),
-						m.getEntryFileMode());
-			} else if (f == null || !m.idEqual(i)) {
-				// The working tree file is missing or the merge content differs
-				// from index content
+			if (i == null || f == null || !m.idEqual(i)
+					|| (i.getDirCacheEntry() != null && (f.isModified(
+							i.getDirCacheEntry(), true, config_filemode(),
+							repo.getFS()) || i.getDirCacheEntry().getStage() != 0))) {
 				update(m.getEntryPathString(), m.getEntryObjectId(),
 						m.getEntryFileMode());
-			} else if (i.getDirCacheEntry() != null) {
-				// The index contains a file (and not a folder)
-				if (f.isModified(i.getDirCacheEntry(), true)
-						|| i.getDirCacheEntry().getStage() != 0)
-					// The working tree file is dirty or the index contains a
-					// conflict
-					update(m.getEntryPathString(), m.getEntryObjectId(),
-							m.getEntryFileMode());
-				else
-					keep(i.getDirCacheEntry());
 			} else
-				// The index contains a folder
 				keep(i.getDirCacheEntry());
 		} else {
-			// There is no entry in the merge commit. Means: we want to delete
-			// what's currently in the index and working tree
 			if (f != null) {
-				// There is a file/folder for that path in the working tree
 				if (walk.isDirectoryFileConflict()) {
 					conflicts.add(walk.getPathString());
 				} else {
-					// No file/folder conflict exists. All entries are files or
-					// all entries are folders
 					if (i != null) {
-						// ... and the working tree contained a file or folder
-						// -> add it to the removed set and remove it from
+						// ... and the working dir contained a file or folder ->
+						// add it to the removed set and remove it from
 						// conflicts set
 						remove(i.getEntryPathString());
 						conflicts.remove(i.getEntryPathString());
-					} else {
-						// untracked file, neither contained in tree to merge
-						// nor in index
 					}
 				}
-			} else {
-				// There is no file/folder for that path in the working tree.
-				// The only entry we have is the index entry. If that entry is a
-				// conflict simply remove it. Otherwise keep that entry in the
-				// index
-				if (i.getDirCacheEntry().getStage() == 0)
-					keep(i.getDirCacheEntry());
-			}
+			} else if (i.getDirCacheEntry().getStage() == 0)
+				keep(i.getDirCacheEntry());
 		}
 	}
 
@@ -419,11 +392,10 @@ public class DirCacheCheckout {
 		for (String path : updated.keySet()) {
 			// ... create/overwrite this file ...
 			file = new File(repo.getWorkTree(), path);
-			if (!file.getParentFile().mkdirs()) {
-				// ignore
-			}
+			file.getParentFile().mkdirs();
+			file.createNewFile();
 			DirCacheEntry entry = dc.getEntry(path);
-			checkoutEntry(repo, file, entry);
+			checkoutEntry(repo, file, entry, config_filemode());
 		}
 
 
@@ -607,7 +579,9 @@ public class DirCacheCheckout {
 			case 0xFFD: // 12 13 14
 				if (hId.equals(iId)) {
 					dce = i.getDirCacheEntry();
-					if (f == null || f.isModified(dce, true))
+					if (f == null
+							|| f.isModified(dce, true, config_filemode(),
+									repo.getFS()))
 						conflict(name, i.getDirCacheEntry(), h, m);
 					else
 						remove(name);
@@ -636,16 +610,6 @@ public class DirCacheCheckout {
 		}
 
 		if (i == null) {
-			// make sure not to overwrite untracked files
-			if (f != null) {
-				// a dirty worktree: the index is empty but we have a
-				// workingtree-file
-				if (mId == null || !mId.equals(f.getEntryObjectId())) {
-					conflict(name, null, h, m);
-					return;
-				}
-			}
-
 			/**
 			 * <pre>
 			 * 		    I (index)                H        M        Result
@@ -683,7 +647,8 @@ public class DirCacheCheckout {
 				if (m == null || mId.equals(iId)) {
 					if (m==null && walk.isDirectoryFileConflict()) {
 						if (dce != null
-								&& (f == null || f.isModified(dce, true)))
+								&& (f == null || f.isModified(dce, true,
+										config_filemode(), repo.getFS())))
 							conflict(name, i.getDirCacheEntry(), h, m);
 						else
 							remove(name);
@@ -705,7 +670,9 @@ public class DirCacheCheckout {
 				 */
 
 				if (hId.equals(iId)) {
-					if (f == null || f.isModified(dce, true))
+					if (f == null
+							|| f.isModified(dce, true, config_filemode(),
+									repo.getFS()))
 						conflict(name, i.getDirCacheEntry(), h, m);
 					else
 						remove(name);
@@ -715,7 +682,9 @@ public class DirCacheCheckout {
 				if (!hId.equals(mId) && !hId.equals(iId) && !mId.equals(iId))
 					conflict(name, i.getDirCacheEntry(), h, m);
 				else if (hId.equals(iId) && !mId.equals(iId)) {
-					if (dce != null && (f == null || f.isModified(dce, true)))
+					if (dce != null
+							&& (f == null || f.isModified(dce, true,
+									config_filemode(), repo.getFS())))
 						conflict(name, i.getDirCacheEntry(), h, m);
 					else
 						update(name, mId, m.getEntryFileMode());
@@ -777,6 +746,19 @@ public class DirCacheCheckout {
 		}
 	}
 
+	private Boolean filemode;
+
+	private boolean config_filemode() {
+		// TODO: temporary till we can actually set parameters. We need to be
+		// able to change this for testing.
+		if (filemode == null) {
+			StoredConfig config = repo.getConfig();
+			filemode = Boolean.valueOf(config.getBoolean("core", null,
+					"filemode", true));
+		}
+		return filemode.booleanValue();
+	}
+
 	/**
 	 * If <code>true</code>, will scan first to see if it's possible to check
 	 * out, otherwise throw {@link CheckoutConflictException}. If
@@ -805,18 +787,17 @@ public class DirCacheCheckout {
 		}
 		for (String r : removed) {
 			File file = new File(repo.getWorkTree(), r);
-			if (!file.delete())
-				throw new CheckoutConflictException(
-						MessageFormat.format(JGitText.get().cannotDeleteFile,
-								file.getAbsolutePath()));
+			file.delete();
 			removeEmptyParents(file);
 		}
 	}
 
 	private boolean isModified(String path) throws CorruptObjectException, IOException {
 		NameConflictTreeWalk tw = new NameConflictTreeWalk(repo);
+		tw.reset();
 		tw.addTree(new DirCacheIterator(dc));
-		tw.addTree(new FileTreeIterator(repo));
+		tw.addTree(new FileTreeIterator(repo.getWorkTree(), repo.getFS(),
+				WorkingTreeOptions.createDefaultInstance()));
 		tw.setRecursive(true);
 		tw.setFilter(PathFilter.create(path));
 		DirCacheIterator dcIt;
@@ -826,7 +807,7 @@ public class DirCacheCheckout {
 			wtIt = tw.getTree(1, WorkingTreeIterator.class);
 			if (dcIt == null || wtIt == null)
 				return true;
-			if (wtIt.isModified(dcIt.getDirCacheEntry(), true)) {
+			if (wtIt.isModified(dcIt.getDirCacheEntry(), true, config_filemode(), repo.getFS())) {
 				return true;
 			}
 		}
@@ -848,22 +829,33 @@ public class DirCacheCheckout {
 	 *            has to exist already
 	 * @param entry
 	 *            the entry containing new mode and content
+	 * @param config_filemode
+	 *            whether the mode bits should be handled at all.
 	 * @throws IOException
 	 */
-	public static void checkoutEntry(final Repository repo, File f,
-			DirCacheEntry entry) throws IOException {
+	public static void checkoutEntry(final Repository repo, File f, DirCacheEntry entry,
+			boolean config_filemode) throws IOException {
 		ObjectLoader ol = repo.open(entry.getObjectId());
+		if (ol == null)
+			throw new MissingObjectException(entry.getObjectId(),
+					Constants.TYPE_BLOB);
+
+		byte[] bytes = ol.getCachedBytes();
+
 		File parentDir = f.getParentFile();
 		File tmpFile = File.createTempFile("._" + f.getName(), null, parentDir);
-		FileOutputStream channel = new FileOutputStream(tmpFile);
+		FileChannel channel = new FileOutputStream(tmpFile).getChannel();
+		ByteBuffer buffer = ByteBuffer.wrap(bytes);
 		try {
-			ol.copyTo(channel);
+			int j = channel.write(buffer);
+			if (j != bytes.length)
+				throw new IOException(MessageFormat.format(
+						JGitText.get().couldNotWriteFile, tmpFile));
 		} finally {
 			channel.close();
 		}
 		FS fs = repo.getFS();
-		WorkingTreeOptions opt = repo.getConfig().get(WorkingTreeOptions.KEY);
-		if (opt.isFileMode() && fs.supportsExecute()) {
+		if (config_filemode && fs.supportsExecute()) {
 			if (FileMode.EXECUTABLE_FILE.equals(entry.getRawMode())) {
 				if (!fs.canExecute(tmpFile))
 					fs.setExecute(tmpFile, true);
@@ -875,7 +867,7 @@ public class DirCacheCheckout {
 		if (!tmpFile.renameTo(f)) {
 			// tried to rename which failed. Let' delete the target file and try
 			// again
-			FileUtils.delete(f);
+			f.delete();
 			if (!tmpFile.renameTo(f)) {
 				throw new IOException(MessageFormat.format(
 						JGitText.get().couldNotWriteFile, tmpFile.getPath(),

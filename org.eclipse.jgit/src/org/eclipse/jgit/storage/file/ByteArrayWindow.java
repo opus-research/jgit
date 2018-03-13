@@ -46,11 +46,10 @@
 package org.eclipse.jgit.storage.file;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.zip.CRC32;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
-
-import org.eclipse.jgit.storage.pack.PackOutputStream;
 
 /**
  * A {@link ByteWindow} with an underlying byte array for storage.
@@ -82,8 +81,7 @@ final class ByteArrayWindow extends ByteWindow {
 		out.update(array, (int) (pos - start), cnt);
 	}
 
-	@Override
-	void write(PackOutputStream out, long pos, int cnt) throws IOException {
+	void write(OutputStream out, long pos, int cnt) throws IOException {
 		out.write(array, (int) (pos - start), cnt);
 	}
 

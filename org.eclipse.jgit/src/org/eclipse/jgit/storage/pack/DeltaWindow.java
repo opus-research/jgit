@@ -129,6 +129,8 @@ class DeltaWindow {
 			int cnt) throws IOException {
 		try {
 			for (int end = off + cnt; off < end; off++) {
+				monitor.update(1);
+
 				res = window[resSlot];
 				if (0 < maxMemory) {
 					clear(res);
@@ -150,7 +152,6 @@ class DeltaWindow {
 				} else {
 					// Search for a delta for the current window slot.
 					//
-					monitor.update(1);
 					search();
 				}
 			}

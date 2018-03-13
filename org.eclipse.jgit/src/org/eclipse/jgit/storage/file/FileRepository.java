@@ -66,7 +66,6 @@ import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileObjectDatabase.AlternateHandle;
 import org.eclipse.jgit.storage.file.FileObjectDatabase.AlternateRepository;
-import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.SystemReader;
 
 /**
@@ -95,8 +94,6 @@ import org.eclipse.jgit.util.SystemReader;
  *
  */
 public class FileRepository extends Repository {
-	private final FileBasedConfig systemConfig;
-
 	private final FileBasedConfig userConfig;
 
 	private final FileBasedConfig repoConfig;
@@ -154,18 +151,15 @@ public class FileRepository extends Repository {
 	public FileRepository(final BaseRepositoryBuilder options) throws IOException {
 		super(options);
 
-		systemConfig = SystemReader.getInstance().openSystemConfig(null, getFS());
-		userConfig = SystemReader.getInstance().openUserConfig(systemConfig,
-				getFS());
+		userConfig = SystemReader.getInstance().openUserConfig(getFS());
 		repoConfig = new FileBasedConfig(userConfig, //
 				getFS().resolve(getDirectory(), "config"), //
 				getFS());
 
-		loadSystemConfig();
 		loadUserConfig();
 		loadRepoConfig();
 
-		repoConfig.addChangeListener(new ConfigChangedListener() {
+		getConfig().addChangeListener(new ConfigChangedListener() {
 			public void onConfigChanged(ConfigChangedEvent event) {
 				fireEvent(event);
 			}
@@ -186,18 +180,6 @@ public class FileRepository extends Repository {
 						JGitText.get().unknownRepositoryFormat2,
 						repositoryFormatVersion));
 			}
-		}
-	}
-
-	private void loadSystemConfig() throws IOException {
-		try {
-			systemConfig.load();
-		} catch (ConfigInvalidException e1) {
-			IOException e2 = new IOException(MessageFormat.format(JGitText
-					.get().systemConfigFileInvalid, systemConfig.getFile()
-					.getAbsolutePath(), e1));
-			e2.initCause(e1);
-			throw e2;
 		}
 	}
 
@@ -239,11 +221,11 @@ public class FileRepository extends Repository {
 			throw new IllegalStateException(MessageFormat.format(
 					JGitText.get().repositoryAlreadyExists, getDirectory()));
 		}
-		FileUtils.mkdirs(getDirectory(), true);
+		getDirectory().mkdirs();
 		refs.create();
 		objectDatabase.create();
 
-		FileUtils.mkdir(new File(getDirectory(), "branches"));
+		new File(getDirectory(), "branches").mkdir();
 
 		RefUpdate head = updateRef(Constants.HEAD);
 		head.disableRefLog();
@@ -258,7 +240,7 @@ public class FileRepository extends Repository {
 
 			getFS().setExecute(tmp, false);
 			final boolean off = getFS().canExecute(tmp);
-			FileUtils.delete(tmp);
+			tmp.delete();
 
 			fileMode = on && !off;
 		} else {
@@ -302,13 +284,6 @@ public class FileRepository extends Repository {
 	 * @return the configuration of this repository
 	 */
 	public FileBasedConfig getConfig() {
-		if (systemConfig.isOutdated()) {
-			try {
-				loadSystemConfig();
-			} catch (IOException e) {
-				throw new RuntimeException(e);
-			}
-		}
 		if (userConfig.isOutdated()) {
 			try {
 				loadUserConfig();
@@ -343,12 +318,8 @@ public class FileRepository extends Repository {
 				Repository repo;
 
 				repo = ((AlternateRepository) d).repository;
-				for (Ref ref : repo.getAllRefs().values()) {
-					if (ref.getObjectId() != null)
-						r.add(ref.getObjectId());
-					if (ref.getPeeledObjectId() != null)
-						r.add(ref.getPeeledObjectId());
-				}
+				for (Ref ref : repo.getAllRefs().values())
+					r.add(ref.getObjectId());
 				r.addAll(repo.getAdditionalHaves());
 			}
 		}

@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.junit;
 
-import static org.junit.Assert.*;
-
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -57,6 +55,9 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
+import junit.framework.Assert;
+import junit.framework.AssertionFailedError;
 
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
@@ -96,7 +97,6 @@ import org.eclipse.jgit.storage.file.PackIndex.MutableEntry;
 import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
-import org.eclipse.jgit.util.FileUtils;
 
 /**
  * Wrapper to make creating test data easier.
@@ -276,10 +276,12 @@ public class TestRepository<R extends Repository> {
 	 * @param path
 	 *            the path to find the entry of.
 	 * @return the parsed object entry at this path, never null.
+	 * @throws AssertionFailedError
+	 *             if the path does not exist in the given tree.
 	 * @throws Exception
 	 */
 	public RevObject get(final RevTree tree, final String path)
-			throws Exception {
+			throws AssertionFailedError, Exception {
 		final TreeWalk tw = new TreeWalk(pool.getObjectReader());
 		tw.setFilter(PathFilterGroup.createFromStrings(Collections
 				.singleton(path)));
@@ -293,7 +295,7 @@ public class TestRepository<R extends Repository> {
 			final FileMode entmode = tw.getFileMode(0);
 			return pool.lookupAny(entid, entmode.getObjectType());
 		}
-		fail("Can't find " + path + " in tree " + tree.name());
+		Assert.fail("Can't find " + path + " in tree " + tree.name());
 		return null; // never reached.
 	}
 
@@ -595,7 +597,7 @@ public class TestRepository<R extends Repository> {
 		md.update(Constants.encodeASCII(bin.length));
 		md.update((byte) 0);
 		md.update(bin);
-		assertEquals(id, ObjectId.fromRaw(md.digest()));
+		Assert.assertEquals(id, ObjectId.fromRaw(md.digest()));
 	}
 
 	/**
@@ -649,10 +651,10 @@ public class TestRepository<R extends Repository> {
 		}
 	}
 
-	private void prunePacked(ObjectDirectory odb) throws IOException {
+	private void prunePacked(ObjectDirectory odb) {
 		for (PackFile p : odb.getPacks()) {
 			for (MutableEntry e : p)
-				FileUtils.delete(odb.fileFor(e.toObjectId()));
+				odb.fileFor(e.toObjectId()).delete();
 		}
 	}
 

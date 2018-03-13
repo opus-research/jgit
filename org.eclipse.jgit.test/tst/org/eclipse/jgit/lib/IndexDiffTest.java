@@ -45,21 +45,15 @@
 
 package org.eclipse.jgit.lib;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
 import java.io.File;
 import java.io.IOException;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEditor;
-import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
-import org.junit.Test;
 
 public class IndexDiffTest extends RepositoryTestCase {
-	@Test
 	public void testAdded() throws IOException {
 		GitIndex index = new GitIndex(db);
 		writeTrashFile("file1", "file1");
@@ -81,7 +75,6 @@ public class IndexDiffTest extends RepositoryTestCase {
 		assertEquals(0, diff.getRemoved().size());
 	}
 
-	@Test
 	public void testRemoved() throws IOException {
 		writeTrashFile("file2", "file2");
 		writeTrashFile("dir/file3", "dir/file3");
@@ -107,7 +100,6 @@ public class IndexDiffTest extends RepositoryTestCase {
 		assertEquals(0, diff.getAdded().size());
 	}
 
-	@Test
 	public void testModified() throws IOException {
 		GitIndex index = new GitIndex(db);
 
@@ -139,7 +131,6 @@ public class IndexDiffTest extends RepositoryTestCase {
 		assertEquals(0, diff.getMissing().size());
 	}
 
-	@Test
 	public void testUnchangedSimple() throws IOException {
 		GitIndex index = new GitIndex(db);
 
@@ -174,7 +165,6 @@ public class IndexDiffTest extends RepositoryTestCase {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testUnchangedComplex() throws IOException {
 		GitIndex index = new GitIndex(db);
 
@@ -230,7 +220,6 @@ public class IndexDiffTest extends RepositoryTestCase {
 	 *
 	 * @throws Exception
 	 */
-	@Test
 	public void testRemovedUntracked() throws Exception{
 		Git git = new Git(db);
 		String path = "file";
@@ -245,41 +234,6 @@ public class IndexDiffTest extends RepositoryTestCase {
 		assertTrue(diff.getUntracked().contains(path));
 	}
 
-	@Test
-	public void testAssumeUnchanged() throws Exception {
-		Git git = new Git(db);
-		String path = "file";
-		writeTrashFile(path, "content");
-		git.add().addFilepattern(path).call();
-		String path2 = "file2";
-		writeTrashFile(path2, "content");
-		git.add().addFilepattern(path2).call();
-		git.commit().setMessage("commit").call();
-		assumeUnchanged(path2);
-		writeTrashFile(path, "more content");
-		writeTrashFile(path2, "more content");
-
-		FileTreeIterator iterator = new FileTreeIterator(db);
-		IndexDiff diff = new IndexDiff(db, Constants.HEAD, iterator);
-		diff.diff();
-		assertEquals(1, diff.getAssumeUnchanged().size());
-		assertEquals(1, diff.getModified().size());
-		assertEquals(0, diff.getChanged().size());
-		assertTrue(diff.getAssumeUnchanged().contains("file2"));
-		assertTrue(diff.getModified().contains("file"));
-
-		git.add().addFilepattern(".").call();
-
-		iterator = new FileTreeIterator(db);
-		diff = new IndexDiff(db, Constants.HEAD, iterator);
-		diff.diff();
-		assertEquals(1, diff.getAssumeUnchanged().size());
-		assertEquals(0, diff.getModified().size());
-		assertEquals(1, diff.getChanged().size());
-		assertTrue(diff.getAssumeUnchanged().contains("file2"));
-		assertTrue(diff.getChanged().contains("file"));
-	}
-
 	private void removeFromIndex(String path) throws IOException {
 		final DirCache dirc = db.lockDirCache();
 		final DirCacheEditor edit = dirc.editor();
@@ -287,15 +241,4 @@ public class IndexDiffTest extends RepositoryTestCase {
 		if (!edit.commit())
 			throw new IOException("could not commit");
 	}
-
-	private void assumeUnchanged(String path) throws IOException {
-		final DirCache dirc = db.lockDirCache();
-		final DirCacheEntry ent = dirc.getEntry(path);
-		if (ent != null)
-			ent.setAssumeValid(true);
-		dirc.write();
-		if (!dirc.commit())
-			throw new IOException("could not commit");
-	}
-
 }

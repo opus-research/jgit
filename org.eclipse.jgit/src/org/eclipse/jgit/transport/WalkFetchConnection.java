@@ -87,7 +87,6 @@ import org.eclipse.jgit.storage.file.PackIndex;
 import org.eclipse.jgit.storage.file.PackLock;
 import org.eclipse.jgit.storage.file.UnpackedObject;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.util.FileUtils;
 
 /**
  * Generic fetch support for dumb transport protocols.
@@ -541,12 +540,8 @@ class WalkFetchConnection extends BaseFetchConnection {
 				// it failed the index and pack are unusable and we
 				// shouldn't consult them again.
 				//
-				try {
-					if (pack.tmpIdx != null)
-						FileUtils.delete(pack.tmpIdx);
-				} catch (IOException e) {
-					throw new TransportException(e.getMessage(), e);
-				}
+				if (pack.tmpIdx != null)
+					pack.tmpIdx.delete();
 				packItr.remove();
 			}
 
@@ -835,7 +830,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 					fos.close();
 				}
 			} catch (IOException err) {
-				FileUtils.delete(tmpIdx);
+				tmpIdx.delete();
 				throw err;
 			} finally {
 				s.in.close();
@@ -843,29 +838,30 @@ class WalkFetchConnection extends BaseFetchConnection {
 			pm.endTask();
 
 			if (pm.isCancelled()) {
-				FileUtils.delete(tmpIdx);
+				tmpIdx.delete();
 				return;
 			}
 
 			try {
 				index = PackIndex.open(tmpIdx);
 			} catch (IOException e) {
-				FileUtils.delete(tmpIdx);
+				tmpIdx.delete();
 				throw e;
 			}
 		}
 
 		void downloadPack(final ProgressMonitor monitor) throws IOException {
-			String name = "pack/" + packName;
-			WalkRemoteObjectDatabase.FileStream s = connection.open(name);
-			PackParser parser = inserter.newPackParser(s.in);
-			parser.setAllowThin(false);
-			parser.setObjectChecker(objCheck);
-			parser.setLockMessage(lockMessage);
-			PackLock lock = parser.parse(monitor);
-			if (lock != null)
-				packLocks.add(lock);
-			inserter.flush();
+			final WalkRemoteObjectDatabase.FileStream s;
+			final IndexPack ip;
+
+			s = connection.open("pack/" + packName);
+			ip = IndexPack.create(local, s.in);
+			ip.setFixThin(false);
+			ip.setObjectChecker(objCheck);
+			ip.index(monitor);
+			final PackLock keep = ip.renameAndOpenPack(lockMessage);
+			if (keep != null)
+				packLocks.add(keep);
 		}
 	}
 }

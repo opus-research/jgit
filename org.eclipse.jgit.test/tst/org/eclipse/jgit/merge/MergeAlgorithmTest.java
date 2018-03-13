@@ -43,17 +43,16 @@
 
 package org.eclipse.jgit.merge;
 
-import static org.junit.Assert.assertEquals;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+
+import junit.framework.TestCase;
 
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.diff.RawTextComparator;
 import org.eclipse.jgit.lib.Constants;
-import org.junit.Test;
 
-public class MergeAlgorithmTest {
+public class MergeAlgorithmTest extends TestCase {
 	MergeFormatter fmt=new MergeFormatter();
 
 	/**
@@ -62,7 +61,6 @@ public class MergeAlgorithmTest {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testTwoConflictingModifications() throws IOException {
 		assertEquals(t("a<b=Z>Zdefghij"),
 				merge("abcdefghij", "abZdefghij", "aZZdefghij"));
@@ -75,7 +73,6 @@ public class MergeAlgorithmTest {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testOneAgainstTwoConflictingModifications() throws IOException {
 		assertEquals(t("aZ<Z=c>Zefghij"),
 				merge("abcdefghij", "aZZZefghij", "aZcZefghij"));
@@ -87,7 +84,6 @@ public class MergeAlgorithmTest {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testNoAgainstOneModification() throws IOException {
 		assertEquals(t("aZcZefghij"),
 				merge("abcdefghij", "abcdefghij", "aZcZefghij"));
@@ -99,7 +95,6 @@ public class MergeAlgorithmTest {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testTwoNonConflictingModifications() throws IOException {
 		assertEquals(t("YbZdefghij"),
 				merge("abcdefghij", "abZdefghij", "Ybcdefghij"));
@@ -111,7 +106,6 @@ public class MergeAlgorithmTest {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testTwoComplicatedModifications() throws IOException {
 		assertEquals(t("a<ZZZZfZhZj=bYdYYYYiY>"),
 				merge("abcdefghij", "aZZZZfZhZj", "abYdYYYYiY"));
@@ -122,7 +116,6 @@ public class MergeAlgorithmTest {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testConflictAtStart() throws IOException {
 		assertEquals(t("<Z=Y>bcdefghij"),
 				merge("abcdefghij", "Zbcdefghij", "Ybcdefghij"));
@@ -133,7 +126,6 @@ public class MergeAlgorithmTest {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testConflictAtEnd() throws IOException {
 		assertEquals(t("abcdefghi<Z=Y>"),
 				merge("abcdefghij", "abcdefghiZ", "abcdefghiY"));
@@ -145,7 +137,6 @@ public class MergeAlgorithmTest {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testSameModification() throws IOException {
 		assertEquals(t("abZdefghij"),
 				merge("abcdefghij", "abZdefghij", "abZdefghij"));
@@ -157,49 +148,25 @@ public class MergeAlgorithmTest {
 	 *
 	 * @throws IOException
 	 */
-	@Test
 	public void testDeleteVsModify() throws IOException {
 		assertEquals(t("ab<=Z>defghij"),
 				merge("abcdefghij", "abdefghij", "abZdefghij"));
 	}
 
-	@Test
 	public void testInsertVsModify() throws IOException {
 		assertEquals(t("a<bZ=XY>"), merge("ab", "abZ", "aXY"));
 	}
 
-	@Test
 	public void testAdjacentModifications() throws IOException {
 		assertEquals(t("a<Zc=bY>d"), merge("abcd", "aZcd", "abYd"));
 	}
 
-	@Test
 	public void testSeperateModifications() throws IOException {
 		assertEquals(t("aZcYe"), merge("abcde", "aZcde", "abcYe"));
 	}
 
-	/**
-	 * Test merging two contents which do one similar modification and one
-	 * insertion is only done by one side. Between modification and insertion is
-	 * a block which is common between the two contents and the common base
-	 *
-	 * @throws IOException
-	 */
-	@Test
-	public void testTwoSimilarModsAndOneInsert() throws IOException {
-		assertEquals(t("IAAJ"), merge("iA", "IA", "IAAJ"));
-		assertEquals(t("aBcDde"), merge("abcde", "aBcde", "aBcDde"));
-		assertEquals(t("IAJ"), merge("iA", "IA", "IAJ"));
-		assertEquals(t("IAAAJ"), merge("iA", "IA", "IAAAJ"));
-		assertEquals(t("IAAAJCAB"), merge("iACAB", "IACAB", "IAAAJCAB"));
-		assertEquals(t("HIAAAJCAB"), merge("HiACAB", "HIACAB", "HIAAAJCAB"));
-		assertEquals(t("AGADEFHIAAAJCAB"),
-				merge("AGADEFHiACAB", "AGADEFHIACAB", "AGADEFHIAAAJCAB"));
-
-	}
-
 	private String merge(String commonBase, String ours, String theirs) throws IOException {
-		MergeResult r = new MergeAlgorithm().merge(RawTextComparator.DEFAULT,
+		MergeResult r = MergeAlgorithm.merge(RawTextComparator.DEFAULT,
 				T(commonBase), T(ours), T(theirs));
 		ByteArrayOutputStream bo=new ByteArrayOutputStream(50);
 		fmt.formatMerge(bo, r, "B", "O", "T", Constants.CHARACTER_ENCODING);

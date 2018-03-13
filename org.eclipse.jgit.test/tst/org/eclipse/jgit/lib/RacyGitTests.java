@@ -42,9 +42,6 @@
  */
 package org.eclipse.jgit.lib;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -53,7 +50,6 @@ import java.util.TreeSet;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.FileTreeIteratorWithTimeControl;
 import org.eclipse.jgit.treewalk.NameConflictTreeWalk;
-import org.eclipse.jgit.util.FileUtils;
 
 public class RacyGitTests extends RepositoryTestCase {
 	public void testIterator() throws IllegalStateException, IOException,
@@ -62,25 +58,26 @@ public class RacyGitTests extends RepositoryTestCase {
 		File lastFile = null;
 		for (int i = 0; i < 10; i++) {
 			lastFile = new File(db.getWorkTree(), "0." + i);
-			FileUtils.createNewFile(lastFile);
+			lastFile.createNewFile();
 			if (i == 5)
 				fsTick(lastFile);
 		}
 		modTimes.add(fsTick(lastFile));
 		for (int i = 0; i < 10; i++) {
 			lastFile = new File(db.getWorkTree(), "1." + i);
-			FileUtils.createNewFile(lastFile);
+			lastFile.createNewFile();
 		}
 		modTimes.add(fsTick(lastFile));
 		for (int i = 0; i < 10; i++) {
 			lastFile = new File(db.getWorkTree(), "2." + i);
-			FileUtils.createNewFile(lastFile);
+			lastFile.createNewFile();
 			if (i % 4 == 0)
 				fsTick(lastFile);
 		}
 		FileTreeIteratorWithTimeControl fileIt = new FileTreeIteratorWithTimeControl(
 				db, modTimes);
 		NameConflictTreeWalk tw = new NameConflictTreeWalk(db);
+		tw.reset();
 		tw.addTree(fileIt);
 		tw.setRecursive(true);
 		FileTreeIterator t;

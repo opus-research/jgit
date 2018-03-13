@@ -46,7 +46,6 @@ package org.eclipse.jgit.storage.file;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Collection;
 import java.util.Set;
 
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
@@ -57,10 +56,8 @@ import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdSubclassMap;
 import org.eclipse.jgit.lib.ObjectLoader;
-import org.eclipse.jgit.storage.pack.CachedPack;
 import org.eclipse.jgit.storage.pack.ObjectToPack;
 import org.eclipse.jgit.storage.pack.PackWriter;
-import org.eclipse.jgit.util.FS;
 
 /**
  * The cached instance of an {@link ObjectDirectory}.
@@ -133,16 +130,6 @@ class CachedObjectDirectory extends FileObjectDatabase {
 	@Override
 	Config getConfig() {
 		return wrapped.getConfig();
-	}
-
-	@Override
-	FS getFS() {
-		return wrapped.getFS();
-	}
-
-	@Override
-	Collection<? extends CachedPack> getCachedPacks() throws IOException {
-		return wrapped.getCachedPacks();
 	}
 
 	@Override
@@ -229,13 +216,14 @@ class CachedObjectDirectory extends FileObjectDatabase {
 
 	@Override
 	InsertLooseObjectResult insertUnpackedObject(File tmp, ObjectId objectId,
-			boolean createDuplicate) throws IOException {
+			boolean createDuplicate) {
 		InsertLooseObjectResult result = wrapped.insertUnpackedObject(tmp,
 				objectId, createDuplicate);
 		switch (result) {
 		case INSERTED:
 		case EXISTS_LOOSE:
-			unpackedObjects.addIfAbsent(objectId);
+			if (!unpackedObjects.contains(objectId))
+				unpackedObjects.add(objectId);
 			break;
 
 		case EXISTS_PACKED:
@@ -243,11 +231,6 @@ class CachedObjectDirectory extends FileObjectDatabase {
 			break;
 		}
 		return result;
-	}
-
-	@Override
-	PackFile openPack(File pack, File idx) throws IOException {
-		return wrapped.openPack(pack, idx);
 	}
 
 	@Override
