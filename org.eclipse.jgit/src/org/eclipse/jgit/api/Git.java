@@ -125,6 +125,26 @@ public class Git {
 	}
 
 	/**
+	 * Frees resources held by the underlying {@link Repository} instance. It is
+	 * recommended to call this method as soon as you don't need a reference to
+	 * this {@link Git} instance and the underlying {@link Repository} instance
+	 * anymore. This method closes the underlying object and ref databases. This
+	 * will free memory and file handles. E.g. on Windows the repository will
+	 * keep file handles on pack files unless you call this method. Such open
+	 * file handles may for example prevent that the repository folder in the
+	 * filesystem can be deleted.
+	 * <p>
+	 * After calling close() you should not use this {@link Git} instance and
+	 * the underlying {@link Repository} instance anymore.
+	 *
+	 * @since 3.2
+	 */
+	public void close() {
+		if (repo != null)
+			repo.close();
+	}
+
+	/**
 	 * Returns a command object to execute a {@code clone} command
 	 *
 	 * @see <a
@@ -135,6 +155,17 @@ public class Git {
 	 */
 	public static CloneCommand cloneRepository() {
 		return new CloneCommand();
+	}
+
+	/**
+	 * Returns a command to list remote branches/tags without a local
+	 * repository.
+	 *
+	 * @return a {@link LsRemoteCommand}
+	 * @since 3.1
+	 */
+	public static LsRemoteCommand lsRemoteRepository() {
+		return new LsRemoteCommand(null);
 	}
 
 	/**
@@ -403,6 +434,16 @@ public class Git {
 	}
 
 	/**
+	 * Returns a command to create an archive from a tree
+	 *
+	 * @return a {@link ArchiveCommand}
+	 * @since 3.1
+	 */
+	public ArchiveCommand archive() {
+		return new ArchiveCommand(repo);
+	}
+
+	/**
 	 * Returns a command to add notes to an object
 	 *
 	 * @return a {@link AddNoteCommand}
@@ -636,10 +677,21 @@ public class Git {
 	 * Returns a command object to find human-readable names of revisions.
 	 *
 	 * @return a {@link NameRevCommand}.
-	 * @since 2.3
+	 * @since 3.0
 	 */
 	public NameRevCommand nameRev() {
 		return new NameRevCommand(repo);
+	}
+
+	/**
+	 * Returns a command object to come up with a short name that describes a
+	 * commit in terms of the nearest git tag.
+	 *
+	 * @return a {@link DescribeCommand}.
+	 * @since 3.2
+	 */
+	public DescribeCommand describe() {
+		return new DescribeCommand(repo);
 	}
 
 	/**

@@ -60,6 +60,7 @@ import java.util.Map;
 
 import org.eclipse.jetty.servlet.DefaultServlet;
 import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.junit.http.AccessEvent;
@@ -70,7 +71,6 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.transport.FetchConnection;
 import org.eclipse.jgit.transport.HttpTransport;
 import org.eclipse.jgit.transport.Transport;
@@ -92,14 +92,15 @@ public class DumbClientDumbServerTest extends HttpTestCase {
 	public void setUp() throws Exception {
 		super.setUp();
 
-		final TestRepository<FileRepository> src = createTestRepository();
+		final TestRepository<Repository> src = createTestRepository();
 		final File srcGit = src.getRepository().getDirectory();
 		final URI base = srcGit.getParentFile().toURI();
 
 		ServletContextHandler app = server.addContext("/git");
 		app.setResourceBase(base.toString());
-		app.addServlet(DefaultServlet.class, "/");
-
+		ServletHolder holder = app.addServlet(DefaultServlet.class, "/");
+		// The tmp directory is symlinked on OS X
+		holder.setInitParameter("aliases", "true");
 		server.setUp();
 
 		remoteRepository = src.getRepository();

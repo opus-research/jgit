@@ -51,12 +51,14 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.MergeCommand;
 import org.eclipse.jgit.api.MergeResult;
 import org.eclipse.jgit.api.MergeCommand.FastForwardMode;
+import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
+import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.kohsuke.args4j.Argument;
@@ -71,20 +73,27 @@ class Merge extends TextBuiltin {
 	@Option(name = "--squash", usage = "usage_squash")
 	private boolean squash;
 
-	private MergeStrategy mergeStrategy = MergeStrategy.RESOLVE;
+	@Option(name = "--no-commit", usage = "usage_noCommit")
+	private boolean noCommit = false;
 
-	@Argument(required = true)
+	private MergeStrategy mergeStrategy = MergeStrategy.RECURSIVE;
+
+	@Argument(required = true, metaVar = "metaVar_ref", usage = "usage_mergeRef")
 	private String ref;
 
-	@Option(name = "--ff")
 	private FastForwardMode ff = FastForwardMode.FF;
 
-	@Option(name = "--no-ff")
+	@Option(name = "--ff", usage = "usage_mergeFf")
+	void ff(@SuppressWarnings("unused") final boolean ignored) {
+		ff = FastForwardMode.FF;
+	}
+
+	@Option(name = "--no-ff", usage = "usage_mergeNoFf")
 	void noff(@SuppressWarnings("unused") final boolean ignored) {
 		ff = FastForwardMode.NO_FF;
 	}
 
-	@Option(name = "--ff-only")
+	@Option(name = "--ff-only", usage = "usage_mergeFfOnly")
 	void ffonly(@SuppressWarnings("unused") final boolean ignored) {
 		ff = FastForwardMode.FF_ONLY;
 	}
@@ -111,12 +120,17 @@ class Merge extends TextBuiltin {
 		Ref oldHead = db.getRef(Constants.HEAD);
 		Git git = new Git(db);
 		MergeCommand mergeCmd = git.merge().setStrategy(mergeStrategy)
-				.setSquash(squash).setFastForward(ff);
+				.setSquash(squash).setFastForward(ff).setCommit(!noCommit);
 		if (srcRef != null)
 			mergeCmd.include(srcRef);
 		else
 			mergeCmd.include(src);
-		MergeResult result = mergeCmd.call();
+		MergeResult result;
+		try {
+			result = mergeCmd.call();
+		} catch (CheckoutConflictException e) {
+			result = new MergeResult(e.getConflictingPaths()); // CHECKOUT_CONFLICT
+		}
 
 		switch (result.getMergeStatus()) {
 		case ALREADY_UP_TO_DATE:
@@ -130,6 +144,12 @@ class Merge extends TextBuiltin {
 					.abbreviate(7).name(), result.getNewHead().abbreviate(7)
 					.name()));
 			outw.println(result.getMergeStatus().toString());
+			break;
+		case CHECKOUT_CONFLICT:
+			outw.println(CLIText.get().mergeCheckoutConflict);
+			for (String collidingPath : result.getCheckoutConflicts())
+				outw.println("\t" + collidingPath); //$NON-NLS-1$
+			outw.println(CLIText.get().mergeCheckoutFailed);
 			break;
 		case CONFLICTING:
 			for (String collidingPath : result.getConflicts().keySet())
@@ -160,9 +180,14 @@ class Merge extends TextBuiltin {
 				name = "recursive"; //$NON-NLS-1$
 			outw.println(MessageFormat.format(CLIText.get().mergeMadeBy, name));
 			break;
+		case MERGED_NOT_COMMITTED:
+			outw.println(CLIText.get().mergeWentWellStoppedBeforeCommitting);
+			break;
 		case MERGED_SQUASHED:
 		case FAST_FORWARD_SQUASHED:
+		case MERGED_SQUASHED_NOT_COMMITTED:
 			outw.println(CLIText.get().mergedSquashed);
+			outw.println(CLIText.get().mergeWentWellStoppedBeforeCommitting);
 			break;
 		case ABORTED:
 			throw die(CLIText.get().ffNotPossibleAborting);

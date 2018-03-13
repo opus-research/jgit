@@ -44,6 +44,8 @@
 
 package org.eclipse.jgit.transport;
 
+import static org.eclipse.jgit.lib.RefDatabase.ALL;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -56,6 +58,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.jgit.errors.CompoundException;
@@ -63,6 +66,10 @@ import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.internal.storage.file.ObjectDirectory;
+import org.eclipse.jgit.internal.storage.file.PackIndex;
+import org.eclipse.jgit.internal.storage.file.PackLock;
+import org.eclipse.jgit.internal.storage.file.UnpackedObject;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -82,10 +89,6 @@ import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.file.ObjectDirectory;
-import org.eclipse.jgit.storage.file.PackIndex;
-import org.eclipse.jgit.storage.file.PackLock;
-import org.eclipse.jgit.storage.file.UnpackedObject;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.util.FileUtils;
 
@@ -668,7 +671,13 @@ class WalkFetchConnection extends BaseFetchConnection {
 	}
 
 	private void markLocalRefsComplete(final Set<ObjectId> have) throws TransportException {
-		for (final Ref r : local.getAllRefs().values()) {
+		Map<String, Ref> refs;
+		try {
+			refs = local.getRefDatabase().getRefs(ALL);
+		} catch (IOException e) {
+			throw new TransportException(e.getMessage(), e);
+		}
+		for (final Ref r : refs.values()) {
 			try {
 				markLocalObjComplete(revWalk.parseAny(r.getObjectId()));
 			} catch (IOException readError) {

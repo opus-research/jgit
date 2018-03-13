@@ -160,15 +160,16 @@ public class RevertCommand extends GitCommand<RevCommit> {
 				String revertName = srcCommit.getId().abbreviate(7).name()
 						+ " " + srcCommit.getShortMessage(); //$NON-NLS-1$
 
-				ResolveMerger merger = (ResolveMerger) MergeStrategy.RESOLVE
+				ResolveMerger merger = (ResolveMerger) MergeStrategy.RECURSIVE
 						.newMerger(repo);
 				merger.setWorkingTreeIterator(new FileTreeIterator(repo));
 				merger.setBase(srcCommit.getTree());
-				merger.setCommitNames(new String[] { "BASE", ourName, revertName }); //$NON-NLS-1$ //$NON-NLS-2$
+				merger.setCommitNames(new String[] {
+						"BASE", ourName, revertName }); //$NON-NLS-1$
 
 				String shortMessage = "Revert \"" + srcCommit.getShortMessage() //$NON-NLS-1$
 						+ "\""; //$NON-NLS-1$
-				String newMessage = shortMessage + "\n\n"
+				String newMessage = shortMessage + "\n\n" //$NON-NLS-1$
 						+ "This reverts commit " + srcCommit.getId().getName() //$NON-NLS-1$
 						+ ".\n"; //$NON-NLS-1$
 				if (merger.merge(headCommit, srcParent)) {
@@ -190,17 +191,18 @@ public class RevertCommand extends GitCommand<RevCommit> {
 							.getFailingPaths();
 					if (failingPaths != null)
 						failingResult = new MergeResult(null,
-								merger.getBaseCommit(0, 1),
+								merger.getBaseCommitId(),
 								new ObjectId[] { headCommit.getId(),
 										srcParent.getId() },
-								MergeStatus.FAILED, MergeStrategy.RESOLVE,
+								MergeStatus.FAILED, MergeStrategy.RECURSIVE,
 								merger.getMergeResults(), failingPaths, null);
 					else
 						failingResult = new MergeResult(null,
-								merger.getBaseCommit(0, 1),
+								merger.getBaseCommitId(),
 								new ObjectId[] { headCommit.getId(),
 										srcParent.getId() },
-								MergeStatus.CONFLICTING, MergeStrategy.RESOLVE,
+								MergeStatus.CONFLICTING,
+								MergeStrategy.RECURSIVE,
 								merger.getMergeResults(), failingPaths, null);
 					if (!merger.failed() && !unmergedPaths.isEmpty()) {
 						String message = new MergeMessageFormatter()

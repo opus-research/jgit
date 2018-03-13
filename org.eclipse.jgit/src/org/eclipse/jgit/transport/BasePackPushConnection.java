@@ -45,6 +45,7 @@
 package org.eclipse.jgit.transport;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.HashSet;
@@ -56,10 +57,10 @@ import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.internal.storage.pack.PackWriter;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 
 /**
@@ -87,25 +88,25 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 	 * The client expects a status report after the server processes the pack.
 	 * @since 2.0
 	 */
-	public static final String CAPABILITY_REPORT_STATUS = "report-status"; //$NON-NLS-1$
+	public static final String CAPABILITY_REPORT_STATUS = GitProtocolConstants.CAPABILITY_REPORT_STATUS;
 
 	/**
 	 * The server supports deleting refs.
 	 * @since 2.0
 	 */
-	public static final String CAPABILITY_DELETE_REFS = "delete-refs"; //$NON-NLS-1$
+	public static final String CAPABILITY_DELETE_REFS = GitProtocolConstants.CAPABILITY_DELETE_REFS;
 
 	/**
 	 * The server supports packs with OFS deltas.
 	 * @since 2.0
 	 */
-	public static final String CAPABILITY_OFS_DELTA = "ofs-delta"; //$NON-NLS-1$
+	public static final String CAPABILITY_OFS_DELTA = GitProtocolConstants.CAPABILITY_OFS_DELTA;
 
 	/**
 	 * The client supports using the 64K side-band for progress messages.
 	 * @since 2.0
 	 */
-	public static final String CAPABILITY_SIDE_BAND_64K = "side-band-64k"; //$NON-NLS-1$
+	public static final String CAPABILITY_SIDE_BAND_64K = GitProtocolConstants.CAPABILITY_SIDE_BAND_64K;
 
 	private final boolean thinPack;
 
@@ -138,8 +139,17 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 	public void push(final ProgressMonitor monitor,
 			final Map<String, RemoteRefUpdate> refUpdates)
 			throws TransportException {
+		push(monitor, refUpdates, null);
+	}
+
+	/**
+	 * @since 3.0
+	 */
+	public void push(final ProgressMonitor monitor,
+			final Map<String, RemoteRefUpdate> refUpdates, OutputStream outputStream)
+			throws TransportException {
 		markStartedOperation();
-		doPush(monitor, refUpdates);
+		doPush(monitor, refUpdates, outputStream);
 	}
 
 	@Override
@@ -172,14 +182,17 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 	 *            progress monitor to receive status updates.
 	 * @param refUpdates
 	 *            update commands to be applied to the remote repository.
+	 * @param outputStream
+	 *            output stream to write sideband messages to
 	 * @throws TransportException
 	 *             if any exception occurs.
+	 * @since 3.0
 	 */
 	protected void doPush(final ProgressMonitor monitor,
-			final Map<String, RemoteRefUpdate> refUpdates)
-			throws TransportException {
+			final Map<String, RemoteRefUpdate> refUpdates,
+			OutputStream outputStream) throws TransportException {
 		try {
-			writeCommands(refUpdates.values(), monitor);
+			writeCommands(refUpdates.values(), monitor, outputStream);
 			if (writePack)
 				writePack(refUpdates, monitor);
 			if (sentCommand) {
@@ -208,8 +221,8 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 	}
 
 	private void writeCommands(final Collection<RemoteRefUpdate> refUpdates,
-			final ProgressMonitor monitor) throws IOException {
-		final String capabilities = enableCapabilities(monitor);
+			final ProgressMonitor monitor, OutputStream outputStream) throws IOException {
+		final String capabilities = enableCapabilities(monitor, outputStream);
 		for (final RemoteRefUpdate rru : refUpdates) {
 			if (!capableDeleteRefs && rru.isDelete()) {
 				rru.setStatus(Status.REJECTED_NODELETE);
@@ -242,7 +255,8 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 		outNeedsEnd = false;
 	}
 
-	private String enableCapabilities(final ProgressMonitor monitor) {
+	private String enableCapabilities(final ProgressMonitor monitor,
+			OutputStream outputStream) {
 		final StringBuilder line = new StringBuilder();
 		capableReport = wantCapability(line, CAPABILITY_REPORT_STATUS);
 		capableDeleteRefs = wantCapability(line, CAPABILITY_DELETE_REFS);
@@ -250,7 +264,8 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 
 		capableSideBand = wantCapability(line, CAPABILITY_SIDE_BAND_64K);
 		if (capableSideBand) {
-			in = new SideBandInputStream(in, monitor, getMessageWriter());
+			in = new SideBandInputStream(in, monitor, getMessageWriter(),
+					outputStream);
 			pckIn = new PacketLineIn(in);
 		}
 
@@ -276,6 +291,7 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 					newObjects.add(r.getNewObjectId());
 			}
 
+			writer.setIndexDisabled(true);
 			writer.setUseCachedPacks(true);
 			writer.setUseBitmaps(true);
 			writer.setThin(thinPack);

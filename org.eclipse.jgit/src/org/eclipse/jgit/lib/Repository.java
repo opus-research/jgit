@@ -81,9 +81,6 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.file.CheckoutEntry;
-import org.eclipse.jgit.storage.file.ReflogEntry;
-import org.eclipse.jgit.storage.file.ReflogReader;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -260,9 +257,10 @@ public abstract class Repository {
 	 * @param objectId
 	 *            identity of the object to open.
 	 * @param typeHint
-	 *            hint about the type of object being requested;
-	 *            {@link ObjectReader#OBJ_ANY} if the object type is not known,
-	 *            or does not matter to the caller.
+	 *            hint about the type of object being requested, e.g.
+	 *            {@link Constants#OBJ_BLOB}; {@link ObjectReader#OBJ_ANY} if
+	 *            the object type is not known, or does not matter to the
+	 *            caller.
 	 * @return a {@link ObjectLoader} for accessing the object.
 	 * @throws MissingObjectException
 	 *             the object does not exist.
@@ -757,7 +755,7 @@ public abstract class Repository {
 
 	private String resolveReflogCheckout(int checkoutNo)
 			throws IOException {
-		List<ReflogEntry> reflogEntries = new ReflogReader(this, Constants.HEAD)
+		List<ReflogEntry> reflogEntries = getReflogReader(Constants.HEAD)
 				.getReverseEntries();
 		for (ReflogEntry entry : reflogEntries) {
 			CheckoutEntry checkout = entry.parseCheckout();
@@ -778,7 +776,7 @@ public abstract class Repository {
 					JGitText.get().invalidReflogRevision, time));
 		}
 		assert number >= 0;
-		ReflogReader reader = new ReflogReader(this, ref.getName());
+		ReflogReader reader = getReflogReader(ref.getName());
 		ReflogEntry entry = reader.getReverseEntry(number);
 		if (entry == null)
 			throw new RevisionSyntaxException(MessageFormat.format(
@@ -1269,7 +1267,9 @@ public abstract class Repository {
 	 * @param refName
 	 * @return a {@link ReflogReader} for the supplied refname, or null if the
 	 *         named ref does not exist.
-	 * @throws IOException the ref could not be accessed.
+	 * @throws IOException
+	 *             the ref could not be accessed.
+	 * @since 3.0
 	 */
 	public abstract ReflogReader getReflogReader(String refName)
 			throws IOException;
@@ -1564,4 +1564,42 @@ public abstract class Repository {
 		}
 	}
 
+	/**
+	 * Read a file formatted like the git-rebase-todo file. The "done" file is
+	 * also formatted like the git-rebase-todo file. These files can be found in
+	 * .git/rebase-merge/ or .git/rebase-append/ folders.
+	 *
+	 * @param path
+	 *            path to the file relative to the repository's git-dir. E.g.
+	 *            "rebase-merge/git-rebase-todo" or "rebase-append/done"
+	 * @param includeComments
+	 *            <code>true</code> if also comments should be reported
+	 * @return the list of steps
+	 * @throws IOException
+	 * @since 3.2
+	 */
+	public List<RebaseTodoLine> readRebaseTodo(String path,
+			boolean includeComments)
+			throws IOException {
+		return new RebaseTodoFile(this).readRebaseTodo(path, includeComments);
+	}
+
+	/**
+	 * Write a file formatted like a git-rebase-todo file.
+	 *
+	 * @param path
+	 *            path to the file relative to the repository's git-dir. E.g.
+	 *            "rebase-merge/git-rebase-todo" or "rebase-append/done"
+	 * @param steps
+	 *            the steps to be written
+	 * @param append
+	 *            whether to append to an existing file or to write a new file
+	 * @throws IOException
+	 * @since 3.2
+	 */
+	public void writeRebaseTodoFile(String path, List<RebaseTodoLine> steps,
+			boolean append)
+			throws IOException {
+		new RebaseTodoFile(this).writeRebaseTodoFile(path, steps, append);
+	}
 }

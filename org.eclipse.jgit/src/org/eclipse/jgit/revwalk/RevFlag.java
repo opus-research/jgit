@@ -73,8 +73,10 @@ public class RevFlag {
 	 * queue, especially if we reached it by more than one path.
 	 * <p>
 	 * This is a static flag. Its RevWalk is not available.
+	 *
+	 * @since 3.0
 	 */
-	public static final RevFlag SEEN = new StaticRevFlag("SEEN", RevWalk.SEEN);
+	public static final RevFlag SEEN = new StaticRevFlag("SEEN", RevWalk.SEEN); //$NON-NLS-1$
 
 	final RevWalk walker;
 

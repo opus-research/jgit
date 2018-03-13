@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2010, 2013 Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,8 +43,7 @@
 
 package org.eclipse.jgit.util;
 
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.endsWith;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -52,17 +51,19 @@ import static org.junit.Assert.fail;
 import java.io.File;
 import java.io.IOException;
 
+import org.eclipse.jgit.junit.JGitTestUtil;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 public class FileUtilTest {
-
-	private final File trash = new File(new File("target"), "trash");
+	private File trash;
 
 	@Before
 	public void setUp() throws Exception {
-		assertTrue(trash.mkdirs());
+		trash = File.createTempFile("tmp_", "");
+		trash.delete();
+		assertTrue("mkdir " + trash, trash.mkdir());
 	}
 
 	@After
@@ -113,6 +114,121 @@ public class FileUtilTest {
 			FileUtils.delete(d, FileUtils.RECURSIVE | FileUtils.SKIP_MISSING);
 		} catch (IOException e) {
 			fail("recursive deletion of non-existing directory must not fail with option SKIP_MISSING");
+		}
+	}
+
+	@Test
+
+	public void testDeleteRecursiveEmpty() throws IOException {
+		File f1 = new File(trash, "test/test/a");
+		File f2 = new File(trash, "test/a");
+		File d1 = new File(trash, "test");
+		File d2 = new File(trash, "test/test");
+		File d3 = new File(trash, "test/b");
+		FileUtils.mkdirs(f1.getParentFile());
+		FileUtils.createNewFile(f2);
+		FileUtils.createNewFile(f1);
+		FileUtils.mkdirs(d3);
+
+		// Cannot delete hierarchy since files exist
+		try {
+			FileUtils.delete(d1, FileUtils.EMPTY_DIRECTORIES_ONLY);
+			fail("delete should fail");
+		} catch (IOException e1) {
+			try {
+				FileUtils.delete(d1, FileUtils.EMPTY_DIRECTORIES_ONLY|FileUtils.RECURSIVE);
+				fail("delete should fail");
+			} catch (IOException e2) {
+				// Everything still there
+				assertTrue(f1.exists());
+				assertTrue(f2.exists());
+				assertTrue(d1.exists());
+				assertTrue(d2.exists());
+				assertTrue(d3.exists());
+			}
+		}
+
+		// setup: delete files, only directories left
+		assertTrue(f1.delete());
+		assertTrue(f2.delete());
+
+		// Shall not delete hierarchy without recursive
+		try {
+			FileUtils.delete(d1, FileUtils.EMPTY_DIRECTORIES_ONLY);
+			fail("delete should fail");
+		} catch (IOException e2) {
+			// Everything still there
+			assertTrue(d1.exists());
+			assertTrue(d2.exists());
+			assertTrue(d3.exists());
+		}
+
+		// Now delete the empty hierarchy
+		FileUtils.delete(d2, FileUtils.EMPTY_DIRECTORIES_ONLY
+				| FileUtils.RECURSIVE);
+		assertFalse(d2.exists());
+
+		// Will fail to delete non-existing without SKIP_MISSING
+		try {
+			FileUtils.delete(d2, FileUtils.EMPTY_DIRECTORIES_ONLY);
+			fail("Cannot delete non-existent entity");
+		} catch (IOException e) {
+			// ok
+		}
+
+		// ..with SKIP_MISSING there is no exception
+		FileUtils.delete(d2, FileUtils.EMPTY_DIRECTORIES_ONLY
+				| FileUtils.SKIP_MISSING);
+		FileUtils.delete(d2, FileUtils.EMPTY_DIRECTORIES_ONLY
+				| FileUtils.RECURSIVE | FileUtils.SKIP_MISSING);
+
+		// essentially the same, using IGNORE_ERRORS
+		FileUtils.delete(d2, FileUtils.EMPTY_DIRECTORIES_ONLY
+				| FileUtils.IGNORE_ERRORS);
+		FileUtils.delete(d2, FileUtils.EMPTY_DIRECTORIES_ONLY
+				| FileUtils.RECURSIVE | FileUtils.IGNORE_ERRORS);
+	}
+
+	@Test
+	public void testDeleteRecursiveEmptyNeedsToCheckFilesFirst()
+			throws IOException {
+		File d1 = new File(trash, "test");
+		File d2 = new File(trash, "test/a");
+		File d3 = new File(trash, "test/b");
+		File f1 = new File(trash, "test/c");
+		File d4 = new File(trash, "test/d");
+		FileUtils.mkdirs(d1);
+		FileUtils.mkdirs(d2);
+		FileUtils.mkdirs(d3);
+		FileUtils.mkdirs(d4);
+		FileUtils.createNewFile(f1);
+
+		// Cannot delete hierarchy since file exists
+		try {
+			FileUtils.delete(d1, FileUtils.EMPTY_DIRECTORIES_ONLY
+					| FileUtils.RECURSIVE);
+			fail("delete should fail");
+		} catch (IOException e) {
+			// Everything still there
+			assertTrue(f1.exists());
+			assertTrue(d1.exists());
+			assertTrue(d2.exists());
+			assertTrue(d3.exists());
+			assertTrue(d4.exists());
+		}
+	}
+
+	@Test
+	public void testDeleteRecursiveEmptyDirectoriesOnlyButIsFile()
+			throws IOException {
+		File f1 = new File(trash, "test/test/a");
+		FileUtils.mkdirs(f1.getParentFile());
+		FileUtils.createNewFile(f1);
+		try {
+			FileUtils.delete(f1, FileUtils.EMPTY_DIRECTORIES_ONLY);
+			fail("delete should fail");
+		} catch (IOException e) {
+			assertTrue(f1.exists());
 		}
 	}
 
@@ -215,7 +331,7 @@ public class FileUtilTest {
 			FileUtils.delete(t, FileUtils.EMPTY_DIRECTORIES_ONLY | FileUtils.RECURSIVE);
 			fail("expected failure to delete f");
 		} catch (IOException e) {
-			assertThat(e.getMessage(), endsWith(f.getAbsolutePath()));
+			assertTrue(e.getMessage().endsWith(f.getAbsolutePath()));
 		}
 		assertTrue(t.exists());
 	}
@@ -235,5 +351,87 @@ public class FileUtilTest {
 		assertTrue(t.exists());
 		assertTrue(f.exists());
 		assertFalse(e.exists());
+	}
+
+	@Test
+	public void testRenameOverNonExistingFile() throws IOException {
+		File d = new File(trash, "d");
+		FileUtils.mkdirs(d);
+		File f1 = new File(trash, "d/f");
+		File f2 = new File(trash, "d/g");
+		JGitTestUtil.write(f1, "f1");
+		// test
+		FileUtils.rename(f1, f2);
+		assertFalse(f1.exists());
+		assertTrue(f2.exists());
+		assertEquals("f1", JGitTestUtil.read(f2));
+	}
+
+	@Test
+	public void testRenameOverExistingFile() throws IOException {
+		File d = new File(trash, "d");
+		FileUtils.mkdirs(d);
+		File f1 = new File(trash, "d/f");
+		File f2 = new File(trash, "d/g");
+		JGitTestUtil.write(f1, "f1");
+		JGitTestUtil.write(f2, "f2");
+		// test
+		FileUtils.rename(f1, f2);
+		assertFalse(f1.exists());
+		assertTrue(f2.exists());
+		assertEquals("f1", JGitTestUtil.read(f2));
+	}
+
+	@Test
+	public void testRenameOverExistingNonEmptyDirectory() throws IOException {
+		File d = new File(trash, "d");
+		FileUtils.mkdirs(d);
+		File f1 = new File(trash, "d/f");
+		File f2 = new File(trash, "d/g");
+		File d1 = new File(trash, "d/g/h/i");
+		File f3 = new File(trash, "d/g/h/f");
+		FileUtils.mkdirs(d1);
+		JGitTestUtil.write(f1, "f1");
+		JGitTestUtil.write(f3, "f3");
+		// test
+		try {
+			FileUtils.rename(f1, f2);
+			fail("rename to non-empty directory should fail");
+		} catch (IOException e) {
+			assertEquals("f1", JGitTestUtil.read(f1)); // untouched source
+			assertEquals("f3", JGitTestUtil.read(f3)); // untouched
+			// empty directories within f2 may or may not have been deleted
+		}
+	}
+
+	@Test
+	public void testRenameOverExistingEmptyDirectory() throws IOException {
+		File d = new File(trash, "d");
+		FileUtils.mkdirs(d);
+		File f1 = new File(trash, "d/f");
+		File f2 = new File(trash, "d/g");
+		File d1 = new File(trash, "d/g/h/i");
+		FileUtils.mkdirs(d1);
+		JGitTestUtil.write(f1, "f1");
+		// test
+		FileUtils.rename(f1, f2);
+		assertFalse(f1.exists());
+		assertTrue(f2.exists());
+		assertEquals("f1", JGitTestUtil.read(f2));
+	}
+
+	@Test
+	public void testCreateSymlink() throws IOException {
+		FS fs = FS.DETECTED;
+		try {
+			fs.createSymLink(new File(trash, "x"), "y");
+		} catch (IOException e) {
+			if (fs.supportsSymlinks())
+				fail("FS claims to support symlinks but attempt to create symlink failed");
+			return;
+		}
+		assertTrue(fs.supportsSymlinks());
+		String target = fs.readSymLink(new File(trash, "x"));
+		assertEquals("y", target);
 	}
 }
