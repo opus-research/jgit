@@ -143,7 +143,7 @@ public abstract class PackParser {
 
 	private boolean expectDataAfterPackFooter;
 
-	private long expectedObjectCount;
+	private long objectCount;
 
 	private PackedObjectInfo[] entries;
 
@@ -525,15 +525,15 @@ public abstract class PackParser {
 		try {
 			readPackHeader();
 
-			entries = new PackedObjectInfo[(int) expectedObjectCount];
+			entries = new PackedObjectInfo[(int) objectCount];
 			baseById = new ObjectIdOwnerMap<>();
 			baseByPos = new LongMap<>();
 			collisionCheckObjs = new BlockList<>();
 
 			receiving.beginTask(JGitText.get().receivingObjects,
-					(int) expectedObjectCount);
+					(int) objectCount);
 			try {
-				for (int done = 0; done < expectedObjectCount; done++) {
+				for (int done = 0; done < objectCount; done++) {
 					indexOneObject();
 					receiving.update(1);
 					if (receiving.isCancelled())
@@ -550,7 +550,29 @@ public abstract class PackParser {
 			}
 
 			if (deltaCount > 0) {
-				processDeltas(resolving);
+				if (resolving instanceof BatchingProgressMonitor) {
+					((BatchingProgressMonitor) resolving).setDelayStart(
+							1000,
+							TimeUnit.MILLISECONDS);
+				}
+				resolving.beginTask(JGitText.get().resolvingDeltas, deltaCount);
+				resolveDeltas(resolving);
+				if (entryCount < objectCount) {
+					if (!isAllowThin()) {
+						throw new IOException(MessageFormat.format(
+								JGitText.get().packHasUnresolvedDeltas,
+								Long.valueOf(objectCount - entryCount)));
+					}
+
+					resolveDeltasWithExternalBases(resolving);
+
+					if (entryCount < objectCount) {
+						throw new IOException(MessageFormat.format(
+								JGitText.get().packHasUnresolvedDeltas,
+								Long.valueOf(objectCount - entryCount)));
+					}
+				}
+				resolving.endTask();
 			}
 
 			packDigest = null;
@@ -571,31 +593,6 @@ public abstract class PackParser {
 			}
 		}
 		return null; // By default there is no locking.
-	}
-
-	private void processDeltas(ProgressMonitor resolving) throws IOException {
-		if (resolving instanceof BatchingProgressMonitor) {
-			((BatchingProgressMonitor) resolving).setDelayStart(1000,
-					TimeUnit.MILLISECONDS);
-		}
-		resolving.beginTask(JGitText.get().resolvingDeltas, deltaCount);
-		resolveDeltas(resolving);
-		if (entryCount < expectedObjectCount) {
-			if (!isAllowThin()) {
-				throw new IOException(MessageFormat.format(
-						JGitText.get().packHasUnresolvedDeltas,
-						Long.valueOf(expectedObjectCount - entryCount)));
-			}
-
-			resolveDeltasWithExternalBases(resolving);
-
-			if (entryCount < expectedObjectCount) {
-				throw new IOException(MessageFormat.format(
-						JGitText.get().packHasUnresolvedDeltas,
-						Long.valueOf(expectedObjectCount - entryCount)));
-			}
-		}
-		resolving.endTask();
 	}
 
 	private void resolveDeltas(final ProgressMonitor progress)
@@ -687,7 +684,6 @@ public abstract class PackParser {
 			PackedObjectInfo oe;
 			oe = newInfo(tempObjectId, visit.delta, visit.parent.id);
 			oe.setOffset(visit.delta.position);
-			oe.setType(type);
 			onInflatedObjectData(oe, type, visit.data);
 			addObjectAndTrack(oe);
 			visit.id = oe;
@@ -858,9 +854,10 @@ public abstract class PackParser {
 			visit.id = baseId;
 			final int typeCode = ldr.getType();
 			final PackedObjectInfo oe = newInfo(baseId, null, null);
-			oe.setType(typeCode);
+
 			if (onAppendBase(typeCode, visit.data, oe))
 				entries[entryCount++] = oe;
+
 			visit.nextChild = firstChildOf(oe);
 			resolveDeltas(visit.next(), typeCode,
 					new ObjectTypeAndSize(), progress);
@@ -881,7 +878,7 @@ public abstract class PackParser {
 	private void growEntries(int extraObjects) {
 		final PackedObjectInfo[] ne;
 
-		ne = new PackedObjectInfo[(int) expectedObjectCount + extraObjects];
+		ne = new PackedObjectInfo[(int) objectCount + extraObjects];
 		System.arraycopy(entries, 0, ne, 0, entryCount);
 		entries = ne;
 	}
@@ -904,9 +901,9 @@ public abstract class PackParser {
 		if (vers != 2 && vers != 3)
 			throw new IOException(MessageFormat.format(
 					JGitText.get().unsupportedPackVersion, Long.valueOf(vers)));
-		final long objectCount = NB.decodeUInt32(buf, p + 8);
+		objectCount = NB.decodeUInt32(buf, p + 8);
 		use(hdrln);
-		setExpectedObjectCount(objectCount);
+
 		onPackHeader(objectCount);
 	}
 
@@ -1062,7 +1059,6 @@ public abstract class PackParser {
 
 		PackedObjectInfo obj = newInfo(tempObjectId, null, null);
 		obj.setOffset(pos);
-		obj.setType(type);
 		onEndWholeObject(obj);
 		if (data != null)
 			onInflatedObjectData(obj, type, data);
@@ -1073,21 +1069,8 @@ public abstract class PackParser {
 		}
 	}
 
-	/**
-	 * Verify the integrity of the object.
-	 *
-	 * @param id
-	 *            identity of the object to be checked.
-	 * @param type
-	 *            the type of the object.
-	 * @param data
-	 *            raw content of the object.
-	 * @throws CorruptObjectException
-	 * @since 4.9
-	 *
-	 */
-	protected void verifySafeObject(final AnyObjectId id, final int type,
-			final byte[] data) throws CorruptObjectException {
+	private void verifySafeObject(final AnyObjectId id, final int type,
+			final byte[] data) throws IOException {
 		if (objCheck != null) {
 			try {
 				objCheck.check(id, type, data);
@@ -1095,11 +1078,11 @@ public abstract class PackParser {
 				if (e.getErrorType() != null) {
 					throw e;
 				}
-				throw new CorruptObjectException(
-						MessageFormat.format(JGitText.get().invalidObject,
-								Constants.typeString(type), id.name(),
-								e.getMessage()),
-						e);
+				throw new CorruptObjectException(MessageFormat.format(
+						JGitText.get().invalidObject,
+						Constants.typeString(type),
+						id.name(),
+						e.getMessage()), e);
 			}
 		}
 	}
@@ -1275,23 +1258,6 @@ public abstract class PackParser {
 		if (delta != null)
 			oe.setCRC(delta.crc);
 		return oe;
-	}
-
-	/**
-	 * Set the expected number of objects in the pack stream.
-	 * <p>
-	 * The object count in the pack header is not always correct for some Dfs
-	 * pack files. e.g. INSERT pack always assume 1 object in the header since
-	 * the actual object count is unknown when the pack is written.
-	 * <p>
-	 * If external implementation wants to overwrite the expectedObjectCount,
-	 * they should call this method during {@link #onPackHeader(long)}.
-	 *
-	 * @param expectedObjectCount
-	 * @since 4.9
-	 */
-	protected void setExpectedObjectCount(long expectedObjectCount) {
-		this.expectedObjectCount = expectedObjectCount;
 	}
 
 	/**

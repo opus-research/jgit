@@ -58,8 +58,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
-import org.eclipse.jgit.annotations.Nullable;
-import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -82,10 +80,8 @@ public class BatchRefUpdate {
 	 * clock skew between machines on the same LAN using an NTP server also on
 	 * the same LAN should be under 5 seconds. 5 seconds is also not that long
 	 * for a large `git push` operation to complete.
-	 *
-	 * @since 4.9
 	 */
-	protected static final Duration MAX_WAIT = Duration.ofSeconds(5);
+	private static final Duration MAX_WAIT = Duration.ofSeconds(5);
 
 	private final RefDatabase refdb;
 
@@ -177,17 +173,11 @@ public class BatchRefUpdate {
 	 * @return message the caller wants to include in the reflog; null if the
 	 *         update should not be logged.
 	 */
-	@Nullable
 	public String getRefLogMessage() {
 		return refLogMessage;
 	}
 
-	/**
-	 * Check whether the reflog message should include the result of the update,
-	 * such as fast-forward or force-update.
-	 *
-	 * @return true if the message should include the result.
-	 */
+	/** @return {@code true} if the ref log message should show the result. */
 	public boolean isRefLogIncludingResult() {
 		return refLogIncludeResult;
 	}
@@ -196,11 +186,12 @@ public class BatchRefUpdate {
 	 * Set the message to include in the reflog.
 	 *
 	 * @param msg
-	 *            the message to describe this change. If null and appendStatus is
-	 *            false, the reflog will not be updated.
+	 *            the message to describe this change. It may be null if
+	 *            appendStatus is null in order not to append to the reflog
 	 * @param appendStatus
 	 *            true if the status of the ref change (fast-forward or
-	 *            forced-update) should be appended to the user supplied message.
+	 *            forced-update) should be appended to the user supplied
+	 *            message.
 	 * @return {@code this}.
 	 */
 	public BatchRefUpdate setRefLogMessage(String msg, boolean appendStatus) {
@@ -218,8 +209,6 @@ public class BatchRefUpdate {
 
 	/**
 	 * Don't record this update in the ref's associated reflog.
-	 * <p>
-	 * Equivalent to {@code setRefLogMessage(null, false)}.
 	 *
 	 * @return {@code this}.
 	 */
@@ -229,11 +218,7 @@ public class BatchRefUpdate {
 		return this;
 	}
 
-	/**
-	 * Check whether log has been disabled by {@link #disableRefLog()}.
-	 *
-	 * @return true if disabled.
-	 */
+	/** @return true if log has been disabled by {@link #disableRefLog()}. */
 	public boolean isRefLogDisabled() {
 		return refLogMessage == null;
 	}
@@ -338,26 +323,11 @@ public class BatchRefUpdate {
 	/**
 	 * Gets the list of option strings associated with this update.
 	 *
-	 * @return push options that were passed to {@link #execute}; prior to calling
-	 *         {@link #execute}, always returns null.
+	 * @return pushOptions
 	 * @since 4.5
 	 */
-	@Nullable
 	public List<String> getPushOptions() {
 		return pushOptions;
-	}
-
-	/**
-	 * Set push options associated with this update.
-	 * <p>
-	 * Implementations must call this at the top of {@link #execute(RevWalk,
-	 * ProgressMonitor, List)}.
-	 *
-	 * @param options options passed to {@code execute}.
-	 * @since 4.9
-	 */
-	protected void setPushOptions(List<String> options) {
-		pushOptions = options;
 	}
 
 	/**
@@ -426,7 +396,7 @@ public class BatchRefUpdate {
 		}
 
 		if (options != null) {
-			setPushOptions(options);
+			pushOptions = options;
 		}
 
 		monitor.beginTask(JGitText.get().updatingReferences, commands.size());
@@ -437,11 +407,6 @@ public class BatchRefUpdate {
 		for (ReceiveCommand cmd : commands) {
 			try {
 				if (cmd.getResult() == NOT_ATTEMPTED) {
-					if (isMissing(walk, cmd.getOldId())
-							|| isMissing(walk, cmd.getNewId())) {
-						cmd.setResult(ReceiveCommand.Result.REJECTED_MISSING_OBJECT);
-						continue;
-					}
 					cmd.updateType(walk);
 					switch (cmd.getType()) {
 					case CREATE:
@@ -497,7 +462,7 @@ public class BatchRefUpdate {
 								break SWITCH;
 							}
 							ru.setCheckConflicting(false);
-							takenPrefixes.addAll(getPrefixes(cmd.getRefName()));
+							addRefToPrefixes(takenPrefixes, cmd.getRefName());
 							takenNames.add(cmd.getRefName());
 							cmd.setResult(ru.update(walk));
 						}
@@ -511,19 +476,6 @@ public class BatchRefUpdate {
 			}
 		}
 		monitor.endTask();
-	}
-
-	private static boolean isMissing(RevWalk walk, ObjectId id)
-			throws IOException {
-		if (id.equals(ObjectId.zeroId())) {
-			return false; // Explicit add or delete is not missing.
-		}
-		try {
-			walk.parseAny(id);
-			return false;
-		} catch (MissingObjectException e) {
-			return true;
-		}
 	}
 
 	/**
@@ -571,45 +523,29 @@ public class BatchRefUpdate {
 		execute(walk, monitor, null);
 	}
 
-	private static Collection<String> getTakenPrefixes(Collection<String> names) {
+	private static Collection<String> getTakenPrefixes(
+			final Collection<String> names) {
 		Collection<String> ref = new HashSet<>();
-		for (String name : names) {
-			addPrefixesTo(name, ref);
-		}
+		for (String name : names)
+			ref.addAll(getPrefixes(name));
 		return ref;
 	}
 
-	/**
-	 * Get all path prefixes of a ref name.
-	 *
-	 * @param name
-	 *            ref name.
-	 * @return path prefixes of the ref name. For {@code refs/heads/foo}, returns
-	 *         {@code refs} and {@code refs/heads}.
-	 * @since 4.9
-	 */
-	protected static Collection<String> getPrefixes(String name) {
-		Collection<String> ret = new HashSet<>();
-		addPrefixesTo(name, ret);
-		return ret;
+	private static void addRefToPrefixes(Collection<String> prefixes,
+			String name) {
+		for (String prefix : getPrefixes(name)) {
+			prefixes.add(prefix);
+		}
 	}
 
-	/**
-	 * Add prefixes of a ref name to an existing collection.
-	 *
-	 * @param name
-	 *            ref name.
-	 * @param out
-	 *            path prefixes of the ref name. For {@code refs/heads/foo},
-	 *            returns {@code refs} and {@code refs/heads}.
-	 * @since 4.9
-	 */
-	protected static void addPrefixesTo(String name, Collection<String> out) {
-		int p1 = name.indexOf('/');
+	static Collection<String> getPrefixes(String s) {
+		Collection<String> ret = new HashSet<>();
+		int p1 = s.indexOf('/');
 		while (p1 > 0) {
-			out.add(name.substring(0, p1));
-			p1 = name.indexOf('/', p1 + 1);
+			ret.add(s.substring(0, p1));
+			p1 = s.indexOf('/', p1 + 1);
 		}
+		return ret;
 	}
 
 	/**

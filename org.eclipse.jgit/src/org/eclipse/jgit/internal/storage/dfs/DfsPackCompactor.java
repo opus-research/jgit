@@ -370,23 +370,27 @@ public class DfsPackCompactor {
 	private static void writePack(DfsObjDatabase objdb,
 			DfsPackDescription pack,
 			PackWriter pw, ProgressMonitor pm) throws IOException {
-		try (DfsOutputStream out = objdb.writeFile(pack, PACK)) {
+		DfsOutputStream out = objdb.writeFile(pack, PACK);
+		try {
 			pw.writePack(pm, pm, out);
 			pack.addFileExt(PACK);
-			pack.setBlockSize(PACK, out.blockSize());
+		} finally {
+			out.close();
 		}
 	}
 
 	private static void writeIndex(DfsObjDatabase objdb,
 			DfsPackDescription pack,
 			PackWriter pw) throws IOException {
-		try (DfsOutputStream out = objdb.writeFile(pack, INDEX)) {
+		DfsOutputStream out = objdb.writeFile(pack, INDEX);
+		try {
 			CountingOutputStream cnt = new CountingOutputStream(out);
 			pw.writeIndex(cnt);
 			pack.addFileExt(INDEX);
 			pack.setFileSize(INDEX, cnt.getCount());
-			pack.setBlockSize(INDEX, out.blockSize());
 			pack.setIndexVersion(pw.getIndexVersion());
+		} finally {
+			out.close();
 		}
 	}
 
