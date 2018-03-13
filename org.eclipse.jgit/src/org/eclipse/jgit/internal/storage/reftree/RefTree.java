@@ -63,6 +63,7 @@ import java.util.Map;
 
 import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.dircache.DirCache;
+import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEditor.DeletePath;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
@@ -88,25 +89,28 @@ import org.eclipse.jgit.util.RawParseUtils;
  * Tree of references in the reference graph.
  * <p>
  * The root corresponds to the {@code "refs/"} subdirectory, for example the
- * default reference {@code "refs/heads/master"} is stored as
+ * default reference {@code "refs/heads/master"} is stored at path
  * {@code "heads/master"} in a {@code RefTree}.
  * <p>
- * Normal references are stored as {@link FileMode#GITLINK} entries.
+ * Normal references are stored as {@link FileMode#GITLINK} tree entries. The
+ * ObjectId in the tree entry is the ObjectId the reference refers to.
  * <p>
  * Symbolic references are stored as {@link FileMode#SYMLINK} entries, with the
  * blob storing the name of the target reference.
  * <p>
  * Annotated tags also store the peeled object using a {@code GITLINK} entry
- * with the suffix <code>"^{}"</code>, for example {@code "tags/v1.0"} will
- * point to the annotated tag while <code>"tags/v1.0^{}"</code> stores the
- * commit the tag annotates.
+ * with the suffix <code>"^{}"</code>, for example {@code "tags/v1.0"} stores
+ * the annotated tag object, while <code>"tags/v1.0^{}"</code> stores the commit
+ * the tag annotates.
  * <p>
  * {@code HEAD} is a special case and stored as {@code "..HEAD"}.
  */
 public class RefTree {
 	private static final int MAX_SYMBOLIC_REF_DEPTH = 5;
 	static final String ROOT_DOTDOT = ".."; //$NON-NLS-1$
-	static final String PEELED_SUFFIX = "^{}"; //$NON-NLS-1$
+
+	/** Suffix applied to GITLINK to indicate its the peeled value of a tag. */
+	public static final String PEELED_SUFFIX = "^{}"; //$NON-NLS-1$
 
 	/**
 	 * Create an empty reference tree.
@@ -215,7 +219,7 @@ public class RefTree {
 	public Ref exactRef(String name) throws IOException {
 		Ref r = readRef(name);
 		if (r == null) {
-			return r;
+			return null;
 		} else if (r.isSymbolic()) {
 			return resolve(r, 0);
 		}
@@ -238,16 +242,17 @@ public class RefTree {
 		if (mode == TYPE_GITLINK) {
 			ObjectId id = e.getObjectId();
 			return new ObjectIdRef.PeeledNonTag(PACKED, name, id);
+		}
 
-		} else if (mode == TYPE_SYMLINK) {
+		if (mode == TYPE_SYMLINK) {
 			ObjectId id = e.getObjectId();
-			String dst = pendingBlobs != null ? pendingBlobs.get(id) : null;
-			if (dst == null) {
+			String n = pendingBlobs != null ? pendingBlobs.get(id) : null;
+			if (n == null) {
 				byte[] bin = reader.open(id, OBJ_BLOB).getCachedBytes();
-				dst = RawParseUtils.decode(bin);
+				n = RawParseUtils.decode(bin);
 			}
-			Ref trg = new ObjectIdRef.Unpeeled(NEW, dst, null);
-			return new SymbolicRef(name, trg);
+			Ref dst = new ObjectIdRef.Unpeeled(NEW, n, null);
+			return new SymbolicRef(name, dst);
 		}
 
 		return null; // garbage file or something; not a reference.
@@ -271,9 +276,9 @@ public class RefTree {
 	 * The batch is applied atomically. Either all commands apply at once, or
 	 * they all reject and the RefTree is left unmodified.
 	 * <p>
-	 * On {@code true} return value the command results are left as-is (probably
-	 * {@code NOT_ATTEMPTED}). Results are set only when this method returns
-	 * {@code false} to indicate failure.
+	 * On success (when this method returns {@code true}) the command results
+	 * are left as-is (probably {@code NOT_ATTEMPTED}). Result fields are set
+	 * only when this method returns {@code false} to indicate failure.
 	 *
 	 * @param cmdList
 	 *            to apply. All commands should still have result NOT_ATTEMPTED.
@@ -328,7 +333,7 @@ public class RefTree {
 					}
 					pendingBlobs.put(id, dst);
 				}
-			});
+			}.setReplace(false));
 			cleanupPeeledRef(ed, oldRef);
 			return;
 		}
@@ -340,7 +345,7 @@ public class RefTree {
 				ent.setFileMode(GITLINK);
 				ent.setObjectId(newRef.getObjectId());
 			}
-		});
+		}.setReplace(false));
 
 		if (newRef.getPeeledObjectId() != null) {
 			ed.add(new PathEdit(peeledPath(newRef.getName())) {
@@ -349,7 +354,7 @@ public class RefTree {
 					ent.setFileMode(GITLINK);
 					ent.setObjectId(newRef.getPeeledObjectId());
 				}
-			});
+			}.setReplace(false));
 		} else {
 			cleanupPeeledRef(ed, oldRef);
 		}
@@ -364,7 +369,7 @@ public class RefTree {
 
 	private static void cleanupPeeledRef(DirCacheEditor ed, Ref ref) {
 		if (ref != null && !ref.isSymbolic()
-				&& ref.getPeeledObjectId() != null) {
+				&& (!ref.isPeeled() || ref.getPeeledObjectId() != null)) {
 			ed.add(new DeletePath(peeledPath(ref.getName())));
 		}
 	}
@@ -382,7 +387,15 @@ public class RefTree {
 		cmd.setResult(REJECTED_OTHER_REASON, msg);
 	}
 
-	private static String refName(String path) {
+	/**
+	 * Convert a path name in a RefTree to the reference name known by Git.
+	 *
+	 * @param path
+	 *            name read from the RefTree structure, for example
+	 *            {@code "heads/master"}.
+	 * @return reference name for the path, {@code "refs/heads/master"}.
+	 */
+	public static String refName(String path) {
 		if (path.startsWith(ROOT_DOTDOT)) {
 			return path.substring(2);
 		}
@@ -419,6 +432,20 @@ public class RefTree {
 			pendingBlobs = null;
 		}
 		return contents.writeTree(inserter);
+	}
+
+	/** @return a deep copy of this RefTree. */
+	public RefTree copy() {
+		RefTree r = new RefTree(null, DirCache.newInCore());
+		DirCacheBuilder b = r.contents.builder();
+		for (int i = 0; i < contents.getEntryCount(); i++) {
+			b.add(new DirCacheEntry(contents.getEntry(i)));
+		}
+		b.finish();
+		if (pendingBlobs != null) {
+			r.pendingBlobs = new HashMap<>(pendingBlobs);
+		}
+		return r;
 	}
 
 	/** Releases the ObjectReader remembered by the tree. */

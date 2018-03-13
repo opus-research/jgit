@@ -48,6 +48,7 @@ import static org.eclipse.jgit.lib.Constants.encode;
 import static org.eclipse.jgit.lib.FileMode.TYPE_GITLINK;
 import static org.eclipse.jgit.lib.FileMode.TYPE_SYMLINK;
 import static org.eclipse.jgit.lib.Ref.Storage.NETWORK;
+import static org.eclipse.jgit.transport.ReceiveCommand.Result.NOT_ATTEMPTED;
 
 import java.io.IOException;
 
@@ -90,7 +91,7 @@ public class Command {
 		this.oldRef = oldRef;
 		this.newRef = newRef;
 		this.cmd = null;
-		this.result = Result.NOT_ATTEMPTED;
+		this.result = NOT_ATTEMPTED;
 
 		if (oldRef == null && newRef == null) {
 			throw new IllegalArgumentException();
@@ -110,9 +111,7 @@ public class Command {
 	 * @param rw
 	 *            walk instance to peel the {@code newId}.
 	 * @param cmd
-	 *            command received from the push client. The result of this
-	 *            command will be pushed into {@code cmd}, making it available
-	 *            to clients.
+	 *            command received from a push client.
 	 * @throws MissingObjectException
 	 *             {@code oldId} or {@code newId} is missing.
 	 * @throws IOException
@@ -120,23 +119,30 @@ public class Command {
 	 */
 	public Command(RevWalk rw, ReceiveCommand cmd)
 			throws MissingObjectException, IOException {
-		this.oldRef = toRef(rw, cmd.getOldId(), cmd.getRefName());
-		this.newRef = toRef(rw, cmd.getNewId(), cmd.getRefName());
+		this.oldRef = toRef(rw, cmd.getOldId(), cmd.getRefName(), false);
+		this.newRef = toRef(rw, cmd.getNewId(), cmd.getRefName(), true);
 		this.cmd = cmd;
 	}
 
-	private static Ref toRef(RevWalk rw, ObjectId id, String name)
-			throws MissingObjectException, IOException {
+	private static Ref toRef(RevWalk rw, ObjectId id, String name,
+			boolean mustExist) throws MissingObjectException, IOException {
 		if (ObjectId.zeroId().equals(id)) {
 			return null;
 		}
 
-		RevObject o = rw.parseAny(id);
-		if (o instanceof RevTag) {
-			RevObject p = rw.peel(o);
-			return new ObjectIdRef.PeeledTag(NETWORK, name, id, p.copy());
+		try {
+			RevObject o = rw.parseAny(id);
+			if (o instanceof RevTag) {
+				RevObject p = rw.peel(o);
+				return new ObjectIdRef.PeeledTag(NETWORK, name, id, p.copy());
+			}
+			return new ObjectIdRef.PeeledNonTag(NETWORK, name, id);
+		} catch (MissingObjectException e) {
+			if (mustExist) {
+				throw e;
+			}
+			return new ObjectIdRef.Unpeeled(NETWORK, name, id);
 		}
-		return new ObjectIdRef.PeeledNonTag(NETWORK, name, id);
 	}
 
 	/** @return name of the reference affected by this command. */
@@ -149,11 +155,25 @@ public class Command {
 		return oldRef.getName();
 	}
 
-	void setResult(Result result) {
+	/**
+	 * Set the result of this command.
+	 *
+	 * @param result
+	 *            the command result.
+	 */
+	public void setResult(Result result) {
 		setResult(result, null);
 	}
 
-	void setResult(Result result, String why) {
+	/**
+	 * Set the result of this command.
+	 *
+	 * @param result
+	 *            the command result.
+	 * @param why
+	 *            optional message explaining the result status.
+	 */
+	public void setResult(Result result, @Nullable String why) {
 		if (cmd != null) {
 			cmd.setResult(result, why);
 		} else {

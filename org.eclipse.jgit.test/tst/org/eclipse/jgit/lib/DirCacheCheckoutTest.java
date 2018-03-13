@@ -70,7 +70,6 @@ import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.errors.CheckoutConflictException;
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.DirCacheNameConflictException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
@@ -1042,7 +1041,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		assertTrue(st.isClean());
 	}
 
-	@Test(expected = DirCacheNameConflictException.class) // BROKEN TEST
+	@Test
 	public void testCheckoutChangeLinkToNonEmptyDirsAndNewIndexEntry()
 			throws Exception {
 		Assume.assumeTrue(FS.DETECTED.supportsSymlinks());
@@ -1085,7 +1084,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		assertWorkDir(mkmap(linkName, "a", fname, "a"));
 
 		Status st = git.status().call();
-		assertFalse(st.isClean());
+		assertTrue(st.isClean());
 	}
 
 	@Test
@@ -1179,7 +1178,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		assertTrue(st.isClean());
 	}
 
-	@Test(expected = DirCacheNameConflictException.class) // BROKEN TEST
+	@Test
 	public void testCheckoutChangeFileToNonEmptyDirsAndNewIndexEntry()
 			throws Exception {
 		String fname = "was_file";
@@ -1214,9 +1213,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		assertWorkDir(mkmap(fname, "a"));
 
 		Status st = git.status().call();
-		assertFalse(st.isClean());
-		assertEquals(1, st.getAdded().size());
-		assertTrue(st.getAdded().contains(fname + "/dir/file1"));
+		assertTrue(st.isClean());
 	}
 
 	@Test

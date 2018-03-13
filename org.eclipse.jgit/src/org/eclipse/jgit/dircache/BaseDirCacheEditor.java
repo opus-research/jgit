@@ -252,7 +252,7 @@ abstract class BaseDirCacheEditor {
 		return true;
 	}
 
-	private static int pathCompare(byte[] aPath, int aPos, int aEnd, int aMode,
+	static int pathCompare(byte[] aPath, int aPos, int aEnd, int aMode,
 			byte[] bPath, int bPos, int bEnd, int bMode) {
 		while (aPos < aEnd && bPos < bEnd) {
 			int cmp = (aPath[aPos++] & 0xff) - (bPath[bPos++] & 0xff);
