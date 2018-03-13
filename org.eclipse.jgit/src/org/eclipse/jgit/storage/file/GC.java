@@ -662,6 +662,7 @@ public class GC {
 						JGitText.get().cannotCreateIndexfile, tmpIdx.getPath()));
 
 			// write the packfile
+			@SuppressWarnings("resource" /* java 7 */)
 			FileChannel channel = new FileOutputStream(tmpPack).getChannel();
 			OutputStream channelStream = Channels.newOutputStream(channel);
 			try {
@@ -672,9 +673,8 @@ public class GC {
 				channel.close();
 			}
 
-			pw.prepareIndexBitmaps(pm, want);
-
 			// write the packindex
+			@SuppressWarnings("resource")
 			FileChannel idxChannel = new FileOutputStream(tmpIdx).getChannel();
 			OutputStream idxStream = Channels.newOutputStream(idxChannel);
 			try {
