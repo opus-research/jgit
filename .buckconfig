@@ -1,0 +1,13 @@
+[alias]
+  jgit = //:jgit
+  jgit6 = //:jgit6
+  lib = //org.eclipse.jgit:lib
+
+[project]
+  ignore = .git
+
+[buildfile]
+  includes = //tools/osgi/bundle.defs
+
+[java]
+  src_roots = src, resources, tst, tst-rsrc
