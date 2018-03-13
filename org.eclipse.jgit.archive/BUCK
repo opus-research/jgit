@@ -1,11 +1,3 @@
-java_bundle(
-  name = 'bundle',
-  deps = [
-    ':archive',
-    ':osgi',
-  ],
-)
-
 ACTIVATOR = ['src/org/eclipse/jgit/archive/FormatActivator.java']
 
 java_library(

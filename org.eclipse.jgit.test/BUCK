@@ -11,6 +11,10 @@ for test in LIB:
     srcs = [test],
     deps = [':test_util'],
     labels = ['lib'],
+    # TODO(msohn): find out why this doesn't work if OS platform encoding is different
+    vm_args = [
+      '-Dfile.encoding=UTF-8'
+    ]
   )
 
 for test in DFS:
@@ -31,7 +35,19 @@ java_library(
   resources = glob(['tst-rsrc/**/*'], excludes = DATA),
   deps = [
     ':sample_data_jar',
+    '//org.eclipse.jgit:api',
+    '//org.eclipse.jgit:blame',
+    '//org.eclipse.jgit:fnmatch',
     '//org.eclipse.jgit:lib',
+    '//org.eclipse.jgit:merge',
+    '//org.eclipse.jgit:nls',
+    '//org.eclipse.jgit:notes',
+    '//org.eclipse.jgit:progress',
+    '//org.eclipse.jgit:revplot',
+    '//org.eclipse.jgit:text',
+    '//org.eclipse.jgit:transport_client',
+    '//org.eclipse.jgit:transport_server',
+    '//org.eclipse.jgit:util',
     '//org.eclipse.jgit.junit:junit',
     '//lib:ewah',
     '//lib:hamcrest-core',

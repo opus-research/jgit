@@ -1,25 +1,3 @@
-java_bundle(
-  name = 'bundle',
-  deps = [
-    ':api',
-    ':blame',
-    ':daemon',
-    ':fnmatch',
-    ':http_util',
-    ':lib',
-    ':merge',
-    ':nls',
-    ':notes',
-    ':progress',
-    ':revplot',
-    ':text',
-    ':transport_client',
-    ':transport_resolver',
-    ':transport_server',
-    ':util',
-  ],
-)
-
 def pkg(*names):
   return ['src/org/eclipse/jgit/' + n for n in names]
 
@@ -370,7 +348,10 @@ java_library(
     'resources/org/eclipse/jgit/internal/JGitText.properties',
   ],
   deps = [':nls'],
-  visibility = ['//org.eclipse.jgit.http.test:test_util']
+  visibility = [
+    '//org.eclipse.jgit.test:test_util',
+    '//org.eclipse.jgit.http.test:test_util',
+  ]
 )
 
 genrule(
