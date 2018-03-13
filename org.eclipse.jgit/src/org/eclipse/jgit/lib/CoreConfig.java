@@ -103,6 +103,8 @@ public class CoreConfig {
 
 	/**
 	 * Options for symlink handling
+	 *
+	 * @since 3.3
 	 */
 	public static enum SymLinks {
 		/** Checkout symbolic links as plain files */
