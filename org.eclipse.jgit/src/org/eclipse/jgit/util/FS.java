@@ -375,7 +375,7 @@ public abstract class FS {
 	public File userHome() {
 		Holder<File> p = userHome;
 		if (p == null) {
-			p = new Holder<File>(userHomeImpl());
+			p = new Holder<>(userHomeImpl());
 			userHome = p;
 		}
 		return p.value;
@@ -390,7 +390,7 @@ public abstract class FS {
 	 * @return {@code this}.
 	 */
 	public FS setUserHome(File path) {
-		userHome = new Holder<File>(path);
+		userHome = new Holder<>(path);
 		return this;
 	}
 
@@ -409,6 +409,7 @@ public abstract class FS {
 	protected File userHomeImpl() {
 		final String home = AccessController
 				.doPrivileged(new PrivilegedAction<String>() {
+					@Override
 					public String run() {
 						return System.getProperty("user.home"); //$NON-NLS-1$
 					}
@@ -649,7 +650,7 @@ public abstract class FS {
 	 */
 	public File getGitSystemConfig() {
 		if (gitSystemConfig == null) {
-			gitSystemConfig = new Holder<File>(discoverGitSystemConfig());
+			gitSystemConfig = new Holder<>(discoverGitSystemConfig());
 		}
 		return gitSystemConfig.value;
 	}
@@ -663,7 +664,7 @@ public abstract class FS {
 	 * @since 4.0
 	 */
 	public FS setGitSystemConfig(File configFile) {
-		gitSystemConfig = new Holder<File>(configFile);
+		gitSystemConfig = new Holder<>(configFile);
 		return this;
 	}
 
@@ -1342,6 +1343,7 @@ public abstract class FS {
 			this.out = output;
 		}
 
+		@Override
 		public void run() {
 			try {
 				copy();

@@ -56,9 +56,11 @@ import static org.eclipse.jgit.internal.storage.pack.PackExt.PACK;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.GregorianCalendar;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -82,6 +84,7 @@ import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.storage.pack.PackStatistics;
+import org.eclipse.jgit.util.SystemReader;
 import org.eclipse.jgit.util.io.CountingOutputStream;
 
 /** Repack and garbage collect a repository. */
@@ -100,7 +103,8 @@ public class DfsGarbageCollector {
 
 	private PackConfig packConfig;
 
-	// See pack(), below, for how these two variables interact.
+	// See packIsCoalesceableGarbage(), below, for how these two variables
+	// interact.
 	private long coalesceGarbageLimit = 50 << 20;
 	private long garbageTtlMillis = TimeUnit.DAYS.toMillis(1);
 
@@ -123,9 +127,9 @@ public class DfsGarbageCollector {
 		repo = repository;
 		refdb = repo.getRefDatabase();
 		objdb = repo.getObjectDatabase();
-		newPackDesc = new ArrayList<DfsPackDescription>(4);
-		newPackStats = new ArrayList<PackStatistics>(4);
-		newPackObj = new ArrayList<ObjectIdSet>(4);
+		newPackDesc = new ArrayList<>(4);
+		newPackStats = new ArrayList<>(4);
+		newPackObj = new ArrayList<>(4);
 
 		packConfig = new PackConfig(repo);
 		packConfig.setIndexVersion(2);
@@ -228,14 +232,8 @@ public class DfsGarbageCollector {
 		if (packConfig.getIndexVersion() != 2)
 			throw new IllegalStateException(
 					JGitText.get().supportOnlyPackIndexVersion2);
-		if (garbageTtlMillis > 0) {
-			// We disable coalescing because the coalescing step will keep
-			// refreshing the UNREACHABLE_GARBAGE pack and we wouldn't
-			// actually prune anything.
-			coalesceGarbageLimit = 0;
-		}
 
-		startTimeMillis = System.currentTimeMillis();
+		startTimeMillis = SystemReader.getInstance().getCurrentTime();
 		ctx = (DfsReader) objdb.newReader();
 		try {
 			refdb.refresh();
@@ -251,10 +249,10 @@ public class DfsGarbageCollector {
 				return true;
 			}
 
-			allHeads = new HashSet<ObjectId>();
-			nonHeads = new HashSet<ObjectId>();
-			txnHeads = new HashSet<ObjectId>();
-			tagTargets = new HashSet<ObjectId>();
+			allHeads = new HashSet<>();
+			nonHeads = new HashSet<>();
+			txnHeads = new HashSet<>();
+			tagTargets = new HashSet<>();
 			for (Ref ref : refsBefore) {
 				if (ref.isSymbolic() || ref.getObjectId() == null)
 					continue;
@@ -306,18 +304,18 @@ public class DfsGarbageCollector {
 
 	private void readPacksBefore() throws IOException {
 		DfsPackFile[] packs = objdb.getPacks();
-		packsBefore = new ArrayList<DfsPackFile>(packs.length);
-		expiredGarbagePacks = new ArrayList<DfsPackFile>(packs.length);
+		packsBefore = new ArrayList<>(packs.length);
+		expiredGarbagePacks = new ArrayList<>(packs.length);
 
 		long mostRecentGC = mostRecentGC(packs);
-		long now = System.currentTimeMillis();
+		long now = SystemReader.getInstance().getCurrentTime();
 		for (DfsPackFile p : packs) {
 			DfsPackDescription d = p.getPackDescription();
 			if (d.getPackSource() != UNREACHABLE_GARBAGE) {
 				packsBefore.add(p);
 			} else if (packIsExpiredGarbage(d, mostRecentGC, now)) {
 				expiredGarbagePacks.add(p);
-			} else if (d.getFileSize(PackExt.PACK) < coalesceGarbageLimit) {
+			} else if (packIsCoalesceableGarbage(d, now)) {
 				packsBefore.add(p);
 			}
 		}
@@ -360,6 +358,68 @@ public class DfsGarbageCollector {
 				&& now - d.getLastModified() >= garbageTtlMillis;
 	}
 
+	private boolean packIsCoalesceableGarbage(DfsPackDescription d, long now) {
+		// An UNREACHABLE_GARBAGE pack can be coalesced if its size is less than
+		// the coalesceGarbageLimit and either garbageTtl is zero or if the pack
+		// is created in a close time interval (on a single calendar day when
+		// the garbageTtl is more than one day or one third of the garbageTtl).
+		//
+		// When the garbageTtl is more than 24 hours, garbage packs that are
+		// created within a single calendar day are coalesced together. This
+		// would make the effective ttl of the garbage pack as garbageTtl+23:59
+		// and limit the number of garbage to a maximum number of
+		// garbageTtl_in_days + 1 (assuming all of them are less than the size
+		// of coalesceGarbageLimit).
+		//
+		// When the garbageTtl is less than or equal to 24 hours, garbage packs
+		// that are created within a one third of garbageTtl are coalesced
+		// together. This would make the effective ttl of the garbage packs as
+		// garbageTtl + (garbageTtl / 3) and would limit the number of garbage
+		// packs to a maximum number of 4 (assuming all of them are less than
+		// the size of coalesceGarbageLimit).
+
+		if (d.getPackSource() != UNREACHABLE_GARBAGE
+				|| d.getFileSize(PackExt.PACK) >= coalesceGarbageLimit) {
+			return false;
+		}
+
+		if (garbageTtlMillis == 0) {
+			return true;
+		}
+
+		long lastModified = d.getLastModified();
+		long dayStartLastModified = dayStartInMillis(lastModified);
+		long dayStartToday = dayStartInMillis(now);
+
+		if (dayStartLastModified != dayStartToday) {
+			return false; // this pack is not created today.
+		}
+
+		if (garbageTtlMillis > TimeUnit.DAYS.toMillis(1)) {
+			return true; // ttl is more than one day and pack is created today.
+		}
+
+		long timeInterval = garbageTtlMillis / 3;
+		if (timeInterval == 0) {
+			return false; // ttl is too small, don't try to coalesce.
+		}
+
+		long modifiedTimeSlot = (lastModified - dayStartLastModified) / timeInterval;
+		long presentTimeSlot = (now - dayStartToday) / timeInterval;
+		return modifiedTimeSlot == presentTimeSlot;
+	}
+
+	private static long dayStartInMillis(long timeInMillis) {
+		Calendar cal = new GregorianCalendar(
+				SystemReader.getInstance().getTimeZone());
+		cal.setTimeInMillis(timeInMillis);
+		cal.set(Calendar.HOUR_OF_DAY, 0);
+		cal.set(Calendar.MINUTE, 0);
+		cal.set(Calendar.SECOND, 0);
+		cal.set(Calendar.MILLISECOND, 0);
+		return cal.getTimeInMillis();
+	}
+
 	/** @return all of the source packs that fed into this compaction. */
 	public List<DfsPackDescription> getSourcePacks() {
 		return toPrune();
@@ -377,7 +437,7 @@ public class DfsGarbageCollector {
 
 	private List<DfsPackDescription> toPrune() {
 		int cnt = packsBefore.size();
-		List<DfsPackDescription> all = new ArrayList<DfsPackDescription>(cnt);
+		List<DfsPackDescription> all = new ArrayList<>(cnt);
 		for (DfsPackFile pack : packsBefore) {
 			all.add(pack.getPackDescription());
 		}

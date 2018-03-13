@@ -57,6 +57,7 @@ import org.apache.commons.compress.archivers.tar.TarConstants;
 import org.eclipse.jgit.api.ArchiveCommand;
 import org.eclipse.jgit.archive.internal.ArchiveText;
 import org.eclipse.jgit.lib.FileMode;
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 
 /**
@@ -67,6 +68,7 @@ public final class TarFormat extends BaseFormat implements
 	private static final List<String> SUFFIXES = Collections
 			.unmodifiableList(Arrays.asList(".tar")); //$NON-NLS-1$
 
+	@Override
 	public ArchiveOutputStream createArchiveOutputStream(OutputStream s)
 			throws IOException {
 		return createArchiveOutputStream(s,
@@ -76,6 +78,7 @@ public final class TarFormat extends BaseFormat implements
 	/**
 	 * @since 4.0
 	 */
+	@Override
 	public ArchiveOutputStream createArchiveOutputStream(OutputStream s,
 			Map<String, Object> o) throws IOException {
 		TarArchiveOutputStream out = new TarArchiveOutputStream(s, "UTF-8"); //$NON-NLS-1$
@@ -84,8 +87,20 @@ public final class TarFormat extends BaseFormat implements
 		return applyFormatOptions(out, o);
 	}
 
+	@Deprecated
+	@Override
 	public void putEntry(ArchiveOutputStream out,
 			String path, FileMode mode, ObjectLoader loader)
+			throws IOException {
+		putEntry(out, null, path, mode,loader);
+	}
+
+	/**
+	 * @since 4.7
+	 */
+	@Override
+	public void putEntry(ArchiveOutputStream out,
+			ObjectId tree, String path, FileMode mode, ObjectLoader loader)
 			throws IOException {
 		if (mode == FileMode.SYMLINK) {
 			final TarArchiveEntry entry = new TarArchiveEntry(
@@ -127,6 +142,7 @@ public final class TarFormat extends BaseFormat implements
 		out.closeArchiveEntry();
 	}
 
+	@Override
 	public Iterable<String> suffixes() {
 		return SUFFIXES;
 	}

@@ -66,6 +66,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Pattern;
 
 import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.annotations.Nullable;
@@ -110,6 +111,17 @@ import org.slf4j.LoggerFactory;
 public abstract class Repository implements AutoCloseable {
 	private static final Logger LOG = LoggerFactory.getLogger(Repository.class);
 	private static final ListenerList globalListeners = new ListenerList();
+
+	/**
+	 * Branch names containing slashes should not have a name component that is
+	 * one of the reserved device names on Windows.
+	 *
+	 * @see #normalizeBranchName(String)
+	 */
+	private static final Pattern FORBIDDEN_BRANCH_NAME_COMPONENTS = Pattern
+			.compile(
+					"(^|/)(aux|com[1-9]|con|lpt[1-9]|nul|prn)(\\.[^/]*)?", //$NON-NLS-1$
+					Pattern.CASE_INSENSITIVE);
 
 	/** @return the global listener list observing all events in this JVM. */
 	public static ListenerList getGlobalListenerList() {
@@ -912,7 +924,6 @@ public abstract class Repository implements AutoCloseable {
 		getRefDatabase().close();
 	}
 
-	@SuppressWarnings("nls")
 	@Override
 	@NonNull
 	public String toString() {
@@ -923,7 +934,7 @@ public abstract class Repository implements AutoCloseable {
 		else
 			desc = getClass().getSimpleName() + "-" //$NON-NLS-1$
 					+ System.identityHashCode(this);
-		return "Repository[" + desc + "]"; //$NON-NLS-1$
+		return "Repository[" + desc + "]"; //$NON-NLS-1$ //$NON-NLS-2$
 	}
 
 	/**
@@ -1053,7 +1064,7 @@ public abstract class Repository implements AutoCloseable {
 		try {
 			return getRefDatabase().getRefs(RefDatabase.ALL);
 		} catch (IOException e) {
-			return new HashMap<String, Ref>();
+			return new HashMap<>();
 		}
 	}
 
@@ -1067,7 +1078,7 @@ public abstract class Repository implements AutoCloseable {
 		try {
 			return getRefDatabase().getRefs(Constants.R_TAGS);
 		} catch (IOException e) {
-			return new HashMap<String, Ref>();
+			return new HashMap<>();
 		}
 	}
 
@@ -1102,7 +1113,7 @@ public abstract class Repository implements AutoCloseable {
 	@NonNull
 	public Map<AnyObjectId, Set<Ref>> getAllRefsByPeeledObjectId() {
 		Map<String, Ref> allRefs = getAllRefs();
-		Map<AnyObjectId, Set<Ref>> ret = new HashMap<AnyObjectId, Set<Ref>>(allRefs.size());
+		Map<AnyObjectId, Set<Ref>> ret = new HashMap<>(allRefs.size());
 		for (Ref ref : allRefs.values()) {
 			ref = peel(ref);
 			AnyObjectId target = ref.getPeeledObjectId();
@@ -1114,7 +1125,7 @@ public abstract class Repository implements AutoCloseable {
 				// that was not the case (rare)
 				if (oset.size() == 1) {
 					// Was a read-only singleton, we must copy to a new Set
-					oset = new HashSet<Ref>(oset);
+					oset = new HashSet<>(oset);
 				}
 				ret.put(target, oset);
 				oset.add(ref);
@@ -1333,12 +1344,105 @@ public abstract class Repository implements AutoCloseable {
 	}
 
 	/**
+	 * Normalizes the passed branch name into a possible valid branch name. The
+	 * validity of the returned name should be checked by a subsequent call to
+	 * {@link #isValidRefName(String)}.
+	 * <p/>
+	 * Future implementations of this method could be more restrictive or more
+	 * lenient about the validity of specific characters in the returned name.
+	 * <p/>
+	 * The current implementation returns the trimmed input string if this is
+	 * already a valid branch name. Otherwise it returns a trimmed string with
+	 * special characters not allowed by {@link #isValidRefName(String)}
+	 * replaced by hyphens ('-') and blanks replaced by underscores ('_').
+	 * Leading and trailing slashes, dots, hyphens, and underscores are removed.
+	 *
+	 * @param name
+	 *            to normalize
+	 *
+	 * @return The normalized name or an empty String if it is {@code null} or
+	 *         empty.
+	 * @since 4.7
+	 * @see #isValidRefName(String)
+	 */
+	public static String normalizeBranchName(String name) {
+		if (name == null || name.isEmpty()) {
+			return ""; //$NON-NLS-1$
+		}
+		String result = name.trim();
+		String fullName = result.startsWith(Constants.R_HEADS) ? result
+				: Constants.R_HEADS + result;
+		if (isValidRefName(fullName)) {
+			return result;
+		}
+
+		// All Unicode blanks to underscore
+		result = result.replaceAll("(?:\\h|\\v)+", "_"); //$NON-NLS-1$ //$NON-NLS-2$
+		StringBuilder b = new StringBuilder();
+		char p = '/';
+		for (int i = 0, len = result.length(); i < len; i++) {
+			char c = result.charAt(i);
+			if (c < ' ' || c == 127) {
+				continue;
+			}
+			// Substitute a dash for problematic characters
+			switch (c) {
+			case '\\':
+			case '^':
+			case '~':
+			case ':':
+			case '?':
+			case '*':
+			case '[':
+			case '@':
+			case '<':
+			case '>':
+			case '|':
+			case '"':
+				c = '-';
+				break;
+			default:
+				break;
+			}
+			// Collapse multiple slashes, dashes, dots, underscores, and omit
+			// dashes, dots, and underscores following a slash.
+			switch (c) {
+			case '/':
+				if (p == '/') {
+					continue;
+				}
+				p = '/';
+				break;
+			case '.':
+			case '_':
+			case '-':
+				if (p == '/' || p == '-') {
+					continue;
+				}
+				p = '-';
+				break;
+			default:
+				p = c;
+				break;
+			}
+			b.append(c);
+		}
+		// Strip trailing special characters, and avoid the .lock extension
+		result = b.toString().replaceFirst("[/_.-]+$", "") //$NON-NLS-1$ //$NON-NLS-2$
+				.replaceAll("\\.lock($|/)", "_lock$1"); //$NON-NLS-1$ //$NON-NLS-2$
+		return FORBIDDEN_BRANCH_NAME_COMPONENTS.matcher(result)
+				.replaceAll("$1+$2$3"); //$NON-NLS-1$
+	}
+
+	/**
 	 * Strip work dir and return normalized repository path.
 	 *
-	 * @param workDir Work dir
-	 * @param file File whose path shall be stripped of its workdir
-	 * @return normalized repository relative path or the empty
-	 *         string if the file is not relative to the work directory.
+	 * @param workDir
+	 *            Work dir
+	 * @param file
+	 *            File whose path shall be stripped of its workdir
+	 * @return normalized repository relative path or the empty string if the
+	 *         file is not relative to the work directory.
 	 */
 	@NonNull
 	public static String stripWorkDir(File workDir, File file) {
@@ -1576,7 +1680,7 @@ public abstract class Repository implements AutoCloseable {
 		if (raw == null)
 			return null;
 
-		LinkedList<ObjectId> heads = new LinkedList<ObjectId>();
+		LinkedList<ObjectId> heads = new LinkedList<>();
 		for (int p = 0; p < raw.length;) {
 			heads.add(ObjectId.fromString(raw, p));
 			p = RawParseUtils
@@ -1888,41 +1992,5 @@ public abstract class Repository implements AutoCloseable {
 	 */
 	public void autoGC(ProgressMonitor monitor) {
 		// default does nothing
-	}
-
-	/**
-	 * Normalizes the passed branch name into a possible valid branch name. The
-	 * validity of the returned name should be checked by a subsequent call to
-	 * {@link #isValidRefName(String)}.
-	 * <p/>
-	 * Future implementations of this method could be more restrictive or more
-	 * lenient about the validity of specific characters in the returned name.
-	 * <p/>
-	 * The current implementation returns a trimmed string only containing word
-	 * characters ([a-zA-Z_0-9]) and hyphens ('-'). Colons are replaced by
-	 * hyphens. Repeating underscores and hyphens are replaced by a single
-	 * occurrence. Underscores and hyphens at the beginning of the string are
-	 * removed.
-	 *
-	 * @param name
-	 *            The name to normalize.
-	 *
-	 * @return The normalized String or null if null was passed.
-	 * @since 4.7
-	 * @see #isValidRefName(String)
-	 */
-	public static String normalizeBranchName(String name) {
-		if (name == null || name.length() == 0) {
-			return name;
-		}
-		String result = name.trim();
-		return result.replaceAll("\\s+([_:-])*?\\s+", "$1") //$NON-NLS-1$//$NON-NLS-2$
-				.replaceAll(":", "-") //$NON-NLS-1$//$NON-NLS-2$
-				.replaceAll("\\s+", "_") //$NON-NLS-1$//$NON-NLS-2$
-				.replaceAll("_{2,}", "_") //$NON-NLS-1$//$NON-NLS-2$
-				.replaceAll("-{2,}", "-") //$NON-NLS-1$//$NON-NLS-2$
-				.replaceAll("[^\\w-]", "") //$NON-NLS-1$ //$NON-NLS-2$
-				.replaceAll("^_+", "") //$NON-NLS-1$//$NON-NLS-2$
-				.replaceAll("^-+", ""); //$NON-NLS-1$//$NON-NLS-2$
 	}
 }

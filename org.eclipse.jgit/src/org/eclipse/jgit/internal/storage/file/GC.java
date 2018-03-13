@@ -274,7 +274,8 @@ public class GC {
 		ObjectReader reader = repo.newObjectReader();
 		ObjectDirectory dir = repo.getObjectDatabase();
 		ObjectDirectoryInserter inserter = dir.newInserter();
-		boolean shouldLoosen = getExpireDate() < Long.MAX_VALUE;
+		boolean shouldLoosen = !"now".equals(getPruneExpireStr()) && //$NON-NLS-1$
+			getExpireDate() < Long.MAX_VALUE;
 
 		prunePreserved();
 		long packExpireDate = getPackExpireDate();
@@ -297,6 +298,7 @@ public class GC {
 				prunePack(oldName);
 			}
 		}
+
 		// close the complete object database. That's my only chance to force
 		// rescanning and to detect that certain pack files are now deleted.
 		repo.getObjectDatabase().close();
@@ -451,51 +453,54 @@ public class GC {
 
 		// Collect all loose objects which are old enough, not referenced from
 		// the index and not in objectsToKeep
-		Map<ObjectId, File> deletionCandidates = new HashMap<ObjectId, File>();
+		Map<ObjectId, File> deletionCandidates = new HashMap<>();
 		Set<ObjectId> indexObjects = null;
 		File objects = repo.getObjectsDirectory();
 		String[] fanout = objects.list();
-		if (fanout != null && fanout.length > 0) {
-			pm.beginTask(JGitText.get().pruneLooseUnreferencedObjects,
-					fanout.length);
-			try {
-				for (String d : fanout) {
+		if (fanout == null || fanout.length == 0) {
+			return;
+		}
+		pm.beginTask(JGitText.get().pruneLooseUnreferencedObjects,
+				fanout.length);
+		try {
+			for (String d : fanout) {
+				checkCancelled();
+				pm.update(1);
+				if (d.length() != 2)
+					continue;
+				File[] entries = new File(objects, d).listFiles();
+				if (entries == null)
+					continue;
+				for (File f : entries) {
 					checkCancelled();
-					pm.update(1);
-					if (d.length() != 2)
+					String fName = f.getName();
+					if (fName.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
 						continue;
-					File[] entries = new File(objects, d).listFiles();
-					if (entries == null)
+					if (repo.getFS().lastModified(f) >= expireDate)
 						continue;
-					for (File f : entries) {
-						checkCancelled();
-						String fName = f.getName();
-						if (fName.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
+					try {
+						ObjectId id = ObjectId.fromString(d + fName);
+						if (objectsToKeep.contains(id))
 							continue;
-						if (repo.getFS().lastModified(f) >= expireDate)
+						if (indexObjects == null)
+							indexObjects = listNonHEADIndexObjects();
+						if (indexObjects.contains(id))
 							continue;
-						try {
-							ObjectId id = ObjectId.fromString(d + fName);
-							if (objectsToKeep.contains(id))
-								continue;
-							if (indexObjects == null)
-								indexObjects = listNonHEADIndexObjects();
-							if (indexObjects.contains(id))
-								continue;
-							deletionCandidates.put(id, f);
-						} catch (IllegalArgumentException notAnObject) {
-							// ignoring the file that does not represent loose
-							// object
-							continue;
-						}
+						deletionCandidates.put(id, f);
+					} catch (IllegalArgumentException notAnObject) {
+						// ignoring the file that does not represent loose
+						// object
+						continue;
 					}
 				}
-			} finally {
-				pm.endTask();
 			}
+		} finally {
+			pm.endTask();
 		}
-		if (deletionCandidates.isEmpty())
+
+		if (deletionCandidates.isEmpty()) {
 			return;
+		}
 
 		checkCancelled();
 
@@ -576,10 +581,17 @@ public class GC {
 		// loose objects. Make a last check, though, to avoid deleting objects
 		// that could have been referenced while the candidates list was being
 		// built (by an incoming push, for example).
+		Set<File> touchedFanout = new HashSet<>();
 		for (File f : deletionCandidates.values()) {
 			if (f.lastModified() < expireDate) {
 				f.delete();
+				touchedFanout.add(f.getParentFile());
 			}
+		}
+
+		for (File f : touchedFanout) {
+			FileUtils.delete(f,
+					FileUtils.EMPTY_DIRECTORIES_ONLY | FileUtils.IGNORE_ERRORS);
 		}
 
 		repo.getObjectDatabase().close();
@@ -589,9 +601,7 @@ public class GC {
 		long expireDate = Long.MAX_VALUE;
 
 		if (expire == null && expireAgeMillis == -1) {
-			String pruneExpireStr = repo.getConfig().getString(
-					ConfigConstants.CONFIG_GC_SECTION, null,
-					ConfigConstants.CONFIG_KEY_PRUNEEXPIRE);
+			String pruneExpireStr = getPruneExpireStr();
 			if (pruneExpireStr == null)
 				pruneExpireStr = PRUNE_EXPIRE_DEFAULT;
 			expire = GitDateParser.parse(pruneExpireStr, null, SystemReader
@@ -603,6 +613,12 @@ public class GC {
 		if (expireAgeMillis != -1)
 			expireDate = System.currentTimeMillis() - expireAgeMillis;
 		return expireDate;
+	}
+
+	private String getPruneExpireStr() {
+		return repo.getConfig().getString(
+                        ConfigConstants.CONFIG_GC_SECTION, null,
+                        ConfigConstants.CONFIG_KEY_PRUNEEXPIRE);
 	}
 
 	private long getPackExpireDate() throws ParseException {
@@ -678,7 +694,7 @@ public class GC {
 	 */
 	public void packRefs() throws IOException {
 		Collection<Ref> refs = repo.getRefDatabase().getRefs(Constants.R_REFS).values();
-		List<String> refsToBePacked = new ArrayList<String>(refs.size());
+		List<String> refsToBePacked = new ArrayList<>(refs.size());
 		pm.beginTask(JGitText.get().packRefs, refs.size());
 		try {
 			for (Ref ref : refs) {
@@ -713,10 +729,10 @@ public class GC {
 		long time = System.currentTimeMillis();
 		Collection<Ref> refsBefore = getAllRefs();
 
-		Set<ObjectId> allHeads = new HashSet<ObjectId>();
-		Set<ObjectId> nonHeads = new HashSet<ObjectId>();
-		Set<ObjectId> txnHeads = new HashSet<ObjectId>();
-		Set<ObjectId> tagTargets = new HashSet<ObjectId>();
+		Set<ObjectId> allHeads = new HashSet<>();
+		Set<ObjectId> nonHeads = new HashSet<>();
+		Set<ObjectId> txnHeads = new HashSet<>();
+		Set<ObjectId> tagTargets = new HashSet<>();
 		Set<ObjectId> indexObjects = listNonHEADIndexObjects();
 		RefDatabase refdb = repo.getRefDatabase();
 
@@ -735,7 +751,7 @@ public class GC {
 				tagTargets.add(ref.getPeeledObjectId());
 		}
 
-		List<ObjectIdSet> excluded = new LinkedList<ObjectIdSet>();
+		List<ObjectIdSet> excluded = new LinkedList<>();
 		for (final PackFile f : repo.getObjectDatabase().getPacks()) {
 			checkCancelled();
 			if (f.shouldBeKept())
@@ -745,7 +761,7 @@ public class GC {
 		tagTargets.addAll(allHeads);
 		nonHeads.addAll(indexObjects);
 
-		List<PackFile> ret = new ArrayList<PackFile>(2);
+		List<PackFile> ret = new ArrayList<>(2);
 		PackFile heads = null;
 		if (!allHeads.isEmpty()) {
 			heads = writePack(allHeads, Collections.<ObjectId> emptySet(),
@@ -847,7 +863,7 @@ public class GC {
 				.getReverseEntries();
 		if (rlEntries == null || rlEntries.isEmpty())
 			return Collections.<ObjectId> emptySet();
-		Set<ObjectId> ret = new HashSet<ObjectId>();
+		Set<ObjectId> ret = new HashSet<>();
 		for (ReflogEntry e : rlEntries) {
 			if (e.getWho().getWhen().getTime() < minTime)
 				break;
@@ -916,7 +932,7 @@ public class GC {
 
 			treeWalk.setFilter(TreeFilter.ANY_DIFF);
 			treeWalk.setRecursive(true);
-			Set<ObjectId> ret = new HashSet<ObjectId>();
+			Set<ObjectId> ret = new HashSet<>();
 
 			while (treeWalk.next()) {
 				checkCancelled();
@@ -949,8 +965,9 @@ public class GC {
 			List<ObjectIdSet> excludeObjects) throws IOException {
 		checkCancelled();
 		File tmpPack = null;
-		Map<PackExt, File> tmpExts = new TreeMap<PackExt, File>(
+		Map<PackExt, File> tmpExts = new TreeMap<>(
 				new Comparator<PackExt>() {
+					@Override
 					public int compare(PackExt o1, PackExt o2) {
 						// INDEX entries must be returned last, so the pack
 						// scanner does pick up the new pack until all the
@@ -1149,6 +1166,7 @@ public class GC {
 		 */
 		public long numberOfBitmaps;
 
+		@Override
 		public String toString() {
 			final StringBuilder b = new StringBuilder();
 			b.append("numberOfPackedObjects=").append(numberOfPackedObjects); //$NON-NLS-1$
@@ -1382,6 +1400,7 @@ public class GC {
 		try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir,
 				new DirectoryStream.Filter<Path>() {
 
+					@Override
 					public boolean accept(Path file) throws IOException {
 						Path fileName = file.getFileName();
 						return Files.isRegularFile(file) && fileName != null

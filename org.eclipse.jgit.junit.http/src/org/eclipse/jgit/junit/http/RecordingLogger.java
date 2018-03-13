@@ -49,10 +49,11 @@ import java.util.Collections;
 import java.util.List;
 
 import org.eclipse.jetty.util.log.Logger;
+import org.slf4j.helpers.MessageFormatter;
 
 /** Logs warnings into an array for later inspection. */
 public class RecordingLogger implements Logger {
-	private static List<Warning> warnings = new ArrayList<Warning>();
+	private static List<Warning> warnings = new ArrayList<>();
 
 	/** Clear the warnings, automatically done by {@link AppServer#setUp()} */
 	public static void clear() {
@@ -64,7 +65,7 @@ public class RecordingLogger implements Logger {
 	/** @return the warnings (if any) from the last execution */
 	public static List<Warning> getWarnings() {
 		synchronized (warnings) {
-			ArrayList<Warning> copy = new ArrayList<Warning>(warnings);
+			ArrayList<Warning> copy = new ArrayList<>(warnings);
 			return Collections.unmodifiableList(copy);
 		}
 	}
@@ -94,10 +95,12 @@ public class RecordingLogger implements Logger {
 		this.name = name;
 	}
 
+	@Override
 	public Logger getLogger(@SuppressWarnings("hiding") String name) {
 		return new RecordingLogger(name);
 	}
 
+	@Override
 	public String getName() {
 		return name;
 	}
@@ -108,6 +111,7 @@ public class RecordingLogger implements Logger {
 		}
 	}
 
+	@Override
 	public void warn(String msg, Throwable th) {
 		synchronized (warnings) {
 			warnings.add(new Warning(msg, th));
@@ -126,6 +130,7 @@ public class RecordingLogger implements Logger {
 		// Ignore (not relevant to test failures)
 	}
 
+	@Override
 	public void debug(String msg, Throwable th) {
 		// Ignore (not relevant to test failures)
 	}
@@ -144,46 +149,57 @@ public class RecordingLogger implements Logger {
 		// Ignore (not relevant to test failures)
 	}
 
+	@Override
 	public boolean isDebugEnabled() {
 		return false;
 	}
 
+	@Override
 	public void setDebugEnabled(boolean enabled) {
 		// Ignore (not relevant to test failures)
 	}
 
+	@Override
 	public void warn(String msg, Object... args) {
 		synchronized (warnings) {
-			warnings.add(new Warning(MessageFormat.format(msg, args)));
+			warnings.add(new Warning(
+					MessageFormatter.format(msg, args).getMessage()));
 		}
 	}
 
+	@Override
 	public void warn(Throwable thrown) {
 		synchronized (warnings) {
 			warnings.add(new Warning(thrown));
 		}
 	}
 
+	@Override
 	public void info(String msg, Object... args) {
 		// Ignore (not relevant to test failures)
 	}
 
+	@Override
 	public void info(Throwable thrown) {
 		// Ignore (not relevant to test failures)
 	}
 
+	@Override
 	public void info(String msg, Throwable thrown) {
 		// Ignore (not relevant to test failures)
 	}
 
+	@Override
 	public void debug(String msg, Object... args) {
 		// Ignore (not relevant to test failures)
 	}
 
+	@Override
 	public void debug(Throwable thrown) {
 		// Ignore (not relevant to test failures)
 	}
 
+	@Override
 	public void ignore(Throwable arg0) {
 		// Ignore (not relevant to test failures)
 	}
