@@ -64,6 +64,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.eclipse.jgit.attributes.AttributesNodeProvider;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.CorruptObjectException;
@@ -208,6 +209,16 @@ public abstract class Repository implements AutoCloseable {
 	 * @return the configuration of this repository
 	 */
 	public abstract StoredConfig getConfig();
+
+	/**
+	 * @return a new {@link AttributesNodeProvider}. This
+	 *         {@link AttributesNodeProvider} is lazy loaded only once. It means
+	 *         that it will not be updated after loading. Prefer creating new
+	 *         instance for each use.
+	 * @since 4.2
+	 */
+	public abstract AttributesNodeProvider createAttributesNodeProvider();
+
 
 	/**
 	 * @return the used file system abstraction
@@ -1579,6 +1590,9 @@ public abstract class Repository implements AutoCloseable {
 		try {
 			return RawParseUtils.decode(IO.readFully(mergeMsgFile));
 		} catch (FileNotFoundException e) {
+			if (mergeMsgFile.exists()) {
+				throw e;
+			}
 			// the file has disappeared in the meantime ignore it
 			return null;
 		}
@@ -1610,6 +1624,9 @@ public abstract class Repository implements AutoCloseable {
 			byte[] raw = IO.readFully(file);
 			return raw.length > 0 ? raw : null;
 		} catch (FileNotFoundException notFound) {
+			if (file.exists()) {
+				throw notFound;
+			}
 			return null;
 		}
 	}

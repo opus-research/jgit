@@ -120,11 +120,11 @@ public class LockFile {
 
 	private boolean haveLck;
 
-	private FileOutputStream os;
+	FileOutputStream os;
 
 	private boolean needSnapshot;
 
-	private boolean fsync;
+	boolean fsync;
 
 	private FileSnapshot commitSnapshot;
 
@@ -227,6 +227,10 @@ public class LockFile {
 				fis.close();
 			}
 		} catch (FileNotFoundException fnfe) {
+			if (ref.exists()) {
+				unlock();
+				throw fnfe;
+			}
 			// Don't worry about a file that doesn't exist yet, it
 			// conceptually has no current content to copy.
 			//
