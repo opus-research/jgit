@@ -181,7 +181,7 @@ public class RawText extends Sequence {
 	 */
 	public String getString(int begin, int end, boolean dropLF) {
 		if (begin == end)
-			return ""; //$NON-NLS-1$
+			return "";
 
 		int s = getStart(begin);
 		int e = getEnd(end - 1);
@@ -290,8 +290,8 @@ public class RawText extends Sequence {
 		if (content[e - 1] != '\n')
 			return null;
 		if (content.length > 1 && content[e - 2] == '\r')
-			return "\r\n"; //$NON-NLS-1$
+			return "\r\n";
 		else
-			return "\n"; //$NON-NLS-1$
+			return "\n";
 	}
 }

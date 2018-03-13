@@ -148,7 +148,7 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 
 				String ourName = calculateOurName(headRef);
 				String cherryPickName = srcCommit.getId().abbreviate(7).name()
-						+ " " + srcCommit.getShortMessage(); //$NON-NLS-1$
+						+ " " + srcCommit.getShortMessage();
 
 				ResolveMerger merger = (ResolveMerger) MergeStrategy.RESOLVE
 						.newMerger(repo);
@@ -168,7 +168,7 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 					newHead = new Git(getRepository()).commit()
 							.setMessage(srcCommit.getFullMessage())
 							.setReflogComment(
-									"cherry-pick: " //$NON-NLS-1$
+									"cherry-pick: "
 											+ srcCommit.getShortMessage())
 							.setAuthor(srcCommit.getAuthorIdent()).call();
 					cherryPickedRefs.add(src);

@@ -489,7 +489,6 @@ public abstract class AnyObjectId implements Comparable<Object> {
 			dst[o--] = '0';
 	}
 
-	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
 		return "AnyObjectId[" + name() + "]";
