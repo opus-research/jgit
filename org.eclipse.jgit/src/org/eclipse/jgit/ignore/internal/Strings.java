@@ -44,7 +44,6 @@ package org.eclipse.jgit.ignore.internal;
 
 import static java.lang.Character.isLetter;
 
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -53,7 +52,6 @@ import java.util.regex.PatternSyntaxException;
 
 import org.eclipse.jgit.errors.InvalidPatternException;
 import org.eclipse.jgit.ignore.FastIgnoreRule;
-import org.eclipse.jgit.internal.JGitText;
 
 /**
  * Various {@link String} related utility methods, written mostly to avoid
@@ -374,8 +372,8 @@ public class Strings {
 			return Pattern.compile(sb.toString());
 		} catch (PatternSyntaxException e) {
 			InvalidPatternException patternException = new InvalidPatternException(
-					MessageFormat.format(JGitText.get().invalidIgnoreRule,
-							pattern),
+					"Exception caught while parsing ignore rule '" + pattern //$NON-NLS-1$
+							+ "'.", //$NON-NLS-1$
 					pattern);
 			patternException.initCause(e);
 			throw patternException;
