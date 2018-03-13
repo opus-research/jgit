@@ -265,6 +265,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String flagNotFromThis;
 	/***/ public String flagsAlreadyCreated;
 	/***/ public String funnyRefname;
+	/***/ public String gitmodulesNotFound;
 	/***/ public String headRequiredToStash;
 	/***/ public String hoursAgo;
 	/***/ public String hugeIndexesAreNotSupportedByJgitYet;
@@ -484,6 +485,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String sourceIsNotAWildcard;
 	/***/ public String sourceRefDoesntResolveToAnyObject;
 	/***/ public String sourceRefNotSpecifiedForRefspec;
+	/***/ public String squashCommitNotUpdatingHEAD;
 	/***/ public String staleRevFlagsOn;
 	/***/ public String startingReadStageWithoutWrittenRequestDataPendingIsNotSupported;
 	/***/ public String stashApplyFailed;
@@ -510,6 +512,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String transportExceptionInvalid;
 	/***/ public String transportExceptionMissingAssumed;
 	/***/ public String transportExceptionReadRef;
+	/***/ public String transportNeedsRepository;
 	/***/ public String transportProtoAmazonS3;
 	/***/ public String transportProtoBundleFile;
 	/***/ public String transportProtoFTP;
