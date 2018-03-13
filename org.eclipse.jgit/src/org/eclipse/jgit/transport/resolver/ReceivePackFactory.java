@@ -77,7 +77,6 @@ public interface ReceivePackFactory<C> {
 	 *             this factory refuses to create the instance for this HTTP
 	 *             request and repository, such as due to a permission error.
 	 */
-	ReceivePack create(C req, Repository db)
-			throws ServiceNotEnabledException,
+	ReceivePack create(C req, Repository db) throws ServiceNotEnabledException,
 			ServiceNotAuthorizedException;
 }

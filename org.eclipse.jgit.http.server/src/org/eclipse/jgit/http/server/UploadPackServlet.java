@@ -74,7 +74,6 @@ import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 import org.eclipse.jgit.transport.UploadPack;
 import org.eclipse.jgit.transport.UploadPackInternalServerErrorException;
 import org.eclipse.jgit.transport.UploadPackMayNotContinueException;
-import org.eclipse.jgit.transport.UploadSession;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.transport.resolver.UploadPackFactory;
@@ -96,7 +95,7 @@ class UploadPackServlet extends HttpServlet {
 		protected void begin(HttpServletRequest req, Repository db)
 				throws IOException, ServiceNotEnabledException,
 				ServiceNotAuthorizedException {
-			UploadSession up = uploadPackFactory.create(req, db);
+			UploadPack up = uploadPackFactory.create(req, db);
 			req.setAttribute(ATTRIBUTE_HANDLER, up);
 		}
 
@@ -125,7 +124,7 @@ class UploadPackServlet extends HttpServlet {
 				FilterChain chain) throws IOException, ServletException {
 			HttpServletRequest req = (HttpServletRequest) request;
 			HttpServletResponse rsp = (HttpServletResponse) response;
-			UploadSession rp;
+			UploadPack rp;
 			try {
 				rp = uploadPackFactory.create(req, getRepository(req));
 			} catch (ServiceNotAuthorizedException e) {

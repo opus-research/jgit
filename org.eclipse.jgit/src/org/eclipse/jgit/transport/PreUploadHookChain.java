@@ -79,20 +79,20 @@ public class PreUploadHookChain implements PreUploadHook {
 			return new PreUploadHookChain(newHooks, i);
 	}
 
-	public void onPreAdvertiseRefs(UploadSession up)
+	public void onPreAdvertiseRefs(UploadPack up)
 			throws UploadPackMayNotContinueException {
 		for (int i = 0; i < count; i++)
 			hooks[i].onPreAdvertiseRefs(up);
 	}
 
-	public void onBeginNegotiateRound(UploadSession up,
+	public void onBeginNegotiateRound(UploadPack up,
 			Collection<? extends ObjectId> wants, int cntOffered)
 			throws UploadPackMayNotContinueException {
 		for (int i = 0; i < count; i++)
 			hooks[i].onBeginNegotiateRound(up, wants, cntOffered);
 	}
 
-	public void onEndNegotiateRound(UploadSession up,
+	public void onEndNegotiateRound(UploadPack up,
 			Collection<? extends ObjectId> wants, int cntCommon,
 			int cntNotFound, boolean ready)
 			throws UploadPackMayNotContinueException {
@@ -100,7 +100,7 @@ public class PreUploadHookChain implements PreUploadHook {
 			hooks[i].onEndNegotiateRound(up, wants, cntCommon, cntNotFound, ready);
 	}
 
-	public void onSendPack(UploadSession up,
+	public void onSendPack(UploadPack up,
 			Collection<? extends ObjectId> wants,
 			Collection<? extends ObjectId> haves)
 			throws UploadPackMayNotContinueException {
