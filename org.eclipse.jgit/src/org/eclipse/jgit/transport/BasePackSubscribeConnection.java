@@ -281,6 +281,8 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 		if ("reconnect".equals(line))
 			return false;
 
+		if (line.startsWith("error: "))
+			throw new TransportException(line.substring("error: ".length()));
 		if (!line.startsWith("restart-token "))
 			throw new TransportException(MessageFormat.format(
 					JGitText.get().expectedGot, "restart-token", line));
