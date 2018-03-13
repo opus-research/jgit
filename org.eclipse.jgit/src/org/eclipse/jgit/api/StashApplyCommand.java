@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, GitHub Inc.
+ * Copyright (C) 2012, 2017 GitHub Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,8 +42,13 @@
  */
 package org.eclipse.jgit.api;
 
+import static org.eclipse.jgit.treewalk.TreeWalk.OperationType.CHECKOUT_OP;
+
 import java.io.IOException;
 import java.text.MessageFormat;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
@@ -58,6 +63,7 @@ import org.eclipse.jgit.dircache.DirCacheCheckout.CheckoutMetadata;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CheckoutConflictException;
+import org.eclipse.jgit.events.WorkingTreeModifiedEvent;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig.EolStreamType;
@@ -157,6 +163,7 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 	 * @throws NoHeadException
 	 * @throws StashApplyFailureException
 	 */
+	@Override
 	public ObjectId call() throws GitAPIException,
 			WrongRepositoryStateException, NoHeadException,
 			StashApplyFailureException {
@@ -197,7 +204,13 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 					"stash" }); //$NON-NLS-1$
 			merger.setBase(stashHeadCommit);
 			merger.setWorkingTreeIterator(new FileTreeIterator(repo));
-			if (merger.merge(headCommit, stashCommit)) {
+			boolean mergeSucceeded = merger.merge(headCommit, stashCommit);
+			List<String> modifiedByMerge = merger.getModifiedFiles();
+			if (!modifiedByMerge.isEmpty()) {
+				repo.fireEvent(
+						new WorkingTreeModifiedEvent(modifiedByMerge, null));
+			}
+			if (mergeSucceeded) {
 				DirCache dc = repo.lockDirCache();
 				DirCacheCheckout dco = new DirCacheCheckout(repo, headTree,
 						dc, merger.getResultTreeId());
@@ -232,19 +245,19 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 					untrackedMerger.setBase(null);
 					boolean ok = untrackedMerger.merge(headCommit,
 							untrackedCommit);
-					if (ok)
+					if (ok) {
 						try {
 							RevTree untrackedTree = revWalk
-									.parseTree(untrackedMerger
-											.getResultTreeId());
+									.parseTree(untrackedCommit);
 							resetUntracked(untrackedTree);
 						} catch (CheckoutConflictException e) {
 							throw new StashApplyFailureException(
-									JGitText.get().stashApplyConflict);
+									JGitText.get().stashApplyConflict, e);
 						}
-					else
+					} else {
 						throw new StashApplyFailureException(
 								JGitText.get().stashApplyConflict);
+					}
 				}
 			} else {
 				throw new StashApplyFailureException(
@@ -328,6 +341,7 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 
 	private void resetUntracked(RevTree tree) throws CheckoutConflictException,
 			IOException {
+		Set<String> actuallyModifiedPaths = new HashSet<>();
 		// TODO maybe NameConflictTreeWalk ?
 		try (TreeWalk walk = new TreeWalk(repo)) {
 			walk.addTree(tree);
@@ -343,7 +357,8 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 					// Not in commit, don't create untracked
 					continue;
 
-				final EolStreamType eolStreamType = walk.getEolStreamType();
+				final EolStreamType eolStreamType = walk
+						.getEolStreamType(CHECKOUT_OP);
 				final DirCacheEntry entry = new DirCacheEntry(walk.getRawPath());
 				entry.setFileMode(cIter.getEntryFileMode());
 				entry.setObjectIdFromRaw(cIter.idBuffer(), cIter.idOffset());
@@ -360,6 +375,12 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 
 				checkoutPath(entry, reader,
 						new CheckoutMetadata(eolStreamType, null));
+				actuallyModifiedPaths.add(entry.getPathString());
+			}
+		} finally {
+			if (!actuallyModifiedPaths.isEmpty()) {
+				repo.fireEvent(new WorkingTreeModifiedEvent(
+						actuallyModifiedPaths, null));
 			}
 		}
 	}

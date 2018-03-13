@@ -59,7 +59,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -78,6 +77,8 @@ import org.slf4j.LoggerFactory;
 
 /** Abstraction to support various file system operations not in Java. */
 public abstract class FS {
+	private static final Logger LOG = LoggerFactory.getLogger(FS.class);
+
 	/**
 	 * This class creates FS instances. It will be overridden by a Java7 variant
 	 * if such can be detected in {@link #detect(Boolean)}.
@@ -159,12 +160,10 @@ public abstract class FS {
 		}
 	}
 
-	private final static Logger LOG = LoggerFactory.getLogger(FS.class);
-
 	/** The auto-detected implementation selected for this operating system and JRE. */
 	public static final FS DETECTED = detect();
 
-	private static FSFactory factory;
+	private volatile static FSFactory factory;
 
 	/**
 	 * Auto-detect the appropriate file system abstraction.
@@ -235,21 +234,6 @@ public abstract class FS {
 	 *         executable bit information; false otherwise.
 	 */
 	public abstract boolean supportsExecute();
-
-	/**
-	 * Does this file system support atomic file creation via
-	 * java.io.File#createNewFile()? In certain environments (e.g. on NFS) it is
-	 * not guaranteed that when two file system clients run createNewFile() in
-	 * parallel only one will succeed. In such cases both clients may think they
-	 * created a new file.
-	 *
-	 * @return true if this implementation support atomic creation of new
-	 *         Files by {@link File#createNewFile()}
-	 * @since 4.5
-	 */
-	public boolean supportsAtomicCreateNewFile() {
-		return true;
-	}
 
 	/**
 	 * Does this operating system and JRE supports symbolic links. The
@@ -391,7 +375,7 @@ public abstract class FS {
 	public File userHome() {
 		Holder<File> p = userHome;
 		if (p == null) {
-			p = new Holder<File>(userHomeImpl());
+			p = new Holder<>(userHomeImpl());
 			userHome = p;
 		}
 		return p.value;
@@ -406,7 +390,7 @@ public abstract class FS {
 	 * @return {@code this}.
 	 */
 	public FS setUserHome(File path) {
-		userHome = new Holder<File>(path);
+		userHome = new Holder<>(path);
 		return this;
 	}
 
@@ -425,6 +409,7 @@ public abstract class FS {
 	protected File userHomeImpl() {
 		final String home = AccessController
 				.doPrivileged(new PrivilegedAction<String>() {
+					@Override
 					public String run() {
 						return System.getProperty("user.home"); //$NON-NLS-1$
 					}
@@ -512,7 +497,13 @@ public abstract class FS {
 			if (env != null) {
 				pb.environment().putAll(env);
 			}
-			Process p = pb.start();
+			Process p;
+			try {
+				p = pb.start();
+			} catch (IOException e) {
+				// Process failed to start
+				throw new CommandFailedException(-1, e.getMessage(), e);
+			}
 			p.getOutputStream().close();
 			GobblerThread gobbler = new GobblerThread(p, command, dir);
 			gobbler.start();
@@ -665,7 +656,7 @@ public abstract class FS {
 	 */
 	public File getGitSystemConfig() {
 		if (gitSystemConfig == null) {
-			gitSystemConfig = new Holder<File>(discoverGitSystemConfig());
+			gitSystemConfig = new Holder<>(discoverGitSystemConfig());
 		}
 		return gitSystemConfig.value;
 	}
@@ -679,7 +670,7 @@ public abstract class FS {
 	 * @since 4.0
 	 */
 	public FS setGitSystemConfig(File configFile) {
-		gitSystemConfig = new Holder<File>(configFile);
+		gitSystemConfig = new Holder<>(configFile);
 		return this;
 	}
 
@@ -792,23 +783,7 @@ public abstract class FS {
 	}
 
 	/**
-	 * Create a new file. See {@link File#createNewFile()}. Subclasses of this
-	 * class may take care to provide a safe implementation for this even if
-	 * {@link #supportsAtomicCreateNewFile()} is <code>false</code>
-	 *
-	 * @param path
-	 *            the file to be created
-	 * @return <code>true</code> if the file was created, <code>false</code> if
-	 *         the file already existed
-	 * @throws IOException
-	 * @since 4.5
-	 */
-	public boolean createNewFile(File path) throws IOException {
-		return path.createNewFile();
-	}
-
-	/**
-	 * See {@link FileUtils#relativize(String, String)}.
+	 * See {@link FileUtils#relativizePath(String, String, String, boolean)}.
 	 *
 	 * @param base
 	 *            The path against which <code>other</code> should be
@@ -817,11 +792,11 @@ public abstract class FS {
 	 *            The path that will be made relative to <code>base</code>.
 	 * @return A relative path that, when resolved against <code>base</code>,
 	 *         will yield the original <code>other</code>.
-	 * @see FileUtils#relativize(String, String)
+	 * @see FileUtils#relativizePath(String, String, String, boolean)
 	 * @since 3.7
 	 */
 	public String relativize(String base, String other) {
-		return FileUtils.relativize(base, other);
+		return FileUtils.relativizePath(base, other, File.separator, this.isCaseSensitive());
 	}
 
 	/**
@@ -1042,16 +1017,13 @@ public abstract class FS {
 		IOException ioException = null;
 		try {
 			process = processBuilder.start();
-			final Callable<Void> errorGobbler = new StreamGobbler(
-					process.getErrorStream(), errRedirect);
-			final Callable<Void> outputGobbler = new StreamGobbler(
-					process.getInputStream(), outRedirect);
-			executor.submit(errorGobbler);
-			executor.submit(outputGobbler);
+			executor.execute(
+					new StreamGobbler(process.getErrorStream(), errRedirect));
+			executor.execute(
+					new StreamGobbler(process.getInputStream(), outRedirect));
 			OutputStream outputStream = process.getOutputStream();
 			if (inRedirect != null) {
-				new StreamGobbler(inRedirect, outputStream)
-						.call();
+				new StreamGobbler(inRedirect, outputStream).copy();
 			}
 			try {
 				outputStream.close();
@@ -1367,7 +1339,7 @@ public abstract class FS {
 	 * streams.
 	 * </p>
 	 */
-	private static class StreamGobbler implements Callable<Void> {
+	private static class StreamGobbler implements Runnable {
 		private InputStream in;
 
 		private OutputStream out;
@@ -1377,7 +1349,16 @@ public abstract class FS {
 			this.out = output;
 		}
 
-		public Void call() throws IOException {
+		@Override
+		public void run() {
+			try {
+				copy();
+			} catch (IOException e) {
+				// Do nothing on read failure; leave streams open.
+			}
+		}
+
+		void copy() throws IOException {
 			boolean writeFailure = false;
 			byte buffer[] = new byte[4096];
 			int readBytes;
@@ -1394,7 +1375,6 @@ public abstract class FS {
 					}
 				}
 			}
-			return null;
 		}
 	}
 }

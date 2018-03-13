@@ -114,11 +114,11 @@ public class RemoteConfig implements Serializable {
 	 */
 	public static List<RemoteConfig> getAllRemoteConfigs(final Config rc)
 			throws URISyntaxException {
-		final List<String> names = new ArrayList<String>(rc
+		final List<String> names = new ArrayList<>(rc
 				.getSubsections(SECTION));
 		Collections.sort(names);
 
-		final List<RemoteConfig> result = new ArrayList<RemoteConfig>(names
+		final List<RemoteConfig> result = new ArrayList<>(names
 				.size());
 		for (final String name : names)
 			result.add(new RemoteConfig(rc, name));
@@ -169,39 +169,50 @@ public class RemoteConfig implements Serializable {
 
 		vlst = rc.getStringList(SECTION, name, KEY_URL);
 		Map<String, String> insteadOf = getReplacements(rc, KEY_INSTEADOF);
-		uris = new ArrayList<URIish>(vlst.length);
-		for (final String s : vlst)
+		uris = new ArrayList<>(vlst.length);
+		for (final String s : vlst) {
 			uris.add(new URIish(replaceUri(s, insteadOf)));
-
-		Map<String, String> pushInsteadOf = getReplacements(rc,
-				KEY_PUSHINSTEADOF);
-		vlst = rc.getStringList(SECTION, name, KEY_PUSHURL);
-		pushURIs = new ArrayList<URIish>(vlst.length);
-		for (final String s : vlst)
-			pushURIs.add(new URIish(replaceUri(s, pushInsteadOf)));
-
-		vlst = rc.getStringList(SECTION, name, KEY_FETCH);
-		fetch = new ArrayList<RefSpec>(vlst.length);
-		for (final String s : vlst)
-			fetch.add(new RefSpec(s));
-
-		vlst = rc.getStringList(SECTION, name, KEY_PUSH);
-		push = new ArrayList<RefSpec>(vlst.length);
-		for (final String s : vlst)
-			push.add(new RefSpec(s));
-
+		}
+		String[] plst = rc.getStringList(SECTION, name, KEY_PUSHURL);
+		pushURIs = new ArrayList<>(plst.length);
+		for (final String s : plst) {
+			pushURIs.add(new URIish(s));
+		}
+		if (pushURIs.isEmpty()) {
+			// Would default to the uris. If we have pushinsteadof, we must
+			// supply rewritten push uris.
+			Map<String, String> pushInsteadOf = getReplacements(rc,
+					KEY_PUSHINSTEADOF);
+			if (!pushInsteadOf.isEmpty()) {
+				for (String s : vlst) {
+					String replaced = replaceUri(s, pushInsteadOf);
+					if (!s.equals(replaced)) {
+						pushURIs.add(new URIish(replaced));
+					}
+				}
+			}
+		}
+		fetch = rc.getRefSpecs(SECTION, name, KEY_FETCH);
+		push = rc.getRefSpecs(SECTION, name, KEY_PUSH);
 		val = rc.getString(SECTION, name, KEY_UPLOADPACK);
-		if (val == null)
+		if (val == null) {
 			val = DEFAULT_UPLOAD_PACK;
+		}
 		uploadpack = val;
 
 		val = rc.getString(SECTION, name, KEY_RECEIVEPACK);
-		if (val == null)
+		if (val == null) {
 			val = DEFAULT_RECEIVE_PACK;
+		}
 		receivepack = val;
 
-		val = rc.getString(SECTION, name, KEY_TAGOPT);
-		tagopt = TagOpt.fromOption(val);
+		try {
+			val = rc.getString(SECTION, name, KEY_TAGOPT);
+			tagopt = TagOpt.fromOption(val);
+		} catch (IllegalArgumentException e) {
+			// C git silently ignores invalid tagopt values.
+			tagopt = TagOpt.AUTO_FOLLOW;
+		}
 		mirror = rc.getBoolean(SECTION, name, KEY_MIRROR, DEFAULT_MIRROR);
 		timeout = rc.getInt(SECTION, name, KEY_TIMEOUT, 0);
 	}
@@ -213,7 +224,7 @@ public class RemoteConfig implements Serializable {
 	 *            the configuration file to store ourselves into.
 	 */
 	public void update(final Config rc) {
-		final List<String> vlst = new ArrayList<String>();
+		final List<String> vlst = new ArrayList<>();
 
 		vlst.clear();
 		for (final URIish u : getURIs())
@@ -272,7 +283,7 @@ public class RemoteConfig implements Serializable {
 
 	private Map<String, String> getReplacements(final Config config,
 			final String keyName) {
-		final Map<String, String> replacements = new HashMap<String, String>();
+		final Map<String, String> replacements = new HashMap<>();
 		for (String url : config.getSubsections(KEY_URL))
 			for (String insteadOf : config.getStringList(KEY_URL, url, keyName))
 				replacements.put(insteadOf, url);

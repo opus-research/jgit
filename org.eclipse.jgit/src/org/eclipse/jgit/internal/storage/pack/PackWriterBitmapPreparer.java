@@ -59,18 +59,19 @@ import java.util.Set;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.internal.revwalk.AddUnseenToBitmapFilter;
 import org.eclipse.jgit.internal.storage.file.BitmapIndexImpl;
 import org.eclipse.jgit.internal.storage.file.BitmapIndexImpl.CompressedBitmap;
 import org.eclipse.jgit.internal.storage.file.PackBitmapIndex;
 import org.eclipse.jgit.internal.storage.file.PackBitmapIndexBuilder;
 import org.eclipse.jgit.internal.storage.file.PackBitmapIndexRemapper;
-import org.eclipse.jgit.internal.storage.pack.PackWriterBitmapWalker.AddUnseenToBitmapFilter;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.BitmapIndex.BitmapBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
+import org.eclipse.jgit.revwalk.BitmapWalker;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
@@ -91,6 +92,7 @@ class PackWriterBitmapPreparer {
 	private static final int DAY_IN_SECONDS = 24 * 60 * 60;
 
 	private static final Comparator<BitmapBuilderEntry> ORDER_BY_CARDINALITY = new Comparator<BitmapBuilderEntry>() {
+		@Override
 		public int compare(BitmapBuilderEntry a, BitmapBuilderEntry b) {
 			return Integer.signum(a.getBuilder().cardinality()
 					- b.getBuilder().cardinality());
@@ -140,6 +142,8 @@ class PackWriterBitmapPreparer {
 	 *
 	 * @param expectedCommitCount
 	 *            count of commits in the pack
+	 * @param excludeFromBitmapSelection
+	 *            commits that should be excluded from bitmap selection
 	 * @return commit objects for which bitmap indices should be built
 	 * @throws IncorrectObjectTypeException
 	 *             if any of the processed objects is not a commit
@@ -148,7 +152,8 @@ class PackWriterBitmapPreparer {
 	 * @throws MissingObjectException
 	 *             if an expected object is missing
 	 */
-	Collection<BitmapCommit> selectCommits(int expectedCommitCount)
+	Collection<BitmapCommit> selectCommits(int expectedCommitCount,
+			Set<? extends ObjectId> excludeFromBitmapSelection)
 			throws IncorrectObjectTypeException, IOException,
 			MissingObjectException {
 		/*
@@ -163,11 +168,11 @@ class PackWriterBitmapPreparer {
 		RevWalk rw = new RevWalk(reader);
 		rw.setRetainBody(false);
 		CommitSelectionHelper selectionHelper = setupTipCommitBitmaps(rw,
-				expectedCommitCount);
+				expectedCommitCount, excludeFromBitmapSelection);
 		pm.endTask();
 
 		int totCommits = selectionHelper.getCommitCount();
-		BlockList<BitmapCommit> selections = new BlockList<BitmapCommit>(
+		BlockList<BitmapCommit> selections = new BlockList<>(
 				totCommits / recentCommitSpan + 1);
 		for (BitmapCommit reuse : selectionHelper.reusedCommits) {
 			selections.add(reuse);
@@ -194,7 +199,7 @@ class PackWriterBitmapPreparer {
 			// better compression/on the run-length encoding of the XORs between
 			// them.
 			List<List<BitmapCommit>> chains =
-					new ArrayList<List<BitmapCommit>>();
+					new ArrayList<>();
 
 			// Mark the current branch as inactive if its tip commit isn't
 			// recent and there are an excessive number of branches, to
@@ -286,7 +291,7 @@ class PackWriterBitmapPreparer {
 				}
 
 				if (longestAncestorChain == null) {
-					longestAncestorChain = new ArrayList<BitmapCommit>();
+					longestAncestorChain = new ArrayList<>();
 					chains.add(longestAncestorChain);
 				}
 				longestAncestorChain.add(new BitmapCommit(
@@ -362,6 +367,8 @@ class PackWriterBitmapPreparer {
 	 * @param expectedCommitCount
 	 *            expected count of commits. The actual count may be less due to
 	 *            unreachable garbage.
+	 * @param excludeFromBitmapSelection
+	 *            commits that should be excluded from bitmap selection
 	 * @return a {@link CommitSelectionHelper} containing bitmaps for the tip
 	 *         commits
 	 * @throws IncorrectObjectTypeException
@@ -372,10 +379,12 @@ class PackWriterBitmapPreparer {
 	 *             if an expected object is missing
 	 */
 	private CommitSelectionHelper setupTipCommitBitmaps(RevWalk rw,
-			int expectedCommitCount) throws IncorrectObjectTypeException,
-					IOException, MissingObjectException {
+			int expectedCommitCount,
+			Set<? extends ObjectId> excludeFromBitmapSelection)
+			throws IncorrectObjectTypeException, IOException,
+			MissingObjectException {
 		BitmapBuilder reuse = commitBitmapIndex.newBitmapBuilder();
-		List<BitmapCommit> reuseCommits = new ArrayList<BitmapCommit>();
+		List<BitmapCommit> reuseCommits = new ArrayList<>();
 		for (PackBitmapIndexRemapper.Entry entry : bitmapRemapper) {
 			// More recent commits did not have the reuse flag set, so skip them
 			if ((entry.getFlags() & FLAG_REUSE) != FLAG_REUSE) {
@@ -397,12 +406,13 @@ class PackWriterBitmapPreparer {
 
 		// Add branch tips that are not represented in old bitmap indices. Set
 		// up the RevWalk to walk the new commits not in the old packs.
-		List<BitmapBuilderEntry> tipCommitBitmaps = new ArrayList<BitmapBuilderEntry>(
+		List<BitmapBuilderEntry> tipCommitBitmaps = new ArrayList<>(
 				want.size());
-		Set<RevCommit> peeledWant = new HashSet<RevCommit>(want.size());
+		Set<RevCommit> peeledWant = new HashSet<>(want.size());
 		for (AnyObjectId objectId : want) {
 			RevObject ro = rw.peel(rw.parseAny(objectId));
-			if (!(ro instanceof RevCommit) || reuse.contains(ro)) {
+			if (!(ro instanceof RevCommit) || reuse.contains(ro)
+					|| excludeFromBitmapSelection.contains(ro)) {
 				continue;
 			}
 
@@ -499,8 +509,8 @@ class PackWriterBitmapPreparer {
 		return Math.max(next, recentCommitSpan);
 	}
 
-	PackWriterBitmapWalker newBitmapWalker() {
-		return new PackWriterBitmapWalker(
+	BitmapWalker newBitmapWalker() {
+		return new BitmapWalker(
 				new ObjectWalk(reader), bitmapIndex, null);
 	}
 
@@ -579,20 +589,24 @@ class PackWriterBitmapPreparer {
 			this.reusedCommits = reuse;
 		}
 
+		@Override
 		public Iterator<RevCommit> iterator() {
 			// Member variables referenced by this iterator will have synthetic
 			// accessors generated for them if they are made private.
 			return new Iterator<RevCommit>() {
 				int pos = commitStartPos;
 
+				@Override
 				public boolean hasNext() {
 					return pos < commitsByOldest.length;
 				}
 
+				@Override
 				public RevCommit next() {
 					return commitsByOldest[pos++];
 				}
 
+				@Override
 				public void remove() {
 					throw new UnsupportedOperationException();
 				}

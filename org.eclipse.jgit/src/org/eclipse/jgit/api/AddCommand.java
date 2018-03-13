@@ -96,7 +96,7 @@ public class AddCommand extends GitCommand<DirCache> {
 	 */
 	public AddCommand(Repository repo) {
 		super(repo);
-		filepatterns = new LinkedList<String>();
+		filepatterns = new LinkedList<>();
 	}
 
 	/**
@@ -134,6 +134,7 @@ public class AddCommand extends GitCommand<DirCache> {
 	 *
 	 * @return the DirCache after Add
 	 */
+	@Override
 	public DirCache call() throws GitAPIException, NoFilepatternException {
 
 		if (filepatterns.isEmpty())
@@ -224,6 +225,11 @@ public class AddCommand extends GitCommand<DirCache> {
 					entry.setLength(f.getEntryLength());
 					entry.setLastModified(f.getEntryLastModified());
 					long len = f.getEntryContentLength();
+					// We read and filter the content multiple times.
+					// f.getEntryContentLength() reads and filters the input and
+					// inserter.insert(...) does it again. That's because an
+					// ObjectInserter needs to know the length before it starts
+					// inserting. TODO: Fix this by using Buffers.
 					try (InputStream in = f.openEntryStream()) {
 						ObjectId id = inserter.insert(OBJ_BLOB, len, in);
 						entry.setObjectId(id);

@@ -62,6 +62,7 @@ import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.UnmergedPathException;
+import org.eclipse.jgit.events.WorkingTreeModifiedEvent;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
@@ -211,6 +212,7 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 		refUpdate.setNewObjectId(commitId);
 		refUpdate.setRefLogIdent(refLogIdent);
 		refUpdate.setRefLogMessage(refLogMessage, false);
+		refUpdate.setForceRefLog(true);
 		if (currentRef != null)
 			refUpdate.setExpectedOldObjectId(currentRef.getObjectId());
 		else
@@ -236,9 +238,11 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 	 * @return stashed commit or null if no changes to stash
 	 * @throws GitAPIException
 	 */
+	@Override
 	public RevCommit call() throws GitAPIException {
 		checkCallable();
 
+		List<String> deletedFiles = new ArrayList<>();
 		Ref head = getHead();
 		try (ObjectReader reader = repo.newObjectReader()) {
 			RevCommit headCommit = parseCommit(reader, head.getObjectId());
@@ -261,9 +265,9 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 					return null;
 
 				MutableObjectId id = new MutableObjectId();
-				List<PathEdit> wtEdits = new ArrayList<PathEdit>();
-				List<String> wtDeletes = new ArrayList<String>();
-				List<DirCacheEntry> untracked = new ArrayList<DirCacheEntry>();
+				List<PathEdit> wtEdits = new ArrayList<>();
+				List<String> wtDeletes = new ArrayList<>();
+				List<DirCacheEntry> untracked = new ArrayList<>();
 				boolean hasChanges = false;
 				do {
 					AbstractTreeIterator headIter = treeWalk.getTree(0,
@@ -305,6 +309,7 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 							untracked.add(entry);
 						else
 							wtEdits.add(new PathEdit(entry) {
+								@Override
 								public void apply(DirCacheEntry ent) {
 									ent.copyMetaData(entry);
 								}
@@ -375,9 +380,11 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 				// Remove untracked files
 				if (includeUntracked) {
 					for (DirCacheEntry entry : untracked) {
+						String repoRelativePath = entry.getPathString();
 						File file = new File(repo.getWorkTree(),
-								entry.getPathString());
+								repoRelativePath);
 						FileUtils.delete(file);
+						deletedFiles.add(repoRelativePath);
 					}
 				}
 
@@ -392,6 +399,11 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 			return parseCommit(reader, commitId);
 		} catch (IOException e) {
 			throw new JGitInternalException(JGitText.get().stashFailed, e);
+		} finally {
+			if (!deletedFiles.isEmpty()) {
+				repo.fireEvent(
+						new WorkingTreeModifiedEvent(null, deletedFiles));
+			}
 		}
 	}
 }

@@ -46,6 +46,7 @@ package org.eclipse.jgit.junit;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -103,7 +104,6 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 import org.eclipse.jgit.util.ChangeIdUtil;
 import org.eclipse.jgit.util.FileUtils;
-import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
  * Wrapper to make creating test data easier.
@@ -587,6 +587,7 @@ public class TestRepository<R extends Repository> {
 	public void delete(String ref) throws Exception {
 		ref = normalizeRef(ref);
 		RefUpdate u = db.updateRef(ref);
+		u.setForceUpdate(true);
 		switch (u.delete()) {
 		case FAST_FORWARD:
 		case FORCED:
@@ -876,7 +877,7 @@ public class TestRepository<R extends Repository> {
 
 			final File pack, idx;
 			try (PackWriter pw = new PackWriter(db)) {
-				Set<ObjectId> all = new HashSet<ObjectId>();
+				Set<ObjectId> all = new HashSet<>();
 				for (Ref r : db.getAllRefs().values())
 					all.add(r.getObjectId());
 				pw.preparePack(m, all, PackWriter.NONE);
@@ -885,14 +886,14 @@ public class TestRepository<R extends Repository> {
 
 				pack = nameFor(odb, name, ".pack");
 				try (OutputStream out =
-						new SafeBufferedOutputStream(new FileOutputStream(pack))) {
+						new BufferedOutputStream(new FileOutputStream(pack))) {
 					pw.writePack(m, m, out);
 				}
 				pack.setReadOnly();
 
 				idx = nameFor(odb, name, ".idx");
 				try (OutputStream out =
-						new SafeBufferedOutputStream(new FileOutputStream(idx))) {
+						new BufferedOutputStream(new FileOutputStream(idx))) {
 					pw.writeIndex(out);
 				}
 				idx.setReadOnly();
@@ -912,7 +913,7 @@ public class TestRepository<R extends Repository> {
 	}
 
 	private static File nameFor(ObjectDirectory odb, ObjectId name, String t) {
-		File packdir = new File(odb.getDirectory(), "pack");
+		File packdir = odb.getPackDirectory();
 		return new File(packdir, "pack-" + name.name() + t);
 	}
 
@@ -992,7 +993,7 @@ public class TestRepository<R extends Repository> {
 
 		private ObjectId topLevelTree;
 
-		private final List<RevCommit> parents = new ArrayList<RevCommit>(2);
+		private final List<RevCommit> parents = new ArrayList<>(2);
 
 		private int tick = 1;
 

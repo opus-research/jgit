@@ -51,6 +51,7 @@ import java.nio.channels.FileLock;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.CopyOption;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -65,6 +66,7 @@ import java.text.Normalizer;
 import java.text.Normalizer.Form;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 import org.eclipse.jgit.internal.JGitText;
@@ -111,6 +113,26 @@ public class FileUtils {
 	public static final int EMPTY_DIRECTORIES_ONLY = 16;
 
 	/**
+	 * Safe conversion from {@link java.io.File} to {@link java.nio.file.Path}.
+	 *
+	 * @param f
+	 *            {@code File} to be converted to {@code Path}
+	 * @return the path represented by the file
+	 * @throws IOException
+	 *             in case the path represented by the file is not valid (
+	 *             {@link java.nio.file.InvalidPathException})
+	 *
+	 * @since 4.10
+	 */
+	public static Path toPath(final File f) throws IOException {
+		try {
+			return f.toPath();
+		} catch (InvalidPathException ex) {
+			throw new IOException(ex);
+		}
+	}
+
+	/**
 	 * Delete file or empty folder
 	 *
 	 * @param f
@@ -150,8 +172,8 @@ public class FileUtils {
 		if ((options & RECURSIVE) != 0 && fs.isDirectory(f)) {
 			final File[] items = f.listFiles();
 			if (items != null) {
-				List<File> files = new ArrayList<File>();
-				List<File> dirs = new ArrayList<File>();
+				List<File> files = new ArrayList<>();
+				List<File> dirs = new ArrayList<>();
 				for (File c : items)
 					if (c.isFile())
 						files.add(c);
@@ -258,7 +280,7 @@ public class FileUtils {
 		int attempts = FS.DETECTED.retryFailedLockFileCommit() ? 10 : 1;
 		while (--attempts >= 0) {
 			try {
-				Files.move(src.toPath(), dst.toPath(), options);
+				Files.move(toPath(src), toPath(dst), options);
 				return;
 			} catch (AtomicMoveNotSupportedException e) {
 				throw e;
@@ -268,7 +290,7 @@ public class FileUtils {
 						delete(dst, EMPTY_DIRECTORIES_ONLY | RECURSIVE);
 					}
 					// On *nix there is no try, you do or do not
-					Files.move(src.toPath(), dst.toPath(), options);
+					Files.move(toPath(src), toPath(dst), options);
 					return;
 				} catch (IOException e2) {
 					// ignore and continue retry
@@ -407,7 +429,7 @@ public class FileUtils {
 	 */
 	public static Path createSymLink(File path, String target)
 			throws IOException {
-		Path nioPath = path.toPath();
+		Path nioPath = toPath(path);
 		if (Files.exists(nioPath, LinkOption.NOFOLLOW_LINKS)) {
 			BasicFileAttributes attrs = Files.readAttributes(nioPath,
 					BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
@@ -420,7 +442,7 @@ public class FileUtils {
 		if (SystemReader.getInstance().isWindows()) {
 			target = target.replace('/', '\\');
 		}
-		Path nioTarget = new File(target).toPath();
+		Path nioTarget = toPath(new File(target));
 		return Files.createSymbolicLink(nioPath, nioTarget);
 	}
 
@@ -431,7 +453,7 @@ public class FileUtils {
 	 * @since 3.0
 	 */
 	public static String readSymLink(File path) throws IOException {
-		Path nioPath = path.toPath();
+		Path nioPath = toPath(path);
 		Path target = Files.readSymbolicLink(nioPath);
 		String targetString = target.toString();
 		if (SystemReader.getInstance().isWindows()) {
@@ -467,10 +489,71 @@ public class FileUtils {
 		throw new IOException(JGitText.get().cannotCreateTempDir);
 	}
 
+
 	/**
-	 * This will try and make a given path relative to another.
+	 * @deprecated Use the more-clearly-named
+	 *             {@link FileUtils#relativizeNativePath(String, String)}
+	 *             instead, or directly call
+	 *             {@link FileUtils#relativizePath(String, String, String, boolean)}
+	 *
+	 *             Expresses <code>other</code> as a relative file path from
+	 *             <code>base</code>. File-separator and case sensitivity are
+	 *             based on the current file system.
+	 *
+	 *             See also
+	 *             {@link FileUtils#relativizePath(String, String, String, boolean)}.
+	 *
+	 * @param base
+	 *            Base path
+	 * @param other
+	 *            Destination path
+	 * @return Relative path from <code>base</code> to <code>other</code>
+	 * @since 3.7
+	 */
+	@Deprecated
+	public static String relativize(String base, String other) {
+		return relativizeNativePath(base, other);
+	}
+
+	/**
+	 * Expresses <code>other</code> as a relative file path from <code>base</code>.
+	 * File-separator and case sensitivity are based on the current file system.
+	 *
+	 * See also {@link FileUtils#relativizePath(String, String, String, boolean)}.
+	 *
+	 * @param base
+	 *            Base path
+	 * @param other
+	 *             Destination path
+	 * @return Relative path from <code>base</code> to <code>other</code>
+	 * @since 4.8
+	 */
+	public static String relativizeNativePath(String base, String other) {
+		return FS.DETECTED.relativize(base, other);
+	}
+
+	/**
+	 * Expresses <code>other</code> as a relative file path from <code>base</code>.
+	 * File-separator and case sensitivity are based on Git's internal representation of files (which matches Unix).
+	 *
+	 * See also {@link FileUtils#relativizePath(String, String, String, boolean)}.
+	 *
+	 * @param base
+	 *            Base path
+	 * @param other
+	 *             Destination path
+	 * @return Relative path from <code>base</code> to <code>other</code>
+	 * @since 4.8
+	 */
+	public static String relativizeGitPath(String base, String other) {
+		return relativizePath(base, other, "/", false); //$NON-NLS-1$
+	}
+
+
+	/**
+	 * Expresses <code>other</code> as a relative file path from <code>base</code>
 	 * <p>
-	 * For example, if this is called with the two following paths :
+	 * For example, if called with the two following paths :
 	 *
 	 * <pre>
 	 * <code>base = "c:\\Users\\jdoe\\eclipse\\git\\project"</code>
@@ -479,9 +562,7 @@ public class FileUtils {
 	 *
 	 * This will return "..\\another_project\\pom.xml".
 	 * </p>
-	 * <p>
-	 * This method uses {@link File#separator} to split the paths into segments.
-	 * </p>
+	 *
 	 * <p>
 	 * <b>Note</b> that this will return the empty String if <code>base</code>
 	 * and <code>other</code> are equal.
@@ -493,29 +574,32 @@ public class FileUtils {
 	 *            folder and not a file.
 	 * @param other
 	 *            The path that will be made relative to <code>base</code>.
+	 * @param dirSeparator
+	 *            A string that separates components of the path. In practice, this is "/" or "\\".
+	 * @param caseSensitive
+	 *            Whether to consider differently-cased directory names as distinct
 	 * @return A relative path that, when resolved against <code>base</code>,
 	 *         will yield the original <code>other</code>.
-	 * @since 3.7
+	 * @since 4.8
 	 */
-	public static String relativize(String base, String other) {
+	public static String relativizePath(String base, String other, String dirSeparator, boolean caseSensitive) {
 		if (base.equals(other))
 			return ""; //$NON-NLS-1$
 
-		final boolean ignoreCase = !FS.DETECTED.isCaseSensitive();
-		final String[] baseSegments = base.split(Pattern.quote(File.separator));
+		final String[] baseSegments = base.split(Pattern.quote(dirSeparator));
 		final String[] otherSegments = other.split(Pattern
-				.quote(File.separator));
+				.quote(dirSeparator));
 
 		int commonPrefix = 0;
 		while (commonPrefix < baseSegments.length
 				&& commonPrefix < otherSegments.length) {
-			if (ignoreCase
+			if (caseSensitive
+					&& baseSegments[commonPrefix]
+					.equals(otherSegments[commonPrefix]))
+				commonPrefix++;
+			else if (!caseSensitive
 					&& baseSegments[commonPrefix]
 							.equalsIgnoreCase(otherSegments[commonPrefix]))
-				commonPrefix++;
-			else if (!ignoreCase
-					&& baseSegments[commonPrefix]
-							.equals(otherSegments[commonPrefix]))
 				commonPrefix++;
 			else
 				break;
@@ -523,11 +607,11 @@ public class FileUtils {
 
 		final StringBuilder builder = new StringBuilder();
 		for (int i = commonPrefix; i < baseSegments.length; i++)
-			builder.append("..").append(File.separator); //$NON-NLS-1$
+			builder.append("..").append(dirSeparator); //$NON-NLS-1$
 		for (int i = commonPrefix; i < otherSegments.length; i++) {
 			builder.append(otherSegments[i]);
 			if (i < otherSegments.length - 1)
-				builder.append(File.separator);
+				builder.append(dirSeparator);
 		}
 		return builder.toString();
 	}
@@ -542,7 +626,28 @@ public class FileUtils {
 	public static boolean isStaleFileHandle(IOException ioe) {
 		String msg = ioe.getMessage();
 		return msg != null
-				&& msg.toLowerCase().matches("stale .*file .*handle"); //$NON-NLS-1$
+				&& msg.toLowerCase(Locale.ROOT)
+						.matches("stale .*file .*handle"); //$NON-NLS-1$
+	}
+
+	/**
+	 * Determine if a throwable or a cause in its causal chain is a Stale NFS
+	 * File Handle
+	 *
+	 * @param throwable
+	 * @return a boolean true if the throwable or a cause in its causal chain is
+	 *         a Stale NFS File Handle
+	 * @since 4.7
+	 */
+	public static boolean isStaleFileHandleInCausalChain(Throwable throwable) {
+		while (throwable != null) {
+			if (throwable instanceof IOException
+					&& isStaleFileHandle((IOException) throwable)) {
+				return true;
+			}
+			throwable = throwable.getCause();
+		}
+		return false;
 	}
 
 	/**
@@ -560,7 +665,7 @@ public class FileUtils {
 	 * @throws IOException
 	 */
 	static long lastModified(File file) throws IOException {
-		return Files.getLastModifiedTime(file.toPath(), LinkOption.NOFOLLOW_LINKS)
+		return Files.getLastModifiedTime(toPath(file), LinkOption.NOFOLLOW_LINKS)
 				.toMillis();
 	}
 
@@ -570,7 +675,7 @@ public class FileUtils {
 	 * @throws IOException
 	 */
 	static void setLastModified(File file, long time) throws IOException {
-		Files.setLastModifiedTime(file.toPath(), FileTime.fromMillis(time));
+		Files.setLastModifiedTime(toPath(file), FileTime.fromMillis(time));
 	}
 
 	/**
@@ -588,7 +693,7 @@ public class FileUtils {
 	 * @throws IOException
 	 */
 	static boolean isHidden(File file) throws IOException {
-		return Files.isHidden(file.toPath());
+		return Files.isHidden(toPath(file));
 	}
 
 	/**
@@ -598,7 +703,7 @@ public class FileUtils {
 	 * @since 4.1
 	 */
 	public static void setHidden(File file, boolean hidden) throws IOException {
-		Files.setAttribute(file.toPath(), "dos:hidden", Boolean.valueOf(hidden), //$NON-NLS-1$
+		Files.setAttribute(toPath(file), "dos:hidden", Boolean.valueOf(hidden), //$NON-NLS-1$
 				LinkOption.NOFOLLOW_LINKS);
 	}
 
@@ -609,7 +714,7 @@ public class FileUtils {
 	 * @since 4.1
 	 */
 	public static long getLength(File file) throws IOException {
-		Path nioPath = file.toPath();
+		Path nioPath = toPath(file);
 		if (Files.isSymbolicLink(nioPath))
 			return Files.readSymbolicLink(nioPath).toString()
 					.getBytes(Constants.CHARSET).length;
@@ -653,7 +758,7 @@ public class FileUtils {
 	 */
 	static Attributes getFileAttributesBasic(FS fs, File file) {
 		try {
-			Path nioPath = file.toPath();
+			Path nioPath = toPath(file);
 			BasicFileAttributes readAttributes = nioPath
 					.getFileSystem()
 					.provider()
@@ -685,7 +790,7 @@ public class FileUtils {
 	 */
 	public static Attributes getFileAttributesPosix(FS fs, File file) {
 		try {
-			Path nioPath = file.toPath();
+			Path nioPath = toPath(file);
 			PosixFileAttributes readAttributes = nioPath
 					.getFileSystem()
 					.provider()

@@ -45,8 +45,8 @@ package org.eclipse.jgit.transport;
 
 import static org.eclipse.jgit.lib.RefDatabase.ALL;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_AGENT;
-import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_ALLOW_TIP_SHA1_IN_WANT;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_ALLOW_REACHABLE_SHA1_IN_WANT;
+import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_ALLOW_TIP_SHA1_IN_WANT;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_INCLUDE_TAG;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_MULTI_ACK;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_MULTI_ACK_DETAILED;
@@ -58,6 +58,7 @@ import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_SIDE_BAND;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_SIDE_BAND_64K;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_THIN_PACK;
 
+import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -70,21 +71,24 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.pack.PackWriter;
+import org.eclipse.jgit.lib.BitmapIndex;
+import org.eclipse.jgit.lib.BitmapIndex.BitmapBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.AsyncRevObjectQueue;
+import org.eclipse.jgit.revwalk.BitmapWalker;
 import org.eclipse.jgit.revwalk.DepthWalk;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -177,7 +181,7 @@ public class UploadPack {
 		 */
 		public FirstLine(String line) {
 			if (line.length() > 45) {
-				final HashSet<String> opts = new HashSet<String>();
+				final HashSet<String> opts = new HashSet<>();
 				String opt = line.substring(45);
 				if (opt.startsWith(" ")) //$NON-NLS-1$
 					opt = opt.substring(1);
@@ -235,7 +239,7 @@ public class UploadPack {
 
 	private InputStream rawIn;
 
-	private OutputStream rawOut;
+	private ResponseBufferedOutputStream rawOut;
 
 	private PacketLineIn pckIn;
 
@@ -263,19 +267,19 @@ public class UploadPack {
 	String userAgent;
 
 	/** Raw ObjectIds the client has asked for, before validating them. */
-	private final Set<ObjectId> wantIds = new HashSet<ObjectId>();
+	private final Set<ObjectId> wantIds = new HashSet<>();
 
 	/** Objects the client wants to obtain. */
-	private final Set<RevObject> wantAll = new HashSet<RevObject>();
+	private final Set<RevObject> wantAll = new HashSet<>();
 
 	/** Objects on both sides, these don't have to be sent. */
-	private final Set<RevObject> commonBase = new HashSet<RevObject>();
+	private final Set<RevObject> commonBase = new HashSet<>();
 
 	/** Shallow commits the client already has. */
-	private final Set<ObjectId> clientShallowCommits = new HashSet<ObjectId>();
+	private final Set<ObjectId> clientShallowCommits = new HashSet<>();
 
 	/** Shallow commits on the client which are now becoming unshallow */
-	private final List<ObjectId> unshallowCommits = new ArrayList<ObjectId>();
+	private final List<ObjectId> unshallowCommits = new ArrayList<>();
 
 	/** Desired depth from the client on a shallow request. */
 	private int depth;
@@ -313,6 +317,7 @@ public class UploadPack {
 
 	private PackStatistics statistics;
 
+	@SuppressWarnings("deprecation")
 	private UploadPackLogger logger = UploadPackLogger.NULL;
 
 	/**
@@ -643,11 +648,10 @@ public class UploadPack {
 	 *            other network connections this should be null.
 	 * @throws IOException
 	 */
-	public void upload(final InputStream input, final OutputStream output,
+	public void upload(final InputStream input, OutputStream output,
 			final OutputStream messages) throws IOException {
 		try {
 			rawIn = input;
-			rawOut = output;
 			if (messages != null)
 				msgOut = messages;
 
@@ -655,11 +659,17 @@ public class UploadPack {
 				final Thread caller = Thread.currentThread();
 				timer = new InterruptTimer(caller.getName() + "-Timer"); //$NON-NLS-1$
 				TimeoutInputStream i = new TimeoutInputStream(rawIn, timer);
-				TimeoutOutputStream o = new TimeoutOutputStream(rawOut, timer);
+				@SuppressWarnings("resource")
+				TimeoutOutputStream o = new TimeoutOutputStream(output, timer);
 				i.setTimeout(timeout * 1000);
 				o.setTimeout(timeout * 1000);
 				rawIn = i;
-				rawOut = o;
+				output = o;
+			}
+
+			rawOut = new ResponseBufferedOutputStream(output);
+			if (biDirectionalPipe) {
+				rawOut.stopBuffering();
 			}
 
 			pckIn = new PacketLineIn(rawIn);
@@ -712,7 +722,9 @@ public class UploadPack {
 	}
 
 	private void service() throws IOException {
-		boolean sendPack;
+		boolean sendPack = false;
+		// If it's a non-bidi request, we need to read the entire request before
+		// writing a response. Buffer the response until then.
 		try {
 			if (biDirectionalPipe)
 				sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
@@ -743,6 +755,17 @@ public class UploadPack {
 			if (!clientShallowCommits.isEmpty())
 				walk.assumeShallow(clientShallowCommits);
 			sendPack = negotiate();
+			if (sendPack && !biDirectionalPipe) {
+				// Ensure the request was fully consumed. Any remaining input must
+				// be a protocol error. If we aren't at EOF the implementation is broken.
+				int eof = rawIn.read();
+				if (0 <= eof) {
+					sendPack = false;
+					throw new CorruptObjectException(MessageFormat.format(
+							JGitText.get().expectedEOFReceived,
+							"\\x" + Integer.toHexString(eof))); //$NON-NLS-1$
+				}
+			}
 		} catch (ServiceMayNotContinueException err) {
 			if (!err.isOutput() && err.getMessage() != null) {
 				try {
@@ -768,6 +791,13 @@ public class UploadPack {
 				throw new UploadPackInternalServerErrorException(err);
 			}
 			throw err;
+		} finally {
+			if (!sendPack && !biDirectionalPipe) {
+				while (0 < rawIn.skip(2048) || 0 <= rawIn.read()) {
+					// Discard until EOF.
+				}
+			}
+			rawOut.stopBuffering();
 		}
 
 		if (sendPack)
@@ -775,7 +805,7 @@ public class UploadPack {
 	}
 
 	private static Set<ObjectId> refIdSet(Collection<Ref> refs) {
-		Set<ObjectId> ids = new HashSet<ObjectId>(refs.size());
+		Set<ObjectId> ids = new HashSet<>(refs.size());
 		for (Ref ref : refs) {
 			ObjectId id = ref.getObjectId();
 			if (id != null) {
@@ -1017,7 +1047,7 @@ public class UploadPack {
 		okToGiveUp = Boolean.FALSE;
 
 		ObjectId last = ObjectId.zeroId();
-		List<ObjectId> peerHas = new ArrayList<ObjectId>(64);
+		List<ObjectId> peerHas = new ArrayList<>(64);
 		for (;;) {
 			String line;
 			try {
@@ -1171,7 +1201,7 @@ public class UploadPack {
 		for (ObjectId obj : wantIds) {
 			if (!advertised.contains(obj)) {
 				if (notAdvertisedWants == null)
-					notAdvertisedWants = new ArrayList<ObjectId>();
+					notAdvertisedWants = new ArrayList<>();
 				notAdvertisedWants.add(obj);
 			}
 		}
@@ -1214,6 +1244,7 @@ public class UploadPack {
 	 */
 	public static final class AdvertisedRequestValidator
 			implements RequestValidator {
+		@Override
 		public void checkWants(UploadPack up, List<ObjectId> wants)
 				throws PackProtocolException, IOException {
 			if (!up.isBiDirectionalPipe())
@@ -1230,9 +1261,10 @@ public class UploadPack {
 	 */
 	public static final class ReachableCommitRequestValidator
 			implements RequestValidator {
+		@Override
 		public void checkWants(UploadPack up, List<ObjectId> wants)
 				throws PackProtocolException, IOException {
-			checkNotAdvertisedWants(up.getRevWalk(), wants,
+			checkNotAdvertisedWants(up, wants,
 					refIdSet(up.getAdvertisedRefs().values()));
 		}
 	}
@@ -1243,6 +1275,7 @@ public class UploadPack {
 	 * @since 3.1
 	 */
 	public static final class TipRequestValidator implements RequestValidator {
+		@Override
 		public void checkWants(UploadPack up, List<ObjectId> wants)
 				throws PackProtocolException, IOException {
 			if (!up.isBiDirectionalPipe())
@@ -1265,9 +1298,10 @@ public class UploadPack {
 	 */
 	public static final class ReachableCommitTipRequestValidator
 			implements RequestValidator {
+		@Override
 		public void checkWants(UploadPack up, List<ObjectId> wants)
 				throws PackProtocolException, IOException {
-			checkNotAdvertisedWants(up.getRevWalk(), wants,
+			checkNotAdvertisedWants(up, wants,
 					refIdSet(up.getRepository().getRefDatabase().getRefs(ALL).values()));
 		}
 	}
@@ -1278,13 +1312,26 @@ public class UploadPack {
 	 * @since 3.1
 	 */
 	public static final class AnyRequestValidator implements RequestValidator {
+		@Override
 		public void checkWants(UploadPack up, List<ObjectId> wants)
 				throws PackProtocolException, IOException {
 			// All requests are valid.
 		}
 	}
 
-	private static void checkNotAdvertisedWants(RevWalk walk,
+	private static void checkNotAdvertisedWantsUsingBitmap(ObjectReader reader,
+			BitmapIndex bitmapIndex, List<ObjectId> notAdvertisedWants,
+			Set<ObjectId> reachableFrom) throws IOException {
+		BitmapWalker bitmapWalker = new BitmapWalker(new ObjectWalk(reader), bitmapIndex, null);
+		BitmapBuilder reachables = bitmapWalker.findObjects(reachableFrom, null, false);
+		for (ObjectId oid : notAdvertisedWants) {
+			if (!reachables.contains(oid)) {
+				throw new WantNotValidException(oid);
+			}
+		}
+	}
+
+	private static void checkNotAdvertisedWants(UploadPack up,
 			List<ObjectId> notAdvertisedWants, Set<ObjectId> reachableFrom)
 			throws MissingObjectException, IncorrectObjectTypeException, IOException {
 		// Walk the requested commits back to the provided set of commits. If any
@@ -1293,32 +1340,49 @@ public class UploadPack {
 		// into an advertised branch it will be marked UNINTERESTING and no commits
 		// return.
 
-		AsyncRevObjectQueue q = walk.parseAny(notAdvertisedWants, true);
-		try {
-			RevObject obj;
-			while ((obj = q.next()) != null) {
-				if (!(obj instanceof RevCommit))
-					throw new WantNotValidException(obj);
-				walk.markStart((RevCommit) obj);
-			}
-		} catch (MissingObjectException notFound) {
-			throw new WantNotValidException(notFound.getObjectId(), notFound);
-		} finally {
-			q.release();
-		}
-		for (ObjectId id : reachableFrom) {
+		ObjectReader reader = up.getRevWalk().getObjectReader();
+		try (RevWalk walk = new RevWalk(reader)) {
+			AsyncRevObjectQueue q = walk.parseAny(notAdvertisedWants, true);
 			try {
-				walk.markUninteresting(walk.parseCommit(id));
-			} catch (IncorrectObjectTypeException notCommit) {
-				continue;
+				RevObject obj;
+				while ((obj = q.next()) != null) {
+					if (!(obj instanceof RevCommit)) {
+						// If unadvertized non-commits are requested, use
+						// bitmaps. If there are no bitmaps, instead of
+						// incurring the expense of a manual walk, reject
+						// the request.
+						BitmapIndex bitmapIndex = reader.getBitmapIndex();
+						if (bitmapIndex != null) {
+							checkNotAdvertisedWantsUsingBitmap(
+									reader,
+									bitmapIndex,
+									notAdvertisedWants,
+									reachableFrom);
+							return;
+						}
+						throw new WantNotValidException(obj);
+					}
+					walk.markStart((RevCommit) obj);
+				}
+			} catch (MissingObjectException notFound) {
+				throw new WantNotValidException(notFound.getObjectId(),
+						notFound);
+			} finally {
+				q.release();
+			}
+			for (ObjectId id : reachableFrom) {
+				try {
+					walk.markUninteresting(walk.parseCommit(id));
+				} catch (IncorrectObjectTypeException notCommit) {
+					continue;
+				}
+			}
+
+			RevCommit bad = walk.next();
+			if (bad != null) {
+				throw new WantNotValidException(bad);
 			}
 		}
-
-		RevCommit bad = walk.next();
-		if (bad != null) {
-			throw new WantNotValidException(bad);
-		}
-		walk.reset();
 	}
 
 	private void addCommonBase(final RevObject o) {
@@ -1374,17 +1438,6 @@ public class UploadPack {
 	private void sendPack() throws IOException {
 		final boolean sideband = options.contains(OPTION_SIDE_BAND)
 				|| options.contains(OPTION_SIDE_BAND_64K);
-
-		if (!biDirectionalPipe) {
-			// Ensure the request was fully consumed. Any remaining input must
-			// be a protocol error. If we aren't at EOF the implementation is broken.
-			int eof = rawIn.read();
-			if (0 <= eof)
-				throw new CorruptObjectException(MessageFormat.format(
-						JGitText.get().expectedEOFReceived,
-						"\\x" + Integer.toHexString(eof))); //$NON-NLS-1$
-		}
-
 		if (sideband) {
 			try {
 				sendPack(true);
@@ -1428,6 +1481,7 @@ public class UploadPack {
 		}
 	}
 
+	@SuppressWarnings("deprecation")
 	private void sendPack(final boolean sideband) throws IOException {
 		ProgressMonitor pm = NullProgressMonitor.INSTANCE;
 		OutputStream packOut = rawOut;
@@ -1481,7 +1535,7 @@ public class UploadPack {
 			pw.setReuseValidatingObjects(false);
 
 			if (commonBase.isEmpty() && refs != null) {
-				Set<ObjectId> tagTargets = new HashSet<ObjectId>();
+				Set<ObjectId> tagTargets = new HashSet<>();
 				for (Ref ref : refs.values()) {
 					if (ref.getPeeledObjectId() != null)
 						tagTargets.add(ref.getPeeledObjectId());
@@ -1506,7 +1560,7 @@ public class UploadPack {
 				walk.reset();
 
 				ObjectWalk ow = rw.toObjectWalkWithSameObjects();
-				pw.preparePack(pm, ow, wantAll, commonBase);
+				pw.preparePack(pm, ow, wantAll, commonBase, PackWriter.NONE);
 				rw = ow;
 			}
 
@@ -1563,6 +1617,49 @@ public class UploadPack {
 		Ref head = refs.get(Constants.HEAD);
 		if (head != null && head.isSymbolic()) {
 			adv.addSymref(Constants.HEAD, head.getLeaf().getName());
+		}
+	}
+
+	private static class ResponseBufferedOutputStream extends OutputStream {
+		private final OutputStream rawOut;
+
+		private OutputStream out;
+
+		ResponseBufferedOutputStream(OutputStream rawOut) {
+			this.rawOut = rawOut;
+			this.out = new ByteArrayOutputStream();
+		}
+
+		@Override
+		public void write(int b) throws IOException {
+			out.write(b);
+		}
+
+		@Override
+		public void write(byte b[]) throws IOException {
+			out.write(b);
+		}
+
+		@Override
+		public void write(byte b[], int off, int len) throws IOException {
+			out.write(b, off, len);
+		}
+
+		@Override
+		public void flush() throws IOException {
+			out.flush();
+		}
+
+		@Override
+		public void close() throws IOException {
+			out.close();
+		}
+
+		void stopBuffering() throws IOException {
+			if (out != rawOut) {
+				((ByteArrayOutputStream) out).writeTo(rawOut);
+				out = rawOut;
+			}
 		}
 	}
 }

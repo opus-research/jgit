@@ -657,7 +657,8 @@ public class RefTreeDatabaseTest {
 				Ref old = tree.exactRef(reader, name);
 				Command n;
 				try (RevWalk rw = new RevWalk(repo)) {
-					n = new Command(old, Command.toRef(rw, id, name, true));
+					n = new Command(old,
+							Command.toRef(rw, id, null, name, true));
 				}
 				return tree.apply(Collections.singleton(n));
 			}
@@ -711,6 +712,7 @@ public class RefTreeDatabaseTest {
 			RefTreeDatabaseTest.this.refdb = refs;
 		}
 
+		@Override
 		public RefDatabase getRefDatabase() {
 			return refs;
 		}

@@ -58,7 +58,13 @@ import org.eclipse.jgit.transport.PushCertificate;
  * Creates, updates or deletes any reference.
  */
 public abstract class RefUpdate {
-	/** Status of an update request. */
+	/**
+	 * Status of an update request.
+	 * <p>
+	 * New values may be added to this enum in the future. Callers may assume that
+	 * unknown values are failures, and may generally treat them the same as
+	 * {@link #REJECTED_OTHER_REASON}.
+	 */
 	public static enum Result {
 		/** The ref update/delete has not been attempted by the caller. */
 		NOT_ATTEMPTED,
@@ -114,6 +120,10 @@ public abstract class RefUpdate {
 		 * merged into the new value. The configuration did not allow a forced
 		 * update/delete to take place, so ref still contains the old value. No
 		 * previous history was lost.
+		 * <p>
+		 * <em>Note:</em> Despite the general name, this result only refers to the
+		 * non-fast-forward case. For more general errors, see {@link
+		 * #REJECTED_OTHER_REASON}.
 		 */
 		REJECTED,
 
@@ -139,7 +149,25 @@ public abstract class RefUpdate {
 		 * The ref was renamed from another name
 		 * <p>
 		 */
-		RENAMED
+		RENAMED,
+
+		/**
+		 * One or more objects aren't in the repository.
+		 * <p>
+		 * This is severe indication of either repository corruption on the
+		 * server side, or a bug in the client wherein the client did not supply
+		 * all required objects during the pack transfer.
+		 *
+		 * @since 4.9
+		 */
+		REJECTED_MISSING_OBJECT,
+
+		/**
+		 * Rejected for some other reason not covered by another enum value.
+		 *
+		 * @since 4.9
+		 */
+		REJECTED_OTHER_REASON;
 	}
 
 	/** New value the caller wants this ref to have. */
@@ -156,6 +184,12 @@ public abstract class RefUpdate {
 
 	/** Should the Result value be appended to {@link #refLogMessage}. */
 	private boolean refLogIncludeResult;
+
+	/**
+	 * Should reflogs be written even if the configured default for this ref is
+	 * not to write it.
+	 */
+	private boolean forceRefLog;
 
 	/** Old value of the ref, obtained after we lock it. */
 	private ObjectId oldValue;
@@ -278,6 +312,16 @@ public abstract class RefUpdate {
 	}
 
 	/**
+	 * Return whether this update is actually detaching a symbolic ref.
+	 *
+	 * @return true if detaching a symref.
+	 * @since 4.9
+	 */
+	public boolean isDetachingSymbolicRef() {
+		return detachingSymbolicRef;
+	}
+
+	/**
 	 * Set the new value the ref will update to.
 	 *
 	 * @param id
@@ -365,6 +409,12 @@ public abstract class RefUpdate {
 
 	/**
 	 * Set the message to include in the reflog.
+	 * <p>
+	 * Repository implementations may limit which reflogs are written by default,
+	 * based on the project configuration. If a repo is not configured to write
+	 * logs for this ref by default, setting the message alone may have no effect.
+	 * To indicate that the repo should write logs for this update in spite of
+	 * configured defaults, use {@link #setForceRefLog(boolean)}.
 	 *
 	 * @param msg
 	 *            the message to describe this change. It may be null if
@@ -390,6 +440,26 @@ public abstract class RefUpdate {
 	public void disableRefLog() {
 		refLogMessage = null;
 		refLogIncludeResult = false;
+	}
+
+	/**
+	 * Force writing a reflog for the updated ref.
+	 *
+	 * @param force whether to force.
+	 * @since 4.9
+	 */
+	public void setForceRefLog(boolean force) {
+		forceRefLog = force;
+	}
+
+	/**
+	 * Check whether the reflog should be written regardless of repo defaults.
+	 *
+	 * @return whether force writing is enabled.
+	 * @since 4.9
+	 */
+	protected boolean isForceRefLog() {
+		return forceRefLog;
 	}
 
 	/**
@@ -627,34 +697,47 @@ public abstract class RefUpdate {
 		RevObject oldObj;
 
 		// don't make expensive conflict check if this is an existing Ref
-		if (oldValue == null && checkConflicting && getRefDatabase().isNameConflicting(getName()))
+		if (oldValue == null && checkConflicting
+				&& getRefDatabase().isNameConflicting(getName())) {
 			return Result.LOCK_FAILURE;
+		}
 		try {
 			// If we're detaching a symbolic reference, we should update the reference
 			// itself. Otherwise, we will update the leaf reference, which should be
 			// an ObjectIdRef.
-			if (!tryLock(!detachingSymbolicRef))
+			if (!tryLock(!detachingSymbolicRef)) {
 				return Result.LOCK_FAILURE;
+			}
 			if (expValue != null) {
 				final ObjectId o;
 				o = oldValue != null ? oldValue : ObjectId.zeroId();
-				if (!AnyObjectId.equals(expValue, o))
+				if (!AnyObjectId.equals(expValue, o)) {
 					return Result.LOCK_FAILURE;
+				}
 			}
-			if (oldValue == null)
+			try {
+				newObj = safeParseNew(walk, newValue);
+			} catch (MissingObjectException e) {
+				return Result.REJECTED_MISSING_OBJECT;
+			}
+
+			if (oldValue == null) {
 				return store.execute(Result.NEW);
+			}
 
-			newObj = safeParse(walk, newValue);
-			oldObj = safeParse(walk, oldValue);
-			if (newObj == oldObj && !detachingSymbolicRef)
+			oldObj = safeParseOld(walk, oldValue);
+			if (newObj == oldObj && !detachingSymbolicRef) {
 				return store.execute(Result.NO_CHANGE);
+			}
 
-			if (isForceUpdate())
+			if (isForceUpdate()) {
 				return store.execute(Result.FORCED);
+			}
 
 			if (newObj instanceof RevCommit && oldObj instanceof RevCommit) {
-				if (walk.isMergedInto((RevCommit) oldObj, (RevCommit) newObj))
+				if (walk.isMergedInto((RevCommit) oldObj, (RevCommit) newObj)) {
 					return store.execute(Result.FAST_FORWARD);
+				}
 			}
 
 			return Result.REJECTED;
@@ -674,16 +757,23 @@ public abstract class RefUpdate {
 		checkConflicting = check;
 	}
 
-	private static RevObject safeParse(final RevWalk rw, final AnyObjectId id)
+	private static RevObject safeParseNew(RevWalk rw, AnyObjectId newId)
+			throws IOException {
+		if (newId == null || ObjectId.zeroId().equals(newId)) {
+			return null;
+		}
+		return rw.parseAny(newId);
+	}
+
+	private static RevObject safeParseOld(RevWalk rw, AnyObjectId oldId)
 			throws IOException {
 		try {
-			return id != null ? rw.parseAny(id) : null;
+			return oldId != null ? rw.parseAny(oldId) : null;
 		} catch (MissingObjectException e) {
-			// We can expect some objects to be missing, like if we are
-			// trying to force a deletion of a branch and the object it
-			// points to has been pruned from the database due to freak
-			// corruption accidents (it happens with 'git new-work-dir').
-			//
+			// We can expect some old objects to be missing, like if we are trying to
+			// force a deletion of a branch and the object it points to has been
+			// pruned from the database due to freak corruption accidents (it happens
+			// with 'git new-work-dir').
 			return null;
 		}
 	}
