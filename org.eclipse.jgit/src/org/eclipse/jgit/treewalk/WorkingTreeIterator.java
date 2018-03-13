@@ -64,7 +64,6 @@ import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
-import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.ignore.IgnoreNode;
 import org.eclipse.jgit.ignore.IgnoreRule;
@@ -182,24 +181,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		ignoreNode = new RootIgnoreNode(entry, repo);
 	}
 
-	/**
-	 * Define the matching {@link DirCacheIterator}, to optimize ObjectIds.
-	 *
-	 * Once the DirCacheIterator has been set this iterator must only be
-	 * advanced by the TreeWalk that is supplied, as it assumes that itself and
-	 * the corresponding DirCacheIterator are positioned on the same file path
-	 * whenever {@link #idBuffer()} is invoked.
-	 *
-	 * @param walk
-	 *            the walk that will be advancing this iterator.
-	 * @param treeId
-	 *            index of the matching {@link DirCacheIterator}.
-	 */
-	public void setDirCacheIterator(TreeWalk walk, int treeId) {
-		state.walk = walk;
-		state.dirCacheTree = treeId;
-	}
-
 	@Override
 	public boolean hasId() {
 		if (contentIdFromPtr == ptr)
@@ -211,22 +192,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	public byte[] idBuffer() {
 		if (contentIdFromPtr == ptr)
 			return contentId;
-
-		if (state.walk != null) {
-			// If there is a matching DirCacheIterator, we can reuse
-			// its idBuffer, but only if we appear to be clean against
-			// the cached index information for the path.
-			//
-			DirCacheIterator i = state.walk.getTree(state.dirCacheTree,
-					DirCacheIterator.class);
-			if (i != null) {
-				DirCacheEntry ent = i.getDirCacheEntry();
-				if (ent != null
-						&& compareMetadata(ent) == MetadataDiff.DIFFER_BY_TIMESTAMP)
-					return i.idBuffer();
-			}
-		}
-
 		switch (mode & FileMode.TYPE_MASK) {
 		case FileMode.TYPE_FILE:
 			contentIdFromPtr = ptr;
@@ -575,11 +540,10 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		EQUAL,
 
 		/**
-		 * The entries are not equal by metaData (mode, length,
-		 * modification-timestamp) or the <code>isUpdateNeeded</code> attribute
-		 * of the index entry is set
+		 * The entries are not equal by metaData (mode, length) or the
+		 * <code>isUpdateNeeded</code> attribute of the index entry is set
 		 */
-		NOT_EQUAL,
+		DIFFER_BY_METADATA,
 
 		/** index entry is smudged - can't use that entry for comparison */
 		SMUDGED,
@@ -605,10 +569,10 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			return MetadataDiff.EQUAL;
 
 		if (entry.isUpdateNeeded())
-			return MetadataDiff.NOT_EQUAL;
+			return MetadataDiff.DIFFER_BY_METADATA;
 
 		if (!entry.isSmudged() && (getEntryLength() != entry.getLength()))
-			return MetadataDiff.NOT_EQUAL;
+			return MetadataDiff.DIFFER_BY_METADATA;
 
 		// Determine difference in mode-bits of file and index-entry. In the
 		// bitwise presentation of modeDiff we'll have a '1' when the two modes
@@ -625,7 +589,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			if (modeDiff != 0)
 				// Report a modification if the modes still (after potentially
 				// ignoring EXECUTABLE_FILE bits) differ
-				return MetadataDiff.NOT_EQUAL;
+				return MetadataDiff.DIFFER_BY_METADATA;
 		}
 
 		// Git under windows only stores seconds so we round the timestamp
@@ -661,7 +625,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 * @return true if content is most likely different.
 	 */
 	public boolean isModified(DirCacheEntry entry, boolean forceContentCheck) {
-		switch (compareMetadata(entry)) {
+		MetadataDiff diff = compareMetadata(entry);
+		switch (diff) {
 		case DIFFER_BY_TIMESTAMP:
 			if (forceContentCheck)
 				// But we are told to look at content even though timestamps
@@ -676,10 +641,11 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			return contentCheck(entry);
 		case EQUAL:
 			return false;
-		case NOT_EQUAL:
+		case DIFFER_BY_METADATA:
 			return true;
 		default:
-			return true;
+			throw new IllegalStateException(MessageFormat.format(
+					JGitText.get().unexpectedCompareResult, diff.name()));
 		}
 	}
 
@@ -923,12 +889,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 		/** Buffer used to perform {@link #contentId} computations. */
 		byte[] contentReadBuffer;
-
-		/** TreeWalk with a (supposedly) matching DirCacheIterator. */
-		TreeWalk walk;
-
-		/** Position of the matching {@link DirCacheIterator}. */
-		int dirCacheTree;
 
 		IteratorState(WorkingTreeOptions options) {
 			this.options = options;
