@@ -53,7 +53,6 @@ import java.text.MessageFormat;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.util.MutableInteger;
-import org.eclipse.jgit.util.RawParseUtils;
 
 /**
  * Verifies that an object is formatted correctly.
@@ -373,24 +372,12 @@ public class ObjectChecker {
 		if (ptr == end)
 			throw new CorruptObjectException("zero length name");
 		if (raw[ptr] == '.') {
-			switch (end - ptr) {
-			case 1:
+			int nameLen = end - ptr;
+			if (nameLen == 1)
 				throw new CorruptObjectException("invalid name '.'");
-			case 2:
-				if (raw[ptr + 1] == '.')
-					throw new CorruptObjectException("invalid name '..'");
-				break;
-			case 4:
-				if (isDotGit(raw, ptr + 1))
-					throw new CorruptObjectException(String.format(
-							"invalid name '%s'",
-							RawParseUtils.decode(raw, ptr, end)));
-			}
+			if (nameLen == 2 && raw[ptr + 1] == '.')
+				throw new CorruptObjectException("invalid name '..'");
 		}
-	}
-
-	private static boolean isDotGit(byte[] buf, int p) {
-		return buf[p] == 'g' && buf[p + 1] == 'i' && buf[p + 2] == 't';
 	}
 
 	/**
