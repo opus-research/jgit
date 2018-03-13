@@ -61,12 +61,12 @@ import java.util.zip.CRC32;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackInvalidException;
 import org.eclipse.jgit.errors.PackMismatchException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
@@ -353,7 +353,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		int headerCnt = 1;
 		while ((c & 0x80) != 0) {
 			c = buf[headerCnt++] & 0xff;
-			inflatedLength += (c & 0x7f) << shift;
+			inflatedLength += ((long) (c & 0x7f)) << shift;
 			shift += 7;
 		}
 
@@ -692,7 +692,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 				int p = 1;
 				while ((c & 0x80) != 0) {
 					c = ib[p++] & 0xff;
-					sz += (c & 0x7f) << shift;
+					sz += ((long) (c & 0x7f)) << shift;
 					shift += 7;
 				}
 
@@ -937,7 +937,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		int p = 1;
 		while ((c & 0x80) != 0) {
 			c = ib[p++] & 0xff;
-			sz += (c & 0x7f) << shift;
+			sz += ((long) (c & 0x7f)) << shift;
 			shift += 7;
 		}
 

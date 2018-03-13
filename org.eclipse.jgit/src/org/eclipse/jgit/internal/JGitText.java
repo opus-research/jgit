@@ -41,7 +41,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit;
+package org.eclipse.jgit.internal;
 
 import org.eclipse.jgit.nls.NLS;
 import org.eclipse.jgit.nls.TranslationBundle;
@@ -410,6 +410,8 @@ public class JGitText extends TranslationBundle {
 	/***/ public String packRefs;
 	/***/ public String packTooLargeForIndexVersion1;
 	/***/ public String packWriterStatistics;
+	/***/ public String patchApplyException;
+	/***/ public String patchFormatException;
 	/***/ public String pathIsNotInWorkingDir;
 	/***/ public String pathNotConfigured;
 	/***/ public String peeledLineBeforeRef;
@@ -443,6 +445,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String renameBranchFailedBecauseTag;
 	/***/ public String renameBranchFailedUnknownReason;
 	/***/ public String renameBranchUnexpectedResult;
+	/***/ public String renameFileFailed;
 	/***/ public String renamesAlreadyFound;
 	/***/ public String renamesBreakingModifies;
 	/***/ public String renamesFindingByContent;
@@ -491,6 +494,9 @@ public class JGitText extends TranslationBundle {
 	/***/ public String stashApplyFailed;
 	/***/ public String stashApplyOnUnsafeRepository;
 	/***/ public String stashCommitMissingTwoParents;
+	/***/ public String stashDropDeleteRefFailed;
+	/***/ public String stashDropFailed;
+	/***/ public String stashDropMissingReflog;
 	/***/ public String stashFailed;
 	/***/ public String stashResolveFailed;
 	/***/ public String statelessRPCRequiresOptionToBeEnabled;
@@ -535,6 +541,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unexpectedRefReport;
 	/***/ public String unexpectedReportLine;
 	/***/ public String unexpectedReportLine2;
+	/***/ public String unknownOrUnsupportedCommand;
 	/***/ public String unknownDIRCVersion;
 	/***/ public String unknownHost;
 	/***/ public String unknownIndexVersionOrCorruptIndex;
