@@ -43,40 +43,19 @@
 
 package org.eclipse.jgit.internal.storage.dfs;
 
-import org.eclipse.jgit.internal.storage.pack.ObjectToPack;
-import org.eclipse.jgit.internal.storage.pack.StoredObjectRepresentation;
-import org.eclipse.jgit.lib.AnyObjectId;
+import java.util.concurrent.RejectedExecutionHandler;
+import java.util.concurrent.ThreadPoolExecutor;
 
-/** {@link ObjectToPack} for {@link DfsObjDatabase}. */
-class DfsObjectToPack extends ObjectToPack {
-	/** Pack to reuse compressed data from, otherwise null. */
-	DfsPackFile pack;
+/** This handler aborts a {@link ReadAheadTask} when the queue is full. */
+final class ReadAheadRejectedExecutionHandler implements
+		RejectedExecutionHandler {
+	static final ReadAheadRejectedExecutionHandler INSTANCE = new ReadAheadRejectedExecutionHandler();
 
-	/** Position of the pack in the reader's pack list. */
-	int packIndex;
-
-	/** Offset of the object's header in {@link #pack}. */
-	long offset;
-
-	/** Length of the data section of the object. */
-	long length;
-
-	DfsObjectToPack(AnyObjectId src, final int type) {
-		super(src, type);
+	private ReadAheadRejectedExecutionHandler() {
+		// Singleton, do not create more instances.
 	}
 
-	@Override
-	protected void clearReuseAsIs() {
-		super.clearReuseAsIs();
-		pack = null;
-	}
-
-	@Override
-	public void select(StoredObjectRepresentation ref) {
-		DfsObjectRepresentation ptr = (DfsObjectRepresentation) ref;
-		this.pack = ptr.pack;
-		this.packIndex = ptr.packIndex;
-		this.offset = ptr.offset;
-		this.length = ptr.length;
+	public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
+		((ReadAheadTask.TaskFuture) r).task.abort();
 	}
 }
