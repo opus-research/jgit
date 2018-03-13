@@ -400,8 +400,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		boolean conflicts = false;
 		if (rebaseState.getFile(AUTOSTASH).exists()) {
 			String stash = rebaseState.readFile(AUTOSTASH);
-			try {
-				Git.wrap(repo).stashApply().setStashRef(stash)
+			try (Git git = Git.wrap(repo)) {
+				git.stashApply().setStashRef(stash)
 						.ignoreRepositoryState(true).setStrategy(strategy)
 						.call();
 			} catch (StashApplyFailureException e) {
