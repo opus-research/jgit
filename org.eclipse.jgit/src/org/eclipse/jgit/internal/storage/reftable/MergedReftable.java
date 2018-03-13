@@ -70,6 +70,7 @@ public class MergedReftable extends RefCursor {
 	private boolean useGetRef;
 	private String refName;
 	private Ref ref;
+	private long logTimeUsec;
 	private ReflogEntry log;
 
 	/**
@@ -132,11 +133,11 @@ public class MergedReftable extends RefCursor {
 	}
 
 	@Override
-	public void seekLog(String name, int time) throws IOException {
+	public void seekLog(String name, long timeUsec) throws IOException {
 		queue = new PriorityQueue<>(tables.length, TableRef::compareLog);
 		useGetRef = false;
 		for (TableRef t : tables) {
-			t.table.seekLog(name, time);
+			t.table.seekLog(name, timeUsec);
 			next(t);
 		}
 	}
@@ -162,6 +163,7 @@ public class MergedReftable extends RefCursor {
 					return true;
 				}
 			} else {
+				logTimeUsec = t.table.getReflogTimeUsec();
 				log = t.table.getReflogEntry();
 				next(t);
 				return true;
@@ -196,6 +198,11 @@ public class MergedReftable extends RefCursor {
 	@Override
 	public Ref getRef() {
 		return ref;
+	}
+
+	@Override
+	public long getReflogTimeUsec() {
+		return logTimeUsec;
 	}
 
 	@Override
