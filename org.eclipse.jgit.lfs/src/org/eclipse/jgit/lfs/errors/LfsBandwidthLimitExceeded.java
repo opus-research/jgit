@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Ned Twigg <ned.twigg@diffplug.com>
+ * Copyright (C) 2016, David Pursehouse <david.pursehouse@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,46 +41,22 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.pgm;
+package org.eclipse.jgit.lfs.errors;
 
-import java.text.MessageFormat;
-import java.util.Set;
+/**
+ * Thrown when the bandwidth limit for the user or repository has been exceeded.
+ *
+ * @since 4.5
+ *
+ */
+public class LfsBandwidthLimitExceeded extends LfsException {
+	private static final long serialVersionUID = 1L;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.pgm.internal.CLIText;
-import org.kohsuke.args4j.Option;
-
-@Command(common = true, usage = "usage_clean")
-class Clean extends TextBuiltin {
-	@Option(name = "-d", usage = "usage_removeUntrackedDirectories")
-	private boolean dirs = false;
-
-	@Option(name = "--force", aliases = {
-			"-f" }, usage = "usage_forceClean")
-	private boolean force = false;
-
-	@Option(name = "--dryRun", aliases = { "-n" })
-	private boolean dryRun = false;
-
-	@Override
-	protected void run() throws Exception {
-		try (Git git = new Git(db)) {
-			boolean requireForce = git.getRepository().getConfig()
-					.getBoolean("clean", "requireForce", true); //$NON-NLS-1$ //$NON-NLS-2$
-			if (requireForce && !(force || dryRun)) {
-				throw die(CLIText.fatalError(CLIText.get().cleanRequireForce));
-			}
-			// Note that CleanCommand's setForce(true) will delete
-			// .git folders. In the cgit cli, this behavior
-			// requires setting "-f" twice, not sure how to do
-			// this with args4j, so this feature is unimplemented
-			// for now.
-			Set<String> removedFiles = git.clean().setCleanDirectories(dirs)
-					.setDryRun(dryRun).call();
-			for (String removedFile : removedFiles) {
-				outw.println(MessageFormat.format(CLIText.get().removing,
-						removedFile));
-			}
-		}
+	/**
+	 * @param message
+	 *            error message, which may be shown to an end-user.
+	 */
+	public LfsBandwidthLimitExceeded(String message) {
+		super(message);
 	}
 }

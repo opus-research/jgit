@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, David Pursehouse <david.pursehouse@gmail.com>
+ * Copyright (C) 2016, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,27 +40,14 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.junit;
 
-package org.eclipse.jgit.lfs.errors;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.lfs.internal.LfsText;
-
-/**
- * Thrown when the user has read, but not write access. Only applicable when the
- * operation in the request is "upload".
- *
- * @since 4.5
- */
-public class LfsRepositoryReadOnly extends LfsException {
-	private static final long serialVersionUID = 1L;
-
-	/**
-	 * @param name
-	 *            the repository name.
-	 */
-	public LfsRepositoryReadOnly(String name) {
-		super(MessageFormat.format(LfsText.get().repositoryReadOnly, name));
-	}
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ java.lang.annotation.ElementType.METHOD })
+public @interface Repeat {
+	public abstract int n();
 }

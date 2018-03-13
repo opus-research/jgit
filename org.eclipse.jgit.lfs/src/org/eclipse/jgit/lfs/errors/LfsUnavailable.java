@@ -48,19 +48,18 @@ import java.text.MessageFormat;
 import org.eclipse.jgit.lfs.internal.LfsText;
 
 /**
- * Thrown when the user has read, but not write access. Only applicable when the
- * operation in the request is "upload".
+ * Thrown when LFS is not available.
  *
  * @since 4.5
  */
-public class LfsRepositoryReadOnly extends LfsException {
+public class LfsUnavailable extends LfsException {
 	private static final long serialVersionUID = 1L;
 
 	/**
 	 * @param name
 	 *            the repository name.
 	 */
-	public LfsRepositoryReadOnly(String name) {
-		super(MessageFormat.format(LfsText.get().repositoryReadOnly, name));
+	public LfsUnavailable(String name) {
+		super(MessageFormat.format(LfsText.get().lfsUnavailable, name));
 	}
 }

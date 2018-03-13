@@ -43,24 +43,20 @@
 
 package org.eclipse.jgit.lfs.errors;
 
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.lfs.internal.LfsText;
-
 /**
- * Thrown when the user has read, but not write access. Only applicable when the
- * operation in the request is "upload".
+ * Thrown when the user has hit a rate limit with the server.
  *
  * @since 4.5
+ *
  */
-public class LfsRepositoryReadOnly extends LfsException {
+public class LfsRateLimitExceeded extends LfsException {
 	private static final long serialVersionUID = 1L;
 
 	/**
-	 * @param name
-	 *            the repository name.
+	 * @param message
+	 *            error message, which may be shown to an end-user.
 	 */
-	public LfsRepositoryReadOnly(String name) {
-		super(MessageFormat.format(LfsText.get().repositoryReadOnly, name));
+	public LfsRateLimitExceeded(String message) {
+		super(message);
 	}
 }
