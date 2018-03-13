@@ -55,7 +55,6 @@ import java.nio.channels.FileChannel;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.text.MessageFormat;
 import java.text.ParseException;
@@ -74,8 +73,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.dircache.DirCacheIterator;
@@ -128,13 +125,6 @@ public class GC {
 
 	private static final Pattern PATTERN_LOOSE_OBJECT = Pattern
 			.compile("[0-9a-fA-F]{38}"); //$NON-NLS-1$
-
-	private static final String PACK_EXT = "." + PackExt.PACK.getExtension();//$NON-NLS-1$
-
-	private static final String BITMAP_EXT = "." //$NON-NLS-1$
-			+ PackExt.BITMAP_INDEX.getExtension();
-
-	private static final String INDEX_EXT = "." + PackExt.INDEX.getExtension(); //$NON-NLS-1$
 
 	private static final int DEFAULT_AUTOPACKLIMIT = 50;
 
@@ -221,9 +211,10 @@ public class GC {
 	/**
 	 * Delete old pack files. What is 'old' is defined by specifying a set of
 	 * old pack files and a set of new pack files. Each pack file contained in
-	 * old pack files but not contained in new pack files will be deleted. If an
-	 * expirationDate is set then pack files which are younger than the
-	 * expirationDate will not be deleted.
+	 * old pack files but not contained in new pack files will be deleted. If
+	 * preserveOldPacks is set, keep a copy of the pack file in the preserve
+	 * directory. If an expirationDate is set then pack files which are younger
+	 * than the expirationDate will not be deleted nor preserved.
 	 *
 	 * @param oldPacks
 	 * @param newPacks
@@ -232,6 +223,7 @@ public class GC {
 	 */
 	private void deleteOldPacks(Collection<PackFile> oldPacks,
 			Collection<PackFile> newPacks) throws ParseException, IOException {
+		prunePreserved();
 		long packExpireDate = getPackExpireDate();
 		oldPackLoop: for (PackFile oldPack : oldPacks) {
 			String oldName = oldPack.getPackName();
@@ -248,9 +240,47 @@ public class GC {
 				prunePack(oldName);
 			}
 		}
-		// close the complete object database. Thats my only chance to force
+		// close the complete object database. That's my only chance to force
 		// rescanning and to detect that certain pack files are now deleted.
 		repo.getObjectDatabase().close();
+	}
+
+	/**
+	 * Deletes old pack file, unless 'preserve-oldpacks' is set, in which case it
+	 * moves the pack file to the preserved directory
+	 *
+	 * @param packFile
+	 * @param packName
+	 * @param ext
+	 * @param deleteOptions
+	 * @throws IOException
+	 */
+	private void removeOldPack(File packFile, String packName, PackExt ext,
+			int deleteOptions) throws IOException {
+		if (pconfig != null && pconfig.isPreserveOldPacks()) {
+			File oldPackDir = repo.getObjectDatabase().getPreservedDirectory();
+			FileUtils.mkdir(oldPackDir, true);
+
+			String oldPackName = "pack-" + packName + ".old-" + ext.getExtension();  //$NON-NLS-1$ //$NON-NLS-2$
+			File oldPackFile = new File(oldPackDir, oldPackName);
+			FileUtils.rename(packFile, oldPackFile);
+		} else {
+			FileUtils.delete(packFile, deleteOptions);
+		}
+	}
+
+	/**
+	 * Delete the preserved directory including all pack files within
+	 */
+	private void prunePreserved() {
+		if (pconfig != null && pconfig.isPrunePreserved()) {
+			try {
+				FileUtils.delete(repo.getObjectDatabase().getPreservedDirectory(),
+						FileUtils.RECURSIVE | FileUtils.RETRY | FileUtils.SKIP_MISSING);
+			} catch (IOException e) {
+				// Deletion of the preserved pack files failed. Silently return.
+			}
+		}
 	}
 
 	/**
@@ -272,7 +302,7 @@ public class GC {
 			for (PackExt ext : extensions)
 				if (PackExt.PACK.equals(ext)) {
 					File f = nameFor(packName, "." + ext.getExtension()); //$NON-NLS-1$
-					FileUtils.delete(f, deleteOptions);
+					removeOldPack(f, packName, ext, deleteOptions);
 					break;
 				}
 			// The .pack file has been deleted. Delete as many as the other
@@ -281,7 +311,7 @@ public class GC {
 			for (PackExt ext : extensions) {
 				if (!PackExt.PACK.equals(ext)) {
 					File f = nameFor(packName, "." + ext.getExtension()); //$NON-NLS-1$
-					FileUtils.delete(f, deleteOptions);
+					removeOldPack(f, packName, ext, deleteOptions);
 				}
 			}
 		} catch (IOException e) {
@@ -617,7 +647,7 @@ public class GC {
 			nonHeads.addAll(listRefLogObjects(ref, 0));
 			if (ref.isSymbolic() || ref.getObjectId() == null)
 				continue;
-			if (ref.getName().startsWith(Constants.R_HEADS))
+			if (isHead(ref) || isTag(ref))
 				allHeads.add(ref.getObjectId());
 			else if (RefTreeNames.isRefTree(refdb, ref.getName()))
 				txnHeads.add(ref.getObjectId());
@@ -664,53 +694,18 @@ public class GC {
 			throw new IOException(e);
 		}
 		prunePacked();
-		deleteOrphans();
 
 		lastPackedRefs = refsBefore;
 		lastRepackTime = time;
 		return ret;
 	}
 
-	/**
-	 * Deletes orphans
-	 * <p>
-	 * A file is considered an orphan if it is either a "bitmap" or an index
-	 * file, and its corresponding pack file is missing in the list.
-	 * </p>
-	 */
-	private void deleteOrphans() {
-		Path packDir = Paths.get(repo.getObjectsDirectory().getAbsolutePath(),
-				"pack"); //$NON-NLS-1$
-		List<String> fileNames = null;
-		try (Stream<Path> files = Files.list(packDir)) {
-			fileNames = files.map(path -> path.getFileName().toString())
-					.filter(name -> {
-						return (name.endsWith(PACK_EXT)
-								|| name.endsWith(BITMAP_EXT)
-								|| name.endsWith(INDEX_EXT));
-					}).sorted(Collections.reverseOrder())
-					.collect(Collectors.toList());
-		} catch (IOException e1) {
-			// ignore
-		}
-		if (fileNames == null) {
-			return;
-		}
+	private static boolean isHead(Ref ref) {
+		return ref.getName().startsWith(Constants.R_HEADS);
+	}
 
-		String base = null;
-		for (String n : fileNames) {
-			if (n.endsWith(PACK_EXT)) {
-				base = n.substring(0, n.lastIndexOf('.'));
-			} else {
-				if (base == null || !n.startsWith(base)) {
-					try {
-						Files.delete(new File(packDir.toFile(), n).toPath());
-					} catch (IOException e) {
-						LOG.error(e.getMessage(), e);
-					}
-				}
-			}
-		}
+	private static boolean isTag(Ref ref) {
+		return ref.getName().startsWith(Constants.R_TAGS);
 	}
 
 	/**
@@ -1257,9 +1252,10 @@ public class GC {
 				new DirectoryStream.Filter<Path>() {
 
 					public boolean accept(Path file) throws IOException {
-						return Files.isRegularFile(file) && PATTERN_LOOSE_OBJECT
-								.matcher(file.getFileName().toString())
-								.matches();
+						Path fileName = file.getFileName();
+						return Files.isRegularFile(file) && fileName != null
+								&& PATTERN_LOOSE_OBJECT
+										.matcher(fileName.toString()).matches();
 					}
 				})) {
 			for (Iterator<Path> iter = stream.iterator(); iter.hasNext();
