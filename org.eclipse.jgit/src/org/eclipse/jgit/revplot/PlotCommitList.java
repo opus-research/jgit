@@ -58,7 +58,7 @@ import org.eclipse.jgit.revwalk.RevWalk;
  * <p>
  * The source of the list must be a {@link PlotWalk} and {@link #fillTo(int)}
  * must be used to populate the list.
- *
+ * 
  * @param <L>
  *            type of lane used by the application.
  */
@@ -70,15 +70,7 @@ public class PlotCommitList<L extends PlotLane> extends
 
 	private final TreeSet<Integer> freeLanes = new TreeSet<Integer>();
 
-	private final HashSet<PlotLane> activeLanes = new HashSet<PlotLane>(32);
-
-	@Override
-	public void clear() {
-		super.clear();
-		lanesAllocated = 0;
-		freeLanes.clear();
-		activeLanes.clear();
-	}
+	private HashSet<PlotLane> activeLanes = new HashSet<PlotLane>(32);
 
 	@Override
 	public void source(final RevWalk w) {
@@ -98,7 +90,7 @@ public class PlotCommitList<L extends PlotLane> extends
 	 * <p>
 	 * This method modifies the passed collection by adding the lanes in any
 	 * order.
-	 *
+	 * 
 	 * @param currCommit
 	 *            the commit the caller needs to get the lanes from.
 	 * @param result
@@ -147,7 +139,7 @@ public class PlotCommitList<L extends PlotLane> extends
 				final PlotCommit c = currCommit.children[i];
 				if (activeLanes.remove(c.lane)) {
 					recycleLane((L) c.lane);
-					freeLanes.add(Integer.valueOf(c.lane.getPosition()));
+					freeLanes.add(Integer.valueOf(c.lane.position));
 				}
 			}
 
@@ -195,7 +187,7 @@ public class PlotCommitList<L extends PlotLane> extends
 	/**
 	 * Return colors and other reusable information to the plotter when a lane
 	 * is no longer needed.
-	 *
+	 * 
 	 * @param lane
 	 */
 	protected void recycleLane(final L lane) {

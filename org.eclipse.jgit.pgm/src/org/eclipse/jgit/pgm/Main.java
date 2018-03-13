@@ -1,4 +1,6 @@
 /*
+ * Copyright (C) 2008-2009, Google Inc.
+ * Copyright (C) 2008, Marek Zawirski <marek.zawirski@gmail.com>
  * Copyright (C) 2006, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
@@ -45,23 +47,19 @@
 package org.eclipse.jgit.pgm;
 
 import java.io.File;
-import java.lang.reflect.InvocationTargetException;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.eclipse.jgit.awtui.AwtAuthenticator;
-import org.eclipse.jgit.awtui.AwtSshSessionFactory;
-import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.pgm.opt.CmdLineParser;
-import org.eclipse.jgit.pgm.opt.SubcommandHandler;
-import org.eclipse.jgit.util.CachedAuthenticator;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.ExampleMode;
 import org.kohsuke.args4j.Option;
+import org.eclipse.jgit.awtui.AwtAuthenticator;
+import org.eclipse.jgit.errors.TransportException;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.pgm.opt.CmdLineParser;
+import org.eclipse.jgit.pgm.opt.SubcommandHandler;
+import org.eclipse.jgit.util.HttpSupport;
 
 /** Command line entry point. */
 public class Main {
@@ -82,18 +80,15 @@ public class Main {
 
 	/**
 	 * Execute the command line.
-	 *
+	 * 
 	 * @param argv
 	 *            arguments.
 	 */
 	public static void main(final String[] argv) {
 		final Main me = new Main();
 		try {
-			if (!installConsole()) {
-				AwtAuthenticator.install();
-				AwtSshSessionFactory.install();
-			}
-			configureHttpProxy();
+			AwtAuthenticator.install();
+			HttpSupport.configureHttpProxy();
 			me.execute(argv);
 		} catch (Die err) {
 			System.err.println("fatal: " + err.getMessage());
@@ -185,84 +180,5 @@ public class Main {
 			current = current.getParentFile();
 		}
 		return null;
-	}
-
-	private static boolean installConsole() {
-		try {
-			install("org.eclipse.jgit.console.ConsoleAuthenticator");
-			install("org.eclipse.jgit.console.ConsoleSshSessionFactory");
-			return true;
-		} catch (ClassNotFoundException e) {
-			return false;
-		} catch (NoClassDefFoundError e) {
-			return false;
-		} catch (UnsupportedClassVersionError e) {
-			return false;
-
-		} catch (IllegalArgumentException e) {
-			throw new RuntimeException("Cannot setup console", e);
-		} catch (SecurityException e) {
-			throw new RuntimeException("Cannot setup console", e);
-		} catch (IllegalAccessException e) {
-			throw new RuntimeException("Cannot setup console", e);
-		} catch (InvocationTargetException e) {
-			throw new RuntimeException("Cannot setup console", e);
-		} catch (NoSuchMethodException e) {
-			throw new RuntimeException("Cannot setup console", e);
-		}
-	}
-
-	private static void install(final String name)
-			throws IllegalAccessException, InvocationTargetException,
-			NoSuchMethodException, ClassNotFoundException {
-		try {
-		Class.forName(name).getMethod("install").invoke(null);
-		} catch (InvocationTargetException e) {
-			if (e.getCause() instanceof RuntimeException)
-				throw (RuntimeException) e.getCause();
-			if (e.getCause() instanceof Error)
-				throw (Error) e.getCause();
-			throw e;
-		}
-	}
-
-	/**
-	 * Configure the JRE's standard HTTP based on <code>http_proxy</code>.
-	 * <p>
-	 * The popular libcurl library honors the <code>http_proxy</code>
-	 * environment variable as a means of specifying an HTTP proxy for requests
-	 * made behind a firewall. This is not natively recognized by the JRE, so
-	 * this method can be used by command line utilities to configure the JRE
-	 * before the first request is sent.
-	 *
-	 * @throws MalformedURLException
-	 *             the value in <code>http_proxy</code> is unsupportable.
-	 */
-	private static void configureHttpProxy() throws MalformedURLException {
-		final String s = System.getenv("http_proxy");
-		if (s == null || s.equals(""))
-			return;
-
-		final URL u = new URL((s.indexOf("://") == -1) ? "http://" + s : s);
-		if (!"http".equals(u.getProtocol()))
-			throw new MalformedURLException("Invalid http_proxy: " + s
-					+ ": Only http supported.");
-
-		final String proxyHost = u.getHost();
-		final int proxyPort = u.getPort();
-
-		System.setProperty("http.proxyHost", proxyHost);
-		if (proxyPort > 0)
-			System.setProperty("http.proxyPort", String.valueOf(proxyPort));
-
-		final String userpass = u.getUserInfo();
-		if (userpass != null && userpass.contains(":")) {
-			final int c = userpass.indexOf(':');
-			final String user = userpass.substring(0, c);
-			final String pass = userpass.substring(c + 1);
-			CachedAuthenticator
-					.add(new CachedAuthenticator.CachedAuthentication(
-							proxyHost, proxyPort, user, pass));
-		}
 	}
 }

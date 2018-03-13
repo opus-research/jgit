@@ -44,16 +44,12 @@
 
 package org.eclipse.jgit.lib;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.List;
 
 import org.eclipse.jgit.lib.ReflogReader.Entry;
 
-public class ReflogReaderTest extends SampleDataRepositoryTestCase {
+public class ReflogReaderTest extends RepositoryTestCase {
 
 	static byte[] oneLine = "da85355dfc525c9f6f3927b876f379f46ccf826e 3e7549db262d1e836d9bf0af7e22355468f1717c A O Thor Too <authortoo@wri.tr> 1243028200 +0200\tcommit: Add a toString for debugging to RemoteRefUpdate\n"
 			.getBytes();
@@ -177,22 +173,4 @@ public class ReflogReaderTest extends SampleDataRepositoryTestCase {
 		assertEquals(0, db.getReflogReader("master").getReverseEntries().size());
 		assertNull(db.getReflogReader("master").getLastEntry());
 	}
-
-	private void setupReflog(String logName, byte[] data)
-			throws FileNotFoundException, IOException {
-				File logfile = new File(db.getDirectory(), logName);
-				if (!logfile.getParentFile().mkdirs()
-						&& !logfile.getParentFile().isDirectory()) {
-					throw new IOException(
-							"oops, cannot create the directory for the test reflog file"
-									+ logfile);
-				}
-				FileOutputStream fileOutputStream = new FileOutputStream(logfile);
-				try {
-					fileOutputStream.write(data);
-				} finally {
-					fileOutputStream.close();
-				}
-			}
-
 }
