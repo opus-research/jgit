@@ -44,12 +44,9 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.test.resources;
+package org.eclipse.jgit.junit;
 
 import java.io.File;
-
-import org.eclipse.jgit.junit.JGitTestUtil;
-import org.eclipse.jgit.junit.RepositoryTestCase;
 
 
 /** Test case which includes C Git generated pack files for testing. */
