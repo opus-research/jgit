@@ -97,7 +97,8 @@ public abstract class Merger {
 	 */
 	protected Merger(final Repository local) {
 		db = local;
-		reader = db.newObjectReader();
+		inserter = db.newObjectInserter();
+		reader = inserter.newReader();
 		walk = new RevWalk(reader);
 	}
 
@@ -108,14 +109,8 @@ public abstract class Merger {
 		return db;
 	}
 
-	/**
-	 * @return an object writer to create objects in {@link #getRepository()}.
-	 *         If no inserter has been set on this instance, one will be created
-	 *         and returned by all future calls.
-	 */
+	/** @return an object writer to create objects in {@link #getRepository()}. */
 	public ObjectInserter getObjectInserter() {
-		if (inserter == null)
-			setObjectInserter(getRepository().newObjectInserter());
 		return inserter;
 	}
 
@@ -131,13 +126,12 @@ public abstract class Merger {
 	 *            repository instance returned by {@link #getRepository()}.
 	 */
 	public void setObjectInserter(ObjectInserter oi) {
-		if (inserter != null)
-			inserter.release();
-		reader.release();
 		walk.release();
+		reader.release();
+		inserter.release();
+		inserter = oi;
 		reader = oi.newReader();
 		walk = new RevWalk(reader);
-		inserter = oi;
 	}
 
 	/**
@@ -160,34 +154,6 @@ public abstract class Merger {
 	 *             be written to the Repository.
 	 */
 	public boolean merge(final AnyObjectId... tips) throws IOException {
-		return merge(true, tips);
-	}
-
-	/**
-	 * Merge together two or more tree-ish objects.
-	 * <p>
-	 * Any tree-ish may be supplied as inputs. Commits and/or tags pointing at
-	 * trees or commits may be passed as input objects.
-	 *
-	 * @param flush
-	 *            whether to flush the underlying object inserter when finished to
-	 *            store any content-merged blobs and virtual merged bases; if
-	 *            false, callers are responsible for flushing.
-	 * @param tips
-	 *            source trees to be combined together. The merge base is not
-	 *            included in this set.
-	 * @return true if the merge was completed without conflicts; false if the
-	 *         merge strategy cannot handle this merge or there were conflicts
-	 *         preventing it from automatically resolving all paths.
-	 * @throws IncorrectObjectTypeException
-	 *             one of the input objects is not a commit, but the strategy
-	 *             requires it to be a commit.
-	 * @throws IOException
-	 *             one or more sources could not be read, or outputs could not
-	 *             be written to the Repository.
-	 */
-	public boolean merge(final boolean flush, final AnyObjectId... tips)
-			throws IOException {
 		sourceObjects = new RevObject[tips.length];
 		for (int i = 0; i < tips.length; i++)
 			sourceObjects[i] = walk.parseAny(tips[i]);
@@ -207,12 +173,11 @@ public abstract class Merger {
 
 		try {
 			boolean ok = mergeImpl();
-			if (ok && inserter != null && flush)
+			if (ok)
 				inserter.flush();
 			return ok;
 		} finally {
-			if (inserter != null && flush)
-				inserter.release();
+			inserter.release();
 			reader.release();
 		}
 	}
@@ -266,9 +231,7 @@ public abstract class Merger {
 			// since the merge already happened, implementations *shouldn't* create
 			// new virtual merges at this point, but the interface of
 			// getBaseCommit(RevCommit, RevCommit) doesn't guarantee this.
-			if (inserter != null) {
-				inserter.flush();
-			}
+			inserter.flush();
 		}
 	}
 
