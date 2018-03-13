@@ -56,6 +56,7 @@ import org.eclipse.jgit.storage.pack.PackWriter;
 public interface UploadPackLogger {
 	/** A simple no-op logger. */
 	public static final UploadPackLogger NULL = new UploadPackLogger() {
+		@Override
 		public void onPackStatistics(PackWriter.Statistics stats) {
 			// Do nothing.
 		}
