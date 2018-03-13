@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2017, David Pursehouse <david.pursehouse@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,64 +41,55 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.pgm.opt;
+package org.eclipse.jgit.transport;
 
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.pgm.CommandCatalog;
-import org.eclipse.jgit.pgm.CommandRef;
-import org.eclipse.jgit.pgm.TextBuiltin;
-import org.eclipse.jgit.pgm.internal.CLIText;
-import org.kohsuke.args4j.CmdLineException;
-import org.kohsuke.args4j.CmdLineParser;
-import org.kohsuke.args4j.OptionDef;
-import org.kohsuke.args4j.spi.OptionHandler;
-import org.kohsuke.args4j.spi.Parameters;
-import org.kohsuke.args4j.spi.Setter;
+import org.eclipse.jgit.lib.Config;
+import org.eclipse.jgit.util.StringUtils;
 
 /**
- * Custom Argument handler for jgit command selection.
- * <p>
- * Translates a single argument string to a {@link TextBuiltin} instance which
- * we can execute at runtime with the remaining arguments of the parser.
+ * Push section of a Git configuration file.
+ *
+ * @since 4.9
  */
-public class SubcommandHandler extends OptionHandler<TextBuiltin> {
-	private final org.eclipse.jgit.pgm.opt.CmdLineParser clp;
-
+public class PushConfig {
 	/**
-	 * Create a new handler for the command name.
-	 * <p>
-	 * This constructor is used only by args4j.
-	 *
-	 * @param parser
-	 * @param option
-	 * @param setter
+	 * Config values for push.recurseSubmodules.
 	 */
-	public SubcommandHandler(final CmdLineParser parser,
-			final OptionDef option, final Setter<? super TextBuiltin> setter) {
-		super(parser, option, setter);
-		clp = (org.eclipse.jgit.pgm.opt.CmdLineParser) parser;
-	}
+	public enum PushRecurseSubmodulesMode implements Config.ConfigEnum {
+		/**
+		 * Verify that all submodule commits that changed in the revisions to be
+		 * pushed are available on at least one remote of the submodule.
+		 */
+		CHECK("check"), //$NON-NLS-1$
 
-	@Override
-	public int parseArguments(final Parameters params) throws CmdLineException {
-		final String name = params.getParameter(0);
-		final CommandRef cr = CommandCatalog.get(name);
-		if (cr == null)
-			throw new CmdLineException(clp, MessageFormat.format(
-					CLIText.get().notAJgitCommand, name));
+		/**
+		 * All submodules that changed in the revisions to be pushed will be
+		 * pushed.
+		 */
+		ON_DEMAND("on-demand"), //$NON-NLS-1$
 
-		// Force option parsing to stop. Everything after us should
-		// be arguments known only to this command and must not be
-		// recognized by the current parser.
-		//
-		owner.stopOptionParsing();
-		setter.addValue(cr.create());
-		return 1;
-	}
+		/** Default behavior of ignoring submodules when pushing is retained. */
+		NO("false"); //$NON-NLS-1$
 
-	@Override
-	public String getDefaultMetaVariable() {
-		return CLIText.get().metaVar_command;
+		private final String configValue;
+
+		private PushRecurseSubmodulesMode(String configValue) {
+			this.configValue = configValue;
+		}
+
+		@Override
+		public String toConfigValue() {
+			return configValue;
+		}
+
+		@Override
+		public boolean matchConfigValue(String s) {
+			if (StringUtils.isEmptyOrNull(s)) {
+				return false;
+			}
+			s = s.replace('-', '_');
+			return name().equalsIgnoreCase(s)
+					|| configValue.equalsIgnoreCase(s);
+		}
 	}
 }

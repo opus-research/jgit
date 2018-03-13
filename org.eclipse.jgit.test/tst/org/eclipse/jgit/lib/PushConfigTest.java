@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2017, David Pursehouse <david.pursehouse@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,62 +41,48 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.pgm.opt;
+package org.eclipse.jgit.lib;
 
-import java.io.IOException;
-import java.text.MessageFormat;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.pgm.internal.CLIText;
-import org.kohsuke.args4j.CmdLineException;
-import org.kohsuke.args4j.CmdLineParser;
-import org.kohsuke.args4j.OptionDef;
-import org.kohsuke.args4j.spi.OptionHandler;
-import org.kohsuke.args4j.spi.Parameters;
-import org.kohsuke.args4j.spi.Setter;
+import org.eclipse.jgit.transport.PushConfig.PushRecurseSubmodulesMode;
+import org.junit.Test;
 
-/**
- * Custom argument handler {@link ObjectId} from string values.
- * <p>
- * Assumes the parser has been initialized with a Repository.
- */
-public class ObjectIdHandler extends OptionHandler<ObjectId> {
-	private final org.eclipse.jgit.pgm.opt.CmdLineParser clp;
+public class PushConfigTest {
+	@Test
+	public void pushRecurseSubmoduleMatch() throws Exception {
+		assertTrue(PushRecurseSubmodulesMode.CHECK.matchConfigValue("check"));
+		assertTrue(PushRecurseSubmodulesMode.CHECK.matchConfigValue("CHECK"));
 
-	/**
-	 * Create a new handler for the command name.
-	 * <p>
-	 * This constructor is used only by args4j.
-	 *
-	 * @param parser
-	 * @param option
-	 * @param setter
-	 */
-	public ObjectIdHandler(final CmdLineParser parser, final OptionDef option,
-			final Setter<? super ObjectId> setter) {
-		super(parser, option, setter);
-		clp = (org.eclipse.jgit.pgm.opt.CmdLineParser) parser;
+		assertTrue(PushRecurseSubmodulesMode.ON_DEMAND
+				.matchConfigValue("on-demand"));
+		assertTrue(PushRecurseSubmodulesMode.ON_DEMAND
+				.matchConfigValue("ON-DEMAND"));
+		assertTrue(PushRecurseSubmodulesMode.ON_DEMAND
+				.matchConfigValue("on_demand"));
+		assertTrue(PushRecurseSubmodulesMode.ON_DEMAND
+				.matchConfigValue("ON_DEMAND"));
+
+		assertTrue(PushRecurseSubmodulesMode.NO.matchConfigValue("no"));
+		assertTrue(PushRecurseSubmodulesMode.NO.matchConfigValue("NO"));
+		assertTrue(PushRecurseSubmodulesMode.NO.matchConfigValue("false"));
+		assertTrue(PushRecurseSubmodulesMode.NO.matchConfigValue("FALSE"));
 	}
 
-	@Override
-	public int parseArguments(final Parameters params) throws CmdLineException {
-		final String name = params.getParameter(0);
-		final ObjectId id;
-		try {
-			id = clp.getRepository().resolve(name);
-		} catch (IOException e) {
-			throw new CmdLineException(clp, e.getMessage());
-		}
-		if (id != null) {
-			setter.addValue(id);
-			return 1;
-		}
-
-		throw new CmdLineException(clp, MessageFormat.format(CLIText.get().notAnObject, name));
+	@Test
+	public void pushRecurseSubmoduleNoMatch() throws Exception {
+		assertFalse(PushRecurseSubmodulesMode.NO.matchConfigValue("N"));
+		assertFalse(PushRecurseSubmodulesMode.ON_DEMAND
+				.matchConfigValue("ONDEMAND"));
 	}
 
-	@Override
-	public String getDefaultMetaVariable() {
-		return CLIText.get().metaVar_object;
+	@Test
+	public void pushRecurseSubmoduleToConfigValue() {
+		assertEquals("on-demand",
+				PushRecurseSubmodulesMode.ON_DEMAND.toConfigValue());
+		assertEquals("check", PushRecurseSubmodulesMode.CHECK.toConfigValue());
+		assertEquals("false", PushRecurseSubmodulesMode.NO.toConfigValue());
 	}
 }
