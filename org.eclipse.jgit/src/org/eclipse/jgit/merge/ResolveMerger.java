@@ -571,13 +571,8 @@ public class ResolveMerger extends ThreeWayMerger {
 		final int modeO = tw.getRawMode(T_OURS);
 
 		// Worktree entry has to match ours to be considered clean
-		final boolean isDirty;
-		if (nonTree(modeF))
-			isDirty = workingTreeIterator.isModeDifferent(modeO)
-					|| !tw.idEqual(T_FILE, T_OURS);
-		else
-			isDirty = false;
-
+		final boolean isDirty = nonTree(modeF)
+				&& !(modeO == modeF && tw.idEqual(T_FILE, T_OURS));
 		if (isDirty)
 			failingPaths.put(tw.getPathString(),
 					MergeFailureReason.DIRTY_WORKTREE);
