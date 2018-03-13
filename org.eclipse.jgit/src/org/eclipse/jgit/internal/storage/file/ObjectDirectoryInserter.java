@@ -90,17 +90,9 @@ class ObjectDirectoryInserter extends ObjectInserter {
 	}
 
 	/**
-	 * Insert a loose object into the database. If createDuplicate is true,
-	 * write the loose object even if we already have it in the loose or packed
-	 * ODB.
-	 *
-	 * @param type
-	 * @param data
-	 * @param off
-	 * @param len
-	 * @param createDuplicate
-	 * @return ObjectId
-	 * @throws IOException
+	 * Insert a loose object into the database.  If createDuplicate is
+	 * true, write the loose object even if we already have it in the
+	 * loose or packed ODB.
 	 */
 	private ObjectId insert(
 			int type, byte[] data, int off, int len, boolean createDuplicate)
@@ -121,16 +113,9 @@ class ObjectDirectoryInserter extends ObjectInserter {
 	}
 
 	/**
-	 * Insert a loose object into the database. If createDuplicate is true,
-	 * write the loose object even if we already have it in the loose or packed
-	 * ODB.
-	 *
-	 * @param type
-	 * @param len
-	 * @param is
-	 * @param createDuplicate
-	 * @return ObjectId
-	 * @throws IOException
+	 * Insert a loose object into the database.  If createDuplicate is
+	 * true, write the loose object even if we already have it in the
+	 * loose or packed ODB.
 	 */
 	ObjectId insert(int type, long len, InputStream is, boolean createDuplicate)
 			throws IOException {
