@@ -253,7 +253,7 @@ class SimilarityRenameDetector {
 
 				long max = Math.max(srcSize, dstSize);
 				long min = Math.min(srcSize, dstSize);
-				if (min * 100 / max < renameScore) {
+				if ((max * renameScore) / 100 > min) {
 					// Cannot possibly match, as the file sizes are so different
 					pm.update(1);
 					continue;
