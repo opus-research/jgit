@@ -67,9 +67,6 @@ class Clone extends AbstractFetchCommand {
 	@Option(name = "--no-checkout", aliases = { "-n" }, usage = "usage_noCheckoutAfterClone")
 	private boolean noCheckout;
 
-	@Option(name = "--bare", usage = "usage_bareClone")
-	private boolean isBare;
-
 	@Argument(index = 0, required = true, metaVar = "metaVar_uriish")
 	private String sourceUri;
 
@@ -90,10 +87,12 @@ class Clone extends AbstractFetchCommand {
 		File localNameF;
 		if (localName == null) {
 			try {
+				localName = uri.getHumanishName();
 				localNameF = new File(SystemReader.getInstance().getProperty(
-						Constants.OS_USER_DIR), uri.getHumanishName());
+						Constants.OS_USER_DIR), localName);
 			} catch (IllegalArgumentException e) {
-				throw die(MessageFormat.format(CLIText.get().cannotGuessLocalNameFrom, sourceUri));
+				throw die(MessageFormat.format(
+						CLIText.get().cannotGuessLocalNameFrom, sourceUri));
 			}
 		} else
 			localNameF = new File(localName);
@@ -102,15 +101,14 @@ class Clone extends AbstractFetchCommand {
 			branch = Constants.HEAD;
 
 		CloneCommand command = Git.cloneRepository();
-		command.setURI(sourceUri).setRemote(remoteName).setBare(isBare)
+		command.setURI(sourceUri).setRemote(remoteName)
 				.setNoCheckout(noCheckout).setBranch(branch);
 
 		command.setGitDir(gitdir == null ? null : new File(gitdir));
 		command.setDirectory(localNameF);
+		outw.println(MessageFormat.format(CLIText.get().cloningInto, localName));
 		try {
 			db = command.call().getRepository();
-			outw.println(MessageFormat.format(CLIText.get().cloningInto,
-					command.getDirectory().getPath()));
 			if (db.resolve(Constants.HEAD) == null)
 				outw.println(CLIText.get().clonedEmptyRepository);
 		} catch (InvalidRemoteException e) {
