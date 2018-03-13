@@ -49,6 +49,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -770,13 +771,22 @@ public class TreeWalkAttributeTest extends RepositoryTestCase {
 		assertEquals(pathName, walk.getPathString());
 		assertEquals(type, walk.getFileMode(0));
 
-		assertEquals(checkinAttributes, ci_walk.getAttributes());
-		assertEquals(checkoutAttributes, walk.getAttributes());
+		assertEquals(checkinAttributes,
+				asSet(ci_walk.getAttributes().values()));
+		assertEquals(checkoutAttributes, asSet(walk.getAttributes().values()));
 
 		if (D.equals(type)) {
 			walk.enterSubtree();
 			ci_walk.enterSubtree();
 		}
+	}
+
+	private static Set<Attribute> asSet(Collection<Attribute> attributes) {
+		Set<Attribute> ret = new HashSet<Attribute>();
+		for (Attribute a : attributes) {
+			ret.add(a);
+		}
+		return (ret);
 	}
 
 	private File writeAttributesFile(String name, String... rules)
