@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Christian Halstrick
+ * Copyright (C) 2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,60 +40,54 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.pgm;
 
-import static org.junit.Assert.fail;
+import static org.junit.Assert.assertEquals;
 
-import java.text.ParseException;
-import java.util.Calendar;
-import java.util.GregorianCalendar;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.eclipse.jgit.merge.MergeStrategy;
+import org.junit.Before;
+import org.junit.Test;
 
-import org.junit.experimental.theories.DataPoints;
-import org.junit.experimental.theories.Theories;
-import org.junit.experimental.theories.Theory;
-import org.junit.runner.RunWith;
-
-/**
- * Tests which assert that unparseable Strings lead to ParseExceptions
- */
-@RunWith(Theories.class)
-public class GitDateParserBadlyFormattedTest {
-	private String dateStr;
-
-	public GitDateParserBadlyFormattedTest(String dateStr) {
-		this.dateStr = dateStr;
+public class MergeTest extends CLIRepositoryTestCase {
+	@Override
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		new Git(db).commit().setMessage("initial commit").call();
 	}
 
-	@DataPoints
-	static public String[] getDataPoints() {
-		return new String[] { "", "1970", "3000.3000.3000", "3 yesterday ago",
-				"now yesterday ago", "yesterdays", "3.day. 2.week.ago",
-				"day ago", "Gra Feb 21 15:35:00 2007 +0100",
-				"Sun Feb 21 15:35:00 2007 +0100",
-				"Wed Feb 21 15:35:00 Grand +0100" };
+	@Test
+	public void testMergeSelf() throws Exception {
+		assertEquals("Already up-to-date.", execute("git merge master")[0]);
 	}
 
-	@Theory
-	public void badlyFormattedWithExplicitRef() {
-		Calendar ref = new GregorianCalendar(SystemReader.getInstance()
-				.getTimeZone(), SystemReader.getInstance().getLocale());
-		try {
-			GitDateParser.parse(dateStr, ref);
-			fail("The expected ParseException while parsing '" + dateStr
-					+ "' did not occur.");
-		} catch (ParseException e) {
-			// expected
-		}
+	@Test
+	public void testFastForward() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
+		new Git(db).branchCreate().setName("side").call();
+		writeTrashFile("file", "master");
+		new Git(db).add().addFilepattern("file").call();
+		new Git(db).commit().setMessage("commit").call();
+		new Git(db).checkout().setName("side").call();
+
+		assertEquals("Fast-forward", execute("git merge master")[0]);
 	}
 
-	@Theory
-	public void badlyFormattedWithoutRef() {
-		try {
-			GitDateParser.parse(dateStr, null);
-			fail("The expected ParseException while parsing '" + dateStr
-					+ "' did not occur.");
-		} catch (ParseException e) {
-			// expected
-		}
+	@Test
+	public void testMerge() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
+		new Git(db).branchCreate().setName("side").call();
+		writeTrashFile("master", "content");
+		new Git(db).add().addFilepattern("master").call();
+		new Git(db).commit().setMessage("master commit").call();
+		new Git(db).checkout().setName("side").call();
+		writeTrashFile("side", "content");
+		new Git(db).add().addFilepattern("side").call();
+		new Git(db).commit().setMessage("side commit").call();
+
+		assertEquals("Merge made by the '" + MergeStrategy.RESOLVE.getName()
+				+ "' strategy.", execute("git merge master")[0]);
 	}
 }
