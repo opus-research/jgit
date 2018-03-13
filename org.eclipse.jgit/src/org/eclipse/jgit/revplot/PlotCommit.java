@@ -65,16 +65,19 @@ public class PlotCommit<L extends PlotLane> extends RevCommit {
 
 	PlotCommit[] children;
 
-	Ref[] refs;
+	final Ref[] refs;
 
 	/**
 	 * Create a new commit.
 	 *
 	 * @param id
 	 *            the identity of this commit.
+	 * @param tags
+	 *            the tags associated with this commit, null for no tags
 	 */
-	protected PlotCommit(final AnyObjectId id) {
+	protected PlotCommit(final AnyObjectId id, final Ref[] tags) {
 		super(id);
+		this.refs = tags;
 		passingLanes = NO_LANES;
 		children = NO_CHILDREN;
 	}
