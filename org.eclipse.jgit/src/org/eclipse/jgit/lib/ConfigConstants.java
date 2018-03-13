@@ -291,18 +291,6 @@ public class ConfigConstants {
 	public static final String CONFIG_KEY_PRUNEPACKEXPIRE = "prunepackexpire";
 
 	/**
-	 * The "logexpiry" key
-	 * @since 4.7
-	 */
-	public static final String CONFIG_KEY_LOGEXPIRY = "logExpiry";
-
-	/**
-	 * The "autodetach" key
-	 * @since 4.7
-	 */
-	public static final String CONFIG_KEY_AUTODETACH = "autoDetach";
-
-	/**
 	 * The "aggressiveDepth" key
 	 * @since 3.6
 	 */
@@ -386,4 +374,16 @@ public class ConfigConstants {
 	 * @since 4.6
 	 */
 	public static final String CONFIG_KEY_USEJGITBUILTIN = "useJGitBuiltin";
+
+	/**
+	 * The "fetchRecurseSubmodules" key
+	 * @since 4.7
+	 */
+	public static final String CONFIG_KEY_FETCH_RECURSE_SUBMODULES = "fetchRecurseSubmodules";
+
+	/**
+	 * The "recurseSubmodules" key
+	 * @since 4.7
+	 */
+	public static final String CONFIG_KEY_RECURSE_SUBMODULES = "recurseSubmodules";
 }
