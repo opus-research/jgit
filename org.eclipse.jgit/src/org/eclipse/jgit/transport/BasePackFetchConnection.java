@@ -45,8 +45,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -54,7 +52,6 @@ import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
-import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.jgit.errors.PackProtocolException;
@@ -66,7 +63,6 @@ import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
-import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ProgressMonitor;
@@ -185,13 +181,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	 */
 	public static final String OPTION_NO_DONE = "no-done"; //$NON-NLS-1$
 
-	/**
-	 * The client supports fetching objects at the tip of any ref, even if not
-	 * advertised.
-	 * @since 3.1
-	 */
-	public static final String OPTION_ALLOW_TIP_SHA1_IN_WANT = "allow-tip-sha1-in-want"; //$NON-NLS-1$
-
 	static enum MultiAck {
 		OFF, CONTINUE, DETAILED;
 	}
@@ -225,8 +214,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 	private boolean noDone;
 
-	private boolean noProgress;
-
 	private String lockMessage;
 
 	private PackLock packLock;
@@ -245,33 +232,21 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	public BasePackFetchConnection(final PackTransport packTransport) {
 		super(packTransport);
 
-		if (local != null) {
-			final FetchConfig cfg = local.getConfig().get(FetchConfig.KEY);
-			allowOfsDelta = cfg.allowOfsDelta;
-		} else {
-			allowOfsDelta = true;
-		}
+		final FetchConfig cfg = local.getConfig().get(FetchConfig.KEY);
 		includeTags = transport.getTagOpt() != TagOpt.NO_TAGS;
 		thinPack = transport.isFetchThin();
+		allowOfsDelta = cfg.allowOfsDelta;
 
-		if (local != null) {
-			walk = new RevWalk(local);
-			reachableCommits = new RevCommitList<RevCommit>();
-			REACHABLE = walk.newFlag("REACHABLE"); //$NON-NLS-1$
-			COMMON = walk.newFlag("COMMON"); //$NON-NLS-1$
-			STATE = walk.newFlag("STATE"); //$NON-NLS-1$
-			ADVERTISED = walk.newFlag("ADVERTISED"); //$NON-NLS-1$
+		walk = new RevWalk(local);
+		reachableCommits = new RevCommitList<RevCommit>();
+		REACHABLE = walk.newFlag("REACHABLE"); //$NON-NLS-1$
+		COMMON = walk.newFlag("COMMON"); //$NON-NLS-1$
+		STATE = walk.newFlag("STATE"); //$NON-NLS-1$
+		ADVERTISED = walk.newFlag("ADVERTISED"); //$NON-NLS-1$
 
-			walk.carry(COMMON);
-			walk.carry(REACHABLE);
-			walk.carry(ADVERTISED);
-		} else {
-			walk = null;
-			REACHABLE = null;
-			COMMON = null;
-			STATE = null;
-			ADVERTISED = null;
-		}
+		walk.carry(COMMON);
+		walk.carry(REACHABLE);
+		walk.carry(ADVERTISED);
 	}
 
 	private static class FetchConfig {
@@ -326,9 +301,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	 * Execute common ancestor negotiation and fetch the objects.
 	 *
 	 * @param monitor
-	 *            progress monitor to receive status updates. If the monitor is
-	 *            the {@link NullProgressMonitor#INSTANCE}, then the no-progress
-	 *            option enabled.
+	 *            progress monitor to receive status updates.
 	 * @param want
 	 *            the advertised remote references the caller wants to fetch.
 	 * @param have
@@ -345,8 +318,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 			final Collection<Ref> want, final Set<ObjectId> have,
 			OutputStream outputStream) throws TransportException {
 		try {
-			noProgress = monitor == NullProgressMonitor.INSTANCE;
-
 			markRefsAdvertised();
 			markReachable(have, maxTimeWanted(want));
 
@@ -379,8 +350,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 	@Override
 	public void close() {
-		if (walk != null)
-			walk.release();
+		walk.release();
 		super.close();
 	}
 
@@ -403,8 +373,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 	private void markReachable(final Set<ObjectId> have, final int maxTime)
 			throws IOException {
-		Map<String, Ref> refs = local.getRefDatabase().getRefs(ALL);
-		for (final Ref r : refs.values()) {
+		for (final Ref r : local.getAllRefs().values()) {
 			ObjectId id = r.getPeeledObjectId();
 			if (id == null)
 				id = r.getObjectId();
@@ -491,8 +460,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 	private String enableCapabilities() throws TransportException {
 		final StringBuilder line = new StringBuilder();
-		if (noProgress)
-			wantCapability(line, OPTION_NO_PROGRESS);
 		if (includeTags)
 			includeTags = wantCapability(line, OPTION_INCLUDE_TAG);
 		if (allowOfsDelta)
