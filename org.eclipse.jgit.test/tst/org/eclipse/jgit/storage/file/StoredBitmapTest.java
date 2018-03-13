@@ -43,79 +43,52 @@
 
 package org.eclipse.jgit.storage.file;
 
+import static org.junit.Assert.*;
 import javaewah.EWAHCompressedBitmap;
+import javaewah.IntIterator;
 
-import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.ObjectIdOwnerMap;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.storage.file.BasePackBitmapIndex.StoredBitmap;
+import org.junit.Test;
 
-/**
- * Base implementation of the PackBitmapIndex.
- */
-abstract class BasePackBitmapIndex extends PackBitmapIndex {
-	private final ObjectIdOwnerMap<StoredBitmap> bitmaps;
+public class StoredBitmapTest {
 
-	BasePackBitmapIndex(ObjectIdOwnerMap<StoredBitmap> bitmaps) {
-		this.bitmaps = bitmaps;
+	@Test
+	public void testGetBitmapWithoutXor() {
+		EWAHCompressedBitmap b = bitmapOf(100);
+		StoredBitmap sb = newStoredBitmap(bitmapOf(100));
+		assertEquals(b, sb.getBitmap());
 	}
 
-	public EWAHCompressedBitmap getBitmap(AnyObjectId objectId) {
-		StoredBitmap sb = bitmaps.get(objectId);
-		return sb != null ? sb.getBitmap() : null;
+	@Test
+	public void testGetBitmapWithOneXor() {
+		StoredBitmap sb = newStoredBitmap(bitmapOf(100), bitmapOf(100, 101));
+		assertEquals(bitmapOf(101), sb.getBitmap());
 	}
 
-	ObjectIdOwnerMap<StoredBitmap> getBitmaps() {
-		return bitmaps;
+	@Test
+	public void testGetBitmapWithThreeXor() {
+		StoredBitmap sb = newStoredBitmap(
+				bitmapOf(100),
+				bitmapOf(90, 101),
+				bitmapOf(100, 101),
+				bitmapOf(50));
+		assertEquals(bitmapOf(50, 90), sb.getBitmap());
+		assertEquals(bitmapOf(50, 90), sb.getBitmap());
 	}
 
-	/**
-	 * Data representation of the bitmap entry restored from a pack index. The
-	 * commit of the bitmap is the map key.
-	 */
-	static final class StoredBitmap extends ObjectIdOwnerMap.Entry {
-		private volatile Object bitmapContainer;
-
-		StoredBitmap(AnyObjectId objectId, EWAHCompressedBitmap bitmap,
-				StoredBitmap xorBitmap) {
-			super(objectId);
-			this.bitmapContainer = xorBitmap == null
-					? bitmap
-					: new XorCompressedBitmap(bitmap, xorBitmap);
-		}
-
-		/**
-		 * Computes and returns the full bitmap.
-		 *
-		 * @return the full bitmap
-		 */
-		EWAHCompressedBitmap getBitmap() {
-			// Fast path to immediately return the expanded result.
-			Object r = bitmapContainer;
-			if (r instanceof EWAHCompressedBitmap)
-				return (EWAHCompressedBitmap) r;
-
-			// Expand the bitmap and cache the result.
-			XorCompressedBitmap xb = (XorCompressedBitmap) r;
-			EWAHCompressedBitmap out = xb.bitmap;
-			for (;;) {
-				r = xb.xorBitmap.bitmapContainer;
-				if (r instanceof EWAHCompressedBitmap) {
-					out = out.xor((EWAHCompressedBitmap) r);
-					bitmapContainer = out;
-					return out;
-				}
-				xb = (XorCompressedBitmap) r;
-				out = out.xor(xb.bitmap);
-			}
-		}
+	private static final StoredBitmap newStoredBitmap(
+			EWAHCompressedBitmap... bitmaps) {
+		StoredBitmap sb = null;
+		for (EWAHCompressedBitmap bitmap : bitmaps)
+			sb = new StoredBitmap(ObjectId.zeroId(), bitmap, sb);
+		return sb;
 	}
 
-	private static final class XorCompressedBitmap {
-		final EWAHCompressedBitmap bitmap;
-		final StoredBitmap xorBitmap;
-
-		XorCompressedBitmap(EWAHCompressedBitmap b, StoredBitmap xb) {
-			bitmap = b;
-			xorBitmap = xb;
-		}
+	private static final EWAHCompressedBitmap bitmapOf(int... bits) {
+		EWAHCompressedBitmap b = new EWAHCompressedBitmap();
+		for (int bit : bits)
+			b.set(bit);
+		return b;
 	}
 }
