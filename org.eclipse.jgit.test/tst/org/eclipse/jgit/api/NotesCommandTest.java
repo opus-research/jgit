@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Leonard Broman <leonard.broman@gmail.com>
+ * Copyright (C) 2011, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,36 +40,61 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.api;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
-import java.nio.charset.Charset;
-import java.nio.charset.UnsupportedCharsetException;
+import java.util.List;
 
+import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.notes.Note;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.junit.Before;
 import org.junit.Test;
 
-public class RawParseUtilsTest {
+public class NotesCommandTest extends RepositoryTestCase {
 
-	@Test
-	public void testParseEncoding_ISO8859_1_encoding() {
-		Charset result = RawParseUtils.parseEncoding("encoding ISO-8859-1\n"
-				.getBytes());
-		assertNotNull(result);
+	private Git git;
+
+	private RevCommit commit1, commit2;
+
+	private static final String FILE = "test.txt";
+
+	@Override
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+
+		git = new Git(db);
+		// commit something
+		writeTrashFile(FILE, "Hello world");
+		git.add().addFilepattern(FILE).call();
+		commit1 = git.commit().setMessage("Initial commit").call();
+		git.rm().addFilepattern(FILE).call();
+		commit2 = git.commit().setMessage("Removed file").call();
+		git.notesAdd().setObjectId(commit1)
+				.setMessage("data").call();
 	}
 
 	@Test
-	public void testParseEncoding_Accept_Latin_One_AsISO8859_1() {
-		Charset result = RawParseUtils.parseEncoding("encoding latin-1\n"
-				.getBytes());
-		assertNotNull(result);
-		assertEquals("ISO-8859-1", result.name());
+	public void testListNotes() throws Exception {
+		List<Note> notes = git.notesList().call();
+		assertTrue(notes.size() == 1);
 	}
 
-	@Test(expected=UnsupportedCharsetException.class)
-	public void testParseEncoding_badEncoding() {
-		RawParseUtils.parseEncoding("encoding xyz\n".getBytes());
+	@Test
+	public void testAddAndRemoveNote() throws Exception {
+		git.notesAdd().setObjectId(commit2).setMessage("data").call();
+		Note note = git.notesShow().setObjectId(commit2).call();
+		String content = new String(db.open(note.getData()).getCachedBytes(),
+				"UTF-8");
+		assertEquals(content, "data");
+
+		git.notesRemove().setObjectId(commit2).call();
+
+		List<Note> notes = git.notesList().call();
+		assertTrue(notes.size() == 1);
 	}
 
 }
