@@ -240,9 +240,8 @@ public class CheckoutCommand extends GitCommand<Ref> {
 					dco.checkout();
 				} catch (org.eclipse.jgit.errors.CheckoutConflictException e) {
 					status = new CheckoutResult(Status.CONFLICTS,
-							new ArrayList<String>(dco.getConflicts().keySet()));
-					throw new CheckoutConflictException(new ArrayList<String>(
-							dco.getConflicts().keySet()), e);
+							dco.getConflicts());
+					throw new CheckoutConflictException(dco.getConflicts(), e);
 				}
 			} finally {
 				dc.unlock();
