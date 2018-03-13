@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2012, Robin Rosenberg <robin.rosenberg@dewire.com>
- * and other copyright owners as documented in the project's IP log.
+ * Copyright (C) 2012, Roberto Tyley <roberto.tyley@gmail.com>
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -41,26 +40,42 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.storage.file;
 
-import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FS.FSFactory;
-import org.eclipse.jgit.util.SystemReader;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
-/**
- * A factory for creating FS instances on Java7
- */
-public class Java7FSFactory extends FSFactory {
-	@Override
-	public FS detect(Boolean cygwinUsed) {
-		if (SystemReader.getInstance().isWindows()) {
-			if (cygwinUsed == null)
-				cygwinUsed = Boolean.valueOf(FS_Win32_Cygwin.isCygwin());
-			if (cygwinUsed.booleanValue())
-				return new FS_Win32_Java7Cygwin();
-			else
-				return new FS_Win32_Java7();
-		} else
-			return new FS_POSIX_Java7();
+import org.eclipse.jgit.junit.RepositoryTestCase;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.ObjectId;
+import org.junit.Test;
+
+public class ObjectDirectoryTest extends RepositoryTestCase {
+
+	@Test
+	public void testConcurrentInsertionOfBlobsToTheSameNewFanOutDirectory()
+			throws Exception {
+		ExecutorService e = Executors.newCachedThreadPool();
+		for (int i=0; i < 100; ++i) {
+			ObjectDirectory db = createBareRepository().getObjectDatabase();
+			for (Future f : e.invokeAll(blobInsertersForTheSameFanOutDir(db))) {
+				f.get();
+			}
+		}
 	}
+
+	private Collection<Callable<ObjectId>> blobInsertersForTheSameFanOutDir(
+			final ObjectDirectory db) {
+		Callable<ObjectId> callable = new Callable<ObjectId>() {
+			public ObjectId call() throws Exception {
+				return db.newInserter().insert(Constants.OBJ_BLOB, new byte[0]);
+			}
+		};
+		return Collections.nCopies(4, callable);
+	}
+
 }
