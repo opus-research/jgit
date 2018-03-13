@@ -125,7 +125,7 @@ The largest block size is `16777215` bytes (15.99 MiB).
 
 ### Header
 
-A 8-byte header appears at the beginning of the file:
+An 8-byte header appears at the beginning of the file:
 
     '\1REF'
     uint8( version_number = 1 )
@@ -145,9 +145,9 @@ A ref block is written as:
 
     'r'
     uint24 ( block_len )
-    ref_record*
-    uint32( restart_offset )*
-    uint16( number_of_restarts )
+    ref_record+
+    uint32( restart_offset )+
+    uint16( restart_count_m1 )
     padding?
 
 Blocks begin with `block_type = 'r'` and a 3-byte `block_len` which
@@ -160,17 +160,21 @@ The 4-byte block header is followed by a variable number of
 `ref_record`, describing reference names and values.  The format
 is described below.
 
-A variable number of 4-byte `restart_offset` values follows the
-records.  Offsets are relative to the start of the block (0 in first
-block to include file header) and refer to the first byte of any
-`ref_record` whose name has not been prefixed compressed.  Readers can
-start linear scans from any of these records.
+A variable number of 4-byte `restart_offset` values follow the
+records.  Offsets are relative to the start of the block and refer to
+the first byte of any `ref_record` whose name has not been prefix
+compressed.  Readers can start linear scans from any of these records.
+Offsets in the first block are relative to the start of the file
+(position 0), and include the file header.  This requires the first
+restart in the first block to be at offset 8.
 
-The 2-byte `number_of_restarts + 1` stores the number of entries in
-the `restart_offset` list.
+The 2-byte `restart_count_m1` stores *one less* than the number of
+entries in the `restart_offset` list.  There is always a restart
+corresponding to the first ref record. Readers are responsible for
+computing `restart_count = restart_count_m1 + 1`.
 
 Readers can use the restart count to binary search between restarts
-before starting a linear scan.  The `number_of_restarts` field must be
+before starting a linear scan.  The `restart_count_m1` field must be
 the last 2 bytes of the block as specified by `block_len` from the
 block header.
 
@@ -188,8 +192,9 @@ A `ref_record` describes a single reference, storing both the name and
 its value(s). Records are formatted as:
 
     varint( prefix_length )
-    varint( (suffix_length << 2) | value_type )
+    varint( suffix_length )
     suffix
+    varint( value_type )
     value?
 
 The `prefix_length` field specifies how many leading bytes of the
@@ -202,12 +207,11 @@ Recovering a reference name from any `ref_record` is a simple concat:
 
     this_name = prior_name[0..prefix_length] + suffix
 
-The second varint carries both `suffix_length` and `value_type`.  The
-`suffix_length` value provides the number of bytes to copy from
+The `suffix_length` value provides the number of bytes to copy from
 `suffix` to complete the reference name.
 
-The `value` immediately follows.  Its format is determined by
-`value_type`, a 2 bit code, one of the following:
+The `value_type` and `value` follows.  Its format is determined by
+`value_type`, one of the following:
 
 - `0x0`: deletion; no value data (see transactions, below)
 - `0x1`: one 20-byte object id; value of the ref
@@ -237,9 +241,9 @@ index block from smaller files saves space.
 Index block format:
 
     uint32( (0x80 << 24) | block_len )
-    index_record*
-    uint32( restart_offset )*
-    uint16( number_of_restarts )
+    index_record+
+    uint32( restart_offset )+
+    uint16( restart_count_m1 )
 
 The index block header starts with the high bit set.  This identifies
 the block as an index block, and not as a ref block, log block or file
@@ -248,13 +252,13 @@ byte order, and allowed to occupy the space normally used by the block
 type in other blocks.  This supports indexes significantly larger than
 the file's `block_size`.
 
-The `restart_offset` and `number_of_restarts` fields are identical in
+The `restart_offset` and `restart_count_m1` fields are identical in
 format, meaning and usage as in ref blocks.
 
 To reduce the number of reads required for random access in very large
 files, the index block may be larger than the other blocks.  However,
 readers must hold the entire index in memory to benefit from this, so
-its a time-space tradeoff in both file size, and reader memory.
+it's a time-space tradeoff in both file size, and reader memory.
 Increasing the block size in the writer decreases the index size.
 
 Unlike ref blocks, the index block is not padded.
@@ -265,13 +269,11 @@ An index record describes the last entry in another block.
 Index records are written as:
 
     varint( prefix_length )
-    varint( (suffix_length << 2) )
+    varint( suffix_length )
     suffix
     varint( block_offset )
 
-Index records use prefix compression exactly like `ref_record`.  The
-`suffix_length` is shifted 2 bits without a `type` to simplify unified
-reader/writer code for both block types.
+Index records use prefix compression exactly like `ref_record`.
 
 Index records store `block_offset` after the suffix, specifying the
 offset in bytes (from the start of the file) of the block that ends
@@ -284,14 +286,19 @@ obtain `ref_index_offset`. If not present, the offset will be 0.
 
 ### Log block format
 
+Unlike ref blocks, log block sizes are variable in size, and do not
+match the `block_size` specified in the file header or footer.
+Writers should choose an appropiate buffer size to prepare a log block
+for deflation, such as `2 * block_size`.
+
 A log block is written as:
 
     'g'
     uint24( block_len )
     zlib_deflate {
-      log_record*
-      int32( restart_offset )*
-      int16( number_of_restarts )
+      log_record+
+      int32( restart_offset )+
+      int16( restart_count_m1 )
     }
 
 Log blocks look similar to ref blocks, except `block_type = 'g'`.
@@ -300,51 +307,59 @@ The 4-block header is followed by the deflated block contents using
 zlib deflate.  The `block_len` in the header is the inflated size
 (including 4-byte block header), and should be used by readers to
 preallocate the inflation output buffer.  Offsets within the block
-(e.g.  `restart_offset`) still include the 4-byte header.  Readers may
+(e.g. `restart_offset`) still include the 4-byte header.  Readers may
 prefer prefixing the inflation output buffer with the 4-byte header.
 
 Within the deflate container, a variable number of `log_record`,
-describing reference changes.  The log record format is described
+describe reference changes.  The log record format is described
 below.  See ref block format (above) for a description of
-`restart_offset` and `number_of_restarts`.
+`restart_offset` and `restart_count_m1`.
 
 Unlike ref blocks, log blocks are written at any alignment, without
 padding.  The first log block immediately follows the end of the last
 ref block, or the ref index.  In very small files the log block may
 appear in the first block.
 
-Readers must keep track of the bytes consumed by the inflater to know
-where the next log block begins.
+Because log blocks have no alignment or padding between blocks,
+readers must keep track of the bytes consumed by the inflater to
+know where the next log block begins.
 
 #### log record
 
 Log record keys are structured as:
 
-    ref_name '\0' reverse_int32( time_sec )
+    ref_name '\0' reverse_int64( time_usec )
 
-where `time_sec` is the update time in seconds since the epoch.  The
-`reverse_int32` function inverses the value so lexographical ordering
-the network byte order time sorts more recent records first:
+where `time_usec` is the update time in microseconds since the epoch.
+The `reverse_int64` function inverses the value so lexographical
+ordering the network byte order time sorts more recent records first:
 
-    reverse_int(int32 t) {
-      return 0xffffffff - t;
+    reverse_int(int64 t) {
+      return 0xffffffffffffffff - t;
     }
+
+The `time_usec` field must be unique within the scope of a `ref_name`.
+Writers working from seconds precision source are recomended to add
+`999999` microseconds to the timestamp, and decrement microseconds
+from older entries within the same second to prevent duplicates.
+Rounding down to seconds on read will restore the original values.
 
 Log records have a similar starting structure to ref and index
 records, utilizing the same prefix compression scheme applied to the
-key described above.  Like in an index record, a log record uses
-`value_type = 0x0`:
+key described above.
 
+```
     varint( prefix_length )
-    varint( (suffix_length << 2) | 0x0 )
+    varint( suffix_length )
     suffix
-    
+
     old_id
     new_id
     sint16( tz_offset )
     varint( name_length  )   name
     varint( email_length )   email
     varint( message_length ) message
+```
 
 The value data following the key suffix is complex:
 
@@ -396,14 +411,16 @@ like the file header, but is extended with additional data.
 
 A 36-byte footer appears at the end:
 
+```
     '\1REF'
     uint8( version_number = 1 )
     uint24( block_size )
-    
+
     uint64( ref_index_offset )
     uint64( log_offset )
     uint64( log_index_offset )
     uint32( CRC-32 of prior )
+```
 
 If a section is missing (e.g. ref index) the corresponding offset
 field (e.g. `ref_index_offset`) will be 0.
@@ -519,57 +536,72 @@ so log records are grouped by reference, and sorted descending by time.
 
 ## Repository format
 
-When reftable is stored in a file-backed Git repository, the stack is
-represented as a series of reftable files in the dedicated
-`$GIT_DIR/reftable/` directory:
+### Version 1
 
-    stack
-    22b9ac56abe0ddc5f23d651fe4ef46343f338d20.ref
-    82f128e165c8afae9894aacf0219bc53a580f2ad.ref
+A repository must set its `$GIT_DIR/config` to configure reftable:
 
-where `.ref` files are named by the SHA-1 hash of the contents of the
-reftable.
+    [core]
+        repositoryformatversion = 1
+    [extensions]
+        reftable = 1
 
-The `stack` file lists the current files, one per line, in order, from
-oldest (base) to newest (most recent):
+### Layout
 
-    $ cat stack
-    82f128e165c8afae9894aacf0219bc53a580f2ad.ref
-    22b9ac56abe0ddc5f23d651fe4ef46343f338d20.ref
+The `$GIT_DIR/refs` path is a file when reftable is configured, not a
+directory.  This prevents loose references from being stored.
 
-Readers must read `stack` to determine which files are relevant right
-now, and search through the stack in reverse order (last reftable is
-examined first).
+A collection of reftable files are stored in the `$GIT_DIR/reftable/`
+directory:
 
-Files not listed in `stack` may be new (and about to be added to the
-stack by the active writer), or ancient and ready to be pruned.
+    1500398516_UF4paF
+    1500398517_bUVgy4
+
+where reftable files are named by a unique name such as produced by
+the function:
+
+    mktemp "${seconds_since_epoch}_XXXXXX"
+
+The stack ordering file is `$GIT_DIR/refs` and lists the current
+files, one per line, in order, from oldest (base) to newest (most
+recent):
+
+    $ cat .git/refs
+    1500398516_UF4paF
+    1500398517_bUVgy4
+
+Readers must read `$GIT_DIR/refs` to determine which files are
+relevant right now, and search through the stack in reverse order
+(last reftable is examined first).
+
+Reftable files not listed in `refs` may be new (and about to be added
+to the stack by the active writer), or ancient and ready to be pruned.
 
 ### Update transactions
 
 Although reftables are immutable, mutations are supported by writing a
 new reftable and atomically appending it to the stack:
 
-1. Read `stack` to determine current reftables.
-2. Prepare new reftable in temp file `.refXXXXXXX`, include log entries.
-3. Rename (2) to `${sha1}.ref`.
-4. Acquire `stack.lock`.
-5. If `stack` differs from (1), verify `${sha1}.ref` does not conflict.
-6. Copy `stack` to `stack.lock`, appending `{$sha1}.ref`.
-6. Rename `stack.lock` to `stack`.
+1. Read `refs` to determine current reftables.
+2. Prepare new reftable `${time}_XXXXXX`, including log entries.
+3. Acquire `refs.lock`.
+4. If `refs` differs from (1), verify file from (2) does not conflict.
+5. Copy `refs` to `refs.lock`, appending file from (2).
+6. Rename `refs.lock` to `refs`.
 
-Because a single `stack.lock` file is used to manage locking, the
+Because a single `refs.lock` file is used to manage locking, the
 repository is single-threaded for writers.  Writers may have to
-busy-spin (with some small backoff) around creating `stack.lock`,
+busy-spin (with some small backoff) around creating `refs.lock`,
 for up to an acceptable wait period, aborting if the repository is too
 busy to mutate.  Application servers wrapped around repositories (e.g.
 Gerrit Code Review) can layer their own in memory thread lock/wait
 queue to improve fairness.
 
-By prepareing the update in steps 1-3 without the lock held,
-concurrent updaters may be able to update unrelated references in a
-safe way, with a minimal critical section.  This requires updaters to
-verify in 5 that the stack has not changed in a meaningful way, and to
-gracefully abort by deleting `${sha1}.ref` if a conflict was detected.
+By preparing the update in steps 1-2 without the lock held, concurrent
+updaters may be able to update unrelated references in a safe way,
+with a minimal critical section.  This requires updaters to verify in
+4 that the stack has not changed in a meaningful way, and to
+gracefully abort by deleting `${time}_XXXXXX` if a conflict is
+detected.
 
 ### Reference deletions
 
@@ -588,20 +620,21 @@ For sake of illustration, assume the stack currently consists of
 reftable files (from oldest to newest): A, B, C, and D. The compactor
 is going to compact B and C, leaving A and D alone.
 
-1.  Obtain lock `stack.lock` and read the `stack` file.
+1.  Obtain lock `refs.lock` and read the `refs` file.
 2.  Obtain locks `B.lock` and `C.lock`.
     Ownership of these locks prevents other processes from trying
-	to compact these files.
-3.  Release `stack.lock`.
-4.  Compact `B` and `C` in temp file `.refXXXXXXX`.
-5.  Reacquire lock `stack.lock`.
+    to compact these files.
+3.  Release `refs.lock`.
+4.  Compact `B` and `C` into a new file `${time}_XXXXXX`, where `${time}`
+    is the latest time prefix, likely from `C`.
+5.  Reacquire lock `refs.lock`.
 6.  Verify that `B` and `C` are still in the stack, in that order. This
     should always be the case, assuming that other processes are adhering
     to the locking protocol.
-7.  Rename `.refXXXXXXX` to `X`.
-8.  Write the new stack to `stack.lock`, replacing `B` and `C` with `X`.
-9.  Atomically rename `stack.lock` to `stack`.
-10. Delete `B` and `C`, perhaps after a short sleep to avoid forcing
+7.  Write the new stack to `refs.lock`, replacing `B` and `C` with the
+    file from (4).
+8.  Rename `refs.lock` to `refs`.
+9.  Delete `B` and `C`, perhaps after a short sleep to avoid forcing
     readers to backtrack.
 
 This strategy permits compactions to proceed independently of updates.

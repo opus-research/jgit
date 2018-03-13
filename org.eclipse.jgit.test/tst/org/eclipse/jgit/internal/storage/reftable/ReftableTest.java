@@ -114,7 +114,7 @@ public class ReftableTest {
 	public void oneIdRef() throws IOException {
 		Ref exp = ref(MASTER, 1);
 		byte[] table = write(exp);
-		assertEquals(8 + 4 + 2 + MASTER.length() + 20 + 6 + 36, table.length);
+		assertEquals(8 + 4 + 2 + MASTER.length() + 1 + 20 + 6 + 36, table.length);
 
 		ReftableReader r = seekToFirstRef(table);
 		assertTrue(r.next());
@@ -127,7 +127,6 @@ public class ReftableTest {
 		assertEquals(exp.getName(), act.getName());
 		assertEquals(exp.getObjectId(), act.getObjectId());
 		assertNull(act.getPeeledObjectId());
-		assertFalse(r.wasDeleted());
 		assertFalse(r.next());
 
 		r = seek(table, MASTER);
@@ -142,7 +141,7 @@ public class ReftableTest {
 	public void oneTagRef() throws IOException {
 		Ref exp = tag(V1_0, 1, 2);
 		byte[] table = write(exp);
-		assertEquals(8 + 4 + 2 + V1_0.length() + 40 + 6 + 36, table.length);
+		assertEquals(8 + 4 + 2 + V1_0.length() + 1 + 40 + 6 + 36, table.length);
 
 		ReftableReader r = seekToFirstRef(table);
 		assertTrue(r.next());
@@ -161,7 +160,7 @@ public class ReftableTest {
 		Ref exp = sym(HEAD, MASTER);
 		byte[] table = write(exp);
 		assertEquals(
-				8 + 4 + 2 + HEAD.length() + 1 + MASTER.length() + 6 + 36,
+				8 + 4 + 2 + HEAD.length() + 2 + MASTER.length() + 6 + 36,
 				table.length);
 
 		ReftableReader r = seekToFirstRef(table);
@@ -180,7 +179,7 @@ public class ReftableTest {
 		String name = "refs/heads/gone";
 		Ref exp = newRef(name);
 		byte[] table = write(exp);
-		assertEquals(8 + 4 + 2 + name.length() + 6 + 36, table.length);
+		assertEquals(8 + 4 + 2 + name.length() + 1 + 6 + 36, table.length);
 
 		ReftableReader r = seekToFirstRef(table);
 		r.setIncludeDeletes(true);
@@ -191,7 +190,6 @@ public class ReftableTest {
 		assertEquals(name, act.getName());
 		assertEquals(NEW, act.getStorage());
 		assertNull(act.getObjectId());
-		assertTrue(r.wasDeleted());
 	}
 
 	@Test
@@ -349,7 +347,7 @@ public class ReftableTest {
 		writer.finish();
 		stats = writer.getStats();
 		byte[] table = buffer.toByteArray();
-		assertEquals(193, table.length);
+		assertEquals(199, table.length);
 
 		ReftableReader r = read(table);
 		r.seekToFirstRef();

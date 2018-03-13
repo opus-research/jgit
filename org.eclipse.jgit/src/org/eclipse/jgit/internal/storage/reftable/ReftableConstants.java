@@ -45,15 +45,20 @@ package org.eclipse.jgit.internal.storage.reftable;
 
 class ReftableConstants {
 	static final byte[] FILE_HEADER_MAGIC = { '\1', 'R', 'E', 'F' };
+	static final byte VERSION_1 = (byte) 1;
 
 	static final int FILE_HEADER_LEN = 8;
 	static final int FILE_FOOTER_LEN = 36;
-	static final byte VERSION_1 = (byte) 1;
 
 	static final byte FILE_BLOCK_TYPE = '\1';
 	static final byte REF_BLOCK_TYPE = 'r';
 	static final byte LOG_BLOCK_TYPE = 'g';
 	static final byte INDEX_BLOCK_TYPE = (byte) 0x80;
+
+	static final int VALUE_NONE = 0x0;
+	static final int VALUE_1ID = 0x1;
+	static final int VALUE_2ID = 0x2;
+	static final int VALUE_SYMREF = 0x3;
 
 	static final int MAX_RESTARTS = 65536;
 
@@ -63,6 +68,10 @@ class ReftableConstants {
 				&& buf[o + 1] == FILE_HEADER_MAGIC[1]
 				&& buf[o + 2] == FILE_HEADER_MAGIC[2]
 				&& buf[o + 3] == FILE_HEADER_MAGIC[3];
+	}
+
+	static long reverseTime(long time) {
+		return 0xffffffffffffffffL - time;
 	}
 
 	private ReftableConstants() {
