@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Tomasz Zarna <Tomasz.Zarna@pl.ibm.com>
+ * Copyright (C) 2011, GitHub Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,56 +40,76 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.revwalk.filter;
+package org.eclipse.jgit.submodule;
 
-import java.io.IOException;
-
-import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.errors.StopWalkException;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.lib.ObjectId;
 
 /**
- * Filter that includes commits after a configured number are skipped.
+ * Status class containing the type, path, and commit id of the submodule.
  */
-public class SkipRevFilter extends RevFilter {
+public class SubmoduleStatus {
 
-	private final int skip;
+	private final SubmoduleStatusType type;
 
-	private int count;
+	private final String path;
+
+	private final ObjectId indexId;
+
+	private final ObjectId headId;
 
 	/**
-	 * Create a new skip filter.
+	 * Create submodule status
 	 *
-	 * @param skip
-	 *            the number of commits to skip
-	 * @return a new filter
+	 * @param type
+	 * @param path
+	 * @param indexId
 	 */
-	public static RevFilter create(int skip) {
-		if (skip < 0)
-			throw new IllegalArgumentException(
-					JGitText.get().skipMustBeNonNegative);
-		return new SkipRevFilter(skip);
+	public SubmoduleStatus(final SubmoduleStatusType type, final String path,
+			final ObjectId indexId) {
+		this(type, path, indexId, null);
 	}
 
-	private SkipRevFilter(int skip) {
-		this.skip = skip;
+	/**
+	 * Create submodule status
+	 *
+	 * @param type
+	 * @param path
+	 * @param indexId
+	 * @param headId
+	 */
+	public SubmoduleStatus(final SubmoduleStatusType type, final String path,
+			final ObjectId indexId, final ObjectId headId) {
+		this.type = type;
+		this.path = path;
+		this.indexId = indexId;
+		this.headId = headId;
 	}
 
-	@Override
-	public boolean include(RevWalk walker, RevCommit cmit)
-			throws StopWalkException, MissingObjectException,
-			IncorrectObjectTypeException, IOException {
-		if (skip > count++)
-			return false;
-		return true;
+	/**
+	 * @return type
+	 */
+	public SubmoduleStatusType getType() {
+		return type;
 	}
 
-	@Override
-	public RevFilter clone() {
-		return new SkipRevFilter(skip);
+	/**
+	 * @return path
+	 */
+	public String getPath() {
+		return path;
 	}
 
+	/**
+	 * @return index object id
+	 */
+	public ObjectId getIndexId() {
+		return indexId;
+	}
+
+	/**
+	 * @return HEAD object id
+	 */
+	public ObjectId getHeadId() {
+		return headId;
+	}
 }

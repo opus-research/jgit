@@ -59,9 +59,7 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.revwalk.filter.AndRevFilter;
 import org.eclipse.jgit.revwalk.filter.MaxCountRevFilter;
-import org.eclipse.jgit.revwalk.filter.SkipRevFilter;
 import org.eclipse.jgit.treewalk.filter.AndTreeFilter;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
@@ -90,8 +88,6 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 
 	private int maxCount = -1;
 
-	private int skip = -1;
-
 	/**
 	 * @param repo
 	 */
@@ -115,12 +111,7 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 		if (pathFilters.size() > 0)
 			walk.setTreeFilter(AndTreeFilter.create(
 					PathFilterGroup.create(pathFilters), TreeFilter.ANY_DIFF));
-		if (skip > -1 && maxCount > -1)
-			walk.setRevFilter(AndRevFilter.create(SkipRevFilter.create(skip),
-					MaxCountRevFilter.create(maxCount)));
-		else if (skip > -1)
-			walk.setRevFilter(SkipRevFilter.create(skip));
-		else if (maxCount > -1)
+		if (maxCount > -1)
 			walk.setRevFilter(MaxCountRevFilter.create(maxCount));
 		if (!startSpecified) {
 			try {
@@ -262,20 +253,7 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	}
 
 	/**
-	 * Skip the number of commits before starting to show the commit output.
-	 *
-	 * @param skip
-	 *            the number of commits to skip
-	 * @return {@code this}
-	 */
-	public LogCommand setSkip(int skip) {
-		checkCallable();
-		this.skip = skip;
-		return this;
-	}
-
-	/**
-	 * Limit the number of commits to output.
+	 * Limit the number of commits to output
 	 *
 	 * @param maxCount
 	 *            the limit

@@ -118,6 +118,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotLock;
 	/***/ public String cannotLockPackIn;
 	/***/ public String cannotMatchOnEmptyString;
+	/***/ public String maxCountMustBeNonNegative;
 	/***/ public String cannotMoveIndexTo;
 	/***/ public String cannotMovePackTo;
 	/***/ public String cannotOpenService;
@@ -331,7 +332,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String lockError;
 	/***/ public String lockOnNotClosed;
 	/***/ public String lockOnNotHeld;
-	/***/ public String maxCountMustBeNonNegative;
 	/***/ public String malformedpersonIdentString;
 	/***/ public String mergeConflictOnNotes;
 	/***/ public String mergeConflictOnNonNoteEntries;
@@ -407,6 +407,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String packingCancelledDuringObjectsWriting;
 	/***/ public String packWriterStatistics;
 	/***/ public String pathIsNotInWorkingDir;
+	/***/ public String pathNotConfigured;
 	/***/ public String peeledLineBeforeRef;
 	/***/ public String peerDidNotSupplyACompleteObjectGraph;
 	/***/ public String prefixRemote;
@@ -473,7 +474,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String signingNotSupportedOnTag;
 	/***/ public String similarityScoreMustBeWithinBounds;
 	/***/ public String sizeExceeds2GB;
-	/***/ public String skipMustBeNonNegative;
 	/***/ public String smartHTTPPushDisabled;
 	/***/ public String sourceDestinationMustMatch;
 	/***/ public String sourceIsNotAWildcard;
@@ -482,6 +482,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String staleRevFlagsOn;
 	/***/ public String startingReadStageWithoutWrittenRequestDataPendingIsNotSupported;
 	/***/ public String statelessRPCRequiresOptionToBeEnabled;
+	/***/ public String submoduleExists;
 	/***/ public String submodulesNotSupported;
 	/***/ public String symlinkCannotBeWrittenAsTheLinkTarget;
 	/***/ public String systemConfigFileInvalid;
@@ -541,6 +542,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unsupportedPackVersion;
 	/***/ public String updatingReferences;
 	/***/ public String updatingRefFailed;
+	/***/ public String uriNotConfigured;
 	/***/ public String uriNotFound;
 	/***/ public String userConfigFileInvalid;
 	/***/ public String walkFailure;
