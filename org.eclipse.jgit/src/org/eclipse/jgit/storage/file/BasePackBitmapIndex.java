@@ -73,15 +73,13 @@ abstract class BasePackBitmapIndex extends PackBitmapIndex {
 	 */
 	static final class StoredBitmap extends ObjectIdOwnerMap.Entry {
 		private volatile Object bitmapContainer;
-		private final int flags;
 
 		StoredBitmap(AnyObjectId objectId, EWAHCompressedBitmap bitmap,
-				StoredBitmap xorBitmap, int flags) {
+				StoredBitmap xorBitmap) {
 			super(objectId);
 			this.bitmapContainer = xorBitmap == null
 					? bitmap
 					: new XorCompressedBitmap(bitmap, xorBitmap);
-			this.flags = flags;
 		}
 
 		/**
@@ -96,23 +94,26 @@ abstract class BasePackBitmapIndex extends PackBitmapIndex {
 				return (EWAHCompressedBitmap) r;
 
 			// Expand the bitmap and cache the result.
-			XorCompressedBitmap xb = (XorCompressedBitmap) r;
-			EWAHCompressedBitmap out = xb.bitmap;
-			for (;;) {
-				r = xb.xorBitmap.bitmapContainer;
-				if (r instanceof EWAHCompressedBitmap) {
-					out = out.xor((EWAHCompressedBitmap) r);
-					bitmapContainer = out;
-					return out;
-				}
-				xb = (XorCompressedBitmap) r;
-				out = out.xor(xb.bitmap);
-			}
+			EWAHCompressedBitmap out = ((XorCompressedBitmap) r).bitmap;
+			StoredBitmap sb = this;
+			while ((sb = sb.xorBitmap()) != null)
+				out = out.xor(sb.bitmap());
+			bitmapContainer = out;
+			return out;
 		}
 
-		/** @return the flags associated with the bitmap */
-		int getFlags() {
-			return flags;
+		private EWAHCompressedBitmap bitmap() {
+			Object r = bitmapContainer;
+			if (r instanceof EWAHCompressedBitmap)
+				return (EWAHCompressedBitmap) r;
+			return ((XorCompressedBitmap) r).bitmap;
+		}
+
+		private StoredBitmap xorBitmap() {
+			Object r = bitmapContainer;
+			if (r instanceof EWAHCompressedBitmap)
+				return null;
+			return ((XorCompressedBitmap) r).xorBitmap;
 		}
 	}
 
