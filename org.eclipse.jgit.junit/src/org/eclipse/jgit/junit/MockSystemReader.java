@@ -70,13 +70,7 @@ public class MockSystemReader extends SystemReader {
 			@Override
 			public void load() throws IOException, ConfigInvalidException {
 				// Do nothing
-			}
-
-			@Override
-			public boolean isOutdated() {
-				return false;
-			}
-		};
+			}};
 	}
 
 	private void init(final String n) {
