@@ -79,7 +79,6 @@ public class ConfigConstants {
 
 	/**
 	 * The "rebase" section
-	 *
 	 * @since 3.2
 	 */
 	public static final String CONFIG_REBASE_SECTION = "rebase";
@@ -92,14 +91,12 @@ public class ConfigConstants {
 
 	/**
 	 * The "fetch" section
-	 *
 	 * @since 3.3
 	 */
 	public static final String CONFIG_FETCH_SECTION = "fetch";
 
 	/**
 	 * The "pull" section
-	 *
 	 * @since 3.5
 	 */
 	public static final String CONFIG_PULL_SECTION = "pull";
@@ -115,13 +112,6 @@ public class ConfigConstants {
 
 	/** The "excludesfile" key */
 	public static final String CONFIG_KEY_EXCLUDESFILE = "excludesfile";
-
-	/**
-	 * The "attributesfile" key
-	 *
-	 * @since 3.6
-	 */
-	public static final String CONFIG_KEY_ATTRIBUTESFILE = "attributesfile";
 
 	/** The "filemode" key */
 	public static final String CONFIG_KEY_FILEMODE = "filemode";
@@ -146,7 +136,6 @@ public class ConfigConstants {
 
 	/**
 	 * The "symlinks" key
-	 *
 	 * @since 3.3
 	 */
 	public static final String CONFIG_KEY_SYMLINKS = "symlinks";
@@ -174,7 +163,6 @@ public class ConfigConstants {
 
 	/**
 	 * The "autostash" key
-	 *
 	 * @since 3.2
 	 */
 	public static final String CONFIG_KEY_AUTOSTASH = "autostash";
@@ -215,6 +203,12 @@ public class ConfigConstants {
 	/** The "update" key */
 	public static final String CONFIG_KEY_UPDATE = "update";
 
+	/**
+	 * The "ignore" key
+	 * @since 3.6
+	 */
+	public static final String CONFIG_KEY_IGNORE = "ignore";
+
 	/** The "compression" key */
 	public static final String CONFIG_KEY_COMPRESSION = "compression";
 
@@ -235,14 +229,12 @@ public class ConfigConstants {
 
 	/**
 	 * The "aggressiveDepth" key
-	 *
 	 * @since 3.6
 	 */
 	public static final String CONFIG_KEY_AGGRESSIVE_DEPTH = "aggressiveDepth";
 
 	/**
 	 * The "aggressiveWindow" key
-	 *
 	 * @since 3.6
 	 */
 	public static final String CONFIG_KEY_AGGRESSIVE_WINDOW = "aggressiveWindow";
@@ -260,38 +252,43 @@ public class ConfigConstants {
 	public static final String CONFIG_KEY_CHECKSTAT = "checkstat";
 
 	/**
-         * The "renamelimit" key in the "diff section"
-         * @since 3.0
-         */
+	 * The "renamelimit" key in the "diff section"
+	 * @since 3.0
+	 */
 	public static final String CONFIG_KEY_RENAMELIMIT = "renamelimit";
 
 	/**
-         * The "noprefix" key in the "diff section"
-         * @since 3.0
-         */
+	 * The "trustfolderstat" key in the "core section"
+	 * @since 3.6
+	 */
+	public static final String CONFIG_KEY_TRUSTFOLDERSTAT = "trustfolderstat";
+
+	/**
+	 * The "noprefix" key in the "diff section"
+	 * @since 3.0
+	 */
 	public static final String CONFIG_KEY_NOPREFIX = "noprefix";
 
 	/**
-         * A "renamelimit" value in the "diff section"
-         * @since 3.0
-         */
+	 * A "renamelimit" value in the "diff section"
+	 * @since 3.0
+	 */
 	public static final String CONFIG_RENAMELIMIT_COPY = "copy";
 
 	/**
-         * A "renamelimit" value in the "diff section"
-         * @since 3.0
-         */
+	 * A "renamelimit" value in the "diff section"
+	 * @since 3.0
+	 */
 	public static final String CONFIG_RENAMELIMIT_COPIES = "copies";
 
 	/**
-         * The "renames" key in the "diff section"
-         * @since 3.0
-         */
+	 * The "renames" key in the "diff section"
+	 * @since 3.0
+	 */
 	public static final String CONFIG_KEY_RENAMES = "renames";
 
 	/**
 	 * The "prune" key
-	 *
 	 * @since 3.3
 	 */
 	public static final String CONFIG_KEY_PRUNE = "prune";

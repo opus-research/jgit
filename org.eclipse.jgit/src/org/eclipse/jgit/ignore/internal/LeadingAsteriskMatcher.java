@@ -43,38 +43,41 @@
 package org.eclipse.jgit.ignore.internal;
 
 /**
- * Generic string matcher
+ * Matcher for simple regex patterns starting with an asterisk, e.g. "*.tmp"
  *
  * @since 3.6
  */
-public interface IMatcher {
+public class LeadingAsteriskMatcher extends NameMatcher {
 
-	/**
-	 * Matches entire given string
-	 *
-	 * @param path
-	 *            string which is not null, but might be empty
-	 * @param assumeDirectory
-	 *            true to assume this path as directory (even if it doesn't end
-	 *            with a slash)
-	 * @return true if this matcher pattern matches given string
-	 */
-	boolean matches(String path, boolean assumeDirectory);
+	LeadingAsteriskMatcher(String pattern, Character pathSeparator, boolean dirOnly) {
+		super(pattern, pathSeparator, dirOnly);
 
-	/**
-	 * Matches only part of given string
-	 *
-	 * @param segment
-	 *            string which is not null, but might be empty
-	 * @param startIncl
-	 *            start index, inclusive
-	 * @param endExcl
-	 *            end index, exclusive
-	 * @param assumeDirectory
-	 *            true to assume this path as directory (even if it doesn't end
-	 *            with a slash)
-	 * @return true if this matcher pattern matches given string
-	 */
-	boolean matches(String segment, int startIncl, int endExcl,
-			boolean assumeDirectory);
+		if (subPattern.charAt(0) != '*')
+			throw new IllegalArgumentException(
+					"Pattern must have leading asterisk: " + pattern); //$NON-NLS-1$
+	}
+
+	public boolean matches(String segment, int startIncl, int endExcl,
+			boolean assumeDirectory) {
+		// faster local access, same as in string.indexOf()
+		String s = subPattern;
+
+		// we don't need to count '*' character itself
+		int subLength = s.length() - 1;
+		// simple /*/ pattern
+		if (subLength == 0)
+			return true;
+
+		if (subLength > (endExcl - startIncl))
+			return false;
+
+		for (int i = subLength, j = endExcl - 1; i > 0; i--, j--) {
+			char c1 = s.charAt(i);
+			char c2 = segment.charAt(j);
+			if (c1 != c2)
+				return false;
+		}
+		return true;
+	}
+
 }

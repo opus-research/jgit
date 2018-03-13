@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
- * Copyright (C) 2013, Gunnar Wagenknecht
+ * Copyright (C) 2014, Andrey Loskutov <loskutov@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,38 +40,43 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.attributes;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-
-import org.eclipse.jgit.attributes.Attribute.State;
-import org.junit.Test;
-
+package org.eclipse.jgit.ignore.internal;
 
 /**
- * Tests {@link Attribute}
+ * Matcher for simple patterns ending with an asterisk, e.g. "Makefile.*"
+ *
+ * @since 3.6
  */
-public class AttributeTest {
+public class TrailingAsteriskMatcher extends NameMatcher {
 
-	@Test
-	public void testBasic() {
-		Attribute a = new Attribute("delta", State.SET);
-		assertEquals(a.getKey(), "delta");
-		assertEquals(a.getState(), State.SET);
-		assertNull(a.getValue());
-		assertEquals(a.toString(), "delta");
+	TrailingAsteriskMatcher(String pattern, Character pathSeparator, boolean dirOnly) {
+		super(pattern, pathSeparator, dirOnly);
 
-		a = new Attribute("delta", State.UNSET);
-		assertEquals(a.getKey(), "delta");
-		assertEquals(a.getState(), State.UNSET);
-		assertNull(a.getValue());
-		assertEquals(a.toString(), "-delta");
-
-		a = new Attribute("delta", "value");
-		assertEquals(a.getKey(), "delta");
-		assertEquals(a.getState(), State.CUSTOM);
-		assertEquals(a.getValue(), "value");
-		assertEquals(a.toString(), "delta=value");
+		if (subPattern.charAt(subPattern.length() - 1) != '*')
+			throw new IllegalArgumentException(
+					"Pattern must have trailing asterisk: " + pattern); //$NON-NLS-1$
 	}
+
+	public boolean matches(String segment, int startIncl, int endExcl,
+			boolean assumeDirectory) {
+		// faster local access, same as in string.indexOf()
+		String s = subPattern;
+		// we don't need to count '*' character itself
+		int subLenth = s.length() - 1;
+		// simple /*/ pattern
+		if (subLenth == 0)
+			return true;
+
+		if (subLenth > (endExcl - startIncl))
+			return false;
+
+		for (int i = 0; i < subLenth; i++) {
+			char c1 = s.charAt(i);
+			char c2 = segment.charAt(i + startIncl);
+			if (c1 != c2)
+				return false;
+		}
+		return true;
+	}
+
 }
