@@ -60,7 +60,7 @@
 
   <properties>
     <tycho-version>0.12.0</tycho-version>
-    <eclipse-site>http://download.eclipse.org/releases/indigo</eclipse-site>
+    <eclipse-site>http://download.eclipse.org/releases/galileo</eclipse-site>
   </properties>
 
   <modules>
@@ -72,7 +72,7 @@
 
   <repositories>
     <repository>
-      <id>indigo</id>
+      <id>ganymede</id>
       <layout>p2</layout>
       <url>${eclipse-site}</url>
     </repository>
@@ -150,11 +150,6 @@
                 <os>win32</os>
                 <ws>win32</ws>
                 <arch>x86_64</arch>
-              </environment>
-              <environment>
-                <os>macosx</os>
-                <ws>cocoa</ws>
-                <arch>x86</arch>
               </environment>
               <environment>
                 <os>macosx</os>
