@@ -50,11 +50,9 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.BitmapIndex;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.BitmapIndex.Bitmap;
 import org.eclipse.jgit.lib.BitmapIndex.BitmapBuilder;
-import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevFlag;
@@ -69,13 +67,9 @@ final class PackWriterBitmapWalker {
 
 	private final BitmapIndex bitmapIndex;
 
-	private final ProgressMonitor pm;
-
-	PackWriterBitmapWalker(
-			ObjectWalk walker, BitmapIndex bitmapIndex, ProgressMonitor pm) {
+	PackWriterBitmapWalker(ObjectWalk walker, BitmapIndex bitmapIndex) {
 		this.walker = walker;
 		this.bitmapIndex = bitmapIndex;
-		this.pm = (pm == null) ? NullProgressMonitor.INSTANCE : pm;
 	}
 
 	BitmapBuilder findObjects(Set<? extends ObjectId> start, BitmapBuilder seen)
@@ -103,14 +97,11 @@ final class PackWriterBitmapWalker {
 			while (walker.next() != null) {
 				// Iterate through all of the commits. The BitmapRevFilter does
 				// the work.
-				pm.update(1);
 			}
 
 			RevObject ro;
-			while ((ro = walker.nextObject()) != null) {
+			while ((ro = walker.nextObject()) != null)
 				bitmapResult.add(ro, ro.getType());
-				pm.update(1);
-			}
 		}
 
 		return bitmapResult;

@@ -43,16 +43,8 @@
 
 package org.eclipse.jgit.storage.file;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.text.MessageFormat;
-
 import javaewah.EWAHCompressedBitmap;
 
-import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 
@@ -68,80 +60,6 @@ import org.eclipse.jgit.lib.ObjectId;
  * compatible with the encoded bitmaps available from the index.
  */
 public abstract class PackBitmapIndex {
-	/** Flag bit denoting the bitmap should be reused during index creation. */
-	public static final int FLAG_REUSE = 1;
-
-	/**
-	 * Read an existing pack bitmap index file from a buffered stream.
-	 * <p>
-	 * The format of the file will be automatically detected and a proper access
-	 * implementation for that format will be constructed and returned to the
-	 * caller. The file may or may not be held open by the returned instance.
-	 *
-	 * @param idxFile
-	 *            existing pack .bitmap to read.
-	 * @param packIndex
-	 *            the pack index for the corresponding pack file.
-	 * @param reverseIndex
-	 *            the pack reverse index for the corresponding pack file.
-	 * @return a copy of the index in-memory.
-	 * @throws IOException
-	 *             the stream cannot be read.
-	 * @throws CorruptObjectException
-	 *             the stream does not contain a valid pack bitmap index.
-	 */
-	public static PackBitmapIndex open(
-			File idxFile, PackIndex packIndex, PackReverseIndex reverseIndex)
-			throws IOException {
-		final FileInputStream fd = new FileInputStream(idxFile);
-		try {
-			return read(fd, packIndex, reverseIndex);
-		} catch (IOException ioe) {
-			final String path = idxFile.getAbsolutePath();
-			final IOException err;
-			err = new IOException(MessageFormat.format(
-					JGitText.get().unreadablePackIndex, path));
-			err.initCause(ioe);
-			throw err;
-		} finally {
-			try {
-				fd.close();
-			} catch (IOException err2) {
-				// ignore
-			}
-		}
-	}
-
-	/**
-	 * Read an existing pack bitmap index file from a buffered stream.
-	 * <p>
-	 * The format of the file will be automatically detected and a proper access
-	 * implementation for that format will be constructed and returned to the
-	 * caller. The file may or may not be held open by the returned instance.
-	 *
-	 * @param fd
-	 *            stream to read the bitmap index file from. The stream must be
-	 *            buffered as some small IOs are performed against the stream.
-	 *            The caller is responsible for closing the stream.
-	 * @param packIndex
-	 *            the pack index for the corresponding pack file.
-	 * @param reverseIndex
-	 *            the pack reverse index for the corresponding pack file.
-	 * @return a copy of the index in-memory.
-	 * @throws IOException
-	 *             the stream cannot be read.
-	 * @throws CorruptObjectException
-	 *             the stream does not contain a valid pack bitmap index.
-	 */
-	public static PackBitmapIndex read(
-			InputStream fd, PackIndex packIndex, PackReverseIndex reverseIndex)
-			throws IOException {
-		return new PackBitmapIndexV1(fd, packIndex, reverseIndex);
-	}
-
-	/** Footer checksum applied on the bottom of the pack file. */
-	byte[] packChecksum;
-
 	/**
 	 * Finds the position in the bitmap of the object.
 	 *

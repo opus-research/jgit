@@ -145,7 +145,7 @@ class Branch extends TextBuiltin {
 				else
 					startBranch = Constants.HEAD;
 				Ref startRef = db.getRef(startBranch);
-				ObjectId startAt = db.resolve(startBranch + "^0"); //$NON-NLS-1$
+				ObjectId startAt = db.resolve(startBranch + "^0");
 				if (startRef != null)
 					startBranch = startRef.getName();
 				else
@@ -180,7 +180,7 @@ class Branch extends TextBuiltin {
 		if (head != null) {
 			String current = head.getLeaf().getName();
 			if (current.equals(Constants.HEAD))
-				addRef("(no branch)", head); //$NON-NLS-1$
+				addRef("(no branch)", head);
 			addRefs(refs, Constants.R_HEADS, !remote);
 			addRefs(refs, Constants.R_REMOTES, remote);
 
@@ -220,7 +220,7 @@ class Branch extends TextBuiltin {
 		outw.print(ref);
 		if (verbose) {
 			final int spaces = maxNameLength - ref.length() + 1;
-			outw.format("%" + spaces + "s", ""); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+			outw.format("%" + spaces + "s", "");
 			final ObjectId objectId = refObj.getObjectId();
 			outw.print(reader.abbreviate(objectId).name());
 			outw.print(' ');
