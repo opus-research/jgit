@@ -213,7 +213,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String duplicateRemoteRefUpdateIsIllegal;
 	/***/ public String duplicateStagesNotAllowed;
 	/***/ public String eitherGitDirOrWorkTreeRequired;
-	/***/ public String emptyCommit;
 	/***/ public String emptyPathNotPermitted;
 	/***/ public String encryptionError;
 	/***/ public String endOfFileInEscape;
@@ -268,7 +267,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String hunkDisconnectedFromFile;
 	/***/ public String hunkHeaderDoesNotMatchBodyLineCountOf;
 	/***/ public String illegalArgumentNotA;
-	/***/ public String illegalCombinationOfArguments;
 	/***/ public String illegalStateExists;
 	/***/ public String improperlyPaddedBase64Input;
 	/***/ public String inMemoryBufferLimitExceeded;
