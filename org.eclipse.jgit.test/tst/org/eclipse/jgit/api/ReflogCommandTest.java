@@ -90,8 +90,7 @@ public class ReflogCommandTest extends RepositoryTestCase {
 		assertNotNull(reflog);
 		assertEquals(3, reflog.size());
 		ReflogEntry[] reflogs = reflog.toArray(new ReflogEntry[reflog.size()]);
-		assertEquals(reflogs[2].getComment(),
-				"commit (initial): Initial commit");
+		assertEquals(reflogs[2].getComment(), "commit: Initial commit");
 		assertEquals(reflogs[2].getNewId(), commit1.getId());
 		assertEquals(reflogs[2].getOldId(), ObjectId.zeroId());
 		assertEquals(reflogs[1].getComment(),
@@ -137,8 +136,7 @@ public class ReflogCommandTest extends RepositoryTestCase {
 		assertNotNull(reflog);
 		assertEquals(4, reflog.size());
 		ReflogEntry[] reflogs = reflog.toArray(new ReflogEntry[reflog.size()]);
-		assertEquals(reflogs[3].getComment(),
-				"commit (initial): Initial commit");
+		assertEquals(reflogs[3].getComment(), "commit: Initial commit");
 		assertEquals(reflogs[3].getNewId(), commit1.getId());
 		assertEquals(reflogs[3].getOldId(), ObjectId.zeroId());
 		assertEquals(reflogs[2].getComment(),

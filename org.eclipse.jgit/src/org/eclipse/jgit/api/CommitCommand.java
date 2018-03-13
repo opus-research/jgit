@@ -228,8 +228,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 							ru.setRefLogMessage(reflogComment, false);
 						} else {
 							String prefix = amend ? "commit (amend): " //$NON-NLS-1$
-									: parents.size() == 0 ? "commit (initial): "
-											: "commit: ";
+									: "commit: ";
 							ru.setRefLogMessage(
 									prefix + revCommit.getShortMessage(), false);
 						}
