@@ -3,7 +3,6 @@
  * Copyright (C) 2008-2009, Google Inc.
  * Copyright (C) 2009, Matthias Sohn <matthias.sohn@sap.com>
  * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2009, Sasa Zivkov <sasa.zivkov@sap.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -54,10 +53,9 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.jgit.errors.MissingBundlePrerequisiteException;
@@ -86,7 +84,7 @@ class BundleFetchConnection extends BaseFetchConnection {
 
 	InputStream bin;
 
-	final Map<ObjectId, String> prereqs = new HashMap<ObjectId, String>();
+	final Set<ObjectId> prereqs = new HashSet<ObjectId>();
 
 	private String lockMessage;
 
@@ -131,11 +129,7 @@ class BundleFetchConnection extends BaseFetchConnection {
 				break;
 
 			if (line.charAt(0) == '-') {
-				ObjectId id = ObjectId.fromString(line.substring(1, 41));
-				String shortDesc = null;
-				if (line.length() > 42)
-					shortDesc = line.substring(42);
-				prereqs.put(id, shortDesc);
+				prereqs.add(ObjectId.fromString(line.substring(1, 41)));
 				continue;
 			}
 
@@ -214,10 +208,9 @@ class BundleFetchConnection extends BaseFetchConnection {
 		final RevFlag PREREQ = rw.newFlag("PREREQ");
 		final RevFlag SEEN = rw.newFlag("SEEN");
 
-		final Map<ObjectId, String> missing = new HashMap<ObjectId, String>();
+		final List<ObjectId> missing = new ArrayList<ObjectId>();
 		final List<RevObject> commits = new ArrayList<RevObject>();
-		for (final Map.Entry<ObjectId, String> e : prereqs.entrySet()) {
-			ObjectId p = e.getKey();
+		for (final ObjectId p : prereqs) {
 			try {
 				final RevCommit c = rw.parseCommit(p);
 				if (!c.has(PREREQ)) {
@@ -225,7 +218,7 @@ class BundleFetchConnection extends BaseFetchConnection {
 					commits.add(c);
 				}
 			} catch (MissingObjectException notFound) {
-				missing.put(p, e.getValue());
+				missing.add(p);
 			} catch (IOException err) {
 				throw new TransportException(transport.uri, "Cannot read commit "
 						+ p.name(), err);
@@ -259,7 +252,7 @@ class BundleFetchConnection extends BaseFetchConnection {
 		if (remaining > 0) {
 			for (final RevObject o : commits) {
 				if (!o.has(SEEN))
-					missing.put(o, prereqs.get(o));
+					missing.add(o);
 			}
 			throw new MissingBundlePrerequisiteException(transport.uri, missing);
 		}
