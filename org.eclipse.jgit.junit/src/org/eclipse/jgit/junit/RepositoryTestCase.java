@@ -307,27 +307,26 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 	 */
 	protected void resetIndex(FileTreeIterator treeItr)
 			throws FileNotFoundException, IOException {
-		try (ObjectInserter inserter = db.newObjectInserter()) {
-			DirCacheBuilder builder = db.lockDirCache().builder();
-			DirCacheEntry dce;
+		ObjectInserter inserter = db.newObjectInserter();
+		DirCacheBuilder builder = db.lockDirCache().builder();
+		DirCacheEntry dce;
 
-			while (!treeItr.eof()) {
-				long len = treeItr.getEntryLength();
+		while (!treeItr.eof()) {
+			long len = treeItr.getEntryLength();
 
-				dce = new DirCacheEntry(treeItr.getEntryPathString());
-				dce.setFileMode(treeItr.getEntryFileMode());
-				dce.setLastModified(treeItr.getEntryLastModified());
-				dce.setLength((int) len);
-				FileInputStream in = new FileInputStream(
-						treeItr.getEntryFile());
-				dce.setObjectId(inserter.insert(Constants.OBJ_BLOB, len, in));
-				in.close();
-				builder.add(dce);
-				treeItr.next(1);
-			}
-			builder.commit();
-			inserter.flush();
+			dce = new DirCacheEntry(treeItr.getEntryPathString());
+			dce.setFileMode(treeItr.getEntryFileMode());
+			dce.setLastModified(treeItr.getEntryLastModified());
+			dce.setLength((int) len);
+			FileInputStream in = new FileInputStream(treeItr.getEntryFile());
+			dce.setObjectId(inserter.insert(Constants.OBJ_BLOB, len, in));
+			in.close();
+			builder.add(dce);
+			treeItr.next(1);
 		}
+		builder.commit();
+		inserter.flush();
+		inserter.release();
 	}
 
 	/**
@@ -411,15 +410,14 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 
 	protected void checkoutBranch(String branchName)
 			throws IllegalStateException, IOException {
-		try (RevWalk walk = new RevWalk(db)) {
-			RevCommit head = walk.parseCommit(db.resolve(Constants.HEAD));
-			RevCommit branch = walk.parseCommit(db.resolve(branchName));
-			DirCacheCheckout dco = new DirCacheCheckout(db,
-					head.getTree().getId(), db.lockDirCache(),
-					branch.getTree().getId());
-			dco.setFailOnConflict(true);
-			dco.checkout();
-		}
+		RevWalk walk = new RevWalk(db);
+		RevCommit head = walk.parseCommit(db.resolve(Constants.HEAD));
+		RevCommit branch = walk.parseCommit(db.resolve(branchName));
+		DirCacheCheckout dco = new DirCacheCheckout(db, head.getTree().getId(),
+				db.lockDirCache(), branch.getTree().getId());
+		dco.setFailOnConflict(true);
+		dco.checkout();
+		walk.release();
 		// update the HEAD
 		RefUpdate refUpdate = db.updateRef(Constants.HEAD);
 		refUpdate.setRefLogMessage("checkout: moving to " + branchName, false);

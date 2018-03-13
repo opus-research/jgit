@@ -144,9 +144,10 @@ public class RmCommand extends GitCommand<DirCache> {
 		checkCallable();
 		DirCache dc = null;
 
-		try (final TreeWalk tw = new TreeWalk(repo)) {
+		try {
 			dc = repo.lockDirCache();
 			DirCacheBuilder builder = dc.builder();
+			final TreeWalk tw = new TreeWalk(repo);
 			tw.reset(); // drop the first empty tree, which we do not need here
 			tw.setRecursive(true);
 			tw.setFilter(PathFilterGroup.createFromStrings(filepatterns));

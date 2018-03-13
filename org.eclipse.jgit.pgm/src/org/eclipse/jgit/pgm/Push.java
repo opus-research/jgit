@@ -125,8 +125,11 @@ class Push extends TextBuiltin {
 		push.setTimeout(timeout);
 		Iterable<PushResult> results = push.call();
 		for (PushResult result : results) {
-			try (ObjectReader reader = db.newObjectReader()) {
+			ObjectReader reader = db.newObjectReader();
+			try {
 				printPushResult(reader, result.getURI(), result);
+			} finally {
+				reader.release();
 			}
 		}
 	}
