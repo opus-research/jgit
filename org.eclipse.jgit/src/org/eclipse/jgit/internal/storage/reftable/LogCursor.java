@@ -41,57 +41,32 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.pgm.debug;
+package org.eclipse.jgit.internal.storage.reftable;
 
-import java.io.FileInputStream;
 import java.io.IOException;
 
-import org.eclipse.jgit.internal.storage.io.BlockSource;
-import org.eclipse.jgit.internal.storage.reftable.RefCursor;
-import org.eclipse.jgit.internal.storage.reftable.ReftableReader;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.pgm.Command;
-import org.eclipse.jgit.pgm.TextBuiltin;
-import org.kohsuke.args4j.Argument;
+import org.eclipse.jgit.lib.ReflogEntry;
 
-@Command
-class ReadReftable extends TextBuiltin {
-	@Argument(index = 0)
-	private String input;
+/** Iterator over logs inside a {@link Reftable}. */
+public abstract class LogCursor implements AutoCloseable {
+	/**
+	 * Check if another log record is available.
+	 *
+	 * @return {@code true} if there is another result.
+	 * @throws IOException
+	 *             logs cannot be read.
+	 */
+	public abstract boolean next() throws IOException;
 
-	@Argument(index = 1, required = false)
-	private String ref;
+	/** @return name of the current reference. */
+	public abstract String getRefName();
+
+	/** @return time of reflog entry, microseconds since the epoch. */
+	public abstract long getReflogTimeUsec();
+
+	/** @return current log entry. */
+	public abstract ReflogEntry getReflogEntry();
 
 	@Override
-	protected void run() throws Exception {
-		try (FileInputStream in = new FileInputStream(input);
-				BlockSource src = BlockSource.from(in);
-				ReftableReader reader = new ReftableReader(src)) {
-			try (RefCursor rc = ref != null
-					? reader.seek(ref)
-					: reader.allRefs()) {
-				while (rc.next()) {
-					write(rc.getRef());
-				}
-			}
-		}
-	}
-
-	private void write(Ref r) throws IOException {
-		if (r.isSymbolic()) {
-			outw.println(r.getTarget().getName() + '\t' + r.getName());
-			return;
-		}
-
-		ObjectId id1 = r.getObjectId();
-		if (id1 != null) {
-			outw.println(id1.name() + '\t' + r.getName());
-		}
-
-		ObjectId id2 = r.getPeeledObjectId();
-		if (id2 != null) {
-			outw.println('^' + id2.name());
-		}
-	}
+	public abstract void close();
 }
