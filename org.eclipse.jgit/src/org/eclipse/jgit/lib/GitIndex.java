@@ -567,12 +567,7 @@ public class GitIndex {
 				return true;
 
 			File file = getFile(wd);
-			long length = file.length();
-			if (length == 0) {
-				if (!file.exists())
-					return true;
-			}
-			if (length != size)
+			if (!file.exists())
 				return true;
 
 			// JDK1.6 has file.canExecute
@@ -604,6 +599,9 @@ public class GitIndex {
 					}
 				}
 			}
+
+			if (file.length() != size)
+				return true;
 
 			// Git under windows only stores seconds so we round the timestamp
 			// Java gives us if it looks like the timestamp in index is seconds
