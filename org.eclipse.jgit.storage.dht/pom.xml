@@ -50,7 +50,7 @@
   <parent>
     <groupId>org.eclipse.jgit</groupId>
     <artifactId>org.eclipse.jgit-parent</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.1.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>org.eclipse.jgit.storage.dht</artifactId>
@@ -70,6 +70,12 @@
       <artifactId>org.eclipse.jgit</artifactId>
       <version>${project.version}</version>
     </dependency>
+
+    <dependency>
+      <groupId>org.eclipse.jgit</groupId>
+      <artifactId>org.eclipse.jgit.generated.storage.dht.proto</artifactId>
+      <version>${project.version}</version>
+    </dependency>
   </dependencies>
 
   <build>
@@ -80,6 +86,7 @@
         <directory>.</directory>
         <includes>
           <include>plugin.properties</include>
+          <include>about.html</include>
         </includes>
       </resource>
       <resource>

@@ -54,7 +54,9 @@ import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEntry;
+import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
@@ -62,7 +64,9 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryState;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 
 /**
  * A class used to execute a {@code Reset} command. It has setters for all
@@ -260,19 +264,32 @@ public class ResetCommand extends GitCommand<Ref> {
 			dc = repo.lockDirCache();
 			edit = dc.editor();
 
-			for (String filepath : filepaths) {
-				final TreeWalk tw = TreeWalk.forPath(repo, filepath,
-						commit.getTree());
-				if (tw == null)
+			final TreeWalk tw = new TreeWalk(repo);
+			tw.addTree(new DirCacheIterator(dc));
+			tw.addTree(commit.getTree());
+			tw.setFilter(PathFilterGroup.createFromStrings(filepaths));
+			tw.setRecursive(true);
+
+			while (tw.next()) {
+				final String path = tw.getPathString();
+				// DirCacheIterator dci = tw.getTree(0, DirCacheIterator.class);
+				final CanonicalTreeParser tree = tw.getTree(1,
+						CanonicalTreeParser.class);
+				if (tree == null)
 					// file is not in the commit, remove from index
-					edit.add(new DirCacheEditor.DeletePath(filepath));
-				else {
-					edit.add(new DirCacheEditor.PathEdit(filepath) {
+					edit.add(new DirCacheEditor.DeletePath(path));
+				else { // revert index to commit
+					// it seams that there is concurrent access to tree
+					// variable, therefore we need to keep references to
+					// entryFileMode and entryObjectId in local
+					// variables
+					final FileMode entryFileMode = tree.getEntryFileMode();
+					final ObjectId entryObjectId = tree.getEntryObjectId();
+					edit.add(new DirCacheEditor.PathEdit(path) {
 						@Override
 						public void apply(DirCacheEntry ent) {
-							ent.setFileMode(tw.getFileMode(0));
-							ent.setObjectId(tw.getObjectId(0));
-							// for index & working tree compare
+							ent.setFileMode(entryFileMode);
+							ent.setObjectId(entryObjectId);
 							ent.setLastModified(0);
 						}
 					});
