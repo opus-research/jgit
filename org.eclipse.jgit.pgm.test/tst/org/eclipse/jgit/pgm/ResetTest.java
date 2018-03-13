@@ -65,8 +65,8 @@ public class ResetTest extends CLIRepositoryTestCase {
 	@Test
 	public void testPathOptionHelp() throws Exception {
 		String[] result = execute("git reset -h");
-		assertFalse("Unexpected argument: " + result[0],
-				result[0].endsWith(" [-- path ... ...]"));
+		assertTrue("Unexpected argument: " + result[1],
+				result[1].endsWith("[-- path ... ...]"));
 	}
 
 	@Test
