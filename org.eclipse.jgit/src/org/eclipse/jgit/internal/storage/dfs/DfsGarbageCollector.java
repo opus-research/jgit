@@ -48,7 +48,6 @@ import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.UN
 import static org.eclipse.jgit.internal.storage.pack.PackExt.BITMAP_INDEX;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.INDEX;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.PACK;
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -195,7 +194,7 @@ public class DfsGarbageCollector {
 			refdb.clearCache();
 			objdb.clearCache();
 
-			refsBefore = refdb.getRefs(ALL);
+			refsBefore = repo.getAllRefs();
 			packsBefore = packsToRebuild();
 			if (packsBefore.isEmpty())
 				return true;

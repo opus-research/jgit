@@ -119,10 +119,6 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 		return JGitTestUtil.read(db, name);
 	}
 
-	protected boolean check(final String name) {
-		return JGitTestUtil.check(db, name);
-	}
-
 	protected void deleteTrashFile(final String name) throws IOException {
 		JGitTestUtil.deleteTrashFile(db, name);
 	}
@@ -379,7 +375,7 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 	 */
 	public static long fsTick(File lastFile) throws InterruptedException,
 			IOException {
-		long sleepTime = 64;
+		long sleepTime = 1;
 		FS fs = FS.DETECTED;
 		if (lastFile != null && !fs.exists(lastFile))
 			throw new FileNotFoundException(lastFile.getPath());
@@ -390,9 +386,8 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 			long actTime = fs.lastModified(tmp);
 			while (actTime <= startTime) {
 				Thread.sleep(sleepTime);
-				sleepTime *= 2;
-				FileOutputStream fos = new FileOutputStream(tmp);
-				fos.close();
+				sleepTime *= 5;
+				fs.setLastModified(tmp, System.currentTimeMillis());
 				actTime = fs.lastModified(tmp);
 			}
 			return actTime;
@@ -420,7 +415,6 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 		walk.release();
 		// update the HEAD
 		RefUpdate refUpdate = db.updateRef(Constants.HEAD);
-		refUpdate.setRefLogMessage("checkout: moving to " + branchName, false);
 		refUpdate.link(branchName);
 	}
 
@@ -468,25 +462,16 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 	protected RevCommit commitFile(String filename, String contents, String branch) {
 		try {
 			Git git = new Git(db);
-			Repository repo = git.getRepository();
-			String originalBranch = repo.getFullBranch();
-			boolean empty = repo.resolve(Constants.HEAD) == null;
-			if (!empty) {
-				if (repo.getRef(branch) == null)
-					git.branchCreate().setName(branch).call();
-				git.checkout().setName(branch).call();
-			}
-
+			String originalBranch = git.getRepository().getFullBranch();
+			if (git.getRepository().getRef(branch) == null)
+				git.branchCreate().setName(branch).call();
+			git.checkout().setName(branch).call();
 			writeTrashFile(filename, contents);
 			git.add().addFilepattern(filename).call();
 			RevCommit commit = git.commit()
 					.setMessage(branch + ": " + filename).call();
-
 			if (originalBranch != null)
 				git.checkout().setName(originalBranch).call();
-			else if (empty)
-				git.branchCreate().setName(branch).setStartPoint(commit).call();
-
 			return commit;
 		} catch (IOException e) {
 			throw new RuntimeException(e);
@@ -511,10 +496,5 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 		entry.setObjectId(new ObjectInserter.Formatter().idFor(
 				Constants.OBJ_BLOB, Constants.encode(content)));
 		return entry;
-	}
-
-	public static void assertEqualsFile(File expected, File actual)
-			throws IOException {
-		assertEquals(expected.getCanonicalFile(), actual.getCanonicalFile());
 	}
 }

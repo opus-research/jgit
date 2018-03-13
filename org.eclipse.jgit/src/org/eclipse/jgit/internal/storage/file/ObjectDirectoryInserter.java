@@ -63,7 +63,6 @@ import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
-import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.transport.PackParser;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.IO;
@@ -132,13 +131,8 @@ class ObjectDirectoryInserter extends ObjectInserter {
 	}
 
 	@Override
-	public ObjectReader newReader() {
-		return new WindowCursor(db);
-	}
-
-	@Override
 	public void flush() throws IOException {
-		// Do nothing. Loose objects are immediately visible.
+		// Do nothing. Objects are immediately visible.
 	}
 
 	@Override
@@ -188,7 +182,7 @@ class ObjectDirectoryInserter extends ObjectInserter {
 			return tmp;
 		} finally {
 			if (delete)
-				FileUtils.delete(tmp, FileUtils.RETRY);
+				FileUtils.delete(tmp);
 		}
 	}
 
@@ -217,7 +211,7 @@ class ObjectDirectoryInserter extends ObjectInserter {
 			return tmp;
 		} finally {
 			if (delete)
-				FileUtils.delete(tmp, FileUtils.RETRY);
+				FileUtils.delete(tmp);
 		}
 	}
 
