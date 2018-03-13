@@ -50,9 +50,10 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Subscribes to a single remote Publisher process with multiple repositories.
+ * The state of a SubscribeConnection to a single remote Publisher process with
+ * multiple repositories.
  */
-public class SubscriptionState {
+public class SubscribeState {
 	private final Map<String, SubscribedRepository>
 			repoSubscriptions = new HashMap<String, SubscribedRepository>();
 
