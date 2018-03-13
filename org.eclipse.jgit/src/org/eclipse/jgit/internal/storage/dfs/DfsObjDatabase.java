@@ -68,11 +68,6 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		}
 
 		@Override
-		void clearDirty() {
-			// Always dirty.
-		}
-
-		@Override
 		public void markDirty() {
 			// Always dirty.
 		}
@@ -448,10 +443,8 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 			p.close();
 		if (list.isEmpty())
 			return new PackListImpl(NO_PACKS.packs);
-		if (!foundNew) {
-			old.clearDirty();
+		if (!foundNew)
 			return old;
-		}
 		return new PackListImpl(list.toArray(new DfsPackFile[list.size()]));
 	}
 
@@ -521,7 +514,6 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		}
 
 		abstract boolean dirty();
-		abstract void clearDirty();
 
 		/**
 		 * Mark pack list as dirty.
@@ -543,11 +535,6 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		@Override
 		boolean dirty() {
 			return dirty;
-		}
-
-		@Override
-		void clearDirty() {
-			dirty = false;
 		}
 
 		@Override
