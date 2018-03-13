@@ -45,11 +45,6 @@ package org.eclipse.jgit.util;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.LinkOption;
-import java.nio.file.Path;
-
-import org.eclipse.jgit.util.FS;
 
 /**
  * FS for Java7 on Windows
