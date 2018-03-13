@@ -249,18 +249,17 @@ public class CloneCommandTest extends RepositoryTestCase {
 	@Test
 	public void testBareCloneRepositoryNullRemote() throws Exception {
 		File directory = createTempDirectory("testCloneRemoteNull_bare");
-		try {
-			CloneCommand command = Git.cloneRepository();
-			command.setBare(true);
-			command.setDirectory(directory);
-			command.setRemote(null);
-			command.setURI(fileUri());
-			Git git2 = command.call();
-			addRepoToClose(git2.getRepository());
-			fail("Expected NullPointerException");
-		} catch (NullPointerException e) {
-			// good
-		}
+		CloneCommand command = Git.cloneRepository();
+		command.setBare(true);
+		command.setDirectory(directory);
+		command.setRemote(null);
+		command.setURI(fileUri());
+		Git git2 = command.call();
+		addRepoToClose(git2.getRepository());
+		assertEquals("+refs/heads/*:refs/heads/*", git2.getRepository()
+				.getConfig().getStringList("remote", "origin", "fetch")[0]);
+		assertEquals("origin", git2.getRepository().getConfig()
+				.getString("branch", "test", "remote"));
 	}
 
 	public static RefSpec fetchRefSpec(Repository r) throws URISyntaxException {
@@ -452,6 +451,17 @@ public class CloneCommandTest extends RepositoryTestCase {
 		git.add().addFilepattern(path)
 				.addFilepattern(Constants.DOT_GIT_MODULES).call();
 		git.commit().setMessage("adding submodule").call();
+		try (SubmoduleWalk walk = SubmoduleWalk.forIndex(git.getRepository())) {
+			assertTrue(walk.next());
+			Repository subRepo = walk.getRepository();
+			addRepoToClose(subRepo);
+			assertNotNull(subRepo);
+			assertEquals(
+					new File(git.getRepository().getWorkTree(), walk.getPath()),
+					subRepo.getWorkTree());
+			assertEquals(new File(new File(git.getRepository().getDirectory(),
+					"modules"), walk.getPath()), subRepo.getDirectory());
+		}
 
 		File directory = createTempDirectory("testCloneRepositoryWithSubmodules");
 		CloneCommand clone = Git.cloneRepository();

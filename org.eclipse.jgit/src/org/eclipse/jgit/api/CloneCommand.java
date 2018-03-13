@@ -331,13 +331,11 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 
 	/**
 	 * @param uri
-	 *            the uri to clone from.  Must be non-{@code null}.
+	 *            the URI to clone from, or {@code null} to unset the URI.
+	 *            The URI must be set before {@link #call} is called.
 	 * @return this instance
 	 */
 	public CloneCommand setURI(String uri) {
-		if (uri == null) {
-			throw new NullPointerException();
-		}
 		this.uri = uri;
 		return this;
 	}
@@ -349,7 +347,8 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	 * @see URIish#getHumanishName()
 	 *
 	 * @param directory
-	 *            the directory to clone to
+	 *            the directory to clone to, or {@code null} if the directory
+	 *            name should be taken from the source uri
 	 * @return this instance
 	 * @throws IllegalStateException
 	 *             if the combination of directory, gitDir and bare is illegal.
@@ -365,7 +364,8 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 
 	/**
 	 * @param gitDir
-	 *            the repository meta directory
+	 *            the repository meta directory, or {@code null} to choose one
+	 *            automatically at clone time
 	 * @return this instance
 	 * @throws IllegalStateException
 	 *             if the combination of directory, gitDir and bare is illegal.
@@ -403,12 +403,13 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	 *
 	 * @see Constants#DEFAULT_REMOTE_NAME
 	 * @param remote
-	 *            name that keeps track of the upstream repository
+	 *            name that keeps track of the upstream repository.
+	 *            {@code null} means to use DEFAULT_REMOTE_NAME.
 	 * @return this instance
 	 */
 	public CloneCommand setRemote(String remote) {
 		if (remote == null) {
-			throw new NullPointerException();
+			remote = Constants.DEFAULT_REMOTE_NAME;
 		}
 		this.remote = remote;
 		return this;
@@ -422,9 +423,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	 * @return this instance
 	 */
 	public CloneCommand setBranch(String branch) {
-		if (branch == null) {
-			throw new NullPointerException();
-		}
 		this.branch = branch;
 		return this;
 	}
@@ -439,6 +437,9 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	 * @return {@code this}
 	 */
 	public CloneCommand setProgressMonitor(ProgressMonitor monitor) {
+		if (monitor == null) {
+			monitor = NullProgressMonitor.INSTANCE;
+		}
 		this.monitor = monitor;
 		return this;
 	}
