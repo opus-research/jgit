@@ -54,9 +54,10 @@ import org.eclipse.jgit.errors.CorruptObjectException;
 class DeltaOfsPackedObjectLoader extends DeltaPackedObjectLoader {
 	private final long deltaBase;
 
-	DeltaOfsPackedObjectLoader(final PackFile pr, final long objectOffset,
-			final int headerSz, final int deltaSz, final long base) {
-		super(pr, objectOffset, headerSz, deltaSz);
+	DeltaOfsPackedObjectLoader(final PackFile pr,
+			final long dataOffset, final long objectOffset, final int deltaSz,
+			final long base) {
+		super(pr, dataOffset, objectOffset, deltaSz);
 		deltaBase = base;
 	}
 
