@@ -48,7 +48,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.TreeSet;
 
-import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
@@ -118,7 +117,6 @@ public class RacyGitTests extends RepositoryTestCase {
 
 	public void testRacyGitDetection() throws IOException,
 			IllegalStateException, InterruptedException {
-		DirCache dc;
 		TreeSet<Long> modTimes = new TreeSet<Long>();
 		File lastFile;
 
@@ -138,11 +136,9 @@ public class RacyGitTests extends RepositoryTestCase {
 		addToIndex(modTimes);
 
 		assertEquals(
-				"[[a, modTime(index/file): t0/t0, length(index/file): 1/1," +
-				" mode(index/file): 100644/100644, stage: 0]," +
-				" [b, modTime(index/file): t0/t0, length(index/file): 1/1," +
-				" mode(index/file): 100644/100644, stage: 0]]",
-				indexState(modTimes));
+				"[a, mode:100644, time:t0, length:1, sha1:2e65efe2a145dda7ee51d1741299f848e5bf752e]" +
+				"[b, mode:100644, time:t0, length:1, sha1:63d8dbd40c23542e740659a7168a0ce3138ea748]",
+				indexState(SMUDGE | MOD_TIME | LENGTH | CONTENT_ID));
 
 		// Remember the last modTime of index file. All modifications times of
 		// further modification are translated to this value so it looks that
@@ -156,51 +152,12 @@ public class RacyGitTests extends RepositoryTestCase {
 		// mod time.
 		addToIndex(modTimes);
 
-		dc = db.readDirCache();
-		assertTrue(dc.getEntryCount() == 2);
-		assertTrue(dc.getEntry("a").isSmudged());
-		assertFalse(dc.getEntry("b").isSmudged());
-
+		db.readDirCache();
 		// although racily clean a should not be reported as being dirty
 		assertEquals(
-				"[[a, modTime(index/file): t0/t0, unsmudged," +
-				" length(index/file): 2/2, mode(index/file): 100644/100644," +
-				" stage: 0], [b, modTime(index/file): t1/t1, length(index/file):" +
-				" 1/1, mode(index/file): 100644/100644, stage: 0]]",
-				indexState(modTimes));
-
-	}
-
-	/**
-	 * Waits until it is guaranteed that the filesystem timer (used e.g. for
-	 * lastModified) has a value greater than the lastmodified time of the given
-	 * file. This is done by touch a file, reading the lastmodified and sleeping
-	 * attribute sleeping
-	 *
-	 * @param lastFile
-	 * @return return the last measured value of the filesystem timer which is
-	 *         greater than then the lastmodification time of lastfile.
-	 * @throws InterruptedException
-	 * @throws IOException
-	 */
-	public static long fsTick(File lastFile) throws InterruptedException,
-			IOException {
-		long sleepTime = 1;
-		File tmp = File.createTempFile("FileTreeIteratorWithTimeControl", null);
-		try {
-			long startTime = (lastFile == null) ? tmp.lastModified() : lastFile
-					.lastModified();
-			long actTime = tmp.lastModified();
-			while (actTime <= startTime) {
-				Thread.sleep(sleepTime);
-				sleepTime *= 5;
-				tmp.setLastModified(System.currentTimeMillis());
-				actTime = tmp.lastModified();
-			}
-			return actTime;
-		} finally {
-			tmp.delete();
-		}
+				"[a, mode:100644, time:t1, smudged, length:0]" +
+				"[b, mode:100644, time:t0, length:1]",
+				indexState(SMUDGE|MOD_TIME|LENGTH));
 	}
 
 	private void addToIndex(TreeSet<Long> modTimes)
