@@ -51,7 +51,6 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -86,7 +85,6 @@ import org.eclipse.jgit.storage.pack.ObjectReuseAsIs;
 import org.eclipse.jgit.storage.pack.ObjectToPack;
 import org.eclipse.jgit.storage.pack.PackOutputStream;
 import org.eclipse.jgit.storage.pack.PackWriter;
-import org.eclipse.jgit.treewalk.TreeOptions;
 
 /**
  * ObjectReader implementation for DHT based repositories.
@@ -120,15 +118,13 @@ public class DhtReader extends ObjectReader implements ObjectReuseAsIs {
 
 	private Prefetcher prefetcher;
 
-	private TreeOptions treeOptions;
-
 	DhtReader(DhtObjDatabase objdb) {
 		this.repository = objdb.getRepository();
 		this.repo = objdb.getRepository().getRepositoryKey();
 		this.db = objdb.getDatabase();
 		this.readerOptions = objdb.getReaderOptions();
 		this.inserterOptions = objdb.getInserterOptions();
-		this.treeOptions = new TreeOptions(repository.getConfig());
+
 		this.stats = new Statistics();
 		this.recentInfo = new RecentInfoCache(getOptions());
 		this.recentChunks = new RecentChunks(this);
@@ -698,10 +694,5 @@ public class DhtReader extends ObjectReader implements ObjectReuseAsIs {
 				return b.toString();
 			}
 		}
-	}
-
-	@Override
-	public Charset getPathEncoding() {
-		return treeOptions.getPathEncoding();
 	}
 }

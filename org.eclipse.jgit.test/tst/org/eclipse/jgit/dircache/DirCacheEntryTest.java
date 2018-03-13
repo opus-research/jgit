@@ -49,10 +49,8 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.treewalk.TreeOptions;
 import org.junit.Test;
 
 public class DirCacheEntryTest {
@@ -77,13 +75,11 @@ public class DirCacheEntryTest {
 
 	@Test
 	public void testCreate_ByStringPath() {
-		assertEquals("a", new DirCacheEntry("a", new TreeOptions(
-				new Config())).getPathString());
-		assertEquals("a/b", new DirCacheEntry("a/b", new TreeOptions(
-				new Config())).getPathString());
+		assertEquals("a", new DirCacheEntry("a").getPathString());
+		assertEquals("a/b", new DirCacheEntry("a/b").getPathString());
 
 		try {
-			new DirCacheEntry("/a", new TreeOptions(new Config()));
+			new DirCacheEntry("/a");
 			fail("Incorrectly created DirCacheEntry");
 		} catch (IllegalArgumentException err) {
 			assertEquals("Invalid path: /a", err.getMessage());
@@ -134,8 +130,7 @@ public class DirCacheEntryTest {
 
 	@Test
 	public void testSetFileMode() {
-		final DirCacheEntry e = new DirCacheEntry("a", new TreeOptions(
-				new Config()));
+		final DirCacheEntry e = new DirCacheEntry("a");
 
 		assertEquals(0, e.getRawMode());
 

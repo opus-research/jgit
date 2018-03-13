@@ -51,7 +51,6 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -78,7 +77,6 @@ import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.ReflogReader;
-import org.eclipse.jgit.treewalk.TreeOptions;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
@@ -108,6 +106,8 @@ public abstract class Repository {
 
 	/** File abstraction used to resolve paths. */
 	private final FS fs;
+
+	private GitIndex index;
 
 	private final ListenerList myListeners = new ListenerList();
 
@@ -807,6 +807,27 @@ public abstract class Repository {
 	}
 
 	/**
+	 * @return a representation of the index associated with this
+	 *         {@link Repository}
+	 * @throws IOException
+	 *             if the index can not be read
+	 * @throws NoWorkTreeException
+	 *             if this is bare, which implies it has no working directory.
+	 *             See {@link #isBare()}.
+	 */
+	public GitIndex getIndex() throws IOException, NoWorkTreeException {
+		if (isBare())
+			throw new NoWorkTreeException();
+		if (index == null) {
+			index = new GitIndex(this);
+			index.read();
+		} else {
+			index.rereadIfNecessary();
+		}
+		return index;
+	}
+
+	/**
 	 * @return the index file location
 	 * @throws NoWorkTreeException
 	 *             if this is bare, which implies it has no working directory.
@@ -838,8 +859,7 @@ public abstract class Repository {
 	 */
 	public DirCache readDirCache() throws NoWorkTreeException,
 			CorruptObjectException, IOException {
-		return DirCache.read(getIndexFile(), getFS(), new TreeOptions(
-				getConfig()));
+		return DirCache.read(getIndexFile(), getFS());
 	}
 
 	/**
@@ -863,8 +883,7 @@ public abstract class Repository {
 	 */
 	public DirCache lockDirCache() throws NoWorkTreeException,
 			CorruptObjectException, IOException {
-		return DirCache.lock(getIndexFile(), getFS(), new TreeOptions(
-				getConfig()));
+		return DirCache.lock(getIndexFile(), getFS());
 	}
 
 	static byte[] gitInternalSlash(byte[] bytes) {
@@ -1250,20 +1269,4 @@ public abstract class Repository {
 			FileUtils.delete(headsFile, FileUtils.SKIP_MISSING);
 		}
 	}
-
-	/**
-	 * @return the encoding for paths
-	 */
-	public Charset getPathEncoding() {
-		String encoding = getConfig().getString(
-				ConfigConstants.CONFIG_JGIT_SECTION,
-				null, ConfigConstants.CONFIG_KEY_PATHENCODING);
-		Charset pathEncoding;
-		if (encoding == null)
-			pathEncoding = Constants.FILENAME_CHARSET;
-		else
-			pathEncoding = Charset.forName(encoding);
-		return pathEncoding;
-	}
-
 }

@@ -44,7 +44,6 @@
 package org.eclipse.jgit.revwalk;
 
 import java.io.IOException;
-import java.nio.charset.Charset;
 
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -71,18 +70,17 @@ public class FollowFilter extends TreeFilter {
 	 * caller must prepend the subdirectory's path prior to creating the filter.
 	 * <p>
 	 * Path strings use '/' to delimit directories on all platforms.
-	 * 
+	 *
 	 * @param path
 	 *            the path to filter on. Must not be the empty string. All
 	 *            trailing '/' characters will be trimmed before string's length
 	 *            is checked or is used as part of the constructed filter.
-	 * @param encoding
 	 * @return a new filter for the requested path.
 	 * @throws IllegalArgumentException
 	 *             the path supplied was the empty string.
 	 */
-	public static FollowFilter create(String path, Charset encoding) {
-		return new FollowFilter(PathFilter.create(path, encoding));
+	public static FollowFilter create(String path) {
+		return new FollowFilter(PathFilter.create(path));
 	}
 
 	private final PathFilter path;

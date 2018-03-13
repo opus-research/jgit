@@ -51,10 +51,8 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.eclipse.jgit.treewalk.TreeOptions;
 import org.junit.Test;
 
 public class DirCacheLargePathTest extends RepositoryTestCase {
@@ -88,10 +86,8 @@ public class DirCacheLargePathTest extends RepositoryTestCase {
 		final String longPath = makeLongPath(len);
 		final String shortPath = "~~~ shorter-path";
 
-		final DirCacheEntry longEnt = new DirCacheEntry(longPath,
-				new TreeOptions(new Config()));
-		final DirCacheEntry shortEnt = new DirCacheEntry(shortPath,
-				new TreeOptions(new Config()));
+		final DirCacheEntry longEnt = new DirCacheEntry(longPath);
+		final DirCacheEntry shortEnt = new DirCacheEntry(shortPath);
 
 		longEnt.setFileMode(FileMode.REGULAR_FILE);
 		shortEnt.setFileMode(FileMode.REGULAR_FILE);

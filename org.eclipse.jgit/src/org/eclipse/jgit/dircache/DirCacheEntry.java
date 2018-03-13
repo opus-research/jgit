@@ -61,8 +61,6 @@ import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.treewalk.TreeOptions;
-import org.eclipse.jgit.util.ByteUtil;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.MutableInteger;
 import org.eclipse.jgit.util.NB;
@@ -207,14 +205,13 @@ public class DirCacheEntry {
 	 *
 	 * @param newPath
 	 *            name of the cache entry.
-	 * @param options
 	 * @throws IllegalArgumentException
 	 *             If the path starts or ends with "/", or contains "//" either
 	 *             "\0". These sequences are not permitted in a git tree object
 	 *             or DirCache file.
 	 */
-	public DirCacheEntry(final String newPath, TreeOptions options) {
-		this(Constants.encode(newPath, options.getPathEncoding()), STAGE_0);
+	public DirCacheEntry(final String newPath) {
+		this(Constants.encode(newPath));
 	}
 
 	/**
@@ -231,7 +228,7 @@ public class DirCacheEntry {
 	 *             range 0..3, inclusive.
 	 */
 	public DirCacheEntry(final String newPath, final int stage) {
-		this(Constants.encode(newPath, Constants.FILENAME_CHARSET), stage);
+		this(Constants.encode(newPath), stage);
 	}
 
 	/**
@@ -253,34 +250,13 @@ public class DirCacheEntry {
 	 *
 	 * @param newPath
 	 *            name of the cache entry, in the standard encoding.
-	 * @param length
-	 *            number of bytes in the buffer to use
 	 * @param stage
 	 *            the stage index of the new entry.
 	 * @throws IllegalArgumentException
 	 *             If the path starts or ends with "/", or contains "//" either
 	 *             "\0". These sequences are not permitted in a git tree object
-	 *             or DirCache file. Or if {@code stage} is outside of the range
-	 *             0..3, inclusive.
-	 */
-	public DirCacheEntry(final byte[] newPath, int length, final int stage) {
-		this(ByteUtil.copy(newPath, 0, length), stage);
-	}
-
-	/**
-	 * Create an empty entry at the specified stage.
-	 *
-	 * @param newPath
-	 *            name of the cache entry, in the standard encoding.
-	 *            <p>
-	 *            FIXME: Does not copy....
-	 * @param stage
-	 *            the stage index of the new entry.
-	 * @throws IllegalArgumentException
-	 *             If the path starts or ends with "/", or contains "//" either
-	 *             "\0". These sequences are not permitted in a git tree object
-	 *             or DirCache file. Or if {@code stage} is outside of the range
-	 *             0..3, inclusive.
+	 *             or DirCache file.  Or if {@code stage} is outside of the
+	 *             range 0..3, inclusive.
 	 */
 	public DirCacheEntry(final byte[] newPath, final int stage) {
 		if (!isValidPath(newPath))
@@ -667,8 +643,7 @@ public class DirCacheEntry {
 	}
 
 	private static String toString(final byte[] path) {
-		return Constants.FILENAME_CHARSET.decode(ByteBuffer.wrap(path))
-				.toString();
+		return Constants.CHARSET.decode(ByteBuffer.wrap(path)).toString();
 	}
 
 	static boolean isValidPath(final byte[] path) {

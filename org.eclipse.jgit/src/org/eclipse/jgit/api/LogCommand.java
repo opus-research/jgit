@@ -224,8 +224,7 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	 */
 	public LogCommand addPath(String path) {
 		checkCallable();
-		pathFilters.add(PathFilter.create(path, getRepository()
-				.getPathEncoding()));
+		pathFilters.add(PathFilter.create(path));
 		return this;
 	}
 

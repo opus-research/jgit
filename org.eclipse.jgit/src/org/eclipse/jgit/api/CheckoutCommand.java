@@ -241,8 +241,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			TreeWalk treeWalk = new TreeWalk(revWalk.getObjectReader());
 			treeWalk.setRecursive(true);
 			treeWalk.addTree(new DirCacheIterator(dc));
-			treeWalk.setFilter(PathFilterGroup.createFromStrings(paths,
-					treeWalk.getPathEncoding()));
+			treeWalk.setFilter(PathFilterGroup.createFromStrings(paths));
 			List<String> files = new LinkedList<String>();
 			while (treeWalk.next())
 				files.add(treeWalk.getPathString());

@@ -55,7 +55,6 @@ import java.io.File;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.eclipse.jgit.treewalk.TreeOptions;
 import org.junit.Test;
 
 public class DirCacheBuilderTest extends RepositoryTestCase {
@@ -81,8 +80,7 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 		final DirCacheBuilder b = dc.builder();
 		assertNotNull(b);
 
-		final DirCacheEntry e = new DirCacheEntry("a", new TreeOptions(
-				db.getConfig()));
+		final DirCacheEntry e = new DirCacheEntry("a");
 		assertEquals(0, e.getRawMode());
 		try {
 			b.add(e);
@@ -103,8 +101,7 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 			final DirCacheBuilder b = dc.builder();
 			assertNotNull(b);
 
-			entOrig = new DirCacheEntry(path, new TreeOptions(
-					db.getConfig()));
+			entOrig = new DirCacheEntry(path);
 			entOrig.setFileMode(mode);
 			entOrig.setLastModified(lastModified);
 			entOrig.setLength(length);
@@ -154,8 +151,7 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 			final DirCacheBuilder b = dc.builder();
 			assertNotNull(b);
 
-			entOrig = new DirCacheEntry(path, new TreeOptions(
-					db.getConfig()));
+			entOrig = new DirCacheEntry(path);
 			entOrig.setFileMode(mode);
 			entOrig.setLastModified(lastModified);
 			entOrig.setLength(length);
@@ -198,8 +194,7 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 		final DirCacheBuilder b = dc.builder();
 		assertNotNull(b);
 
-		final DirCacheEntry entOrig = new DirCacheEntry(path,
-				new TreeOptions(db.getConfig()));
+		final DirCacheEntry entOrig = new DirCacheEntry(path);
 		entOrig.setFileMode(FileMode.REGULAR_FILE);
 		assertNotSame(path, entOrig.getPathString());
 		assertEquals(path, entOrig.getPathString());
@@ -226,8 +221,7 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 		final String[] paths = { "a.", "a.b", "a/b", "a0b" };
 		final DirCacheEntry[] ents = new DirCacheEntry[paths.length];
 		for (int i = 0; i < paths.length; i++) {
-			ents[i] = new DirCacheEntry(paths[i], new TreeOptions(
-					db.getConfig()));
+			ents[i] = new DirCacheEntry(paths[i]);
 			ents[i].setFileMode(FileMode.REGULAR_FILE);
 		}
 
@@ -252,8 +246,7 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 		final String[] paths = { "a.", "a.b", "a/b", "a0b" };
 		final DirCacheEntry[] ents = new DirCacheEntry[paths.length];
 		for (int i = 0; i < paths.length; i++) {
-			ents[i] = new DirCacheEntry(paths[i], new TreeOptions(
-					db.getConfig()));
+			ents[i] = new DirCacheEntry(paths[i]);
 			ents[i].setFileMode(FileMode.REGULAR_FILE);
 		}
 
@@ -278,8 +271,7 @@ public class DirCacheBuilderTest extends RepositoryTestCase {
 		final String[] paths = { "a.", "a.b", "a/b", "a0b" };
 		final DirCacheEntry[] ents = new DirCacheEntry[paths.length];
 		for (int i = 0; i < paths.length; i++) {
-			ents[i] = new DirCacheEntry(paths[i], new TreeOptions(
-					db.getConfig()));
+			ents[i] = new DirCacheEntry(paths[i]);
 			ents[i].setFileMode(FileMode.REGULAR_FILE);
 		}
 		{

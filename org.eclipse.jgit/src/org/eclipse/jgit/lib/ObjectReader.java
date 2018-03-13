@@ -44,7 +44,6 @@
 package org.eclipse.jgit.lib;
 
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
@@ -437,9 +436,4 @@ public abstract class ObjectReader {
 	public void release() {
 		// Do nothing.
 	}
-
-	/**
-	 * @return the {@link Charset} for path
-	 */
-	public abstract Charset getPathEncoding();
 }

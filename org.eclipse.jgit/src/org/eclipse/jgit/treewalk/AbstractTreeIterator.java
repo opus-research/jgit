@@ -137,19 +137,11 @@ public abstract class AbstractTreeIterator {
 	 */
 	protected int pathLen;
 
-	private TreeOptions treeOptions = null;
-
-	/**
-	 * Create a new iterator with no parent.
-	 *
-	 * @param options
-	 */
-	protected AbstractTreeIterator(TreeOptions options) {
+	/** Create a new iterator with no parent. */
+	protected AbstractTreeIterator() {
 		parent = null;
 		path = new byte[DEFAULT_PATH_SIZE];
 		pathOffset = 0;
-		treeOptions = options;
-		assert treeOptions != null;
 	}
 
 	/**
@@ -166,19 +158,14 @@ public abstract class AbstractTreeIterator {
 	 *            may be null or the empty string to indicate the prefix is the
 	 *            root of the repository. A trailing slash ('/') is
 	 *            automatically appended if the prefix does not end in '/'.
-	 * @param treeOptions
-	 *            options for working with the tree
 	 */
-	protected AbstractTreeIterator(final String prefix,
-			final TreeOptions treeOptions) {
-		this.treeOptions = treeOptions;
-		assert treeOptions != null;
+	protected AbstractTreeIterator(final String prefix) {
 		parent = null;
 
 		if (prefix != null && prefix.length() > 0) {
 			final ByteBuffer b;
 
-			b = treeOptions.getPathEncoding().encode(CharBuffer.wrap(prefix));
+			b = Constants.CHARSET.encode(CharBuffer.wrap(prefix));
 			pathLen = b.limit();
 			path = new byte[Math.max(DEFAULT_PATH_SIZE, pathLen + 1)];
 			b.get(path, 0, pathLen);
@@ -205,12 +192,8 @@ public abstract class AbstractTreeIterator {
 	 *            may be null or the empty array to indicate the prefix is the
 	 *            root of the repository. A trailing slash ('/') is
 	 *            automatically appended if the prefix does not end in '/'.
-	 * @param options
 	 */
-	protected AbstractTreeIterator(final byte[] prefix,
-			TreeOptions options) {
-		this.treeOptions = options;
-		assert treeOptions != null;
+	protected AbstractTreeIterator(final byte[] prefix) {
 		parent = null;
 
 		if (prefix != null && prefix.length > 0) {
@@ -233,8 +216,6 @@ public abstract class AbstractTreeIterator {
 	 *            parent tree iterator.
 	 */
 	protected AbstractTreeIterator(final AbstractTreeIterator p) {
-		this.treeOptions = p.treeOptions;
-		assert treeOptions != null;
 		parent = p;
 		path = p.path;
 		pathOffset = p.pathLen + 1;
@@ -265,8 +246,6 @@ public abstract class AbstractTreeIterator {
 	 */
 	protected AbstractTreeIterator(final AbstractTreeIterator p,
 			final byte[] childPath, final int childPathOffset) {
-		treeOptions = p.treeOptions;
-		assert treeOptions != null;
 		parent = p;
 		path = childPath;
 		pathOffset = childPathOffset;
@@ -676,13 +655,5 @@ public abstract class AbstractTreeIterator {
 	 */
 	public void getName(byte[] buffer, int offset) {
 		System.arraycopy(path, pathOffset, buffer, offset, pathLen - pathOffset);
-	}
-
-	/**
-	 * @return the tree options for the iterator
-	 */
-	public TreeOptions getTreeOptions() {
-		assert treeOptions != null;
-		return treeOptions;
 	}
 }
