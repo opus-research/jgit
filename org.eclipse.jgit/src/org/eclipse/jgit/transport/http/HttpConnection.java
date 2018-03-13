@@ -56,6 +56,7 @@ import java.util.Map;
 
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.KeyManager;
+import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 
 /**
@@ -251,7 +252,7 @@ public interface HttpConnection {
 
 	/**
 	 * Configure the connection so that it can be used for https communication.
-	 *
+	 * 
 	 * @param km
 	 *            the keymanager managing the key material used to authenticate
 	 *            the local SSLSocket to its peer
@@ -260,7 +261,8 @@ public interface HttpConnection {
 	 *            that is used when making trust decisions, and for deciding
 	 *            whether credentials presented by a peer should be accepted.
 	 * @param random
-	 * 
+	 *            the source of randomness for this generator or null. See
+	 *            {@link SSLContext#init(KeyManager[], TrustManager[], SecureRandom)}
 	 * @throws NoSuchAlgorithmException
 	 * @throws KeyManagementException
 	 */
