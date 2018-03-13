@@ -58,7 +58,6 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -88,7 +87,6 @@ import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.WindowCursor;
-import org.eclipse.jgit.revwalk.FooterKey;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -111,10 +109,11 @@ public class IpLogGenerator {
 
 	private static final String INDENT = "{http://xml.apache.org/xslt}indent-amount";
 
-	private static final FooterKey BUG = new FooterKey("Bug");
-
 	/** Projects indexed by their ID string, e.g. {@code technology.jgit}. */
 	private final Map<String, Project> projects = new TreeMap<String, Project>();
+
+	/** Projects indexed by their ID string, e.g. {@code technology.jgit}. */
+	private final Map<String, Project> consumedProjects = new TreeMap<String, Project>();
 
 	/** Known committers, indexed by their foundation ID. */
 	private final Map<String, Committer> committersById = new HashMap<String, Committer>();
@@ -133,6 +132,9 @@ public class IpLogGenerator {
 
 	/** The meta file we loaded to bootstrap our definitions. */
 	private IpLogMeta meta;
+
+	/** URL to obtain review information about a specific contribution. */
+	private String reviewUrl;
 
 	private String characterEncoding = "UTF-8";
 
@@ -223,7 +225,11 @@ public class IpLogGenerator {
 			p.setVersion(version);
 			projects.put(p.getName(), p);
 		}
+		for (Project p : meta.getConsumedProjects()) {
+			consumedProjects.put(p.getName(), p);
+		}
 		cqs.addAll(meta.getCQs());
+		reviewUrl = meta.getReviewUrl();
 	}
 
 	private void loadCommitters(Repository repo) throws IOException {
@@ -352,20 +358,6 @@ public class IpLogGenerator {
 			String subj = commit.getShortMessage();
 			SingleContribution item = new SingleContribution(id, when, subj);
 
-			List<String> bugs = commit.getFooterLines(BUG);
-			if (1 == bugs.size()) {
-				item.setBugID(bugs.get(0));
-
-			} else if (2 <= bugs.size()) {
-				StringBuilder tmp = new StringBuilder();
-				for (String bug : bugs) {
-					if (tmp.length() > 0)
-						tmp.append(",");
-					tmp.append(bug);
-				}
-				item.setBugID(tmp.toString());
-			}
-
 			if (2 <= cnt) {
 				item.setSize("(merge)");
 				contributor.add(item);
@@ -480,8 +472,19 @@ public class IpLogGenerator {
 			root.appendChild(createProject(project));
 			licenses.addAll(project.getLicenses());
 		}
+
+		if (!consumedProjects.isEmpty())
+			appendBlankLine(root);
+		for (Project project : sort(consumedProjects, Project.COMPARATOR)) {
+			root.appendChild(createConsumes(project));
+			licenses.addAll(project.getLicenses());
+		}
+
 		for (RevCommit c : sort(commits))
 			root.appendChild(createCommitMeta(c));
+
+		if (licenses.size() > 1)
+			appendBlankLine(root);
 		for (String name : sort(licenses))
 			root.appendChild(createLicense(name));
 
@@ -509,11 +512,21 @@ public class IpLogGenerator {
 
 	private Element createProject(Project p) {
 		Element project = createElement("project");
+		populateProjectType(p, project);
+		return project;
+	}
+
+	private Element createConsumes(Project p) {
+		Element project = createElement("consumes");
+		populateProjectType(p, project);
+		return project;
+	}
+
+	private void populateProjectType(Project p, Element project) {
 		required(project, "id", p.getID());
 		required(project, "name", p.getName());
 		optional(project, "comments", p.getComments());
 		optional(project, "version", p.getVersion());
-		return project;
 	}
 
 	private Element createCommitMeta(RevCommit c) {
@@ -567,18 +580,13 @@ public class IpLogGenerator {
 	}
 
 	private Element createContribution(SingleContribution s) {
-		Element r = createElement("bug");
+		Element r = createElement("contribution");
 		required(r, "id", s.getID());
-		optional(r, "bug-id", s.getBugID());
+		required(r, "description", s.getSummary());
 		required(r, "size", s.getSize());
-		required(r, "type", "A"); // assume attachment type
-		required(r, "created", format(s.getCreated()));
-		required(r, "summary", s.getSummary());
+		if (reviewUrl != null)
+			optional(r, "url", reviewUrl + s.getID());
 		return r;
-	}
-
-	private String format(Date created) {
-		return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(created);
 	}
 
 	private Element createElement(String name) {
