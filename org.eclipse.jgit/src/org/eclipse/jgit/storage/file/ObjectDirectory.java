@@ -123,8 +123,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	private final FS fs;
 
-	private final File shallowFile;
-
 	private final AtomicReference<AlternateHandle[]> alternates;
 
 	private final UnpackedObjectCache unpackedObjectCache;
@@ -141,13 +139,11 @@ public class ObjectDirectory extends FileObjectDatabase {
 	 * @param fs
 	 *            the file system abstraction which will be necessary to perform
 	 *            certain file system operations.
-	 * @param shallowFile
-	 *            file which contains IDs of shallow commits
 	 * @throws IOException
 	 *             an alternate object cannot be opened.
 	 */
 	public ObjectDirectory(final Config cfg, final File dir,
-			File[] alternatePaths, FS fs, File shallowFile) throws IOException {
+			File[] alternatePaths, FS fs) throws IOException {
 		config = cfg;
 		objects = dir;
 		infoDirectory = new File(objects, "info");
@@ -158,7 +154,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 		cachedPacks = new AtomicReference<CachedPackList>();
 		unpackedObjectCache = new UnpackedObjectCache();
 		this.fs = fs;
-		this.shallowFile = shallowFile;
 
 		alternates = new AtomicReference<AlternateHandle[]>();
 		if (alternatePaths != null) {
@@ -619,28 +614,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 		return fs;
 	}
 
-	@Override
-	Set<ObjectId> getShallowCommits() throws IOException {
-		final File shallow = shallowFile;
-		if (!shallow.isFile())
-			return Collections.emptySet();
-
-		final BufferedReader reader = new BufferedReader(
-				new FileReader(shallow));
-		try {
-			final Set<ObjectId> ids = new HashSet<ObjectId>();
-			String line;
-			while ((line = reader.readLine()) != null) {
-				final ObjectId id = ObjectId.fromString(line);
-				ids.add(id);
-			}
-
-			return ids;
-		} finally {
-			reader.close();
-		}
-	}
-
 	private void insertPack(final PackFile pf) {
 		PackList o, n;
 		do {
@@ -856,7 +829,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 			return new AlternateRepository(db);
 		}
 
-		ObjectDirectory db = new ObjectDirectory(config, objdir, null, fs, shallowFile);
+		ObjectDirectory db = new ObjectDirectory(config, objdir, null, fs);
 		return new AlternateHandle(db);
 	}
 
