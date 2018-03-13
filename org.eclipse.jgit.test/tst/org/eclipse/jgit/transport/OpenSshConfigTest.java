@@ -323,12 +323,11 @@ public class OpenSshConfigTest extends RepositoryTestCase {
 
 	@Test
 	public void testListValueMultiple() throws Exception {
-		// Tilde expansion occurs within the parser
+		// Tilde expansion doesn't occur within the parser
 		config("Host orcz\nUserKnownHostsFile \"~/foo/ba z\" /foo/bar \n");
 		final ConfigRepository.Config c = osc.getConfig("orcz");
 		assertNotNull(c);
-		assertArrayEquals(new Object[] { new File(home, "foo/ba z").getPath(),
-				"/foo/bar" },
+		assertArrayEquals(new Object[] { "~/foo/ba z", "/foo/bar" },
 				c.getValues("UserKnownHostsFile"));
 	}
 
@@ -343,7 +342,8 @@ public class OpenSshConfigTest extends RepositoryTestCase {
 		assertEquals(h1.getConnectionAttempts(), h2.getConnectionAttempts());
 		final ConfigRepository.Config c = osc.getConfig("orcz");
 		assertNotNull(c);
-		assertSame(h1.getConfig(), h2.getConfig());
+		assertSame(c, h1.getConfig());
+		assertSame(c, h2.getConfig());
 	}
 
 	@Test
@@ -371,9 +371,8 @@ public class OpenSshConfigTest extends RepositoryTestCase {
 		// Host does tilde replacement
 		assertEquals(new File(home, "foo/ba z"), f);
 		final ConfigRepository.Config c = h.getConfig();
-		// Config does tilde replacement, too
-		assertArrayEquals(new Object[] { new File(home, "foo/ba z").getPath(),
-				"/foo/bar" },
+		// Config doesn't
+		assertArrayEquals(new Object[] { "~/foo/ba z", "/foo/bar" },
 				c.getValues("IdentityFile"));
 	}
 
@@ -387,9 +386,8 @@ public class OpenSshConfigTest extends RepositoryTestCase {
 		// Host does tilde replacement
 		assertEquals(new File(home, "foo/ba z"), f);
 		final ConfigRepository.Config c = h.getConfig();
-		// Config does tilde replacement, too
-		assertArrayEquals(new Object[] { new File(home, "foo/ba z").getPath(),
-				"/foo/bar", "/foo/baz" },
+		// Config doesn't
+		assertArrayEquals(new Object[] { "~/foo/ba z", "/foo/bar", "/foo/baz" },
 				c.getValues("IdentityFile"));
 	}
 
@@ -399,7 +397,7 @@ public class OpenSshConfigTest extends RepositoryTestCase {
 		final Host h = osc.lookup("repo.or.cz");
 		assertNotNull(h);
 		assertEquals(new File(home, "foo/bar"), h.getIdentityFile());
-		assertArrayEquals(new Object[] { new File(home, "foo/bar").getPath() },
+		assertArrayEquals(new Object[] { "~/foo/bar" },
 				h.getConfig().getValues("IdentityFile"));
 	}
 
@@ -409,8 +407,7 @@ public class OpenSshConfigTest extends RepositoryTestCase {
 		final Host h = osc.lookup("repo.or.cz");
 		assertNotNull(h);
 		assertEquals(new File(home, "foo/bar"), h.getIdentityFile());
-		assertArrayEquals(new Object[] { new File(home, "foo/bar").getPath(),
-				"/foo/baz" },
+		assertArrayEquals(new Object[] { "~/foo/bar", "/foo/baz" },
 				h.getConfig().getValues("IdentityFile"));
 	}
 
@@ -420,13 +417,12 @@ public class OpenSshConfigTest extends RepositoryTestCase {
 		final Host h1 = osc.lookup("repo.or.cz");
 		assertNotNull(h1);
 		assertEquals(new File(home, "foo/bar"), h1.getIdentityFile());
-		assertArrayEquals(new Object[] { new File(home, "foo/bar").getPath(),
-				"/foo/baz" },
+		assertArrayEquals(new Object[] { "~/foo/bar", "/foo/baz" },
 				h1.getConfig().getValues("IdentityFile"));
 		final Host h2 = osc.lookup("orcz");
 		assertNotNull(h2);
 		assertEquals(new File(home, "foo/bar"), h2.getIdentityFile());
-		assertArrayEquals(new Object[] { new File(home, "foo/bar").getPath() },
+		assertArrayEquals(new Object[] { "~/foo/bar" },
 				h2.getConfig().getValues("IdentityFile"));
 	}
 

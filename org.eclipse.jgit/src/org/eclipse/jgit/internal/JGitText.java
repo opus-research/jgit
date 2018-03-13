@@ -147,7 +147,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotParseGitURIish;
 	/***/ public String cannotPullOnARepoWithState;
 	/***/ public String cannotRead;
-	/***/ public String cannotReadBackDelta;
 	/***/ public String cannotReadBlob;
 	/***/ public String cannotReadCommit;
 	/***/ public String cannotReadFile;
@@ -667,7 +666,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String sourceRefDoesntResolveToAnyObject;
 	/***/ public String sourceRefNotSpecifiedForRefspec;
 	/***/ public String squashCommitNotUpdatingHEAD;
-	/***/ public String sshUserNameError;
 	/***/ public String sslFailureExceptionMessage;
 	/***/ public String sslFailureInfo;
 	/***/ public String sslFailureCause;
@@ -745,7 +743,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unexpectedCompareResult;
 	/***/ public String unexpectedEndOfConfigFile;
 	/***/ public String unexpectedEndOfInput;
-	/***/ public String unexpectedEofInPack;
 	/***/ public String unexpectedHunkTrailer;
 	/***/ public String unexpectedOddResult;
 	/***/ public String unexpectedRefReport;
