@@ -98,7 +98,7 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 		this.repoDesc = repoDesc;
 		int dot = name.lastIndexOf('.');
 		this.packName = (dot < 0) ? name : name.substring(0, dot);
-		this.sizeMap = new HashMap<String, Long>(5);
+		this.sizeMap = new HashMap<String, Long>();
 	}
 
 	/** @return description of the repository. */
@@ -165,7 +165,7 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	 */
 	public long getFileSize(String ext) {
 		Long size = sizeMap.get(ext);
-		return size == null ? 0 : size.longValue();
+		return (size == null) ? 0 : size.longValue();
 	}
 
 	/**
@@ -254,8 +254,8 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	public boolean equals(Object b) {
 		if (b instanceof DfsPackDescription) {
 			DfsPackDescription desc = (DfsPackDescription) b;
-			return packName.equals(desc.packName) &&
-					getRepositoryDescription().equals(desc.getRepositoryDescription());
+			return packName.equals(desc.packName) && getRepositoryDescription()
+					.equals(desc.getRepositoryDescription());
 		}
 		return false;
 	}
