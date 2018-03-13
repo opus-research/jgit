@@ -248,8 +248,7 @@ public class TransportSftp extends SshTransport implements WalkTransport {
 
 				Collections.sort(packs, new Comparator<String>() {
 					public int compare(final String o1, final String o2) {
-						return mtimes.get(o2).intValue()
-								- mtimes.get(o1).intValue();
+						return mtimes.get(o2) - mtimes.get(o1);
 					}
 				});
 			} catch (SftpException je) {
