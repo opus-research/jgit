@@ -62,7 +62,6 @@ import java.util.Map;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.RebaseResult.Status;
-import org.eclipse.jgit.api.errors.AbnormalMergeFailureException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
@@ -85,8 +84,8 @@ import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
-import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -247,21 +246,13 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				// unnecessary object rewriting
 				newHead = tryFastForward(commitToPick);
 				lastStepWasForward = newHead != null;
-				try {
-					if (!lastStepWasForward)
-						// TODO if the content of this commit is already merged
-						// here we should skip this step in order to avoid
-						// confusing pseudo-changed
-						newHead = new Git(repo).cherryPick()
-								.include(commitToPick).call();
-				} catch (AbnormalMergeFailureException e) {
-					// if we stopped before (and now are continuing), we will
-					// stop again; but we will fail in all other cases
-					if (this.operation != Operation.CONTINUE)
-						return fail(e);
-				} finally {
-					monitor.endTask();
-				}
+				if (!lastStepWasForward)
+					// TODO if the content of this commit is already merged here
+					// we should skip this step in order to avoid confusing
+					// pseudo-changed
+					newHead = new Git(repo).cherryPick().include(commitToPick)
+							.call();
+				monitor.endTask();
 				if (newHead == null) {
 					return stop(commitToPick);
 				}
@@ -379,12 +370,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			return null;
 		}
 		return parseAuthor(raw);
-	}
-
-	private RebaseResult fail(Throwable cause) throws IOException {
-		// TODO: abort and reset index; needs more work
-		abort();
-		return new RebaseResult(cause);
 	}
 
 	private RebaseResult stop(RevCommit commitToPick) throws IOException {
