@@ -52,18 +52,18 @@ import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.RevWalkException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.AsyncObjectLoaderQueue;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdOwnerMap;
+import org.eclipse.jgit.lib.ObjectIdSubclassMap;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
@@ -170,7 +170,7 @@ public class RevWalk implements Iterable<RevCommit> {
 
 	final MutableObjectId idBuffer;
 
-	ObjectIdOwnerMap<RevObject> objects;
+	private final ObjectIdSubclassMap<RevObject> objects;
 
 	private int freeFlags = APP_FLAGS;
 
@@ -220,7 +220,7 @@ public class RevWalk implements Iterable<RevCommit> {
 		repository = repo;
 		reader = or;
 		idBuffer = new MutableObjectId();
-		objects = new ObjectIdOwnerMap<RevObject>();
+		objects = new ObjectIdSubclassMap<RevObject>();
 		roots = new ArrayList<RevCommit>();
 		queue = new DateRevQueue();
 		pending = new StartGenerator(this);
@@ -682,8 +682,7 @@ public class RevWalk implements Iterable<RevCommit> {
 				r = new RevTag(id);
 				break;
 			default:
-				throw new IllegalArgumentException(MessageFormat.format(
-						JGitText.get().invalidGitType, Integer.valueOf(type)));
+				throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidGitType, type));
 			}
 			objects.add(r);
 		}
@@ -844,8 +843,8 @@ public class RevWalk implements Iterable<RevCommit> {
 			break;
 		}
 		default:
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().badObjectType, Integer.valueOf(type)));
+			throw new IllegalArgumentException(MessageFormat.format(JGitText
+					.get().badObjectType, type));
 		}
 		objects.add(r);
 		return r;
@@ -966,7 +965,7 @@ public class RevWalk implements Iterable<RevCommit> {
 	}
 
 	/**
-	 * Ensure the object's full body content is available.
+	 * Ensure the object's fully body content is available.
 	 * <p>
 	 * This method only returns successfully if the object exists and was parsed
 	 * without error.
@@ -1027,8 +1026,7 @@ public class RevWalk implements Iterable<RevCommit> {
 	int allocFlag() {
 		if (freeFlags == 0)
 			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().flagsAlreadyCreated,
-					Integer.valueOf(32 - RESERVED_FLAGS)));
+					JGitText.get().flagsAlreadyCreated, 32 - RESERVED_FLAGS));
 		final int m = Integer.lowestOneBit(freeFlags);
 		freeFlags &= ~m;
 		return m;
@@ -1183,6 +1181,7 @@ public class RevWalk implements Iterable<RevCommit> {
 			}
 		}
 
+		reader.release();
 		roots.clear();
 		queue = new DateRevQueue();
 		pending = new StartGenerator(this);
@@ -1271,26 +1270,6 @@ public class RevWalk implements Iterable<RevCommit> {
 
 	private boolean isNotStarted() {
 		return pending instanceof StartGenerator;
-	}
-
-	/**
-	 * Create and return an {@link ObjectWalk} using the same objects.
-	 * <p>
-	 * Prior to using this method, the caller must reset this RevWalk to clean
-	 * any flags that were used during the last traversal.
-	 * <p>
-	 * The returned ObjectWalk uses the same ObjectReader, internal object pool,
-	 * and free RevFlags. Once the ObjectWalk is created, this RevWalk should
-	 * not be used anymore.
-	 *
-	 * @return a new walk, using the exact same object pool.
-	 */
-	public ObjectWalk toObjectWalkWithSameObjects() {
-		ObjectWalk ow = new ObjectWalk(reader);
-		RevWalk rw = ow;
-		rw.objects = objects;
-		rw.freeFlags = freeFlags;
-		return ow;
 	}
 
 	/**

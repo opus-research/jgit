@@ -84,8 +84,8 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 *            the repository whose working tree will be scanned.
 	 */
 	public FileTreeIterator(Repository repo) {
-		this(repo.getWorkTree(), repo.getFS(),
-				repo.getConfig().get(WorkingTreeOptions.KEY));
+		this(repo.getWorkTree(), repo.getFS(), WorkingTreeOptions
+				.createConfigurationInstance(repo.getConfig()));
 		initRootIterator(repo);
 	}
 
@@ -159,7 +159,7 @@ public class FileTreeIterator extends WorkingTreeIterator {
 			file = f;
 
 			if (f.isDirectory()) {
-				if (new File(f, Constants.DOT_GIT).exists())
+				if (new File(f, Constants.DOT_GIT).isDirectory())
 					mode = FileMode.GITLINK;
 				else
 					mode = FileMode.TREE;
@@ -222,12 +222,5 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 */
 	public File getEntryFile() {
 		return ((FileEntry) current()).getFile();
-	}
-
-	@Override
-	protected byte[] idSubmodule(final Entry e) {
-		if (repository == null)
-			return idSubmodule(getDirectory(), e);
-		return super.idSubmodule(e);
 	}
 }

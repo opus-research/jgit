@@ -53,7 +53,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 
 /**
  * Caches slices of a {@link PackFile} in memory for faster read access.
@@ -187,7 +187,7 @@ public class WindowCache {
 			oc.removeAll();
 		cache = nc;
 		streamFileThreshold = cfg.getStreamFileThreshold();
-		DeltaBaseCache.reconfigure(cfg);
+		UnpackedObjectCache.reconfigure(cfg);
 	}
 
 	static int getStreamFileThreshold() {

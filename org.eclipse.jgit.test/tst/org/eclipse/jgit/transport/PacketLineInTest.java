@@ -43,33 +43,26 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
-import org.eclipse.jgit.errors.PackProtocolException;
+import junit.framework.TestCase;
+
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
-import org.junit.Test;
 
 // Note, test vectors created with:
 //
 // perl -e 'printf "%4.4x%s\n", 4+length($ARGV[0]),$ARGV[0]'
 
-public class PacketLineInTest {
+public class PacketLineInTest extends TestCase {
 	private ByteArrayInputStream rawIn;
 
 	private PacketLineIn in;
 
 	// readString
 
-	@Test
 	public void testReadString1() throws IOException {
 		init("0006a\n0007bc\n");
 		assertEquals("a", in.readString());
@@ -77,7 +70,6 @@ public class PacketLineInTest {
 		assertEOF();
 	}
 
-	@Test
 	public void testReadString2() throws IOException {
 		init("0032want fcfcfb1fd94829c1a1704f894fc111d14770d34e\n");
 		final String act = in.readString();
@@ -85,7 +77,6 @@ public class PacketLineInTest {
 		assertEOF();
 	}
 
-	@Test
 	public void testReadString4() throws IOException {
 		init("0005a0006bc");
 		assertEquals("a", in.readString());
@@ -93,7 +84,6 @@ public class PacketLineInTest {
 		assertEOF();
 	}
 
-	@Test
 	public void testReadString5() throws IOException {
 		// accept both upper and lower case
 		init("000Fhi i am a s");
@@ -105,7 +95,6 @@ public class PacketLineInTest {
 		assertEOF();
 	}
 
-	@Test
 	public void testReadString_LenHELO() {
 		init("HELO");
 		try {
@@ -116,7 +105,6 @@ public class PacketLineInTest {
 		}
 	}
 
-	@Test
 	public void testReadString_Len0001() {
 		init("0001");
 		try {
@@ -127,7 +115,6 @@ public class PacketLineInTest {
 		}
 	}
 
-	@Test
 	public void testReadString_Len0002() {
 		init("0002");
 		try {
@@ -138,7 +125,6 @@ public class PacketLineInTest {
 		}
 	}
 
-	@Test
 	public void testReadString_Len0003() {
 		init("0003");
 		try {
@@ -149,7 +135,6 @@ public class PacketLineInTest {
 		}
 	}
 
-	@Test
 	public void testReadString_Len0004() throws IOException {
 		init("0004");
 		final String act = in.readString();
@@ -158,7 +143,6 @@ public class PacketLineInTest {
 		assertEOF();
 	}
 
-	@Test
 	public void testReadString_End() throws IOException {
 		init("0000");
 		assertSame(PacketLineIn.END, in.readString());
@@ -167,7 +151,6 @@ public class PacketLineInTest {
 
 	// readStringNoLF
 
-	@Test
 	public void testReadStringRaw1() throws IOException {
 		init("0005a0006bc");
 		assertEquals("a", in.readStringRaw());
@@ -175,7 +158,6 @@ public class PacketLineInTest {
 		assertEOF();
 	}
 
-	@Test
 	public void testReadStringRaw2() throws IOException {
 		init("0031want fcfcfb1fd94829c1a1704f894fc111d14770d34e");
 		final String act = in.readStringRaw();
@@ -183,7 +165,6 @@ public class PacketLineInTest {
 		assertEOF();
 	}
 
-	@Test
 	public void testReadStringRaw3() throws IOException {
 		init("0004");
 		final String act = in.readStringRaw();
@@ -192,14 +173,12 @@ public class PacketLineInTest {
 		assertEOF();
 	}
 
-	@Test
 	public void testReadStringRaw_End() throws IOException {
 		init("0000");
 		assertSame(PacketLineIn.END, in.readStringRaw());
 		assertEOF();
 	}
 
-	@Test
 	public void testReadStringRaw4() {
 		init("HELO");
 		try {
@@ -212,7 +191,6 @@ public class PacketLineInTest {
 
 	// readACK
 
-	@Test
 	public void testReadACK_NAK() throws IOException {
 		final ObjectId expid = ObjectId
 				.fromString("fcfcfb1fd94829c1a1704f894fc111d14770d34e");
@@ -225,7 +203,6 @@ public class PacketLineInTest {
 		assertEOF();
 	}
 
-	@Test
 	public void testReadACK_ACK1() throws IOException {
 		final ObjectId expid = ObjectId
 				.fromString("fcfcfb1fd94829c1a1704f894fc111d14770d34e");
@@ -237,7 +214,6 @@ public class PacketLineInTest {
 		assertEOF();
 	}
 
-	@Test
 	public void testReadACK_ACKcontinue1() throws IOException {
 		final ObjectId expid = ObjectId
 				.fromString("fcfcfb1fd94829c1a1704f894fc111d14770d34e");
@@ -249,7 +225,6 @@ public class PacketLineInTest {
 		assertEOF();
 	}
 
-	@Test
 	public void testReadACK_ACKcommon1() throws IOException {
 		final ObjectId expid = ObjectId
 				.fromString("fcfcfb1fd94829c1a1704f894fc111d14770d34e");
@@ -261,7 +236,6 @@ public class PacketLineInTest {
 		assertEOF();
 	}
 
-	@Test
 	public void testReadACK_ACKready1() throws IOException {
 		final ObjectId expid = ObjectId
 				.fromString("fcfcfb1fd94829c1a1704f894fc111d14770d34e");
@@ -273,7 +247,6 @@ public class PacketLineInTest {
 		assertEOF();
 	}
 
-	@Test
 	public void testReadACK_Invalid1() {
 		init("HELO");
 		try {
@@ -284,7 +257,6 @@ public class PacketLineInTest {
 		}
 	}
 
-	@Test
 	public void testReadACK_Invalid2() {
 		init("0009HELO\n");
 		try {
@@ -295,7 +267,6 @@ public class PacketLineInTest {
 		}
 	}
 
-	@Test
 	public void testReadACK_Invalid3() {
 		String s = "ACK fcfcfb1fd94829c1a1704f894fc111d14770d34e neverhappen";
 		init("003d" + s + "\n");
@@ -307,7 +278,6 @@ public class PacketLineInTest {
 		}
 	}
 
-	@Test
 	public void testReadACK_Invalid4() {
 		init("0000");
 		try {
@@ -315,17 +285,6 @@ public class PacketLineInTest {
 			fail("incorrectly accepted no ACK/NAK");
 		} catch (IOException e) {
 			assertEquals("Expected ACK/NAK, found EOF", e.getMessage());
-		}
-	}
-
-	@Test
-	public void testReadACK_ERR() throws IOException {
-		init("001aERR want is not valid\n");
-		try {
-			in.readACK(new MutableObjectId());
-			fail("incorrectly accepted ERR");
-		} catch (PackProtocolException e) {
-			assertEquals("want is not valid", e.getMessage());
 		}
 	}
 

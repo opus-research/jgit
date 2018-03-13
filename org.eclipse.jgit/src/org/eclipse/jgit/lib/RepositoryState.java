@@ -46,7 +46,7 @@
 
 package org.eclipse.jgit.lib;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 /**
  * Important state of the repository that affects what can and cannot bed
  * done. This is things like unhandled conflicted merges and unfinished rebase.
@@ -57,19 +57,9 @@ import org.eclipse.jgit.internal.JGitText;
 public enum RepositoryState {
 	/** Has no work tree and cannot be used for normal editing. */
 	BARE {
-		@Override
 		public boolean canCheckout() { return false; }
-
-		@Override
 		public boolean canResetHead() { return false; }
-
-		@Override
 		public boolean canCommit() { return false; }
-
-		@Override
-		public boolean canAmend() { return false; }
-
-		@Override
 		public String getDescription() { return "Bare"; }
 	},
 
@@ -77,38 +67,18 @@ public enum RepositoryState {
 	 * A safe state for working normally
 	 * */
 	SAFE {
-		@Override
 		public boolean canCheckout() { return true; }
-
-		@Override
 		public boolean canResetHead() { return true; }
-
-		@Override
 		public boolean canCommit() { return true; }
-
-		@Override
-		public boolean canAmend() { return true; }
-
-		@Override
 		public String getDescription() { return JGitText.get().repositoryState_normal; }
 	},
 
 	/** An unfinished merge. Must resolve or reset before continuing normally
 	 */
 	MERGING {
-		@Override
 		public boolean canCheckout() { return false; }
-
-		@Override
 		public boolean canResetHead() { return true; }
-
-		@Override
 		public boolean canCommit() { return false; }
-
-		@Override
-		public boolean canAmend() { return false; }
-
-		@Override
 		public String getDescription() { return JGitText.get().repositoryState_conflicts; }
 	},
 
@@ -117,59 +87,9 @@ public enum RepositoryState {
 	 * contain any unmerged paths.
 	 */
 	MERGING_RESOLVED {
-		@Override
 		public boolean canCheckout() { return true; }
-
-		@Override
 		public boolean canResetHead() { return true; }
-
-		@Override
 		public boolean canCommit() { return true; }
-
-		@Override
-		public boolean canAmend() { return false; }
-
-		@Override
-		public String getDescription() { return JGitText.get().repositoryState_merged; }
-	},
-
-	/** An unfinished cherry-pick. Must resolve or reset before continuing normally
-	 */
-	CHERRY_PICKING {
-		@Override
-		public boolean canCheckout() { return false; }
-
-		@Override
-		public boolean canResetHead() { return true; }
-
-		@Override
-		public boolean canCommit() { return false; }
-
-		@Override
-		public boolean canAmend() { return false; }
-
-		@Override
-		public String getDescription() { return JGitText.get().repositoryState_conflicts; }
-	},
-
-	/**
-	 * A cherry-pick where all conflicts have been resolved. The index does not
-	 * contain any unmerged paths.
-	 */
-	CHERRY_PICKING_RESOLVED {
-		@Override
-		public boolean canCheckout() { return true; }
-
-		@Override
-		public boolean canResetHead() { return true; }
-
-		@Override
-		public boolean canCommit() { return true; }
-
-		@Override
-		public boolean canAmend() { return false; }
-
-		@Override
 		public String getDescription() { return JGitText.get().repositoryState_merged; }
 	},
 
@@ -177,19 +97,9 @@ public enum RepositoryState {
 	 * An unfinished rebase or am. Must resolve, skip or abort before normal work can take place
 	 */
 	REBASING {
-		@Override
 		public boolean canCheckout() { return false; }
-
-		@Override
 		public boolean canResetHead() { return false; }
-
-		@Override
 		public boolean canCommit() { return true; }
-
-		@Override
-		public boolean canAmend() { return true; }
-
-		@Override
 		public String getDescription() { return JGitText.get().repositoryState_rebaseOrApplyMailbox; }
 	},
 
@@ -197,19 +107,9 @@ public enum RepositoryState {
 	 * An unfinished rebase. Must resolve, skip or abort before normal work can take place
 	 */
 	REBASING_REBASING {
-		@Override
 		public boolean canCheckout() { return false; }
-
-		@Override
 		public boolean canResetHead() { return false; }
-
-		@Override
 		public boolean canCommit() { return true; }
-
-		@Override
-		public boolean canAmend() { return true; }
-
-		@Override
 		public String getDescription() { return JGitText.get().repositoryState_rebase; }
 	},
 
@@ -217,19 +117,9 @@ public enum RepositoryState {
 	 * An unfinished apply. Must resolve, skip or abort before normal work can take place
 	 */
 	APPLY {
-		@Override
 		public boolean canCheckout() { return false; }
-
-		@Override
 		public boolean canResetHead() { return false; }
-
-		@Override
 		public boolean canCommit() { return true; }
-
-		@Override
-		public boolean canAmend() { return true; }
-
-		@Override
 		public String getDescription() { return JGitText.get().repositoryState_applyMailbox; }
 	},
 
@@ -237,19 +127,9 @@ public enum RepositoryState {
 	 * An unfinished rebase with merge. Must resolve, skip or abort before normal work can take place
 	 */
 	REBASING_MERGE {
-		@Override
 		public boolean canCheckout() { return false; }
-
-		@Override
 		public boolean canResetHead() { return false; }
-
-		@Override
 		public boolean canCommit() { return true; }
-
-		@Override
-		public boolean canAmend() { return true; }
-
-		@Override
 		public String getDescription() { return JGitText.get().repositoryState_rebaseWithMerge; }
 	},
 
@@ -257,19 +137,9 @@ public enum RepositoryState {
 	 * An unfinished interactive rebase. Must resolve, skip or abort before normal work can take place
 	 */
 	REBASING_INTERACTIVE {
-		@Override
 		public boolean canCheckout() { return false; }
-
-		@Override
 		public boolean canResetHead() { return false; }
-
-		@Override
 		public boolean canCommit() { return true; }
-
-		@Override
-		public boolean canAmend() { return true; }
-
-		@Override
 		public String getDescription() { return JGitText.get().repositoryState_rebaseInteractive; }
 	},
 
@@ -278,21 +148,14 @@ public enum RepositoryState {
 	 */
 	BISECTING {
 		/* Changing head is a normal operation when bisecting */
-		@Override
 		public boolean canCheckout() { return true; }
 
 		/* Do not reset, checkout instead */
-		@Override
 		public boolean canResetHead() { return false; }
 
 		/* Commit during bisect is useful */
-		@Override
 		public boolean canCommit() { return true; }
 
-		@Override
-		public boolean canAmend() { return false; }
-
-		@Override
 		public String getDescription() { return JGitText.get().repositoryState_bisecting; }
 	};
 
@@ -310,11 +173,6 @@ public enum RepositoryState {
 	 * @return true if reset to another HEAD is considered SAFE
 	 */
 	public abstract boolean canResetHead();
-
-	/**
-	 * @return true if amending is considered SAFE
-	 */
-	public abstract boolean canAmend();
 
 	/**
 	 * @return a human readable description of the state.

@@ -45,31 +45,29 @@ package org.eclipse.jgit.transport;
 
 import static org.eclipse.jgit.transport.WalkRemoteObjectDatabase.ROOT_DIR;
 
+import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeMap;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefWriter;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
-import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
  * Generic push support for dumb transport protocols.
@@ -217,8 +215,8 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 		final PackWriter writer = new PackWriter(transport.getPackConfig(),
 				local.newObjectReader());
 		try {
-			final Set<ObjectId> need = new HashSet<ObjectId>();
-			final Set<ObjectId> have = new HashSet<ObjectId>();
+			final List<ObjectId> need = new ArrayList<ObjectId>();
+			final List<ObjectId> have = new ArrayList<ObjectId>();
 			for (final RemoteRefUpdate r : updates)
 				need.add(r.getNewObjectId());
 			for (final Ref r : getRefs()) {
@@ -232,7 +230,7 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 			// be an empty pack, as the remote has all objects it
 			// needs to complete this change.
 			//
-			if (writer.getObjectCount() == 0)
+			if (writer.getObjectsNumber() == 0)
 				return;
 
 			packNames = new LinkedHashMap<String, String>();
@@ -259,7 +257,7 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 			final String wt = "Put " + base.substring(0, 12);
 			OutputStream os = dest.writeFile(pathPack, monitor, wt + "..pack");
 			try {
-				os = new SafeBufferedOutputStream(os);
+				os = new BufferedOutputStream(os);
 				writer.writePack(monitor, monitor, os);
 			} finally {
 				os.close();
@@ -267,7 +265,7 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 
 			os = dest.writeFile(pathIdx, monitor, wt + "..idx");
 			try {
-				os = new SafeBufferedOutputStream(os);
+				os = new BufferedOutputStream(os);
 				writer.writeIndex(os);
 			} finally {
 				os.close();
@@ -365,7 +363,7 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 			final String config = "[core]\n"
 					+ "\trepositoryformatversion = 0\n";
 			final byte[] bytes = Constants.encode(config);
-			dest.writeFile(ROOT_DIR + Constants.CONFIG, bytes);
+			dest.writeFile(ROOT_DIR + "config", bytes);
 		} catch (IOException e) {
 			throw new TransportException(uri, JGitText.get().cannotCreateConfig, e);
 		}

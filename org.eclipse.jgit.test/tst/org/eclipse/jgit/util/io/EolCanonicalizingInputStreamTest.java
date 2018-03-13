@@ -43,60 +43,37 @@
 
 package org.eclipse.jgit.util.io;
 
-import static org.junit.Assert.assertEquals;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 
-import org.junit.Test;
+import junit.framework.TestCase;
 
-public class EolCanonicalizingInputStreamTest {
+public class EolCanonicalizingInputStreamTest extends TestCase {
 
-	@Test
 	public void testLF() throws IOException {
 		final byte[] bytes = asBytes("1\n2\n3");
-		test(bytes, bytes, false);
+		test(bytes, bytes);
 	}
 
-	@Test
 	public void testCR() throws IOException {
 		final byte[] bytes = asBytes("1\r2\r3");
-		test(bytes, bytes, false);
+		test(bytes, bytes);
 	}
 
-	@Test
 	public void testCRLF() throws IOException {
-		test(asBytes("1\r\n2\r\n3"), asBytes("1\n2\n3"), false);
+		test(asBytes("1\r\n2\r\n3"), asBytes("1\n2\n3"));
 	}
 
-	@Test
 	public void testLFCR() throws IOException {
 		final byte[] bytes = asBytes("1\n\r2\n\r3");
-		test(bytes, bytes, false);
+		test(bytes, bytes);
 	}
 
-	@Test
-	public void testEmpty() throws IOException {
-		final byte[] bytes = asBytes("");
-		test(bytes, bytes, false);
-	}
-
-	@Test
-	public void testBinaryDetect() throws IOException {
-		final byte[] bytes = asBytes("1\r\n2\r\n3\0");
-		test(bytes, bytes, true);
-	}
-
-	@Test
-	public void testBinaryDontDetect() throws IOException {
-		test(asBytes("1\r\n2\r\n3\0"), asBytes("1\n2\n3\0"), false);
-	}
-
-	private void test(byte[] input, byte[] expected, boolean detectBinary) throws IOException {
+	private void test(byte[] input, byte[] expected) throws IOException {
 		final InputStream bis1 = new ByteArrayInputStream(input);
-		final InputStream cis1 = new EolCanonicalizingInputStream(bis1, detectBinary);
+		final InputStream cis1 = new EolCanonicalizingInputStream(bis1);
 		int index1 = 0;
 		for (int b = cis1.read(); b != -1; b = cis1.read()) {
 			assertEquals(expected[index1], (byte) b);
@@ -108,7 +85,7 @@ public class EolCanonicalizingInputStreamTest {
 		for (int bufferSize = 1; bufferSize < 10; bufferSize++) {
 			final byte[] buffer = new byte[bufferSize];
 			final InputStream bis2 = new ByteArrayInputStream(input);
-			final InputStream cis2 = new EolCanonicalizingInputStream(bis2, detectBinary);
+			final InputStream cis2 = new EolCanonicalizingInputStream(bis2);
 
 			int read = 0;
 			for (int readNow = cis2.read(buffer, 0, buffer.length); readNow != -1

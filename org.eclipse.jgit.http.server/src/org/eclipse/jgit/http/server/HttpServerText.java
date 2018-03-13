@@ -60,13 +60,11 @@ public class HttpServerText extends TranslationBundle {
 
 	/***/ public String alreadyInitializedByContainer;
 	/***/ public String cannotGetLengthOf;
-	/***/ public String clientHas175ChunkedEncodingBug;
 	/***/ public String encodingNotSupportedByThisLibrary;
 	/***/ public String expectedRepositoryAttribute;
 	/***/ public String filterMustNotBeNull;
 	/***/ public String internalErrorDuringReceivePack;
 	/***/ public String internalErrorDuringUploadPack;
-	/***/ public String internalServerError;
 	/***/ public String internalServerErrorRequestAttributeWasAlreadySet;
 	/***/ public String invalidBoolean;
 	/***/ public String invalidIndex;
@@ -75,8 +73,8 @@ public class HttpServerText extends TranslationBundle {
 	/***/ public String parameterNotSet;
 	/***/ public String pathForParamNotFound;
 	/***/ public String pathNotSupported;
-	/***/ public String repositoryAccessForbidden;
-	/***/ public String repositoryNotFound;
+	/***/ public String serviceNotEnabled;
+	/***/ public String serviceNotPermitted;
 	/***/ public String servletAlreadyInitialized;
 	/***/ public String servletMustNotBeNull;
 	/***/ public String servletWasAlreadyBound;

@@ -47,7 +47,7 @@ package org.eclipse.jgit.merge;
 import java.text.MessageFormat;
 import java.util.HashMap;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.Repository;
 
 /**
@@ -143,18 +143,4 @@ public abstract class MergeStrategy {
 	 * @return the new merge instance which implements this strategy.
 	 */
 	public abstract Merger newMerger(Repository db);
-
-	/**
-	 * Create a new merge instance.
-	 * 
-	 * @param db
-	 *            repository database the merger will read from, and eventually
-	 *            write results back to.
-	 * @param inCore
-	 *            the merge will happen in memory, working folder will not be
-	 *            modified, in case of a non-trivial merge that requires manual
-	 *            resolution, the merger will fail.
-	 * @return the new merge instance which implements this strategy.
-	 */
-	public abstract Merger newMerger(Repository db, boolean inCore);
 }

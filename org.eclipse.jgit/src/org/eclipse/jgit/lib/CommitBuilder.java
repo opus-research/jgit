@@ -76,6 +76,8 @@ public class CommitBuilder {
 
 	private static final byte[] hencoding = Constants.encodeASCII("encoding");
 
+	private ObjectId commitId;
+
 	private ObjectId treeId;
 
 	private ObjectId[] parentIds;
@@ -94,6 +96,21 @@ public class CommitBuilder {
 		encoding = Constants.CHARSET;
 	}
 
+	/** @return this commit's object id. */
+	public ObjectId getCommitId() {
+		return commitId;
+	}
+
+	/**
+	 * Set the id of this commit object.
+	 *
+	 * @param id
+	 *            the id that we calculated for this object.
+	 */
+	public void setCommitId(final ObjectId id) {
+		commitId = id;
+	}
+
 	/** @return id of the root tree listing this commit's snapshot. */
 	public ObjectId getTreeId() {
 		return treeId;
@@ -107,6 +124,7 @@ public class CommitBuilder {
 	 */
 	public void setTreeId(AnyObjectId id) {
 		treeId = id.copy();
+		commitId = null;
 	}
 
 	/** @return the author of this commit (who wrote it). */
@@ -122,6 +140,7 @@ public class CommitBuilder {
 	 */
 	public void setAuthor(PersonIdent newAuthor) {
 		author = newAuthor;
+		commitId = null;
 	}
 
 	/** @return the committer and commit time for this object. */
@@ -137,6 +156,7 @@ public class CommitBuilder {
 	 */
 	public void setCommitter(PersonIdent newCommitter) {
 		committer = newCommitter;
+		commitId = null;
 	}
 
 	/** @return the ancestors of this commit. Never null. */
@@ -152,6 +172,7 @@ public class CommitBuilder {
 	 */
 	public void setParentId(AnyObjectId newParent) {
 		parentIds = new ObjectId[] { newParent.copy() };
+		commitId = null;
 	}
 
 	/**
@@ -167,6 +188,7 @@ public class CommitBuilder {
 	 */
 	public void setParentIds(AnyObjectId parent1, AnyObjectId parent2) {
 		parentIds = new ObjectId[] { parent1.copy(), parent2.copy() };
+		commitId = null;
 	}
 
 	/**
@@ -179,6 +201,7 @@ public class CommitBuilder {
 		parentIds = new ObjectId[newParents.length];
 		for (int i = 0; i < newParents.length; i++)
 			parentIds[i] = newParents[i].copy();
+		commitId = null;
 	}
 
 	/**
@@ -191,6 +214,7 @@ public class CommitBuilder {
 		parentIds = new ObjectId[newParents.size()];
 		for (int i = 0; i < newParents.size(); i++)
 			parentIds[i] = newParents.get(i).copy();
+		commitId = null;
 	}
 
 	/**
@@ -204,9 +228,11 @@ public class CommitBuilder {
 			setParentId(additionalParent);
 		} else {
 			ObjectId[] newParents = new ObjectId[parentIds.length + 1];
-			System.arraycopy(parentIds, 0, newParents, 0, parentIds.length);
+			for (int i = 0; i < parentIds.length; i++)
+				newParents[i] = parentIds[i];
 			newParents[parentIds.length] = additionalParent.copy();
 			parentIds = newParents;
+			commitId = null;
 		}
 	}
 
@@ -253,13 +279,36 @@ public class CommitBuilder {
 	/**
 	 * Format this builder's state as a commit object.
 	 *
+	 * As a side effect, {@link #getCommitId()} will be populated with the
+	 * proper ObjectId for the formatted content.
+	 *
 	 * @return this object in the canonical commit format, suitable for storage
 	 *         in a repository.
 	 * @throws UnsupportedEncodingException
 	 *             the encoding specified by {@link #getEncoding()} is not
 	 *             supported by this Java runtime.
 	 */
-	public byte[] build() throws UnsupportedEncodingException {
+	public byte[] format() throws UnsupportedEncodingException {
+		return format(new ObjectInserter.Formatter());
+	}
+
+	/**
+	 * Format this builder's state as a commit object.
+	 *
+	 * As a side effect, {@link #getCommitId()} will be populated with the
+	 * proper ObjectId for the formatted content.
+	 *
+	 * @param oi
+	 *            the inserter whose formatting support will be reused. The
+	 *            inserter itself is not affected, and the commit is not
+	 *            actually inserted into the repository.
+	 * @return this object in the canonical commit format, suitable for storage
+	 *         in a repository.
+	 * @throws UnsupportedEncodingException
+	 *             the encoding specified by {@link #getEncoding()} is not
+	 *             supported by this Java runtime.
+	 */
+	public byte[] format(ObjectInserter oi) throws UnsupportedEncodingException {
 		ByteArrayOutputStream os = new ByteArrayOutputStream();
 		OutputStreamWriter w = new OutputStreamWriter(os, getEncoding());
 		try {
@@ -306,26 +355,18 @@ public class CommitBuilder {
 			//
 			throw new RuntimeException(err);
 		}
-		return os.toByteArray();
-	}
 
-	/**
-	 * Format this builder's state as a commit object.
-	 *
-	 * @return this object in the canonical commit format, suitable for storage
-	 *         in a repository.
-	 * @throws UnsupportedEncodingException
-	 *             the encoding specified by {@link #getEncoding()} is not
-	 *             supported by this Java runtime.
-	 */
-	public byte[] toByteArray() throws UnsupportedEncodingException {
-		return build();
+		byte[] content = os.toByteArray();
+		setCommitId(oi.idFor(Constants.OBJ_COMMIT, content));
+		return content;
 	}
 
 	@Override
 	public String toString() {
 		StringBuilder r = new StringBuilder();
 		r.append("Commit");
+		if (commitId != null)
+			r.append("[" + commitId.name() + "]");
 		r.append("={\n");
 
 		r.append("tree ");
