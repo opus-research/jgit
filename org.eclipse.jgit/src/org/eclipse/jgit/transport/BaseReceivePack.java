@@ -55,7 +55,6 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -136,10 +135,10 @@ public abstract class BaseReceivePack {
 	}
 
 	/** Database we write the stored objects into. */
-	protected final Repository db;
+	private final Repository db;
 
 	/** Revision traversal support over {@link #db}. */
-	protected final RevWalk walk;
+	private final RevWalk walk;
 
 	/**
 	 * Is the client connection a bi-directional socket or pipe?
@@ -152,22 +151,22 @@ public abstract class BaseReceivePack {
 	 * If false, this class runs in a read everything then output results mode,
 	 * making it suitable for single round-trip systems RPCs such as HTTP.
 	 */
-	protected boolean biDirectionalPipe = true;
+	private boolean biDirectionalPipe = true;
 
 	/** Expecting data after the pack footer */
-	protected boolean expectDataAfterPackFooter;
+	private boolean expectDataAfterPackFooter;
 
 	/** Should an incoming transfer validate objects? */
-	protected boolean checkReceivedObjects;
+	private boolean checkReceivedObjects;
 
 	/** Should an incoming transfer permit create requests? */
-	protected boolean allowCreates;
+	private boolean allowCreates;
 
 	/** Should an incoming transfer permit delete requests? */
-	protected boolean allowDeletes;
+	private boolean allowDeletes;
 
 	/** Should an incoming transfer permit non-fast-forward requests? */
-	protected boolean allowNonFastForwards;
+	private boolean allowNonFastForwards;
 
 	private boolean allowOfsDelta;
 
@@ -212,23 +211,20 @@ public abstract class BaseReceivePack {
 	private PackParser parser;
 
 	/** The refs we advertised as existing at the start of the connection. */
-	protected Map<String, Ref> refs;
+	private Map<String, Ref> refs;
 
 	/** All SHA-1s shown to the client, which can be possible edges. */
-	protected Set<ObjectId> advertisedHaves;
+	private Set<ObjectId> advertisedHaves;
 
 	/** Capabilities requested by the client. */
-	protected Set<String> enabledCapabilities;
+	private Set<String> enabledCapabilities;
 
 	private List<ReceiveCommand> commands;
 
 	private StringBuilder advertiseError;
 
-	/** If {@link BasePackPushConnection#CAPABILITY_REPORT_STATUS} is enabled. */
-	protected boolean reportStatus;
-
 	/** If {@link BasePackPushConnection#CAPABILITY_SIDE_BAND_64K} is enabled. */
-	protected boolean sideBand;
+	private boolean sideBand;
 
 	/** Lock around the received pack file, while updating refs. */
 	private PackLock packLock;
@@ -872,9 +868,7 @@ public abstract class BaseReceivePack {
 
 	/** Enable capabilities based on a previously read capabilities line. */
 	protected void enableCapabilities() {
-		reportStatus = enabledCapabilities.contains(CAPABILITY_REPORT_STATUS);
-
-		sideBand = enabledCapabilities.contains(CAPABILITY_SIDE_BAND_64K);
+		sideBand = isCapabilityEnabled(CAPABILITY_SIDE_BAND_64K);
 		if (sideBand) {
 			OutputStream out = rawOut;
 
@@ -884,6 +878,17 @@ public abstract class BaseReceivePack {
 			pckOut = new PacketLineOut(rawOut);
 			pckOut.setFlushOnEnd(false);
 		}
+	}
+
+	/**
+	 * Check if the peer requested a capability.
+	 *
+	 * @param name
+	 *            protocol name identifying the capability.
+	 * @return true if the peer requested the capability to be enabled.
+	 */
+	protected boolean isCapabilityEnabled(String name) {
+		return enabledCapabilities.contains(name);
 	}
 
 	/** @return true if a pack is expected based on the list of commands. */
@@ -1049,8 +1054,8 @@ public abstract class BaseReceivePack {
 					// A well behaved client shouldn't have sent us a
 					// create command for a ref we advertised to it.
 					//
-					cmd.setResult(Result.REJECTED_OTHER_REASON, MessageFormat
-							.format(JGitText.get().refAlreadyExists, ref));
+					cmd.setResult(Result.REJECTED_OTHER_REASON,
+							JGitText.get().refAlreadyExists);
 					continue;
 				}
 			}
