@@ -143,7 +143,7 @@ public abstract class PackParser {
 
 	private boolean expectDataAfterPackFooter;
 
-	private long expectedObjectCount;
+	private long objectCount;
 
 	private PackedObjectInfo[] entries;
 
@@ -525,15 +525,15 @@ public abstract class PackParser {
 		try {
 			readPackHeader();
 
-			entries = new PackedObjectInfo[(int) expectedObjectCount];
+			entries = new PackedObjectInfo[(int) objectCount];
 			baseById = new ObjectIdOwnerMap<>();
 			baseByPos = new LongMap<>();
 			collisionCheckObjs = new BlockList<>();
 
 			receiving.beginTask(JGitText.get().receivingObjects,
-					(int) expectedObjectCount);
+					(int) objectCount);
 			try {
-				for (int done = 0; done < expectedObjectCount; done++) {
+				for (int done = 0; done < objectCount; done++) {
 					indexOneObject();
 					receiving.update(1);
 					if (receiving.isCancelled())
@@ -557,19 +557,19 @@ public abstract class PackParser {
 				}
 				resolving.beginTask(JGitText.get().resolvingDeltas, deltaCount);
 				resolveDeltas(resolving);
-				if (entryCount < expectedObjectCount) {
+				if (entryCount < objectCount) {
 					if (!isAllowThin()) {
 						throw new IOException(MessageFormat.format(
 								JGitText.get().packHasUnresolvedDeltas,
-								Long.valueOf(expectedObjectCount - entryCount)));
+								Long.valueOf(objectCount - entryCount)));
 					}
 
 					resolveDeltasWithExternalBases(resolving);
 
-					if (entryCount < expectedObjectCount) {
+					if (entryCount < objectCount) {
 						throw new IOException(MessageFormat.format(
 								JGitText.get().packHasUnresolvedDeltas,
-								Long.valueOf(expectedObjectCount - entryCount)));
+								Long.valueOf(objectCount - entryCount)));
 					}
 				}
 				resolving.endTask();
@@ -878,7 +878,7 @@ public abstract class PackParser {
 	private void growEntries(int extraObjects) {
 		final PackedObjectInfo[] ne;
 
-		ne = new PackedObjectInfo[(int) expectedObjectCount + extraObjects];
+		ne = new PackedObjectInfo[(int) objectCount + extraObjects];
 		System.arraycopy(entries, 0, ne, 0, entryCount);
 		entries = ne;
 	}
@@ -901,9 +901,9 @@ public abstract class PackParser {
 		if (vers != 2 && vers != 3)
 			throw new IOException(MessageFormat.format(
 					JGitText.get().unsupportedPackVersion, Long.valueOf(vers)));
-		final long objectCount = NB.decodeUInt32(buf, p + 8);
+		objectCount = NB.decodeUInt32(buf, p + 8);
 		use(hdrln);
-		setExpectedObjectCount(objectCount);
+
 		onPackHeader(objectCount);
 	}
 
@@ -1258,23 +1258,6 @@ public abstract class PackParser {
 		if (delta != null)
 			oe.setCRC(delta.crc);
 		return oe;
-	}
-
-	/**
-	 * Set the expected number of objects in the pack stream.
-	 * <p>
-	 * The object count in the pack header is not always correct for some Dfs
-	 * pack files. e.g. INSERT pack always assume 1 object in the header since
-	 * the actual object count is unknown when the pack is written.
-	 * <p>
-	 * If external implementation wants to overwrite the expectedObjectCount,
-	 * they should call this method during {@link #onPackHeader(long)}.
-	 *
-	 * @param expectedObjectCount
-	 * @since 4.9
-	 */
-	protected void setExpectedObjectCount(long expectedObjectCount) {
-		this.expectedObjectCount = expectedObjectCount;
 	}
 
 	/**
