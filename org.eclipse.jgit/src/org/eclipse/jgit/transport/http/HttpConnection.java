@@ -234,11 +234,6 @@ public interface HttpConnection {
 	public String getRequestMethod();
 
 	/**
-	 * @see HttpURLConnection#disconnect()
-	 */
-	public void disconnect();
-
-	/**
 	 * @see HttpURLConnection#usingProxy()
 	 * @return a boolean indicating if the connection is using a proxy.
 	 */
@@ -263,7 +258,6 @@ public interface HttpConnection {
 	 * @param random
 	 *            the source of randomness for this generator or null. See
 	 *            {@link SSLContext#init(KeyManager[], TrustManager[], SecureRandom)}
-	 *
 	 * @throws NoSuchAlgorithmException
 	 * @throws KeyManagementException
 	 */
