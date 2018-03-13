@@ -459,13 +459,9 @@ public class TestRepository<R extends Repository> {
 	 */
 	public <T extends AnyObjectId> T update(String ref, T obj) throws Exception {
 		if (Constants.HEAD.equals(ref)) {
-			// nothing
 		} else if ("FETCH_HEAD".equals(ref)) {
-			// nothing
 		} else if ("MERGE_HEAD".equals(ref)) {
-			// nothing
 		} else if (ref.startsWith(Constants.R_REFS)) {
-			// nothing
 		} else
 			ref = Constants.R_HEADS + ref;
 
@@ -541,30 +537,10 @@ public class TestRepository<R extends Repository> {
 	 */
 	public BranchBuilder branch(String ref) {
 		if (Constants.HEAD.equals(ref)) {
-			// nothing
 		} else if (ref.startsWith(Constants.R_REFS)) {
-			// nothing
 		} else
 			ref = Constants.R_HEADS + ref;
 		return new BranchBuilder(ref);
-	}
-
-	/**
-	 * Tag an object using a lightweight tag.
-	 *
-	 * @param name
-	 *            the tag name. The /refs/tags/ prefix will be added if the name
-	 *            doesn't start with it
-	 * @param obj
-	 *            the object to tag
-	 * @return the tagged object
-	 * @throws Exception
-	 */
-	public ObjectId lightweightTag(String name, ObjectId obj) throws Exception {
-		if (!name.startsWith(Constants.R_TAGS)) {
-			name = Constants.R_TAGS + name;
-		}
-		return update(name, obj);
 	}
 
 	/**
@@ -751,8 +727,6 @@ public class TestRepository<R extends Repository> {
 
 		private final DirCache tree = DirCache.newInCore();
 
-		private ObjectId topLevelTree;
-
 		private final List<RevCommit> parents = new ArrayList<RevCommit>(2);
 
 		private int tick = 1;
@@ -807,29 +781,20 @@ public class TestRepository<R extends Repository> {
 			return this;
 		}
 
-		public CommitBuilder setTopLevelTree(ObjectId treeId) {
-			topLevelTree = treeId;
-			return this;
-		}
-
 		public CommitBuilder add(String path, String content) throws Exception {
 			return add(path, blob(content));
 		}
 
 		public CommitBuilder add(String path, final RevBlob id)
 				throws Exception {
-			return edit(new PathEdit(path) {
+			DirCacheEditor e = tree.editor();
+			e.add(new PathEdit(path) {
 				@Override
 				public void apply(DirCacheEntry ent) {
 					ent.setFileMode(FileMode.REGULAR_FILE);
 					ent.setObjectId(id);
 				}
 			});
-		}
-
-		public CommitBuilder edit(PathEdit edit) {
-			DirCacheEditor e = tree.editor();
-			e.add(edit);
 			e.finish();
 			return this;
 		}
@@ -865,10 +830,7 @@ public class TestRepository<R extends Repository> {
 
 				ObjectId commitId;
 				try {
-					if (topLevelTree != null)
-						c.setTreeId(topLevelTree);
-					else
-						c.setTreeId(tree.writeTree(inserter));
+					c.setTreeId(tree.writeTree(inserter));
 					commitId = inserter.insert(c);
 					inserter.flush();
 				} finally {
