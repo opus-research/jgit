@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-   Copyright (C) 2012, Matthias Sohn <matthias.sohn@sap.com>
+   Copyright (C) 2009-2010, Google Inc.
+   Copyright (C) 2008, Imran M Yousuf <imyousuf@smartitengineering.com>
    and other copyright owners as documented in the project's IP log.
 
    This program and the accompanying materials are made available
@@ -49,45 +50,54 @@
 
   <parent>
     <groupId>org.eclipse.jgit</groupId>
-    <artifactId>jgit.tycho.parent</artifactId>
+    <artifactId>org.eclipse.jgit-parent</artifactId>
     <version>2.3.0-SNAPSHOT</version>
   </parent>
 
-  <groupId>org.eclipse.jgit.feature</groupId>
-  <artifactId>org.eclipse.jgit.pgm</artifactId>
-  <packaging>eclipse-feature</packaging>
+  <artifactId>org.eclipse.jgit.iplog</artifactId>
+  <name>JGit - Eclipse IP Log Generator</name>
 
-  <name>JGit Command Line Interface Feature</name>
+  <description>
+    Creates an IP log for Git based projects.
+  </description>
+
+  <properties>
+    <translate-qualifier/>
+  </properties>
 
   <dependencies>
     <dependency>
-      <groupId>args4j</groupId>
-      <artifactId>args4j</artifactId>
-    </dependency>
-
-    <dependency>
       <groupId>org.eclipse.jgit</groupId>
       <artifactId>org.eclipse.jgit</artifactId>
-      <version>2.3.0-SNAPSHOT</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.eclipse.jgit</groupId>
-      <artifactId>org.eclipse.jgit.pgm</artifactId>
-      <version>2.3.0-SNAPSHOT</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.eclipse.jgit</groupId>
-      <artifactId>org.eclipse.jgit.iplog</artifactId>
-      <version>2.3.0-SNAPSHOT</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.eclipse.jgit</groupId>
-      <artifactId>org.eclipse.jgit.ui</artifactId>
-      <version>2.3.0-SNAPSHOT</version>
+      <version>${project.version}</version>
     </dependency>
   </dependencies>
 
+  <build>
+    <sourceDirectory>src/</sourceDirectory>
+
+    <resources>
+      <resource>
+        <directory>.</directory>
+        <includes>
+          <include>plugin.properties</include>
+          <include>about.html</include>
+        </includes>
+      </resource>
+      <resource>
+        <directory>resources/</directory>
+      </resource>
+    </resources>
+
+    <plugins>
+      <plugin>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifestFile>${bundle-manifest}</manifestFile>
+          </archive>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>

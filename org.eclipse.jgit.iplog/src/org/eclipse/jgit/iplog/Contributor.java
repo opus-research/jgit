@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,44 +41,60 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.nls;
+package org.eclipse.jgit.iplog;
 
-import org.eclipse.jgit.awtui.UIText;
-import org.eclipse.jgit.console.ConsoleText;
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.iplog.IpLogText;
-import org.eclipse.jgit.pgm.CLIText;
-import org.junit.Before;
-import org.junit.Test;
+import java.text.MessageFormat;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 
-public class RootLocaleTest {
-	@Before
-	public void setUp() {
-		NLS.setLocale(NLS.ROOT_LOCALE);
+/** A project contributor (non-committer). */
+class Contributor {
+	/** Sorts contributors by their name first name, then last name. */
+	static final Comparator<Contributor> COMPARATOR = new Comparator<Contributor>() {
+		public int compare(Contributor a, Contributor b) {
+			return a.name.compareTo(b.name);
+		}
+	};
+
+	private final String id;
+
+	private final String name;
+
+	private final List<SingleContribution> contributions = new ArrayList<SingleContribution>();
+
+	/**
+	 * @param id
+	 * @param name
+	 */
+	Contributor(String id, String name) {
+		this.id = id;
+		this.name = name;
 	}
 
-	@Test
-	public void testJGitText() {
-		NLS.getBundleFor(JGitText.class);
+	/** @return unique identity of this contributor in the foundation database. */
+	String getID() {
+		return id;
 	}
 
-	@Test
-	public void testConsoleText() {
-		NLS.getBundleFor(ConsoleText.class);
+	/** @return name of the contributor. */
+	String getName() {
+		return name;
 	}
 
-	@Test
-	public void testCLIText() {
-		NLS.getBundleFor(CLIText.class);
+	/** @return all known contributions. */
+	Collection<SingleContribution> getContributions() {
+		return Collections.unmodifiableCollection(contributions);
 	}
 
-	@Test
-	public void testUIText() {
-		NLS.getBundleFor(UIText.class);
+	void add(SingleContribution bug) {
+		contributions.add(bug);
 	}
 
-	@Test
-	public void testIpLogText() {
-		NLS.getBundleFor(IpLogText.class);
+	@Override
+	public String toString() {
+		return MessageFormat.format(IpLogText.get().contributorString, getName());
 	}
 }

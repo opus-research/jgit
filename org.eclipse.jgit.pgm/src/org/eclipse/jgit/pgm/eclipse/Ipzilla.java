@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,44 +41,59 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.nls;
+package org.eclipse.jgit.pgm.eclipse;
 
-import org.eclipse.jgit.awtui.UIText;
-import org.eclipse.jgit.console.ConsoleText;
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.iplog.IpLogText;
+import java.io.File;
+import java.net.Authenticator;
+import java.net.CookieHandler;
+import java.net.PasswordAuthentication;
+import java.net.URL;
+
+import org.eclipse.jgit.iplog.IpLogMeta;
+import org.eclipse.jgit.iplog.SimpleCookieManager;
 import org.eclipse.jgit.pgm.CLIText;
-import org.junit.Before;
-import org.junit.Test;
+import org.eclipse.jgit.pgm.Command;
+import org.eclipse.jgit.pgm.TextBuiltin;
+import org.kohsuke.args4j.Option;
 
-public class RootLocaleTest {
-	@Before
-	public void setUp() {
-		NLS.setLocale(NLS.ROOT_LOCALE);
-	}
+@Command(name = "eclipse-ipzilla", common = false, usage = "usage_synchronizeIPZillaData")
+class Ipzilla extends TextBuiltin {
+	@Option(name = "--url", metaVar = "metaVar_url", usage = "usage_IPZillaURL")
+	private String url = "https://dev.eclipse.org/ipzilla/"; //$NON-NLS-1$
 
-	@Test
-	public void testJGitText() {
-		NLS.getBundleFor(JGitText.class);
-	}
+	@Option(name = "--username", metaVar = "metaVar_user", usage = "usage_IPZillaUsername")
+	private String username;
 
-	@Test
-	public void testConsoleText() {
-		NLS.getBundleFor(ConsoleText.class);
-	}
+	@Option(name = "--password", metaVar = "metaVar_pass", usage = "usage_IPZillaPassword")
+	private String password;
 
-	@Test
-	public void testCLIText() {
-		NLS.getBundleFor(CLIText.class);
-	}
+	@Option(name = "--file", aliases = { "-f" }, metaVar = "metaVar_file", usage = "usage_inputOutputFile")
+	private File output;
 
-	@Test
-	public void testUIText() {
-		NLS.getBundleFor(UIText.class);
-	}
+	@Override
+	protected void run() throws Exception {
+		if (CookieHandler.getDefault() == null)
+			CookieHandler.setDefault(new SimpleCookieManager());
 
-	@Test
-	public void testIpLogText() {
-		NLS.getBundleFor(IpLogText.class);
+		final URL ipzilla = new URL(url);
+		if (username == null) {
+			final PasswordAuthentication auth = Authenticator
+					.requestPasswordAuthentication(ipzilla.getHost(), //
+							null, //
+							ipzilla.getPort(), //
+							ipzilla.getProtocol(), //
+							CLIText.get().IPZillaPasswordPrompt, //
+							ipzilla.getProtocol(), //
+							ipzilla, //
+							Authenticator.RequestorType.SERVER);
+			username = auth.getUserName();
+			password = new String(auth.getPassword());
+		}
+
+		if (output == null)
+			output = new File(db.getWorkTree(), IpLogMeta.IPLOG_CONFIG_FILE);
+
+		IpLogMeta meta = new IpLogMeta();
+		meta.syncCQs(output, db.getFS(), ipzilla, username, password);
 	}
 }

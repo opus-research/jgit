@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,44 +41,59 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.nls;
+package org.eclipse.jgit.iplog;
 
-import org.eclipse.jgit.awtui.UIText;
-import org.eclipse.jgit.console.ConsoleText;
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.iplog.IpLogText;
-import org.eclipse.jgit.pgm.CLIText;
-import org.junit.Before;
-import org.junit.Test;
+import java.util.Comparator;
+import java.util.Date;
 
-public class RootLocaleTest {
-	@Before
-	public void setUp() {
-		NLS.setLocale(NLS.ROOT_LOCALE);
+/** A single contribution by a {@link Contributor}. */
+class SingleContribution {
+	/** Sorts contributors by their name first name, then last name. */
+	public static final Comparator<SingleContribution> COMPARATOR = new Comparator<SingleContribution>() {
+		public int compare(SingleContribution a, SingleContribution b) {
+			return a.created.compareTo(b.created);
+		}
+	};
+
+	private final String id;
+
+	private String summary;
+
+	private Date created;
+
+	private String size;
+
+	/**
+	 * @param id
+	 * @param created
+	 * @param summary
+	 */
+	SingleContribution(String id, Date created, String summary) {
+		this.id = id;
+		this.summary = summary;
+		this.created = created;
 	}
 
-	@Test
-	public void testJGitText() {
-		NLS.getBundleFor(JGitText.class);
+	/** @return unique identity of the contribution. */
+	String getID() {
+		return id;
 	}
 
-	@Test
-	public void testConsoleText() {
-		NLS.getBundleFor(ConsoleText.class);
+	/** @return date the contribution was created. */
+	Date getCreated() {
+		return created;
 	}
 
-	@Test
-	public void testCLIText() {
-		NLS.getBundleFor(CLIText.class);
+	/** @return summary of the contribution. */
+	String getSummary() {
+		return summary;
 	}
 
-	@Test
-	public void testUIText() {
-		NLS.getBundleFor(UIText.class);
+	String getSize() {
+		return size;
 	}
 
-	@Test
-	public void testIpLogText() {
-		NLS.getBundleFor(IpLogText.class);
+	void setSize(String sz) {
+		size = sz;
 	}
 }

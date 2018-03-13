@@ -41,44 +41,39 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.nls;
+package org.eclipse.jgit.iplog;
 
-import org.eclipse.jgit.awtui.UIText;
-import org.eclipse.jgit.console.ConsoleText;
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.iplog.IpLogText;
-import org.eclipse.jgit.pgm.CLIText;
-import org.junit.Before;
-import org.junit.Test;
+import org.eclipse.jgit.nls.NLS;
+import org.eclipse.jgit.nls.TranslationBundle;
 
-public class RootLocaleTest {
-	@Before
-	public void setUp() {
-		NLS.setLocale(NLS.ROOT_LOCALE);
+/**
+ * Translation bundle for JGit IP Log
+ */
+public class IpLogText extends TranslationBundle {
+
+	/**
+	 * @return an instance of this translation bundle
+	 */
+	public static IpLogText get() {
+		return NLS.getBundleFor(IpLogText.class);
 	}
 
-	@Test
-	public void testJGitText() {
-		NLS.getBundleFor(JGitText.class);
-	}
-
-	@Test
-	public void testConsoleText() {
-		NLS.getBundleFor(ConsoleText.class);
-	}
-
-	@Test
-	public void testCLIText() {
-		NLS.getBundleFor(CLIText.class);
-	}
-
-	@Test
-	public void testUIText() {
-		NLS.getBundleFor(UIText.class);
-	}
-
-	@Test
-	public void testIpLogText() {
-		NLS.getBundleFor(IpLogText.class);
-	}
+	// @formatter:off
+	/***/ public String CQString;
+	/***/ public String CSVParsingError;
+	/***/ public String cannotLock;
+	/***/ public String cannotSerializeXML;
+	/***/ public String cannotWrite;
+	/***/ public String committerString;
+	/***/ public String configurationFileInCommitHasNoProjectsDeclared;
+	/***/ public String configurationFileInCommitIsInvalid;
+	/***/ public String contributorString;
+	/***/ public String incorrectlyScanned;
+	/***/ public String invalidDate;
+	/***/ public String invalidURIFormat;
+	/***/ public String loginFailed;
+	/***/ public String pageTitleWas;
+	/***/ public String projectString;
+	/***/ public String queryFailed;
+	/***/ public String responseNotHTMLAsExpected;
 }

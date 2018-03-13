@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,44 +41,94 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.nls;
+package org.eclipse.jgit.iplog;
 
-import org.eclipse.jgit.awtui.UIText;
-import org.eclipse.jgit.console.ConsoleText;
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.iplog.IpLogText;
-import org.eclipse.jgit.pgm.CLIText;
-import org.junit.Before;
-import org.junit.Test;
+import java.text.MessageFormat;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Set;
+import java.util.TreeSet;
 
-public class RootLocaleTest {
-	@Before
-	public void setUp() {
-		NLS.setLocale(NLS.ROOT_LOCALE);
+import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectIdSubclassMap;
+
+/** Description of a project. */
+class Project {
+	/** Sorts projects by unique identities. */
+	static final Comparator<Project> COMPARATOR = new Comparator<Project>() {
+		public int compare(Project a, Project b) {
+			return a.getID().compareTo(b.getID());
+		}
+	};
+
+	private final String id;
+
+	private final String name;
+
+	private String comments;
+
+	private final Set<String> licenses = new TreeSet<String>();
+
+	private final ObjectIdSubclassMap<ObjectId> skipCommits = new ObjectIdSubclassMap<ObjectId>();
+
+	private String version;
+
+	/**
+	 * @param id
+	 * @param name
+	 */
+	Project(String id, String name) {
+		this.id = id;
+		this.name = name;
 	}
 
-	@Test
-	public void testJGitText() {
-		NLS.getBundleFor(JGitText.class);
+	/** @return unique identity of this project. */
+	String getID() {
+		return id;
 	}
 
-	@Test
-	public void testConsoleText() {
-		NLS.getBundleFor(ConsoleText.class);
+	/** @return name of this project. */
+	String getName() {
+		return name;
 	}
 
-	@Test
-	public void testCLIText() {
-		NLS.getBundleFor(CLIText.class);
+	/** @return any additional comments about this project. */
+	String getComments() {
+		return comments;
 	}
 
-	@Test
-	public void testUIText() {
-		NLS.getBundleFor(UIText.class);
+	void setComments(String comments) {
+		this.comments = comments;
 	}
 
-	@Test
-	public void testIpLogText() {
-		NLS.getBundleFor(IpLogText.class);
+	/** @return the licenses this project is released under. */
+	Set<String> getLicenses() {
+		return Collections.unmodifiableSet(licenses);
+	}
+
+	void addLicense(String licenseName) {
+		licenses.add(licenseName);
+	}
+
+	void addSkipCommit(AnyObjectId commit) {
+		skipCommits.add(commit.copy());
+	}
+
+	boolean isSkippedCommit(AnyObjectId commit) {
+		return skipCommits.contains(commit);
+	}
+
+	String getVersion() {
+		return version;
+	}
+
+	void setVersion(String v) {
+		version = v;
+	}
+
+	@Override
+	public String toString() {
+		return MessageFormat.format(IpLogText.get().projectString, getID(), getName());
 	}
 }
