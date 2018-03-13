@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2012, Tomasz Zarna <tomasz.zarna@tasktop.com> and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,61 +40,34 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.pgm;
 
-package org.eclipse.jgit.iplog;
+import static org.junit.Assert.assertEquals;
 
-import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.junit.Before;
+import org.junit.Test;
 
-/** A project contributor (non-committer). */
-class Contributor {
-	/** Sorts contributors by their name first name, then last name. */
-	static final Comparator<Contributor> COMPARATOR = new Comparator<Contributor>() {
-		public int compare(Contributor a, Contributor b) {
-			return a.name.compareTo(b.name);
-		}
-	};
-
-	private final String id;
-
-	private final String name;
-
-	private final List<SingleContribution> contributions = new ArrayList<SingleContribution>();
-
-	/**
-	 * @param id
-	 * @param name
-	 */
-	Contributor(String id, String name) {
-		this.id = id;
-		this.name = name;
-	}
-
-	/** @return unique identity of this contributor in the foundation database. */
-	String getID() {
-		return id;
-	}
-
-	/** @return name of the contributor. */
-	String getName() {
-		return name;
-	}
-
-	/** @return all known contributions. */
-	Collection<SingleContribution> getContributions() {
-		return Collections.unmodifiableCollection(contributions);
-	}
-
-	void add(SingleContribution bug) {
-		contributions.add(bug);
-	}
+public class TagTest extends CLIRepositoryTestCase {
+	private Git git;
 
 	@Override
-	public String toString() {
-		return MessageFormat.format(IpLogText.get().contributorString, getName());
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		git = new Git(db);
+		git.commit().setMessage("initial commit").call();
+	}
+
+	@Test
+	public void testTagTwice() throws Exception {
+		git.tag().setName("test").call();
+		writeTrashFile("file", "content");
+		git.add().addFilepattern("file").call();
+		git.commit().setMessage("commit").call();
+
+		assertEquals("fatal: tag 'test' already exists",
+				execute("git tag test")[0]);
 	}
 }
