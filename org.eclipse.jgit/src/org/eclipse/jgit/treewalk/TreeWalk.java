@@ -45,23 +45,25 @@
 package org.eclipse.jgit.treewalk;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.attributes.Attribute;
+import org.eclipse.jgit.attributes.Attribute.State;
 import org.eclipse.jgit.attributes.Attributes;
 import org.eclipse.jgit.attributes.AttributesNode;
 import org.eclipse.jgit.attributes.AttributesNodeProvider;
 import org.eclipse.jgit.attributes.AttributesProvider;
-import org.eclipse.jgit.attributes.MacroExpanderImpl;
-import org.eclipse.jgit.attributes.Attribute.State;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StopWalkException;
 import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.MutableObjectId;
@@ -71,6 +73,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
+import org.eclipse.jgit.util.QuotedString;
 import org.eclipse.jgit.util.RawParseUtils;
 
 /**
@@ -116,6 +119,12 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 *            Type of operation you want to retrieve the git attributes for.
 	 */
 	private OperationType operationType = OperationType.CHECKOUT_OP;
+
+	/**
+	 * The filter command as defined in gitattributes. The keys are
+	 * filterName+"."+filterCommandType. E.g. "lfs.clean"
+	 */
+	private Map<String, String> filterCommandsByNameDotType = new HashMap<String, String>();
 
 	/**
 	 * @param operationType
@@ -255,12 +264,12 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 
 	private AttributesNodeProvider attributesNodeProvider;
 
-	private final MacroExpanderImpl macroExpander = new MacroExpanderImpl();
-
 	AbstractTreeIterator currentHead;
 
 	/** Cached attribute for the current entry */
 	private Attributes attrs = null;
+
+	private Config config;
 
 	/**
 	 * Create a new tree walker for a given repository.
@@ -272,6 +281,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 */
 	public TreeWalk(final Repository repo) {
 		this(repo.newObjectReader(), true);
+		config = repo.getConfig();
 		attributesNodeProvider = repo.createAttributesNodeProvider();
 	}
 
@@ -1153,28 +1163,19 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 			// Gets the info attributes node
 			AttributesNode infoNodeAttr = attributesNodeProvider
 					.getInfoAttributesNode();
-			// Gets the root attributes node
-			AttributesNode rootNodeAttr = getRootAttributesNode(operationType,
-					workingTreeIterator, dirCacheIterator, other);
-
-			// Update the macro expander using the global node, the info node
-			// and the current root node
-			macroExpander.updateWhenDifferent(globalNodeAttr, infoNodeAttr,
-					rootNodeAttr);
 
 			// Gets the info attributes
 			if (infoNodeAttr != null) {
-				infoNodeAttr.getAttributes(macroExpander, path, isDir,
-						attributes);
+				infoNodeAttr.getAttributes(path, isDir, attributes);
 			}
 
 			// Gets the attributes located on the current entry path
-			getPerDirectoryEntryAttributes(path, isDir, operationType, workingTreeIterator, dirCacheIterator, other, attributes);
+			getPerDirectoryEntryAttributes(path, isDir, operationType,
+					workingTreeIterator, dirCacheIterator, other, attributes);
 
 			// Gets the attributes located in the global attribute file
 			if (globalNodeAttr != null) {
-				globalNodeAttr.getAttributes(macroExpander, path, isDir,
-						attributes);
+				globalNodeAttr.getAttributes(path, isDir, attributes);
 			}
 		} catch (IOException e) {
 			throw new JGitInternalException("Error while parsing attributes", e); //$NON-NLS-1$
@@ -1221,7 +1222,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 			AttributesNode currentAttributesNode = getCurrentAttributesNode(
 					opType, workingTreeIterator, dirCacheIterator, other);
 			if (currentAttributesNode != null) {
-				currentAttributesNode.getAttributes(macroExpander, path, isDir,						attributes);
+				currentAttributesNode.getAttributes(path, isDir, attributes);
 			}
 			getPerDirectoryEntryAttributes(path, isDir, opType,
 					getParent(workingTreeIterator, WorkingTreeIterator.class),
@@ -1236,17 +1237,6 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 			AbstractTreeIterator parent = current.parent;
 			if (type.isInstance(parent)) {
 				return type.cast(parent);
-			}
-		}
-		return null;
-	}
-
-	private static <T extends AbstractTreeIterator> T getRoot(T current,
-			Class<T> type) {
-		if (current != null) {
-			AbstractTreeIterator root = current.root;
-			if (type.isInstance(root)) {
-				return type.cast(root);
 			}
 		}
 		return null;
@@ -1333,86 +1323,64 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	}
 
 	/**
-	 * Gets the {@link AttributesNode} for the root folder. This is needed for
-	 * the git macro expansion facilty that requires the global, the info and
-	 * the root attributes node.
-	 * <p>
-	 * This method implements the fallback mechanism between the index and the
-	 * working tree depending on the operation type
-	 * </p>
+	 * Inspect config and attributes to return a filtercommand applicable for
+	 * the current path
 	 *
-	 * @param opType
-	 * @param workingTreeIterator
-	 * @param dirCacheIterator
-	 * @param other
-	 * @return the root {@link AttributesNode} of the tree,
-	 *         {@link NullPointerException} otherwise.
+	 * @param filterCommandType
+	 *            which type of filterCommand should be executed. E.g. "clean",
+	 *            "smudge"
+	 * @return a filter command
 	 * @throws IOException
-	 *             It raises an {@link IOException} if a problem appears while
-	 *             parsing one on the attributes file.
+	 * @since 4.2
 	 */
-	private AttributesNode getRootAttributesNode(OperationType opType,
-			@Nullable WorkingTreeIterator workingTreeIterator,
-			@Nullable DirCacheIterator dirCacheIterator,
-			@Nullable CanonicalTreeParser other) throws IOException {
-		AttributesNode attributesNode = null;
-		switch (opType) {
-		case CHECKIN_OP:
-			if (workingTreeIterator != null) {
-				WorkingTreeIterator root = getRoot(workingTreeIterator,
-						WorkingTreeIterator.class);
-				if (root != null) {
-					attributesNode = root.getEntryAttributesNode();
-				}
-			}
-			if (attributesNode == null && dirCacheIterator != null) {
-				DirCacheIterator root = getRoot(dirCacheIterator,
-						DirCacheIterator.class);
-				if (root != null) {
-					attributesNode = root
-							.getEntryAttributesNode(getObjectReader());
-				}
- 			}
-			if (attributesNode == null && other != null) {
-				CanonicalTreeParser root = getRoot(other,
-						CanonicalTreeParser.class);
-				if (root != null) {
-					attributesNode = root
-						.getEntryAttributesNode(getObjectReader());
-				}
-			}
-			break;
-		case CHECKOUT_OP:
-			if (other != null) {
-				CanonicalTreeParser root = getRoot(other,
-						CanonicalTreeParser.class);
-				if (root != null) {
-					attributesNode = root
-						.getEntryAttributesNode(getObjectReader());
-				}
-			}
-			if (dirCacheIterator != null) {
-				DirCacheIterator root = getRoot(dirCacheIterator,
-						DirCacheIterator.class);
-				if (root != null) {
-					attributesNode = root
-						.getEntryAttributesNode(getObjectReader());
-				}
-			}
-			if (attributesNode == null && workingTreeIterator != null) {
-				WorkingTreeIterator root = getRoot(workingTreeIterator,
-						WorkingTreeIterator.class);
-				if (root != null) {
-					attributesNode = root.getEntryAttributesNode();
-				}
-			}
-			break;
-		default:
-			throw new IllegalStateException(
-					"The only operation type handled are:" //$NON-NLS-1$
-							+ OperationType.CHECKIN_OP + "," //$NON-NLS-1$
-							+ OperationType.CHECKOUT_OP);
+	public String getFilterCommand(String filterCommandType)
+			throws IOException {
+		Attributes attributes = getAttributes();
+
+		Attribute f = attributes.get(Constants.ATTR_FILTER);
+		if (f == null) {
+			return null;
 		}
-		return attributesNode;
+		String filterValue = f.getValue();
+		if (filterValue == null) {
+			return null;
+		}
+
+		String filterCommand = getFilterCommandDefinition(filterValue,
+				filterCommandType);
+		if (filterCommand == null) {
+			return null;
+		}
+		return filterCommand.replaceAll("%f", //$NON-NLS-1$
+				QuotedString.BOURNE.quote((getPathString())));
+	}
+
+	/**
+	 * Get the filter command how it is defined in gitconfig. The returned
+	 * string may contain "%f" which needs to be replaced by the current path
+	 * before executing the filter command. These filter definitions are cached
+	 * for better performance.
+	 *
+	 * @param filterDriverName
+	 *            The name of the filter driver as it is referenced in the
+	 *            gitattributes file. E.g. "lfs". For each filter driver there
+	 *            may be many commands defined in the .gitconfig
+	 * @param filterCommandType
+	 *            The type of the filter command for a specific filter driver.
+	 *            May be "clean" or "smudge".
+	 * @return the definition of the command to be executed for this filter
+	 *         driver and filter command
+	 */
+	private String getFilterCommandDefinition(String filterDriverName,
+			String filterCommandType) {
+		String key = filterDriverName + "." + filterCommandType; //$NON-NLS-1$
+		String filterCommand = filterCommandsByNameDotType.get(key);
+		if (filterCommand != null)
+			return filterCommand;
+		filterCommand = config.getString(Constants.ATTR_FILTER,
+				filterDriverName, filterCommandType);
+		if (filterCommand != null)
+			filterCommandsByNameDotType.put(key, filterCommand);
+		return filterCommand;
 	}
 }
