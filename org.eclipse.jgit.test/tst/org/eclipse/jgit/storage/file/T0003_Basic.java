@@ -53,7 +53,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.lib.Commit;
 import org.eclipse.jgit.lib.Config;
@@ -100,7 +99,7 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 			fail("Must pass either GIT_DIR or GIT_WORK_TREE");
 		} catch (IllegalArgumentException e) {
 			assertEquals(
-					JGitText.get().eitherGitDirOrWorkTreeRequired,
+					"Either GIT_DIR or GIT_WORK_TREE must be passed to Repository constructor",
 					e.getMessage());
 		}
 	}

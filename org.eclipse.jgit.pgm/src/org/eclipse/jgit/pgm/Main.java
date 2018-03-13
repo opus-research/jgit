@@ -163,17 +163,17 @@ public class Main {
 
 		final TextBuiltin cmd = subcommand;
 		if (cmd.requiresRepository()) {
-			RepositoryBuilder rb = new RepositoryBuilder() //
+			RepositoryBuilder frb = new RepositoryBuilder() //
 					.setGitDir(gitdir) //
 					.readEnvironment() //
 					.findGitDir();
-			if (rb.getGitDir() == null) {
+			if (frb.getGitDir() == null) {
 				writer.println(CLIText.get().cantFindGitDirectory);
 				writer.flush();
 				System.exit(1);
 			}
 
-			cmd.init(rb.build(), null);
+			cmd.init(frb.build(), null);
 		} else {
 			cmd.init(null, gitdir);
 		}
