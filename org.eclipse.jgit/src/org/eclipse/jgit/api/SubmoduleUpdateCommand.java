@@ -177,8 +177,6 @@ public class SubmoduleUpdateCommand extends
 					submoduleRepo = clone.call().getRepository();
 				}
 
-				Git.wrap(submoduleRepo).fetch().call();
-				
 				try (RevWalk walk = new RevWalk(submoduleRepo)) {
 					RevCommit commit = walk
 							.parseCommit(generator.getObjectId());
