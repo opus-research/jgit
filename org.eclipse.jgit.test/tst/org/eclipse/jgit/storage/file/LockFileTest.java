@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, GitHub Inc.
+ * Copyright (C) 2012, GitHub Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,74 +40,44 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
+package org.eclipse.jgit.storage.file;
 
-import java.io.IOException;
-import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
-import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.api.errors.InvalidRefNameException;
+import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.errors.LockFailedException;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.file.ReflogEntry;
+import org.junit.Test;
 
 /**
- * Command class to list the stashed commits in a repository.
- *
- * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-stash.html"
- *      >Git documentation about Stash</a>
+ * Unit tests of {@link LockFile}
  */
-public class StashListCommand extends GitCommand<Collection<RevCommit>> {
+public class LockFileTest extends RepositoryTestCase {
 
-	/**
-	 * Create a new stash list command
-	 *
-	 * @param repo
-	 */
-	public StashListCommand(final Repository repo) {
-		super(repo);
-	}
+	@Test
+	public void lockFailedExceptionRecovery() throws Exception {
+		Git git = new Git(db);
+		writeTrashFile("file.txt", "content");
+		git.add().addFilepattern("file.txt").call();
+		RevCommit commit1 = git.commit().setMessage("create file").call();
 
-	public Collection<RevCommit> call() throws Exception {
-		checkCallable();
+		assertNotNull(commit1);
+		writeTrashFile("file.txt", "content2");
+		git.add().addFilepattern("file.txt").call();
+		assertNotNull(git.commit().setMessage("edit file").call());
 
+		assertTrue(new LockFile(db.getIndexFile(), db.getFS()).lock());
 		try {
-			if (repo.getRef(Constants.R_STASH) == null)
-				return Collections.emptyList();
-		} catch (IOException e) {
-			throw new InvalidRefNameException(MessageFormat.format(
-					JGitText.get().cannotRead, Constants.R_STASH), e);
+			git.checkout().setName(commit1.name()).call();
+			fail("JGitInternalException not thrown");
+		} catch (JGitInternalException e) {
+			assertTrue(e.getCause() instanceof LockFailedException);
+			LockFile.unlock(((LockFailedException) e.getCause()).getFile());
+			git.checkout().setName(commit1.name()).call();
 		}
-
-		final ReflogCommand refLog = new ReflogCommand(repo);
-		refLog.setRef(Constants.R_STASH);
-		final Collection<ReflogEntry> stashEntries = refLog.call();
-		if (stashEntries.isEmpty())
-			return Collections.emptyList();
-
-		final List<RevCommit> stashCommits = new ArrayList<RevCommit>(
-				stashEntries.size());
-		final RevWalk walk = new RevWalk(repo);
-		walk.setRetainBody(true);
-		try {
-			for (ReflogEntry entry : stashEntries)
-				try {
-					stashCommits.add(walk.parseCommit(entry.getNewId()));
-				} catch (IOException e) {
-					throw new JGitInternalException(MessageFormat.format(
-							JGitText.get().cannotReadCommit, entry.getNewId()),
-							e);
-				}
-		} finally {
-			walk.dispose();
-		}
-		return stashCommits;
 	}
 }
