@@ -50,6 +50,7 @@ import java.io.OutputStream;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -62,7 +63,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.revwalk.AsyncRevObjectQueue;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevFlagSet;
@@ -145,6 +145,9 @@ public class UploadPack {
 	/** Objects the client wants to obtain. */
 	private final List<RevObject> wantAll = new ArrayList<RevObject>();
 
+	/** Objects the client wants to obtain. */
+	private final List<RevCommit> wantCommits = new ArrayList<RevCommit>();
+
 	/** Objects on both sides, these don't have to be sent. */
 	private final List<RevObject> commonBase = new ArrayList<RevObject>();
 
@@ -162,9 +165,6 @@ public class UploadPack {
 
 	/** Marked on objects in {@link #commonBase}. */
 	private final RevFlag COMMON;
-
-	/** Objects where we found a path from the want list to a common base. */
-	private final RevFlag SATISFIED;
 
 	private final RevFlagSet SAVE;
 
@@ -185,7 +185,6 @@ public class UploadPack {
 		WANT = walk.newFlag("WANT");
 		PEER_HAS = walk.newFlag("PEER_HAS");
 		COMMON = walk.newFlag("COMMON");
-		SATISFIED = walk.newFlag("SATISFIED");
 		walk.carry(PEER_HAS);
 
 		SAVE = new RevFlagSet();
@@ -377,9 +376,8 @@ public class UploadPack {
 	}
 
 	private void recvWants() throws IOException {
-		HashSet<ObjectId> wantIds = new HashSet<ObjectId>();
 		boolean isFirst = true;
-		for (;;) {
+		for (;; isFirst = false) {
 			String line;
 			try {
 				line = pckIn.readString();
@@ -403,54 +401,41 @@ public class UploadPack {
 				line = line.substring(0, 45);
 			}
 
-			wantIds.add(ObjectId.fromString(line.substring(5)));
-			isFirst = false;
-		}
-
-		if (wantIds.isEmpty())
-			return;
-
-		AsyncRevObjectQueue q = walk.parseAny(wantIds, true);
-		try {
-			for (;;) {
-				RevObject o;
-				try {
-					o = q.next();
-				} catch (IOException error) {
-					throw new PackProtocolException(MessageFormat.format(
-							JGitText.get().notValid, error.getMessage()), error);
-				}
-				if (o == null)
-					break;
-				if (o.has(WANT)) {
-					// Already processed, the client repeated itself.
-
-				} else if (o.has(ADVERTISED)) {
-					o.add(WANT);
-					wantAll.add(o);
-
-					if (o instanceof RevTag) {
-						o = walk.peel(o);
-						if (o instanceof RevCommit) {
-							if (!o.has(WANT)) {
-								o.add(WANT);
-								wantAll.add(o);
-							}
-						}
-					}
-				} else {
-					throw new PackProtocolException(MessageFormat.format(
-							JGitText.get().notValid, o.name()));
-				}
+			final ObjectId id = ObjectId.fromString(line.substring(5));
+			final RevObject o;
+			try {
+				o = walk.parseAny(id);
+			} catch (IOException e) {
+				throw new PackProtocolException(MessageFormat.format(JGitText.get().notValid, id.name()), e);
 			}
-		} finally {
-			q.release();
+			if (!o.has(ADVERTISED))
+				throw new PackProtocolException(MessageFormat.format(JGitText.get().notValid, id.name()));
+			try {
+				want(o);
+			} catch (IOException e) {
+				throw new PackProtocolException(MessageFormat.format(JGitText.get().notValid, id.name()), e);
+			}
+		}
+	}
+
+	private void want(RevObject o) throws MissingObjectException, IOException {
+		if (!o.has(WANT)) {
+			o.add(WANT);
+			wantAll.add(o);
+
+			if (o instanceof RevCommit)
+				wantCommits.add((RevCommit) o);
+
+			else if (o instanceof RevTag) {
+				o = walk.peel(o);
+				if (o instanceof RevCommit)
+					want(o);
+			}
 		}
 	}
 
 	private boolean negotiate() throws IOException {
 		ObjectId last = ObjectId.zeroId();
-		List<ObjectId> peerHas = new ArrayList<ObjectId>(64);
 		for (;;) {
 			String line;
 			try {
@@ -460,7 +445,6 @@ public class UploadPack {
 			}
 
 			if (line == PacketLineIn.END) {
-				last = processHaveLines(peerHas, last);
 				if (commonBase.isEmpty() || multiAck != MultiAck.OFF)
 					pckOut.writeString("NAK\n");
 				if (!biDirectionalPipe)
@@ -468,11 +452,39 @@ public class UploadPack {
 				pckOut.flush();
 
 			} else if (line.startsWith("have ") && line.length() == 45) {
-				peerHas.add(ObjectId.fromString(line.substring(5)));
+				final ObjectId id = ObjectId.fromString(line.substring(5));
+				if (matchHave(id)) {
+					// Both sides have the same object; let the client know.
+					//
+					last = id;
+					switch (multiAck) {
+					case OFF:
+						if (commonBase.size() == 1)
+							pckOut.writeString("ACK " + id.name() + "\n");
+						break;
+					case CONTINUE:
+						pckOut.writeString("ACK " + id.name() + " continue\n");
+						break;
+					case DETAILED:
+						pckOut.writeString("ACK " + id.name() + " common\n");
+						break;
+					}
+				} else if (okToGiveUp()) {
+					// They have this object; we don't.
+					//
+					switch (multiAck) {
+					case OFF:
+						break;
+					case CONTINUE:
+						pckOut.writeString("ACK " + id.name() + " continue\n");
+						break;
+					case DETAILED:
+						pckOut.writeString("ACK " + id.name() + " ready\n");
+						break;
+					}
+				}
 
 			} else if (line.equals("done")) {
-				last = processHaveLines(peerHas, last);
-
 				if (commonBase.isEmpty())
 					pckOut.writeString("NAK\n");
 
@@ -487,76 +499,21 @@ public class UploadPack {
 		}
 	}
 
-	private ObjectId processHaveLines(List<ObjectId> peerHas, ObjectId last)
-			throws IOException {
-		if (peerHas.isEmpty())
-			return last;
-
-		// If both sides have the same object; let the client know.
-		//
-		AsyncRevObjectQueue q = walk.parseAny(peerHas, false);
+	private boolean matchHave(final ObjectId id) {
+		final RevObject o;
 		try {
-			for (;;) {
-				RevObject obj;
-				try {
-					obj = q.next();
-				} catch (MissingObjectException notFound) {
-					continue;
-				}
-				if (obj == null)
-					break;
-
-				last = obj;
-				if (obj.has(PEER_HAS))
-					continue;
-
-				obj.add(PEER_HAS);
-				if (obj instanceof RevCommit)
-					((RevCommit) obj).carry(PEER_HAS);
-				addCommonBase(obj);
-
-				switch (multiAck) {
-				case OFF:
-					if (commonBase.size() == 1)
-						pckOut.writeString("ACK " + obj.name() + "\n");
-					break;
-				case CONTINUE:
-					pckOut.writeString("ACK " + obj.name() + " continue\n");
-					break;
-				case DETAILED:
-					pckOut.writeString("ACK " + obj.name() + " common\n");
-					break;
-				}
-			}
-		} finally {
-			q.release();
+			o = walk.parseAny(id);
+		} catch (IOException err) {
+			return false;
 		}
 
-		// If we don't have one of the objects but we're also willing to
-		// create a pack at this point, let the client know so it stops
-		// telling us about its history.
-		//
-		for (int i = peerHas.size() - 1; i >= 0; i--) {
-			ObjectId id = peerHas.get(i);
-			if (walk.lookupOrNull(id) == null) {
-				if (okToGiveUp()) {
-					switch (multiAck) {
-					case OFF:
-						break;
-					case CONTINUE:
-						pckOut.writeString("ACK " + id.name() + " continue\n");
-						break;
-					case DETAILED:
-						pckOut.writeString("ACK " + id.name() + " ready\n");
-						break;
-					}
-				}
-				break;
-			}
+		if (!o.has(PEER_HAS)) {
+			o.add(PEER_HAS);
+			if (o instanceof RevCommit)
+				((RevCommit) o).carry(PEER_HAS);
+			addCommonBase(o);
 		}
-
-		peerHas.clear();
-		return last;
+		return true;
 	}
 
 	private void addCommonBase(final RevObject o) {
@@ -578,34 +535,27 @@ public class UploadPack {
 			return false;
 
 		try {
-			for (RevObject obj : wantAll) {
-				if (wantSatisfied(obj))
-					return false;
+			for (final Iterator<RevCommit> i = wantCommits.iterator(); i
+					.hasNext();) {
+				final RevCommit want = i.next();
+				if (wantSatisfied(want))
+					i.remove();
 			}
-			return true;
 		} catch (IOException e) {
 			throw new PackProtocolException(JGitText.get().internalRevisionError, e);
 		}
+		return wantCommits.isEmpty();
 	}
 
-	private boolean wantSatisfied(final RevObject want) throws IOException {
-		if (want.has(SATISFIED))
-			return true;
-
-		if (!(want instanceof RevCommit)) {
-			want.add(SATISFIED);
-			return true;
-		}
-
+	private boolean wantSatisfied(final RevCommit want) throws IOException {
 		walk.resetRetain(SAVE);
-		walk.markStart((RevCommit) want);
+		walk.markStart(want);
 		for (;;) {
 			final RevCommit c = walk.next();
 			if (c == null)
 				break;
 			if (c.has(PEER_HAS)) {
 				addCommonBase(c);
-				want.add(SATISFIED);
 				return true;
 			}
 		}
