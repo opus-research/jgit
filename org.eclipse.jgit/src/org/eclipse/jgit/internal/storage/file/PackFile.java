@@ -47,10 +47,10 @@ package org.eclipse.jgit.internal.storage.file;
 
 import static org.eclipse.jgit.internal.storage.pack.PackExt.BITMAP_INDEX;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.INDEX;
+import static org.eclipse.jgit.internal.storage.pack.PackExt.KEEP;
 
 import java.io.EOFException;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.io.RandomAccessFile;
@@ -95,6 +95,7 @@ import org.eclipse.jgit.util.RawParseUtils;
 public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	/** Sorts PackFiles to be most recently created to least recently created. */
 	public static final Comparator<PackFile> SORT = new Comparator<PackFile>() {
+		@Override
 		public int compare(final PackFile a, final PackFile b) {
 			return b.packLastModified - a.packLastModified;
 		}
@@ -245,7 +246,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	 */
 	public boolean shouldBeKept() {
 		if (keepFile == null)
-			keepFile = new File(packFile.getPath() + ".keep"); //$NON-NLS-1$
+			keepFile = extFile(KEEP);
 		return keepFile.exists();
 	}
 
@@ -295,6 +296,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	 *
 	 * @see PackIndex#iterator()
 	 */
+	@Override
 	public Iterator<PackIndex.MutableEntry> iterator() {
 		try {
 			return idx().iterator();
@@ -636,12 +638,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			// don't invalidate the pack, we are interrupted from another thread
 			openFail(false);
 			throw e;
-		} catch (FileNotFoundException fn) {
-			// don't invalidate the pack if opening an existing file failed
-			// since it may be related to a temporary lack of resources (e.g.
-			// max open files)
-			openFail(!packFile.exists());
-			throw fn;
 		} catch (IOException ioe) {
 			openFail(true);
 			throw ioe;
