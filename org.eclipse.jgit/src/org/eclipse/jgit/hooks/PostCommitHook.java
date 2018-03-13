@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2015 Obeo.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,89 +40,45 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs.internal;
+package org.eclipse.jgit.hooks;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.file.Path;
-import java.security.DigestOutputStream;
-import java.text.MessageFormat;
+import java.io.PrintStream;
 
-import org.eclipse.jgit.internal.storage.file.LockFile;
-import org.eclipse.jgit.lfs.errors.CorruptLongObjectException;
-import org.eclipse.jgit.lfs.lib.AnyLongObjectId;
-import org.eclipse.jgit.lfs.lib.Constants;
-import org.eclipse.jgit.lfs.lib.LongObjectId;
+import org.eclipse.jgit.api.errors.AbortedByHookException;
+import org.eclipse.jgit.lib.Repository;
 
 /**
- * Output stream writing content to a {@link LockFile} which is committed on
- * close(). The stream checks if the hash of the stream content matches the
- * id.
+ * The <code>post-commit</code> hook implementation. This hook is run after the
+ * commit was successfully executed.
+ *
+ * @since 4.5
  */
-public class AtomicObjectOutputStream extends OutputStream {
+public class PostCommitHook extends GitHook<Void> {
 
-	private LockFile locked;
-
-	private DigestOutputStream out;
-
-	private boolean aborted;
-
-	private AnyLongObjectId id;
+	/** The post-commit hook name. */
+	public static final String NAME = "post-commit"; //$NON-NLS-1$
 
 	/**
-	 * @param path
-	 * @param id
-	 * @throws IOException
+	 * @param repo
+	 *            The repository
+	 * @param outputStream
+	 *            The output stream the hook must use. {@code null} is allowed,
+	 *            in which case the hook will use {@code System.out}.
 	 */
-	public AtomicObjectOutputStream(Path path, AnyLongObjectId id)
-			throws IOException {
-		locked = new LockFile(path.toFile());
-		locked.lock();
-		this.id = id;
-		out = new DigestOutputStream(locked.getOutputStream(),
-				Constants.newMessageDigest());
+	protected PostCommitHook(Repository repo, PrintStream outputStream) {
+		super(repo, outputStream);
 	}
 
 	@Override
-	public void write(int b) throws IOException {
-		out.write(b);
+	public Void call() throws IOException, AbortedByHookException {
+		doRun();
+		return null;
 	}
 
 	@Override
-	public void write(byte[] b) throws IOException {
-		out.write(b);
+	public String getHookName() {
+		return NAME;
 	}
 
-	@Override
-	public void write(byte[] b, int off, int len) throws IOException {
-		out.write(b, off, len);
-	}
-
-	@Override
-	public void close() throws IOException {
-		out.close();
-		if (!aborted) {
-			verifyHash();
-			locked.commit();
-		}
-	}
-
-	private void verifyHash() {
-		AnyLongObjectId contentHash = LongObjectId
-				.fromRaw(out.getMessageDigest().digest());
-		if (!contentHash.equals(id)) {
-			abort();
-			throw new CorruptLongObjectException(id, contentHash,
-					MessageFormat.format(LfsText.get().corruptLongObject,
-							contentHash, id));
-		}
-	}
-
-	/**
-	 * Aborts the stream. Temporary file will be deleted
-	 */
-	public void abort() {
-		locked.unlock();
-		aborted = true;
-	}
 }

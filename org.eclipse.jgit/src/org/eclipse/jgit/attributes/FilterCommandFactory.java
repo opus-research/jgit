@@ -40,55 +40,34 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.attributes;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import org.eclipse.jgit.lib.Repository;
+
 /**
- * An abstraction for JGit's builtin implementations for hooks and filters.
- * Instead of spawning an external processes to start a filter/hook and to pump
- * data from/to stdin/stdout these builtin commmands may be used. They are
- * constructed by {@link FilterCommandFactory}.
+ * The factory responsible for creating instances of {@link FilterCommand}.
  *
  * @since 4.5
  */
-public abstract class FilterCommand {
+public interface FilterCommandFactory {
 	/**
-	 * The {@link InputStream} this command should read from
-	 */
-	protected InputStream in;
-
-	/**
-	 * The {@link OutputStream} this command should write to
-	 */
-	protected OutputStream out;
-
-	/**
+	 * Create a new {@link FilterCommand}.
+	 *
+	 * @param db
+	 *            the repository this command should work on
 	 * @param in
-	 *            The {@link InputStream} this command should read from
+	 *            the {@link InputStream} this command should read from
 	 * @param out
-	 *            The {@link OutputStream} this command should write to
-	 */
-	public FilterCommand(InputStream in, OutputStream out) {
-		this.in = in;
-		this.out = out;
-	}
-
-	/**
-	 * Execute the command. The command is supposed to read data from
-	 * {@link #in} and to write the result to {@link #out}. It returns the
-	 * number of bytes it read from {@link #in}. It should be called in a loop
-	 * until it returns -1 signaling that the {@link InputStream} is completely
-	 * processed.
-	 *
-	 * @return the number of bytes read from the {@link InputStream} or -1. -1
-	 *         means that the {@link InputStream} is completely processed.
+	 *            the {@link OutputStream} this command should write to
+	 * @return the created {@link FilterCommand}
 	 * @throws IOException
-	 *             when {@link IOException} occured while reading from
-	 *             {@link #in} or writing to {@link #out}
-	 *
+	 *             thrown when the command constructor throws an IOException
 	 */
-	public abstract int run() throws IOException;
+	public FilterCommand create(Repository db, InputStream in,
+			OutputStream out) throws IOException;
+
 }

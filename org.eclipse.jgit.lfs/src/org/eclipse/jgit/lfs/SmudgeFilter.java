@@ -48,10 +48,11 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import org.eclipse.jgit.attributes.FilterCommand;
+import org.eclipse.jgit.attributes.FilterCommandFactory;
+import org.eclipse.jgit.attributes.FilterCommandRegistry;
 import org.eclipse.jgit.lfs.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.util.FilterCommand;
-import org.eclipse.jgit.util.FilterCommandFactory;
 
 /**
  * Built-in LFS smudge filter
@@ -82,7 +83,7 @@ public class SmudgeFilter extends FilterCommand {
 	 * Registers this filter in JGit by calling
 	 */
 	public final static void register() {
-		Repository.registerFilterCommand(
+		FilterCommandRegistry.register(
 				org.eclipse.jgit.lib.Constants.BUILTIN_FILTER_PREFIX
 						+ "lfs/smudge", //$NON-NLS-1$
 				FACTORY);

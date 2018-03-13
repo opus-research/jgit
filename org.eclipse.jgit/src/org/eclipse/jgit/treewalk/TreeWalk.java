@@ -55,6 +55,7 @@ import org.eclipse.jgit.attributes.Attribute;
 import org.eclipse.jgit.attributes.Attributes;
 import org.eclipse.jgit.attributes.AttributesNodeProvider;
 import org.eclipse.jgit.attributes.AttributesProvider;
+import org.eclipse.jgit.attributes.FilterCommandRegistry;
 import org.eclipse.jgit.dircache.DirCacheBuildIterator;
 import org.eclipse.jgit.attributes.AttributesHandler;
 import org.eclipse.jgit.dircache.DirCacheIterator;
@@ -359,7 +360,8 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 		if (repo != null) {
 			config = repo.getConfig();
 			attributesNodeProvider = repo.createAttributesNodeProvider();
-			filterCommands = Repository.getRegisteredFilterCommands();
+			filterCommands = FilterCommandRegistry
+					.getRegisteredFilterCommands();
 		} else {
 			config = null;
 			attributesNodeProvider = null;
@@ -1376,8 +1378,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 				filterDriverName, Constants.ATTR_FILTER_USE_BUILTIN, false);
 		if (useBuiltin) {
 			String builtinFilterCommand = Constants.BUILTIN_FILTER_PREFIX
-					+ filterDriverName
-					+ "/" + filterCommandType;
+					+ filterDriverName + '/' + filterCommandType;
 			if (filterCommands != null
 					&& filterCommands.contains(builtinFilterCommand)) {
 				filterCommand = builtinFilterCommand;

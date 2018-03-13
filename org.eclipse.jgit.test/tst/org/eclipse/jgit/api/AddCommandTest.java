@@ -57,6 +57,7 @@ import java.util.Set;
 import org.eclipse.jgit.api.errors.FilterFailedException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
+import org.eclipse.jgit.attributes.FilterCommandRegistry;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEntry;
@@ -64,7 +65,13 @@ import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lfs.CleanFilter;
 import org.eclipse.jgit.lfs.SmudgeFilter;
-import org.eclipse.jgit.lib.*;
+import org.eclipse.jgit.lib.ConfigConstants;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.FileMode;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -122,6 +129,30 @@ public class AddCommandTest extends RepositoryTestCase {
 
 			assertEquals(
 					"[a.txt, mode:100644, content:content]",
+					indexState(CONTENT));
+		}
+	}
+
+	@Test
+	public void testCleanFilter() throws IOException, GitAPIException {
+		writeTrashFile(".gitattributes", "*.txt filter=tstFilter");
+		writeTrashFile("src/a.tmp", "foo");
+		// Caution: we need a trailing '\n' since sed on mac always appends
+		// linefeeds if missing
+		writeTrashFile("src/a.txt", "foo\n");
+		File script = writeTempFile("sed s/o/e/g");
+
+		try (Git git = new Git(db)) {
+			StoredConfig config = git.getRepository().getConfig();
+			config.setString("filter", "tstFilter", "clean",
+					"sh " + slashify(script.getPath()));
+			config.save();
+
+			git.add().addFilepattern("src/a.txt").addFilepattern("src/a.tmp")
+					.call();
+
+			assertEquals(
+					"[src/a.tmp, mode:100644, content:foo][src/a.txt, mode:100644, content:fee\n]",
 					indexState(CONTENT));
 		}
 	}
@@ -193,10 +224,9 @@ public class AddCommandTest extends RepositoryTestCase {
 		File f = writeTrashFile("src/a.txt", "foo\n");
 
 		// unregister the smudge filter. Only clean filter should be builtin
-		Repository.registerFilterCommand(
+		FilterCommandRegistry.unregister(
 				org.eclipse.jgit.lib.Constants.BUILTIN_FILTER_PREFIX
-						+ "lfs/smudge", //$NON-NLS-1$
-				null);
+						+ "lfs/smudge");
 
 		try (Git git = new Git(db)) {
 			if (!sleepBeforeAdd) {
