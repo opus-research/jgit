@@ -609,6 +609,7 @@ public class UploadPack {
 	public void sendAdvertisedRefs(final RefAdvertiser adv) throws IOException,
 			ServiceMayNotContinueException {
 		try {
+			preUploadHook.onPreAdvertiseRefs(this);
 			advertiseRefsHook.advertiseRefs(this);
 		} catch (ServiceMayNotContinueException fail) {
 			if (fail.getMessage() != null) {
