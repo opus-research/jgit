@@ -222,9 +222,8 @@ public class TagCommand extends GitCommand<Ref> {
 		if (tagger == null && annotated)
 			tagger = new PersonIdent(repo);
 		if (name == null || !Repository.isValidRefName(Constants.R_TAGS + name))
-			throw new InvalidTagNameException(
-					MessageFormat.format(JGitText.get().tagNameInvalid,
-							name == null ? "<null>" : name)); //$NON-NLS-1$
+			throw new InvalidTagNameException(MessageFormat.format(JGitText
+					.get().tagNameInvalid, name == null ? "<null>" : name));
 		if (signed)
 			throw new UnsupportedOperationException(
 					JGitText.get().signingNotSupportedOnTag);

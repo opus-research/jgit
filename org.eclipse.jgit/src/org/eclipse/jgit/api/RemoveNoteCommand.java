@@ -94,7 +94,7 @@ public class RemoveNoteCommand extends GitCommand<Note> {
 			}
 			map.set(id, null, inserter);
 			commitNoteMap(walk, map, notesCommit, inserter,
-					"Notes removed by 'git notes remove'"); //$NON-NLS-1$
+					"Notes removed by 'git notes remove'");
 			return map.getNote(id);
 		} catch (IOException e) {
 			throw new JGitInternalException(e.getMessage(), e);

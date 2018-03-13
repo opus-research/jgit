@@ -1,5 +1,5 @@
-/*
- * Copyright (C) 2012, Research In Motion Limited
+/**
+ * Copyright (C) 2015, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,29 +41,53 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.merge;
+package org.eclipse.jgit.revwalk.filter;
 
-import org.eclipse.jgit.lib.Repository;
+import java.io.IOException;
+
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.revwalk.ObjectWalk;
 
 /**
- * A three-way merge strategy performing a content-merge if necessary
+ * Selects interesting objects when walking.
+ * <p>
+ * Applications should install the filter on an ObjectWalk by
+ * {@link ObjectWalk#setObjectFilter(ObjectFilter)} prior to starting traversal.
  *
- * @since 3.0
+ * @since 4.0
  */
-public class StrategyRecursive extends StrategyResolve {
+public abstract class ObjectFilter {
+	/** Default filter that always returns true. */
+	public static final ObjectFilter ALL = new AllFilter();
 
-	@Override
-	public ThreeWayMerger newMerger(Repository db) {
-		return new RecursiveMerger(db, false);
+	private static final class AllFilter extends ObjectFilter {
+		@Override
+		public boolean include(ObjectWalk walker, AnyObjectId o) {
+			return true;
+		}
 	}
 
-	@Override
-	public ThreeWayMerger newMerger(Repository db, boolean inCore) {
-		return new RecursiveMerger(db, inCore);
-	}
-
-	@Override
-	public String getName() {
-		return "recursive";
-	}
+	/**
+	 * Determine if the named object should be included in the walk.
+	 *
+	 * @param walker
+	 *            the active walker this filter is being invoked from within.
+	 * @param objid
+	 *            the object currently being tested.
+	 * @return {@code true} if the named object should be included in the walk.
+	 * @throws MissingObjectException
+	 *             an object the filter needed to consult to determine its
+	 *             answer was missing
+	 * @throws IncorrectObjectTypeException
+	 *             an object the filter needed to consult to determine its
+	 *             answer was of the wrong type
+	 * @throws IOException
+	 *             an object the filter needed to consult to determine its
+	 *             answer could not be read.
+	 */
+	public abstract boolean include(ObjectWalk walker, AnyObjectId objid)
+			throws MissingObjectException, IncorrectObjectTypeException,
+			       IOException;
 }
