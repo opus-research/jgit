@@ -53,7 +53,6 @@ import java.util.List;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
-import org.eclipse.jgit.diff.SimilarityIndex.TableFullException;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ProgressMonitor;
@@ -110,9 +109,6 @@ class SimilarityRenameDetector {
 
 	/** Score a pair must exceed to be considered a rename. */
 	private int renameScore = 60;
-
-	/** Set if any {@link SimilarityIndex.TableFullException} occurs. */
-	private boolean tableOverflow;
 
 	private List<DiffEntry> out;
 
@@ -186,10 +182,6 @@ class SimilarityRenameDetector {
 		return dsts;
 	}
 
-	boolean isTableOverflow() {
-		return tableOverflow;
-	}
-
 	private static List<DiffEntry> compactSrcList(List<DiffEntry> in) {
 		ArrayList<DiffEntry> r = new ArrayList<DiffEntry>(in.size());
 		for (DiffEntry e : in) {
@@ -234,14 +226,7 @@ class SimilarityRenameDetector {
 				continue;
 			}
 
-			SimilarityIndex s;
-			try {
-				s = hash(OLD, srcEnt);
-			} catch (TableFullException tableFull) {
-				tableOverflow = true;
-				continue;
-			}
-
+			SimilarityIndex s = hash(OLD, srcEnt);
 			for (int dstIdx = 0; dstIdx < dsts.size(); dstIdx++) {
 				DiffEntry dstEnt = dsts.get(dstIdx);
 
@@ -275,15 +260,7 @@ class SimilarityRenameDetector {
 					continue;
 				}
 
-				SimilarityIndex d;
-				try {
-					d = hash(NEW, dstEnt);
-				} catch (TableFullException tableFull) {
-					tableOverflow = true;
-					pm.update(1);
-					continue;
-				}
-
+				SimilarityIndex d = hash(NEW, dstEnt);
 				int contentScore = s.score(d, 10000);
 
 				// nameScore returns a value between 0 and 100, but we want it
@@ -359,7 +336,7 @@ class SimilarityRenameDetector {
 	}
 
 	private SimilarityIndex hash(DiffEntry.Side side, DiffEntry ent)
-			throws IOException, TableFullException {
+			throws IOException {
 		SimilarityIndex r = new SimilarityIndex();
 		r.hash(reader.open(side, ent));
 		r.sort();

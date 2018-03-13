@@ -48,11 +48,10 @@ import java.io.IOException;
 
 import junit.framework.TestCase;
 
-import org.eclipse.jgit.diff.SimilarityIndex.TableFullException;
 import org.eclipse.jgit.lib.Constants;
 
 public class SimilarityIndexTest extends TestCase {
-	public void testIndexingSmallObject() throws TableFullException {
+	public void testIndexingSmallObject() {
 		SimilarityIndex si = hash("" //
 				+ "A\n" //
 				+ "B\n" //
@@ -71,8 +70,7 @@ public class SimilarityIndexTest extends TestCase {
 		assertEquals(2, si.count(si.findIndex(key_D)));
 	}
 
-	public void testIndexingLargeObject() throws IOException,
-			TableFullException {
+	public void testIndexingLargeObject() throws IOException {
 		byte[] in = ("" //
 				+ "A\n" //
 				+ "B\n" //
@@ -83,7 +81,7 @@ public class SimilarityIndexTest extends TestCase {
 		assertEquals(2, si.size());
 	}
 
-	public void testCommonScore_SameFiles() throws TableFullException {
+	public void testCommonScore_SameFiles() {
 		String text = "" //
 				+ "A\n" //
 				+ "B\n" //
@@ -98,22 +96,21 @@ public class SimilarityIndexTest extends TestCase {
 		assertEquals(100, dst.score(src, 100));
 	}
 
-	public void testCommonScore_EmptyFiles() throws TableFullException {
+	public void testCommonScore_EmptyFiles() {
 		SimilarityIndex src = hash("");
 		SimilarityIndex dst = hash("");
 		assertEquals(0, src.common(dst));
 		assertEquals(0, dst.common(src));
 	}
 
-	public void testCommonScore_TotallyDifferentFiles()
-			throws TableFullException {
+	public void testCommonScore_TotallyDifferentFiles() {
 		SimilarityIndex src = hash("A\n");
 		SimilarityIndex dst = hash("D\n");
 		assertEquals(0, src.common(dst));
 		assertEquals(0, dst.common(src));
 	}
 
-	public void testCommonScore_SimiliarBy75() throws TableFullException {
+	public void testCommonScore_SimiliarBy75() {
 		SimilarityIndex src = hash("A\nB\nC\nD\n");
 		SimilarityIndex dst = hash("A\nB\nC\nQ\n");
 		assertEquals(6, src.common(dst));
@@ -123,11 +120,10 @@ public class SimilarityIndexTest extends TestCase {
 		assertEquals(75, dst.score(src, 100));
 	}
 
-	private static SimilarityIndex hash(String text) throws TableFullException {
+	private static SimilarityIndex hash(String text) {
 		SimilarityIndex src = new SimilarityIndex() {
 			@Override
-			void hash(byte[] raw, int ptr, final int end)
-					throws TableFullException {
+			void hash(byte[] raw, int ptr, final int end) {
 				while (ptr < end) {
 					int hash = raw[ptr] & 0xff;
 					int start = ptr;
@@ -147,7 +143,7 @@ public class SimilarityIndexTest extends TestCase {
 		return src;
 	}
 
-	private static int keyFor(String line) throws TableFullException {
+	private static int keyFor(String line) {
 		SimilarityIndex si = hash(line);
 		assertEquals("single line scored", 1, si.size());
 		return si.key(0);
