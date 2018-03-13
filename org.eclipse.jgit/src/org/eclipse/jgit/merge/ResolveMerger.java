@@ -444,7 +444,6 @@ public class ResolveMerger extends ThreeWayMerger {
 	 * conflict is detected the content-merge algorithm will try to write a
 	 * merged version into the working-tree. If the file is dirty we would
 	 * override unsaved data.</li>
-	 * </ul>
 	 *
 	 * @param base
 	 *            the common base for ours and theirs
@@ -469,7 +468,7 @@ public class ResolveMerger extends ThreeWayMerger {
 	 * @throws IncorrectObjectTypeException
 	 * @throws CorruptObjectException
 	 * @throws IOException
-	 * @since 3.5
+	 * @since 3.4
 	 */
 	protected boolean processEntry(CanonicalTreeParser base,
 			CanonicalTreeParser ours, CanonicalTreeParser theirs,
@@ -1022,7 +1021,7 @@ public class ResolveMerger extends ThreeWayMerger {
 	 *            conflicts.
 	 * @return whether the trees merged cleanly
 	 * @throws IOException
-	 * @since 3.5
+	 * @since 3.0
 	 */
 	protected boolean mergeTrees(AbstractTreeIterator baseTree,
 			RevTree headTree, RevTree mergeTree, boolean ignoreConflicts)
@@ -1083,7 +1082,7 @@ public class ResolveMerger extends ThreeWayMerger {
 	 *            {@link ResolveMerger#mergeTrees(AbstractTreeIterator, RevTree, RevTree, boolean)}
 	 * @return Whether the trees merged cleanly.
 	 * @throws IOException
-	 * @since 3.5
+	 * @since 3.4
 	 */
 	protected boolean mergeTreeWalk(TreeWalk treeWalk, boolean ignoreConflicts)
 			throws IOException {
