@@ -93,6 +93,7 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -143,6 +144,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	private static final String HEAD_NAME = "head-name"; //$NON-NLS-1$
 
 	private static final String INTERACTIVE = "interactive"; //$NON-NLS-1$
+
+	private static final String QUIET = "quiet"; //$NON-NLS-1$
 
 	private static final String MESSAGE = "message"; //$NON-NLS-1$
 
@@ -210,6 +213,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	private RevCommit newHead;
 
 	private boolean lastStepWasForward;
+
+	private MergeStrategy strategy = MergeStrategy.RECURSIVE;
 
 	/**
 	 * @param repo
@@ -375,7 +380,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			String stash = rebaseState.readFile(AUTOSTASH);
 			try {
 				Git.wrap(repo).stashApply().setStashRef(stash)
-						.ignoreRepositoryState(true).call();
+						.ignoreRepositoryState(true).setStrategy(strategy)
+						.call();
 			} catch (StashApplyFailureException e) {
 				conflicts = true;
 				RevWalk rw = new RevWalk(repo);
@@ -474,7 +480,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				String ourCommitName = getOurCommitName();
 				CherryPickResult cherryPickResult = new Git(repo).cherryPick()
 						.include(commitToPick).setOurCommitName(ourCommitName)
-						.setReflogPrefix("rebase:").call(); //$NON-NLS-1$
+						.setReflogPrefix("rebase:").setStrategy(strategy).call(); //$NON-NLS-1$
 				switch (cherryPickResult.getStatus()) {
 				case FAILED:
 					if (operation == Operation.BEGIN)
@@ -924,6 +930,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		rebaseState.createFile(ONTO, upstreamCommit.name());
 		rebaseState.createFile(ONTO_NAME, upstreamCommitName);
 		rebaseState.createFile(INTERACTIVE, ""); //$NON-NLS-1$
+		rebaseState.createFile(QUIET, ""); //$NON-NLS-1$
 
 		ArrayList<RebaseTodoLine> toDoSteps = new ArrayList<RebaseTodoLine>();
 		toDoSteps.add(new RebaseTodoLine("# Created by EGit: rebasing " + headId.name() //$NON-NLS-1$
@@ -1299,6 +1306,17 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			final boolean stopAfterRebaseInteractiveInitialization) {
 		this.stopAfterInitialization = stopAfterRebaseInteractiveInitialization;
 		this.interactiveHandler = handler;
+		return this;
+	}
+
+	/**
+	 * @param strategy
+	 *            The merge strategy to use during this rebase operation.
+	 * @return {@code this}
+	 * @since 3.4
+	 */
+	public RebaseCommand setStrategy(MergeStrategy strategy) {
+		this.strategy = strategy;
 		return this;
 	}
 

@@ -73,6 +73,7 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.treewalk.filter.AndTreeFilter;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 
@@ -600,7 +601,16 @@ public class BlameGenerator {
 			return split(n.getNextCandidate(0), n);
 		revPool.parseHeaders(parent);
 
-		if (find(parent, n.sourcePath)) {
+		if (n.sourceCommit != null && n.recursivePath) {
+			treeWalk.setFilter(AndTreeFilter.create(n.sourcePath, ID_DIFF));
+			treeWalk.reset(n.sourceCommit.getTree(), parent.getTree());
+			if (!treeWalk.next())
+				return blameEntireRegionOnParent(n, parent);
+			if (isFile(treeWalk.getRawMode(1))) {
+				treeWalk.getObjectId(idBuf, 1);
+				return splitBlameWithParent(n, parent);
+			}
+		} else if (find(parent, n.sourcePath)) {
 			if (idBuf.equals(n.sourceBlob))
 				return blameEntireRegionOnParent(n, parent);
 			return splitBlameWithParent(n, parent);
@@ -617,7 +627,7 @@ public class BlameGenerator {
 			// A 100% rename without any content change can also
 			// skip directly to the parent.
 			n.sourceCommit = parent;
-			n.sourcePath = PathFilter.create(r.getOldPath());
+			n.setSourcePath(PathFilter.create(r.getOldPath()));
 			push(n);
 			return false;
 		}
@@ -710,7 +720,7 @@ public class BlameGenerator {
 					// have an exact content match. For performance reasons
 					// we choose to follow the one parent over trying to do
 					// possibly both parents.
-					n.sourcePath = PathFilter.create(r.getOldPath());
+					n.setSourcePath(PathFilter.create(r.getOldPath()));
 					return blameEntireRegionOnParent(n, parent);
 				}
 
@@ -758,8 +768,9 @@ public class BlameGenerator {
 				}
 
 				p.regionList = n.regionList;
-				push(p);
-				return false;
+				n.regionList = null;
+				parents[pIdx] = p;
+				break;
 			}
 
 			p.takeBlame(editList, n);
@@ -977,4 +988,26 @@ public class BlameGenerator {
 		return ent.getChangeType() == ChangeType.RENAME
 				|| ent.getChangeType() == ChangeType.COPY;
 	}
+
+	private static final TreeFilter ID_DIFF = new TreeFilter() {
+		@Override
+		public boolean include(TreeWalk tw) {
+			return !tw.idEqual(0, 1);
+		}
+
+		@Override
+		public boolean shouldBeRecursive() {
+			return false;
+		}
+
+		@Override
+		public TreeFilter clone() {
+			return this;
+		}
+
+		@Override
+		public String toString() {
+			return "ID_DIFF"; //$NON-NLS-1$
+		}
+	};
 }
