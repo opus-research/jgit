@@ -128,7 +128,7 @@ public class DfsFsck {
 		fpp.parse(pm);
 		errors.getCorruptObjects().addAll(fpp.getCorruptObjects());
 
-		fpp.verifyIndex(pack.getPackIndex(ctx));
+		fpp.verifyIndex(fpp.getSortedObjectList(null), pack.getPackIndex(ctx));
 	}
 
 	private void checkConnectivity(ProgressMonitor pm, FsckError errors)
