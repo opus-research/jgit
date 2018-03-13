@@ -499,7 +499,6 @@ public final class DfsPackFile {
 				rc.setReadAheadBytes(ctx.getOptions().getStreamPackBufferSize());
 			long position = 12;
 			long remaining = length - (12 + 20);
-			boolean packHeadSkipped = false;
 			while (0 < remaining) {
 				DfsBlock b = cache.get(key, alignToBlock(position));
 				if (b != null) {
@@ -509,7 +508,6 @@ public final class DfsPackFile {
 					position += n;
 					remaining -= n;
 					rc.position(position);
-					packHeadSkipped = true;
 					continue;
 				}
 
@@ -519,14 +517,7 @@ public final class DfsPackFile {
 					throw packfileIsTruncated();
 				else if (n > remaining)
 					n = (int) remaining;
-
-				if (!packHeadSkipped) {
-					// Need skip the 'PACK' header for the first read
-					out.write(buf.array(), 12, n - 12);
-					packHeadSkipped = true;
-				} else {
-					out.write(buf.array(), 0, n);
-				}
+				out.write(buf.array(), 0, n);
 				position += n;
 				remaining -= n;
 			}
