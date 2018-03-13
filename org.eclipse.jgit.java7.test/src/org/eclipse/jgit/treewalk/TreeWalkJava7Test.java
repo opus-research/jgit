@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
- * Copyright (C) 2008, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2012-2013, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,48 +40,32 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.treewalk;
 
-package org.eclipse.jgit.pgm;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
-import java.io.IOException;
+import java.io.File;
 
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
-import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.transport.FetchConnection;
-import org.eclipse.jgit.transport.Transport;
+import org.eclipse.jgit.junit.RepositoryTestCase;
+import org.eclipse.jgit.util.FS;
+import org.junit.Test;
 
-class LsRemote extends TextBuiltin {
-	@Option(name = "--timeout", metaVar = "metaVar_service", usage = "usage_abortConnectionIfNoActivity")
-	int timeout = -1;
-
-	@Argument(index = 0, metaVar = "metaVar_uriish", required = true)
-	private String remote;
-
-	@Override
-	protected void run() throws Exception {
-		final Transport tn = Transport.open(db, remote);
-		if (0 <= timeout)
-			tn.setTimeout(timeout);
-		final FetchConnection c = tn.openFetch();
-		try {
-			for (final Ref r : c.getRefs()) {
-				show(r.getObjectId(), r.getName());
-				if (r.getPeeledObjectId() != null)
-					show(r.getPeeledObjectId(), r.getName() + "^{}"); //$NON-NLS-1$
-			}
-		} finally {
-			c.close();
-			tn.close();
-		}
-	}
-
-	private void show(final AnyObjectId id, final String name)
-			throws IOException {
-		outw.print(id.name());
-		outw.print('\t');
-		outw.print(name);
-		outw.println();
+public class TreeWalkJava7Test extends RepositoryTestCase {
+	@Test
+	public void testSymlinkToDirNotRecursingViaSymlink() throws Exception {
+		FS fs = db.getFS();
+		assertTrue(fs.supportsSymlinks());
+		writeTrashFile("target/data", "targetdata");
+		fs.createSymLink(new File(trash, "link"), "target");
+		TreeWalk tw = new TreeWalk(db);
+		tw.setRecursive(true);
+		tw.addTree(new FileTreeIterator(db));
+		assertTrue(tw.next());
+		assertEquals("link", tw.getPathString());
+		assertTrue(tw.next());
+		assertEquals("target/data", tw.getPathString());
+		assertFalse(tw.next());
 	}
 }
