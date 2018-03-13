@@ -91,6 +91,7 @@ public class WindowCacheGetTest extends SampleDataRepositoryTestCase {
 		checkLimits(cfg);
 
 		final WindowCache cache = WindowCache.getInstance();
+		assertEquals(6, cache.getOpenFiles());
 		assertEquals(17346, cache.getOpenBytes());
 	}
 
@@ -113,7 +114,9 @@ public class WindowCacheGetTest extends SampleDataRepositoryTestCase {
 
 	private void checkLimits(final WindowCacheConfig cfg) {
 		final WindowCache cache = WindowCache.getInstance();
+		assertTrue(cache.getOpenFiles() <= cfg.getPackedGitOpenFiles());
 		assertTrue(cache.getOpenBytes() <= cfg.getPackedGitLimit());
+		assertTrue(0 < cache.getOpenFiles());
 		assertTrue(0 < cache.getOpenBytes());
 	}
 

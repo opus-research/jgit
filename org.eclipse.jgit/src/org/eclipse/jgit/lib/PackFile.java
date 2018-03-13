@@ -47,7 +47,6 @@ package org.eclipse.jgit.lib;
 
 import java.io.EOFException;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
@@ -57,7 +56,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.CRC32;
 import java.util.zip.CheckedOutputStream;
 import java.util.zip.DataFormatException;
@@ -65,6 +63,7 @@ import java.util.zip.DataFormatException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.PackInvalidException;
 import org.eclipse.jgit.errors.PackMismatchException;
+import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.RawParseUtils;
 
@@ -87,7 +86,13 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 	final int hash;
 
+	private RandomAccessFile fd;
+
 	long length;
+
+	private int activeWindows;
+
+	private int activeCopyRawData;
 
 	private int packLastModified;
 
@@ -98,12 +103,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	private PackIndex loadedIdx;
 
 	private PackReverseIndex reverseIdx;
-
-	/** Available open file descriptors against this file. */
-	private final AtomicReference<AvailableFileNode> fds = new AtomicReference<AvailableFileNode>();
-
-	/** Last {@link PackFileHandleCache#tick()} value during access. */
-	private long lastAccess;
 
 	/**
 	 * Construct a reader for an existing, pre-indexed packfile.
@@ -193,22 +192,11 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	}
 
 	/**
-	 * Close any resources utilized by this file.
+	 * Close the resources utilized by this repository
 	 */
 	public void close() {
-		AvailableFileNode open;
-		do {
-			open = fds.get();
-		} while (!fds.compareAndSet(open, null));
-
-		for (; open != null; open = open.next) {
-			try {
-				open.handle.fd.close();
-			} catch (IOException e) {
-				// Ignore close failures of read-only channels.
-			}
-		}
-
+		UnpackedObjectCache.purge(this);
+		WindowCache.purge(this);
 		synchronized (this) {
 			loadedIdx = null;
 			reverseIdx = null;
@@ -344,107 +332,108 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		}
 	}
 
-	ByteArrayWindow read(final long pos, int size) throws IOException {
-		final OpenFile handle = getOpenHandle();
-		try {
-			if (length < pos + size)
-				size = (int) (length - pos);
-			final byte[] buf = new byte[size];
-			handle.fd.seek(pos);
-			handle.fd.readFully(buf, 0, size);
-			return new ByteArrayWindow(this, pos, buf);
-		} finally {
-			putOpenHandle(handle);
+	synchronized void beginCopyRawData() throws IOException {
+		if (++activeCopyRawData == 1 && activeWindows == 0)
+			doOpen();
+	}
+
+	synchronized void endCopyRawData() {
+		if (--activeCopyRawData == 0 && activeWindows == 0)
+			doClose();
+	}
+
+	synchronized boolean beginWindowCache() throws IOException {
+		if (++activeWindows == 1) {
+			if (activeCopyRawData == 0)
+				doOpen();
+			return true;
 		}
+		return false;
+	}
+
+	synchronized boolean endWindowCache() {
+		final boolean r = --activeWindows == 0;
+		if (r && activeCopyRawData == 0)
+			doClose();
+		return r;
+	}
+
+	private void doOpen() throws IOException {
+		try {
+			if (invalid)
+				throw new PackInvalidException(packFile);
+			fd = new RandomAccessFile(packFile, "r");
+			length = fd.length();
+			onOpenPack();
+		} catch (IOException ioe) {
+			openFail();
+			throw ioe;
+		} catch (RuntimeException re) {
+			openFail();
+			throw re;
+		} catch (Error re) {
+			openFail();
+			throw re;
+		}
+	}
+
+	private void openFail() {
+		activeWindows = 0;
+		activeCopyRawData = 0;
+		invalid = true;
+		doClose();
+	}
+
+	private void doClose() {
+		if (fd != null) {
+			try {
+				fd.close();
+			} catch (IOException err) {
+				// Ignore a close event. We had it open only for reading.
+				// There should not be errors related to network buffers
+				// not flushed, etc.
+			}
+			fd = null;
+		}
+	}
+
+	ByteArrayWindow read(final long pos, int size) throws IOException {
+		if (length < pos + size)
+			size = (int) (length - pos);
+		final byte[] buf = new byte[size];
+		IO.readFully(fd.getChannel(), pos, buf, 0, size);
+		return new ByteArrayWindow(this, pos, buf);
 	}
 
 	ByteWindow mmap(final long pos, int size) throws IOException {
-		final OpenFile handle = getOpenHandle();
+		if (length < pos + size)
+			size = (int) (length - pos);
+
+		MappedByteBuffer map;
 		try {
-			if (length < pos + size)
-				size = (int) (length - pos);
-
-			MappedByteBuffer map;
-			try {
-				map = handle.fd.getChannel().map(MapMode.READ_ONLY, pos, size);
-			} catch (IOException ioe1) {
-				// The most likely reason this failed is the JVM has run out
-				// of virtual memory. We need to discard quickly, and try to
-				// force the GC to finalize and release any existing mappings.
-				//
-				System.gc();
-				System.runFinalization();
-				map = handle.fd.getChannel().map(MapMode.READ_ONLY, pos, size);
-			}
-
-			if (map.hasArray())
-				return new ByteArrayWindow(this, pos, map.array());
-			return new ByteBufferWindow(this, pos, map);
-		} finally {
-			putOpenHandle(handle);
+			map = fd.getChannel().map(MapMode.READ_ONLY, pos, size);
+		} catch (IOException ioe1) {
+			// The most likely reason this failed is the JVM has run out
+			// of virtual memory. We need to discard quickly, and try to
+			// force the GC to finalize and release any existing mappings.
+			//
+			System.gc();
+			System.runFinalization();
+			map = fd.getChannel().map(MapMode.READ_ONLY, pos, size);
 		}
+
+		if (map.hasArray())
+			return new ByteArrayWindow(this, pos, map.array());
+		return new ByteBufferWindow(this, pos, map);
 	}
 
-	private OpenFile getOpenHandle() throws IOException {
-		lastAccess = PackFileHandleCache.tick();
-		AvailableFileNode r, n;
-		do {
-			r = fds.get();
-			if (r == null)
-				return newOpenHandle();
-			n = r.next;
-		} while (!fds.compareAndSet(r, n));
-		return r.handle;
-	}
-
-	private void putOpenHandle(OpenFile fc) {
-		AvailableFileNode r, n;
-		do {
-			r = fds.get();
-			n = new AvailableFileNode(r, fc);
-		} while (!fds.compareAndSet(r, n));
-	}
-
-	private OpenFile newOpenHandle() throws IOException {
-		if (invalid)
-			throw new PackInvalidException(packFile);
-
+	private void onOpenPack() throws IOException {
 		final PackIndex idx = idx();
-		final RandomAccessFile fd;
-		try {
-			fd = new RandomAccessFile(packFile, "r");
-		} catch (FileNotFoundException noPack) {
-			invalid = true;
-			throw noPack;
-		}
-
-		boolean goodFile = false;
-		try {
-			checkFile(idx, fd);
-			goodFile = true;
-			return new OpenFile(fd);
-		} finally {
-			if (!goodFile) {
-				invalid = true;
-				try {
-					fd.close();
-				} catch (IOException err) {
-					// Ignore any close errors, we are already failing
-					// with a different (and more descriptive) exception.
-				}
-			}
-		}
-	}
-
-	private void checkFile(final PackIndex idx, final RandomAccessFile fd)
-			throws IOException, PackMismatchException {
 		final byte[] buf = new byte[20];
 
-		fd.seek(0);
-		fd.readFully(buf, 0, 12);
+		IO.readFully(fd.getChannel(), 0, buf, 0, 12);
 		if (RawParseUtils.match(buf, 0, Constants.PACK_SIGNATURE) != 4)
 			throw new IOException("Not a PACK file.");
-
 		final long vers = NB.decodeUInt32(buf, 4);
 		final long packCnt = NB.decodeUInt32(buf, 8);
 		if (vers != 2 && vers != 3)
@@ -452,26 +441,24 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 		if (packCnt != idx.getObjectCount())
 			throw new PackMismatchException("Pack object count mismatch:"
-					+ " pack " + packCnt + " index " + idx.getObjectCount()
+					+ " pack " + packCnt
+					+ " index " + idx.getObjectCount()
 					+ ": " + getPackFile());
 
-		final long len = fd.length();
-		fd.seek(len - 20);
-		fd.readFully(buf, 0, 20);
+		IO.readFully(fd.getChannel(), length - 20, buf, 0, 20);
 		if (!Arrays.equals(buf, packChecksum))
 			throw new PackMismatchException("Pack checksum mismatch:"
-					+ " pack " + ObjectId.fromRaw(buf).name() + " index "
-					+ ObjectId.fromRaw(idx.packChecksum).name() + ": "
-					+ getPackFile());
-
-		length = len;
+					+ " pack " + ObjectId.fromRaw(buf).name()
+					+ " index " + ObjectId.fromRaw(idx.packChecksum).name()
+					+ ": " + getPackFile());
 	}
 
 	private PackedObjectLoader reader(final WindowCursor curs,
 			final long objOffset) throws IOException {
+		long pos = objOffset;
 		int p = 0;
 		final byte[] ib = curs.tempId;
-		readFully(objOffset, ib, 0, 20, curs);
+		readFully(pos, ib, 0, 20, curs);
 		int c = ib[p++] & 0xff;
 		final int typeCode = (c >> 4) & 7;
 		long dataSize = c & 15;
@@ -481,16 +468,19 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			dataSize += (c & 0x7f) << shift;
 			shift += 7;
 		}
+		pos += p;
 
 		switch (typeCode) {
 		case Constants.OBJ_COMMIT:
 		case Constants.OBJ_TREE:
 		case Constants.OBJ_BLOB:
 		case Constants.OBJ_TAG:
-			return new WholePackedObjectLoader(this, objOffset + p, objOffset,
-					typeCode, (int) dataSize);
+			return new WholePackedObjectLoader(this, pos, objOffset, typeCode,
+					(int) dataSize);
 
 		case Constants.OBJ_OFS_DELTA: {
+			readFully(pos, ib, 0, 20, curs);
+			p = 0;
 			c = ib[p++] & 0xff;
 			long ofs = c & 127;
 			while ((c & 128) != 0) {
@@ -499,12 +489,12 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 				ofs <<= 7;
 				ofs += (c & 127);
 			}
-			return new DeltaOfsPackedObjectLoader(this, objOffset + p,
-					objOffset, (int) dataSize, objOffset - ofs);
+			return new DeltaOfsPackedObjectLoader(this, pos + p, objOffset,
+					(int) dataSize, objOffset - ofs);
 		}
 		case Constants.OBJ_REF_DELTA: {
-			readFully(objOffset + p, ib, 0, 20, curs);
-			return new DeltaRefPackedObjectLoader(this, objOffset + p + 20,
+			readFully(pos, ib, 0, 20, curs);
+			return new DeltaRefPackedObjectLoader(this, pos + ib.length,
 					objOffset, (int) dataSize, ObjectId.fromRaw(ib));
 		}
 		default:
@@ -512,8 +502,8 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		}
 	}
 
-	private long findEndOffset(final long startOffset) throws IOException,
-			CorruptObjectException {
+	private long findEndOffset(final long startOffset)
+			throws IOException, CorruptObjectException {
 		final long maxOffset = length - 20;
 		return getReverseIdx().findNextOffset(startOffset, maxOffset);
 	}
@@ -522,32 +512,5 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		if (reverseIdx == null)
 			reverseIdx = new PackReverseIndex(idx());
 		return reverseIdx;
-	}
-
-	/**
-	 * Reference to the local storage file, for direct data access.
-	 * <p>
-	 * An OpenFile <b>must not</b> be shared between threads. The read APIs in
-	 * Java are not sufficiently thread-safe to permit simultaneous concurrent
-	 * access. Instances however may be moved between threads.
-	 */
-	static final class OpenFile {
-		final RandomAccessFile fd;
-
-		OpenFile(final RandomAccessFile fd) {
-			this.fd = fd;
-		}
-	}
-
-	/** A node in the {@link PackFile#fds} queue of available files. */
-	private static final class AvailableFileNode {
-		final AvailableFileNode next;
-
-		final OpenFile handle;
-
-		AvailableFileNode(AvailableFileNode next, OpenFile handle) {
-			this.next = next;
-			this.handle = handle;
-		}
 	}
 }
