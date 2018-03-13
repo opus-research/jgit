@@ -52,7 +52,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
-import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -83,6 +82,8 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 * the strategy used to compute the FileMode for a FileEntry. Can be used to
 	 * control things such as whether to recurse into a directory or create a
 	 * gitlink.
+	 *
+	 * @since 4.3
 	 */
 	protected final FileModeStrategy fileModeStrategy;
 
@@ -93,7 +94,7 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 *            the repository whose working tree will be scanned.
 	 */
 	public FileTreeIterator(Repository repo) {
-    	this(repo, repo.getConfig().get(WorkingTreeOptions.KEY).isDirNoGitLinks() ? NoGitlinksStrategy.INSTANCE : DefaultFileModeStrategy.INSTANCE);
+		this(repo, DefaultFileModeStrategy.INSTANCE);
 	}
 
 	/**
@@ -236,45 +237,24 @@ public class FileTreeIterator extends WorkingTreeIterator {
 		/**
 		 * a singleton instance of the default FileModeStrategy
 		 */
-		public final static DefaultFileModeStrategy INSTANCE = new DefaultFileModeStrategy();
+		public final static DefaultFileModeStrategy INSTANCE =
+				new DefaultFileModeStrategy();
 
 		@Override
 		public FileMode getMode(File f, FS.Attributes attributes) {
-			if (attributes.isSymbolicLink())
+			if (attributes.isSymbolicLink()) {
 				return FileMode.SYMLINK;
-			else if (attributes.isDirectory()) {
-				if (new File(f, Constants.DOT_GIT).exists())
+			} else if (attributes.isDirectory()) {
+				if (new File(f, Constants.DOT_GIT).exists()) {
 					return FileMode.GITLINK;
-				else
+				} else {
 					return FileMode.TREE;
-			} else if (attributes.isExecutable())
+				}
+			} else if (attributes.isExecutable()) {
 				return FileMode.EXECUTABLE_FILE;
-			else
+			} else {
 				return FileMode.REGULAR_FILE;
-		}
-	}
-
-	/**
-	 * A FileModeStrategy that implements native git's DIR_NO_GITLINKS
-	 * behavior
-	 */
-	static public class NoGitlinksStrategy implements FileModeStrategy {
-
-		/**
-		 * a singleton instance of the default FileModeStrategy
-		 */
-		public final static NoGitlinksStrategy INSTANCE = new NoGitlinksStrategy();
-
-		@Override
-		public FileMode getMode(File f, FS.Attributes attributes) {
-			if (attributes.isSymbolicLink())
-				return FileMode.SYMLINK;
-			else if (attributes.isDirectory()) {
-				return FileMode.TREE;
-			} else if (attributes.isExecutable())
-				return FileMode.EXECUTABLE_FILE;
-			else
-				return FileMode.REGULAR_FILE;
+			}
 		}
 	}
 

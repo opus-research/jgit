@@ -252,7 +252,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			// the cached index information for the path.
 			//
 			DirCacheIterator i = state.walk.getTree(state.dirCacheTree,
-							DirCacheIterator.class);
+					DirCacheIterator.class);
 			if (i != null) {
 				DirCacheEntry ent = i.getDirCacheEntry();
 				if (ent != null && compareMetadata(ent) == MetadataDiff.EQUAL) {
@@ -275,11 +275,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			return contentId = idSubmodule(entries[ptr]);
 		}
 		return zeroid;
-	}
-
-	@Override
-	public boolean isWorkTree() {
-		return true;
 	}
 
 	/**
@@ -928,20 +923,14 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		final FileMode wtMode = getEntryFileMode();
 		if (indexIter == null)
 			return wtMode;
-		final FileMode iMode = indexIter.getEntryFileMode();
-		if (getOptions().isFileMode() && iMode != FileMode.GITLINK && iMode != FileMode.TREE)
+		if (getOptions().isFileMode())
 			return wtMode;
+		final FileMode iMode = indexIter.getEntryFileMode();
 		if (FileMode.REGULAR_FILE == wtMode
 				&& FileMode.EXECUTABLE_FILE == iMode)
 			return iMode;
 		if (FileMode.EXECUTABLE_FILE == wtMode
 				&& FileMode.REGULAR_FILE == iMode)
-			return iMode;
-		if (FileMode.GITLINK == iMode
-				&& FileMode.TREE == wtMode)
-			return iMode;
-		if (FileMode.TREE == iMode
-				&& FileMode.GITLINK == wtMode)
 			return iMode;
 		return wtMode;
 	}
