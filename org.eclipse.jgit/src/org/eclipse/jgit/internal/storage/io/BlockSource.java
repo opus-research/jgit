@@ -41,7 +41,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.reftable;
+package org.eclipse.jgit.internal.storage.io;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -49,7 +49,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
 /**
- * Provides content blocks of a reftable to {@link ReftableReader}.
+ * Provides content blocks of file.
  * <p>
  * {@code BlockSource} implementations must decide if they will be thread-safe,
  * or not.
@@ -58,27 +58,26 @@ public abstract class BlockSource implements AutoCloseable {
 	/**
 	 * Wrap a byte array as a {@code BlockSource}.
 	 *
-	 * @param table
+	 * @param content
 	 *            input file.
-	 * @return block source to read from {@code table}.
+	 * @return block source to read from {@code content}.
 	 */
-	public static BlockSource from(byte[] table) {
+	public static BlockSource from(byte[] content) {
 		return new BlockSource() {
 			@Override
-			public ByteBuffer read(long position, int blockSize)
-					throws IOException {
-				ByteBuffer buf = ByteBuffer.allocate(blockSize);
-				if (position < table.length) {
-					int p = (int) position;
-					int n = Math.min(blockSize, table.length - p);
-					buf.put(table, p, n);
+			public ByteBuffer read(long pos, int cnt) {
+				ByteBuffer buf = ByteBuffer.allocate(cnt);
+				if (pos < content.length) {
+					int p = (int) pos;
+					int n = Math.min(cnt, content.length - p);
+					buf.put(content, p, n);
 				}
 				return buf;
 			}
 
 			@Override
-			public long size() throws IOException {
-				return table.length;
+			public long size() {
+				return content.length;
 			}
 
 			@Override
@@ -145,8 +144,8 @@ public abstract class BlockSource implements AutoCloseable {
 	 * Read a block from the file.
 	 * <p>
 	 * To reduce copying, the returned ByteBuffer should have an accessible
-	 * array. {@link ReftableReader} will discard the ByteBuffer and directly
-	 * use the backing array.
+	 * array and {@code arrayOffset() == 0}. The caller will discard the
+	 * ByteBuffer and directly use the backing array.
 	 *
 	 * @param position
 	 *            position of the block in the file, specified in bytes from the

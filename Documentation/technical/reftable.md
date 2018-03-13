@@ -549,13 +549,13 @@ stack by the active writer), or ancient and ready to be pruned.
 Although reftables are immutable, mutations are supported by writing a
 new reftable and atomically appending it to the stack:
 
-1. Atomically create `stack.lock`
-2. Copy current stack to `stack.lock`.
-3. Prepare new reftable in temp file `.refXXXXXXX`.
-   Include log entries.
-4. Rename (3) to `${sha1}.ref`.
-5. Append `${sha1}.ref` to `stack.lock`
-6. Atomically rename `stack.lock` to `stack`.
+1. Read `stack` to determine current reftables.
+2. Prepare new reftable in temp file `.refXXXXXXX`, include log entries.
+3. Rename (2) to `${sha1}.ref`.
+4. Acquire `stack.lock`.
+5. If `stack` differs from (1), verify `${sha1}.ref` does not conflict.
+6. Copy `stack` to `stack.lock`, appending `{$sha1}.ref`.
+6. Rename `stack.lock` to `stack`.
 
 Because a single `stack.lock` file is used to manage locking, the
 repository is single-threaded for writers.  Writers may have to
@@ -564,6 +564,12 @@ for up to an acceptable wait period, aborting if the repository is too
 busy to mutate.  Application servers wrapped around repositories (e.g.
 Gerrit Code Review) can layer their own in memory thread lock/wait
 queue to improve fairness.
+
+By prepareing the update in steps 1-3 without the lock held,
+concurrent updaters may be able to update unrelated references in a
+safe way, with a minimal critical section.  This requires updaters to
+verify in 5 that the stack has not changed in a meaningful way, and to
+gracefully abort by deleting `${sha1}.ref` if a conflict was detected.
 
 ### Reference deletions
 
