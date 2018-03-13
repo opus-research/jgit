@@ -63,7 +63,6 @@ import java.util.Comparator;
 import java.util.List;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.errors.IndexReadException;
 import org.eclipse.jgit.errors.LockFailedException;
 import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.events.IndexChangedEvent;
@@ -77,7 +76,6 @@ import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.treewalk.TreeWalk.OperationType;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
@@ -419,12 +417,6 @@ public class DirCache {
 					}
 				}
 			} catch (FileNotFoundException fnfe) {
-				if (liveFile.exists()) {
-					// Panic: the index file exists but we can't read it
-					throw new IndexReadException(
-							MessageFormat.format(JGitText.get().cannotReadIndex,
-									liveFile.getAbsolutePath(), fnfe));
-				}
 				// Someone must have deleted it between our exists test
 				// and actually opening the path. That's fine, its empty.
 				//
@@ -971,7 +963,6 @@ public class DirCache {
 	private void updateSmudgedEntries() throws IOException {
 		List<String> paths = new ArrayList<String>(128);
 		try (TreeWalk walk = new TreeWalk(repository)) {
-			walk.setOperationType(OperationType.CHECKIN_OP);
 			for (int i = 0; i < entryCnt; i++)
 				if (sortedEntries[i].isSmudged())
 					paths.add(sortedEntries[i].getPathString());

@@ -138,9 +138,6 @@ public class RepoProject implements Comparable<RepoProject> {
 	 */
 	public RepoProject(String name, String path, String revision,
 			String remote, String groups) {
-		if (name == null) {
-			throw new NullPointerException();
-		}
 		this.name = name;
 		if (path != null)
 			this.path = path;
@@ -224,7 +221,7 @@ public class RepoProject implements Comparable<RepoProject> {
 	/**
 	 * Get the name of the remote definition of the sub repo.
 	 *
-	 * @return {@code remote}
+	 * @return {@remote}
 	 */
 	public String getRemote() {
 		return remote;
