@@ -45,11 +45,9 @@ package org.eclipse.jgit.http.server;
 
 import static javax.servlet.http.HttpServletResponse.SC_FORBIDDEN;
 import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
-import static org.eclipse.jgit.http.server.ServletUtils.ATTRIBUTE_HANDLER;
 import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
 
 import java.io.IOException;
-import java.util.List;
 
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
@@ -70,11 +68,8 @@ import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 abstract class SmartServiceInfoRefs implements Filter {
 	private final String svc;
 
-	private final Filter[] filters;
-
-	SmartServiceInfoRefs(final String service, final List<Filter> filters) {
+	SmartServiceInfoRefs(final String service) {
 		this.svc = service;
-		this.filters = filters.toArray(new Filter[filters.size()]);
 	}
 
 	public void init(FilterConfig config) throws ServletException {
@@ -88,71 +83,31 @@ abstract class SmartServiceInfoRefs implements Filter {
 	public void doFilter(ServletRequest request, ServletResponse response,
 			FilterChain chain) throws IOException, ServletException {
 		final HttpServletRequest req = (HttpServletRequest) request;
-		final HttpServletResponse rsp = (HttpServletResponse) response;
 
 		if (svc.equals(req.getParameter("service"))) {
-			final Repository db = getRepository(req);
+			final HttpServletResponse rsp = (HttpServletResponse) response;
 			try {
-				begin(req, db);
+				final Repository db = getRepository(req);
+				rsp.setContentType("application/x-" + svc + "-advertisement");
+
+				final SmartOutputStream buf = new SmartOutputStream(req, rsp);
+				final PacketLineOut out = new PacketLineOut(buf);
+				out.writeString("# service=" + svc + "\n");
+				out.end();
+				advertise(req, db, new PacketLineOutRefAdvertiser(out));
+				buf.close();
 			} catch (ServiceNotAuthorizedException e) {
 				rsp.sendError(SC_UNAUTHORIZED);
-				return;
+
 			} catch (ServiceNotEnabledException e) {
 				rsp.sendError(SC_FORBIDDEN);
-				return;
-			}
-
-			try {
-				if (filters.length == 0)
-					service(req, response);
-				else
-					new Chain().doFilter(request, response);
-			} finally {
-				req.removeAttribute(ATTRIBUTE_HANDLER);
 			}
 		} else {
 			chain.doFilter(request, response);
 		}
 	}
 
-	private void service(ServletRequest request, ServletResponse response)
-			throws IOException {
-		final HttpServletRequest req = (HttpServletRequest) request;
-		final HttpServletResponse rsp = (HttpServletResponse) response;
-		try {
-			rsp.setContentType("application/x-" + svc + "-advertisement");
-
-			final SmartOutputStream buf = new SmartOutputStream(req, rsp);
-			final PacketLineOut out = new PacketLineOut(buf);
-			out.writeString("# service=" + svc + "\n");
-			out.end();
-			advertise(req, new PacketLineOutRefAdvertiser(out));
-			buf.close();
-		} catch (ServiceNotAuthorizedException e) {
-			rsp.sendError(SC_UNAUTHORIZED);
-
-		} catch (ServiceNotEnabledException e) {
-			rsp.sendError(SC_FORBIDDEN);
-		}
-	}
-
-	protected abstract void begin(HttpServletRequest req, Repository db)
-			throws IOException, ServiceNotEnabledException,
-			ServiceNotAuthorizedException;
-
-	protected abstract void advertise(HttpServletRequest req,
+	protected abstract void advertise(HttpServletRequest req, Repository db,
 			PacketLineOutRefAdvertiser pck) throws IOException,
 			ServiceNotEnabledException, ServiceNotAuthorizedException;
-
-	private class Chain implements FilterChain {
-		private int filterIdx;
-
-		public void doFilter(ServletRequest req, ServletResponse rsp)
-				throws IOException, ServletException {
-			if (filterIdx < filters.length)
-				filters[filterIdx++].doFilter(req, rsp, this);
-			else
-				service(req, rsp);
-		}
-	}
 }
