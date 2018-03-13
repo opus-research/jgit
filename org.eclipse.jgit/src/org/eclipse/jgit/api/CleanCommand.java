@@ -63,8 +63,6 @@ import org.eclipse.jgit.util.FileUtils;
 public class CleanCommand extends GitCommand<Set<String>> {
 
 	private Set<String> paths = Collections.emptySet();
-	
-	private boolean dryRun = false;
 
 	/**
 	 * @param repo
@@ -88,8 +86,7 @@ public class CleanCommand extends GitCommand<Set<String>> {
 			Status status = command.call();
 			for (String file : status.getUntracked()) {
 				if (paths.isEmpty() || paths.contains(file)) {
-					if (!dryRun)
-						FileUtils.delete(new File(repo.getWorkTree(), file));
+					FileUtils.delete(new File(repo.getWorkTree(), file));
 					files.add(file);
 				}
 			}
@@ -111,16 +108,4 @@ public class CleanCommand extends GitCommand<Set<String>> {
 		return this;
 	}
 
-	/**
-	 * If dryRun is set, the resources in question will not actually be deleted,
-	 * but a list of their names would be returned instead.
-	 *
-	 * @param dryRun
-	 *            the paths to set
-	 * @return {@code this}
-	 */
-	public CleanCommand setDryRun(boolean dryRun) {
-		this.dryRun = dryRun;
-		return this;
-	}
 }
