@@ -46,21 +46,20 @@ package org.eclipse.jgit.api;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
-import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.StoredConfig;
+import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 
@@ -120,18 +119,15 @@ public class CreateBranchCommand extends GitCommand<Ref> {
 	 *             invalid
 	 * @return the newly created branch
 	 */
-	public Ref call() throws GitAPIException, RefAlreadyExistsException,
+	public Ref call() throws JGitInternalException, RefAlreadyExistsException,
 			RefNotFoundException, InvalidRefNameException {
 		checkCallable();
 		processOptions();
-		RevWalk revWalk = new RevWalk(repo);
 		try {
-			Ref refToCheck = repo.getRef(name);
-			boolean exists = refToCheck != null
-					&& refToCheck.getName().startsWith(Constants.R_HEADS);
+			boolean exists = repo.getRef(name) != null;
 			if (!force && exists)
 				throw new RefAlreadyExistsException(MessageFormat.format(
-						JGitText.get().refAlreadyExists1, name));
+						JGitText.get().refAlreadExists, name));
 
 			ObjectId startAt = getStartPoint();
 			String startPointFullName = null;
@@ -144,37 +140,36 @@ public class CreateBranchCommand extends GitCommand<Ref> {
 			// determine whether we are based on a commit,
 			// a branch, or a tag and compose the reflog message
 			String refLogMessage;
-			String baseBranch = ""; //$NON-NLS-1$
+			String baseBranch = "";
 			if (startPointFullName == null) {
 				String baseCommit;
 				if (startCommit != null)
 					baseCommit = startCommit.getShortMessage();
 				else {
-					RevCommit commit = revWalk.parseCommit(repo
+					RevCommit commit = new RevWalk(repo).parseCommit(repo
 							.resolve(startPoint));
 					baseCommit = commit.getShortMessage();
 				}
 				if (exists)
-					refLogMessage = "branch: Reset start-point to commit " //$NON-NLS-1$
+					refLogMessage = "branch: Reset start-point to commit "
 							+ baseCommit;
 				else
-					refLogMessage = "branch: Created from commit " + baseCommit; //$NON-NLS-1$
+					refLogMessage = "branch: Created from commit " + baseCommit;
 
 			} else if (startPointFullName.startsWith(Constants.R_HEADS)
 					|| startPointFullName.startsWith(Constants.R_REMOTES)) {
 				baseBranch = startPointFullName;
 				if (exists)
-					refLogMessage = "branch: Reset start-point to branch " //$NON-NLS-1$
+					refLogMessage = "branch: Reset start-point to branch "
 							+ startPointFullName; // TODO
 				else
-					refLogMessage = "branch: Created from branch " + baseBranch; //$NON-NLS-1$
+					refLogMessage = "branch: Created from branch " + baseBranch;
 			} else {
-				startAt = revWalk.peel(revWalk.parseAny(startAt));
 				if (exists)
-					refLogMessage = "branch: Reset start-point to tag " //$NON-NLS-1$
+					refLogMessage = "branch: Reset start-point to tag "
 							+ startPointFullName;
 				else
-					refLogMessage = "branch: Created from tag " //$NON-NLS-1$
+					refLogMessage = "branch: Created from tag "
 							+ startPointFullName;
 			}
 
@@ -233,9 +228,9 @@ public class CreateBranchCommand extends GitCommand<Ref> {
 				String autosetupflag = repo.getConfig().getString(
 						ConfigConstants.CONFIG_BRANCH_SECTION, null,
 						ConfigConstants.CONFIG_KEY_AUTOSETUPMERGE);
-				if ("false".equals(autosetupflag)) { //$NON-NLS-1$
+				if ("false".equals(autosetupflag)) {
 					doConfigure = false;
-				} else if ("always".equals(autosetupflag)) { //$NON-NLS-1$
+				} else if ("always".equals(autosetupflag)) {
 					doConfigure = true;
 				} else {
 					// in this case, the default is to configure
@@ -246,8 +241,8 @@ public class CreateBranchCommand extends GitCommand<Ref> {
 
 			if (doConfigure) {
 				StoredConfig config = repo.getConfig();
-				String[] tokens = baseBranch.split("/", 4); //$NON-NLS-1$
-				boolean isRemote = tokens[1].equals("remotes"); //$NON-NLS-1$
+				String[] tokens = baseBranch.split("/", 4);
+				boolean isRemote = tokens[1].equals("remotes");
 				if (isRemote) {
 					// refs/remotes/<remote name>/<branch>
 					String remoteName = tokens[2];
@@ -262,7 +257,7 @@ public class CreateBranchCommand extends GitCommand<Ref> {
 				} else {
 					// set "." as remote
 					config.setString(ConfigConstants.CONFIG_BRANCH_SECTION,
-							name, ConfigConstants.CONFIG_KEY_REMOTE, "."); //$NON-NLS-1$
+							name, ConfigConstants.CONFIG_KEY_REMOTE, ".");
 					config.setString(ConfigConstants.CONFIG_BRANCH_SECTION,
 							name, ConfigConstants.CONFIG_KEY_MERGE, baseBranch);
 				}
@@ -271,8 +266,6 @@ public class CreateBranchCommand extends GitCommand<Ref> {
 			return result;
 		} catch (IOException ioe) {
 			throw new JGitInternalException(ioe.getMessage(), ioe);
-		} finally {
-			revWalk.release();
 		}
 	}
 
@@ -298,7 +291,7 @@ public class CreateBranchCommand extends GitCommand<Ref> {
 		if (name == null
 				|| !Repository.isValidRefName(Constants.R_HEADS + name))
 			throw new InvalidRefNameException(MessageFormat.format(JGitText
-					.get().branchNameInvalid, name == null ? "<null>" : name)); //$NON-NLS-1$
+					.get().branchNameInvalid, name == null ? "<null>" : name));
 	}
 
 	/**

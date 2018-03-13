@@ -47,8 +47,6 @@
 
 package org.eclipse.jgit.pgm;
 
-import static java.lang.Character.valueOf;
-
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.text.MessageFormat;
@@ -65,7 +63,7 @@ abstract class AbstractFetchCommand extends TextBuiltin {
 	@Option(name = "--verbose", aliases = { "-v" }, usage = "usage_beMoreVerbose")
 	private boolean verbose;
 
-	protected void showFetchResult(final FetchResult r) throws IOException {
+	protected void showFetchResult(final FetchResult r) {
 		ObjectReader reader = db.newObjectReader();
 		try {
 			boolean shownURI = false;
@@ -79,14 +77,13 @@ abstract class AbstractFetchCommand extends TextBuiltin {
 				final String dst = abbreviateRef(u.getLocalName(), true);
 
 				if (!shownURI) {
-					outw.println(MessageFormat.format(CLIText.get().fromURI,
-							r.getURI()));
+					out.format(CLIText.get().fromURI, r.getURI());
+					out.println();
 					shownURI = true;
 				}
 
-				outw.format(" %c %-17s %-10s -> %s", valueOf(type), longType, //$NON-NLS-1$
-						src, dst);
-				outw.println();
+				out.format(" %c %-17s %-10s -> %s", type, longType, src, dst);
+				out.println();
 			}
 		} finally {
 			reader.release();
@@ -128,8 +125,7 @@ abstract class AbstractFetchCommand extends TextBuiltin {
 		writer.flush();
 	}
 
-	private static String longTypeOf(ObjectReader reader,
-			final TrackingRefUpdate u) {
+	private String longTypeOf(ObjectReader reader, final TrackingRefUpdate u) {
 		final RefUpdate.Result r = u.getResult();
 		if (r == RefUpdate.Result.LOCK_FAILURE)
 			return "[lock fail]";
@@ -151,21 +147,21 @@ abstract class AbstractFetchCommand extends TextBuiltin {
 		if (r == RefUpdate.Result.FORCED) {
 			final String aOld = safeAbbreviate(reader, u.getOldObjectId());
 			final String aNew = safeAbbreviate(reader, u.getNewObjectId());
-			return aOld + "..." + aNew; //$NON-NLS-1$
+			return aOld + "..." + aNew;
 		}
 
 		if (r == RefUpdate.Result.FAST_FORWARD) {
 			final String aOld = safeAbbreviate(reader, u.getOldObjectId());
 			final String aNew = safeAbbreviate(reader, u.getNewObjectId());
-			return aOld + ".." + aNew; //$NON-NLS-1$
+			return aOld + ".." + aNew;
 		}
 
 		if (r == RefUpdate.Result.NO_CHANGE)
 			return "[up to date]";
-		return "[" + r.name() + "]"; //$NON-NLS-1$//$NON-NLS-2$
+		return "[" + r.name() + "]";
 	}
 
-	private static String safeAbbreviate(ObjectReader reader, ObjectId id) {
+	private String safeAbbreviate(ObjectReader reader, ObjectId id) {
 		try {
 			return reader.abbreviate(id).name();
 		} catch (IOException cannotAbbreviate) {

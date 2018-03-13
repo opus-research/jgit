@@ -484,11 +484,14 @@ public class DirCacheTree {
 			stIdx++;
 		}
 
-		// None of our remaining children can be in this tree
-		// as the current cache entry is after our own name.
-		//
-		while (stIdx < childCnt)
-			removeChild(childCnt - 1);
+		if (stIdx < childCnt) {
+			// None of our remaining children can be in this tree
+			// as the current cache entry is after our own name.
+			//
+			final DirCacheTree[] dct = new DirCacheTree[stIdx];
+			System.arraycopy(children, 0, dct, 0, stIdx);
+			children = dct;
+		}
 	}
 
 	private void insertChild(final int stIdx, final DirCacheTree st) {
@@ -551,10 +554,5 @@ public class DirCacheTree {
 			if (a[aPos] == '/')
 				return aPos;
 		return -1;
-	}
-
-	@Override
-	public String toString() {
-		return getNameString();
 	}
 }

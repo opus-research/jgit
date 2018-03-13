@@ -42,11 +42,6 @@
  */
 package org.eclipse.jgit.api;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.fail;
-
 import java.util.List;
 
 import org.eclipse.jgit.api.CreateBranchCommand.SetupUpstreamMode;
@@ -59,20 +54,17 @@ import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NotMergedException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
-import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.transport.FetchResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.transport.URIish;
-import org.junit.Before;
-import org.junit.Test;
 
 public class BranchCommandTest extends RepositoryTestCase {
 	private Git git;
@@ -82,8 +74,7 @@ public class BranchCommandTest extends RepositoryTestCase {
 	RevCommit secondCommit;
 
 	@Override
-	@Before
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
 		super.setUp();
 		git = new Git(db);
 		// checkout master
@@ -137,7 +128,6 @@ public class BranchCommandTest extends RepositoryTestCase {
 		return localGit;
 	}
 
-	@Test
 	public void testCreateAndList() throws Exception {
 		int localBefore;
 		int remoteBefore;
@@ -190,13 +180,6 @@ public class BranchCommandTest extends RepositoryTestCase {
 				- allBefore);
 	}
 
-	@Test
-	public void testListAllBranchesShouldNotDie() throws Exception {
-		Git git = setUpRepoWithRemote();
-		git.branchList().setListMode(ListMode.ALL).call();
-	}
-
-	@Test
 	public void testCreateFromCommit() throws Exception {
 		Ref branch = git.branchCreate().setName("FromInitial").setStartPoint(
 				initialCommit).call();
@@ -215,7 +198,6 @@ public class BranchCommandTest extends RepositoryTestCase {
 		assertEquals(secondCommit.getId(), branch.getObjectId());
 	}
 
-	@Test
 	public void testCreateForce() throws Exception {
 		// using commits
 		Ref newBranch = createBranch(git, "NewForce", false, secondCommit
@@ -248,29 +230,6 @@ public class BranchCommandTest extends RepositoryTestCase {
 		assertEquals(newBranch.getTarget().getObjectId(), initialCommit.getId());
 	}
 
-	@Test
-	public void testCreateFromLightweightTag() throws Exception {
-		RefUpdate rup = db.updateRef("refs/tags/V10");
-		rup.setNewObjectId(initialCommit);
-		rup.setExpectedOldObjectId(ObjectId.zeroId());
-		rup.update();
-
-		Ref branch = git.branchCreate().setName("FromLightweightTag")
-				.setStartPoint("refs/tags/V10").call();
-		assertEquals(initialCommit.getId(), branch.getObjectId());
-
-	}
-
-	@Test
-	public void testCreateFromAnnotatetdTag() throws Exception {
-		Ref tagRef = git.tag().setName("V10").setObjectId(secondCommit).call();
-		Ref branch = git.branchCreate().setName("FromAnnotatedTag")
-				.setStartPoint("refs/tags/V10").call();
-		assertFalse(tagRef.getObjectId().equals(branch.getObjectId()));
-		assertEquals(secondCommit.getId(), branch.getObjectId());
-	}
-
-	@Test
 	public void testDelete() throws Exception {
 		createBranch(git, "ForDelete", false, "master", null);
 		git.branchDelete().setBranchNames("ForDelete").call();
@@ -315,7 +274,6 @@ public class BranchCommandTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testPullConfigRemoteBranch() throws Exception {
 		Git localGit = setUpRepoWithRemote();
 		Ref remote = localGit.branchList().setListMode(ListMode.REMOTE).call()
@@ -347,7 +305,6 @@ public class BranchCommandTest extends RepositoryTestCase {
 		localGit.branchDelete().setBranchNames("newFromRemote").call();
 	}
 
-	@Test
 	public void testPullConfigLocalBranch() throws Exception {
 		Git localGit = setUpRepoWithRemote();
 		// by default, we should not create pull configuration
@@ -367,7 +324,6 @@ public class BranchCommandTest extends RepositoryTestCase {
 				"newFromRemote", "remote"));
 	}
 
-	@Test
 	public void testPullConfigRenameLocalBranch() throws Exception {
 		Git localGit = setUpRepoWithRemote();
 		// by default, we should not create pull configuration
@@ -392,7 +348,6 @@ public class BranchCommandTest extends RepositoryTestCase {
 				"newFromRemote", "remote"));
 	}
 
-	@Test
 	public void testRenameLocalBranch() throws Exception {
 		// null newName not allowed
 		try {
@@ -447,7 +402,6 @@ public class BranchCommandTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testRenameRemoteTrackingBranch() throws Exception {
 		Git localGit = setUpRepoWithRemote();
 		Ref remoteBranch = localGit.branchList().setListMode(ListMode.REMOTE)
@@ -458,7 +412,6 @@ public class BranchCommandTest extends RepositoryTestCase {
 		assertEquals(Constants.R_REMOTES + "newRemote", renamed.getName());
 	}
 
-	@Test
 	public void testCreationImplicitStart() throws JGitInternalException,
 			GitAPIException {
 		git.branchCreate().setName("topic").call();
@@ -466,7 +419,9 @@ public class BranchCommandTest extends RepositoryTestCase {
 
 	public Ref createBranch(Git actGit, String name, boolean force,
 			String startPoint, SetupUpstreamMode mode)
-			throws JGitInternalException, GitAPIException {
+			throws JGitInternalException, RefAlreadyExistsException,
+			RefNotFoundException,
+			InvalidRefNameException {
 		CreateBranchCommand cmd = actGit.branchCreate();
 		cmd.setName(name);
 		cmd.setForce(force);

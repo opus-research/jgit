@@ -89,7 +89,6 @@ public class SkipWorkTreeFilter extends TreeFilter {
 		return this;
 	}
 
-	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
 		return "SkipWorkTree(" + treeIdx + ")";

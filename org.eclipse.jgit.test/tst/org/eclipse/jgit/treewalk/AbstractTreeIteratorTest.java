@@ -44,23 +44,18 @@
 
 package org.eclipse.jgit.treewalk;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
-
 import java.io.IOException;
+
+import junit.framework.TestCase;
 
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectReader;
-import org.junit.Test;
 
 
-public class AbstractTreeIteratorTest {
+public class AbstractTreeIteratorTest extends TestCase {
 	private static String prefix(String path) {
 		final int s = path.lastIndexOf('/');
 		return s > 0 ? path.substring(0, s) : "";
@@ -85,7 +80,6 @@ public class AbstractTreeIteratorTest {
 		}
 	}
 
-	@Test
 	public void testPathCompare() throws Exception {
 		assertTrue(new FakeTreeIterator("a", FileMode.REGULAR_FILE).pathCompare(
 				new FakeTreeIterator("a", FileMode.TREE)) < 0);
@@ -100,7 +94,6 @@ public class AbstractTreeIteratorTest {
 				new FakeTreeIterator("a", FileMode.TREE)) == 0);
 	}
 
-	@Test
 	public void testGrowPath() throws Exception {
 		final FakeTreeIterator i = new FakeTreeIterator("ab", FileMode.TREE);
 		final byte[] origpath = i.path;
@@ -115,7 +108,6 @@ public class AbstractTreeIteratorTest {
 		assertEquals(i.path[1], 'b');
 	}
 
-	@Test
 	public void testEnsurePathCapacityFastCase() throws Exception {
 		final FakeTreeIterator i = new FakeTreeIterator("ab", FileMode.TREE);
 		final int want = 50;
@@ -131,7 +123,6 @@ public class AbstractTreeIteratorTest {
 		assertEquals(i.path[1], 'b');
 	}
 
-	@Test
 	public void testEnsurePathCapacityGrows() throws Exception {
 		final FakeTreeIterator i = new FakeTreeIterator("ab", FileMode.TREE);
 		final int want = 384;
@@ -148,7 +139,6 @@ public class AbstractTreeIteratorTest {
 		assertEquals(i.path[1], 'b');
 	}
 
-	@Test
 	public void testEntryFileMode() {
 		for (FileMode m : new FileMode[] { FileMode.TREE,
 				FileMode.REGULAR_FILE, FileMode.EXECUTABLE_FILE,
@@ -159,7 +149,6 @@ public class AbstractTreeIteratorTest {
 		}
 	}
 
-	@Test
 	public void testEntryPath() {
 		FakeTreeIterator i = new FakeTreeIterator("a/b/cd", FileMode.TREE);
 		assertEquals("a/b/cd", i.getEntryPathString());
@@ -172,7 +161,6 @@ public class AbstractTreeIteratorTest {
 		assertEquals('d', b[2]);
 	}
 
-	@Test
 	public void testCreateEmptyTreeIterator() {
 		FakeTreeIterator i = new FakeTreeIterator("a/b/cd", FileMode.TREE);
 		EmptyTreeIterator e = i.createEmptyTreeIterator();

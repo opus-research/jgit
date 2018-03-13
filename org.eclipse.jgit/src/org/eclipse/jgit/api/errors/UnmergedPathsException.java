@@ -37,7 +37,7 @@
  */
 package org.eclipse.jgit.api.errors;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 
 /**
  * Thrown when branch deletion fails due to unmerged data
@@ -49,16 +49,6 @@ public class UnmergedPathsException extends GitAPIException {
 	 * The default constructor with a default message
 	 */
 	public UnmergedPathsException() {
-		this(null);
-	}
-
-	/**
-	 * The default constructor with a default message
-	 *
-	 * @param cause
-	 *            original exception
-	 */
-	public UnmergedPathsException(Throwable cause) {
-		super(JGitText.get().unmergedPaths, cause);
+		super(JGitText.get().unmergedPaths);
 	}
 }

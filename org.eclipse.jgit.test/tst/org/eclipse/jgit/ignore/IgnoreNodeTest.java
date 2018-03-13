@@ -42,22 +42,16 @@
  */
 package org.eclipse.jgit.ignore;
 
-import static org.eclipse.jgit.junit.Assert.assertEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-
 import java.io.File;
 import java.io.IOException;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
-import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.FileMode;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.util.FileUtils;
-import org.junit.Test;
 
 /**
  * Tests ignore node behavior on the local filesystem.
@@ -73,7 +67,6 @@ public class IgnoreNodeTest extends RepositoryTestCase {
 
 	private TreeWalk walk;
 
-	@Test
 	public void testRules() throws IOException {
 		writeIgnoreFile(".git/info/exclude", "*~", "/out");
 
@@ -112,7 +105,6 @@ public class IgnoreNodeTest extends RepositoryTestCase {
 		assertEntry(F, ignored, "src/config/old/lex.out");
 	}
 
-	@Test
 	public void testNegation() throws IOException {
 		writeIgnoreFile(".gitignore", "*.o");
 		writeIgnoreFile("src/a/b/.gitignore", "!keep.o");
@@ -129,7 +121,6 @@ public class IgnoreNodeTest extends RepositoryTestCase {
 		assertEntry(F, ignored, "src/a/b/nothere.o");
 	}
 
-	@Test
 	public void testSlashOnlyMatchesDirectory() throws IOException {
 		writeIgnoreFile(".gitignore", "out/");
 		writeTrashFile("out", "");
@@ -147,7 +138,6 @@ public class IgnoreNodeTest extends RepositoryTestCase {
 		assertEntry(F, ignored, "out/foo");
 	}
 
-	@Test
 	public void testWithSlashDoesNotMatchInSubDirectory() throws IOException {
 		writeIgnoreFile(".gitignore", "a/b");
 		writeTrashFile("a/a", "");

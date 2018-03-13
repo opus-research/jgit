@@ -43,6 +43,7 @@
 
 package org.eclipse.jgit.util;
 
+
 /** Conversion utilities for network byte order handling. */
 public final class NB {
 	/**
@@ -100,39 +101,6 @@ public final class NB {
 
 		r |= intbuf[offset + 2] & 0xff;
 		return (r << 8) | (intbuf[offset + 3] & 0xff);
-	}
-
-	/**
-	 * Convert sequence of 8 bytes (network byte order) into signed value.
-	 *
-	 * @param intbuf
-	 *            buffer to acquire the 8 bytes of data from.
-	 * @param offset
-	 *            position within the buffer to begin reading from. This
-	 *            position and the next 7 bytes after it (for a total of 8
-	 *            bytes) will be read.
-	 * @return signed integer value that matches the 64 bits read.
-	 */
-	public static long decodeInt64(final byte[] intbuf, final int offset) {
-		long r = intbuf[offset] << 8;
-
-		r |= intbuf[offset + 1] & 0xff;
-		r <<= 8;
-
-		r |= intbuf[offset + 2] & 0xff;
-		r <<= 8;
-
-		r |= intbuf[offset + 3] & 0xff;
-		r <<= 8;
-
-		r |= intbuf[offset + 4] & 0xff;
-		r <<= 8;
-
-		r |= intbuf[offset + 5] & 0xff;
-		r <<= 8;
-
-		r |= intbuf[offset + 6] & 0xff;
-		return (r << 8) | (intbuf[offset + 7] & 0xff);
 	}
 
 	/**
@@ -219,7 +187,7 @@ public final class NB {
 	 * Write a 64 bit integer as a sequence of 8 bytes (network byte order).
 	 *
 	 * @param intbuf
-	 *            buffer to write the 8 bytes of data into.
+	 *            buffer to write the 48bytes of data into.
 	 * @param offset
 	 *            position within the buffer to begin writing to. This position
 	 *            and the next 7 bytes after it (for a total of 8 bytes) will be

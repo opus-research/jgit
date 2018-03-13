@@ -40,8 +40,7 @@ package org.eclipse.jgit.api;
 import java.text.MessageFormat;
 import java.util.concurrent.Callable;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.Repository;
 
 /**
@@ -117,13 +116,4 @@ public abstract class GitCommand<T> implements Callable<T> {
 					JGitText.get().commandWasCalledInTheWrongState
 					, this.getClass().getName()));
 	}
-
-	/**
-	 * Executes the command
-	 *
-	 * @return T a result. Each command has its own return type
-	 * @throws GitAPIException
-	 *             or subclass thereof when an error occurs
-	 */
-	public abstract T call() throws GitAPIException;
 }

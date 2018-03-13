@@ -75,7 +75,7 @@ public class StrategySimpleTwoWayInCore extends ThreeWayMergeStrategy {
 
 	@Override
 	public String getName() {
-		return "simple-two-way-in-core"; //$NON-NLS-1$
+		return "simple-two-way-in-core";
 	}
 
 	@Override

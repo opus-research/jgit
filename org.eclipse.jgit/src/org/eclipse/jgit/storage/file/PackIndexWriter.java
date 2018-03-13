@@ -51,12 +51,11 @@ import java.security.DigestOutputStream;
 import java.text.MessageFormat;
 import java.util.List;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.transport.PackedObjectInfo;
 import org.eclipse.jgit.util.NB;
-import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
  * Creates a table of contents to support random access by {@link PackFile}.
@@ -94,43 +93,23 @@ public abstract class PackIndexWriter {
 	 * @throws IllegalArgumentException
 	 *             no recognized pack index version can support the supplied
 	 *             objects. This is likely a bug in the implementation.
-	 * @see #oldestPossibleFormat(List)
 	 */
+	@SuppressWarnings("fallthrough")
 	public static PackIndexWriter createOldestPossible(final OutputStream dst,
 			final List<? extends PackedObjectInfo> objs) {
-		return createVersion(dst, oldestPossibleFormat(objs));
-	}
-
-	/**
-	 * Return the oldest (most widely understood) index format.
-	 * <p>
-	 * This method selects an index format that can accurate describe the
-	 * supplied objects and that will be the most compatible format with older
-	 * Git implementations.
-	 * <p>
-	 * Index version 1 is widely recognized by all Git implementations, but
-	 * index version 2 (and later) is not as well recognized as it was
-	 * introduced more than a year later. Index version 1 can only be used if
-	 * the resulting pack file is under 4 gigabytes in size; packs larger than
-	 * that limit must use index version 2.
-	 *
-	 * @param objs
-	 *            the objects the caller needs to store in the index. Entries
-	 *            will be examined until a format can be conclusively selected.
-	 * @return the index format.
-	 * @throws IllegalArgumentException
-	 *             no recognized pack index version can support the supplied
-	 *             objects. This is likely a bug in the implementation.
-	 */
-	public static int oldestPossibleFormat(
-			final List<? extends PackedObjectInfo> objs) {
-		for (final PackedObjectInfo oe : objs) {
-			if (!PackIndexWriterV1.canStore(oe))
-				return 2;
+		int version = 1;
+		LOOP: for (final PackedObjectInfo oe : objs) {
+			switch (version) {
+			case 1:
+				if (PackIndexWriterV1.canStore(oe))
+					continue;
+				version = 2;
+			case 2:
+				break LOOP;
+			}
 		}
-		return 1;
+		return createVersion(dst, version);
 	}
-
 
 	/**
 	 * Create a new writer instance for a specific index format version.
@@ -157,8 +136,7 @@ public abstract class PackIndexWriter {
 			return new PackIndexWriterV2(dst);
 		default:
 			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().unsupportedPackIndexVersion,
-					Integer.valueOf(version)));
+					JGitText.get().unsupportedPackIndexVersion, version));
 		}
 	}
 
@@ -183,8 +161,7 @@ public abstract class PackIndexWriter {
 	 */
 	protected PackIndexWriter(final OutputStream dst) {
 		out = new DigestOutputStream(dst instanceof BufferedOutputStream ? dst
-				: new SafeBufferedOutputStream(dst),
-				Constants.newMessageDigest());
+				: new BufferedOutputStream(dst), Constants.newMessageDigest());
 		tmp = new byte[4 + Constants.OBJECT_ID_LENGTH];
 	}
 

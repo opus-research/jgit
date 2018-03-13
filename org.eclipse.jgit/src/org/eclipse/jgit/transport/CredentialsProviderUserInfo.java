@@ -78,7 +78,7 @@ public class CredentialsProviderUserInfo implements UserInfo,
 
 	private static URIish createURI(Session session) {
 		URIish uri = new URIish();
-		uri = uri.setScheme("ssh"); //$NON-NLS-1$
+		uri = uri.setScheme("ssh");
 		uri = uri.setUser(session.getUserName());
 		uri = uri.setHost(session.getHost());
 		uri = uri.setPort(session.getPort());
@@ -105,9 +105,9 @@ public class CredentialsProviderUserInfo implements UserInfo,
 	}
 
 	public boolean promptPassword(String msg) {
-		CredentialItem.Password p = new CredentialItem.Password(msg);
-		if (provider.get(uri, p)) {
-			password = new String(p.getValue());
+		CredentialItem.StringType v = newPrompt(msg);
+		if (provider.get(uri, v)) {
+			password = v.getValue();
 			return true;
 		} else {
 			password = null;

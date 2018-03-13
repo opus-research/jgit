@@ -47,6 +47,7 @@ package org.eclipse.jgit.storage.pack;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.transport.PackedObjectInfo;
 
 /**
@@ -64,10 +65,6 @@ public class ObjectToPack extends PackedObjectInfo {
 	private static final int DO_NOT_DELTA = 1 << 2;
 
 	private static final int EDGE = 1 << 3;
-
-	private static final int DELTA_ATTEMPTED = 1 << 4;
-
-	private static final int ATTEMPT_DELTA_MASK = REUSE_AS_IS | DELTA_ATTEMPTED;
 
 	private static final int TYPE_SHIFT = 5;
 
@@ -91,7 +88,7 @@ public class ObjectToPack extends PackedObjectInfo {
 	 * <li>1 bit: canReuseAsIs</li>
 	 * <li>1 bit: doNotDelta</li>
 	 * <li>1 bit: edgeObject</li>
-	 * <li>1 bit: deltaAttempted</li>
+	 * <li>1 bit: unused</li>
 	 * <li>3 bits: type</li>
 	 * <li>4 bits: subclass flags (if any)</li>
 	 * <li>--</li>
@@ -117,6 +114,18 @@ public class ObjectToPack extends PackedObjectInfo {
 	public ObjectToPack(AnyObjectId src, final int type) {
 		super(src);
 		flags = type << TYPE_SHIFT;
+	}
+
+	/**
+	 * Construct for the specified object.
+	 *
+	 * @param obj
+	 *            identity of the object that will be packed. The object's
+	 *            parsed status is undefined here. Implementers must not rely on
+	 *            the object being parsed.
+	 */
+	public ObjectToPack(RevObject obj) {
+		this(obj, obj.getType());
 	}
 
 	/**
@@ -256,22 +265,6 @@ public class ObjectToPack extends PackedObjectInfo {
 		flags |= EDGE;
 	}
 
-	boolean doNotAttemptDelta() {
-		// Do not attempt if delta attempted and object reuse.
-		return (flags & ATTEMPT_DELTA_MASK) == ATTEMPT_DELTA_MASK;
-	}
-
-	boolean isDeltaAttempted() {
-		return (flags & DELTA_ATTEMPTED) != 0;
-	}
-
-	void setDeltaAttempted(boolean deltaAttempted) {
-		if (deltaAttempted)
-			flags |= DELTA_ATTEMPTED;
-		else
-			flags &= ~DELTA_ATTEMPTED;
-	}
-
 	/** @return the extended flags on this object, in the range [0x0, 0xf]. */
 	protected int getExtendedFlags() {
 		return (flags >>> EXT_SHIFT) & EXT_MASK;
@@ -380,7 +373,6 @@ public class ObjectToPack extends PackedObjectInfo {
 		// Empty by default.
 	}
 
-	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
 		StringBuilder buf = new StringBuilder();

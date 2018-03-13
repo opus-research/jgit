@@ -52,8 +52,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.security.MessageDigest;
 
-import org.eclipse.jgit.transport.PackParser;
-
 /**
  * Inserts objects into an existing {@code ObjectDatabase}.
  * <p>
@@ -76,11 +74,6 @@ public abstract class ObjectInserter {
 		}
 
 		@Override
-		public PackParser newPackParser(InputStream in) throws IOException {
-			throw new UnsupportedOperationException();
-		}
-
-		@Override
 		public void flush() throws IOException {
 			// Do nothing.
 		}
@@ -88,60 +81,6 @@ public abstract class ObjectInserter {
 		@Override
 		public void release() {
 			// Do nothing.
-		}
-	}
-
-	/** Wraps a delegate ObjectInserter. */
-	public static abstract class Filter extends ObjectInserter {
-		/** @return delegate ObjectInserter to handle all processing. */
-		protected abstract ObjectInserter delegate();
-
-		@Override
-		protected byte[] buffer() {
-			return delegate().buffer();
-		}
-
-		public ObjectId idFor(int type, byte[] data) {
-			return delegate().idFor(type, data);
-		}
-
-		public ObjectId idFor(int type, byte[] data, int off, int len) {
-			return delegate().idFor(type, data, off, len);
-		}
-
-		public ObjectId idFor(int objectType, long length, InputStream in)
-				throws IOException {
-			return delegate().idFor(objectType, length, in);
-		}
-
-		public ObjectId idFor(TreeFormatter formatter) {
-			return delegate().idFor(formatter);
-		}
-
-		public ObjectId insert(int type, byte[] data) throws IOException {
-			return delegate().insert(type, data);
-		}
-
-		public ObjectId insert(int type, byte[] data, int off, int len)
-				throws IOException {
-			return delegate().insert(type, data, off, len);
-		}
-
-		public ObjectId insert(int objectType, long length, InputStream in)
-				throws IOException {
-			return delegate().insert(objectType, length, in);
-		}
-
-		public PackParser newPackParser(InputStream in) throws IOException {
-			return delegate().newPackParser(in);
-		}
-
-		public void flush() throws IOException {
-			delegate().flush();
-		}
-
-		public void release() {
-			delegate().release();
 		}
 	}
 
@@ -156,35 +95,11 @@ public abstract class ObjectInserter {
 		digest = Constants.newMessageDigest();
 	}
 
-	/**
-	 * Obtain a temporary buffer for use by the ObjectInserter or its subclass.
-	 * <p>
-	 * This buffer is supplied by the ObjectInserter base class to itself and
-	 * its subclasses for the purposes of pulling data from a supplied
-	 * InputStream, passing it through a Deflater, or formatting the canonical
-	 * format of a small object like a small tree or commit.
-	 * <p>
-	 * <strong>This buffer IS NOT for translation such as auto-CRLF or content
-	 * filtering and must not be used for such purposes.</strong>
-	 * <p>
-	 * The returned buffer is small, around a few KiBs, and the size may change
-	 * between versions of JGit. Callers using this buffer must always check the
-	 * length of the returned array to ascertain how much space was provided.
-	 * <p>
-	 * There is a single buffer for each ObjectInserter, repeated calls to this
-	 * method will (usually) always return the same buffer. If the caller needs
-	 * more than one buffer, or needs a buffer of a larger size, it must manage
-	 * that buffer on its own.
-	 * <p>
-	 * The buffer is usually on first demand for a buffer.
-	 *
-	 * @return a temporary byte array for use by the caller.
-	 */
+	/** @return a temporary byte array for use by the caller. */
 	protected byte[] buffer() {
-		byte[] b = tempBuffer;
-		if (b == null)
-			tempBuffer = b = new byte[8192];
-		return b;
+		if (tempBuffer == null)
+			tempBuffer = new byte[8192];
+		return tempBuffer;
 	}
 
 	/** @return digest to help compute an ObjectId */
@@ -259,16 +174,6 @@ public abstract class ObjectInserter {
 			length -= n;
 		}
 		return ObjectId.fromRaw(md.digest());
-	}
-
-	/**
-	 * Compute the ObjectId for the given tree without inserting it.
-	 *
-	 * @param formatter
-	 * @return the computed ObjectId
-	 */
-	public ObjectId idFor(TreeFormatter formatter) {
-		return formatter.computeId(this);
 	}
 
 	/**
@@ -366,19 +271,6 @@ public abstract class ObjectInserter {
 	 */
 	public abstract ObjectId insert(int objectType, long length, InputStream in)
 			throws IOException;
-
-	/**
-	 * Initialize a parser to read from a pack formatted stream.
-	 *
-	 * @param in
-	 *            the input stream. The stream is not closed by the parser, and
-	 *            must instead be closed by the caller once parsing is complete.
-	 * @return the pack parser.
-	 * @throws IOException
-	 *             the parser instance, which can be configured and then used to
-	 *             parse objects into the ObjectDatabase.
-	 */
-	public abstract PackParser newPackParser(InputStream in) throws IOException;
 
 	/**
 	 * Make all inserted objects visible.

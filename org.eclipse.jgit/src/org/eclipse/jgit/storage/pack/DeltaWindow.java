@@ -129,6 +129,8 @@ class DeltaWindow {
 			int cnt) throws IOException {
 		try {
 			for (int end = off + cnt; off < end; off++) {
+				monitor.update(1);
+
 				res = window[resSlot];
 				if (0 < maxMemory) {
 					clear(res);
@@ -141,7 +143,7 @@ class DeltaWindow {
 				}
 				res.set(toSearch[off]);
 
-				if (res.object.isEdge() || res.object.doNotAttemptDelta()) {
+				if (res.object.isEdge()) {
 					// We don't actually want to make a delta for
 					// them, just need to push them into the window
 					// so they can be read by other objects.
@@ -150,7 +152,6 @@ class DeltaWindow {
 				} else {
 					// Search for a delta for the current window slot.
 					//
-					monitor.update(1);
 					search();
 				}
 			}
@@ -164,18 +165,10 @@ class DeltaWindow {
 		return DeltaIndex.estimateIndexSize(ent.getWeight());
 	}
 
-	private static long estimateIndexSize(DeltaWindowEntry ent) {
-		if (ent.buffer == null)
-			return estimateSize(ent.object);
-
-		int len = ent.buffer.length;
-		return DeltaIndex.estimateIndexSize(len) - len;
-	}
-
 	private void clear(DeltaWindowEntry ent) {
 		if (ent.index != null)
 			loaded -= ent.index.getIndexSize();
-		else if (ent.buffer != null)
+		else if (res.buffer != null)
 			loaded -= ent.buffer.length;
 		ent.set(null);
 	}
@@ -428,8 +421,6 @@ class DeltaWindow {
 			IOException, LargeObjectException {
 		DeltaIndex idx = ent.index;
 		if (idx == null) {
-			checkLoadable(ent, estimateIndexSize(ent));
-
 			try {
 				idx = new DeltaIndex(buffer(ent));
 			} catch (OutOfMemoryError noMemory) {
@@ -449,29 +440,12 @@ class DeltaWindow {
 			IncorrectObjectTypeException, IOException, LargeObjectException {
 		byte[] buf = ent.buffer;
 		if (buf == null) {
-			checkLoadable(ent, ent.size());
-
 			buf = PackWriter.buffer(config, reader, ent.object);
 			if (0 < maxMemory)
 				loaded += buf.length;
 			ent.buffer = buf;
 		}
 		return buf;
-	}
-
-	private void checkLoadable(DeltaWindowEntry ent, long need) {
-		if (maxMemory <= 0)
-			return;
-
-		int tail = next(resSlot);
-		while (maxMemory < loaded + need) {
-			DeltaWindowEntry cur = window[tail];
-			clear(cur);
-			if (cur == ent)
-				throw new LargeObjectException.ExceedsLimit(
-						maxMemory, loaded + need);
-			tail = next(tail);
-		}
 	}
 
 	private Deflater deflater() {
