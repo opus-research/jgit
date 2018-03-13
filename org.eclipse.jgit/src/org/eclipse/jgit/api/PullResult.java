@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008-2009, Google Inc.
- * Copyright (C) 2009, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,70 +40,61 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.api;
 
-package org.eclipse.jgit.merge;
-
-import java.io.IOException;
-
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.FetchResult;
 
 /**
- * Trivial merge strategy to make the resulting tree exactly match an input.
- * <p>
- * This strategy can be used to cauterize an entire side branch of history, by
- * setting the output tree to one of the inputs, and ignoring any of the paths
- * of the other inputs.
+ * Encapsulates the result of a {@link PullCommand}
  */
-public class StrategyOneSided extends MergeStrategy {
-	private final String strategyName;
+public class PullResult {
+	private final FetchResult fetchResult;
 
-	private final int treeIndex;
+	private final MergeResult mergeResult;
+
+	private final String fetchedFrom;
+
+	PullResult(FetchResult fetchResult, String fetchedFrom,
+			MergeResult mergeResult) {
+		this.fetchResult = fetchResult;
+		this.fetchedFrom = fetchedFrom;
+		this.mergeResult = mergeResult;
+	}
 
 	/**
-	 * Create a new merge strategy to select a specific input tree.
-	 *
-	 * @param name
-	 *            name of this strategy.
-	 * @param index
-	 *            the position of the input tree to accept as the result.
+	 * @return the fetch result, or <code>null</code>
 	 */
-	protected StrategyOneSided(final String name, final int index) {
-		strategyName = name;
-		treeIndex = index;
+	public FetchResult getFetchResult() {
+		return this.fetchResult;
+	}
+
+	/**
+	 * @return the merge result, or <code>null</code>
+	 */
+	public MergeResult getMergeResult() {
+		return this.mergeResult;
+	}
+
+	/**
+	 * @return the name of the remote configuration from which fetch was tried,
+	 *         or <code>null</code>
+	 */
+	public String getFetchedFrom() {
+		return this.fetchedFrom;
 	}
 
 	@Override
-	public String getName() {
-		return strategyName;
-	}
-
-	@Override
-	public Merger newMerger(final Repository db) {
-		return new OneSide(db, treeIndex);
-	}
-
-	@Override
-	public Merger newMerger(final Repository db, boolean inCore) {
-		return new OneSide(db, treeIndex);
-	}
-
-	static class OneSide extends Merger {
-		private final int treeIndex;
-
-		protected OneSide(final Repository local, final int index) {
-			super(local);
-			treeIndex = index;
-		}
-
-		@Override
-		protected boolean mergeImpl() throws IOException {
-			return treeIndex < sourceTrees.length;
-		}
-
-		@Override
-		public ObjectId getResultTreeId() {
-			return sourceTrees[treeIndex];
-		}
+	public String toString() {
+		StringBuilder sb = new StringBuilder();
+		if (fetchResult != null)
+			sb.append(fetchResult.toString());
+		else
+			sb.append("No fetch result");
+		sb.append("\n");
+		if (mergeResult != null)
+			sb.append(mergeResult.toString());
+		else
+			sb.append("No merge result");
+		return sb.toString();
 	}
 }
