@@ -490,87 +490,67 @@ public class IndexPack {
 	}
 
 	private void resolveDeltas(final PackedObjectInfo oe) throws IOException {
+		final int oldCRC = oe.getCRC();
 		if (baseById.get(oe) != null || baseByPos.containsKey(oe.getOffset()))
-			resolveDeltas(new DeltaVisit(oe), Constants.OBJ_BAD);
+			resolveDeltas(oe.getOffset(), oldCRC, Constants.OBJ_BAD, null, oe);
 	}
 
-	private void resolveDeltas(DeltaVisit visit, int type) throws IOException {
-		while (visit != null) {
-			final long pos = visit.id.position;
-			crc.reset();
-			position(pos);
-			int c = readFrom(Source.FILE);
-			final int typeCode = (c >> 4) & 7;
-			long sz = c & 15;
-			int shift = 4;
-			while ((c & 0x80) != 0) {
-				c = readFrom(Source.FILE);
-				sz += (c & 0x7f) << shift;
-				shift += 7;
-			}
-
-			switch (typeCode) {
-			case Constants.OBJ_COMMIT:
-			case Constants.OBJ_TREE:
-			case Constants.OBJ_BLOB:
-			case Constants.OBJ_TAG:
-				type = typeCode;
-				visit.data = inflateAndReturn(Source.FILE, sz);
-				break;
-			case Constants.OBJ_OFS_DELTA: {
-				c = readFrom(Source.FILE) & 0xff;
-				while ((c & 128) != 0)
-					c = readFrom(Source.FILE) & 0xff;
-				visit.data = BinaryDelta.apply(visit.parent.data, inflateAndReturn(Source.FILE, sz));
-				break;
-			}
-			case Constants.OBJ_REF_DELTA: {
-				crc.update(buf, fill(Source.FILE, 20), 20);
-				use(20);
-				visit.data = BinaryDelta.apply(visit.parent.data, inflateAndReturn(Source.FILE, sz));
-				break;
-			}
-			default:
-				throw new IOException(MessageFormat.format(JGitText.get().unknownObjectType, typeCode));
-			}
-
-			final int crc32 = (int) crc.getValue();
-			if (visit.id.crc != crc32)
-				throw new IOException(MessageFormat.format(JGitText.get().corruptionDetectedReReadingAt, pos));
-
-			PackedObjectInfo oe = visit.oe;
-			if (oe == null) {
-				objectDigest.update(Constants.encodedTypeString(type));
-				objectDigest.update((byte) ' ');
-				objectDigest.update(Constants.encodeASCII(visit.data.length));
-				objectDigest.update((byte) 0);
-				objectDigest.update(visit.data);
-				tempObjectId.fromRaw(objectDigest.digest(), 0);
-
-				verifySafeObject(tempObjectId, type, visit.data);
-				oe = new PackedObjectInfo(pos, crc32, tempObjectId);
-				addObjectAndTrack(oe);
-			}
-
-			visit.nextChild = firstChildOf(oe);
-			visit = nextVisit(visit);
+	private void resolveDeltas(final long pos, final int oldCRC, int type,
+			byte[] data, PackedObjectInfo oe) throws IOException {
+		crc.reset();
+		position(pos);
+		int c = readFrom(Source.FILE);
+		final int typeCode = (c >> 4) & 7;
+		long sz = c & 15;
+		int shift = 4;
+		while ((c & 0x80) != 0) {
+			c = readFrom(Source.FILE);
+			sz += (c & 0x7f) << shift;
+			shift += 7;
 		}
-	}
 
-	private static DeltaVisit nextVisit(DeltaVisit visit) {
-		// If our parent has no more children, discard.
-		while (visit.parent != null && visit.parent.nextChild == null)
-			visit.parent = visit.parent.parent;
+		switch (typeCode) {
+		case Constants.OBJ_COMMIT:
+		case Constants.OBJ_TREE:
+		case Constants.OBJ_BLOB:
+		case Constants.OBJ_TAG:
+			type = typeCode;
+			data = inflateAndReturn(Source.FILE, sz);
+			break;
+		case Constants.OBJ_OFS_DELTA: {
+			c = readFrom(Source.FILE) & 0xff;
+			while ((c & 128) != 0)
+				c = readFrom(Source.FILE) & 0xff;
+			data = BinaryDelta.apply(data, inflateAndReturn(Source.FILE, sz));
+			break;
+		}
+		case Constants.OBJ_REF_DELTA: {
+			crc.update(buf, fill(Source.FILE, 20), 20);
+			use(20);
+			data = BinaryDelta.apply(data, inflateAndReturn(Source.FILE, sz));
+			break;
+		}
+		default:
+			throw new IOException(MessageFormat.format(JGitText.get().unknownObjectType, typeCode));
+		}
 
-		do {
-			UnresolvedDelta childId = visit.nextChild;
-			if (childId != null) {
-				visit.nextChild = childId.next;
-				return new DeltaVisit(childId, visit);
-			}
-			visit = visit.parent;
-		} while (visit != null);
-		return null;
+		final int crc32 = (int) crc.getValue();
+		if (oldCRC != crc32)
+			throw new IOException(MessageFormat.format(JGitText.get().corruptionDetectedReReadingAt, pos));
+		if (oe == null) {
+			objectDigest.update(Constants.encodedTypeString(type));
+			objectDigest.update((byte) ' ');
+			objectDigest.update(Constants.encodeASCII(data.length));
+			objectDigest.update((byte) 0);
+			objectDigest.update(data);
+			tempObjectId.fromRaw(objectDigest.digest(), 0);
+
+			verifySafeObject(tempObjectId, type, data);
+			oe = new PackedObjectInfo(pos, crc32, tempObjectId);
+			addObjectAndTrack(oe);
+		}
+
+		resolveChildDeltas(pos, type, data, oe);
 	}
 
 	private UnresolvedDelta removeBaseById(final AnyObjectId id){
@@ -589,36 +569,29 @@ public class IndexPack {
 		return tail;
 	}
 
-	private UnresolvedDelta firstChildOf(PackedObjectInfo oe) {
+	private void resolveChildDeltas(final long pos, int type, byte[] data,
+			PackedObjectInfo oe) throws IOException {
 		UnresolvedDelta a = reverse(removeBaseById(oe));
-		UnresolvedDelta b = reverse(baseByPos.remove(oe.getOffset()));
-
-		if (a == null)
-			return b;
-		if (b == null)
-			return a;
-
-		UnresolvedDelta first = null;
-		UnresolvedDelta last = null;
-		while (a != null || b != null) {
-			UnresolvedDelta n;
-			if (b == null || (a != null && a.position < b.position)) {
-				n = a;
+		UnresolvedDelta b = reverse(baseByPos.remove(pos));
+		while (a != null && b != null) {
+			if (a.position < b.position) {
+				resolveDeltas(a.position, a.crc, type, data, null);
 				a = a.next;
 			} else {
-				n = b;
+				resolveDeltas(b.position, b.crc, type, data, null);
 				b = b.next;
 			}
-			if (last != null) {
-				last.next = n;
-				last = n;
-			} else {
-				first = n;
-				last = n;
-			}
-			n.next = null;
 		}
-		return first;
+		resolveChildDeltaChain(type, data, a);
+		resolveChildDeltaChain(type, data, b);
+	}
+
+	private void resolveChildDeltaChain(final int type, final byte[] data,
+			UnresolvedDelta a) throws IOException {
+		while (a != null) {
+			resolveDeltas(a.position, a.crc, type, data, null);
+			a = a.next;
+		}
 	}
 
 	private void fixThinPack(final ProgressMonitor progress) throws IOException {
@@ -655,11 +628,7 @@ public class IndexPack {
 			entries[entryCount++] = oe;
 			end = packOut.getFilePointer();
 
-			DeltaVisit visit = new DeltaVisit(oe);
-			visit.data = data;
-			visit.nextChild = firstChildOf(oe);
-			resolveDeltas(nextVisit(visit), typeCode);
-
+			resolveChildDeltas(oe.getOffset(), typeCode, data, oe);
 			if (progress.isCancelled())
 				throw new IOException(JGitText.get().downloadCancelledDuringIndexing);
 		}
@@ -1104,29 +1073,6 @@ public class IndexPack {
 		UnresolvedDelta(final long headerOffset, final int crc32) {
 			position = headerOffset;
 			crc = crc32;
-		}
-	}
-
-	private static class DeltaVisit {
-		final UnresolvedDelta id;
-
-		final PackedObjectInfo oe;
-
-		DeltaVisit parent;
-
-		byte[] data;
-
-		UnresolvedDelta nextChild;
-
-		DeltaVisit(UnresolvedDelta id, DeltaVisit parent) {
-			this.oe = null;
-			this.id = id;
-			this.parent = parent;
-		}
-
-		DeltaVisit(PackedObjectInfo oe) {
-			this.oe = oe;
-			this.id = new UnresolvedDelta(oe.getOffset(), oe.getCRC());
 		}
 	}
 
