@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2013, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,55 +40,60 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.attributes;
 
+package org.eclipse.jgit.util;
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 
-/**
- * An abstraction for JGit's builtin implementations for hooks and filters.
- * Instead of spawning an external processes to start a filter/hook and to pump
- * data from/to stdin/stdout these builtin commmands may be used. They are
- * constructed by {@link FilterCommandFactory}.
- *
- * @since 4.6
- */
-public abstract class FilterCommand {
-	/**
-	 * The {@link InputStream} this command should read from
-	 */
-	protected InputStream in;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
-	/**
-	 * The {@link OutputStream} this command should write to
-	 */
-	protected OutputStream out;
+public class FileUtils7Test {
 
-	/**
-	 * @param in
-	 *            The {@link InputStream} this command should read from
-	 * @param out
-	 *            The {@link OutputStream} this command should write to
-	 */
-	public FilterCommand(InputStream in, OutputStream out) {
-		this.in = in;
-		this.out = out;
+	private final File trash = new File(new File("target"), "trash");
+
+	@Before
+	public void setUp() throws Exception {
+		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY | FileUtils.SKIP_MISSING);
+		assertTrue(trash.mkdirs());
 	}
 
-	/**
-	 * Execute the command. The command is supposed to read data from
-	 * {@link #in} and to write the result to {@link #out}. It returns the
-	 * number of bytes it read from {@link #in}. It should be called in a loop
-	 * until it returns -1 signaling that the {@link InputStream} is completely
-	 * processed.
-	 *
-	 * @return the number of bytes read from the {@link InputStream} or -1. -1
-	 *         means that the {@link InputStream} is completely processed.
-	 * @throws IOException
-	 *             when {@link IOException} occured while reading from
-	 *             {@link #in} or writing to {@link #out}
-	 *
-	 */
-	public abstract int run() throws IOException;
+	@After
+	public void tearDown() throws Exception {
+		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY);
+	}
+
+	@Test
+	public void testDeleteSymlinkToDirectoryDoesNotDeleteTarget()
+			throws IOException {
+		org.junit.Assume.assumeTrue(FS.DETECTED.supportsSymlinks());
+		FS fs = FS.DETECTED;
+		File dir = new File(trash, "dir");
+		File file = new File(dir, "file");
+		File link = new File(trash, "link");
+		FileUtils.mkdirs(dir);
+		FileUtils.createNewFile(file);
+		fs.createSymLink(link, "dir");
+		FileUtils.delete(link, FileUtils.RECURSIVE);
+		assertFalse(link.exists());
+		assertTrue(dir.exists());
+		assertTrue(file.exists());
+	}
+
+	@Test
+	public void testAtomicMove() throws IOException {
+		File src = new File(trash, "src");
+		Files.createFile(src.toPath());
+		File dst = new File(trash, "dst");
+		FileUtils.rename(src, dst, StandardCopyOption.ATOMIC_MOVE);
+		assertFalse(Files.exists(src.toPath()));
+		assertTrue(Files.exists(dst.toPath()));
+	}
 }

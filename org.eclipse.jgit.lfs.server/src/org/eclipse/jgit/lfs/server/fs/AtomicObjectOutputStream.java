@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2015, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,32 +40,82 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.lfs.server.fs;
 
-package org.eclipse.jgit.lfs.lib;
-
-import static org.junit.Assert.assertEquals;
-
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+import java.io.OutputStream;
+import java.nio.file.Path;
+import java.security.DigestOutputStream;
+import java.text.MessageFormat;
 
-import org.eclipse.jgit.lfs.LfsPointer;
-import org.junit.Test;
+import org.eclipse.jgit.internal.storage.file.LockFile;
+import org.eclipse.jgit.lfs.errors.CorruptLongObjectException;
+import org.eclipse.jgit.lfs.lib.AnyLongObjectId;
+import org.eclipse.jgit.lfs.lib.Constants;
+import org.eclipse.jgit.lfs.lib.LongObjectId;
+import org.eclipse.jgit.lfs.server.internal.LfsServerText;
 
-/*
- * Test LfsPointer file abstraction
+/**
+ * Output stream writing content to a {@link LockFile} which is committed on
+ * close(). The stream checks if the hash of the stream content matches the
+ * id.
  */
-public class LFSPointerTest {
-	@Test
-	public void testEncoding() throws IOException {
-		final String s = "27e15b72937fc8f558da24ac3d50ec20302a4cf21e33b87ae8e4ce90e89c4b10";
-		AnyLongObjectId id = LongObjectId.fromString(s);
-		LfsPointer ptr = new LfsPointer(id, 4);
-		ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		ptr.encode(baos);
-		baos.close();
-		assertEquals("version https://git-lfs.github.com/spec/v1\noid sha256:"
-				+ s + "\nsize 4\n",
-				baos.toString(StandardCharsets.UTF_8.name()));
+class AtomicObjectOutputStream extends OutputStream {
+
+	private LockFile locked;
+
+	private DigestOutputStream out;
+
+	private boolean aborted;
+
+	private AnyLongObjectId id;
+
+	AtomicObjectOutputStream(Path path, AnyLongObjectId id)
+			throws IOException {
+		locked = new LockFile(path.toFile());
+		locked.lock();
+		this.id = id;
+		out = new DigestOutputStream(locked.getOutputStream(),
+				Constants.newMessageDigest());
+	}
+
+	@Override
+	public void write(int b) throws IOException {
+		out.write(b);
+	}
+
+	@Override
+	public void write(byte[] b) throws IOException {
+		out.write(b);
+	}
+
+	@Override
+	public void write(byte[] b, int off, int len) throws IOException {
+		out.write(b, off, len);
+	}
+
+	@Override
+	public void close() throws IOException {
+		out.close();
+		if (!aborted) {
+			verifyHash();
+			locked.commit();
+		}
+	}
+
+	private void verifyHash() {
+		AnyLongObjectId contentHash = LongObjectId
+				.fromRaw(out.getMessageDigest().digest());
+		if (!contentHash.equals(id)) {
+			abort();
+			throw new CorruptLongObjectException(id, contentHash,
+					MessageFormat.format(LfsServerText.get().corruptLongObject,
+							contentHash, id));
+		}
+	}
+
+	void abort() {
+		locked.unlock();
+		aborted = true;
 	}
 }

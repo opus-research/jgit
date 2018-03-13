@@ -109,7 +109,7 @@ public class RepositoryCacheTest extends RepositoryTestCase {
 
 	@Test
 	public void testFileKeyOpenNew() throws IOException {
-		final Repository n = createRepository(true, false);
+		final Repository n = createBareRepository();
 		final File gitdir = n.getDirectory();
 		n.close();
 		recursiveDelete(gitdir);
@@ -187,14 +187,12 @@ public class RepositoryCacheTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testRepositoryUsageCountWithRegisteredRepository()
-			throws IOException {
-		Repository repo = createRepository(false, false);
-		assertEquals(1, repo.useCnt.get());
-		RepositoryCache.register(repo);
-		assertEquals(1, repo.useCnt.get());
-		repo.close();
-		assertEquals(0, repo.useCnt.get());
+	public void testRepositoryUsageCountWithRegisteredRepository() {
+		assertEquals(1, ((Repository) db).useCnt.get());
+		RepositoryCache.register(db);
+		assertEquals(1, ((Repository) db).useCnt.get());
+		db.close();
+		assertEquals(0, ((Repository) db).useCnt.get());
 	}
 
 	@Test
@@ -212,30 +210,9 @@ public class RepositoryCacheTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testRepositoryUnregisteringWhenExpiredAndUsageCountNegative()
-			throws Exception {
-		Repository repoA = createBareRepository();
-		RepositoryCache.register(repoA);
-
-		assertEquals(1, RepositoryCache.getRegisteredKeys().size());
-		assertTrue(RepositoryCache.isCached(repoA));
-
-		// close the repo twice to make usage count negative
-		repoA.close();
-		repoA.close();
-		// fake that repoA was closed more than 1 hour ago (default expiration
-		// time)
-		repoA.closedAt.set(System.currentTimeMillis() - 65 * 60 * 1000);
-
-		RepositoryCache.clearExpired();
-
-		assertEquals(0, RepositoryCache.getRegisteredKeys().size());
-	}
-
-	@Test
 	public void testRepositoryUnregisteringWhenExpired() throws Exception {
-		Repository repoA = createRepository(true, false);
-		Repository repoB = createRepository(true, false);
+		Repository repoA = createBareRepository();
+		Repository repoB = createBareRepository();
 		Repository repoC = createBareRepository();
 		RepositoryCache.register(repoA);
 		RepositoryCache.register(repoB);
@@ -267,12 +244,11 @@ public class RepositoryCacheTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testReconfigure() throws InterruptedException, IOException {
-		Repository repo = createRepository(false, false);
-		RepositoryCache.register(repo);
-		assertTrue(RepositoryCache.isCached(repo));
-		repo.close();
-		assertTrue(RepositoryCache.isCached(repo));
+	public void testReconfigure() throws InterruptedException {
+		RepositoryCache.register(db);
+		assertTrue(RepositoryCache.isCached(db));
+		db.close();
+		assertTrue(RepositoryCache.isCached(db));
 
 		// Actually, we would only need to validate that
 		// WorkQueue.getExecutor().scheduleWithFixedDelay is called with proper
@@ -290,7 +266,7 @@ public class RepositoryCacheTest extends RepositoryTestCase {
 		// This wait will time out after 2048 ms
 		for (int i = 0; i <= 10; i++) {
 			Thread.sleep(1 << i);
-			if (!RepositoryCache.isCached(repo)) {
+			if (!RepositoryCache.isCached(db)) {
 				return;
 			}
 		}

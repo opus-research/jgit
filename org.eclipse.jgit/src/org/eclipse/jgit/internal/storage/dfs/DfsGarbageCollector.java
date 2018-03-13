@@ -43,12 +43,9 @@
 
 package org.eclipse.jgit.internal.storage.dfs;
 
-import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.COMPACT;
 import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.GC;
 import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.GC_REST;
 import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.GC_TXN;
-import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.INSERT;
-import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.RECEIVE;
 import static org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource.UNREACHABLE_GARBAGE;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.BITMAP_INDEX;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.INDEX;
@@ -58,7 +55,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -67,7 +63,6 @@ import java.util.concurrent.TimeUnit;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource;
 import org.eclipse.jgit.internal.storage.file.PackIndex;
-import org.eclipse.jgit.internal.storage.file.PackReverseIndex;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.eclipse.jgit.internal.storage.pack.PackWriter;
 import org.eclipse.jgit.internal.storage.reftree.RefTreeNames;
@@ -258,7 +253,7 @@ public class DfsGarbageCollector {
 			for (Ref ref : refsBefore) {
 				if (ref.isSymbolic() || ref.getObjectId() == null)
 					continue;
-				if (isHead(ref) || isTag(ref))
+				if (isHead(ref))
 					allHeads.add(ref.getObjectId());
 				else if (RefTreeNames.isRefTree(refdb, ref.getName()))
 					txnHeads.add(ref.getObjectId());
@@ -395,8 +390,7 @@ public class DfsGarbageCollector {
 			pw.setTagTargets(tagTargets);
 			pw.preparePack(pm, allHeads, PackWriter.NONE);
 			if (0 < pw.getObjectCount())
-				writePack(GC, pw, pm,
-						estimateGcPackSize(INSERT, RECEIVE, COMPACT, GC));
+				writePack(GC, pw, pm);
 		}
 	}
 
@@ -409,8 +403,7 @@ public class DfsGarbageCollector {
 				pw.excludeObjects(packedObjs);
 			pw.preparePack(pm, nonHeads, allHeads);
 			if (0 < pw.getObjectCount())
-				writePack(GC_REST, pw, pm,
-						estimateGcPackSize(INSERT, RECEIVE, COMPACT, GC_REST));
+				writePack(GC_REST, pw, pm);
 		}
 	}
 
@@ -423,7 +416,7 @@ public class DfsGarbageCollector {
 				pw.excludeObjects(packedObjs);
 			pw.preparePack(pm, txnHeads, PackWriter.NONE);
 			if (0 < pw.getObjectCount())
-				writePack(GC_TXN, pw, pm, 0 /* unknown pack size */);
+				writePack(GC_TXN, pw, pm);
 		}
 	}
 
@@ -439,29 +432,21 @@ public class DfsGarbageCollector {
 			pw.setDeltaBaseAsOffset(true);
 			pw.setReuseDeltaCommits(true);
 			pm.beginTask(JGitText.get().findingGarbage, objectsBefore());
-			long estimatedPackSize = 12 + 20; // header and trailer sizes.
 			for (DfsPackFile oldPack : packsBefore) {
 				PackIndex oldIdx = oldPack.getPackIndex(ctx);
-				PackReverseIndex oldRevIdx = oldPack.getReverseIdx(ctx);
-				long maxOffset = oldPack.getPackDescription().getFileSize(PACK)
-						- 20; // pack size - trailer size.
 				for (PackIndex.MutableEntry ent : oldIdx) {
 					pm.update(1);
 					ObjectId id = ent.toObjectId();
 					if (pool.lookupOrNull(id) != null || anyPackHas(id))
 						continue;
 
-					long offset = ent.getOffset();
-					int type = oldPack.getObjectType(ctx, offset);
+					int type = oldPack.getObjectType(ctx, ent.getOffset());
 					pw.addObject(pool.lookupAny(id, type));
-					long objSize = oldRevIdx.findNextOffset(offset, maxOffset)
-							- offset;
-					estimatedPackSize += objSize;
 				}
 			}
 			pm.endTask();
 			if (0 < pw.getObjectCount())
-				writePack(UNREACHABLE_GARBAGE, pw, pm, estimatedPackSize);
+				writePack(UNREACHABLE_GARBAGE, pw, pm);
 		}
 	}
 
@@ -474,10 +459,6 @@ public class DfsGarbageCollector {
 
 	private static boolean isHead(Ref ref) {
 		return ref.getName().startsWith(Constants.R_HEADS);
-	}
-
-	private static boolean isTag(Ref ref) {
-		return ref.getName().startsWith(Constants.R_TAGS);
 	}
 
 	private int objectsBefore() {
@@ -494,24 +475,9 @@ public class DfsGarbageCollector {
 		return pw;
 	}
 
-	private long estimateGcPackSize(PackSource first, PackSource... rest) {
-		EnumSet<PackSource> sourceSet = EnumSet.of(first, rest);
-		// Every pack file contains 12 bytes of header and 20 bytes of trailer.
-		// Include the final pack file header and trailer size here and ignore
-		// the same from individual pack files.
-		long size = 32;
-		for (DfsPackDescription pack : getSourcePacks()) {
-			if (sourceSet.contains(pack.getPackSource())) {
-				size += pack.getFileSize(PACK) - 32;
-			}
-		}
-		return size;
-	}
-
 	private DfsPackDescription writePack(PackSource source, PackWriter pw,
-			ProgressMonitor pm, long estimatedPackSize) throws IOException {
-		DfsPackDescription pack = repo.getObjectDatabase().newPack(source,
-				estimatedPackSize);
+			ProgressMonitor pm) throws IOException {
+		DfsPackDescription pack = repo.getObjectDatabase().newPack(source);
 		newPackDesc.add(pack);
 
 		try (DfsOutputStream out = objdb.writeFile(pack, PACK)) {

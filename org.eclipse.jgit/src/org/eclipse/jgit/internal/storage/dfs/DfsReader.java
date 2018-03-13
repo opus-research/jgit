@@ -113,7 +113,6 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 
 	DfsReader(DfsObjDatabase db) {
 		this.db = db;
-		this.streamFileThreshold = db.getReaderOptions().getStreamFileThreshold();
 	}
 
 	DfsReaderOptions getOptions() {
@@ -124,6 +123,10 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		if (baseCache == null)
 			baseCache = new DeltaBaseCache(this);
 		return baseCache;
+	}
+
+	int getStreamFileThreshold() {
+		return getOptions().getStreamFileThreshold();
 	}
 
 	@Override
@@ -219,21 +222,20 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 		ObjectLoader ldr;
 		if (last != null) {
 			ldr = last.get(this, objectId);
-			if (ldr != null) {
-				return checkType(ldr, objectId, typeHint);
-			}
+			if (ldr != null)
+				return ldr;
 		}
 
 		PackList packList = db.getPackList();
 		boolean noGarbage = avoidUnreachable;
 		ldr = openImpl(packList, objectId, noGarbage);
 		if (ldr != null) {
-			return checkType(ldr, objectId, typeHint);
+			return ldr;
 		}
 		if (packList.dirty()) {
 			ldr = openImpl(db.scanPacks(packList), objectId, noGarbage);
 			if (ldr != null) {
-				return checkType(ldr, objectId, typeHint);
+				return ldr;
 			}
 		}
 
@@ -241,14 +243,6 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 			throw new MissingObjectException(objectId.copy(),
 					JGitText.get().unknownObjectType2);
 		throw new MissingObjectException(objectId.copy(), typeHint);
-	}
-
-	private static ObjectLoader checkType(ObjectLoader ldr, AnyObjectId id,
-			int typeHint) throws IncorrectObjectTypeException {
-		if (typeHint != OBJ_ANY && ldr.getType() != typeHint) {
-			throw new IncorrectObjectTypeException(id.copy(), typeHint);
-		}
-		return ldr;
 	}
 
 	private ObjectLoader openImpl(PackList packList, AnyObjectId objectId,

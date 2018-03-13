@@ -150,6 +150,7 @@ public class LockFile {
 	 *
 	 * @param f
 	 *            the file that will be locked.
+	 * @since 4.2
 	 */
 	public LockFile(final File f) {
 		ref = f;

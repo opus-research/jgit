@@ -107,7 +107,7 @@ import org.eclipse.jgit.util.FileUtils;
 public class RepoCommand extends GitCommand<RevCommit> {
 	private String path;
 	private String uri;
-	private String groupsParam;
+	private String groups;
 	private String branch;
 	private String targetBranch = Constants.HEAD;
 	private boolean recordRemoteBranch = false;
@@ -180,10 +180,17 @@ public class RepoCommand extends GitCommand<RevCommit> {
 		public byte[] readFile(String uri, String ref, String path)
 				throws GitAPIException, IOException {
 			File dir = FileUtils.createTempDir("jgit_", ".git", null); //$NON-NLS-1$ //$NON-NLS-2$
-			try (Git git = Git.cloneRepository().setBare(true).setDirectory(dir)
-					.setURI(uri).call()) {
-				return readFileFromRepo(git.getRepository(), ref, path);
+			Repository repo = Git
+					.cloneRepository()
+					.setBare(true)
+					.setDirectory(dir)
+					.setURI(uri)
+					.call()
+					.getRepository();
+			try {
+				return readFileFromRepo(repo, ref, path);
 			} finally {
+				repo.close();
 				FileUtils.delete(dir, FileUtils.RECURSIVE);
 			}
 		}
@@ -279,7 +286,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	 * @return this command
 	 */
 	public RepoCommand setGroups(String groups) {
-		this.groupsParam = groups;
+		this.groups = groups;
 		return this;
 	}
 
@@ -471,7 +478,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				git = new Git(repo);
 
 			ManifestParser parser = new ManifestParser(
-					includedReader, path, branch, uri, groupsParam, repo);
+					includedReader, path, branch, uri, groups, repo);
 			try {
 				parser.read(inputStream);
 				for (RepoProject proj : parser.getFilteredProjects()) {

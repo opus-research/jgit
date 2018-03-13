@@ -45,8 +45,8 @@ package org.eclipse.jgit.transport;
 
 import static org.eclipse.jgit.lib.RefDatabase.ALL;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_AGENT;
-import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_ALLOW_REACHABLE_SHA1_IN_WANT;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_ALLOW_TIP_SHA1_IN_WANT;
+import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_ALLOW_REACHABLE_SHA1_IN_WANT;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_INCLUDE_TAG;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_MULTI_ACK;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_MULTI_ACK_DETAILED;
@@ -313,7 +313,6 @@ public class UploadPack {
 
 	private PackStatistics statistics;
 
-	@SuppressWarnings("deprecation")
 	private UploadPackLogger logger = UploadPackLogger.NULL;
 
 	/**
@@ -1429,7 +1428,6 @@ public class UploadPack {
 		}
 	}
 
-	@SuppressWarnings("deprecation")
 	private void sendPack(final boolean sideband) throws IOException {
 		ProgressMonitor pm = NullProgressMonitor.INSTANCE;
 		OutputStream packOut = rawOut;
@@ -1495,19 +1493,16 @@ public class UploadPack {
 				pw.setTagTargets(tagTargets);
 			}
 
-			RevWalk rw = walk;
-			if (depth > 0) {
+			if (depth > 0)
 				pw.setShallowPack(depth, unshallowCommits);
-				rw = new DepthWalk.RevWalk(walk.getObjectReader(), depth - 1);
-				rw.assumeShallow(clientShallowCommits);
-			}
 
+			RevWalk rw = walk;
 			if (wantAll.isEmpty()) {
-				pw.preparePack(pm, wantIds, commonBase, clientShallowCommits);
+				pw.preparePack(pm, wantIds, commonBase);
 			} else {
 				walk.reset();
 
-				ObjectWalk ow = rw.toObjectWalkWithSameObjects();
+				ObjectWalk ow = walk.toObjectWalkWithSameObjects();
 				pw.preparePack(pm, ow, wantAll, commonBase);
 				rw = ow;
 			}

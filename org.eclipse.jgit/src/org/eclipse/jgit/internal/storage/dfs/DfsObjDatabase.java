@@ -68,11 +68,6 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		}
 
 		@Override
-		void clearDirty() {
-			// Always dirty.
-		}
-
-		@Override
 		public void markDirty() {
 			// Always dirty.
 		}
@@ -266,32 +261,6 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 			throws IOException;
 
 	/**
-	 * Generate a new unique name for a pack file.
-	 *
-	 * <p>
-	 * Default implementation of this method would be equivalent to
-	 * {@code newPack(source).setEstimatedPackSize(estimatedPackSize)}. But the
-	 * clients can override this method to use the given
-	 * {@code estomatedPackSize} value more efficiently in the process of
-	 * creating a new {@link DfsPackDescription} object.
-	 *
-	 * @param source
-	 *            where the pack stream is created.
-	 * @param estimatedPackSize
-	 *            the estimated size of the pack.
-	 * @return a unique name for the pack file. Must not collide with any other
-	 *         pack file name in the same DFS.
-	 * @throws IOException
-	 *             a new unique pack description cannot be generated.
-	 */
-	protected DfsPackDescription newPack(PackSource source,
-			long estimatedPackSize) throws IOException {
-		DfsPackDescription pack = newPack(source);
-		pack.setEstimatedPackSize(estimatedPackSize);
-		return pack;
-	}
-
-	/**
 	 * Commit a pack and index pair that was written to the DFS.
 	 * <p>
 	 * Committing the pack/index pair makes them visible to readers. The JGit
@@ -474,10 +443,8 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 			p.close();
 		if (list.isEmpty())
 			return new PackListImpl(NO_PACKS.packs);
-		if (!foundNew) {
-			old.clearDirty();
+		if (!foundNew)
 			return old;
-		}
 		return new PackListImpl(list.toArray(new DfsPackFile[list.size()]));
 	}
 
@@ -547,7 +514,6 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		}
 
 		abstract boolean dirty();
-		abstract void clearDirty();
 
 		/**
 		 * Mark pack list as dirty.
@@ -569,11 +535,6 @@ public abstract class DfsObjDatabase extends ObjectDatabase {
 		@Override
 		boolean dirty() {
 			return dirty;
-		}
-
-		@Override
-		void clearDirty() {
-			dirty = false;
 		}
 
 		@Override

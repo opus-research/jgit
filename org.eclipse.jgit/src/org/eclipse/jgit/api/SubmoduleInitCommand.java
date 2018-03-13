@@ -94,7 +94,8 @@ public class SubmoduleInitCommand extends GitCommand<Collection<String>> {
 	public Collection<String> call() throws GitAPIException {
 		checkCallable();
 
-		try (SubmoduleWalk generator = SubmoduleWalk.forIndex(repo)) {
+		try {
+			SubmoduleWalk generator = SubmoduleWalk.forIndex(repo);
 			if (!paths.isEmpty())
 				generator.setFilter(PathFilterGroup.createFromStrings(paths));
 			StoredConfig config = repo.getConfig();

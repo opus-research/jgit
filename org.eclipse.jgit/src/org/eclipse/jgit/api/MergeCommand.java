@@ -50,7 +50,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 import org.eclipse.jgit.api.MergeResult.MergeStatus;
@@ -135,7 +134,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 		FF_ONLY;
 
 		public String toConfigValue() {
-			return "--" + name().toLowerCase(Locale.ROOT).replace('_', '-'); //$NON-NLS-1$
+			return "--" + name().toLowerCase().replace('_', '-'); //$NON-NLS-1$
 		}
 
 		public boolean matchConfigValue(String in) {
@@ -382,7 +381,6 @@ public class MergeCommand extends GitCommand<MergeResult> {
 									.call().getId();
 						}
 						mergeStatus = MergeStatus.MERGED;
-						getRepository().autoGC(monitor);
 					}
 					if (commit && squash) {
 						msg = JGitText.get().squashCommitNotUpdatingHEAD;

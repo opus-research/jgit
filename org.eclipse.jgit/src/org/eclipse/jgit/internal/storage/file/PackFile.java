@@ -47,7 +47,6 @@ package org.eclipse.jgit.internal.storage.file;
 
 import static org.eclipse.jgit.internal.storage.pack.PackExt.BITMAP_INDEX;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.INDEX;
-import static org.eclipse.jgit.internal.storage.pack.PackExt.KEEP;
 
 import java.io.EOFException;
 import java.io.File;
@@ -242,7 +241,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	 */
 	public boolean shouldBeKept() {
 		if (keepFile == null)
-			keepFile = extFile(KEEP);
+			keepFile = new File(packFile.getPath() + ".keep"); //$NON-NLS-1$
 		return keepFile.exists();
 	}
 

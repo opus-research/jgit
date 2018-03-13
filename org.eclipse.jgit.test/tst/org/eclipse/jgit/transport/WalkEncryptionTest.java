@@ -85,7 +85,6 @@ import java.security.Security;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Locale;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
@@ -462,7 +461,7 @@ public class WalkEncryptionTest {
 			Set<String> source = Security.getAlgorithms("Cipher");
 			Set<String> target = new TreeSet<String>();
 			for (String algo : source) {
-				algo = algo.toUpperCase(Locale.ROOT);
+				algo = algo.toUpperCase();
 				if (algo.matches(regex)) {
 					target.add(algo);
 				}
@@ -577,7 +576,7 @@ public class WalkEncryptionTest {
 						.forName("javax.crypto.JceSecurity")
 						.getDeclaredField("isRestricted");
 				isRestricted.setAccessible(true);
-				isRestricted.set(null, Boolean.valueOf(restrictedOn));
+				isRestricted.set(null, new Boolean(restrictedOn));
 			} catch (Throwable e) {
 				logger.info(
 						"Could not setup JCE security policy restrictions.");
@@ -760,7 +759,7 @@ public class WalkEncryptionTest {
 			for (String source : cipherSet) {
 				// Standard names are not case-sensitive.
 				// http://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html
-				String target = algorithm.toUpperCase(Locale.ROOT);
+				String target = algorithm.toUpperCase();
 				if (source.equalsIgnoreCase(target)) {
 					return true;
 				}
