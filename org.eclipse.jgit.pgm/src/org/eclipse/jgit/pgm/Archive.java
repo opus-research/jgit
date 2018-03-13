@@ -43,13 +43,12 @@
 
 package org.eclipse.jgit.pgm;
 
-import org.eclipse.jgit.api.ArchiveCommand;
-import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.archive.TarFormat;
-import org.eclipse.jgit.archive.ZipFormat;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.pgm.TextBuiltin;
+import org.eclipse.jgit.pgm.archive.ArchiveCommand;
+import org.eclipse.jgit.pgm.archive.TarFormat;
+import org.eclipse.jgit.pgm.archive.ZipFormat;
 import org.eclipse.jgit.pgm.internal.CLIText;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
@@ -69,7 +68,7 @@ class Archive extends TextBuiltin {
 
 		ArchiveCommand.registerFormat("tar", new TarFormat());
 		ArchiveCommand.registerFormat("zip", new ZipFormat());
-		final ArchiveCommand cmd = new Git(db).archive();
+		final ArchiveCommand cmd = new ArchiveCommand(db);
 		try {
 			cmd.setTree(tree)
 					.setFormat(format)
