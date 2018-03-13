@@ -50,11 +50,8 @@ import org.eclipse.jgit.diff.RawText;
 
 /**
  * An OutputStream that expands LF to CRLF.
- *
+ * <p>
  * Existing CRLF are not expanded to CRCRLF, but retained as is.
- *
- * A binary check on the first 8000 bytes is performed and in case of binary
- * files, canonicalization is turned off (for the complete file).
  */
 public class AutoCRLFOutputStream extends OutputStream {
 

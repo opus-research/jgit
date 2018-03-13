@@ -51,12 +51,10 @@ import org.eclipse.jgit.diff.RawText;
 /**
  * An input stream which canonicalizes EOLs bytes on the fly to '\n'.
  *
- * Optionally, a binary check on the first 8000 bytes is performed and in case
- * of binary files, canonicalization is turned off (for the complete file).
- * 
- * @deprecated use {@link AutoLFInputStream} instead
+ * Optionally, a binary check on the first 8000 bytes is performed
+ * and in case of binary files, canonicalization is turned off
+ * (for the complete file).
  */
-@Deprecated
 public class EolCanonicalizingInputStream extends InputStream {
 	private final byte[] single = new byte[1];
 
