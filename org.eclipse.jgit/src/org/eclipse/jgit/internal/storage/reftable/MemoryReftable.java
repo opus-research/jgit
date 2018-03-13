@@ -43,41 +43,101 @@
 
 package org.eclipse.jgit.internal.storage.reftable;
 
-class ReftableConstants {
-	static final byte[] FILE_HEADER_MAGIC = { '\1', 'R', 'E', 'F' };
-	static final byte VERSION_1 = (byte) 1;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 
-	static final int FILE_HEADER_LEN = 8;
-	static final int FILE_FOOTER_LEN = 52;
-	static final int MAX_BLOCK_SIZE = (1 << 24) - 1;
+import org.eclipse.jgit.internal.storage.io.BlockSource;
 
-	static final byte FILE_BLOCK_TYPE = '\1';
-	static final byte REF_BLOCK_TYPE = 'r';
-	static final byte OBJ_BLOCK_TYPE = 'o';
-	static final byte LOG_BLOCK_TYPE = 'g';
-	static final byte INDEX_BLOCK_TYPE = (byte) 0x80;
+class MemoryReftable {
+	final int blockSize;
+	final List<byte[]> blocks;
+	long size;
+	byte[] buf;
+	int bufPtr;
 
-	static final int VALUE_NONE = 0x0;
-	static final int VALUE_1ID = 0x1;
-	static final int VALUE_2ID = 0x2;
-	static final int VALUE_SYMREF = 0x3;
-	static final int VALUE_LEN_SPECIFIED = 0x4;
-	static final int VALUE_TYPE_MASK = 0x7;
+	MemoryReftable(int blockSize) {
+		this.blockSize = blockSize;
 
-	static final int MAX_RESTARTS = 65536;
-
-	static boolean isFileHeaderMagic(byte[] buf, int o, int n) {
-		return (n - o) >= FILE_HEADER_MAGIC.length
-				&& buf[o + 0] == FILE_HEADER_MAGIC[0]
-				&& buf[o + 1] == FILE_HEADER_MAGIC[1]
-				&& buf[o + 2] == FILE_HEADER_MAGIC[2]
-				&& buf[o + 3] == FILE_HEADER_MAGIC[3];
+		buf = new byte[blockSize];
+		blocks = new ArrayList<>();
+		blocks.add(buf);
 	}
 
-	static long reverseTime(long time) {
-		return 0xffffffffffffffffL - time;
+	void checkBuffer() {
+		if (bufPtr == blockSize) {
+			bufPtr = 0;
+			buf = new byte[blockSize];
+			blocks.add(buf);
+		}
 	}
 
-	private ReftableConstants() {
+	OutputStream getOutput() {
+		return new OutputStream() {
+			@Override
+			public void write(int b) {
+				checkBuffer();
+				buf[bufPtr++] = (byte) b;
+				size++;
+			}
+
+			@Override
+			public void write(byte[] src, int p, int n) {
+				while (n > 0) {
+					checkBuffer();
+					int c = Math.min(n, blockSize - bufPtr);
+					System.arraycopy(src, p, buf, bufPtr, c);
+					bufPtr += c;
+					size += c;
+					n -= c;
+					p += c;
+				}
+			}
+		};
+	}
+
+	BlockSource getBlockSource() {
+		return new BlockSource() {
+			@Override
+			public ByteBuffer read(long pos, int sz) {
+				if (pos >= size) {
+					return ByteBuffer.allocate(0);
+				}
+
+				int idx = (int) (pos / blockSize);
+				int ptr = (int) (pos - (idx * blockSize));
+				byte[] src = blocks.get(idx);
+				int len = src == buf ? bufPtr : blockSize;
+				if (ptr == 0 && sz <= len) {
+					ByteBuffer b = ByteBuffer.wrap(src);
+					b.position(Math.min(sz, len));
+					return b;
+				}
+
+				ByteBuffer b = ByteBuffer.allocate(sz);
+				while (pos < size && b.hasRemaining()) {
+					idx = (int) (pos / blockSize);
+					ptr = (int) (pos - (idx * blockSize));
+					src = blocks.get(idx);
+					len = src == buf ? bufPtr : blockSize;
+					int n = Math.min(b.remaining(), len);
+					b.put(src, ptr, n);
+					pos += n;
+				}
+				return b;
+			}
+
+			@Override
+			public long size() throws IOException {
+				return size;
+			}
+
+			@Override
+			public void close() {
+				// Do nothing.
+			}
+		};
 	}
 }

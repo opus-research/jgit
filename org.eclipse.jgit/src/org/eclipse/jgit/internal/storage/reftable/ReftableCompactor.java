@@ -73,44 +73,22 @@ public class ReftableCompactor {
 	private long oldestReflogTimeUsec;
 
 	/**
+	 * @param cfg
+	 *            configuration for the reftable.
+	 * @return {@code this}
+	 */
+	public ReftableCompactor setConfig(ReftableConfig cfg) {
+		writer.setConfig(cfg);
+		return this;
+	}
+
+	/**
 	 * @param bytes
 	 *            limit on number of bytes from source tables to compact.
 	 * @return {@code this}
 	 */
 	public ReftableCompactor setCompactBytesLimit(long bytes) {
 		compactBytesLimit = bytes;
-		return this;
-	}
-
-	/**
-	 * @param szBytes
-	 *            desired output block size for references, in bytes.
-	 * @return {@code this}
-	 */
-	public ReftableCompactor setRefBlockSize(int szBytes) {
-		writer.setRefBlockSize(szBytes);
-		return this;
-	}
-
-	/**
-	 * @param szBytes
-	 *            desired output block size for log entries, in bytes.
-	 * @return {@code this}
-	 */
-	public ReftableCompactor setLogBlockSize(int szBytes) {
-		writer.setLogBlockSize(szBytes);
-		return this;
-	}
-
-	/**
-	 * @param interval
-	 *            number of references between binary search markers. If
-	 *            {@code interval} is 0 (default), the writer will select a
-	 *            default value based on the block size.
-	 * @return {@code this}
-	 */
-	public ReftableCompactor setRestartInterval(int interval) {
-		writer.setRestartInterval(interval);
 		return this;
 	}
 
