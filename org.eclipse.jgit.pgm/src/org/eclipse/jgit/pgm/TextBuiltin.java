@@ -56,7 +56,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.text.MessageFormat;
 import java.util.ResourceBundle;
@@ -219,6 +218,7 @@ public abstract class TextBuiltin {
 	 *
 	 * @param args
 	 *            the arguments supplied on the command line, if any.
+	 * @throws IOException
 	 */
 	protected void parseArguments(final String[] args) throws IOException {
 		final CmdLineParser clp = new CmdLineParser(this);
@@ -242,6 +242,7 @@ public abstract class TextBuiltin {
 	 * Print the usage line
 	 *
 	 * @param clp
+	 * @throws IOException
 	 */
 	public void printUsageAndExit(final CmdLineParser clp) throws IOException {
 		printUsageAndExit("", clp); //$NON-NLS-1$
@@ -252,6 +253,7 @@ public abstract class TextBuiltin {
 	 *
 	 * @param message
 	 * @param clp
+	 * @throws IOException
 	 */
 	public void printUsageAndExit(final String message, final CmdLineParser clp) throws IOException {
 		errw.println(message);
@@ -324,7 +326,7 @@ public abstract class TextBuiltin {
 
 	/**
 	 * @param aborted
-	 *            boolean indicating that the exception should be aborted
+	 *            boolean indicating that the execution has been aborted before running
 	 * @return a runtime exception the caller is expected to throw
 	 * @since 3.4
 	 */

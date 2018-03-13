@@ -79,9 +79,10 @@ public class Die extends RuntimeException {
 	}
 
 	/**
-	 * Construct a new exception to simply abort the execution.
+	 * Construct a new exception reflecting the fact that the
+	 * command execution has been aborted before running.
 	 *
-	 * @param aborted boolean indicating the fact the execution should be aborted
+	 * @param aborted boolean indicating the fact the execution has been aborted
 	 * @since 3.4
 	 */
 	public Die(boolean aborted) {
