@@ -46,7 +46,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -148,7 +147,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 			ConcurrentRefUpdateException,
 			WrongRepositoryStateException {
 		checkCallable();
-		Collections.sort(only);
 
 		RepositoryState state = repo.getRepositoryState();
 		if (!state.canCommit())
@@ -161,7 +159,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				Git git = new Git(repo);
 				try {
 					git.add()
-							.addFilepattern(".") //$NON-NLS-1$
+							.addFilepattern(".")
 							.setUpdate(true).call();
 				} catch (NoFilepatternException e) {
 					// should really not happen
@@ -175,7 +173,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 						JGitText.get().commitOnRepoWithoutHEADCurrentlyNotSupported);
 
 			// determine the current HEAD and the commit it is referring to
-			ObjectId headId = repo.resolve(Constants.HEAD + "^{commit}"); //$NON-NLS-1$
+			ObjectId headId = repo.resolve(Constants.HEAD + "^{commit}");
 			if (headId == null && amend)
 				throw new WrongRepositoryStateException(
 						JGitText.get().commitAmendOnInitialNotPossible);
@@ -184,8 +182,9 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				if (amend) {
 					RevCommit previousCommit = new RevWalk(repo)
 							.parseCommit(headId);
-					for (RevCommit p : previousCommit.getParents())
-						parents.add(p.getId());
+					RevCommit[] p = previousCommit.getParents();
+					for (int i = 0; i < p.length; i++)
+						parents.add(0, p[i].getId());
 					if (author == null)
 						author = previousCommit.getAuthorIdent();
 				} else {
@@ -227,9 +226,8 @@ public class CommitCommand extends GitCommand<RevCommit> {
 						if (reflogComment != null) {
 							ru.setRefLogMessage(reflogComment, false);
 						} else {
-							String prefix = amend ? "commit (amend): " //$NON-NLS-1$
-									: parents.size() == 0 ? "commit (initial): "
-											: "commit: ";
+							String prefix = amend ? "commit (amend): "
+									: "commit: ";
 							ru.setRefLogMessage(
 									prefix + revCommit.getShortMessage(), false);
 						}
@@ -251,9 +249,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 							} else if (state == RepositoryState.CHERRY_PICKING_RESOLVED) {
 								repo.writeMergeCommitMsg(null);
 								repo.writeCherryPickHead(null);
-							} else if (state == RepositoryState.REVERTING_RESOLVED) {
-								repo.writeMergeCommitMsg(null);
-								repo.writeRevertHead(null);
 							}
 							return revCommit;
 						}
@@ -292,9 +287,9 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				author, committer, message);
 		message = ChangeIdUtil.insertId(message, changeId);
 		if (changeId != null)
-			message = message.replaceAll("\nChange-Id: I" //$NON-NLS-1$
-					+ ObjectId.zeroId().getName() + "\n", "\nChange-Id: I" //$NON-NLS-1$ //$NON-NLS-2$
-					+ changeId.getName() + "\n"); //$NON-NLS-1$
+			message = message.replaceAll("\nChange-Id: I"
+					+ ObjectId.zeroId().getName() + "\n", "\nChange-Id: I"
+					+ changeId.getName() + "\n");
 	}
 
 	private DirCache createTemporaryIndex(ObjectId headId, DirCache index)
@@ -454,15 +449,18 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 * @return the item's index in <code>only</code>; -1 if no item matches
 	 */
 	private int lookupOnly(String pathString) {
-		String p = pathString;
-		while (true) {
-			int position = Collections.binarySearch(only, p);
-			if (position >= 0)
-				return position;
-			int l = p.lastIndexOf("/"); //$NON-NLS-1$
-			if (l < 1)
-				break;
-			p = p.substring(0, l);
+		int i = 0;
+		for (String o : only) {
+			String p = pathString;
+			while (true) {
+				if (p.equals(o))
+					return i;
+				int l = p.lastIndexOf("/");
+				if (l < 1)
+					break;
+				p = p.substring(0, l);
+			}
+			i++;
 		}
 		return -1;
 	}
@@ -635,8 +633,8 @@ public class CommitCommand extends GitCommand<RevCommit> {
 		checkCallable();
 		if (!only.isEmpty())
 			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().illegalCombinationOfArguments, "--all", //$NON-NLS-1$
-					"--only")); //$NON-NLS-1$
+					JGitText.get().illegalCombinationOfArguments, "--all",
+					"--only"));
 		this.all = all;
 		return this;
 	}
@@ -670,9 +668,9 @@ public class CommitCommand extends GitCommand<RevCommit> {
 		checkCallable();
 		if (all)
 			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().illegalCombinationOfArguments, "--only", //$NON-NLS-1$
-					"--all")); //$NON-NLS-1$
-		String o = only.endsWith("/") ? only.substring(0, only.length() - 1) //$NON-NLS-1$
+					JGitText.get().illegalCombinationOfArguments, "--only",
+					"--all"));
+		String o = only.endsWith("/") ? only.substring(0, only.length() - 1)
 				: only;
 		// ignore duplicates
 		if (!this.only.contains(o))

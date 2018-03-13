@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2013 François Rey <eclipse.org_@_francois_._rey_._name>
+ * Copyright (C) 2012, François Rey <eclipse.org_@_francois_._rey_._name>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,6 +42,7 @@
  */
 package org.eclipse.jgit.pgm;
 
+import static org.junit.Assert.assertEquals;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.CLIRepositoryTestCase;
@@ -191,7 +192,7 @@ public class StatusTest extends CLIRepositoryTestCase {
 						"# On branch master", //
 						"# Unmerged paths:", //
 						"# ", //
-						"# \tboth modified:      unmerged", //
+						"# \tunmerged", //
 						"# ", //
 						"# Untracked files:", //
 						"# ", //
@@ -205,12 +206,25 @@ public class StatusTest extends CLIRepositoryTestCase {
 						"# Not currently on any branch.", //
 						"# Unmerged paths:", //
 						"# ", //
-						"# \tboth modified:      unmerged", //
+						"# \tunmerged", //
 						"# ", //
 						"# Untracked files:", //
 						"# ", //
 						"# \tuntracked", //
 						"" //
 				}, execute("git status")); //
+	}
+
+	private void assertArrayOfLinesEquals(String[] expected, String[] actual) {
+		assertEquals(toText(expected), toText(actual));
+	}
+
+	private String toText(String[] lines) {
+		StringBuilder b = new StringBuilder();
+		for (String s : lines) {
+			b.append(s);
+			b.append('\n');
+		}
+		return b.toString();
 	}
 }

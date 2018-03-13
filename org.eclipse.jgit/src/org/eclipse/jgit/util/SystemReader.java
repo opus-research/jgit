@@ -56,8 +56,8 @@ import java.text.SimpleDateFormat;
 import java.util.Locale;
 import java.util.TimeZone;
 
-import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.lib.Config;
+import org.eclipse.jgit.storage.file.FileBasedConfig;
 
 /**
  * Interface to read values from the system.
@@ -93,14 +93,14 @@ public abstract class SystemReader {
 					}
 				};
 			}
-			File etc = fs.resolve(prefix, "etc"); //$NON-NLS-1$
-			File config = fs.resolve(etc, "gitconfig"); //$NON-NLS-1$
+			File etc = fs.resolve(prefix, "etc");
+			File config = fs.resolve(etc, "gitconfig");
 			return new FileBasedConfig(parent, config, fs);
 		}
 
 		public FileBasedConfig openUserConfig(Config parent, FS fs) {
 			final File home = fs.userHome();
-			return new FileBasedConfig(parent, new File(home, ".gitconfig"), fs); //$NON-NLS-1$
+			return new FileBasedConfig(parent, new File(home, ".gitconfig"), fs);
 		}
 
 		public String getHostname() {
@@ -110,7 +110,7 @@ public abstract class SystemReader {
 					hostname = localMachine.getCanonicalHostName();
 				} catch (UnknownHostException e) {
 					// we do nothing
-					hostname = "localhost"; //$NON-NLS-1$
+					hostname = "localhost";
 				}
 				assert hostname != null;
 			}
@@ -251,10 +251,10 @@ public abstract class SystemReader {
 		String osDotName = AccessController
 				.doPrivileged(new PrivilegedAction<String>() {
 					public String run() {
-						return getProperty("os.name"); //$NON-NLS-1$
+						return getProperty("os.name");
 					}
 				});
-		return osDotName.startsWith("Windows"); //$NON-NLS-1$
+		return osDotName.startsWith("Windows");
 	}
 
 	/**
@@ -264,10 +264,10 @@ public abstract class SystemReader {
 		String osDotName = AccessController
 				.doPrivileged(new PrivilegedAction<String>() {
 					public String run() {
-						return getProperty("os.name"); //$NON-NLS-1$
+						return getProperty("os.name");
 					}
 				});
-		return "Mac OS X".equals(osDotName) || "Darwin".equals(osDotName); //$NON-NLS-1$ //$NON-NLS-2$
+		return "Mac OS X".equals(osDotName) || "Darwin".equals(osDotName);
 	}
 
 }

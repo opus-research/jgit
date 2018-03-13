@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2013 Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -63,7 +63,7 @@ public class RefSpec implements Serializable {
 	 * Suffix for wildcard ref spec component, that indicate matching all refs
 	 * with specified prefix.
 	 */
-	public static final String WILDCARD_SUFFIX = "/*"; //$NON-NLS-1$
+	public static final String WILDCARD_SUFFIX = "/*";
 
 	/**
 	 * Check whether provided string is a wildcard ref spec component.
@@ -106,13 +106,13 @@ public class RefSpec implements Serializable {
 	 * <p>
 	 * Specifications are typically one of the following forms:
 	 * <ul>
-	 * <li><code>refs/heads/master</code></li>
-	 * <li><code>refs/heads/master:refs/remotes/origin/master</code></li>
-	 * <li><code>refs/heads/*:refs/remotes/origin/*</code></li>
-	 * <li><code>+refs/heads/master</code></li>
-	 * <li><code>+refs/heads/master:refs/remotes/origin/master</code></li>
-	 * <li><code>+refs/heads/*:refs/remotes/origin/*</code></li>
-	 * <li><code>:refs/heads/master</code></li>
+	 * <li><code>refs/head/master</code></li>
+	 * <li><code>refs/head/master:refs/remotes/origin/master</code></li>
+	 * <li><code>refs/head/*:refs/remotes/origin/*</code></li>
+	 * <li><code>+refs/head/master</code></li>
+	 * <li><code>+refs/head/master:refs/remotes/origin/master</code></li>
+	 * <li><code>+refs/head/*:refs/remotes/origin/*</code></li>
+	 * <li><code>:refs/head/master</code></li>
 	 * </ul>
 	 *
 	 * @param spec
@@ -122,7 +122,7 @@ public class RefSpec implements Serializable {
 	 */
 	public RefSpec(final String spec) {
 		String s = spec;
-		if (s.startsWith("+")) { //$NON-NLS-1$
+		if (s.startsWith("+")) {
 			force = true;
 			s = s.substring(1);
 		}

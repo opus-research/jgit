@@ -58,12 +58,13 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryCache;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
+import org.eclipse.jgit.storage.file.FileRepository;
+import org.eclipse.jgit.storage.file.WindowCache;
 import org.eclipse.jgit.storage.file.WindowCacheConfig;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
@@ -149,7 +150,7 @@ public abstract class LocalDiskRepositoryTestCase {
 		c.setPackedGitWindowSize(8 * WindowCacheConfig.KB);
 		c.setPackedGitMMAP(useMMAP);
 		c.setDeltaBaseCacheLimit(8 * WindowCacheConfig.KB);
-		c.install();
+		WindowCache.reconfigure(c);
 	}
 
 
@@ -161,7 +162,7 @@ public abstract class LocalDiskRepositoryTestCase {
 		mockSystemReader.setProperty(Constants.GIT_CEILING_DIRECTORIES_KEY, makePath(ceilings));
 	}
 
-	private static String makePath(List<?> objects) {
+	private String makePath(List<?> objects) {
 		final StringBuilder stringBuilder = new StringBuilder();
 		for (Object object : objects) {
 			if (stringBuilder.length() > 0)
@@ -302,7 +303,7 @@ public abstract class LocalDiskRepositoryTestCase {
 		toClose.add(r);
 	}
 
-	private static String createUniqueTestFolderPrefix() {
+	private String createUniqueTestFolderPrefix() {
 		return "test" + (System.currentTimeMillis() + "_" + (testCount++));
 	}
 

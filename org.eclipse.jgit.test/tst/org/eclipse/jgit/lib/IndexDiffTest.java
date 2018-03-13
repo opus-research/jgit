@@ -2,7 +2,6 @@
  * Copyright (C) 2007, Dave Watson <dwatson@mimvista.com>
  * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
- * Copyright (C) 2013, Robin Stocker <robin@nibor.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -47,7 +46,6 @@
 package org.eclipse.jgit.lib;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
@@ -63,19 +61,15 @@ import org.eclipse.jgit.api.MergeResult;
 import org.eclipse.jgit.api.MergeResult.MergeStatus;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
-import org.eclipse.jgit.junit.RepositoryTestCase;
-import org.eclipse.jgit.lib.IndexDiff.StageState;
 import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.util.IO;
 import org.junit.Test;
 
-@SuppressWarnings("deprecation")
 public class IndexDiffTest extends RepositoryTestCase {
 
 	static PathEdit add(final Repository db, final File workdir,
@@ -216,8 +210,6 @@ public class IndexDiffTest extends RepositoryTestCase {
 		assertEquals("[]", diff.getMissing().toString());
 		assertEquals("[]", diff.getModified().toString());
 		assertEquals("[a]", diff.getConflicting().toString());
-		assertEquals(StageState.BOTH_MODIFIED,
-				diff.getConflictingStageStates().get("a"));
 		assertEquals(Collections.EMPTY_SET, diff.getUntrackedFolders());
 	}
 
@@ -257,8 +249,6 @@ public class IndexDiffTest extends RepositoryTestCase {
 		assertEquals("[]", diff.getMissing().toString());
 		assertEquals("[]", diff.getModified().toString());
 		assertEquals("[a]", diff.getConflicting().toString());
-		assertEquals(StageState.DELETED_BY_THEM,
-				diff.getConflictingStageStates().get("a"));
 		assertEquals(Collections.EMPTY_SET, diff.getUntrackedFolders());
 	}
 
@@ -475,23 +465,19 @@ public class IndexDiffTest extends RepositoryTestCase {
 		git.add().addFilepattern(path).call();
 		String path2 = "file2";
 		writeTrashFile(path2, "content");
-		String path3 = "file3";
-		writeTrashFile(path3, "some content");
-		git.add().addFilepattern(path2).addFilepattern(path3).call();
+		git.add().addFilepattern(path2).call();
 		git.commit().setMessage("commit").call();
 		assumeUnchanged(path2);
-		assumeUnchanged(path3);
 		writeTrashFile(path, "more content");
-		deleteTrashFile(path3);
+		writeTrashFile(path2, "more content");
 
 		FileTreeIterator iterator = new FileTreeIterator(db);
 		IndexDiff diff = new IndexDiff(db, Constants.HEAD, iterator);
 		diff.diff();
-		assertEquals(2, diff.getAssumeUnchanged().size());
+		assertEquals(1, diff.getAssumeUnchanged().size());
 		assertEquals(1, diff.getModified().size());
 		assertEquals(0, diff.getChanged().size());
 		assertTrue(diff.getAssumeUnchanged().contains("file2"));
-		assertTrue(diff.getAssumeUnchanged().contains("file3"));
 		assertTrue(diff.getModified().contains("file"));
 
 		git.add().addFilepattern(".").call();
@@ -499,53 +485,12 @@ public class IndexDiffTest extends RepositoryTestCase {
 		iterator = new FileTreeIterator(db);
 		diff = new IndexDiff(db, Constants.HEAD, iterator);
 		diff.diff();
-		assertEquals(2, diff.getAssumeUnchanged().size());
+		assertEquals(1, diff.getAssumeUnchanged().size());
 		assertEquals(0, diff.getModified().size());
 		assertEquals(1, diff.getChanged().size());
 		assertTrue(diff.getAssumeUnchanged().contains("file2"));
-		assertTrue(diff.getAssumeUnchanged().contains("file3"));
 		assertTrue(diff.getChanged().contains("file"));
 		assertEquals(Collections.EMPTY_SET, diff.getUntrackedFolders());
-	}
-
-	@Test
-	public void testStageState() throws IOException {
-		final int base = DirCacheEntry.STAGE_1;
-		final int ours = DirCacheEntry.STAGE_2;
-		final int theirs = DirCacheEntry.STAGE_3;
-		verifyStageState(StageState.BOTH_DELETED, base);
-		verifyStageState(StageState.DELETED_BY_THEM, ours, base);
-		verifyStageState(StageState.DELETED_BY_US, base, theirs);
-		verifyStageState(StageState.BOTH_MODIFIED, base, ours, theirs);
-		verifyStageState(StageState.ADDED_BY_US, ours);
-		verifyStageState(StageState.BOTH_ADDED, ours, theirs);
-		verifyStageState(StageState.ADDED_BY_THEM, theirs);
-
-		assertTrue(StageState.BOTH_DELETED.hasBase());
-		assertFalse(StageState.BOTH_DELETED.hasOurs());
-		assertFalse(StageState.BOTH_DELETED.hasTheirs());
-		assertFalse(StageState.BOTH_ADDED.hasBase());
-		assertTrue(StageState.BOTH_ADDED.hasOurs());
-		assertTrue(StageState.BOTH_ADDED.hasTheirs());
-	}
-
-	private void verifyStageState(StageState expected, int... stages)
-			throws IOException {
-		DirCacheBuilder builder = db.lockDirCache().builder();
-		for (int stage : stages) {
-			DirCacheEntry entry = createEntry("a", FileMode.REGULAR_FILE,
-					stage, "content");
-			builder.add(entry);
-		}
-		builder.commit();
-
-		IndexDiff diff = new IndexDiff(db, Constants.HEAD,
-				new FileTreeIterator(db));
-		diff.diff();
-
-		assertEquals(
-				"Conflict for entries in stages " + Arrays.toString(stages),
-				expected, diff.getConflictingStageStates().get("a"));
 	}
 
 	private void removeFromIndex(String path) throws IOException {

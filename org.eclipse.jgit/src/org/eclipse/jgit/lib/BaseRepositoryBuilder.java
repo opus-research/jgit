@@ -64,9 +64,9 @@ import java.util.List;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.lib.RepositoryCache.FileKey;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
+import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
@@ -487,7 +487,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 	 */
 	public B findGitDir() {
 		if (getGitDir() == null)
-			findGitDir(new File("").getAbsoluteFile()); //$NON-NLS-1$
+			findGitDir(new File("").getAbsoluteFile());
 		return self();
 	}
 
@@ -628,7 +628,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 			if (getGitDir() == null)
 				setGitDir(getWorkTree().getParentFile());
 			if (getIndexFile() == null)
-				setIndexFile(new File(getGitDir(), "index")); //$NON-NLS-1$
+				setIndexFile(new File(getGitDir(), "index"));
 		}
 	}
 
@@ -640,7 +640,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 	 */
 	protected void setupInternals() throws IOException {
 		if (getObjectDirectory() == null && getGitDir() != null)
-			setObjectDirectory(safeFS().resolve(getGitDir(), "objects")); //$NON-NLS-1$
+			setObjectDirectory(safeFS().resolve(getGitDir(), "objects"));
 	}
 
 	/**

@@ -593,7 +593,7 @@ public class Tree extends TreeEntry {
 	public String toString() {
 		final StringBuilder r = new StringBuilder();
 		r.append(ObjectId.toString(getId()));
-		r.append(" T "); //$NON-NLS-1$
+		r.append(" T ");
 		r.append(getFullName());
 		return r.toString();
 	}
