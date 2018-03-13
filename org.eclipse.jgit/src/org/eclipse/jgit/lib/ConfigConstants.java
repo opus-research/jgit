@@ -77,11 +77,32 @@ public class ConfigConstants {
 	/** The "submodule" section */
 	public static final String CONFIG_SUBMODULE_SECTION = "submodule";
 
+	/**
+	 * The "rebase" section
+	 *
+	 * @since 3.2
+	 */
+	public static final String CONFIG_REBASE_SECTION = "rebase";
+
 	/** The "gc" section */
 	public static final String CONFIG_GC_SECTION = "gc";
 
 	/** The "pack" section */
 	public static final String CONFIG_PACK_SECTION = "pack";
+
+	/**
+	 * The "fetch" section
+	 *
+	 * @since 3.3
+	 */
+	public static final String CONFIG_FETCH_SECTION = "fetch";
+
+	/**
+	 * The "pull" section
+	 *
+	 * @since 3.5
+	 */
+	public static final String CONFIG_PULL_SECTION = "pull";
 
 	/** The "algorithm" key */
 	public static final String CONFIG_KEY_ALGORITHM = "algorithm";
@@ -116,6 +137,13 @@ public class ConfigConstants {
 	/** The "deltaBaseCacheLimit" key */
 	public static final String CONFIG_KEY_DELTA_BASE_CACHE_LIMIT = "deltaBaseCacheLimit";
 
+	/**
+	 * The "symlinks" key
+	 *
+	 * @since 3.3
+	 */
+	public static final String CONFIG_KEY_SYMLINKS = "symlinks";
+
 	/** The "streamFileThreshold" key */
 	public static final String CONFIG_KEY_STREAM_FILE_TRESHOLD = "streamFileThreshold";
 
@@ -136,6 +164,14 @@ public class ConfigConstants {
 
 	/** The "autosetuprebase" key */
 	public static final String CONFIG_KEY_AUTOSETUPREBASE = "autosetuprebase";
+
+	/**
+	 * The "autostash" key
+	 *
+	 * @since 3.2
+	 */
+	public static final String CONFIG_KEY_AUTOSTASH = "autostash";
+
 	/** The "name" key */
 	public static final String CONFIG_KEY_NAME = "name";
 
@@ -225,4 +261,11 @@ public class ConfigConstants {
          * @since 3.0
          */
 	public static final String CONFIG_KEY_RENAMES = "renames";
+
+	/**
+	 * The "prune" key
+	 *
+	 * @since 3.3
+	 */
+	public static final String CONFIG_KEY_PRUNE = "prune";
 }

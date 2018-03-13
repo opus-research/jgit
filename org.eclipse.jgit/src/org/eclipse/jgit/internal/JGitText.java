@@ -75,6 +75,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String applyingCommit;
 	/***/ public String archiveFormatAlreadyAbsent;
 	/***/ public String archiveFormatAlreadyRegistered;
+	/***/ public String argumentIsNotAValidCommentString;
 	/***/ public String atLeastOnePathIsRequired;
 	/***/ public String atLeastOnePatternIsRequired;
 	/***/ public String atLeastTwoFiltersNeeded;
@@ -100,6 +101,8 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cachedPacksPreventsListingObjects;
 	/***/ public String cannotBeCombined;
 	/***/ public String cannotBeRecursiveWhenTreesAreIncluded;
+	/***/ public String cannotChangeActionOnComment;
+	/***/ public String cannotChangeToComment;
 	/***/ public String cannotCombineSquashWithNoff;
 	/***/ public String cannotCombineTreeFilterWithRevFilter;
 	/***/ public String cannotCommitOnARepoWithState;
@@ -110,6 +113,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotCreateDirectory;
 	/***/ public String cannotCreateHEAD;
 	/***/ public String cannotCreateIndexfile;
+	/***/ public String cannotCreateTempDir;
 	/***/ public String cannotDeleteCheckedOutBranch;
 	/***/ public String cannotDeleteFile;
 	/***/ public String cannotDeleteStaleTrackingRef;
@@ -137,11 +141,13 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotReadTree;
 	/***/ public String cannotRebaseWithoutCurrentHead;
 	/***/ public String cannotResolveLocalTrackingRefForUpdating;
+	/***/ public String cannotSquashFixupWithoutPreviousCommit;
 	/***/ public String cannotStoreObjects;
 	/***/ public String cannotUnloadAModifiedTree;
 	/***/ public String cannotWorkWithOtherStagesThanZeroRightNow;
 	/***/ public String canOnlyCherryPickCommitsWithOneParent;
 	/***/ public String canOnlyRevertCommitsWithOneParent;
+	/***/ public String commitDoesNotHaveGivenParent;
 	/***/ public String cantFindObjectInReversePackIndexForTheSpecifiedOffset;
 	/***/ public String cantPassMeATree;
 	/***/ public String channelMustBeInRange0_255;
@@ -328,6 +334,10 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidOldIdSent;
 	/***/ public String invalidPacketLineHeader;
 	/***/ public String invalidPath;
+	/***/ public String invalidPathContainsSeparator;
+	/***/ public String invalidPathPeriodAtEndWindows;
+	/***/ public String invalidPathSpaceAtEndWindows;
+	/***/ public String invalidPathReservedOnWindows;
 	/***/ public String invalidReflogRevision;
 	/***/ public String invalidRefName;
 	/***/ public String invalidRemote;
@@ -360,6 +370,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String mergeStrategyAlreadyExistsAsDefault;
 	/***/ public String mergeStrategyDoesNotSupportHeads;
 	/***/ public String mergeUsingStrategyResultedInDescription;
+	/***/ public String mergeRecursiveConflictsWhenMergingCommonAncestors;
 	/***/ public String mergeRecursiveReturnedNoCommit;
 	/***/ public String mergeRecursiveTooManyMergeBasesFor;
 	/***/ public String messageAndTaggerNotAllowedInUnannotatedTags;
@@ -432,6 +443,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String packingCancelledDuringObjectsWriting;
 	/***/ public String packObjectCountMismatch;
 	/***/ public String packRefs;
+	/***/ public String packSizeNotSetYet;
 	/***/ public String packTooLargeForIndexVersion1;
 	/***/ public String packWriterStatistics;
 	/***/ public String panicCantRenameIndexFile;
@@ -457,6 +469,8 @@ public class JGitText extends TranslationBundle {
 	/***/ public String readTimedOut;
 	/***/ public String receivePackObjectTooLarge1;
 	/***/ public String receivePackObjectTooLarge2;
+	/***/ public String receivePackInvalidLimit;
+	/***/ public String receivePackTooLarge;
 	/***/ public String receivingObjects;
 	/***/ public String refAlreadyExists;
 	/***/ public String refAlreadyExists1;
@@ -525,7 +539,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String stashApplyFailed;
 	/***/ public String stashApplyWithoutHead;
 	/***/ public String stashApplyOnUnsafeRepository;
-	/***/ public String stashCommitMissingTwoParents;
+	/***/ public String stashCommitIncorrectNumberOfParents;
 	/***/ public String stashDropDeleteRefFailed;
 	/***/ public String stashDropFailed;
 	/***/ public String stashDropMissingReflog;
@@ -557,6 +571,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String transportProtoLocal;
 	/***/ public String transportProtoSFTP;
 	/***/ public String transportProtoSSH;
+	/***/ public String transportSSHRetryInterrupt;
 	/***/ public String treeEntryAlreadyExists;
 	/***/ public String treeFilterMarkerTooManyFilters;
 	/***/ public String treeIteratorDoesNotSupportRemove;
