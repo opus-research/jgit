@@ -52,7 +52,6 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
 
 
 public class AbstractTreeIteratorTest extends TestCase {
@@ -63,7 +62,7 @@ public class AbstractTreeIteratorTest extends TestCase {
 
 	public class FakeTreeIterator extends WorkingTreeIterator {
 		public FakeTreeIterator(String pathName, FileMode fileMode) {
-			super(prefix(pathName), new WorkingTreeOptions(AutoCRLF.FALSE));
+			super(prefix(pathName), new WorkingTreeOptions(false));
 			mode = fileMode.getBits();
 
 			final int s = pathName.lastIndexOf('/');
