@@ -85,6 +85,7 @@ import org.eclipse.jgit.treewalk.filter.SkipWorkTreeFilter;
  *
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-stash.html"
  *      >Git documentation about Stash</a>
+ * @since 2.0
  */
 public class StashCreateCommand extends GitCommand<RevCommit> {
 
@@ -254,11 +255,11 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 						entry.setLength(wtIter.getEntryLength());
 						entry.setLastModified(wtIter.getEntryLastModified());
 						entry.setFileMode(wtIter.getEntryFileMode());
+						long contentLength = wtIter.getEntryContentLength();
 						InputStream in = wtIter.openEntryStream();
 						try {
 							entry.setObjectId(inserter.insert(
-									Constants.OBJ_BLOB,
-									wtIter.getEntryLength(), in));
+									Constants.OBJ_BLOB, contentLength, in));
 						} finally {
 							in.close();
 						}

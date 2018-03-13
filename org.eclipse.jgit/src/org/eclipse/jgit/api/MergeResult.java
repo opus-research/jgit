@@ -45,7 +45,6 @@ package org.eclipse.jgit.api;
 
 import java.text.MessageFormat;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.eclipse.jgit.internal.JGitText;
@@ -79,6 +78,7 @@ public class MergeResult {
 		},
 		/** */
 		ALREADY_UP_TO_DATE {
+			@Override
 			public String toString() {
 				return "Already-up-to-date";
 			}
@@ -90,6 +90,7 @@ public class MergeResult {
 		},
 		/** */
 		FAILED {
+			@Override
 			public String toString() {
 				return "Failed";
 			}
@@ -101,6 +102,7 @@ public class MergeResult {
 		},
 		/** */
 		MERGED {
+			@Override
 			public String toString() {
 				return "Merged";
 			}
@@ -112,6 +114,7 @@ public class MergeResult {
 		},
 		/** */
 		CONFLICTING {
+			@Override
 			public String toString() {
 				return "Conflicting";
 			}
@@ -123,19 +126,9 @@ public class MergeResult {
 		},
 		/** */
 		NOT_SUPPORTED {
+			@Override
 			public String toString() {
 				return "Not-yet-supported";
-			}
-
-			@Override
-			public boolean isSuccessful() {
-				return false;
-			}
-		},
-		/** */
-		CHECKOUT_CONFLICT {
-			public String toString() {
-				return "Checkout Conflict";
 			}
 
 			@Override
@@ -166,8 +159,6 @@ public class MergeResult {
 
 	private Map<String, MergeFailureReason> failingPaths;
 
-	private List<String> checkoutConflicts;
-
 	/**
 	 * @param newHead
 	 *            the object the head points at after the merge
@@ -179,17 +170,19 @@ public class MergeResult {
 	 *            all the commits which have been merged together
 	 * @param mergeStatus
 	 *            the status the merge resulted in
+	 * @param mergeStrategy
+	 *            the used {@link MergeStrategy}
 	 * @param lowLevelResults
 	 *            merge results as returned by
 	 *            {@link ResolveMerger#getMergeResults()}
-	 * @param mergeStrategy
-	 *            the used {@link MergeStrategy}
+	 * @since 2.0
 	 */
 	public MergeResult(ObjectId newHead, ObjectId base,
 			ObjectId[] mergedCommits, MergeStatus mergeStatus,
-			Map<String, org.eclipse.jgit.merge.MergeResult<?>> lowLevelResults,
-			MergeStrategy mergeStrategy) {
-		this(newHead, base, mergedCommits, mergeStatus, mergeStrategy, lowLevelResults, null);
+			MergeStrategy mergeStrategy,
+			Map<String, org.eclipse.jgit.merge.MergeResult<?>> lowLevelResults) {
+		this(newHead, base, mergedCommits, mergeStatus, mergeStrategy,
+				lowLevelResults, null);
 	}
 
 	/**
@@ -216,7 +209,7 @@ public class MergeResult {
 			Map<String, org.eclipse.jgit.merge.MergeResult<?>> lowLevelResults,
 			String description) {
 		this(newHead, base, mergedCommits, mergeStatus, mergeStrategy,
-				lowLevelResults, null, null);
+				lowLevelResults, null, description);
 	}
 
 	/**
@@ -257,18 +250,6 @@ public class MergeResult {
 			for (Map.Entry<String, org.eclipse.jgit.merge.MergeResult<?>> result : lowLevelResults
 					.entrySet())
 				addConflict(result.getKey(), result.getValue());
-	}
-
-	/**
-	 * Creates a new result that represents a checkout conflict before the
-	 * operation even started for real.
-	 *
-	 * @param checkoutConflicts
-	 *            the conflicting files
-	 */
-	public MergeResult(List<String> checkoutConflicts) {
-		this.checkoutConflicts = checkoutConflicts;
-		this.mergeStatus = MergeStatus.CHECKOUT_CONFLICT;
 	}
 
 	/**
@@ -425,15 +406,5 @@ public class MergeResult {
 	 */
 	public Map<String, MergeFailureReason> getFailingPaths() {
 		return failingPaths;
-	}
-
-	/**
-	 * Returns a list of paths that cause a checkout conflict. These paths
-	 * prevent the operation from even starting.
-	 *
-	 * @return the list of files that caused the checkout conflict.
-	 */
-	public List<String> getCheckoutConflicts() {
-		return checkoutConflicts;
 	}
 }

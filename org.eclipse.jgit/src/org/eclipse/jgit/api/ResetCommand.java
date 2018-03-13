@@ -150,7 +150,7 @@ public class ResetCommand extends GitCommand<Ref> {
 			// resolve the ref to a commit
 			final ObjectId commitId;
 			try {
-				commitId = repo.resolve(ref);
+				commitId = repo.resolve(ref + "^{commit}");
 				if (commitId == null) {
 					// @TODO throw an InvalidRefNameException. We can't do that
 					// now because this would break the API
@@ -312,35 +312,27 @@ public class ResetCommand extends GitCommand<Ref> {
 	}
 
 	private void resetIndex(RevCommit commit) throws IOException {
-		DirCache dc = null;
+		DirCache dc = repo.lockDirCache();
 		try {
-			dc = repo.lockDirCache();
 			dc.clear();
 			DirCacheBuilder dcb = dc.builder();
 			dcb.addTree(new byte[0], 0, repo.newObjectReader(),
 					commit.getTree());
 			dcb.commit();
-		} catch (IOException e) {
-			throw e;
 		} finally {
-			if (dc != null)
-				dc.unlock();
+			dc.unlock();
 		}
 	}
 
 	private void checkoutIndex(RevCommit commit) throws IOException {
-		DirCache dc = null;
+		DirCache dc = repo.lockDirCache();
 		try {
-			dc = repo.lockDirCache();
 			DirCacheCheckout checkout = new DirCacheCheckout(repo, dc,
 					commit.getTree());
 			checkout.setFailOnConflict(false);
 			checkout.checkout();
-		} catch (IOException e) {
-			throw e;
 		} finally {
-			if (dc != null)
-				dc.unlock();
+			dc.unlock();
 		}
 	}
 
