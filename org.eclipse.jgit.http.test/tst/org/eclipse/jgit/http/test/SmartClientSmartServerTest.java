@@ -66,7 +66,6 @@ import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.FilterMapping;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.http.server.GitServlet;
@@ -399,8 +398,8 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 				t.push(NullProgressMonitor.INSTANCE, Collections.singleton(u));
 				fail("anonymous push incorrectly accepted without error");
 			} catch (TransportException e) {
-				final String exp = remoteURI + ": "
-						+ JGitText.get().authenticationNotSupported;
+				final String status = "401 Unauthorized";
+				final String exp = remoteURI.toString() + ": " + status;
 				assertEquals(exp, e.getMessage());
 			}
 		} finally {

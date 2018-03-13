@@ -52,7 +52,6 @@ import javax.servlet.http.HttpServletRequest;
 import org.eclipse.jetty.servlet.DefaultServlet;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.errors.TransportException;
@@ -281,8 +280,8 @@ public class HttpClientTests extends HttpTestCase {
 				t.openFetch();
 				fail("connection opened even info/refs needs auth basic");
 			} catch (TransportException err) {
-				String exp = dumbAuthBasicURI + ": "
-						+ JGitText.get().authenticationNotSupported;
+				String status = "401 Unauthorized";
+				String exp = dumbAuthBasicURI + ": " + status;
 				assertEquals(exp, err.getMessage());
 			}
 		} finally {
@@ -298,8 +297,8 @@ public class HttpClientTests extends HttpTestCase {
 				t.openFetch();
 				fail("connection opened even though service disabled");
 			} catch (TransportException err) {
-				String exp = smartAuthBasicURI + ": "
-						+ JGitText.get().authenticationNotSupported;
+				String status = "401 Unauthorized";
+				String exp = smartAuthBasicURI + ": " + status;
 				assertEquals(exp, err.getMessage());
 			}
 		} finally {
