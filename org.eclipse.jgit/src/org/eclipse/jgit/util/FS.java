@@ -279,6 +279,7 @@ public abstract class FS {
 	 * @param f
 	 * @throws IOException
 	 *             this may be a Java7 subclass with detailed information
+	 * @since 3.3
 	 */
 	public void delete(File f) throws IOException {
 		if (!f.delete())
@@ -636,6 +637,8 @@ public abstract class FS {
 
 	/**
 	 * File attributes we typically care for.
+	 *
+	 * @since 3.3
 	 */
 	public static class Attributes {
 
@@ -763,6 +766,7 @@ public abstract class FS {
 	/**
 	 * @param path
 	 * @return the file attributes we care for
+	 * @since 3.3
 	 */
 	public Attributes getAttributes(File path) {
 		boolean isDirectory = isDirectory(path);
@@ -782,6 +786,7 @@ public abstract class FS {
 	 *
 	 * @param file
 	 * @return NFC-format File
+	 * @since 3.3
 	 */
 	public File normalize(File file) {
 		return file;
@@ -792,6 +797,7 @@ public abstract class FS {
 	 *
 	 * @param name
 	 * @return NFC-format string
+	 * @since 3.3
 	 */
 	public String normalize(String name) {
 		return name;
