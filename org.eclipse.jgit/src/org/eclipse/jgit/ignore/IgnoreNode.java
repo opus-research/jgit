@@ -97,13 +97,6 @@ public class IgnoreNode {
 	}
 
 	/**
-	 * @return true if there are no rules in this node
-	 */
-	public boolean isEmpty() {
-		return rules.isEmpty();
-	}
-
-	/**
 	 * Parse files according to gitignore standards.
 	 *
 	 * @param in
