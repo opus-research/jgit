@@ -95,7 +95,7 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 	 *
 	 * @return the result of the cherry-pick
 	 */
-	public CherryPickResult call() throws GitAPIException, GitAPIException {
+	public CherryPickResult call() throws GitAPIException {
 		RevCommit newHead = null;
 		List<Ref> cherryPickedRefs = new LinkedList<Ref>();
 		checkCallable();

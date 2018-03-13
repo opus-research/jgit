@@ -106,7 +106,7 @@ public class RevertCommand extends GitCommand<RevCommit> {
 	 *         is returned. The list of successfully reverted {@link Ref}'s can
 	 *         be obtained by calling {@link #getRevertedRefs()}
 	 */
-	public RevCommit call() throws GitAPIException, GitAPIException {
+	public RevCommit call() throws GitAPIException {
 		RevCommit newHead = null;
 		checkCallable();
 

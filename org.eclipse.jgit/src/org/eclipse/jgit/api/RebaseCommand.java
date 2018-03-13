@@ -190,8 +190,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	 *
 	 * @return an object describing the result of this command
 	 */
-	public RebaseResult call() throws GitAPIException, NoHeadException, RefNotFoundException,
-			JGitInternalException, GitAPIException {
+	public RebaseResult call() throws GitAPIException, NoHeadException,
+			RefNotFoundException, JGitInternalException {
 		RevCommit newHead = null;
 		boolean lastStepWasForward = false;
 		checkCallable();
