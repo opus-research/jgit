@@ -72,7 +72,6 @@ import org.eclipse.jgit.ignore.IgnoreNode;
 import org.eclipse.jgit.ignore.IgnoreRule;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig;
-import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
@@ -403,7 +402,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private InputStream filterClean(InputStream in) throws IOException {
+	private InputStream filterClean(InputStream in) {
 		return new EolCanonicalizingInputStream(in);
 	}
 
@@ -499,13 +498,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *             the file could not be opened for reading.
 	 */
 	public InputStream openEntryStream() throws IOException {
-		InputStream rawis = current().openInputStream();
-		InputStream is;
-		if (getOptions().getAutoCRLF() != AutoCRLF.FALSE)
-			is = new EolCanonicalizingInputStream(rawis);
-		else
-			is = rawis;
-		return is;
+		return current().openInputStream();
 	}
 
 	/**
