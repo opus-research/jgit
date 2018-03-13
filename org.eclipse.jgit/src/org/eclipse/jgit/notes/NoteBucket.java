@@ -71,6 +71,4 @@ abstract class NoteBucket {
 			ObjectReader reader) throws IOException;
 
 	abstract ObjectId writeTree(ObjectInserter inserter) throws IOException;
-
-	abstract ObjectId getTreeId();
 }

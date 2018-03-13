@@ -1,5 +1,8 @@
 /*
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2008-2009, Google Inc.
+ * Copyright (C) 2008, Imran M Yousuf <imyousuf@smartitengineering.com>
+ * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2006-2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,70 +44,50 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.notes;
+package org.eclipse.jgit.storage.file;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+
+import java.io.File;
 import java.io.IOException;
-import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.junit.JGitTestUtil;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectLoader;
+import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
+import org.junit.Test;
 
-/**
- * This exception will be thrown from the {@link NoteMerger} when a conflict on
- * Notes content is found during merge.
- */
-public class NotesMergeConflictException extends IOException {
-	private static final long serialVersionUID = 1L;
+public class T0004_PackReaderTest extends SampleDataRepositoryTestCase {
+	private static final String PACK_NAME = "pack-34be9032ac282b11fa9babdc2b2a93ca996c9c2f";
+	private static final File TEST_PACK = JGitTestUtil.getTestResourceFile(PACK_NAME + ".pack");
+	private static final File TEST_IDX = JGitTestUtil.getTestResourceFile(PACK_NAME + ".idx");
 
-	/**
-	 * Construct a NotesMergeConflictException for the specified base, ours and
-	 * theirs note versions.
-	 *
-	 * @param base
-	 *            note version
-	 * @param ours
-	 *            note version
-	 * @param theirs
-	 *            note version
-	 */
-	public NotesMergeConflictException(Note base, Note ours, Note theirs) {
-		super(MessageFormat.format(JGitText.get().mergeConflictOnNotes,
-				noteOn(base, ours, theirs), noteData(base), noteData(ours),
-				noteData(theirs)));
+	@Test
+	public void test003_lookupCompressedObject() throws IOException {
+		final PackFile pr;
+		final ObjectId id;
+		final ObjectLoader or;
+
+		id = ObjectId.fromString("902d5476fa249b7abc9d84c611577a81381f0327");
+		pr = new PackFile(TEST_IDX, TEST_PACK);
+		or = pr.get(new WindowCursor(null), id);
+		assertNotNull(or);
+		assertEquals(Constants.OBJ_TREE, or.getType());
+		assertEquals(35, or.getSize());
+		pr.close();
 	}
 
-	/**
-	 * Constructs a NotesMergeConflictException for the specified base, ours and
-	 * theirs versions of the root note tree.
-	 *
-	 * @param base
-	 *            version of the root note tree
-	 * @param ours
-	 *            version of the root note tree
-	 * @param theirs
-	 *            version of the root note tree
-	 */
-	public NotesMergeConflictException(NonNoteEntry base, NonNoteEntry ours,
-			NonNoteEntry theirs) {
-		super(MessageFormat.format(
-				JGitText.get().mergeConflictOnNonNoteEntries, name(base),
-				name(ours), name(theirs)));
-	}
+	@Test
+	public void test004_lookupDeltifiedObject() throws IOException {
+		final ObjectId id;
+		final ObjectLoader or;
 
-	private static String noteOn(Note base, Note ours, Note theirs) {
-		if (base != null)
-			return base.name();
-		if (ours != null)
-			return ours.name();
-		return theirs.name();
-	}
-
-	private static String noteData(Note n) {
-		if (n != null)
-			return n.getData().name();
-		return "";
-	}
-
-	private static String name(NonNoteEntry e) {
-		return e != null ? e.name() : "";
+		id = ObjectId.fromString("5b6e7c66c276e7610d4a73c70ec1a1f7c1003259");
+		or = db.open(id);
+		assertNotNull(or);
+		assertEquals(Constants.OBJ_BLOB, or.getType());
+		assertEquals(18009, or.getSize());
 	}
 }

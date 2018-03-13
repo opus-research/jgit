@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2010, Robin Rosenberg
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,48 +40,42 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.util;
 
-package org.eclipse.jgit.notes;
+import java.io.File;
+import java.nio.charset.Charset;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 
-import java.io.IOException;
+abstract class FS_POSIX extends FS {
+	@Override
+	public File gitPrefix() {
+		String path = SystemReader.getInstance().getenv("PATH");
+		File gitExe = searchPath(path, "git");
+		if (gitExe != null)
+			return gitExe.getParentFile().getParentFile();
 
-import org.eclipse.jgit.lib.ObjectInserter;
-import org.eclipse.jgit.lib.ObjectReader;
+		if (isMacOS()) {
+			// On MacOSX, PATH is shorter when Eclipse is launched from the
+			// Finder than from a terminal. Therefore try to launch bash as a
+			// login shell and search using that.
+			//
+			String w = readPipe(userHome(), //
+					new String[] { "bash", "--login", "-c", "which git" }, //
+					Charset.defaultCharset().name());
+			return new File(w).getParentFile().getParentFile();
+		}
 
-/**
- * Three-way note merge operation.
- * <p>
- * This operation takes three versions of a note: base, ours and theirs,
- * performs the three-way merge and returns the merge result.
- */
-public interface NoteMerger {
+		return null;
+	}
 
-	/**
-	 * Merges the conflicting note changes.
-	 * <p>
-	 * base, ours and their are all notes on the same object.
-	 * 
-	 * @param base
-	 *            version of the Note
-	 * @param ours
-	 *            version of the Note
-	 * @param their
-	 *            version of the Note
-	 * @param reader
-	 *            the object reader that must be used to read Git objects
-	 * @param inserter
-	 *            the object inserter that must be used to insert Git objects
-	 * @return the merge result
-	 * @throws NotesMergeConflictException
-	 *             in case there was a merge conflict which this note merger
-	 *             couldn't resolve
-	 * @throws IOException
-	 *             in case the reader or the inserter would throw an IOException
-	 *             the implementor will most likely want to propagate it as it
-	 *             can't do much to recover from it
-	 */
-	Note merge(Note base, Note ours, Note their, ObjectReader reader,
-			ObjectInserter inserter) throws NotesMergeConflictException,
-			IOException;
+	private static boolean isMacOS() {
+		final String osDotName = AccessController
+				.doPrivileged(new PrivilegedAction<String>() {
+					public String run() {
+						return System.getProperty("os.name");
+					}
+				});
+		return "Mac OS X".equals(osDotName);
+	}
 }
-

@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2008-2009, Google Inc.
- * Copyright (C) 2008, Imran M Yousuf <imyousuf@smartitengineering.com>
- * Copyright (C) 2008, Jonas Fonseca <fonseca@diku.dk>
+ * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,37 +41,50 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.nls;
 
-import java.io.File;
-import java.net.URISyntaxException;
-import java.net.URL;
+import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.awtui.UIText;
+import org.eclipse.jgit.console.ConsoleText;
+import org.eclipse.jgit.http.server.HttpServerText;
+import org.eclipse.jgit.iplog.IpLogText;
+import org.eclipse.jgit.pgm.CLIText;
+import org.junit.Before;
+import org.junit.Test;
 
-public abstract class JGitTestUtil {
-	public static final String CLASSPATH_TO_RESOURCES = "org/eclipse/jgit/test/resources/";
-
-	private JGitTestUtil() {
-		throw new UnsupportedOperationException();
+public class RootLocaleTest {
+	@Before
+	public void setUp() {
+		NLS.setLocale(NLS.ROOT_LOCALE);
 	}
 
-	public static File getTestResourceFile(final String fileName) {
-		if (fileName == null || fileName.length() <= 0) {
-			return null;
-		}
-		final URL url = cl().getResource(CLASSPATH_TO_RESOURCES + fileName);
-		if (url == null) {
-			// If URL is null then try to load it as it was being
-			// loaded previously
-			return new File("tst", fileName);
-		}
-		try {
-			return new File(url.toURI());
-		} catch(URISyntaxException e) {
-			return new File(url.getPath());
-		}
+	@Test
+	public void testJGitText() {
+		NLS.getBundleFor(JGitText.class);
 	}
 
-	private static ClassLoader cl() {
-		return JGitTestUtil.class.getClassLoader();
+	@Test
+	public void testHttpServerText() {
+		NLS.getBundleFor(HttpServerText.class);
+	}
+
+	@Test
+	public void testConsoleText() {
+		NLS.getBundleFor(ConsoleText.class);
+	}
+
+	@Test
+	public void testCLIText() {
+		NLS.getBundleFor(CLIText.class);
+	}
+
+	@Test
+	public void testUIText() {
+		NLS.getBundleFor(UIText.class);
+	}
+
+	@Test
+	public void testIpLogText() {
+		NLS.getBundleFor(IpLogText.class);
 	}
 }

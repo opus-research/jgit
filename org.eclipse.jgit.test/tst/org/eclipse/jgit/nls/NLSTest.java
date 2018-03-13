@@ -43,15 +43,19 @@
 
 package org.eclipse.jgit.nls;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+
 import java.util.Locale;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 
-import junit.framework.TestCase;
+import org.junit.Test;
 
+public class NLSTest {
 
-public class TestNLS extends TestCase {
-
+	@Test
 	public void testNLSLocale() {
 		NLS.setLocale(NLS.ROOT_LOCALE);
 		GermanTranslatedBundle bundle = GermanTranslatedBundle.get();
@@ -62,6 +66,7 @@ public class TestNLS extends TestCase {
 		assertEquals(Locale.GERMAN, bundle.effectiveLocale());
 	}
 
+	@Test
 	public void testJVMDefaultLocale() {
 		Locale.setDefault(NLS.ROOT_LOCALE);
 		NLS.useJVMDefaultLocale();
@@ -74,6 +79,7 @@ public class TestNLS extends TestCase {
 		assertEquals(Locale.GERMAN, bundle.effectiveLocale());
 	}
 
+	@Test
 	public void testThreadTranslationBundleInheritance() throws InterruptedException {
 
 		class T extends Thread {
@@ -99,6 +105,7 @@ public class TestNLS extends TestCase {
 		assertSame(mainThreadsBundle, t.bundle);
 	}
 
+	@Test
 	public void testParallelThreadsWithDifferentLocales() throws InterruptedException {
 
 		final CyclicBarrier barrier = new CyclicBarrier(2);
