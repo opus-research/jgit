@@ -120,64 +120,34 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	 */
 	protected static final int MIN_CLIENT_BUFFER = 2 * 32 * 46 + 8;
 
-	/**
-	 * Include tags if we are also including the referenced objects.
-	 * @since 2.0
-	 */
+	/** Include tags if we are also including the referenced objects. */
 	public static final String OPTION_INCLUDE_TAG = "include-tag";
 
-	/**
-	 * Mutli-ACK support for improved negotiation.
-	 * @since 2.0
-	 */
+	/** Mutli-ACK support for improved negotiation. */
 	public static final String OPTION_MULTI_ACK = "multi_ack";
 
-	/**
-	 * Mutli-ACK detailed support for improved negotiation.
-	 * @since 2.0
-	 */
+	/** Mutli-ACK detailed support for improved negotiation. */
 	public static final String OPTION_MULTI_ACK_DETAILED = "multi_ack_detailed";
 
-	/**
-	 * The client supports packs with deltas but not their bases.
-	 * @since 2.0
-	 */
+	/** The client supports packs with deltas but not their bases. */
 	public static final String OPTION_THIN_PACK = "thin-pack";
 
-	/**
-	 * The client supports using the side-band for progress messages.
-	 * @since 2.0
-	 */
+	/** The client supports using the side-band for progress messages. */
 	public static final String OPTION_SIDE_BAND = "side-band";
 
-	/**
-	 * The client supports using the 64K side-band for progress messages.
-	 * @since 2.0
-	 */
+	/** The client supports using the 64K side-band for progress messages. */
 	public static final String OPTION_SIDE_BAND_64K = "side-band-64k";
 
-	/**
-	 * The client supports packs with OFS deltas.
-	 * @since 2.0
-	 */
+	/** The client supports packs with OFS deltas. */
 	public static final String OPTION_OFS_DELTA = "ofs-delta";
 
-	/**
-	 * The client supports shallow fetches.
-	 * @since 2.0
-	 */
+	/** The client supports shallow fetches. */
 	public static final String OPTION_SHALLOW = "shallow";
 
-	/**
-	 * The client does not want progress messages and will ignore them.
-	 * @since 2.0
-	 */
+	/** The client does not want progress messages and will ignore them. */
 	public static final String OPTION_NO_PROGRESS = "no-progress";
 
-	/**
-	 * The client supports receiving a pack before it has sent "done".
-	 * @since 2.0
-	 */
+	/** The client supports receiving a pack before it has sent "done". */
 	public static final String OPTION_NO_DONE = "no-done";
 
 	static enum MultiAck {
@@ -703,7 +673,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	}
 
 	private void receivePack(final ProgressMonitor monitor) throws IOException {
-		onReceivePack();
 		InputStream input = in;
 		if (sideband)
 			input = new SideBandInputStream(input, monitor, getMessageWriter());
@@ -719,17 +688,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		} finally {
 			ins.release();
 		}
-	}
-
-	/**
-	 * Notification event delivered just before the pack is received from the
-	 * network. This event can be used by RPC such as {@link TransportHttp} to
-	 * disable its request magic and ensure the pack stream is read correctly.
-	 *
-	 * @since 2.0
-	 */
-	protected void onReceivePack() {
-		// By default do nothing for TCP based protocols.
 	}
 
 	private static class CancelledException extends Exception {

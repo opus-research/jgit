@@ -149,15 +149,8 @@ public abstract class Transport {
 		try {
 			String line;
 			while ((line = br.readLine()) != null) {
-				line = line.trim();
-				if (line.length() == 0)
-					continue;
-				int comment = line.indexOf('#');
-				if (comment == 0)
-					continue;
-				if (comment != -1)
-					line = line.substring(0, comment).trim();
-				load(ldr, line);
+				if (line.length() > 0 && !line.startsWith("#"))
+					load(ldr, line);
 			}
 		} catch (IOException err) {
 			// If we failed during a read, ignore the error.
@@ -557,29 +550,6 @@ public abstract class Transport {
 	}
 
 	/**
-	 * Open a new transport with no local repository.
-	 *
-	 * @param uri
-	 * @return new Transport instance
-	 * @throws NotSupportedException
-	 * @throws TransportException
-	 */
-	public static Transport open(URIish uri) throws NotSupportedException, TransportException {
-		for (WeakReference<TransportProtocol> ref : protocols) {
-			TransportProtocol proto = ref.get();
-			if (proto == null) {
-				protocols.remove(ref);
-				continue;
-			}
-
-			if (proto.canHandle(uri, null, null))
-				return proto.open(uri);
-		}
-
-		throw new NotSupportedException(MessageFormat.format(JGitText.get().URINotSupported, uri));
-	}
-
-	/**
 	 * Convert push remote refs update specification from {@link RefSpec} form
 	 * to {@link RemoteRefUpdate}. Conversion expands wildcards by matching
 	 * source part to local refs. expectedOldObjectId in RemoteRefUpdate is
@@ -765,18 +735,6 @@ public abstract class Transport {
 		this.local = local;
 		this.uri = uri;
 		this.checkFetchedObjects = tc.isFsckObjects();
-		this.credentialsProvider = CredentialsProvider.getDefault();
-	}
-
-	/**
-	 * Create a minimal transport instance not tied to a single repository.
-	 *
-	 * @param uri
-	 */
-	protected Transport(final URIish uri) {
-		this.uri = uri;
-		this.local = null;
-		this.checkFetchedObjects = true;
 		this.credentialsProvider = CredentialsProvider.getDefault();
 	}
 

@@ -141,14 +141,6 @@ public abstract class JGitTestUtil {
 		return path;
 	}
 
-	public static File writeTrashFile(final FileRepository db,
-			final String subdir,
-			final String name, final String data) throws IOException {
-		File path = new File(db.getWorkTree() + "/" + subdir, name);
-		write(path, data);
-		return path;
-	}
-
 	/**
 	 * Write a string as a UTF-8 file.
 	 *
