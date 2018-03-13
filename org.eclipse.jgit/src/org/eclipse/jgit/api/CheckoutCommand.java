@@ -223,7 +223,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 				}
 			}
 
-			Ref headRef = repo.getRef(Constants.HEAD);
+			Ref headRef = repo.exactRef(Constants.HEAD);
 			if (headRef == null) {
 				// TODO Git CLI supports checkout from unborn branch, we should
 				// also allow this
@@ -242,7 +242,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 								JGitText.get().checkoutUnexpectedResult,
 								r.name()));
 					this.status = CheckoutResult.NOT_TRIED_RESULT;
-					return repo.getRef(Constants.HEAD);
+					return repo.exactRef(Constants.HEAD);
 				}
 				branch = getStartPointObjectId();
 			} else {
@@ -277,7 +277,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			} finally {
 				dc.unlock();
 			}
-			Ref ref = repo.getRef(name);
+			Ref ref = repo.findRef(name);
 			if (ref != null && !ref.getName().startsWith(Constants.R_HEADS))
 				ref = null;
 			String toName = Repository.shortenRefName(name);
@@ -289,7 +289,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 				updateResult = refUpdate.link(ref.getName());
 			else if (orphan) {
 				updateResult = refUpdate.link(getBranchName());
-				ref = repo.getRef(Constants.HEAD);
+				ref = repo.exactRef(Constants.HEAD);
 			} else {
 				refUpdate.setNewObjectId(newCommit);
 				updateResult = refUpdate.forceUpdate();
@@ -318,7 +318,9 @@ public class CheckoutCommand extends GitCommand<Ref> {
 
 			if (!dco.getToBeDeleted().isEmpty()) {
 				status = new CheckoutResult(Status.NONDELETED,
-						dco.getToBeDeleted());
+						dco.getToBeDeleted(),
+						new ArrayList<String>(dco.getUpdated().keySet()),
+						dco.getRemoved());
 			} else
 				status = new CheckoutResult(new ArrayList<String>(dco
 						.getUpdated().keySet()), dco.getRemoved());
@@ -361,6 +363,26 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	public CheckoutCommand addPath(String path) {
 		checkCallable();
 		this.paths.add(path);
+		return this;
+	}
+
+	/**
+	 * Add multiple slash-separated paths to the list of paths to check out. To
+	 * check out all paths, use {@link #setAllPaths(boolean)}.
+	 * <p>
+	 * If this option is set, neither the {@link #setCreateBranch(boolean)} nor
+	 * {@link #setName(String)} option is considered. In other words, these
+	 * options are exclusive.
+	 *
+	 * @param p
+	 *            paths to update in the working tree and index (with
+	 *            <code>/</code> as separator)
+	 * @return {@code this}
+	 * @since 4.6
+	 */
+	public CheckoutCommand addPaths(List<String> p) {
+		checkCallable();
+		this.paths.addAll(p);
 		return this;
 	}
 
@@ -519,7 +541,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 					.get().branchNameInvalid, name == null ? "<null>" : name)); //$NON-NLS-1$
 
 		if (orphan) {
-			Ref refToCheck = repo.getRef(getBranchName());
+			Ref refToCheck = repo.exactRef(getBranchName());
 			if (refToCheck != null)
 				throw new RefAlreadyExistsException(MessageFormat.format(
 						JGitText.get().refAlreadyExists, name));

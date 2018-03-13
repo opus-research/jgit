@@ -58,6 +58,7 @@ import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.lib.BranchConfig.BranchRebaseMode;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -155,6 +156,7 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 		command.setBare(bare);
 		if (directory == null && gitDir == null)
 			directory = new File(u.getHumanishName(), Constants.DOT_GIT);
+		validateDirs(directory, gitDir, bare);
 		if (directory != null && directory.exists()
 				&& directory.listFiles().length != 0)
 			throw new JGitInternalException(MessageFormat.format(
@@ -325,9 +327,9 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 				ConfigConstants.CONFIG_KEY_AUTOSETUPREBASE);
 		if (ConfigConstants.CONFIG_KEY_ALWAYS.equals(autosetupRebase)
 				|| ConfigConstants.CONFIG_KEY_REMOTE.equals(autosetupRebase))
-			clonedRepo.getConfig().setBoolean(
+			clonedRepo.getConfig().setEnum(
 					ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
-					ConfigConstants.CONFIG_KEY_REBASE, true);
+					ConfigConstants.CONFIG_KEY_REBASE, BranchRebaseMode.REBASE);
 		clonedRepo.getConfig().save();
 	}
 
@@ -511,6 +513,15 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	private static void validateDirs(File directory, File gitDir, boolean bare)
 			throws IllegalStateException {
 		if (directory != null) {
+			if (directory.exists() && !directory.isDirectory()) {
+				throw new IllegalStateException(MessageFormat.format(
+						JGitText.get().initFailedDirIsNoDirectory, directory));
+			}
+			if (gitDir != null && gitDir.exists() && !gitDir.isDirectory()) {
+				throw new IllegalStateException(MessageFormat.format(
+						JGitText.get().initFailedGitDirIsNoDirectory,
+						gitDir));
+			}
 			if (bare) {
 				if (gitDir != null && !gitDir.equals(directory))
 					throw new IllegalStateException(MessageFormat.format(
