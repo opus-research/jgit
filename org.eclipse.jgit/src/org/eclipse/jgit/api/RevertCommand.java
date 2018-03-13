@@ -146,13 +146,12 @@ public class RevertCommand extends GitCommand<RevCommit> {
 							merger.getResultTreeId());
 					dco.setFailOnConflict(true);
 					dco.checkout();
-					String shortMessage = "Revert \"" + srcCommit.getShortMessage() + "\"";
-					String newMessage = shortMessage + "\n\n"
+					String newMessage = "Revert \""
+							+ srcCommit.getShortMessage() + "\"" + "\n\n"
 							+ "This reverts commit "
 							+ srcCommit.getId().getName() + ".\n";
-					newHead = new Git(getRepository()).commit()
-							.setMessage(newMessage)
-							.setReflogComment("revert: " + shortMessage).call();
+					newHead = new Git(getRepository()).commit().setMessage(
+							newMessage).call();
 					revertedRefs.add(src);
 				} else {
 					return null;
