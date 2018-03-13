@@ -48,48 +48,42 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import org.eclipse.jgit.attributes.FilterCommand;
-import org.eclipse.jgit.attributes.FilterCommandFactory;
-import org.eclipse.jgit.attributes.FilterCommandRegistry;
-import org.eclipse.jgit.lfs.lib.Constants;
+import org.eclipse.jgit.lfs.lib.LongObjectId;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.util.BuiltinCommand;
+import org.eclipse.jgit.util.BuiltinCommandFactory;
 
 /**
- * Built-in LFS smudge filter
- *
- * When content is read from git's object-database and written to the filesystem
- * and this filter is configured for that content, then this filter will replace
- * the content of LFS pointer files with the original content. This happens e.g.
- * when a checkout needs to update a working tree file which is under LFS
- * control. This implementation expects that the origin content is already
- * available in the .git/lfs/objects folder. This implementation will not
- * contact any LFS servers in order to get the missing content.
- *
- * @since 4.6
+ * @since 4.5
  */
-public class SmudgeFilter extends FilterCommand {
+public class SmudgeFilter extends BuiltinCommand {
 	/**
-	 * The factory is responsible for creating instances of {@link SmudgeFilter}
+	 *
 	 */
-	public final static FilterCommandFactory FACTORY = new FilterCommandFactory() {
+	public final static BuiltinCommandFactory FACTORY = new BuiltinCommandFactory() {
 		@Override
-		public FilterCommand create(Repository db, InputStream in,
+		public BuiltinCommand create(Repository db, InputStream in,
 				OutputStream out) throws IOException {
 			return new SmudgeFilter(db, in, out);
 		}
 	};
 
 	/**
-	 * Registers this filter in JGit by calling
+	 * Registers this filter to JGit by calling
+	 * {@link Repository#registerCommand(String, BuiltinCommandFactory)}
 	 */
 	public final static void register() {
-		FilterCommandRegistry.register(
+		Repository.registerCommand(
 				org.eclipse.jgit.lib.Constants.BUILTIN_FILTER_PREFIX
 						+ "lfs/smudge", //$NON-NLS-1$
 				FACTORY);
-	}
+	};
 
-	private Lfs lfs;
+	LongObjectId id;
+
+	private InputStream mIn;
+
+	private LfsUtil lfsUtil;
 
 	/**
 	 * @param db
@@ -100,12 +94,12 @@ public class SmudgeFilter extends FilterCommand {
 	public SmudgeFilter(Repository db, InputStream in, OutputStream out)
 			throws IOException {
 		super(in, out);
-		lfs = new Lfs(db.getDirectory().toPath().resolve(Constants.LFS));
+		lfsUtil = new LfsUtil(db.getDirectory().toPath().resolve("lfs")); //$NON-NLS-1$
 		LfsPointer res = LfsPointer.parseLfsPointer(in);
 		if (res != null) {
-			Path mediaFile = lfs.getMediaFile(res.getOid());
+			Path mediaFile = lfsUtil.getMediaFile(res.getOid());
 			if (Files.exists(mediaFile)) {
-				this.in = Files.newInputStream(mediaFile);
+				mIn = Files.newInputStream(mediaFile);
 			}
 		}
 	}
@@ -113,11 +107,10 @@ public class SmudgeFilter extends FilterCommand {
 	@Override
 	public int run() throws IOException {
 		int b;
-		if (in != null) {
-			while ((b = in.read()) != -1) {
+		if (mIn != null) {
+			while ((b = mIn.read()) != -1)
 				out.write(b);
-			}
-			in.close();
+			mIn.close();
 		}
 		out.close();
 		return -1;

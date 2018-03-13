@@ -52,6 +52,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URISyntaxException;
 import java.text.MessageFormat;
 import java.util.Collection;
@@ -62,8 +64,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.annotations.Nullable;
@@ -88,14 +90,14 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.util.BuiltinCommand;
+import org.eclipse.jgit.util.BuiltinCommandFactory;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.SystemReader;
 import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Represents a Git repository.
@@ -106,8 +108,6 @@ import org.slf4j.LoggerFactory;
  * This class is thread-safe.
  */
 public abstract class Repository implements AutoCloseable {
-	private static Logger LOG = LoggerFactory.getLogger(Repository.class);
-
 	private static final ListenerList globalListeners = new ListenerList();
 
 	/** @return the global listener list observing all events in this JVM. */
@@ -117,8 +117,6 @@ public abstract class Repository implements AutoCloseable {
 
 	/** Use counter */
 	final AtomicInteger useCnt = new AtomicInteger(1);
-
-	final AtomicLong closedAt = new AtomicLong();
 
 	/** Metadata directory holding the repository's critical files. */
 	private final File gitDir;
@@ -133,6 +131,82 @@ public abstract class Repository implements AutoCloseable {
 
 	/** If not bare, the index file caching the working file states. */
 	private final File indexFile;
+
+	private static ConcurrentHashMap<String, BuiltinCommandFactory> commandRegistry = new ConcurrentHashMap<>();
+
+	/**
+	 * Registers a {@link BuiltinCommandFactory} responsible for creating
+	 * {@link BuiltinCommand}'s for a certain command name. If the factory f1 is
+	 * registered for the name "jgit://builtin/x" then a call to
+	 * <code>getCommand("jgit://builtin/x", ...)</code> will call
+	 * <code>f1(...)</code> to create a new instance of {@link BuiltinCommand}
+	 *
+	 * @param commandName
+	 *            the name for which this factory is registered
+	 * @param fact
+	 *            the factory responsible to create {@link BuiltinCommand}s for
+	 *            the specified name. <code>null</code> can be specified to
+	 *            unregister a factory
+	 * @return the previous factory associated with <tt>commandName</tt>, or
+	 *         <tt>null</tt> if there was no mapping for <tt>commandName</tt>
+	 * @since 4.5
+	 */
+	public static BuiltinCommandFactory registerCommand(String commandName,
+			BuiltinCommandFactory fact) {
+		if (fact == null)
+			return commandRegistry.remove(commandName);
+		else
+			return commandRegistry.put(commandName, fact);
+	}
+
+	/**
+	 * Checks whether some {@link BuiltinCommandFactory} is registered for a
+	 * certain command name
+	 *
+	 * @param commandName
+	 *            the name for which the registry should be checked
+	 * @return <code>true</code> if some factory was registered for the name
+	 * @since 4.5
+	 */
+	public static boolean isRegistered(String commandName) {
+		return commandRegistry.containsKey(commandName);
+	}
+
+	/**
+	 * @return Set of commandNames for which a {@link BuiltinCommandFactory} is
+	 *         registered
+	 *
+	 * @since 4.5
+	 */
+	public static Set<String> listRegisteredCommands() {
+		return commandRegistry.keySet();
+	}
+
+	/**
+	 * Creates a new {@link BuiltinCommand} for the given name. A factory has to
+	 * be registered for the name in advance.
+	 *
+	 * @param commandName
+	 *            The name for which a new {@link BuiltinCommand} should be
+	 *            created
+	 * @param db
+	 *            the repository this command should work on
+	 * @param in
+	 *            the {@link InputStream} this {@link BuiltinCommand} should
+	 *            read from
+	 * @param out
+	 *            the {@link OutputStream} this {@link BuiltinCommand} should
+	 *            write to
+	 * @return the command if a command could be created or <code>null</code> if
+	 *         there was no factory registered for that name
+	 * @throws IOException
+	 * @since 4.5
+	 */
+	public static BuiltinCommand getCommand(String commandName, Repository db,
+			InputStream in, OutputStream out) throws IOException {
+		BuiltinCommandFactory cf = commandRegistry.get(commandName);
+		return (cf == null) ? null : cf.create(db, in, out);
+	}
 
 	/**
 	 * Initialize a new repository instance.
@@ -870,25 +944,9 @@ public abstract class Repository implements AutoCloseable {
 
 	/** Decrement the use count, and maybe close resources. */
 	public void close() {
-		int newCount = useCnt.decrementAndGet();
-		if (newCount == 0) {
-			if (RepositoryCache.isCached(this)) {
-				closedAt.set(System.currentTimeMillis());
-			} else {
-				doClose();
-			}
-		} else if (newCount == -1) {
-			// should not happen, only log when useCnt became negative to
-			// minimize number of log entries
-			if (LOG.isDebugEnabled()) {
-				IllegalStateException e = new IllegalStateException();
-				LOG.debug(JGitText.get().corruptUseCnt, e);
-			} else {
-				LOG.warn(JGitText.get().corruptUseCnt);
-			}
-			if (RepositoryCache.isCached(this)) {
-				closedAt.set(System.currentTimeMillis());
-			}
+		if (useCnt.decrementAndGet() == 0) {
+			doClose();
+			RepositoryCache.unregister(this);
 		}
 	}
 

@@ -49,9 +49,9 @@ import java.text.MessageFormat;
 import org.eclipse.jgit.lfs.internal.LfsText;
 
 /**
- * Thrown when a LFS mediafile is found which doesn't have the expected size
+ * Thrown when a lfs mediafile is found which doesn't have the expected size
  *
- * @since 4.6
+ * @since 4.5
  */
 public class CorruptMediaFile extends IOException {
 	private static final long serialVersionUID = 1L;
@@ -60,21 +60,21 @@ public class CorruptMediaFile extends IOException {
 
 	private long expectedSize;
 
-	private long size;
+	private long observedSize;
 
 	/**
 	 * @param mediaFile
 	 * @param expectedSize
-	 * @param size
+	 * @param observedSize
 	 */
 	@SuppressWarnings("boxing")
 	public CorruptMediaFile(Path mediaFile, long expectedSize,
-			long size) {
+			long observedSize) {
 		super(MessageFormat.format(LfsText.get().inconsistentMediafileLength,
-				mediaFile, expectedSize, size));
+				mediaFile, expectedSize, observedSize));
 		this.mediaFile = mediaFile;
 		this.expectedSize = expectedSize;
-		this.size = size;
+		this.observedSize = observedSize;
 	}
 
 	/**
@@ -94,7 +94,7 @@ public class CorruptMediaFile extends IOException {
 	/**
 	 * @return the actual size of the media file in the file system
 	 */
-	public long getSize() {
-		return size;
+	public long getObservedSize() {
+		return observedSize;
 	}
 }

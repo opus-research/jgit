@@ -50,13 +50,12 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 
 import org.eclipse.jgit.annotations.Nullable;
-import org.eclipse.jgit.lfs.lib.Constants;
 import org.eclipse.jgit.lfs.lib.LongObjectId;
 
 /**
- * Represents an LFS pointer file
+ * Represents a LFS pointer file
  *
- * @since 4.6
+ * @since 4.5
  */
 public class LfsPointer {
 	/**
@@ -65,11 +64,9 @@ public class LfsPointer {
 	public static final String VERSION = "https://git-lfs.github.com/spec/v1"; //$NON-NLS-1$
 
 	/**
-	 * The name of the hash function as used in the pointer files. This will
-	 * evaluate to "sha256"
+	 * The hash function to be used to compute id's
 	 */
-	public static final String HASH_FUNCTION_NAME = Constants.LONG_HASH_FUNCTION
-			.toLowerCase().replace("-", ""); //$NON-NLS-1$ //$NON-NLS-2$
+	public static final String OIDTYPE = "sha256"; //$NON-NLS-1$
 
 	private LongObjectId oid;
 
@@ -101,7 +98,7 @@ public class LfsPointer {
 	}
 
 	/**
-	 * Encode this object into the LFS format defined by {@link #VERSION}
+	 * Encode this object into a format defined by {@link #VERSION}
 	 *
 	 * @param out
 	 *            the {@link OutputStream} into which the encoded data should be
@@ -111,7 +108,7 @@ public class LfsPointer {
 		try (PrintStream ps = new PrintStream(out)) {
 			ps.print("version "); //$NON-NLS-1$
 			ps.println(VERSION);
-			ps.print("oid " + HASH_FUNCTION_NAME + ":"); //$NON-NLS-1$ //$NON-NLS-2$
+			ps.print("oid "); //$NON-NLS-1$
 			ps.println(LongObjectId.toString(oid));
 			ps.print("size "); //$NON-NLS-1$
 			ps.println(size);
@@ -119,49 +116,46 @@ public class LfsPointer {
 	}
 
 	/**
-	 * Try to parse the data provided by an InputStream to the format defined by
-	 * {@link #VERSION}
+	 * Try to parse the data stored in a buffer according to the format defined
+	 * by {@link #VERSION}
 	 *
 	 * @param in
-	 *            the {@link InputStream} from where to read the data
-	 * @return an {@link LfsPointer} or <code>null</code> if the stream was not
-	 *         parseable as LfsPointer
+	 *            the {@link InputStream} where to read the data the data
+	 * @return a {@link LfsPointer} or <code>null</code> if the stream was not
+	 *         parseable as LFSPointer
 	 * @throws IOException
 	 */
 	@Nullable
 	public static LfsPointer parseLfsPointer(InputStream in)
 			throws IOException {
-		boolean versionLine = false;
+		boolean v = false;
 		LongObjectId id = null;
-		long sz = -1;
+		long si = -1;
 
 		try (BufferedReader br = new BufferedReader(
 				new InputStreamReader(in))) {
 			for (String s = br.readLine(); s != null; s = br.readLine()) {
-				if (s.startsWith("#") || s.length() == 0) { //$NON-NLS-1$
+				if (s.startsWith("#") || s.length() == 0) //$NON-NLS-1$
 					continue;
-				} else if (s.startsWith("version") && s.length() > 8 //$NON-NLS-1$
+				if (s.startsWith("version") && s.length() > 8 //$NON-NLS-1$
 						&& s.substring(8).trim().equals(VERSION)) {
-					versionLine = true;
-				} else if (s.startsWith("oid sha256:")) { //$NON-NLS-1$
-					id = LongObjectId.fromString(s.substring(11).trim());
+					v = true;
+				} else if (s.startsWith("oid") && s.length() > 4) { //$NON-NLS-1$
+					if (s.startsWith("oid sha256:")) {
+						id = LongObjectId.fromString(s.substring(11).trim());
+					} else {
+						id = LongObjectId.fromString(s.substring(4).trim());
+					}
 				} else if (s.startsWith("size") && s.length() > 5) { //$NON-NLS-1$
-					sz = Long.parseLong(s.substring(5).trim());
+					si = Long.parseLong(s.substring(5).trim());
 				} else {
 					return null;
 				}
 			}
-			if (versionLine && id != null && sz > -1) {
-				return new LfsPointer(id, sz);
+			if (v && id != null && si > -1) {
+				return new LfsPointer(id, si);
 			}
 		}
 		return null;
 	}
-
-	@Override
-	public String toString() {
-		return "LfsPointer: oid=" + LongObjectId.toString(oid) + ", size=" //$NON-NLS-1$ //$NON-NLS-2$
-				+ size;
-	}
 }
-

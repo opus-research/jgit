@@ -54,8 +54,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.eclipse.jgit.api.errors.FilterFailedException;
-import org.eclipse.jgit.attributes.FilterCommand;
-import org.eclipse.jgit.attributes.FilterCommandRegistry;
 import org.eclipse.jgit.errors.CheckoutConflictException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -82,21 +80,18 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
+import org.eclipse.jgit.util.BuiltinCommand;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FS.ExecutionResult;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.SystemReader;
 import org.eclipse.jgit.util.io.EolStreamTypeUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * This class handles checking out one or two trees merging with the index.
  */
 public class DirCacheCheckout {
-	private static Logger LOG = LoggerFactory.getLogger(DirCacheCheckout.class);
-
 	private static final int MAX_EXCEPTION_TEXT_SIZE = 10 * 1024;
 
 	/**
@@ -1312,13 +1307,49 @@ public class DirCacheCheckout {
 		try (OutputStream channel = EolStreamTypeUtil.wrapOutputStream(
 				new FileOutputStream(tmpFile), nonNullEolStreamType)) {
 			if (checkoutMetadata.smudgeFilterCommand != null) {
-				if (FilterCommandRegistry
+				if (Repository
 						.isRegistered(checkoutMetadata.smudgeFilterCommand)) {
-					runBuiltinFilterCommand(repo, checkoutMetadata, ol,
-							channel);
+					BuiltinCommand command = null;
+					try {
+						command = Repository.getCommand(
+								checkoutMetadata.smudgeFilterCommand, repo,
+								ol.openStream(), channel);
+					} catch (IOException e) {
+						ol.copyTo(channel);
+					}
+					if (command != null) {
+						while (command.run() != -1)
+							;
+					}
 				} else {
-					runExternalFilterCommand(repo, entry, checkoutMetadata, ol,
-							fs, channel);
+					ProcessBuilder filterProcessBuilder = fs.runInShell(
+							checkoutMetadata.smudgeFilterCommand, new String[0]);
+					filterProcessBuilder.directory(repo.getWorkTree());
+					filterProcessBuilder.environment().put(Constants.GIT_DIR_KEY,
+							repo.getDirectory().getAbsolutePath());
+					ExecutionResult result;
+					int rc;
+					try {
+						// TODO: wire correctly with AUTOCRLF
+						result = fs.execute(filterProcessBuilder, ol.openStream());
+						rc = result.getRc();
+						if (rc == 0) {
+							result.getStdout().writeTo(channel,
+									NullProgressMonitor.INSTANCE);
+						}
+					} catch (IOException | InterruptedException e) {
+						throw new IOException(new FilterFailedException(e,
+								checkoutMetadata.smudgeFilterCommand,
+								entry.getPathString()));
+					}
+					if (rc != 0) {
+						throw new IOException(new FilterFailedException(rc,
+								checkoutMetadata.smudgeFilterCommand,
+								entry.getPathString(),
+								result.getStdout().toByteArray(MAX_EXCEPTION_TEXT_SIZE),
+								RawParseUtils.decode(result.getStderr()
+										.toByteArray(MAX_EXCEPTION_TEXT_SIZE))));
+					}
 				}
 			} else {
 				ol.copyTo(channel);
@@ -1359,64 +1390,7 @@ public class DirCacheCheckout {
 				FileUtils.delete(tmpFile);
 			}
 		}
-		entry.setLastModified(fs.lastModified(f));
-	}
-
-	// Run an external filter command
-	private static void runExternalFilterCommand(Repository repo,
-			DirCacheEntry entry,
-			CheckoutMetadata checkoutMetadata, ObjectLoader ol, FS fs,
-			OutputStream channel) throws IOException {
-		ProcessBuilder filterProcessBuilder = fs.runInShell(
-				checkoutMetadata.smudgeFilterCommand, new String[0]);
-		filterProcessBuilder.directory(repo.getWorkTree());
-		filterProcessBuilder.environment().put(Constants.GIT_DIR_KEY,
-				repo.getDirectory().getAbsolutePath());
-		ExecutionResult result;
-		int rc;
-		try {
-			// TODO: wire correctly with AUTOCRLF
-			result = fs.execute(filterProcessBuilder, ol.openStream());
-			rc = result.getRc();
-			if (rc == 0) {
-				result.getStdout().writeTo(channel,
-						NullProgressMonitor.INSTANCE);
-			}
-		} catch (IOException | InterruptedException e) {
-			throw new IOException(new FilterFailedException(e,
-					checkoutMetadata.smudgeFilterCommand,
-					entry.getPathString()));
-		}
-		if (rc != 0) {
-			throw new IOException(new FilterFailedException(rc,
-					checkoutMetadata.smudgeFilterCommand,
-					entry.getPathString(),
-					result.getStdout().toByteArray(MAX_EXCEPTION_TEXT_SIZE),
-					RawParseUtils.decode(result.getStderr()
-							.toByteArray(MAX_EXCEPTION_TEXT_SIZE))));
-		}
-	}
-
-	// Run a builtin filter command
-	private static void runBuiltinFilterCommand(Repository repo,
-			CheckoutMetadata checkoutMetadata, ObjectLoader ol,
-			OutputStream channel) throws MissingObjectException, IOException {
-		FilterCommand command = null;
-		try {
-			command = FilterCommandRegistry.createFilterCommand(
-					checkoutMetadata.smudgeFilterCommand, repo, ol.openStream(),
-					channel);
-		} catch (IOException e) {
-			LOG.error(JGitText.get().failedToDetermineFilterDefinition, e);
-			// In case an IOException occurred during creating of the command
-			// then proceed as if there would not have been a builtin filter.
-			ol.copyTo(channel);
-		}
-		if (command != null) {
-			while (command.run() != -1) {
-				// loop as long as command.run() tells there is work to do
-			}
-		}
+		entry.setLastModified(f.lastModified());
 	}
 
 	@SuppressWarnings("deprecation")
