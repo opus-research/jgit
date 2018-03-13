@@ -168,21 +168,36 @@ public class AppServer {
 		return ctx;
 	}
 
+	static class TestMappedLoginService extends MappedLoginService {
+		private String role;
+
+		TestMappedLoginService(String role) {
+			this.role = role;
+		}
+
+		@Override
+		protected UserIdentity loadUser(String who) {
+			return null;
+		}
+
+		@Override
+		protected void loadUsers() throws IOException {
+			putUser(username, new Password(password), new String[] { role });
+		}
+
+		protected String[] loadRoleInfo(KnownUser user) {
+			return null;
+		}
+
+		protected KnownUser loadUserInfo(String usrname) {
+			return null;
+		}
+	}
+
 	private void auth(ServletContextHandler ctx, Authenticator authType) {
 		final String role = "can-access";
 
-		MappedLoginService users = new MappedLoginService() {
-			@Override
-			protected UserIdentity loadUser(String who) {
-				return null;
-			}
-
-			@Override
-			protected void loadUsers() throws IOException {
-				putUser(username, new Password(password), new String[] { role });
-			}
-		};
-
+		MappedLoginService users = new TestMappedLoginService(role);
 		ConstraintMapping cm = new ConstraintMapping();
 		cm.setConstraint(new Constraint());
 		cm.getConstraint().setAuthenticate(true);

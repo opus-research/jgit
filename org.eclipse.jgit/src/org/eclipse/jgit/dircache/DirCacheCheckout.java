@@ -54,6 +54,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.eclipse.jgit.api.errors.FilterFailedException;
+import org.eclipse.jgit.attributes.FilterCommand;
+import org.eclipse.jgit.attributes.FilterCommandRegistry;
 import org.eclipse.jgit.errors.CheckoutConflictException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -86,11 +88,15 @@ import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.SystemReader;
 import org.eclipse.jgit.util.io.EolStreamTypeUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class handles checking out one or two trees merging with the index.
  */
 public class DirCacheCheckout {
+	private static Logger LOG = LoggerFactory.getLogger(DirCacheCheckout.class);
+
 	private static final int MAX_EXCEPTION_TEXT_SIZE = 10 * 1024;
 
 	/**
@@ -280,8 +286,9 @@ public class DirCacheCheckout {
 
 		addTree(walk, headCommitTree);
 		addTree(walk, mergeCommitTree);
-		walk.addTree(new DirCacheBuildIterator(builder));
+		int dciPos = walk.addTree(new DirCacheBuildIterator(builder));
 		walk.addTree(workingTree);
+		workingTree.setDirCacheIterator(walk, dciPos);
 
 		while (walk.next()) {
 			processEntry(walk.getTree(0, CanonicalTreeParser.class),
@@ -320,8 +327,9 @@ public class DirCacheCheckout {
 
 		walk = new NameConflictTreeWalk(repo);
 		addTree(walk, mergeCommitTree);
-		walk.addTree(new DirCacheBuildIterator(builder));
+		int dciPos = walk.addTree(new DirCacheBuildIterator(builder));
 		walk.addTree(workingTree);
+		workingTree.setDirCacheIterator(walk, dciPos);
 
 		while (walk.next()) {
 			processEntry(walk.getTree(0, CanonicalTreeParser.class),
@@ -352,8 +360,16 @@ public class DirCacheCheckout {
 				// The index entry is missing
 				if (f != null && !FileMode.TREE.equals(f.getEntryFileMode())
 						&& !f.isEntryIgnored()) {
-					// don't overwrite an untracked and not ignored file
-					conflicts.add(walk.getPathString());
+					if (failOnConflict) {
+						// don't overwrite an untracked and not ignored file
+						conflicts.add(walk.getPathString());
+					} else {
+						// failOnConflict is false. Putting something to conflicts
+						// would mean we delete it. Instead we want the mergeCommit
+						// content to be checked out.
+						update(m.getEntryPathString(), m.getEntryObjectId(),
+								m.getEntryFileMode());
+					}
 				} else
 					update(m.getEntryPathString(), m.getEntryObjectId(),
 						m.getEntryFileMode());
@@ -388,6 +404,9 @@ public class DirCacheCheckout {
 			if (f != null) {
 				// There is a file/folder for that path in the working tree
 				if (walk.isDirectoryFileConflict()) {
+					// We put it in conflicts. Even if failOnConflict is false
+					// this would cause the path to be deleted. Thats exactly what
+					// we want in this situation
 					conflicts.add(walk.getPathString());
 				} else {
 					// No file/folder conflict exists. All entries are files or
@@ -705,10 +724,23 @@ public class DirCacheCheckout {
 			return;
 		}
 
-		// if we have no file at all then there is nothing to do
-		if ((ffMask & 0x222) == 0
-				&& (f == null || FileMode.TREE.equals(f.getEntryFileMode())))
-			return;
+		if ((ffMask & 0x222) == 0) {
+			// HEAD, MERGE and index don't contain a file (e.g. all contain a
+			// folder)
+			if (f == null || FileMode.TREE.equals(f.getEntryFileMode())) {
+				// the workingtree entry doesn't exist or also contains a folder
+				// -> no problem
+				return;
+			} else {
+				// the workingtree entry exists and is not a folder
+				if (!idEqual(h, m)) {
+					// Because HEAD and MERGE differ we will try to update the
+					// workingtree with a folder -> return a conflict
+					conflict(name, null, null, null);
+				}
+				return;
+			}
+		}
 
 		if ((ffMask == 0x00F) && f != null && FileMode.TREE.equals(f.getEntryFileMode())) {
 			// File/Directory conflict case #20
@@ -991,6 +1023,17 @@ public class DirCacheCheckout {
 		}
 	}
 
+	private static boolean idEqual(AbstractTreeIterator a,
+			AbstractTreeIterator b) {
+		if (a == b) {
+			return true;
+		}
+		if (a == null || b == null) {
+			return false;
+		}
+		return a.getEntryObjectId().equals(b.getEntryObjectId());
+	}
+
 	/**
 	 * A conflict is detected - add the three different stages to the index
 	 * @param path the path of the conflicting entry
@@ -1093,8 +1136,10 @@ public class DirCacheCheckout {
 	private boolean isModifiedSubtree_IndexWorkingtree(String path)
 			throws CorruptObjectException, IOException {
 		try (NameConflictTreeWalk tw = new NameConflictTreeWalk(repo)) {
-			tw.addTree(new DirCacheIterator(dc));
-			tw.addTree(new FileTreeIterator(repo));
+			int dciPos = tw.addTree(new DirCacheIterator(dc));
+			FileTreeIterator fti = new FileTreeIterator(repo);
+			tw.addTree(fti);
+			fti.setDirCacheIterator(tw, dciPos);
 			tw.setRecursive(true);
 			tw.setFilter(PathFilter.create(path));
 			DirCacheIterator dcIt;
@@ -1264,45 +1309,19 @@ public class DirCacheCheckout {
 		} else {
 			nonNullEolStreamType = EolStreamType.DIRECT;
 		}
-		OutputStream channel = EolStreamTypeUtil.wrapOutputStream(
-				new FileOutputStream(tmpFile), nonNullEolStreamType);
-		if (checkoutMetadata.smudgeFilterCommand != null) {
-			ProcessBuilder filterProcessBuilder = fs.runInShell(
-					checkoutMetadata.smudgeFilterCommand, new String[0]);
-			filterProcessBuilder.directory(repo.getWorkTree());
-			filterProcessBuilder.environment().put(Constants.GIT_DIR_KEY,
-					repo.getDirectory().getAbsolutePath());
-			ExecutionResult result;
-			int rc;
-			try {
-				// TODO: wire correctly with AUTOCRLF
-				result = fs.execute(filterProcessBuilder, ol.openStream());
-				rc = result.getRc();
-				if (rc == 0) {
-					result.getStdout().writeTo(channel,
-							NullProgressMonitor.INSTANCE);
+		try (OutputStream channel = EolStreamTypeUtil.wrapOutputStream(
+				new FileOutputStream(tmpFile), nonNullEolStreamType)) {
+			if (checkoutMetadata.smudgeFilterCommand != null) {
+				if (FilterCommandRegistry
+						.isRegistered(checkoutMetadata.smudgeFilterCommand)) {
+					runBuiltinFilterCommand(repo, checkoutMetadata, ol,
+							channel);
+				} else {
+					runExternalFilterCommand(repo, entry, checkoutMetadata, ol,
+							fs, channel);
 				}
-			} catch (IOException | InterruptedException e) {
-				throw new IOException(new FilterFailedException(e,
-						checkoutMetadata.smudgeFilterCommand,
-						entry.getPathString()));
-
-			} finally {
-				channel.close();
-			}
-			if (rc != 0) {
-				throw new IOException(new FilterFailedException(rc,
-						checkoutMetadata.smudgeFilterCommand,
-						entry.getPathString(),
-						result.getStdout().toByteArray(MAX_EXCEPTION_TEXT_SIZE),
-						RawParseUtils.decode(result.getStderr()
-								.toByteArray(MAX_EXCEPTION_TEXT_SIZE))));
-			}
-		} else {
-			try {
+			} else {
 				ol.copyTo(channel);
-			} finally {
-				channel.close();
 			}
 		}
 		// The entry needs to correspond to the on-disk filesize. If the content
@@ -1340,7 +1359,64 @@ public class DirCacheCheckout {
 				FileUtils.delete(tmpFile);
 			}
 		}
-		entry.setLastModified(f.lastModified());
+		entry.setLastModified(fs.lastModified(f));
+	}
+
+	// Run an external filter command
+	private static void runExternalFilterCommand(Repository repo,
+			DirCacheEntry entry,
+			CheckoutMetadata checkoutMetadata, ObjectLoader ol, FS fs,
+			OutputStream channel) throws IOException {
+		ProcessBuilder filterProcessBuilder = fs.runInShell(
+				checkoutMetadata.smudgeFilterCommand, new String[0]);
+		filterProcessBuilder.directory(repo.getWorkTree());
+		filterProcessBuilder.environment().put(Constants.GIT_DIR_KEY,
+				repo.getDirectory().getAbsolutePath());
+		ExecutionResult result;
+		int rc;
+		try {
+			// TODO: wire correctly with AUTOCRLF
+			result = fs.execute(filterProcessBuilder, ol.openStream());
+			rc = result.getRc();
+			if (rc == 0) {
+				result.getStdout().writeTo(channel,
+						NullProgressMonitor.INSTANCE);
+			}
+		} catch (IOException | InterruptedException e) {
+			throw new IOException(new FilterFailedException(e,
+					checkoutMetadata.smudgeFilterCommand,
+					entry.getPathString()));
+		}
+		if (rc != 0) {
+			throw new IOException(new FilterFailedException(rc,
+					checkoutMetadata.smudgeFilterCommand,
+					entry.getPathString(),
+					result.getStdout().toByteArray(MAX_EXCEPTION_TEXT_SIZE),
+					RawParseUtils.decode(result.getStderr()
+							.toByteArray(MAX_EXCEPTION_TEXT_SIZE))));
+		}
+	}
+
+	// Run a builtin filter command
+	private static void runBuiltinFilterCommand(Repository repo,
+			CheckoutMetadata checkoutMetadata, ObjectLoader ol,
+			OutputStream channel) throws MissingObjectException, IOException {
+		FilterCommand command = null;
+		try {
+			command = FilterCommandRegistry.createFilterCommand(
+					checkoutMetadata.smudgeFilterCommand, repo, ol.openStream(),
+					channel);
+		} catch (IOException e) {
+			LOG.error(JGitText.get().failedToDetermineFilterDefinition, e);
+			// In case an IOException occurred during creating of the command
+			// then proceed as if there would not have been a builtin filter.
+			ol.copyTo(channel);
+		}
+		if (command != null) {
+			while (command.run() != -1) {
+				// loop as long as command.run() tells there is work to do
+			}
+		}
 	}
 
 	@SuppressWarnings("deprecation")

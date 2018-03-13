@@ -629,7 +629,7 @@ public abstract class Transport implements AutoCloseable {
 
 		for (final RefSpec spec : procRefs) {
 			String srcSpec = spec.getSource();
-			final Ref srcRef = db.getRef(srcSpec);
+			final Ref srcRef = db.findRef(srcSpec);
 			if (srcRef != null)
 				srcSpec = srcRef.getName();
 
@@ -772,6 +772,9 @@ public abstract class Transport implements AutoCloseable {
 
 	/** Assists with authentication the connection. */
 	private CredentialsProvider credentialsProvider;
+
+	/** The option strings associated with the push operation. */
+	private List<String> pushOptions;
 
 	private PrintStream hookOutRedirect;
 
@@ -1121,6 +1124,25 @@ public abstract class Transport implements AutoCloseable {
 	}
 
 	/**
+	 * @return the option strings associated with the push operation
+	 * @since 4.5
+	 */
+	public List<String> getPushOptions() {
+		return pushOptions;
+	}
+
+	/**
+	 * Sets the option strings associated with the push operation.
+	 *
+	 * @param pushOptions
+	 *            null if push options are unsupported
+	 * @since 4.5
+	 */
+	public void setPushOptions(final List<String> pushOptions) {
+		this.pushOptions = pushOptions;
+	}
+
+	/**
 	 * Fetch objects and refs from the remote repository to the local one.
 	 * <p>
 	 * This is a utility function providing standard fetch behavior. Local
@@ -1177,6 +1199,9 @@ public abstract class Transport implements AutoCloseable {
 
 		final FetchResult result = new FetchResult();
 		new FetchProcess(this, toFetch).execute(monitor, result);
+
+		local.autoGC(monitor);
+
 		return result;
 	}
 

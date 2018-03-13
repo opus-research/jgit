@@ -63,6 +63,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.annotations.Nullable;
@@ -79,6 +80,7 @@ import org.eclipse.jgit.events.IndexChangedListener;
 import org.eclipse.jgit.events.ListenerList;
 import org.eclipse.jgit.events.RepositoryEvent;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.internal.storage.file.GC;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
@@ -93,6 +95,8 @@ import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.SystemReader;
 import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Represents a Git repository.
@@ -103,6 +107,8 @@ import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
  * This class is thread-safe.
  */
 public abstract class Repository implements AutoCloseable {
+	private static Logger LOG = LoggerFactory.getLogger(Repository.class);
+
 	private static final ListenerList globalListeners = new ListenerList();
 
 	/** @return the global listener list observing all events in this JVM. */
@@ -112,6 +118,8 @@ public abstract class Repository implements AutoCloseable {
 
 	/** Use counter */
 	final AtomicInteger useCnt = new AtomicInteger(1);
+
+	final AtomicLong closedAt = new AtomicLong();
 
 	/** Metadata directory holding the repository's critical files. */
 	private final File gitDir;
@@ -863,9 +871,25 @@ public abstract class Repository implements AutoCloseable {
 
 	/** Decrement the use count, and maybe close resources. */
 	public void close() {
-		if (useCnt.decrementAndGet() == 0) {
-			doClose();
-			RepositoryCache.unregister(this);
+		int newCount = useCnt.decrementAndGet();
+		if (newCount == 0) {
+			if (RepositoryCache.isCached(this)) {
+				closedAt.set(System.currentTimeMillis());
+			} else {
+				doClose();
+			}
+		} else if (newCount == -1) {
+			// should not happen, only log when useCnt became negative to
+			// minimize number of log entries
+			if (LOG.isDebugEnabled()) {
+				IllegalStateException e = new IllegalStateException();
+				LOG.debug(JGitText.get().corruptUseCnt, e);
+			} else {
+				LOG.warn(JGitText.get().corruptUseCnt);
+			}
+			if (RepositoryCache.isCached(this)) {
+				closedAt.set(System.currentTimeMillis());
+			}
 		}
 	}
 
@@ -898,7 +922,7 @@ public abstract class Repository implements AutoCloseable {
 	 * This is essentially the same as doing:
 	 *
 	 * <pre>
-	 * return getRef(Constants.HEAD).getTarget().getName()
+	 * return exactRef(Constants.HEAD).getTarget().getName()
 	 * </pre>
 	 *
 	 * Except when HEAD is detached, in which case this method returns the
@@ -912,7 +936,7 @@ public abstract class Repository implements AutoCloseable {
 	 */
 	@Nullable
 	public String getFullBranch() throws IOException {
-		Ref head = getRef(Constants.HEAD);
+		Ref head = exactRef(Constants.HEAD);
 		if (head == null) {
 			return null;
 		}
@@ -1158,15 +1182,6 @@ public abstract class Repository implements AutoCloseable {
 			}
 		};
 		return DirCache.lock(this, l);
-	}
-
-	static byte[] gitInternalSlash(byte[] bytes) {
-		if (File.separatorChar == '/')
-			return bytes;
-		for (int i=0; i<bytes.length; ++i)
-			if (bytes[i] == File.separatorChar)
-				bytes[i] = '/';
-		return bytes;
 	}
 
 	/**
@@ -1821,5 +1836,23 @@ public abstract class Repository implements AutoCloseable {
 	public Set<String> getRemoteNames() {
 		return getConfig()
 				.getSubsections(ConfigConstants.CONFIG_REMOTE_SECTION);
+	}
+
+	/**
+	 * Check whether any housekeeping is required; if yes, run garbage
+	 * collection; if not, exit without performing any work. Some JGit commands
+	 * run autoGC after performing operations that could create many loose
+	 * objects.
+	 * <p/>
+	 * Currently this option is supported for repositories of type
+	 * {@code FileRepository} only. See {@link GC#setAuto(boolean)} for
+	 * configuration details.
+	 *
+	 * @param monitor
+	 *            to report progress
+	 * @since 4.6
+	 */
+	public void autoGC(ProgressMonitor monitor) {
+		// default does nothing
 	}
 }
