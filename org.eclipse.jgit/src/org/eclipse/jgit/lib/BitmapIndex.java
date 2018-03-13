@@ -205,11 +205,7 @@ public interface BitmapIndex {
 		/** @return the number of elements in the bitmap. */
 		int cardinality();
 
-		/**
-		 * The BitmapIndex for this BitmapBuilder.
-		 *
-		 * @since 4.2
-		 */
+		/** The BitmapIndex this BitmapBuilder is based on values from. */
 		BitmapIndex getBitmapIndex();
 	}
 }
