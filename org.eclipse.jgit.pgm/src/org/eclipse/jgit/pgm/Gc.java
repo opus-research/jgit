@@ -56,6 +56,6 @@ class Gc extends TextBuiltin {
 	protected void run() throws Exception {
 		Git git = Git.wrap(db);
 		git.gc().setAggressive(aggressive)
-				.setProgressMonitor(new TextProgressMonitor(errw)).call();
+				.setProgressMonitor(new TextProgressMonitor()).call();
 	}
 }
