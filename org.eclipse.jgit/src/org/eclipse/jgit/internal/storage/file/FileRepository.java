@@ -478,7 +478,7 @@ public class FileRepository extends Repository {
 	 * @throws IOException the ref could not be accessed.
 	 */
 	public ReflogReader getReflogReader(String refName) throws IOException {
-		Ref ref = findRef(refName);
+		Ref ref = getRef(refName);
 		if (ref != null)
 			return new ReflogReaderImpl(this, ref.getName());
 		return null;

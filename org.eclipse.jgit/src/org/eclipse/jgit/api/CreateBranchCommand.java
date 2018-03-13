@@ -125,7 +125,7 @@ public class CreateBranchCommand extends GitCommand<Ref> {
 		checkCallable();
 		processOptions();
 		try (RevWalk revWalk = new RevWalk(repo)) {
-			Ref refToCheck = repo.findRef(name);
+			Ref refToCheck = repo.getRef(name);
 			boolean exists = refToCheck != null
 					&& refToCheck.getName().startsWith(Constants.R_HEADS);
 			if (!force && exists)
@@ -135,7 +135,7 @@ public class CreateBranchCommand extends GitCommand<Ref> {
 			ObjectId startAt = getStartPointObjectId();
 			String startPointFullName = null;
 			if (startPoint != null) {
-				Ref baseRef = repo.findRef(startPoint);
+				Ref baseRef = repo.getRef(startPoint);
 				if (baseRef != null)
 					startPointFullName = baseRef.getName();
 			}
@@ -207,7 +207,7 @@ public class CreateBranchCommand extends GitCommand<Ref> {
 						.get().createBranchUnexpectedResult, updateResult
 						.name()));
 
-			Ref result = repo.findRef(name);
+			Ref result = repo.getRef(name);
 			if (result == null)
 				throw new JGitInternalException(
 						JGitText.get().createBranchFailedUnknownReason);

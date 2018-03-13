@@ -629,7 +629,7 @@ public abstract class Transport {
 
 		for (final RefSpec spec : procRefs) {
 			String srcSpec = spec.getSource();
-			final Ref srcRef = db.findRef(srcSpec);
+			final Ref srcRef = db.getRef(srcSpec);
 			if (srcRef != null)
 				srcSpec = srcRef.getName();
 
