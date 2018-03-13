@@ -178,7 +178,10 @@ public final class DfsBlockCache {
 		blockSizeShift = Integer.numberOfTrailingZeros(blockSize);
 
 		clockLock = new ReentrantLock(true /* fair */);
-		clockHand = new Ref<>(DfsStreamKey.of(""), -1, 0, null); //$NON-NLS-1$
+		String none = ""; //$NON-NLS-1$
+		clockHand = new Ref<>(
+				DfsStreamKey.of(new DfsRepositoryDescription(none), none),
+				-1, 0, null);
 		clockHand.next = clockHand;
 
 		statHit = new AtomicLong();
@@ -271,7 +274,7 @@ public final class DfsBlockCache {
 		int slot = slot(key, position);
 		HashEntry e1 = table.get(slot);
 		DfsBlock v = scan(e1, key, position);
-		if (v != null) {
+		if (v != null && v.contains(key, requestedPosition)) {
 			ctx.stats.blockCacheHit++;
 			statHit.incrementAndGet();
 			return v;
@@ -295,7 +298,7 @@ public final class DfsBlockCache {
 			statMiss.incrementAndGet();
 			boolean credit = true;
 			try {
-				v = file.readOneBlock(position, ctx, fileChannel);
+				v = file.readOneBlock(requestedPosition, ctx, fileChannel);
 				credit = false;
 			} finally {
 				if (credit)
