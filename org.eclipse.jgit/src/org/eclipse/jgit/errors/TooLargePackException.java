@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2014, Sasa Zivkov <sasa.zivkov@sap.com>, SAP AG
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,72 +41,29 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.file;
+package org.eclipse.jgit.errors;
 
-import java.io.File;
 import java.io.IOException;
+import java.text.MessageFormat;
 
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FileUtils;
+import org.eclipse.jgit.internal.JGitText;
 
-/** Keeps track of a {@link PackFile}'s associated <code>.keep</code> file. */
-public class PackLock {
-	private final File keepFile;
-	private final FS fs;
-	private final File packFile;
+/**
+ * Thrown when a pack exceeds a given size limit
+ *
+ * @since 3.3
+ */
+public class TooLargePackException extends IOException {
+	private static final long serialVersionUID = 1L;
 
 	/**
-	 * Create a new lock for a pack file.
+	 * Construct a too large pack exception.
 	 *
-	 * @param packFile
-	 *            location of the <code>pack-*.pack</code> file.
-	 * @param fs
-	 *            the filesystem abstraction used by the repository.
+	 * @param packSizeLimit
+	 *            the pack size limit (in bytes) that was exceeded
 	 */
-	public PackLock(final File packFile, final FS fs) {
-		final File p = packFile.getParentFile();
-		final String n = packFile.getName();
-		keepFile = new File(p, n.substring(0, n.length() - 5) + ".keep"); //$NON-NLS-1$
-		this.fs = fs;
-		this.packFile = packFile;
-	}
-
-	/**
-	 * Create the <code>pack-*.keep</code> file, with the given message.
-	 *
-	 * @param msg
-	 *            message to store in the file.
-	 * @return true if the keep file was successfully written; false otherwise.
-	 * @throws IOException
-	 *             the keep file could not be written.
-	 */
-	public boolean lock(String msg) throws IOException {
-		if (msg == null)
-			return false;
-		if (!msg.endsWith("\n")) //$NON-NLS-1$
-			msg += "\n"; //$NON-NLS-1$
-		final LockFile lf = new LockFile(keepFile, fs);
-		if (!lf.lock())
-			return false;
-		lf.write(Constants.encode(msg));
-		return lf.commit();
-	}
-
-	/**
-	 * Remove the <code>.keep</code> file that holds this pack in place.
-	 *
-	 * @throws IOException
-	 *             if deletion of .keep file failed
-	 */
-	public void unlock() throws IOException {
-		FileUtils.delete(keepFile);
-	}
-
-	/**
-	 * @return the pack file being held by this lock
-	 */
-	public File getPackFile() {
-		return packFile;
+	public TooLargePackException(long packSizeLimit) {
+		super(MessageFormat.format(JGitText.get().receivePackTooLarge,
+				Long.valueOf(packSizeLimit)));
 	}
 }
