@@ -87,7 +87,7 @@ public class FileUtils {
 	 * Option to only delete empty directories. This option can be combined with
 	 * {@link #RECURSIVE}
 	 *
-	 * @since 2.4
+	 * @since 3.0
 	 */
 	public static final int EMPTY_DIRECTORIES_ONLY = 16;
 
@@ -171,7 +171,14 @@ public class FileUtils {
 	 * Rename a file or folder. If the rename fails and if we are running on a
 	 * filesystem where it makes sense to repeat a failing rename then repeat
 	 * the rename operation up to 9 times with 100ms sleep time between two
-	 * calls
+	 * calls. Furthermore if the destination exists and is directory hierarchy
+	 * with only directories in it, the whole directory hierarchy will be
+	 * deleted. If the target represents a non-empty directory structure, empty
+	 * subdirectories within that structure may or may not be deleted even if
+	 * the method fails. Furthermore if the destination exists and is a file
+	 * then the file will be deleted and then the rename is retried.
+	 * <p>
+	 * This operation is <em>not</me> atomic.
 	 *
 	 * @see FS#retryFailedLockFileCommit()
 	 * @param src
@@ -180,6 +187,7 @@ public class FileUtils {
 	 *            the new {@code File}
 	 * @throws IOException
 	 *             if the rename has failed
+	 * @since 3.0
 	 */
 	public static void rename(final File src, final File dst)
 			throws IOException {
@@ -187,6 +195,15 @@ public class FileUtils {
 		while (--attempts >= 0) {
 			if (src.renameTo(dst))
 				return;
+			try {
+				if (!dst.delete())
+					delete(dst, EMPTY_DIRECTORIES_ONLY | RECURSIVE);
+				// On *nix there is no try, you do or do not
+				if (src.renameTo(dst))
+					return;
+			} catch (IOException e) {
+				// ignore and continue retry
+			}
 			try {
 				Thread.sleep(100);
 			} catch (InterruptedException e) {
