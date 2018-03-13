@@ -46,7 +46,6 @@ package org.eclipse.jgit.diff;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 
 import org.eclipse.jgit.util.IO;
@@ -66,28 +65,6 @@ import org.eclipse.jgit.util.RawParseUtils;
  * they are converting from "line number" to "element index".
  */
 public class RawText implements Sequence {
-	/** Creates a RawText instance. */
-	public static interface Factory {
-		/**
-		 * Construct a RawText instance for the content.
-		 *
-		 * @param input
-		 *            the content array.
-		 * @return a RawText instance wrapping this content.
-		 */
-		RawText create(byte[] input);
-	}
-
-	/** Creates RawText that does not treat whitespace specially. */
-	public static final Factory FACTORY = new Factory() {
-		public RawText create(byte[] input) {
-			return new RawText(input);
-		}
-	};
-
-	/** Number of bytes to check for heuristics in {@link #isBinary(byte[])} */
-	private static final int FIRST_FEW_BYTES = 8000;
-
 	/** The file content for this sequence. */
 	protected final byte[] content;
 
@@ -119,8 +96,7 @@ public class RawText implements Sequence {
 	 *
 	 * @param file
 	 *            the text file.
-	 * @throws IOException
-	 *             if Exceptions occur while reading the file
+	 * @throws IOException if Exceptions occur while reading the file
 	 */
 	public RawText(File file) throws IOException {
 		this(IO.readFully(file));
@@ -225,67 +201,5 @@ public class RawText implements Sequence {
 		for (; ptr < end; ptr++)
 			hash = (hash << 5) ^ (raw[ptr] & 0xff);
 		return hash;
-	}
-
-	/**
-	 * Determine heuristically whether a byte array represents binary (as
-	 * opposed to text) content.
-	 *
-	 * @param raw
-	 *            the raw file content.
-	 * @return true if raw is likely to be a binary file, false otherwise
-	 */
-	public static boolean isBinary(byte[] raw) {
-		return isBinary(raw, raw.length);
-	}
-
-	/**
-	 * Determine heuristically whether the bytes contained in a stream
-	 * represents binary (as opposed to text) content.
-	 *
-	 * Note: Do not further use this stream after having called this method! The
-	 * stream may not be fully read and will be left at an unknown position
-	 * after consuming an unknown number of bytes. The caller is responsible for
-	 * closing the stream.
-	 *
-	 * @param raw
-	 *            input stream containing the raw file content.
-	 * @return true if raw is likely to be a binary file, false otherwise
-	 * @throws IOException
-	 *             if input stream could not be read
-	 */
-	public static boolean isBinary(InputStream raw) throws IOException {
-		final byte[] buffer = new byte[FIRST_FEW_BYTES];
-		int cnt = 0;
-		while (cnt < buffer.length) {
-			final int n = raw.read(buffer, cnt, buffer.length - cnt);
-			if (n == -1)
-				break;
-			cnt += n;
-		}
-		return isBinary(buffer, cnt);
-	}
-
-	/**
-	 * Determine heuristically whether a byte array represents binary (as
-	 * opposed to text) content.
-	 *
-	 * @param raw
-	 *            the raw file content.
-	 * @param length
-	 *            number of bytes in {@code raw} to evaluate. This should be
-	 *            {@code raw.length} unless {@code raw} was over-allocated by
-	 *            the caller.
-	 * @return true if raw is likely to be a binary file, false otherwise
-	 */
-	public static boolean isBinary(byte[] raw, int length) {
-		// Same heuristic as C Git
-		if (length > FIRST_FEW_BYTES)
-			length = FIRST_FEW_BYTES;
-		for (int ptr = 0; ptr < length; ptr++)
-			if (raw[ptr] == '\0')
-				return true;
-
-		return false;
 	}
 }

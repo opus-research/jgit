@@ -45,7 +45,6 @@
 
 package org.eclipse.jgit.transport;
 
-import java.io.Serializable;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -61,9 +60,7 @@ import org.eclipse.jgit.lib.Config;
  * describing how refs should be transferred between this repository and the
  * remote repository.
  */
-public class RemoteConfig implements Serializable {
-	private static final long serialVersionUID = 1L;
-
+public class RemoteConfig {
 	private static final String SECTION = "remote";
 
 	private static final String KEY_URL = "url";

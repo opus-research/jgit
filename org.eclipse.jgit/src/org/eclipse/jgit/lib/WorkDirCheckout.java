@@ -62,11 +62,10 @@ import org.eclipse.jgit.lib.GitIndex.Entry;
  * with the index (actually a tree too).
  *
  * Three-way merges are no performed. See {@link #setFailOnConflict(boolean)}.
- *
- * @deprecated Use org.eclipse.jgit.dircache.DirCacheCheckout.
  */
-@Deprecated
 public class WorkDirCheckout {
+	Repository repo;
+
 	File root;
 
 	GitIndex index;
@@ -88,6 +87,7 @@ public class WorkDirCheckout {
 
 	WorkDirCheckout(Repository repo, File workDir,
 			GitIndex oldIndex, GitIndex newIndex) throws IOException {
+		this.repo = repo;
 		this.root = workDir;
 		this.index = oldIndex;
 		this.merge = repo.mapTree(newIndex.writeTree());
@@ -103,6 +103,7 @@ public class WorkDirCheckout {
 	 */
 	public WorkDirCheckout(Repository repo, File root,
 			GitIndex index, Tree merge) {
+		this.repo = repo;
 		this.root = root;
 		this.index = index;
 		this.merge = merge;
@@ -165,10 +166,6 @@ public class WorkDirCheckout {
 	private void checkoutOutIndexNoHead() throws IOException {
 		new IndexTreeWalker(index, merge, root, new AbstractIndexTreeVisitor() {
 			public void visitEntry(TreeEntry m, Entry i, File f) throws IOException {
-				// TODO remove this once we support submodules
-				if (f.getName().equals(".gitmodules"))
-					throw new UnsupportedOperationException(
-							JGitText.get().submodulesNotSupported);
 				if (m == null) {
 					index.remove(root, f);
 					return;

@@ -54,7 +54,6 @@ import java.io.InputStream;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.FS;
 
@@ -65,29 +64,8 @@ import org.eclipse.jgit.util.FS;
  * specified working directory as part of a {@link TreeWalk}.
  */
 public class FileTreeIterator extends WorkingTreeIterator {
-	/**
-	 * the starting directory. This directory should correspond to the root of
-	 * the repository.
-	 */
-	protected final File directory;
-
-	/**
-	 * the file system abstraction which will be necessary to perform certain
-	 * file system operations.
-	 */
-	protected final FS fs;
-
-	/**
-	 * Create a new iterator to traverse the work tree and its children.
-	 *
-	 * @param repo
-	 *            the repository whose working tree will be scanned.
-	 */
-	public FileTreeIterator(Repository repo) {
-		this(repo.getWorkTree(), repo.getFS(), WorkingTreeOptions
-				.createConfigurationInstance(repo.getConfig()));
-		initRootIterator(repo);
-	}
+	private final File directory;
+	private final FS fs;
 
 	/**
 	 * Create a new iterator to traverse the given directory and its children.
@@ -96,13 +74,10 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 *            the starting directory. This directory should correspond to
 	 *            the root of the repository.
 	 * @param fs
-	 *            the file system abstraction which will be necessary to perform
-	 *            certain file system operations.
-	 * @param options
-	 *            working tree options to be used
+	 *            the file system abstraction which will be necessary to
+	 *            perform certain file system operations.
 	 */
-	public FileTreeIterator(final File root, FS fs, WorkingTreeOptions options) {
-		super(options);
+	public FileTreeIterator(final File root, FS fs) {
 		directory = root;
 		this.fs = fs;
 		init(entries());
@@ -114,8 +89,8 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	 * @param p
 	 *            the parent iterator we were created from.
 	 * @param fs
-	 *            the file system abstraction which will be necessary to perform
-	 *            certain file system operations.
+	 *            the file system abstraction which will be necessary to
+	 *            perform certain file system operations.
 	 * @param root
 	 *            the subdirectory. This should be a directory contained within
 	 *            the parent directory.
@@ -128,7 +103,7 @@ public class FileTreeIterator extends WorkingTreeIterator {
 	}
 
 	@Override
-	public AbstractTreeIterator createSubtreeIterator(final ObjectReader reader)
+	public AbstractTreeIterator createSubtreeIterator(final Repository repo)
 			throws IncorrectObjectTypeException, IOException {
 		return new FileTreeIterator(this, ((FileEntry) current()).file, fs);
 	}
@@ -206,21 +181,5 @@ public class FileTreeIterator extends WorkingTreeIterator {
 		public File getFile() {
 			return file;
 		}
-	}
-
-	/**
-	 * @return The root directory of this iterator
-	 */
-	public File getDirectory() {
-		return directory;
-	}
-
-	/**
-	 * @return The location of the working file. This is the same as {@code new
-	 *         File(getDirectory(), getEntryPath())} but may be faster by
-	 *         reusing an internal File instance.
-	 */
-	public File getEntryFile() {
-		return ((FileEntry) current()).getFile();
 	}
 }

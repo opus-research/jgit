@@ -1,5 +1,4 @@
 /*
- * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
  * Copyright (C) 2009, Constantine Plotnikov <constantine.plotnikov@gmail.com>
  * Copyright (C) 2007, Dave Watson <dwatson@mimvista.com>
  * Copyright (C) 2008-2010, Google Inc.
@@ -63,10 +62,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.ConfigInvalidException;
-import org.eclipse.jgit.events.ConfigChangedEvent;
-import org.eclipse.jgit.events.ConfigChangedListener;
-import org.eclipse.jgit.events.ListenerHandle;
-import org.eclipse.jgit.events.ListenerList;
 import org.eclipse.jgit.util.StringUtils;
 
 
@@ -78,9 +73,6 @@ public class Config {
 	private static final long KiB = 1024;
 	private static final long MiB = 1024 * KiB;
 	private static final long GiB = 1024 * MiB;
-
-	/** the change listeners */
-	private final ListenerList listeners = new ListenerList();
 
 	/**
 	 * Immutable current state of the configuration data.
@@ -222,21 +214,6 @@ public class Config {
 			return (int) val;
 		throw new IllegalArgumentException(MessageFormat.format(JGitText.get().integerValueOutOfRange
 				, section, name));
-	}
-
-	/**
-	 * Obtain an integer value from the configuration.
-	 *
-	 * @param section
-	 *            section the key is grouped within.
-	 * @param name
-	 *            name of the key to get.
-	 * @param defaultValue
-	 *            default value to return if no value was present.
-	 * @return an integer value from the configuration, or defaultValue.
-	 */
-	public long getLong(String section, String name, long defaultValue) {
-		return getLong(section, null, name, defaultValue);
 	}
 
 	/**
@@ -395,33 +372,6 @@ public class Config {
 	}
 
 	/**
-	 * @return the sections defined in this {@link Config}
-	 */
-	public Set<String> getSections() {
-		return get(new SectionNames());
-	}
-
-	/**
-	 * @param section
-	 *            the section
-	 * @return the list of names defined for this section
-	 */
-	public Set<String> getNames(String section) {
-		return getNames(section, null);
-	}
-
-	/**
-	 * @param section
-	 *            the section
-	 * @param subsection
-	 *            the subsection
-	 * @return the list of names defined for this subsection
-	 */
-	public Set<String> getNames(String section, String subsection) {
-		return get(new NamesInSection(section, subsection));
-	}
-
-	/**
 	 * Obtain a handle to a parsed set of configuration values.
 	 *
 	 * @param <T>
@@ -456,43 +406,6 @@ public class Config {
 	 */
 	public void uncache(final SectionParser<?> parser) {
 		state.get().cache.remove(parser);
-	}
-
-	/**
-	 * Adds a listener to be notified about changes.
-	 * <p>
-	 * Clients are supposed to remove the listeners after they are done with
-	 * them using the {@link ListenerHandle#remove()} method
-	 *
-	 * @param listener
-	 *            the listener
-	 * @return the handle to the registered listener
-	 */
-	public ListenerHandle addChangeListener(ConfigChangedListener listener) {
-		return listeners.addConfigChangedListener(listener);
-	}
-
-	/**
-	 * Determine whether to issue change events for transient changes.
-	 * <p>
-	 * If <code>true</code> is returned (which is the default behavior),
-	 * {@link #fireConfigChangedEvent()} will be called upon each change.
-	 * <p>
-	 * Subclasses that override this to return <code>false</code> are
-	 * responsible for issuing {@link #fireConfigChangedEvent()} calls
-	 * themselves.
-	 *
-	 * @return <code></code>
-	 */
-	protected boolean notifyUponTransientChanges() {
-		return true;
-	}
-
-	/**
-	 * Notifies the listeners
-	 */
-	protected void fireConfigChangedEvent() {
-		listeners.dispatch(new ConfigChangedEvent());
 	}
 
 	private String getRawString(final String section, final String subsection,
@@ -726,8 +639,6 @@ public class Config {
 			src = state.get();
 			res = replaceStringList(src, section, subsection, name, values);
 		} while (!state.compareAndSet(src, res));
-		if (notifyUponTransientChanges())
-			fireConfigChangedEvent();
 	}
 
 	private State replaceStringList(final State srcState,
@@ -1165,80 +1076,6 @@ public class Config {
 			return Collections.unmodifiableSet(result);
 		}
 	}
-
-	private static class NamesInSection implements SectionParser<Set<String>> {
-		private final String section;
-
-		private final String subsection;
-
-		NamesInSection(final String sectionName, final String subSectionName) {
-			section = sectionName;
-			subsection = subSectionName;
-		}
-
-		@Override
-		public int hashCode() {
-			final int prime = 31;
-			int result = 1;
-			result = prime * result + section.hashCode();
-			result = prime * result
-					+ ((subsection == null) ? 0 : subsection.hashCode());
-			return result;
-		}
-
-		@Override
-		public boolean equals(Object obj) {
-			if (this == obj)
-				return true;
-			if (obj == null)
-				return false;
-			if (getClass() != obj.getClass())
-				return false;
-			NamesInSection other = (NamesInSection) obj;
-			if (!section.equals(other.section))
-				return false;
-			if (subsection == null) {
-				if (other.subsection != null)
-					return false;
-			} else if (!subsection.equals(other.subsection))
-				return false;
-			return true;
-		}
-
-		public Set<String> parse(Config cfg) {
-			final Set<String> result = new HashSet<String>();
-			while (cfg != null) {
-				for (final Entry e : cfg.state.get().entryList) {
-					if (e.name != null
-							&& StringUtils.equalsIgnoreCase(e.section, section)) {
-						if (subsection == null && e.subsection == null)
-							result.add(StringUtils.toLowerCase(e.name));
-						else if (e.subsection != null
-								&& e.subsection.equals(subsection))
-							result.add(StringUtils.toLowerCase(e.name));
-
-					}
-				}
-				cfg = cfg.baseConfig;
-			}
-			return Collections.unmodifiableSet(result);
-		}
-	}
-
-	private static class SectionNames implements SectionParser<Set<String>> {
-		public Set<String> parse(Config cfg) {
-			final Set<String> result = new HashSet<String>();
-			while (cfg != null) {
-				for (final Entry e : cfg.state.get().entryList) {
-					if (e.section != null)
-						result.add(StringUtils.toLowerCase(e.section));
-				}
-				cfg = cfg.baseConfig;
-			}
-			return Collections.unmodifiableSet(result);
-		}
-	}
-
 
 	private static class State {
 		final List<Entry> entryList;

@@ -51,7 +51,7 @@ import junit.framework.TestCase;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.Repository;
 
 
 public class AbstractTreeIteratorTest extends TestCase {
@@ -62,7 +62,7 @@ public class AbstractTreeIteratorTest extends TestCase {
 
 	public class FakeTreeIterator extends WorkingTreeIterator {
 		public FakeTreeIterator(String pathName, FileMode fileMode) {
-			super(prefix(pathName), new WorkingTreeOptions(false));
+			super(prefix(pathName));
 			mode = fileMode.getBits();
 
 			final int s = pathName.lastIndexOf('/');
@@ -73,7 +73,7 @@ public class AbstractTreeIteratorTest extends TestCase {
 		}
 
 		@Override
-		public AbstractTreeIterator createSubtreeIterator(ObjectReader reader)
+		public AbstractTreeIterator createSubtreeIterator(Repository repo)
 				throws IncorrectObjectTypeException, IOException {
 			return null;
 		}

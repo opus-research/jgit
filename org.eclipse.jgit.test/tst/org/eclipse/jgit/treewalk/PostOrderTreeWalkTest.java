@@ -43,8 +43,7 @@
 
 package org.eclipse.jgit.treewalk;
 
-import static org.eclipse.jgit.lib.FileMode.REGULAR_FILE;
-import static org.eclipse.jgit.lib.FileMode.TREE;
+import java.io.ByteArrayInputStream;
 
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
@@ -52,8 +51,11 @@ import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.ObjectWriter;
 import org.eclipse.jgit.lib.RepositoryTestCase;
+
+import static org.eclipse.jgit.lib.FileMode.REGULAR_FILE;
+import static org.eclipse.jgit.lib.FileMode.TREE;
 
 public class PostOrderTreeWalkTest extends RepositoryTestCase {
 	public void testInitialize_NoPostOrder() throws Exception {
@@ -84,7 +86,7 @@ public class PostOrderTreeWalkTest extends RepositoryTestCase {
 	}
 
 	public void testNoPostOrder() throws Exception {
-		final DirCache tree = db.readDirCache();
+		final DirCache tree = DirCache.read(db);
 		{
 			final DirCacheBuilder b = tree.builder();
 
@@ -113,7 +115,7 @@ public class PostOrderTreeWalkTest extends RepositoryTestCase {
 	}
 
 	public void testWithPostOrder_EnterSubtree() throws Exception {
-		final DirCache tree = db.readDirCache();
+		final DirCache tree = DirCache.read(db);
 		{
 			final DirCacheBuilder b = tree.builder();
 
@@ -148,7 +150,7 @@ public class PostOrderTreeWalkTest extends RepositoryTestCase {
 	}
 
 	public void testWithPostOrder_NoEnterSubtree() throws Exception {
-		final DirCache tree = db.readDirCache();
+		final DirCache tree = DirCache.read(db);
 		{
 			final DirCacheBuilder b = tree.builder();
 
@@ -176,10 +178,11 @@ public class PostOrderTreeWalkTest extends RepositoryTestCase {
 	}
 
 	private DirCacheEntry makeFile(final String path) throws Exception {
+		final byte[] pathBytes = Constants.encode(path);
 		final DirCacheEntry ent = new DirCacheEntry(path);
 		ent.setFileMode(REGULAR_FILE);
-		ent.setObjectId(new ObjectInserter.Formatter().idFor(
-				Constants.OBJ_BLOB, Constants.encode(path)));
+		ent.setObjectId(new ObjectWriter(db).computeBlobSha1(pathBytes.length,
+				new ByteArrayInputStream(pathBytes)));
 		return ent;
 	}
 

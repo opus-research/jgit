@@ -45,34 +45,27 @@
 
 package org.eclipse.jgit.pgm;
 
-import java.io.BufferedOutputStream;
 import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.eclipse.jgit.diff.DiffEntry;
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.Option;
+
 import org.eclipse.jgit.diff.DiffFormatter;
-import org.eclipse.jgit.diff.RawTextIgnoreAllWhitespace;
-import org.eclipse.jgit.diff.RawTextIgnoreLeadingWhitespace;
-import org.eclipse.jgit.diff.RawTextIgnoreTrailingWhitespace;
-import org.eclipse.jgit.diff.RawTextIgnoreWhitespaceChange;
-import org.eclipse.jgit.diff.RenameDetector;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.TextProgressMonitor;
+import org.eclipse.jgit.diff.MyersDiff;
+import org.eclipse.jgit.diff.RawText;
+import org.eclipse.jgit.lib.FileMode;
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.pgm.opt.PathTreeFilterHandler;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.AndTreeFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
 
 @Command(common = true, usage = "usage_ShowDiffs")
 class Diff extends TextBuiltin {
-	private final DiffFormatter diffFmt = new DiffFormatter( //
-			new BufferedOutputStream(System.out));
-
 	@Argument(index = 0, metaVar = "metaVar_treeish", required = true)
 	void tree_0(final AbstractTreeIterator c) {
 		trees.add(c);
@@ -81,101 +74,13 @@ class Diff extends TextBuiltin {
 	@Argument(index = 1, metaVar = "metaVar_treeish", required = true)
 	private final List<AbstractTreeIterator> trees = new ArrayList<AbstractTreeIterator>();
 
-	@Option(name = "--", metaVar = "metaVar_paths", multiValued = true, handler = PathTreeFilterHandler.class)
+	@Option(name = "--", metaVar = "metaVar_port", multiValued = true, handler = PathTreeFilterHandler.class)
 	private TreeFilter pathFilter = TreeFilter.ALL;
 
-	// BEGIN -- Options shared with Log
-	@Option(name = "-p", usage = "usage_showPatch")
-	boolean showPatch;
-
-	@Option(name = "-M", usage = "usage_detectRenames")
-	private boolean detectRenames;
-
-	@Option(name = "-l", usage = "usage_renameLimit")
-	private Integer renameLimit;
-
-	@Option(name = "--name-status", usage = "usage_nameStatus")
-	private boolean showNameAndStatusOnly;
-
-	@Option(name = "--ignore-space-at-eol")
-	void ignoreSpaceAtEol(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setRawTextFactory(RawTextIgnoreTrailingWhitespace.FACTORY);
-	}
-
-	@Option(name = "--ignore-leading-space")
-	void ignoreLeadingSpace(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setRawTextFactory(RawTextIgnoreLeadingWhitespace.FACTORY);
-	}
-
-	@Option(name = "-b", aliases = { "--ignore-space-change" })
-	void ignoreSpaceChange(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setRawTextFactory(RawTextIgnoreWhitespaceChange.FACTORY);
-	}
-
-	@Option(name = "-w", aliases = { "--ignore-all-space" })
-	void ignoreAllSpace(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setRawTextFactory(RawTextIgnoreAllWhitespace.FACTORY);
-	}
-
-	@Option(name = "-U", aliases = { "--unified" }, metaVar = "metaVar_linesOfContext")
-	void unified(int lines) {
-		diffFmt.setContext(lines);
-	}
-
-	@Option(name = "--abbrev", metaVar = "n")
-	void abbrev(int lines) {
-		diffFmt.setAbbreviationLength(lines);
-	}
-
-	@Option(name = "--full-index")
-	void abbrev(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setAbbreviationLength(Constants.OBJECT_ID_STRING_LENGTH);
-	}
-
-	// END -- Options shared with Log
+	private DiffFormatter fmt = new DiffFormatter();
 
 	@Override
 	protected void run() throws Exception {
-		List<DiffEntry> files = scan();
-
-		if (showNameAndStatusOnly) {
-			nameStatus(out, files);
-			out.flush();
-
-		} else {
-			diffFmt.setRepository(db);
-			diffFmt.format(files);
-			diffFmt.flush();
-		}
-	}
-
-	static void nameStatus(PrintWriter out, List<DiffEntry> files) {
-		for (DiffEntry ent : files) {
-			switch (ent.getChangeType()) {
-			case ADD:
-				out.println("A\t" + ent.getNewPath());
-				break;
-			case DELETE:
-				out.println("D\t" + ent.getOldPath());
-				break;
-			case MODIFY:
-				out.println("M\t" + ent.getNewPath());
-				break;
-			case COPY:
-				out.format("C%1$03d\t%2$s\t%3$s", ent.getScore(), //
-						ent.getOldPath(), ent.getNewPath());
-				out.println();
-				break;
-			case RENAME:
-				out.format("R%1$03d\t%2$s\t%3$s", ent.getScore(), //
-						ent.getOldPath(), ent.getNewPath());
-				out.println();
-				break;
-			}
-		}
-	}
-
-	private List<DiffEntry> scan() throws IOException {
 		final TreeWalk walk = new TreeWalk(db);
 		walk.reset();
 		walk.setRecursive(true);
@@ -183,14 +88,44 @@ class Diff extends TextBuiltin {
 			walk.addTree(i);
 		walk.setFilter(AndTreeFilter.create(TreeFilter.ANY_DIFF, pathFilter));
 
-		List<DiffEntry> files = DiffEntry.scan(walk);
-		if (detectRenames) {
-			RenameDetector rd = new RenameDetector(db);
-			if (renameLimit != null)
-				rd.setRenameLimit(renameLimit.intValue());
-			rd.addAll(files);
-			files = rd.compute(new TextProgressMonitor());
+		while (walk.next())
+			outputDiff(System.out, walk.getPathString(),
+				walk.getObjectId(0), walk.getFileMode(0),
+				walk.getObjectId(1), walk.getFileMode(1));
+	}
+
+	protected void outputDiff(PrintStream out, String path,
+			ObjectId id1, FileMode mode1, ObjectId id2, FileMode mode2) throws IOException {
+		String name1 = "a/" + path;
+		String name2 =  "b/" + path;
+		out.println("diff --git " + name1 + " " + name2);
+		boolean isNew=false;
+		boolean isDelete=false;
+		if (id1.equals(ObjectId.zeroId())) {
+			out.println("new file mode " + mode2);
+			isNew=true;
+		} else if (id2.equals(ObjectId.zeroId())) {
+			out.println("deleted file mode " + mode1);
+			isDelete=true;
+		} else if (!mode1.equals(mode2)) {
+			out.println("old mode " + mode1);
+			out.println("new mode " + mode2);
 		}
-		return files;
+		out.println("index " + id1.abbreviate(db, 7).name()
+			+ ".." + id2.abbreviate(db, 7).name()
+			+ (mode1.equals(mode2) ? " " + mode1 : ""));
+		out.println("--- " + (isNew ?  "/dev/null" : name1));
+		out.println("+++ " + (isDelete ?  "/dev/null" : name2));
+		RawText a = getRawText(id1);
+		RawText b = getRawText(id2);
+		MyersDiff diff = new MyersDiff(a, b);
+		fmt.formatEdits(out, a, b, diff.getEdits());
+	}
+
+	private RawText getRawText(ObjectId id) throws IOException {
+		if (id.equals(ObjectId.zeroId()))
+			return new RawText(new byte[] { });
+		return new RawText(db.openBlob(id).getCachedBytes());
 	}
 }
+
