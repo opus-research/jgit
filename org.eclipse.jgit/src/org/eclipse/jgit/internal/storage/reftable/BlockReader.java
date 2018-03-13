@@ -326,10 +326,10 @@ class BlockReader {
 		return new PersonIdent(name, email, ms, tz);
 	}
 
-	void readBlock(BlockSource src, long pos, int estBlockSize)
+	void readBlock(BlockSource src, long pos, int fileBlockSize)
 			throws IOException {
-		readBlockIntoBuf(src, pos, estBlockSize);
-		parseBlockStart(pos);
+		readBlockIntoBuf(src, pos, fileBlockSize);
+		parseBlockStart(src, pos, fileBlockSize);
 	}
 
 	private void readBlockIntoBuf(BlockSource src, long pos, int size)
@@ -349,7 +349,8 @@ class BlockReader {
 		endPosition = pos + bufLen;
 	}
 
-	private void parseBlockStart(long pos) throws IOException {
+	private void parseBlockStart(BlockSource src, long pos, int fileBlockSize)
+			throws IOException {
 		ptr = 0;
 		if (pos == 0) {
 			if (bufLen == FILE_HEADER_LEN) {
@@ -373,7 +374,7 @@ class BlockReader {
 		}
 		if (blockType == LOG_BLOCK_TYPE) {
 			// Log blocks must be inflated after the header.
-			long deflatedSize = inflateBuf(blockLen);
+			long deflatedSize = inflateBuf(src, pos, blockLen, fileBlockSize);
 			endPosition = pos + 4 + deflatedSize;
 		}
 		if (bufLen < blockLen) {
@@ -401,8 +402,9 @@ class BlockReader {
 		return typeAndSize & 0x7fffffff;
 	}
 
-	private long inflateBuf(int blockLen) throws IOException {
-		byte[] dst = new byte[4 + blockLen];
+	private long inflateBuf(BlockSource src, long pos, int blockLen,
+			int fileBlockSize) throws IOException {
+		byte[] dst = new byte[blockLen];
 		System.arraycopy(buf, 0, dst, 0, 4);
 
 		long deflatedSize = 0;
@@ -415,6 +417,10 @@ class BlockReader {
 				if (inf.finished()) {
 					deflatedSize = inf.getBytesRead();
 					break;
+				} else if (n <= 0 && inf.needsInput()) {
+					long p = pos + 4 + inf.getBytesRead();
+					readBlockIntoBuf(src, p, fileBlockSize);
+					inf.setInput(buf, 0, bufLen);
 				} else if (n <= 0) {
 					throw invalidBlock();
 				}
