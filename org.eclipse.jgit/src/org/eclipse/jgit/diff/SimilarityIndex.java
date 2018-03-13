@@ -76,9 +76,6 @@ class SimilarityIndex {
 	 */
 	private static final int KEY_SHIFT = 32;
 
-	/** Maximum value of the count field, also mask to extract the count. */
-	private static final long MAX_COUNT = (1L << KEY_SHIFT) - 1;
-
 	/** Total size of the file we hashed into the structure. */
 	private long fileSize;
 
@@ -199,11 +196,11 @@ class SimilarityIndex {
 		return (int) ((common(dst) * maxScore) / max);
 	}
 
-	long common(SimilarityIndex dst) {
+	int common(SimilarityIndex dst) {
 		return common(this, dst);
 	}
 
-	private static long common(SimilarityIndex src, SimilarityIndex dst) {
+	private static int common(SimilarityIndex src, SimilarityIndex dst) {
 		int srcIdx = src.packedIndex(0);
 		int dstIdx = dst.packedIndex(0);
 		long[] srcHash = src.idHash;
@@ -211,12 +208,12 @@ class SimilarityIndex {
 		return common(srcHash, srcIdx, dstHash, dstIdx);
 	}
 
-	private static long common(long[] srcHash, int srcIdx, //
+	private static int common(long[] srcHash, int srcIdx, //
 			long[] dstHash, int dstIdx) {
 		if (srcIdx == srcHash.length || dstIdx == dstHash.length)
 			return 0;
 
-		long common = 0;
+		int common = 0;
 		int srcKey = keyOf(srcHash[srcIdx]);
 		int dstKey = keyOf(dstHash[dstIdx]);
 
@@ -239,8 +236,8 @@ class SimilarityIndex {
 					break;
 				srcKey = keyOf(srcHash[srcIdx]);
 
-			} else /* if (dstKey < srcKey) */{
-				// Regions of dst which do not appear in src.
+			} else /* if (srcKey > dstKey) */{
+				// Regions of dst which do not appear in dst.
 				if (++dstIdx == dstHash.length)
 					break;
 				dstKey = keyOf(dstHash[dstIdx]);
@@ -290,27 +287,19 @@ class SimilarityIndex {
 					j = slot(key);
 					continue;
 				}
-				idHash[j] = pair(key, cnt);
+				idHash[j] = (((long) key) << KEY_SHIFT) | cnt;
 				idSize++;
 				return;
 
 			} else if (keyOf(v) == key) {
-				// Same key, increment the counter. If it overflows, fail
-				// indexing to prevent the key from being impacted.
-				//
-				idHash[j] = pair(key, countOf(v) + cnt);
+				// Same key, increment the counter.
+				idHash[j] = v + cnt;
 				return;
 
 			} else if (++j >= idHash.length) {
 				j = 0;
 			}
 		}
-	}
-
-	private static long pair(int key, long cnt) throws TableFullException {
-		if (MAX_COUNT < cnt)
-			throw new TableFullException();
-		return (((long) key) << KEY_SHIFT) | cnt;
 	}
 
 	private int slot(int key) {
@@ -357,8 +346,8 @@ class SimilarityIndex {
 		return (int) (v >>> KEY_SHIFT);
 	}
 
-	private static long countOf(long v) {
-		return v & MAX_COUNT;
+	private static int countOf(long v) {
+		return (int) v;
 	}
 
 	static class TableFullException extends Exception {
