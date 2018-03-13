@@ -174,7 +174,10 @@ public class TestRepository<R extends Repository> {
 		return pool;
 	}
 
-	/** @return an API wrapper for the underlying repository. */
+	/**
+	 * @return an API wrapper for the underlying repository. This wrapper does
+	 *         not allocate any new resources and need not be closed (but closing
+	 *         it is harmless). */
 	public Git git() {
 		return git;
 	}
