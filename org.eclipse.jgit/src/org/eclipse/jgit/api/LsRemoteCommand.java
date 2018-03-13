@@ -153,21 +153,6 @@ public class LsRemoteCommand extends
 	public Collection<Ref> call() throws GitAPIException,
 			InvalidRemoteException,
 			org.eclipse.jgit.api.errors.TransportException {
-		return getMap().values();
-	}
-
-	/**
-	 * Same as {@link #call()}, but return the Map instead of Collection.
-	 *
-	 * @return a map from names to references in the remote repository
-	 * @throws InvalidRemoteException
-	 *             when called with an invalid remote uri
-	 * @throws org.eclipse.jgit.api.errors.TransportException
-	 *             for errors that occurs during transport
-	 */
-	public Map<String, Ref> getMap() throws GitAPIException,
-			InvalidRemoteException,
-			org.eclipse.jgit.api.errors.TransportException {
 		checkCallable();
 
 		Transport transport = null;
@@ -199,7 +184,7 @@ public class LsRemoteCommand extends
 							refmap.put(r.getName(), r);
 							break;
 						}
-			return refmap;
+			return refmap.values();
 		} catch (URISyntaxException e) {
 			throw new InvalidRemoteException(MessageFormat.format(
 					JGitText.get().invalidRemote, remote));
