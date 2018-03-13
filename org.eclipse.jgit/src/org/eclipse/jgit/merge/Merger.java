@@ -153,10 +153,7 @@ public abstract class Merger {
 			sourceTrees[i] = walk.parseTree(sourceObjects[i]);
 
 		try {
-			boolean ok = mergeImpl();
-			if (ok && inserter != null)
-				inserter.flush();
-			return ok;
+			return mergeImpl();
 		} finally {
 			if (inserter != null)
 				inserter.release();

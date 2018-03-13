@@ -56,7 +56,6 @@ import java.util.Map;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.MergeResult.MergeStatus;
-import org.eclipse.jgit.api.ResetCommand.ResetType;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.dircache.DirCache;
@@ -177,35 +176,6 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 				"h()", "untracked", "untracked"));
 	}
 
-	/**
-	 * Reset hard from unclean condition.
-	 * <p>
-	 * WorkDir: Empty <br/>
-	 * Index: f/g <br/>
-	 * Merge: x
-	 *
-	 * @throws Exception
-	 */
-	@Test
-	public void testResetHardFromIndexEntryWithoutFileToTreeWithoutFile()
-			throws Exception {
-		Git git = new Git(db);
-		writeTrashFile("x", "x");
-		git.add().addFilepattern("x").call();
-		RevCommit id1 = git.commit().setMessage("c1").call();
-
-		writeTrashFile("f/g", "f/g");
-		git.rm().addFilepattern("x").call();
-		git.add().addFilepattern("f/g").call();
-		git.commit().setMessage("c2").call();
-		deleteTrashFile("f/g");
-		deleteTrashFile("f");
-
-		// The actual test
-		git.reset().setMode(ResetType.HARD).setRef(id1.getName()).call();
-		assertIndex(mkmap("x", "x"));
-	}
-
 	private DirCacheCheckout resetHard(RevCommit commit)
 			throws NoWorkTreeException,
 			CorruptObjectException, IOException {
@@ -274,8 +244,8 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 			for (java.util.Map.Entry<String,String> e : indexEntries.entrySet()) {
 				writeTrashFile(e.getKey(), e.getValue());
 				ObjectInserter inserter = db.newObjectInserter();
-				final ObjectId id = inserter.insert(Constants.OBJ_BLOB,
-						Constants.encode(e.getValue()));
+				final ObjectId id = inserter.insert(Constants.OBJ_BLOB, e
+						.getValue().getBytes(Constants.CHARSET));
 				editor.add(new DirCacheEditor.DeletePath(e.getKey()));
 				editor.add(new DirCacheEditor.PathEdit(e.getKey()) {
 					@Override
@@ -553,13 +523,13 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		assertConflict("DF/DF/DF/DF/DF");
 
 		// assertUpdated("DF/DF");
-		// Why do we expect an update on DF/DF. H==M,
-		// H&M are files and index contains a dir, index
-		// is dirty: that case is not in the table but
-		// we cannot update DF/DF to a file, this would
-		// require that we delete DF/DF/DF/DF/DF in workdir
-		// throwing away unsaved contents.
-		// This test would fail in DirCacheCheckoutTests.
+								// Why do we expect an update on DF/DF. H==M,
+								// H&M are files and index contains a dir, index
+								// is dirty: that case is not in the table but
+								// we cannot update DF/DF to a file, this would
+								// require that we delete DF/DF/DF/DF/DF in workdir
+								// throwing away unsaved contents.
+								// This test would fail in DirCacheCheckoutTests.
 	}
 
 	@Test
@@ -889,38 +859,39 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 
 	public void assertWorkDir(HashMap<String, String> i) throws CorruptObjectException,
 			IOException {
-		TreeWalk walk = new TreeWalk(db);
-		walk.setRecursive(true);
-		walk.addTree(new FileTreeIterator(db));
-		String expectedValue;
-		String path;
-		int nrFiles = 0;
-		FileTreeIterator ft;
-		while (walk.next()) {
-			ft = walk.getTree(0, FileTreeIterator.class);
-			path = ft.getEntryPathString();
-			expectedValue = i.get(path);
-			assertNotNull("found unexpected file for path " + path
-					+ " in workdir", expectedValue);
-			File file = new File(db.getWorkTree(), path);
-			assertTrue(file.exists());
-			if (file.isFile()) {
-				FileInputStream is = new FileInputStream(file);
-				byte[] buffer = new byte[(int) file.length()];
-				int offset = 0;
-				int numRead = 0;
-				while (offset < buffer.length
-						&& (numRead = is.read(buffer, offset, buffer.length
-								- offset)) >= 0) {
-					offset += numRead;
+				TreeWalk walk = new TreeWalk(db);
+				walk.setRecursive(true);
+				walk.addTree(new FileTreeIterator(db));
+				String expectedValue;
+				String path;
+				int nrFiles = 0;
+				FileTreeIterator ft;
+				while (walk.next()) {
+					ft = walk.getTree(0, FileTreeIterator.class);
+					path = ft.getEntryPathString();
+					expectedValue = i.get(path);
+					assertNotNull("found unexpected file for path "
+							+ path + " in workdir", expectedValue);
+					File file = new File(db.getWorkTree(), path);
+					assertTrue(file.exists());
+					if (file.isFile()) {
+						FileInputStream is = new FileInputStream(file);
+						byte[] buffer = new byte[(int) file.length()];
+						int offset = 0;
+						int numRead = 0;
+						while (offset < buffer.length
+								&& (numRead = is.read(buffer, offset, buffer.length
+										- offset)) >= 0) {
+							offset += numRead;
+						}
+						is.close();
+						assertTrue("unexpected content for path " + path
+								+ " in workDir. Expected: <" + expectedValue + ">",
+								Arrays.equals(buffer, i.get(path).getBytes()));
+						nrFiles++;
+					}
 				}
-				is.close();
-				assertTrue("unexpected content for path " + path
-						+ " in workDir. Expected: <" + expectedValue + ">",
-						Arrays.equals(buffer, i.get(path).getBytes()));
-				nrFiles++;
+				assertEquals("WorkDir has not the right size.", i.size(), nrFiles);
 			}
-		}
-		assertEquals("WorkDir has not the right size.", i.size(), nrFiles);
-	}
+
 }
