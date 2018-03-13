@@ -64,6 +64,11 @@ class SimpleDataOutput implements DataOutput {
 		this.fd = fd;
 	}
 
+	public void writeShort(int v) throws IOException {
+		NB.encodeInt16(buf, 0, v);
+		fd.write(buf, 0, 2);
+	}
+
 	public void writeInt(int v) throws IOException {
 		NB.encodeInt32(buf, 0, v);
 		fd.write(buf, 0, 4);
@@ -91,10 +96,6 @@ class SimpleDataOutput implements DataOutput {
 	}
 
 	public void writeByte(int v) throws IOException {
-		throw new UnsupportedOperationException();
-	}
-
-	public void writeShort(int v) throws IOException {
 		throw new UnsupportedOperationException();
 	}
 
