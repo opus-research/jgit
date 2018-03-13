@@ -414,8 +414,7 @@ public class BaseRepositoryBuilder<B extends BaseRepositoryBuilder, R extends Re
 				}
 
 				current = current.getParentFile();
-				if (current != null && ceilingDirectories != null
-						&& ceilingDirectories.contains(current))
+				if (current != null && ceilingDirectories.contains(current))
 					break;
 			}
 		}

@@ -338,7 +338,7 @@ public class DirCacheTree {
 				entryIdx++;
 			}
 
-			id = ow.insert(fmt);
+			id = fmt.insert(ow);
 		}
 		return id;
 	}
