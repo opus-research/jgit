@@ -172,7 +172,6 @@ public class IndexDiff {
 		dirCache = repository.readDirCache();
 
 		TreeWalk treeWalk = new TreeWalk(repository);
-		treeWalk.reset();
 		treeWalk.setRecursive(true);
 		// add the trees (tree, dirchache, workdir)
 		if (tree != null)
@@ -233,8 +232,7 @@ public class IndexDiff {
 					missing.add(treeWalk.getPathString());
 					changesExist = true;
 				} else {
-					if (workingTreeIterator.isModified(
-							dirCacheIterator.getDirCacheEntry(), true)) {
+					if (!dirCacheIterator.idEqual(workingTreeIterator)) {
 						// in index, in workdir, content differs => modified
 						modified.add(treeWalk.getPathString());
 						changesExist = true;
