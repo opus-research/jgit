@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,3 +41,28 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+package org.eclipse.jgit.diff;
+
+import org.eclipse.jgit.lib.Config;
+import org.eclipse.jgit.lib.Config.SectionParser;
+
+/** Keeps track of diff related configuration options. */
+public class DiffConfig {
+	/** Key for {@link Config#get(SectionParser)}. */
+	public static final Config.SectionParser<DiffConfig> KEY = new SectionParser<DiffConfig>() {
+		public DiffConfig parse(final Config cfg) {
+			return new DiffConfig(cfg);
+		}
+	};
+
+	private final int renameLimit;
+
+	private DiffConfig(final Config rc) {
+		renameLimit = rc.getInt("diff", "renamelimit", 200);
+	}
+
+	/** @return limit on number of paths to perform inexact rename detection. */
+	public int getRenameLimit() {
+		return renameLimit;
+	}
+}

@@ -56,10 +56,7 @@ import org.eclipse.jgit.errors.SymlinksNotSupportedException;
 /**
  * A tree visitor for writing a directory tree to the git object database. Blob
  * data is fetched from the files, not the cached blobs.
- *
- * @deprecated Use {@link org.eclipse.jgit.dircache.DirCache} instead.
  */
-@Deprecated
 public class WriteTree extends TreeVisitorWithCurrentDirectory {
 	private final ObjectWriter ow;
 
