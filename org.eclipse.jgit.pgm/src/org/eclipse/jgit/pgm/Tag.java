@@ -47,8 +47,6 @@
 
 package org.eclipse.jgit.pgm;
 
-import java.text.MessageFormat;
-
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -57,18 +55,18 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.PersonIdent;
 
-@Command(common = true, usage = "usage_CreateATag")
+@Command(common = true, usage = "Create a tag")
 class Tag extends TextBuiltin {
-	@Option(name = "-f", usage = "usage_forceReplacingAnExistingTag")
+	@Option(name = "-f", usage = "force replacing an existing tag")
 	private boolean force;
 
-	@Option(name = "-m", metaVar = "metaVar_message", usage = "usage_tagMessage")
+	@Option(name = "-m", metaVar = "message", usage = "tag message")
 	private String message = "";
 
-	@Argument(index = 0, required = true, metaVar = "metaVar_name")
+	@Argument(index = 0, required = true, metaVar = "name")
 	private String tagName;
 
-	@Argument(index = 1, metaVar = "metaVar_object")
+	@Argument(index = 1, metaVar = "object")
 	private ObjectId object;
 
 	@Override
@@ -76,14 +74,15 @@ class Tag extends TextBuiltin {
 		if (object == null) {
 			object = db.resolve(Constants.HEAD);
 			if (object == null)
-				throw die(MessageFormat.format(CLIText.get().cannotResolve, Constants.HEAD));
+				throw die("Cannot resolve " + Constants.HEAD);
 		}
 
 		if (!tagName.startsWith(Constants.R_TAGS))
 			tagName = Constants.R_TAGS + tagName;
 		if (!force && db.resolve(tagName) != null) {
-			throw die(MessageFormat.format(CLIText.get().fatalErrorTagExists
-					, tagName.substring(Constants.R_TAGS.length())));
+			throw die("fatal: tag '"
+					+ tagName.substring(Constants.R_TAGS.length())
+					+ "' exists");
 		}
 
 		final ObjectLoader ldr = db.openObject(object);

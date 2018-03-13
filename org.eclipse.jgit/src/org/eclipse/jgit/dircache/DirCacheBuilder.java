@@ -45,10 +45,8 @@
 package org.eclipse.jgit.dircache;
 
 import java.io.IOException;
-import java.text.MessageFormat;
 import java.util.Arrays;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.WindowCursor;
@@ -103,8 +101,8 @@ public class DirCacheBuilder extends BaseDirCacheEditor {
 	 */
 	public void add(final DirCacheEntry newEntry) {
 		if (newEntry.getRawMode() == 0)
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().fileModeNotSetForPath
-					, newEntry.getPathString()));
+			throw new IllegalArgumentException("FileMode not set for path "
+					+ newEntry.getPathString());
 		beforeAdd(newEntry);
 		fastAdd(newEntry);
 	}
@@ -216,9 +214,9 @@ public class DirCacheBuilder extends BaseDirCacheEditor {
 				final int peStage = lastEntry.getStage();
 				final int dceStage = newEntry.getStage();
 				if (peStage == dceStage)
-					throw bad(newEntry, JGitText.get().duplicateStagesNotAllowed);
+					throw bad(newEntry, "Duplicate stages not allowed");
 				if (peStage == 0 || dceStage == 0)
-					throw bad(newEntry, JGitText.get().mixedStagesNotAllowed);
+					throw bad(newEntry, "Mixed stages not allowed");
 				if (peStage > dceStage)
 					sorted = false;
 			}
@@ -239,9 +237,9 @@ public class DirCacheBuilder extends BaseDirCacheEditor {
 				final int peStage = pe.getStage();
 				final int ceStage = ce.getStage();
 				if (peStage == ceStage)
-					throw bad(ce, JGitText.get().duplicateStagesNotAllowed);
+					throw bad(ce, "Duplicate stages not allowed");
 				if (peStage == 0 || ceStage == 0)
-					throw bad(ce, JGitText.get().mixedStagesNotAllowed);
+					throw bad(ce, "Mixed stages not allowed");
 			}
 		}
 

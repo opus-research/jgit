@@ -48,7 +48,6 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -60,7 +59,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.PackMismatchException;
 import org.eclipse.jgit.lib.RepositoryCache.FileKey;
 import org.eclipse.jgit.util.FS;
@@ -88,8 +86,6 @@ public class ObjectDirectory extends ObjectDatabase {
 
 	private final File[] alternateObjectDir;
 
-	private final FS fs;
-
 	/**
 	 * Initialize a reference to an on-disk object directory.
 	 *
@@ -97,18 +93,14 @@ public class ObjectDirectory extends ObjectDatabase {
 	 *            the location of the <code>objects</code> directory.
 	 * @param alternateObjectDir
 	 *            a list of alternate object directories
-	 * @param fs
-	 *            the file system abstraction which will be necessary to
-	 *            perform certain file system operations.
 	 */
-	public ObjectDirectory(final File dir, File[] alternateObjectDir, FS fs) {
+	public ObjectDirectory(final File dir, File[] alternateObjectDir) {
 		objects = dir;
 		this.alternateObjectDir = alternateObjectDir;
 		infoDirectory = new File(objects, "info");
 		packDirectory = new File(objects, "pack");
 		alternatesFile = new File(infoDirectory, "alternates");
 		packList = new AtomicReference<PackList>(NO_PACKS);
-		this.fs = fs;
 	}
 
 	/**
@@ -183,13 +175,13 @@ public class ObjectDirectory extends ObjectDatabase {
 		final String i = idx.getName();
 
 		if (p.length() != 50 || !p.startsWith("pack-") || !p.endsWith(".pack"))
-			throw new IOException(MessageFormat.format(JGitText.get().notAValidPack, pack));
+			throw new IOException("Not a valid pack " + pack);
 
 		if (i.length() != 49 || !i.startsWith("pack-") || !i.endsWith(".idx"))
-			throw new IOException(MessageFormat.format(JGitText.get().notAValidPack, idx));
+			throw new IOException("Not a valid pack " + idx);
 
 		if (!p.substring(0, 45).equals(i.substring(0, 45)))
-			throw new IOException(MessageFormat.format(JGitText.get().packDoesNotMatchIndex, pack));
+			throw new IOException("Pack " + pack + "does not match index");
 
 		insertPack(new PackFile(idx, pack));
 	}
@@ -300,20 +292,7 @@ public class ObjectDirectory extends ObjectDatabase {
 		PackList o, n;
 		do {
 			o = packList.get();
-
-			// If the pack in question is already present in the list
-			// (picked up by a concurrent thread that did a scan?) we
-			// do not want to insert it a second time.
-			//
 			final PackFile[] oldList = o.packs;
-			final String name = pf.getPackFile().getName();
-			for (PackFile p : oldList) {
-				if (PackFile.SORT.compare(pf, p) < 0)
-					break;
-				if (name.equals(p.getPackFile().getName()))
-					return;
-			}
-
 			final PackFile[] newList = new PackFile[1 + oldList.length];
 			newList[0] = pf;
 			System.arraycopy(oldList, 0, newList, 1, oldList.length);
@@ -437,11 +416,10 @@ public class ObjectDirectory extends ObjectDatabase {
 				// This should never occur. It should be impossible for us
 				// to have two pack files with the same name, as all of them
 				// came out of the same directory. If it does, we promised to
-				// close any PackFiles we did not reuse, so close the second,
-				// readers are likely to be actively using the first.
+				// close any PackFiles we did not reuse, so close the one we
+				// just evicted out of the reuse map.
 				//
-				forReuse.put(prior.getPackFile().getName(), prior);
-				p.close();
+				prior.close();
 			}
 		}
 		return forReuse;
@@ -491,17 +469,17 @@ public class ObjectDirectory extends ObjectDatabase {
 
 	private ObjectDatabase openAlternate(final String location)
 			throws IOException {
-		final File objdir = fs.resolve(objects, location);
+		final File objdir = FS.resolve(objects, location);
 		return openAlternate(objdir);
 	}
 
 	private ObjectDatabase openAlternate(File objdir) throws IOException {
 		final File parent = objdir.getParentFile();
-		if (FileKey.isGitRepository(parent, fs)) {
-			final Repository db = RepositoryCache.open(FileKey.exact(parent, fs));
+		if (FileKey.isGitRepository(parent)) {
+			final Repository db = RepositoryCache.open(FileKey.exact(parent));
 			return new AlternateRepositoryDatabase(db);
 		}
-		return new ObjectDirectory(objdir, null, fs);
+		return new ObjectDirectory(objdir, null);
 	}
 
 	private static final class PackList {

@@ -72,7 +72,7 @@ class FS_Win32_Cygwin extends FS_Win32 {
 		return false;
 	}
 
-	public File resolve(final File dir, final String pn) {
+	protected File resolveImpl(final File dir, final String pn) {
 		try {
 			final Process p;
 
@@ -103,7 +103,7 @@ class FS_Win32_Cygwin extends FS_Win32 {
 			// Fall through and use the default return.
 			//
 		}
-		return super.resolve(dir, pn);
+		return super.resolveImpl(dir, pn);
 	}
 
 	@Override
@@ -116,6 +116,6 @@ class FS_Win32_Cygwin extends FS_Win32 {
 				});
 		if (home == null || home.length() == 0)
 			return super.userHomeImpl();
-		return resolve(new File("."), home);
+		return resolveImpl(new File("."), home);
 	}
 }

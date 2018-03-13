@@ -46,9 +46,6 @@
 package org.eclipse.jgit.errors;
 
 import java.io.IOException;
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.JGitText;
 
 /**
  * Exception thrown if a conflict occurs during a merge checkout.
@@ -62,7 +59,7 @@ public class CheckoutConflictException extends IOException {
 	 * @param file
 	 */
 	public CheckoutConflictException(String file) {
-		super(MessageFormat.format(JGitText.get().checkoutConflictWithFile, file));
+		super("Checkout conflict with file: " + file);
 	}
 
 	/**
@@ -71,7 +68,7 @@ public class CheckoutConflictException extends IOException {
 	 * @param files
 	 */
 	public CheckoutConflictException(String[] files) {
-		super(MessageFormat.format(JGitText.get().checkoutConflictWithFiles, buildList(files)));
+		super("Checkout conflict with files: " + buildList(files));
 	}
 
 	private static String buildList(String[] files) {

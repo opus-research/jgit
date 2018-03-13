@@ -57,13 +57,11 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryCache;
 import org.eclipse.jgit.lib.RepositoryCache.FileKey;
-import org.eclipse.jgit.util.FS;
 
 /** Basic daemon for the anonymous <code>git://</code> transport protocol. */
 public class Daemon {
@@ -252,7 +250,7 @@ public class Daemon {
 	 */
 	public synchronized void start() throws IOException {
 		if (acceptThread != null)
-			throw new IllegalStateException(JGitText.get().daemonAlreadyRunning);
+			throw new IllegalStateException("Daemon already running");
 
 		final ServerSocket listenSock = new ServerSocket(
 				myAddress != null ? myAddress.getPort() : 0, BACKLOG,
@@ -369,7 +367,7 @@ public class Daemon {
 		}
 
 		for (final File baseDir : exportBase) {
-			final File gitdir = FileKey.resolve(new File(baseDir, name), FS.DETECTED);
+			final File gitdir = FileKey.resolve(new File(baseDir, name));
 			if (gitdir != null && canExport(gitdir))
 				return openRepository(gitdir);
 		}
@@ -378,7 +376,7 @@ public class Daemon {
 
 	private static Repository openRepository(final File gitdir) {
 		try {
-			return RepositoryCache.open(FileKey.exact(gitdir, FS.DETECTED));
+			return RepositoryCache.open(FileKey.exact(gitdir));
 		} catch (IOException err) {
 			// null signals it "wasn't found", which is all that is suitable
 			// for the remote client to know.

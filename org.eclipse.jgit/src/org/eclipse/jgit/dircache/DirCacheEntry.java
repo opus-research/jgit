@@ -51,10 +51,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
-import java.text.MessageFormat;
 import java.util.Arrays;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -147,7 +145,7 @@ public class DirCacheEntry {
 			for (;;) {
 				final int c = in.read();
 				if (c < 0)
-					throw new EOFException(JGitText.get().shortReadOfBlock);
+					throw new EOFException("Short read of block.");
 				if (c == 0)
 					break;
 				tmp.write(c);
@@ -231,11 +229,11 @@ public class DirCacheEntry {
 	 */
 	public DirCacheEntry(final byte[] newPath, final int stage) {
 		if (!isValidPath(newPath))
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidPath
-					, toString(newPath)));
+			throw new IllegalArgumentException("Invalid path: "
+					+ toString(newPath));
 		if (stage < 0 || 3 < stage)
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidStageForPath
-					, stage, toString(newPath)));
+			throw new IllegalArgumentException("Invalid stage " + stage
+					+ " for path " + toString(newPath));
 
 		info = new byte[INFO_LEN];
 		infoOffset = 0;
@@ -399,8 +397,8 @@ public class DirCacheEntry {
 		switch (mode.getBits() & FileMode.TYPE_MASK) {
 		case FileMode.TYPE_MISSING:
 		case FileMode.TYPE_TREE:
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidModeForPath
-					, mode, getPathString()));
+			throw new IllegalArgumentException("Invalid mode " + mode
+					+ " for path " + getPathString());
 		}
 		NB.encodeInt32(info, infoOffset + P_MODE, mode.getBits());
 	}

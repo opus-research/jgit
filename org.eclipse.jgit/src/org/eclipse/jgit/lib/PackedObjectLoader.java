@@ -55,11 +55,9 @@ import java.io.OutputStream;
 abstract class PackedObjectLoader extends ObjectLoader {
 	protected final PackFile pack;
 
-	/** Position of the first byte of the object's header. */
-	protected final long objectOffset;
+	protected final long dataOffset;
 
-	/** Bytes used to express the object header, including delta reference. */
-	protected final int headerSize;
+	protected final long objectOffset;
 
 	protected int objectType;
 
@@ -67,11 +65,11 @@ abstract class PackedObjectLoader extends ObjectLoader {
 
 	protected byte[] cachedBytes;
 
-	PackedObjectLoader(final PackFile pr, final long objectOffset,
-			final int headerSize) {
+	PackedObjectLoader(final PackFile pr, final long dataOffset,
+			final long objectOffset) {
 		pack = pr;
+		this.dataOffset = dataOffset;
 		this.objectOffset = objectOffset;
-		this.headerSize = headerSize;
 	}
 
 	/**
@@ -113,6 +111,13 @@ abstract class PackedObjectLoader extends ObjectLoader {
 	 */
 	public final long getObjectOffset() {
 		return objectOffset;
+	}
+
+	/**
+	 * @return offset of object data within pack file
+	 */
+	public final long getDataOffset() {
+		return dataOffset;
 	}
 
 	/**

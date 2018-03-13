@@ -49,9 +49,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.util.MutableInteger;
 
@@ -329,8 +327,8 @@ public final class Constants {
 		try {
 			return MessageDigest.getInstance(HASH_FUNCTION);
 		} catch (NoSuchAlgorithmException nsae) {
-			throw new RuntimeException(MessageFormat.format(
-					JGitText.get().requiredHashFunctionNotAvailable, HASH_FUNCTION), nsae);
+			throw new RuntimeException("Required hash function "
+					+ HASH_FUNCTION + " not available.", nsae);
 		}
 	}
 
@@ -351,7 +349,7 @@ public final class Constants {
 		case OBJ_TAG:
 			return TYPE_TAG;
 		default:
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().badObjectType, typeCode));
+			throw new IllegalArgumentException("Bad object type: " + typeCode);
 		}
 	}
 
@@ -375,7 +373,7 @@ public final class Constants {
 		case OBJ_TAG:
 			return ENCODED_TYPE_TAG;
 		default:
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().badObjectType, typeCode));
+			throw new IllegalArgumentException("Bad object type: " + typeCode);
 		}
 	}
 
@@ -410,7 +408,7 @@ public final class Constants {
 						|| typeString[position + 2] != 'o'
 						|| typeString[position + 3] != 'b'
 						|| typeString[position + 4] != endMark)
-					throw new CorruptObjectException(id, JGitText.get().corruptObjectInvalidType);
+					throw new CorruptObjectException(id, "invalid type");
 				offset.value = position + 5;
 				return Constants.OBJ_BLOB;
 
@@ -421,7 +419,7 @@ public final class Constants {
 						|| typeString[position + 4] != 'i'
 						|| typeString[position + 5] != 't'
 						|| typeString[position + 6] != endMark)
-					throw new CorruptObjectException(id, JGitText.get().corruptObjectInvalidType);
+					throw new CorruptObjectException(id, "invalid type");
 				offset.value = position + 7;
 				return Constants.OBJ_COMMIT;
 
@@ -430,7 +428,7 @@ public final class Constants {
 				case 'a':
 					if (typeString[position + 2] != 'g'
 							|| typeString[position + 3] != endMark)
-						throw new CorruptObjectException(id, JGitText.get().corruptObjectInvalidType);
+						throw new CorruptObjectException(id, "invalid type");
 					offset.value = position + 4;
 					return Constants.OBJ_TAG;
 
@@ -438,19 +436,19 @@ public final class Constants {
 					if (typeString[position + 2] != 'e'
 							|| typeString[position + 3] != 'e'
 							|| typeString[position + 4] != endMark)
-						throw new CorruptObjectException(id, JGitText.get().corruptObjectInvalidType);
+						throw new CorruptObjectException(id, "invalid type");
 					offset.value = position + 5;
 					return Constants.OBJ_TREE;
 
 				default:
-					throw new CorruptObjectException(id, JGitText.get().corruptObjectInvalidType);
+					throw new CorruptObjectException(id, "invalid type");
 				}
 
 			default:
-				throw new CorruptObjectException(id, JGitText.get().corruptObjectInvalidType);
+				throw new CorruptObjectException(id, "invalid type");
 			}
 		} catch (ArrayIndexOutOfBoundsException bad) {
-			throw new CorruptObjectException(id, JGitText.get().corruptObjectInvalidType);
+			throw new CorruptObjectException(id, "invalid type");
 		}
 	}
 
@@ -483,7 +481,7 @@ public final class Constants {
 		for (int k = r.length - 1; k >= 0; k--) {
 			final char c = s.charAt(k);
 			if (c > 127)
-				throw new IllegalArgumentException(MessageFormat.format(JGitText.get().notASCIIString, s));
+				throw new IllegalArgumentException("Not ASCII string: " + s);
 			r[k] = (byte) c;
 		}
 		return r;
@@ -514,15 +512,9 @@ public final class Constants {
 
 	static {
 		if (OBJECT_ID_LENGTH != newMessageDigest().getDigestLength())
-			throw new LinkageError(JGitText.get().incorrectOBJECT_ID_LENGTH);
+			throw new LinkageError("Incorrect OBJECT_ID_LENGTH.");
 		CHARSET = Charset.forName(CHARACTER_ENCODING);
 	}
-
-	/** name of the file containing the commit msg for a merge commit */
-	public static final String MERGE_MSG = "MERGE_MSG";
-
-	/** name of the file containing the IDs of the parents of a merge commit */
-	public static final String MERGE_HEAD = "MERGE_HEAD";
 
 	private Constants() {
 		// Hide the default constructor
