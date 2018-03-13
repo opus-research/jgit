@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2017 Ericsson
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,62 +43,77 @@
 
 package org.eclipse.jgit.internal.storage.file;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
-import java.util.Iterator;
+import java.io.IOException;
 
-import org.eclipse.jgit.internal.storage.file.PackIndex.MutableEntry;
-import org.eclipse.jgit.junit.TestRepository.BranchBuilder;
+import org.junit.Before;
 import org.junit.Test;
 
-public class GcKeepFilesTest extends GcTestCase {
+public class GcOrphanFilesTest extends GcTestCase {
+	private final static String PACK = "pack";
+
+	private final static String BITMAP_File_1 = PACK + "-1.bitmap";
+
+	private final static String IDX_File_2 = PACK + "-2.idx";
+
+	private final static String IDX_File_malformed = PACK + "-1234idx";
+
+	private final static String PACK_File_2 = PACK + "-2.pack";
+
+	private final static String PACK_File_3 = PACK + "-3.pack";
+
+	private File packDir;
+
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		packDir = new File(repo.getObjectsDirectory(), PACK);
+	}
+
 	@Test
-	public void testKeepFiles() throws Exception {
-		BranchBuilder bb = tr.branch("refs/heads/master");
-		bb.commit().add("A", "A").add("B", "B").create();
-		stats = gc.getStatistics();
-		assertEquals(4, stats.numberOfLooseObjects);
-		assertEquals(0, stats.numberOfPackedObjects);
-		assertEquals(0, stats.numberOfPackFiles);
+	public void bitmapAndIdxDeletedButPackNot() throws Exception {
+		createFileInPackFolder(BITMAP_File_1);
+		createFileInPackFolder(IDX_File_2);
+		createFileInPackFolder(PACK_File_3);
 		gc.gc();
-		stats = gc.getStatistics();
-		assertEquals(0, stats.numberOfLooseObjects);
-		assertEquals(4, stats.numberOfPackedObjects);
-		assertEquals(1, stats.numberOfPackFiles);
+		assertFalse(new File(packDir, BITMAP_File_1).exists());
+		assertFalse(new File(packDir, IDX_File_2).exists());
+		assertTrue(new File(packDir, PACK_File_3).exists());
+	}
 
-		Iterator<PackFile> packIt = repo.getObjectDatabase().getPacks()
-				.iterator();
-		PackFile singlePack = packIt.next();
-		assertFalse(packIt.hasNext());
-		File keepFile = new File(singlePack.getPackFile().getPath() + ".keep");
-		assertFalse(keepFile.exists());
-		assertTrue(keepFile.createNewFile());
-		bb.commit().add("A", "A2").add("B", "B2").create();
-		stats = gc.getStatistics();
-		assertEquals(4, stats.numberOfLooseObjects);
-		assertEquals(4, stats.numberOfPackedObjects);
-		assertEquals(1, stats.numberOfPackFiles);
+	@Test
+	public void bitmapDeletedButIdxAndPackNot() throws Exception {
+		createFileInPackFolder(BITMAP_File_1);
+		createFileInPackFolder(IDX_File_2);
+		createFileInPackFolder(PACK_File_2);
+		createFileInPackFolder(PACK_File_3);
 		gc.gc();
-		stats = gc.getStatistics();
-		assertEquals(0, stats.numberOfLooseObjects);
-		assertEquals(8, stats.numberOfPackedObjects);
-		assertEquals(2, stats.numberOfPackFiles);
+		assertFalse(new File(packDir, BITMAP_File_1).exists());
+		assertTrue(new File(packDir, IDX_File_2).exists());
+		assertTrue(new File(packDir, PACK_File_2).exists());
+		assertTrue(new File(packDir, PACK_File_3).exists());
+	}
 
-		// check that no object is packed twice
-		Iterator<PackFile> packs = repo.getObjectDatabase().getPacks()
-				.iterator();
-		PackIndex ind1 = packs.next().getIndex();
-		assertEquals(4, ind1.getObjectCount());
-		PackIndex ind2 = packs.next().getIndex();
-		assertEquals(4, ind2.getObjectCount());
-		for (MutableEntry e: ind1)
-			if (ind2.hasObject(e.toObjectId()))
-				assertFalse(
-						"the following object is in both packfiles: "
-								+ e.toObjectId(),
-						ind2.hasObject(e.toObjectId()));
+	@Test
+	public void malformedIdxNotDeleted() throws Exception {
+		createFileInPackFolder(IDX_File_malformed);
+		gc.gc();
+		assertTrue(new File(packDir, IDX_File_malformed).exists());
+	}
+
+	private void createFileInPackFolder(String fileName) throws IOException {
+		if (!packDir.exists() || !packDir.isDirectory()) {
+			assertTrue(packDir.mkdirs());
+		}
+		assertTrue(new File(packDir, fileName).createNewFile());
+	}
+
+	@Test
+	public void noSuchPackFolder() throws Exception {
+		assertTrue(packDir.delete());
+		gc.gc();
 	}
 }
