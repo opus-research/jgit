@@ -45,7 +45,8 @@ package org.eclipse.jgit.internal.storage.dfs;
 
 import static org.eclipse.jgit.internal.storage.pack.PackExt.PACK;
 
-import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
@@ -61,15 +62,25 @@ import org.eclipse.jgit.storage.pack.PackStatistics;
  */
 public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	private final DfsRepositoryDescription repoDesc;
+
 	private final String packName;
+
 	private PackSource packSource;
+
 	private long lastModified;
-	private long[] sizeMap;
+
+	private final Map<PackExt, Long> sizeMap;
+
 	private long objectCount;
+
 	private long deltaCount;
+
 	private PackStatistics stats;
+
 	private int extensions;
+
 	private int indexVersion;
+
 	private long estimatedPackSize;
 
 	/**
@@ -91,7 +102,7 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 		this.repoDesc = repoDesc;
 		int dot = name.lastIndexOf('.');
 		this.packName = (dot < 0) ? name : name.substring(0, dot);
-		this.sizeMap = new long[PackExt.values().length];
+		this.sizeMap = new HashMap<>(PackExt.values().length * 2);
 	}
 
 	/** @return description of the repository. */
@@ -133,7 +144,7 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	 * @return cache key for use by the block cache.
 	 */
 	public DfsStreamKey getStreamKey(PackExt ext) {
-		return DfsStreamKey.of(getRepositoryDescription(), getFileName(ext));
+		return DfsStreamKey.of(getFileName(ext));
 	}
 
 	/** @return the source of the pack. */
@@ -175,11 +186,7 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	 * @return {@code this}
 	 */
 	public DfsPackDescription setFileSize(PackExt ext, long bytes) {
-		int i = ext.getPosition();
-		if (i >= sizeMap.length) {
-			sizeMap = Arrays.copyOf(sizeMap, i + 1);
-		}
-		sizeMap[i] = Math.max(0, bytes);
+		sizeMap.put(ext, Long.valueOf(Math.max(0, bytes)));
 		return this;
 	}
 
@@ -189,8 +196,8 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	 * @return size of the file, in bytes. If 0 the file size is not yet known.
 	 */
 	public long getFileSize(PackExt ext) {
-		int i = ext.getPosition();
-		return i < sizeMap.length ? sizeMap[i] : 0;
+		Long size = sizeMap.get(ext);
+		return size == null ? 0 : size.longValue();
 	}
 
 	/**
