@@ -54,7 +54,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.lang.reflect.Field;
 import java.net.URISyntaxException;
 import java.text.MessageFormat;
 import java.util.Collection;
@@ -133,7 +132,7 @@ public abstract class Repository implements AutoCloseable {
 	/** If not bare, the index file caching the working file states. */
 	private final File indexFile;
 
-	private ConcurrentHashMap<String, BuiltinCommandFactory> commandRegistry = new ConcurrentHashMap<>();
+	private static ConcurrentHashMap<String, BuiltinCommandFactory> commandRegistry = new ConcurrentHashMap<>();
 
 	/**
 	 * Registers a {@link BuiltinCommandFactory} responsible for creating
@@ -152,7 +151,7 @@ public abstract class Repository implements AutoCloseable {
 	 *         <tt>null</tt> if there was no mapping for <tt>commandName</tt>
 	 * @since 4.5
 	 */
-	public BuiltinCommandFactory registerComand(String commandName,
+	public static BuiltinCommandFactory registerCommand(String commandName,
 			BuiltinCommandFactory fact) {
 		if (fact == null)
 			return commandRegistry.remove(commandName);
@@ -169,7 +168,7 @@ public abstract class Repository implements AutoCloseable {
 	 * @return <code>true</code> if some factory was registered for the name
 	 * @since 4.5
 	 */
-	public boolean isRegistered(String commandName) {
+	public static boolean isRegistered(String commandName) {
 		return commandRegistry.containsKey(commandName);
 	}
 
@@ -179,7 +178,7 @@ public abstract class Repository implements AutoCloseable {
 	 *
 	 * @since 4.5
 	 */
-	public Set<String> listRegisteredCommands() {
+	public static Set<String> listRegisteredCommands() {
 		return commandRegistry.keySet();
 	}
 
@@ -203,7 +202,7 @@ public abstract class Repository implements AutoCloseable {
 	 * @throws IOException
 	 * @since 4.5
 	 */
-	public BuiltinCommand getCommand(String commandName, Repository db,
+	public static BuiltinCommand getCommand(String commandName, Repository db,
 			InputStream in, OutputStream out) throws IOException {
 		BuiltinCommandFactory cf = commandRegistry.get(commandName);
 		return (cf == null) ? null : cf.create(db, in, out);
@@ -211,9 +210,6 @@ public abstract class Repository implements AutoCloseable {
 
 	/**
 	 * Initialize a new repository instance.
-	 *
-	 * TODO: Ideally the lfs bundle would trigger registration of itself. Core
-	 * should not know about any specific commands.
 	 *
 	 * @param options
 	 *            options to configure the repository.
@@ -223,30 +219,6 @@ public abstract class Repository implements AutoCloseable {
 		fs = options.getFS();
 		workTree = options.getWorkTree();
 		indexFile = options.getIndexFile();
-
-		registerComand("jgit://builtin/lfs/clean",
-				(BuiltinCommandFactory) getStaticField(
-						"org.eclipse.jgit.lfs.CleanFilter", "FACTORY"));
-		registerComand("jgit://builtin/lfs/smudge",
-				(BuiltinCommandFactory) getStaticField(
-						"org.eclipse.jgit.lfs.SmudgeFilter", "FACTORY"));
-	}
-
-	private Object getStaticField(String className, String fieldName) {
-		Class cl;
-		try {
-			cl = Class.forName(className);
-		if (cl == null)
-			return null;
-		Field f=cl.getField(fieldName);
-		if (f == null)
-			return null;
-		return (f.get(null));
-		} catch (IllegalArgumentException | IllegalAccessException
-				| ClassNotFoundException | NoSuchFieldException
-				| SecurityException e) {
-			return null;
-		}
 	}
 
 	/** @return listeners observing only events on this repository. */

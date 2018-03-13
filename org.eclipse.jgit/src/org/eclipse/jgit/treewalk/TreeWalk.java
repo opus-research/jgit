@@ -359,7 +359,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 		if (repo != null) {
 			config = repo.getConfig();
 			attributesNodeProvider = repo.createAttributesNodeProvider();
-			registeredCommands = repo.listRegisteredCommands();
+			registeredCommands = Repository.listRegisteredCommands();
 		} else {
 			config = null;
 			attributesNodeProvider = null;

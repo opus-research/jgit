@@ -74,7 +74,7 @@ public class CleanFilter extends BuiltinCommand {
 	/**
 	 * The factory is responsible for creating instances for {@link CleanFilter}
 	 * . This factory can be registered to the repository with the help of
-	 * {@link Repository#registerComand(String, BuiltinCommandFactory)}
+	 * {@link Repository#registerCommand(String, BuiltinCommandFactory)}
 	 */
 	public final static BuiltinCommandFactory FACTORY = new BuiltinCommandFactory() {
 		@Override
@@ -82,6 +82,17 @@ public class CleanFilter extends BuiltinCommand {
 				OutputStream out) throws IOException {
 			return new CleanFilter(db, in, out);
 		}
+	};
+
+	/**
+	 * Registers this filter to JGit by calling
+	 * {@link Repository#registerCommand(String, BuiltinCommandFactory)}
+	 */
+	public final static void register() {
+		Repository.registerCommand(
+				org.eclipse.jgit.lib.Constants.BUILTIN_FILTER_PREFIX
+						+ "lfs/clean",
+				FACTORY);
 	};
 
 	// Used to compute the hash for the original content
