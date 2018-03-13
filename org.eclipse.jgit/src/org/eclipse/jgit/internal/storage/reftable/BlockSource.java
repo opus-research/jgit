@@ -41,7 +41,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.io;
+package org.eclipse.jgit.internal.storage.reftable;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -49,44 +49,12 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
 /**
- * Provides content blocks of file.
+ * Provides content blocks of a reftable to {@link ReftableReader}.
  * <p>
  * {@code BlockSource} implementations must decide if they will be thread-safe,
  * or not.
  */
 public abstract class BlockSource implements AutoCloseable {
-	/**
-	 * Wrap a byte array as a {@code BlockSource}.
-	 *
-	 * @param content
-	 *            input file.
-	 * @return block source to read from {@code content}.
-	 */
-	public static BlockSource from(byte[] content) {
-		return new BlockSource() {
-			@Override
-			public ByteBuffer read(long pos, int cnt) {
-				ByteBuffer buf = ByteBuffer.allocate(cnt);
-				if (pos < content.length) {
-					int p = (int) pos;
-					int n = Math.min(cnt, content.length - p);
-					buf.put(content, p, n);
-				}
-				return buf;
-			}
-
-			@Override
-			public long size() {
-				return content.length;
-			}
-
-			@Override
-			public void close() {
-				// Do nothing.
-			}
-		};
-	}
-
 	/**
 	 * Read from a {@code FileInputStream}.
 	 * <p>
@@ -144,8 +112,8 @@ public abstract class BlockSource implements AutoCloseable {
 	 * Read a block from the file.
 	 * <p>
 	 * To reduce copying, the returned ByteBuffer should have an accessible
-	 * array and {@code arrayOffset() == 0}. The caller will discard the
-	 * ByteBuffer and directly use the backing array.
+	 * array. {@link ReftableReader} will discard the ByteBuffer and directly
+	 * use the backing array.
 	 *
 	 * @param position
 	 *            position of the block in the file, specified in bytes from the
@@ -154,7 +122,7 @@ public abstract class BlockSource implements AutoCloseable {
 	 *            size to read.
 	 * @return buffer containing the block content.
 	 * @throws IOException
-	 *             if block cannot be read.
+	 *             block cannot be read.
 	 */
 	public abstract ByteBuffer read(long position, int blockSize)
 			throws IOException;
@@ -164,19 +132,19 @@ public abstract class BlockSource implements AutoCloseable {
 	 *
 	 * @return total number of bytes in the file.
 	 * @throws IOException
-	 *             if size cannot be obtained.
+	 *             size cannot be obtained.
 	 */
 	public abstract long size() throws IOException;
 
 	/**
 	 * Advise the {@code BlockSource} a sequential scan is starting.
 	 *
-	 * @param startPos
+	 * @param start
 	 *            starting position.
-	 * @param endPos
+	 * @param end
 	 *            ending position.
 	 */
-	public void adviseSequentialRead(long startPos, long endPos) {
+	public void adviseSequentialRead(long start, long end) {
 		// Do nothing by default.
 	}
 
