@@ -52,7 +52,7 @@ import java.io.OutputStream;
  * data from/to stdin/stdout these builtin commmands may be used. They are
  * constructed by {@link FilterCommandFactory}.
  *
- * @since 4.5
+ * @since 4.6
  */
 public abstract class FilterCommand {
 	/**

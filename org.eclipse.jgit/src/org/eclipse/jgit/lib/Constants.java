@@ -394,7 +394,7 @@ public final class Constants {
 	/**
 	 * Builtin filter commands start with this prefix
 	 *
-	 * @since 4.5
+	 * @since 4.6
 	 */
 	public static final String BUILTIN_FILTER_PREFIX = "jgit://builtin/";
 
