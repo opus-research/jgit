@@ -68,7 +68,7 @@ public class SymlinksTest extends RepositoryTestCase {
 	 * Steps: 1.Add file 'a' 2.Commit 3.Create branch '1' 4.Replace file 'a' by
 	 * symlink 'a' 5.Commit 6.Checkout branch '1'
 	 *
-	 * The working tree should contains 'a' with FileMode.REGULAR_FILE after the
+	 * The working tree should contain 'a' with FileMode.REGULAR_FILE after the
 	 * checkout.
 	 *
 	 * @throws Exception
@@ -101,7 +101,7 @@ public class SymlinksTest extends RepositoryTestCase {
 	 * Steps: 1.Add symlink 'a' 2.Commit 3.Create branch '1' 4.Replace symlink
 	 * 'a' by file 'a' 5.Commit 6.Checkout branch '1'
 	 *
-	 * The working tree should contains 'a' with FileMode.SYMLINK after the
+	 * The working tree should contain 'a' with FileMode.SYMLINK after the
 	 * checkout.
 	 *
 	 * @throws Exception
@@ -134,7 +134,7 @@ public class SymlinksTest extends RepositoryTestCase {
 	 * Steps: 1.Add folder 'a' 2.Commit 3.Create branch '1' 4.Replace folder 'a'
 	 * by symlink 'a' 5.Commit 6.Checkout branch '1'
 	 *
-	 * The working tree should contains 'a' with FileMode.TREE after the
+	 * The working tree should contain 'a' with FileMode.TREE after the
 	 * checkout.
 	 *
 	 * @throws Exception
@@ -168,7 +168,7 @@ public class SymlinksTest extends RepositoryTestCase {
 	 * Steps: 1.Add symlink 'a' 2.Commit 3.Create branch '1' 4.Replace symlink
 	 * 'a' by folder 'a' 5.Commit 6.Checkout branch '1'
 	 *
-	 * The working tree should contains 'a' with FileMode.SYMLINK after the
+	 * The working tree should contain 'a' with FileMode.SYMLINK after the
 	 * checkout.
 	 *
 	 * @throws Exception
@@ -202,7 +202,7 @@ public class SymlinksTest extends RepositoryTestCase {
 	 * Steps: 1.Add file 'b' 2.Commit 3.Create branch '1' 4.Add symlink 'a'
 	 * 5.Commit 6.Checkout branch '1'
 	 *
-	 * The working tree should not contains 'a' -> FileMode.MISSING after the
+	 * The working tree should not contain 'a' -> FileMode.MISSING after the
 	 * checkout.
 	 *
 	 * @throws Exception
@@ -233,7 +233,7 @@ public class SymlinksTest extends RepositoryTestCase {
 	 * Steps: 1.Add symlink 'a' 2.Commit 3.Create branch '1' 4.Delete symlink
 	 * 'a' 5.Commit 6.Checkout branch '1'
 	 *
-	 * The working tree should contains 'a' with FileMode.SYMLINK after the
+	 * The working tree should contain 'a' with FileMode.SYMLINK after the
 	 * checkout.
 	 *
 	 * @throws Exception
