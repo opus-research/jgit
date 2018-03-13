@@ -80,7 +80,7 @@ public abstract class PublisherPackSlice {
 		 *
 		 * @param slice
 		 */
-		public void stored(PublisherPackSlice slice);
+		public void unloaded(PublisherPackSlice slice);
 	}
 
 	/** Size of each write in bytes between relocking. */
@@ -146,7 +146,7 @@ public abstract class PublisherPackSlice {
 
 	/**
 	 * Same as {@link #store()}, except only call
-	 * {@link LoadCallback#stored(PublisherPackSlice)} if allocated is true.
+	 * {@link LoadCallback#unloaded(PublisherPackSlice)} if allocated is true.
 	 *
 	 * @param allocated
 	 * @return true if this block was released, false if it wasn't loaded
@@ -162,7 +162,7 @@ public abstract class PublisherPackSlice {
 			inMemory = false;
 			memoryBuffer = null;
 			if (allocated)
-				loadCallback.stored(this);
+				loadCallback.unloaded(this);
 			return true;
 		} finally {
 			writeLock.unlock();
@@ -252,7 +252,7 @@ public abstract class PublisherPackSlice {
 	public void release() {
 		if (referenceCount.decrementAndGet() == 0) {
 			if (inMemory)
-				loadCallback.stored(this);
+				loadCallback.unloaded(this);
 			close();
 		}
 	}
@@ -269,6 +269,7 @@ public abstract class PublisherPackSlice {
 		Lock writeLock = rwLock.writeLock();
 		writeLock.lock();
 		try {
+			inMemory = false;
 			memoryBuffer = null;
 			closed = true;
 		} finally {

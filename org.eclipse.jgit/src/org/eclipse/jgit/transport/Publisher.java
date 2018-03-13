@@ -46,7 +46,9 @@ package org.eclipse.jgit.transport;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -289,21 +291,46 @@ public class Publisher {
 		// Split pack apart into the smallest number of packs needed to cover
 		// the different sessions. Not all sessions will be subscribed to all of
 		// the updated refs.
+		String dbName = getName(db);
 		Map<Set<ReceiveCommand>, List<PublisherSession>> updateGroups = processor
-				.getAffectedClients(getName(db), updates);
+				.getAffectedClients(dbName, updates);
 		for (Map.Entry<Set<ReceiveCommand>, List<PublisherSession>> e :
 				updateGroups.entrySet()) {
-			try {
-				List<PublisherSession> sessions = e.getValue();
-				if (sessions.size() == 0)
-					break;
+			// Need to split up the session list further to include all possible
+			// existing ObjectIds of all covered objects. This reduces the pack
+			// size as much as possible without asking each client for their
+			// ref state by assuming the client's state matches the server for
+			// all refs that match the subscription specs.
+			List<PublisherSession> updateGroup = e.getValue();
+			Map<Set<SubscribeSpec>, List<PublisherSession>> existingObjectGroups
+					= new HashMap<Set<SubscribeSpec>, List<PublisherSession>>();
 
-				PublisherPack pk = packFactory.buildPack(
-						sessions.size(), getName(db), updates, db);
+			if (updateGroup.size() == 0)
+				break;
+			for (PublisherSession s : updateGroup) {
+				Set<SubscribeSpec> specSet = new HashSet<SubscribeSpec>();
+				specSet.addAll(s.getSubscriptions(dbName));
+				List<PublisherSession> sessionGroup = existingObjectGroups.get(
+						specSet);
+				if (sessionGroup == null) {
+					sessionGroup = new ArrayList<PublisherSession>();
+					sessionGroup.add(s);
+					existingObjectGroups.put(specSet, sessionGroup);
+				} else
+					sessionGroup.add(s);
+			}
 
-				packStream.put(pk);
-			} catch (IOException ex) {
-				// Nothing, pack already released
+			for (Map.Entry<Set<SubscribeSpec>, List<PublisherSession>> e2 :
+					existingObjectGroups.entrySet()) {
+				List<PublisherSession> sessionList = e2.getValue();
+				Set<SubscribeSpec> sessionSpecs = e2.getKey();
+				try {
+					PublisherPack pk = packFactory.buildPack(sessionList.size(),
+							dbName, updates, db, sessionSpecs);
+					packStream.put(pk);
+				} catch (IOException ex) {
+					// Nothing, pack already released
+				}
 			}
 		}
 	}
@@ -337,7 +364,9 @@ public class Publisher {
 	 */
 	public PublisherPack createInitialPack(List<ReceiveCommand> refUpdates,
 			Repository serverRepository, String repoName) throws IOException {
-		return packFactory.buildPack(1, repoName, refUpdates, serverRepository);
+		List<SubscribeSpec> emptySpecs = Collections.emptyList();
+		return packFactory.buildPack(
+				1, repoName, refUpdates, serverRepository, emptySpecs);
 	}
 
 	/**

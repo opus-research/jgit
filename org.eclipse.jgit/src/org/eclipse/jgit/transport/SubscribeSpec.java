@@ -80,6 +80,11 @@ public class SubscribeSpec {
 	}
 
 	@Override
+	public int hashCode() {
+		return refName.hashCode();
+	}
+
+	@Override
 	public boolean equals(Object other) {
 		if (!(other instanceof SubscribeSpec))
 			return false;
