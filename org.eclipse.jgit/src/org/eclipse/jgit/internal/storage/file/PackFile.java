@@ -62,7 +62,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.CRC32;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
@@ -127,8 +126,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	private volatile boolean invalid;
 
 	private boolean invalidBitmap;
-
-	private AtomicInteger transientErrorCount = new AtomicInteger();
 
 	private byte[] packChecksum;
 
@@ -572,14 +569,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 	void setInvalid() {
 		invalid = true;
-	}
-
-	int incrementTransientErrorCount() {
-		return transientErrorCount.incrementAndGet();
-	}
-
-	void resetTransientErrorCount() {
-		transientErrorCount.set(0);
 	}
 
 	private void readFully(final long position, final byte[] dstbuf,
