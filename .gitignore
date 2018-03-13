@@ -1,6 +1,9 @@
 /.project
 /target
-.DS_Store
 infer-out
-bazel-*
+bazel-bin
+bazel-genfiles
+bazel-jgit
+bazel-out
+bazel-testlogs
 *~

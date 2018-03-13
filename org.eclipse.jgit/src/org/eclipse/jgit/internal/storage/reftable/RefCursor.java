@@ -45,14 +45,38 @@ package org.eclipse.jgit.internal.storage.reftable;
 
 import java.io.IOException;
 
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.lib.Ref;
 
-/** Iterator over references inside a {@link Reftable}. */
+/** Iterator over references. */
 public abstract class RefCursor implements AutoCloseable {
+	/**
+	 * Seek to the first reference, to iterate in order.
+	 *
+	 * @throws IOException
+	 *             references cannot be read.
+	 */
+	public abstract void seekToFirstRef() throws IOException;
+
+	/**
+	 * Seek either to a reference, or a reference subtree.
+	 * <p>
+	 * If {@code refName} ends with {@code "/"} the method will seek to the
+	 * subtree of all references starting with {@code refName} as a prefix.
+	 * <p>
+	 * Otherwise, only {@code refName} will be found, if present.
+	 *
+	 * @param refName
+	 *            reference name or subtree to find.
+	 * @throws IOException
+	 *             references cannot be read.
+	 */
+	public abstract void seek(String refName) throws IOException;
+
 	/**
 	 * Check if another reference is available.
 	 *
-	 * @return {@code true} if there is another result.
+	 * @return {@code true} if there is another reference.
 	 * @throws IOException
 	 *             references cannot be read.
 	 */
@@ -67,6 +91,41 @@ public abstract class RefCursor implements AutoCloseable {
 		return r.getStorage() == Ref.Storage.NEW && r.getObjectId() == null;
 	}
 
+	/**
+	 * Lookup a reference, or null if not found.
+	 *
+	 * @param refName
+	 *            reference name to find.
+	 * @return the reference, or {@code null} if not found.
+	 * @throws IOException
+	 *             references cannot be read.
+	 */
+	@Nullable
+	public Ref exactRef(String refName) throws IOException {
+		seek(refName);
+		return next() ? getRef() : null;
+	}
+
+	/**
+	 * Test if a reference or reference subtree exists.
+	 * <p>
+	 * If {@code refName} ends with {@code "/"}, the method tests if any
+	 * reference starts with {@code refName} as a prefix.
+	 * <p>
+	 * Otherwise, the method checks if {@code refName} exists.
+	 *
+	 * @param refName
+	 *            reference name or subtree to find.
+	 * @return {@code true} if the reference exists, or at least one reference
+	 *         exists in the subtree.
+	 * @throws IOException
+	 *             references cannot be read.
+	 */
+	public boolean hasRef(String refName) throws IOException {
+		seek(refName);
+		return next();
+	}
+
 	@Override
-	public abstract void close();
+	public abstract void close() throws IOException;
 }
