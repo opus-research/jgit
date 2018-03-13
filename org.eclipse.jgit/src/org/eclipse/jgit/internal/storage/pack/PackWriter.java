@@ -114,7 +114,6 @@ import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.storage.pack.PackConfig;
-import org.eclipse.jgit.storage.pack.PackStatistics;
 import org.eclipse.jgit.transport.ObjectCountCallback;
 import org.eclipse.jgit.transport.WriteAbortedException;
 import org.eclipse.jgit.util.BlockList;
@@ -248,13 +247,13 @@ public class PackWriter implements AutoCloseable {
 
 	private final PackConfig config;
 
-	private final PackStatistics.Accumulator stats;
+	private final Statistics stats;
 
 	private final MutableState state;
 
 	private final WeakReference<PackWriter> selfRef;
 
-	private PackStatistics.ObjectType.Accumulator typeStats;
+	private Statistics.ObjectType typeStats;
 
 	private List<ObjectToPack> sortedByName;
 
@@ -357,7 +356,7 @@ public class PackWriter implements AutoCloseable {
 		deltaBaseAsOffset = config.isDeltaBaseAsOffset();
 		reuseDeltas = config.isReuseDeltas();
 		reuseValidate = true; // be paranoid by default
-		stats = new PackStatistics.Accumulator();
+		stats = new Statistics();
 		state = new MutableState();
 		selfRef = new WeakReference<PackWriter>(this);
 		instances.put(selfRef, Boolean.TRUE);
@@ -982,7 +981,7 @@ public class PackWriter implements AutoCloseable {
 
 			writeObjects(out);
 			if (!edgeObjects.isEmpty() || !cachedPacks.isEmpty()) {
-				for (PackStatistics.ObjectType.Accumulator typeStat : stats.objectTypes) {
+				for (Statistics.ObjectType typeStat : stats.objectTypes) {
 					if (typeStat == null)
 						continue;
 					stats.thinPackBytes += typeStat.bytes;
@@ -1003,7 +1002,7 @@ public class PackWriter implements AutoCloseable {
 			stats.timeWriting = System.currentTimeMillis() - writeStart;
 			stats.depth = depth;
 
-			for (PackStatistics.ObjectType.Accumulator typeStat : stats.objectTypes) {
+			for (Statistics.ObjectType typeStat : stats.objectTypes) {
 				if (typeStat == null)
 					continue;
 				typeStat.cntDeltas += typeStat.reusedDeltas;
@@ -1023,8 +1022,8 @@ public class PackWriter implements AutoCloseable {
 	 *         final pack stream. The object is only available to callers after
 	 *         {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)}
 	 */
-	public PackStatistics getStatistics() {
-		return new PackStatistics(stats);
+	public Statistics getStatistics() {
+		return stats;
 	}
 
 	/** @return snapshot of the current state of this PackWriter. */
@@ -2029,36 +2028,28 @@ public class PackWriter implements AutoCloseable {
 		return true;
 	}
 
-	/**
-	 * Summary of how PackWriter created the pack.
-	 *
-	 * @deprecated Use {@link PackStatistics} instead.
-	 */
-	@Deprecated
+	/** Summary of how PackWriter created the pack. */
 	public static class Statistics {
 		/** Statistics about a single class of object. */
 		public static class ObjectType {
-			// All requests are forwarded to this object.
-			private PackStatistics.ObjectType objectType;
+			long cntObjects;
 
-			/**
-			 * Wraps an
-			 * {@link org.eclipse.jgit.storage.pack.PackStatistics.ObjectType}
-			 * instance to maintain backwards compatibility with existing API.
-			 *
-			 * @param type
-			 *            the wrapped instance
-			 */
-			public ObjectType(PackStatistics.ObjectType type) {
-				objectType = type;
-			}
+			long cntDeltas;
+
+			long reusedObjects;
+
+			long reusedDeltas;
+
+			long bytes;
+
+			long deltaBytes;
 
 			/**
 			 * @return total number of objects output. This total includes the
 			 *         value of {@link #getDeltas()}.
 			 */
 			public long getObjects() {
-				return objectType.getObjects();
+				return cntObjects;
 			}
 
 			/**
@@ -2066,7 +2057,7 @@ public class PackWriter implements AutoCloseable {
 			 *         actual number of deltas if a cached pack was reused.
 			 */
 			public long getDeltas() {
-				return objectType.getDeltas();
+				return cntDeltas;
 			}
 
 			/**
@@ -2075,7 +2066,7 @@ public class PackWriter implements AutoCloseable {
 			 *         {@link #getReusedDeltas()}.
 			 */
 			public long getReusedObjects() {
-				return objectType.getReusedObjects();
+				return reusedObjects;
 			}
 
 			/**
@@ -2086,7 +2077,7 @@ public class PackWriter implements AutoCloseable {
 			 *         was reused.
 			 */
 			public long getReusedDeltas() {
-				return objectType.getReusedDeltas();
+				return reusedDeltas;
 			}
 
 			/**
@@ -2095,7 +2086,7 @@ public class PackWriter implements AutoCloseable {
 			 *         also includes all of {@link #getDeltaBytes()}.
 			 */
 			public long getBytes() {
-				return objectType.getBytes();
+				return bytes;
 			}
 
 			/**
@@ -2103,22 +2094,54 @@ public class PackWriter implements AutoCloseable {
 			 *         object headers for the delta objects.
 			 */
 			public long getDeltaBytes() {
-				return objectType.getDeltaBytes();
+				return deltaBytes;
 			}
 		}
 
-		// All requests are forwarded to this object.
-		private PackStatistics statistics;
+		Set<ObjectId> interestingObjects;
 
-		/**
-		 * Wraps a {@link PackStatistics} object to maintain backwards
-		 * compatibility with existing API.
-		 *
-		 * @param stats
-		 *            the wrapped PackStatitics object
-		 */
-		public Statistics(PackStatistics stats) {
-			statistics = stats;
+		Set<ObjectId> uninterestingObjects;
+
+		Collection<CachedPack> reusedPacks;
+
+		int depth;
+
+		int deltaSearchNonEdgeObjects;
+
+		int deltasFound;
+
+		long totalObjects;
+
+		long bitmapIndexMisses;
+
+		long totalDeltas;
+
+		long reusedObjects;
+
+		long reusedDeltas;
+
+		long totalBytes;
+
+		long thinPackBytes;
+
+		long timeCounting;
+
+		long timeSearchingForReuse;
+
+		long timeSearchingForSizes;
+
+		long timeCompressing;
+
+		long timeWriting;
+
+		ObjectType[] objectTypes;
+
+		{
+			objectTypes = new ObjectType[5];
+			objectTypes[OBJ_COMMIT] = new ObjectType();
+			objectTypes[OBJ_TREE] = new ObjectType();
+			objectTypes[OBJ_BLOB] = new ObjectType();
+			objectTypes[OBJ_TAG] = new ObjectType();
 		}
 
 		/**
@@ -2127,7 +2150,7 @@ public class PackWriter implements AutoCloseable {
 		 *         test.
 		 */
 		public Set<ObjectId> getInterestingObjects() {
-			return statistics.getInterestingObjects();
+			return interestingObjects;
 		}
 
 		/**
@@ -2136,7 +2159,7 @@ public class PackWriter implements AutoCloseable {
 		 *         has these objects.
 		 */
 		public Set<ObjectId> getUninterestingObjects() {
-			return statistics.getUninterestingObjects();
+			return uninterestingObjects;
 		}
 
 		/**
@@ -2144,7 +2167,7 @@ public class PackWriter implements AutoCloseable {
 		 *         in the output, if any were selected for reuse.
 		 */
 		public Collection<CachedPack> getReusedPacks() {
-			return statistics.getReusedPacks();
+			return reusedPacks;
 		}
 
 		/**
@@ -2152,7 +2175,7 @@ public class PackWriter implements AutoCloseable {
 		 *         delta search process in order to find a potential delta base.
 		 */
 		public int getDeltaSearchNonEdgeObjects() {
-			return statistics.getDeltaSearchNonEdgeObjects();
+			return deltaSearchNonEdgeObjects;
 		}
 
 		/**
@@ -2161,7 +2184,7 @@ public class PackWriter implements AutoCloseable {
 		 *         {@link #getDeltaSearchNonEdgeObjects()}.
 		 */
 		public int getDeltasFound() {
-			return statistics.getDeltasFound();
+			return deltasFound;
 		}
 
 		/**
@@ -2169,7 +2192,7 @@ public class PackWriter implements AutoCloseable {
 		 *         of {@link #getTotalDeltas()}.
 		 */
 		public long getTotalObjects() {
-			return statistics.getTotalObjects();
+			return totalObjects;
 		}
 
 		/**
@@ -2180,7 +2203,7 @@ public class PackWriter implements AutoCloseable {
 		 * @since 4.0
 		 */
 		public long getBitmapIndexMisses() {
-			return statistics.getBitmapIndexMisses();
+			return bitmapIndexMisses;
 		}
 
 		/**
@@ -2188,7 +2211,7 @@ public class PackWriter implements AutoCloseable {
 		 *         actual number of deltas if a cached pack was reused.
 		 */
 		public long getTotalDeltas() {
-			return statistics.getTotalDeltas();
+			return totalDeltas;
 		}
 
 		/**
@@ -2196,7 +2219,7 @@ public class PackWriter implements AutoCloseable {
 		 *         the output. This count includes {@link #getReusedDeltas()}.
 		 */
 		public long getReusedObjects() {
-			return statistics.getReusedObjects();
+			return reusedObjects;
 		}
 
 		/**
@@ -2206,7 +2229,7 @@ public class PackWriter implements AutoCloseable {
 		 *         actual number of reused deltas if a cached pack was reused.
 		 */
 		public long getReusedDeltas() {
-			return statistics.getReusedDeltas();
+			return reusedDeltas;
 		}
 
 		/**
@@ -2214,7 +2237,7 @@ public class PackWriter implements AutoCloseable {
 		 *         header, trailer, thin pack, and reused cached pack(s).
 		 */
 		public long getTotalBytes() {
-			return statistics.getTotalBytes();
+			return totalBytes;
 		}
 
 		/**
@@ -2226,7 +2249,7 @@ public class PackWriter implements AutoCloseable {
 		 *         pack header or trailer.
 		 */
 		public long getThinPackBytes() {
-			return statistics.getThinPackBytes();
+			return thinPackBytes;
 		}
 
 		/**
@@ -2235,17 +2258,17 @@ public class PackWriter implements AutoCloseable {
 		 * @return information about this type of object in the pack.
 		 */
 		public ObjectType byObjectType(int typeCode) {
-			return new ObjectType(statistics.byObjectType(typeCode));
+			return objectTypes[typeCode];
 		}
 
 		/** @return true if the resulting pack file was a shallow pack. */
 		public boolean isShallow() {
-			return statistics.isShallow();
+			return depth > 0;
 		}
 
 		/** @return depth (in commits) the pack includes if shallow. */
 		public int getDepth() {
-			return statistics.getDepth();
+			return depth;
 		}
 
 		/**
@@ -2254,7 +2277,7 @@ public class PackWriter implements AutoCloseable {
 		 *         that occur when a cached pack is selected for reuse.
 		 */
 		public long getTimeCounting() {
-			return statistics.getTimeCounting();
+			return timeCounting;
 		}
 
 		/**
@@ -2263,7 +2286,7 @@ public class PackWriter implements AutoCloseable {
 		 *         can be assumed to already have.
 		 */
 		public long getTimeSearchingForReuse() {
-			return statistics.getTimeSearchingForReuse();
+			return timeSearchingForReuse;
 		}
 
 		/**
@@ -2273,7 +2296,7 @@ public class PackWriter implements AutoCloseable {
 		 *         together and improve delta compression ratios.
 		 */
 		public long getTimeSearchingForSizes() {
-			return statistics.getTimeSearchingForSizes();
+			return timeSearchingForSizes;
 		}
 
 		/**
@@ -2283,7 +2306,7 @@ public class PackWriter implements AutoCloseable {
 		 *         delta compression.
 		 */
 		public long getTimeCompressing() {
-			return statistics.getTimeCompressing();
+			return timeCompressing;
 		}
 
 		/**
@@ -2293,12 +2316,16 @@ public class PackWriter implements AutoCloseable {
 		 *         value.
 		 */
 		public long getTimeWriting() {
-			return statistics.getTimeWriting();
+			return timeWriting;
 		}
 
 		/** @return total time spent processing this pack. */
 		public long getTimeTotal() {
-			return statistics.getTimeTotal();
+			return timeCounting
+				+ timeSearchingForReuse
+				+ timeSearchingForSizes
+				+ timeCompressing
+				+ timeWriting;
 		}
 
 		/**
@@ -2306,12 +2333,14 @@ public class PackWriter implements AutoCloseable {
 		 *         {@code getTotalBytes() / (getTimeWriting() / 1000.0)}.
 		 */
 		public double getTransferRate() {
-			return statistics.getTransferRate();
+			return getTotalBytes() / (getTimeWriting() / 1000.0);
 		}
 
 		/** @return formatted message string for display to clients. */
 		public String getMessage() {
-			return statistics.getMessage();
+			return MessageFormat.format(JGitText.get().packWriterStatistics, //
+					Long.valueOf(totalObjects), Long.valueOf(totalDeltas), //
+					Long.valueOf(reusedObjects), Long.valueOf(reusedDeltas));
 		}
 	}
 
