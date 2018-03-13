@@ -248,12 +248,11 @@ public class BlameCommand extends GitCommand<BlameResult> {
 			rawText = new RawText(inTree);
 			break;
 		case TRUE:
-			try (AutoLFInputStream in = new AutoLFInputStream(
-					new FileInputStream(inTree), true)) {
-				// Canonicalization should lead to same or shorter length
-				// (CRLF to LF), so the file size on disk is an upper size bound
-				rawText = new RawText(toByteArray(in, (int) inTree.length()));
-			}
+			AutoLFInputStream in = new AutoLFInputStream(
+					new FileInputStream(inTree), true);
+			// Canonicalization should lead to same or shorter length
+			// (CRLF to LF), so the file size on disk is an upper size bound
+			rawText = new RawText(toByteArray(in, (int) inTree.length()));
 			break;
 		default:
 			throw new IllegalArgumentException(
