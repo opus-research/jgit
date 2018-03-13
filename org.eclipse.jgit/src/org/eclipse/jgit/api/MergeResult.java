@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010, Stefan Lay <stefan.lay@sap.com>
- * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2010-2012, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -76,8 +76,23 @@ public class MergeResult {
 				return true;
 			}
 		},
+		/**
+		 * @since 2.0
+		 */
+		FAST_FORWARD_SQUASHED {
+			@Override
+			public String toString() {
+				return "Fast-forward-squashed";
+			}
+
+			@Override
+			public boolean isSuccessful() {
+				return true;
+			}
+		},
 		/** */
 		ALREADY_UP_TO_DATE {
+			@Override
 			public String toString() {
 				return "Already-up-to-date";
 			}
@@ -89,6 +104,7 @@ public class MergeResult {
 		},
 		/** */
 		FAILED {
+			@Override
 			public String toString() {
 				return "Failed";
 			}
@@ -100,6 +116,7 @@ public class MergeResult {
 		},
 		/** */
 		MERGED {
+			@Override
 			public String toString() {
 				return "Merged";
 			}
@@ -109,8 +126,23 @@ public class MergeResult {
 				return true;
 			}
 		},
+		/**
+		 * @since 2.0
+		 */
+		MERGED_SQUASHED {
+			@Override
+			public String toString() {
+				return "Merged-squashed";
+			}
+
+			@Override
+			public boolean isSuccessful() {
+				return true;
+			}
+		},
 		/** */
 		CONFLICTING {
+			@Override
 			public String toString() {
 				return "Conflicting";
 			}
@@ -122,6 +154,7 @@ public class MergeResult {
 		},
 		/** */
 		NOT_SUPPORTED {
+			@Override
 			public String toString() {
 				return "Not-yet-supported";
 			}
@@ -165,17 +198,19 @@ public class MergeResult {
 	 *            all the commits which have been merged together
 	 * @param mergeStatus
 	 *            the status the merge resulted in
+	 * @param mergeStrategy
+	 *            the used {@link MergeStrategy}
 	 * @param lowLevelResults
 	 *            merge results as returned by
 	 *            {@link ResolveMerger#getMergeResults()}
-	 * @param mergeStrategy
-	 *            the used {@link MergeStrategy}
+	 * @since 2.0
 	 */
 	public MergeResult(ObjectId newHead, ObjectId base,
 			ObjectId[] mergedCommits, MergeStatus mergeStatus,
-			Map<String, org.eclipse.jgit.merge.MergeResult<?>> lowLevelResults,
-			MergeStrategy mergeStrategy) {
-		this(newHead, base, mergedCommits, mergeStatus, mergeStrategy, lowLevelResults, null);
+			MergeStrategy mergeStrategy,
+			Map<String, org.eclipse.jgit.merge.MergeResult<?>> lowLevelResults) {
+		this(newHead, base, mergedCommits, mergeStatus, mergeStrategy,
+				lowLevelResults, null);
 	}
 
 	/**
@@ -202,7 +237,7 @@ public class MergeResult {
 			Map<String, org.eclipse.jgit.merge.MergeResult<?>> lowLevelResults,
 			String description) {
 		this(newHead, base, mergedCommits, mergeStatus, mergeStrategy,
-				lowLevelResults, null, null);
+				lowLevelResults, null, description);
 	}
 
 	/**
