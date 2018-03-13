@@ -155,6 +155,7 @@ public class ValidRefNameTest {
 	@Test
 	public void testValidSpecialCharacters() {
 		assertValid(true, "refs/heads/!");
+		assertValid(true, "refs/heads/\"");
 		assertValid(true, "refs/heads/#");
 		assertValid(true, "refs/heads/$");
 		assertValid(true, "refs/heads/%");
@@ -166,27 +167,21 @@ public class ValidRefNameTest {
 		assertValid(true, "refs/heads/,");
 		assertValid(true, "refs/heads/-");
 		assertValid(true, "refs/heads/;");
+		assertValid(true, "refs/heads/<");
 		assertValid(true, "refs/heads/=");
+		assertValid(true, "refs/heads/>");
 		assertValid(true, "refs/heads/@");
 		assertValid(true, "refs/heads/]");
 		assertValid(true, "refs/heads/_");
 		assertValid(true, "refs/heads/`");
 		assertValid(true, "refs/heads/{");
+		assertValid(true, "refs/heads/|");
 		assertValid(true, "refs/heads/}");
 
 		// This is valid on UNIX, but not on Windows
 		// hence we make in invalid due to non-portability
 		//
 		assertValid(false, "refs/heads/\\");
-	}
-
-	@Test
-	public void testSpecialCharactersInvalidOnWindows() {
-		boolean windows = SystemReader.getInstance().isWindows();
-		assertValid(!windows, "refs/heads/\"");
-		assertValid(!windows, "refs/heads/<");
-		assertValid(!windows, "refs/heads/>");
-		assertValid(!windows, "refs/heads/|");
 	}
 
 	@Test
