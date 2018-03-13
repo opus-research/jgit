@@ -272,7 +272,7 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 	 *             the inflater encountered an invalid chunk of data. Data
 	 *             stream corruption is likely.
 	 */
-	synchronized int inflate(final PackFile pack, long position, final byte[] dstbuf,
+	int inflate(final PackFile pack, long position, final byte[] dstbuf,
 			boolean headerOnly) throws IOException, DataFormatException {
 		prepareInflater();
 		pin(pack, position);
