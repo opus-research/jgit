@@ -1,0 +1,24 @@
+java_bundle(
+  name = 'bundle',
+  deps = [
+    ':ant',
+  ],
+)
+
+java_library(
+  name = 'ant',
+  srcs = glob(['src/**/*.java']),
+  resources = glob(['resources/**/*']),
+  deps = [
+    '//org.eclipse.jgit:api',
+    '//org.eclipse.jgit:lib',
+    '//lib/ant:ant',
+  ],
+  visibility = ['PUBLIC'],
+)
+
+java_library(
+  name = 'ant-src',
+  resources = glob(['src/**/*.java', 'resources/**/*']),
+  visibility = ['PUBLIC'],
+)

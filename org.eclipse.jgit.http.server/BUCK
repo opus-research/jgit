@@ -1,0 +1,29 @@
+java_bundle(
+  name = 'bundle',
+  deps = [
+    ':server',
+  ],
+)
+
+java_library(
+  name = 'server',
+  srcs = glob(['src/**/*.java']),
+  resources = glob(['resources/**/*']),
+  deps = [
+    '//org.eclipse.jgit:http_util',
+    '//org.eclipse.jgit:lib',
+    '//org.eclipse.jgit:nls',
+    '//org.eclipse.jgit:progress',
+    '//org.eclipse.jgit:transport_resolver',
+    '//org.eclipse.jgit:transport_server',
+    '//org.eclipse.jgit:util',
+    '//lib:servlet-api',
+  ],
+  visibility = ['PUBLIC'],
+)
+
+java_library(
+  name = 'server-src',
+  resources = glob(['src/**/*.java', 'resources/**/*']),
+  visibility = ['PUBLIC'],
+)
