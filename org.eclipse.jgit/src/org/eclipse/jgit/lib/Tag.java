@@ -53,13 +53,12 @@ import java.text.MessageFormat;
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.ObjectWritingException;
-import org.eclipse.jgit.storage.file.FileRepository;
 
 /**
  * Represents a named reference to another Git object of any type.
  */
 public class Tag {
-	private final FileRepository objdb;
+	private final Repository objdb;
 
 	private ObjectId tagId;
 
@@ -80,7 +79,7 @@ public class Tag {
 	 *
 	 * @param db
 	 */
-	public Tag(final FileRepository db) {
+	public Tag(final Repository db) {
 		objdb = db;
 	}
 
@@ -88,12 +87,12 @@ public class Tag {
 	 * Construct a Tag representing an existing with a known name referencing an known object.
 	 * This could be either a simple or annotated tag.
 	 *
-	 * @param db {@link FileRepository}
+	 * @param db {@link Repository}
 	 * @param id target id.
 	 * @param refName tag name or null
 	 * @param raw data of an annotated tag.
 	 */
-	public Tag(final FileRepository db, final ObjectId id, String refName, final byte[] raw) {
+	public Tag(final Repository db, final ObjectId id, String refName, final byte[] raw) {
 		objdb = db;
 		if (raw != null) {
 			tagId = id;

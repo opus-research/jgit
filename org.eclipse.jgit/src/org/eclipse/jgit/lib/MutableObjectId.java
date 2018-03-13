@@ -71,7 +71,11 @@ public class MutableObjectId extends AnyObjectId {
 	 *            original entry, to copy id from
 	 */
 	MutableObjectId(MutableObjectId src) {
-		fromObjectId(src);
+		this.w1 = src.w1;
+		this.w2 = src.w2;
+		this.w3 = src.w3;
+		this.w4 = src.w4;
+		this.w5 = src.w5;
 	}
 
 	/** Make this id match {@link ObjectId#zeroId()}. */
@@ -81,20 +85,6 @@ public class MutableObjectId extends AnyObjectId {
 		w3 = 0;
 		w4 = 0;
 		w5 = 0;
-	}
-
-	/**
-	 * Copy another ObjectId into this instance.
-	 *
-	 * @param src
-	 *            the source to copy from.
-	 */
-	public void fromObjectId(AnyObjectId src) {
-		this.w1 = src.w1;
-		this.w2 = src.w2;
-		this.w3 = src.w3;
-		this.w4 = src.w4;
-		this.w5 = src.w5;
 	}
 
 	/**

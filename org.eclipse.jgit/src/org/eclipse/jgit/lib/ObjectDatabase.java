@@ -47,9 +47,6 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.eclipse.jgit.storage.file.PackedObjectLoader;
-import org.eclipse.jgit.storage.file.WindowCursor;
-
 /**
  * Abstraction of arbitrary object storage.
  * <p>
@@ -297,9 +294,9 @@ public abstract class ObjectDatabase {
 	 *            id of object to search for
 	 * @throws IOException
 	 */
-	public final void openObjectInAllPacks(
-			final Collection<PackedObjectLoader> out, final WindowCursor curs,
-			final AnyObjectId objectId) throws IOException {
+	final void openObjectInAllPacks(final Collection<PackedObjectLoader> out,
+			final WindowCursor curs, final AnyObjectId objectId)
+			throws IOException {
 		openObjectInAllPacks1(out, curs, objectId);
 		for (final ObjectDatabase alt : getAlternates()) {
 			alt.openObjectInAllPacks1(out, curs, objectId);
@@ -318,7 +315,7 @@ public abstract class ObjectDatabase {
 	 *            id of object to search for
 	 * @throws IOException
 	 */
-	protected void openObjectInAllPacks1(Collection<PackedObjectLoader> out,
+	void openObjectInAllPacks1(Collection<PackedObjectLoader> out,
 			WindowCursor curs, AnyObjectId objectId) throws IOException {
 		// Assume no pack support
 	}

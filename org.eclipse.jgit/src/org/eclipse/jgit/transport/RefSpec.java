@@ -43,8 +43,8 @@
 
 package org.eclipse.jgit.transport;
 
-import java.io.Serializable;
 import java.text.MessageFormat;
+import java.io.Serializable;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.Constants;

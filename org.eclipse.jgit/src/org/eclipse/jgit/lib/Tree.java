@@ -45,7 +45,6 @@
 
 package org.eclipse.jgit.lib;
 
-import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
 
@@ -53,7 +52,6 @@ import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.EntryExistsException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.util.RawParseUtils;
 
 /**
@@ -159,7 +157,7 @@ public class Tree extends TreeEntry implements Treeish {
 		return -(low + 1);
 	}
 
-	private final FileRepository db;
+	private final Repository db;
 
 	private TreeEntry[] contents;
 
@@ -168,7 +166,7 @@ public class Tree extends TreeEntry implements Treeish {
 	 *
 	 * @param repo The repository that owns the Tree.
 	 */
-	public Tree(final FileRepository repo) {
+	public Tree(final Repository repo) {
 		super(null, null, null);
 		db = repo;
 		contents = EMPTY_TREE;
@@ -182,7 +180,7 @@ public class Tree extends TreeEntry implements Treeish {
 	 * @param raw
 	 * @throws IOException
 	 */
-	public Tree(final FileRepository repo, final ObjectId myId, final byte[] raw)
+	public Tree(final Repository repo, final ObjectId myId, final byte[] raw)
 			throws IOException {
 		super(null, myId, null);
 		db = repo;
@@ -225,7 +223,7 @@ public class Tree extends TreeEntry implements Treeish {
 		return getParent() == null;
 	}
 
-	public FileRepository getRepository() {
+	public Repository getRepository() {
 		return db;
 	}
 
@@ -262,7 +260,7 @@ public class Tree extends TreeEntry implements Treeish {
 	 * @throws IOException
 	 */
 	public FileTreeEntry addFile(final String name) throws IOException {
-		return addFile(gitInternalSlash(Constants.encode(name)), 0);
+		return addFile(Repository.gitInternalSlash(Constants.encode(name)), 0);
 	}
 
 	/**
@@ -314,7 +312,7 @@ public class Tree extends TreeEntry implements Treeish {
 	 * @throws IOException
 	 */
 	public Tree addTree(final String name) throws IOException {
-		return addTree(gitInternalSlash(Constants.encode(name)), 0);
+		return addTree(Repository.gitInternalSlash(Constants.encode(name)), 0);
 	}
 
 	/**
@@ -458,7 +456,7 @@ public class Tree extends TreeEntry implements Treeish {
 	}
 
 	private TreeEntry findMember(final String s, byte slast) throws IOException {
-		return findMember(gitInternalSlash(Constants.encode(s)), slast, 0);
+		return findMember(Repository.gitInternalSlash(Constants.encode(s)), slast, 0);
 	}
 
 	private TreeEntry findMember(final byte[] s, final byte slast, final int offset)
@@ -609,12 +607,4 @@ public class Tree extends TreeEntry implements Treeish {
 		return r.toString();
 	}
 
-	static byte[] gitInternalSlash(byte[] bytes) {
-		if (File.separatorChar == '/')
-			return bytes;
-		for (int i=0; i<bytes.length; ++i)
-			if (bytes[i] == File.separatorChar)
-				bytes[i] = '/';
-		return bytes;
-	}
 }

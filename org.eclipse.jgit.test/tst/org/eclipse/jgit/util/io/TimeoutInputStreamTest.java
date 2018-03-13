@@ -50,9 +50,11 @@ import java.io.PipedOutputStream;
 import java.util.Arrays;
 import java.util.List;
 
-import junit.framework.TestCase;
-
 import org.eclipse.jgit.util.IO;
+import org.eclipse.jgit.util.io.InterruptTimer;
+import org.eclipse.jgit.util.io.TimeoutInputStream;
+
+import junit.framework.TestCase;
 
 public class TimeoutInputStreamTest extends TestCase {
 	private static final int timeout = 250;

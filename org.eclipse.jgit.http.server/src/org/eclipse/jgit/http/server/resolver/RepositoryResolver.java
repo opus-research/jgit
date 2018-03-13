@@ -46,12 +46,12 @@ package org.eclipse.jgit.http.server.resolver;
 import javax.servlet.http.HttpServletRequest;
 
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
-import org.eclipse.jgit.storage.file.FileRepository;
+import org.eclipse.jgit.lib.Repository;
 
-/** Locate a Git {@link FileRepository} by name from the URL. */
+/** Locate a Git {@link Repository} by name from the URL. */
 public interface RepositoryResolver {
 	/**
-	 * Locate and open a reference to a {@link FileRepository}.
+	 * Locate and open a reference to a {@link Repository}.
 	 * <p>
 	 * The caller is responsible for closing the returned Repository.
 	 *
@@ -71,7 +71,7 @@ public interface RepositoryResolver {
 	 *             the repository exists, but HTTP access is not allowed on the
 	 *             target repository, by any user.
 	 */
-	FileRepository open(HttpServletRequest req, String name)
+	Repository open(HttpServletRequest req, String name)
 			throws RepositoryNotFoundException, ServiceNotAuthorizedException,
 			ServiceNotEnabledException;
 }

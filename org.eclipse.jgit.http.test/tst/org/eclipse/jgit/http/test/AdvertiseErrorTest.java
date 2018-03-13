@@ -61,17 +61,17 @@ import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryConfig;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.transport.ReceivePack;
 import org.eclipse.jgit.transport.RemoteRefUpdate;
 import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.URIish;
 
 public class AdvertiseErrorTest extends HttpTestCase {
-	private FileRepository remoteRepository;
+	private Repository remoteRepository;
 
 	private URIish remoteURI;
 
@@ -84,19 +84,19 @@ public class AdvertiseErrorTest extends HttpTestCase {
 		ServletContextHandler app = server.addContext("/git");
 		GitServlet gs = new GitServlet();
 		gs.setRepositoryResolver(new RepositoryResolver() {
-			public FileRepository open(HttpServletRequest req, String name)
+			public Repository open(HttpServletRequest req, String name)
 					throws RepositoryNotFoundException,
 					ServiceNotEnabledException {
 				if (!name.equals(srcName))
 					throw new RepositoryNotFoundException(name);
 
-				final FileRepository db = src.getRepository();
+				final Repository db = src.getRepository();
 				db.incrementOpen();
 				return db;
 			}
 		});
 		gs.setReceivePackFactory(new DefaultReceivePackFactory() {
-			public ReceivePack create(HttpServletRequest req, FileRepository db)
+			public ReceivePack create(HttpServletRequest req, Repository db)
 					throws ServiceNotEnabledException,
 					ServiceNotAuthorizedException {
 				ReceivePack rp = super.create(req, db);
@@ -123,7 +123,7 @@ public class AdvertiseErrorTest extends HttpTestCase {
 		final TestRepository src = createTestRepository();
 		final RevBlob Q_txt = src.blob("new text");
 		final RevCommit Q = src.commit().add("Q", Q_txt).create();
-		final FileRepository db = src.getRepository();
+		final Repository db = src.getRepository();
 		final String dstName = Constants.R_HEADS + "new.branch";
 		final Transport t = Transport.open(db, remoteURI);
 		try {

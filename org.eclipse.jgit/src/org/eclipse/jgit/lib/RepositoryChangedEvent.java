@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.lib;
 
-import org.eclipse.jgit.storage.file.FileRepository;
-
 /**
  * This class passes information about changed refs to a
  * {@link RepositoryListener}
@@ -52,16 +50,16 @@ import org.eclipse.jgit.storage.file.FileRepository;
  * Currently only a reference to the repository is passed.
  */
 public class RepositoryChangedEvent {
-	private final FileRepository repository;
+	private final Repository repository;
 
-	RepositoryChangedEvent(final FileRepository repository) {
+	RepositoryChangedEvent(final Repository repository) {
 		this.repository = repository;
 	}
 
 	/**
 	 * @return the repository that was changed
 	 */
-	public FileRepository getRepository() {
+	public Repository getRepository() {
 		return repository;
 	}
 

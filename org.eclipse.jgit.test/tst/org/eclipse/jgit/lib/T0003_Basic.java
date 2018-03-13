@@ -54,8 +54,6 @@ import java.io.IOException;
 import java.io.PrintWriter;
 
 import org.eclipse.jgit.errors.ConfigInvalidException;
-import org.eclipse.jgit.storage.file.RefDirectory;
-import org.eclipse.jgit.storage.file.FileRepository;
 
 public class T0003_Basic extends SampleDataRepositoryTestCase {
 	public void test001_Initalize() {
@@ -82,7 +80,7 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 
 	public void test000_openRepoBadArgs() throws IOException {
 		try {
-			new FileRepository(null, null);
+			new Repository(null, null);
 			fail("Must pass either GIT_DIR or GIT_WORK_TREE");
 		} catch (IllegalArgumentException e) {
 			assertEquals(
@@ -99,12 +97,12 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 	 */
 	public void test000_openrepo_default_gitDirSet() throws IOException {
 		File repo1Parent = new File(trash.getParentFile(), "r1");
-		FileRepository repo1initial = new FileRepository(new File(repo1Parent, Constants.DOT_GIT));
+		Repository repo1initial = new Repository(new File(repo1Parent, Constants.DOT_GIT));
 		repo1initial.create();
 		repo1initial.close();
 
 		File theDir = new File(repo1Parent, Constants.DOT_GIT);
-		FileRepository r = new FileRepository(theDir, null);
+		Repository r = new Repository(theDir, null);
 		assertEqualsPath(theDir, r.getDirectory());
 		assertEqualsPath(repo1Parent, r.getWorkDir());
 		assertEqualsPath(new File(theDir, "index"), r.getIndexFile());
@@ -119,12 +117,12 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 	 */
 	public void test000_openrepo_default_gitDirAndWorkTreeSet() throws IOException {
 		File repo1Parent = new File(trash.getParentFile(), "r1");
-		FileRepository repo1initial = new FileRepository(new File(repo1Parent, Constants.DOT_GIT));
+		Repository repo1initial = new Repository(new File(repo1Parent, Constants.DOT_GIT));
 		repo1initial.create();
 		repo1initial.close();
 
 		File theDir = new File(repo1Parent, Constants.DOT_GIT);
-		FileRepository r = new FileRepository(theDir, repo1Parent.getParentFile());
+		Repository r = new Repository(theDir, repo1Parent.getParentFile());
 		assertEqualsPath(theDir, r.getDirectory());
 		assertEqualsPath(repo1Parent.getParentFile(), r.getWorkDir());
 		assertEqualsPath(new File(theDir, "index"), r.getIndexFile());
@@ -139,12 +137,12 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 	 */
 	public void test000_openrepo_default_workDirSet() throws IOException {
 		File repo1Parent = new File(trash.getParentFile(), "r1");
-		FileRepository repo1initial = new FileRepository(new File(repo1Parent, Constants.DOT_GIT));
+		Repository repo1initial = new Repository(new File(repo1Parent, Constants.DOT_GIT));
 		repo1initial.create();
 		repo1initial.close();
 
 		File theDir = new File(repo1Parent, Constants.DOT_GIT);
-		FileRepository r = new FileRepository(null, repo1Parent);
+		Repository r = new Repository(null, repo1Parent);
 		assertEqualsPath(theDir, r.getDirectory());
 		assertEqualsPath(repo1Parent, r.getWorkDir());
 		assertEqualsPath(new File(theDir, "index"), r.getIndexFile());
@@ -161,7 +159,7 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 		File repo1Parent = new File(trash.getParentFile(), "r1");
 		File workdir = new File(trash.getParentFile(), "rw");
 		workdir.mkdir();
-		FileRepository repo1initial = new FileRepository(new File(repo1Parent, Constants.DOT_GIT));
+		Repository repo1initial = new Repository(new File(repo1Parent, Constants.DOT_GIT));
 		repo1initial.create();
 		repo1initial.getConfig().setString("core", null, "worktree",
 				workdir.getAbsolutePath());
@@ -169,7 +167,7 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 		repo1initial.close();
 
 		File theDir = new File(repo1Parent, Constants.DOT_GIT);
-		FileRepository r = new FileRepository(theDir, null);
+		Repository r = new Repository(theDir, null);
 		assertEqualsPath(theDir, r.getDirectory());
 		assertEqualsPath(workdir, r.getWorkDir());
 		assertEqualsPath(new File(theDir, "index"), r.getIndexFile());
@@ -186,7 +184,7 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 		File repo1Parent = new File(trash.getParentFile(), "r1");
 		File workdir = new File(trash.getParentFile(), "rw");
 		workdir.mkdir();
-		FileRepository repo1initial = new FileRepository(new File(repo1Parent, Constants.DOT_GIT));
+		Repository repo1initial = new Repository(new File(repo1Parent, Constants.DOT_GIT));
 		repo1initial.create();
 		repo1initial.getConfig()
 				.setString("core", null, "worktree", "../../rw");
@@ -194,7 +192,7 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 		repo1initial.close();
 
 		File theDir = new File(repo1Parent, Constants.DOT_GIT);
-		FileRepository r = new FileRepository(theDir, null);
+		Repository r = new Repository(theDir, null);
 		assertEqualsPath(theDir, r.getDirectory());
 		assertEqualsPath(workdir, r.getWorkDir());
 		assertEqualsPath(new File(theDir, "index"), r.getIndexFile());
@@ -213,12 +211,12 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 		File indexFile = new File(trash, "idx");
 		File objDir = new File(trash, "../obj");
 		File[] altObjDirs = new File[] { db.getObjectsDirectory() };
-		FileRepository repo1initial = new FileRepository(new File(repo1Parent, Constants.DOT_GIT));
+		Repository repo1initial = new Repository(new File(repo1Parent, Constants.DOT_GIT));
 		repo1initial.create();
 		repo1initial.close();
 
 		File theDir = new File(repo1Parent, Constants.DOT_GIT);
-		FileRepository r = new FileRepository(theDir, null, objDir, altObjDirs,
+		Repository r = new Repository(theDir, null, objDir, altObjDirs,
 				indexFile);
 		assertEqualsPath(theDir, r.getDirectory());
 		assertEqualsPath(theDir.getParentFile(), r.getWorkDir());
@@ -240,7 +238,7 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 		// open when we create it we won't write the object file out as a loose
 		// object (as it already exists in the pack).
 		//
-		final FileRepository newdb = createBareRepository();
+		final Repository newdb = createBareRepository();
 		final Tree t = new Tree(newdb);
 		t.accept(new WriteTree(trash, newdb), TreeEntry.MODIFIED_ONLY);
 		assertEquals("4b825dc642cb6eb9a060e54bf8d69288fbee4904", t.getId()
@@ -323,7 +321,7 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 	}
 
 	public void test007_Open() throws IOException {
-		final FileRepository db2 = new FileRepository(db.getDirectory());
+		final Repository db2 = new Repository(db.getDirectory());
 		assertEquals(db.getDirectory(), db2.getDirectory());
 		assertEquals(db.getObjectsDirectory(), db2.getObjectsDirectory());
 		assertNotSame(db.getConfig(), db2.getConfig());
@@ -339,7 +337,7 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 		pw.close();
 
 		try {
-			new FileRepository(db.getDirectory());
+			new Repository(db.getDirectory());
 			fail("incorrectly opened a bad repository");
 		} catch (IOException ioe) {
 			assertTrue(ioe.getMessage().indexOf("format") > 0);
@@ -716,20 +714,20 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 
 		File relBaseFile = new File(new File(relBase, "other"), "module.c");
 		File absBaseFile = new File(new File(absBase, "other"), "module.c");
-		assertEquals("other/module.c", FileRepository.stripWorkDir(relBase, relBaseFile));
-		assertEquals("other/module.c", FileRepository.stripWorkDir(relBase, absBaseFile));
-		assertEquals("other/module.c", FileRepository.stripWorkDir(absBase, relBaseFile));
-		assertEquals("other/module.c", FileRepository.stripWorkDir(absBase, absBaseFile));
+		assertEquals("other/module.c", Repository.stripWorkDir(relBase, relBaseFile));
+		assertEquals("other/module.c", Repository.stripWorkDir(relBase, absBaseFile));
+		assertEquals("other/module.c", Repository.stripWorkDir(absBase, relBaseFile));
+		assertEquals("other/module.c", Repository.stripWorkDir(absBase, absBaseFile));
 
 		File relNonFile = new File(new File(relCwd, "not-repo"), ".gitignore");
 		File absNonFile = new File(new File(absCwd, "not-repo"), ".gitignore");
-		assertEquals("", FileRepository.stripWorkDir(relBase, relNonFile));
-		assertEquals("", FileRepository.stripWorkDir(absBase, absNonFile));
+		assertEquals("", Repository.stripWorkDir(relBase, relNonFile));
+		assertEquals("", Repository.stripWorkDir(absBase, absNonFile));
 
-		assertEquals("", FileRepository.stripWorkDir(db.getWorkDir(), db.getWorkDir()));
+		assertEquals("", Repository.stripWorkDir(db.getWorkDir(), db.getWorkDir()));
 
 		File file = new File(new File(db.getWorkDir(), "subdir"), "File.java");
-		assertEquals("subdir/File.java", FileRepository.stripWorkDir(db.getWorkDir(), file));
+		assertEquals("subdir/File.java", Repository.stripWorkDir(db.getWorkDir(), file));
 
 	}
 

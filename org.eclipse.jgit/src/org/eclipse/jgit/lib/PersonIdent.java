@@ -52,7 +52,6 @@ import java.util.Locale;
 import java.util.TimeZone;
 
 import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.util.SystemReader;
 
 /**
@@ -77,7 +76,7 @@ public class PersonIdent {
 	 *
 	 * @param repo
 	 */
-	public PersonIdent(final FileRepository repo) {
+	public PersonIdent(final Repository repo) {
 		final RepositoryConfig config = repo.getConfig();
 		name = config.getCommitterName();
 		emailAddress = config.getCommitterEmail();

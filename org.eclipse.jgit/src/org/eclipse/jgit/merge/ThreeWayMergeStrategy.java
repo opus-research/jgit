@@ -43,11 +43,10 @@
 
 package org.eclipse.jgit.merge;
 
-import org.eclipse.jgit.storage.file.FileRepository;
-
+import org.eclipse.jgit.lib.Repository;
 
 /** A merge strategy to merge 2 trees, using a common base ancestor tree. */
 public abstract class ThreeWayMergeStrategy extends MergeStrategy {
 	@Override
-	public abstract ThreeWayMerger newMerger(FileRepository db);
+	public abstract ThreeWayMerger newMerger(Repository db);
 }

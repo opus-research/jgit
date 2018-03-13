@@ -50,10 +50,10 @@ import org.eclipse.jgit.http.server.resolver.AsIsFileService;
 import org.eclipse.jgit.http.server.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
-import org.eclipse.jgit.storage.file.FileRepository;
+import org.eclipse.jgit.lib.Repository;
 
 public class AsIsServiceTest extends LocalDiskRepositoryTestCase {
-	private FileRepository db;
+	private Repository db;
 
 	private AsIsFileService service;
 

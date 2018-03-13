@@ -54,7 +54,6 @@ import java.text.MessageFormat;
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.storage.file.FileRepository;
 
 /**
  * Instances of this class represent a Commit object. It represents a snapshot
@@ -63,7 +62,7 @@ import org.eclipse.jgit.storage.file.FileRepository;
 public class Commit implements Treeish {
 	private static final ObjectId[] EMPTY_OBJECTID_LIST = new ObjectId[0];
 
-	private final FileRepository objdb;
+	private final Repository objdb;
 
 	private ObjectId commitId;
 
@@ -90,7 +89,7 @@ public class Commit implements Treeish {
 	 * @param db
 	 *            The repository with which to associate it.
 	 */
-	public Commit(final FileRepository db) {
+	public Commit(final Repository db) {
 		objdb = db;
 		parentIds = EMPTY_OBJECTID_LIST;
 	}
@@ -104,7 +103,7 @@ public class Commit implements Treeish {
 	 * @param parentIds
 	 *            Id's of the parent(s)
 	 */
-	public Commit(final FileRepository db, final ObjectId[] parentIds) {
+	public Commit(final Repository db, final ObjectId[] parentIds) {
 		objdb = db;
 		this.parentIds = parentIds;
 	}
@@ -120,7 +119,7 @@ public class Commit implements Treeish {
 	 * @param raw
 	 *            Raw commit object data
 	 */
-	public Commit(final FileRepository db, final ObjectId id, final byte[] raw) {
+	public Commit(final Repository db, final ObjectId id, final byte[] raw) {
 		objdb = db;
 		commitId = id;
 		treeId = ObjectId.fromString(raw, 5);
@@ -160,7 +159,7 @@ public class Commit implements Treeish {
 	/**
 	 * @return get repository for the commit
 	 */
-	public FileRepository getRepository() {
+	public Repository getRepository() {
 		return objdb;
 	}
 

@@ -44,9 +44,10 @@
 
 package org.eclipse.jgit.fnmatch;
 
-import junit.framework.TestCase;
-
 import org.eclipse.jgit.errors.InvalidPatternException;
+import org.eclipse.jgit.fnmatch.FileNameMatcher;
+
+import junit.framework.TestCase;
 
 public class FileNameMatcherTest extends TestCase {
 

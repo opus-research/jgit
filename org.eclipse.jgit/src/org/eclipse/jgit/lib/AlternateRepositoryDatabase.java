@@ -47,13 +47,8 @@ package org.eclipse.jgit.lib;
 import java.io.IOException;
 import java.util.Collection;
 
-import org.eclipse.jgit.storage.file.ObjectDirectory;
-import org.eclipse.jgit.storage.file.PackedObjectLoader;
-import org.eclipse.jgit.storage.file.FileRepository;
-import org.eclipse.jgit.storage.file.WindowCursor;
-
 /**
- * An ObjectDatabase of another {@link FileRepository}.
+ * An ObjectDatabase of another {@link Repository}.
  * <p>
  * This {@code ObjectDatabase} wraps around another {@code Repository}'s object
  * database, providing its contents to the caller, and closing the Repository
@@ -62,7 +57,7 @@ import org.eclipse.jgit.storage.file.WindowCursor;
  * {@code objects/} directory of another repository.
  */
 public final class AlternateRepositoryDatabase extends ObjectDatabase {
-	private final FileRepository repository;
+	private final Repository repository;
 
 	private final ObjectDatabase odb;
 
@@ -70,13 +65,13 @@ public final class AlternateRepositoryDatabase extends ObjectDatabase {
 	 * @param alt
 	 *            the alternate repository to wrap and export.
 	 */
-	public AlternateRepositoryDatabase(final FileRepository alt) {
+	public AlternateRepositoryDatabase(final Repository alt) {
 		repository = alt;
 		odb = repository.getObjectDatabase();
 	}
 
 	/** @return the alternate repository objects are borrowed from. */
-	public FileRepository getRepository() {
+	public Repository getRepository() {
 		return repository;
 	}
 
@@ -124,9 +119,9 @@ public final class AlternateRepositoryDatabase extends ObjectDatabase {
 	}
 
 	@Override
-	protected void openObjectInAllPacks1(
-			final Collection<PackedObjectLoader> out, final WindowCursor curs,
-			final AnyObjectId objectId) throws IOException {
+	void openObjectInAllPacks1(final Collection<PackedObjectLoader> out,
+			final WindowCursor curs, final AnyObjectId objectId)
+			throws IOException {
 		odb.openObjectInAllPacks1(out, curs, objectId);
 	}
 

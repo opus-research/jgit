@@ -52,7 +52,6 @@ import java.text.MessageFormat;
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.GitlinksNotSupportedException;
 import org.eclipse.jgit.errors.SymlinksNotSupportedException;
-import org.eclipse.jgit.storage.file.FileRepository;
 
 /**
  * A tree visitor for writing a directory tree to the git object database. Blob
@@ -67,7 +66,7 @@ public class WriteTree extends TreeVisitorWithCurrentDirectory {
 	 * @param sourceDirectory
 	 * @param db
 	 */
-	public WriteTree(final File sourceDirectory, final FileRepository db) {
+	public WriteTree(final File sourceDirectory, final Repository db) {
 		super(sourceDirectory);
 		ow = new ObjectWriter(db);
 	}

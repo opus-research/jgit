@@ -52,7 +52,6 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.file.FileRepository;
 
 /**
  * Creates, updates or deletes any reference.
@@ -168,13 +167,7 @@ public abstract class RefUpdate {
 
 	private final Ref ref;
 
-	/**
-	 * Configure a new update operation for a specific reference.
-	 *
-	 * @param ref
-	 *            the reference that will be updated by this operation.
-	 */
-	protected RefUpdate(final Ref ref) {
+	RefUpdate(final Ref ref) {
 		this.ref = ref;
 		oldValue = ref.getObjectId();
 		refLogMessage = "";
@@ -184,7 +177,7 @@ public abstract class RefUpdate {
 	protected abstract RefDatabase getRefDatabase();
 
 	/** @return the repository storing the database's objects. */
-	protected abstract FileRepository getRepository();
+	protected abstract Repository getRepository();
 
 	/**
 	 * Try to acquire the lock on the reference.

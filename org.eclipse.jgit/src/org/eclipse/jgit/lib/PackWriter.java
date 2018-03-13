@@ -61,12 +61,6 @@ import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevSort;
-import org.eclipse.jgit.storage.file.PackFile;
-import org.eclipse.jgit.storage.file.PackIndexWriter;
-import org.eclipse.jgit.storage.file.PackedObjectLoader;
-import org.eclipse.jgit.storage.file.FileRepository;
-import org.eclipse.jgit.storage.file.WholePackedObjectLoader;
-import org.eclipse.jgit.storage.file.WindowCursor;
 import org.eclipse.jgit.transport.PackedObjectInfo;
 import org.eclipse.jgit.util.NB;
 
@@ -173,7 +167,7 @@ public class PackWriter {
 	// edge objects for thin packs
 	private final ObjectIdSubclassMap<ObjectId> edgeObjects = new ObjectIdSubclassMap<ObjectId>();
 
-	private final FileRepository db;
+	private final Repository db;
 
 	private PackOutputStream out;
 
@@ -219,7 +213,7 @@ public class PackWriter {
 	 *            {@link #preparePack(Collection, Collection)}
 	 *            , or {@link #writePack(OutputStream)}.
 	 */
-	public PackWriter(final FileRepository repo, final ProgressMonitor monitor) {
+	public PackWriter(final Repository repo, final ProgressMonitor monitor) {
 		this(repo, monitor, monitor);
 	}
 
@@ -239,7 +233,7 @@ public class PackWriter {
 	 *            operations progress monitor, used within
 	 *            {@link #writePack(OutputStream)}.
 	 */
-	public PackWriter(final FileRepository repo, final ProgressMonitor imonitor,
+	public PackWriter(final Repository repo, final ProgressMonitor imonitor,
 			final ProgressMonitor wmonitor) {
 		this.db = repo;
 		initMonitor = imonitor == null ? NullProgressMonitor.INSTANCE : imonitor;
@@ -1004,12 +998,12 @@ public class PackWriter {
 		}
 
 		PackedObjectLoader getCopyLoader(WindowCursor curs) throws IOException {
-			return copyFromPack.get(curs, copyOffset);
+			return copyFromPack.resolveBase(curs, copyOffset);
 		}
 
 		void setCopyFromPack(PackedObjectLoader loader) {
-			this.copyFromPack = loader.getPackFile();
-			this.copyOffset = loader.getObjectOffset();
+			this.copyFromPack = loader.pack;
+			this.copyOffset = loader.objectOffset;
 		}
 
 		void clearSourcePack() {

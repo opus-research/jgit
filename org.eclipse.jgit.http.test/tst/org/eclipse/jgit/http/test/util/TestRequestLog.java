@@ -43,6 +43,11 @@
 
 package org.eclipse.jgit.http.test.util;
 
+import org.eclipse.jetty.server.DispatcherType;
+import org.eclipse.jetty.server.Request;
+import org.eclipse.jetty.server.Response;
+import org.eclipse.jetty.server.handler.HandlerWrapper;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -51,11 +56,6 @@ import java.util.concurrent.Semaphore;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
-import org.eclipse.jetty.server.DispatcherType;
-import org.eclipse.jetty.server.Request;
-import org.eclipse.jetty.server.Response;
-import org.eclipse.jetty.server.handler.HandlerWrapper;
 
 /** Logs request made through {@link AppServer}. */
 class TestRequestLog extends HandlerWrapper {

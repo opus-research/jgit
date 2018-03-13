@@ -48,6 +48,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.Option;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.TextProgressMonitor;
@@ -57,8 +59,6 @@ import org.eclipse.jgit.transport.RemoteRefUpdate;
 import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.URIish;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
 
 @Command(common = true, usage = "usage_UpdateRemoteRepositoryFromLocalRefs")
 class Push extends TextBuiltin {

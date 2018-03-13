@@ -64,8 +64,8 @@ import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
+import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.transport.FetchConnection;
 import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.URIish;
@@ -116,13 +116,13 @@ public class HttpClientTests extends HttpTestCase {
 	private ServletContextHandler smart(final String path) {
 		GitServlet gs = new GitServlet();
 		gs.setRepositoryResolver(new RepositoryResolver() {
-			public FileRepository open(HttpServletRequest req, String name)
+			public Repository open(HttpServletRequest req, String name)
 					throws RepositoryNotFoundException,
 					ServiceNotEnabledException {
 				if (!name.equals(nameOf(remoteRepository)))
 					throw new RepositoryNotFoundException(name);
 
-				final FileRepository db = remoteRepository.getRepository();
+				final Repository db = remoteRepository.getRepository();
 				db.incrementOpen();
 				return db;
 			}
@@ -139,7 +139,7 @@ public class HttpClientTests extends HttpTestCase {
 
 	public void testRepositoryNotFound_Dumb() throws Exception {
 		URIish uri = toURIish("/dumb.none/not-found");
-		FileRepository dst = createBareRepository();
+		Repository dst = createBareRepository();
 		Transport t = Transport.open(dst, uri);
 		try {
 			try {
@@ -157,7 +157,7 @@ public class HttpClientTests extends HttpTestCase {
 
 	public void testRepositoryNotFound_Smart() throws Exception {
 		URIish uri = toURIish("/smart.none/not-found");
-		FileRepository dst = createBareRepository();
+		Repository dst = createBareRepository();
 		Transport t = Transport.open(dst, uri);
 		try {
 			try {
@@ -174,13 +174,13 @@ public class HttpClientTests extends HttpTestCase {
 	}
 
 	public void testListRemote_Dumb_DetachedHEAD() throws Exception {
-		FileRepository src = remoteRepository.getRepository();
+		Repository src = remoteRepository.getRepository();
 		RefUpdate u = src.updateRef(Constants.HEAD, true);
 		RevCommit Q = remoteRepository.commit().message("Q").create();
 		u.setNewObjectId(Q);
 		assertEquals(RefUpdate.Result.FORCED, u.forceUpdate());
 
-		FileRepository dst = createBareRepository();
+		Repository dst = createBareRepository();
 		Ref head;
 		Transport t = Transport.open(dst, dumbAuthNoneURI);
 		try {
@@ -198,12 +198,12 @@ public class HttpClientTests extends HttpTestCase {
 	}
 
 	public void testListRemote_Dumb_NoHEAD() throws Exception {
-		FileRepository src = remoteRepository.getRepository();
+		Repository src = remoteRepository.getRepository();
 		File headref = new File(src.getDirectory(), Constants.HEAD);
 		assertTrue("HEAD used to be present", headref.delete());
 		assertFalse("HEAD is gone", headref.exists());
 
-		FileRepository dst = createBareRepository();
+		Repository dst = createBareRepository();
 		Ref head;
 		Transport t = Transport.open(dst, dumbAuthNoneURI);
 		try {
@@ -220,13 +220,13 @@ public class HttpClientTests extends HttpTestCase {
 	}
 
 	public void testListRemote_Smart_DetachedHEAD() throws Exception {
-		FileRepository src = remoteRepository.getRepository();
+		Repository src = remoteRepository.getRepository();
 		RefUpdate u = src.updateRef(Constants.HEAD, true);
 		RevCommit Q = remoteRepository.commit().message("Q").create();
 		u.setNewObjectId(Q);
 		assertEquals(RefUpdate.Result.FORCED, u.forceUpdate());
 
-		FileRepository dst = createBareRepository();
+		Repository dst = createBareRepository();
 		Ref head;
 		Transport t = Transport.open(dst, smartAuthNoneURI);
 		try {
@@ -245,7 +245,7 @@ public class HttpClientTests extends HttpTestCase {
 
 	public void testListRemote_Smart_WithQueryParameters() throws Exception {
 		URIish myURI = toURIish("/snone/do?r=1&p=test.git");
-		FileRepository dst = createBareRepository();
+		Repository dst = createBareRepository();
 		Transport t = Transport.open(dst, myURI);
 		try {
 			try {
@@ -272,7 +272,7 @@ public class HttpClientTests extends HttpTestCase {
 	}
 
 	public void testListRemote_Dumb_NeedsAuth() throws Exception {
-		FileRepository dst = createBareRepository();
+		Repository dst = createBareRepository();
 		Transport t = Transport.open(dst, dumbAuthBasicURI);
 		try {
 			try {
@@ -289,7 +289,7 @@ public class HttpClientTests extends HttpTestCase {
 	}
 
 	public void testListRemote_Smart_UploadPackNeedsAuth() throws Exception {
-		FileRepository dst = createBareRepository();
+		Repository dst = createBareRepository();
 		Transport t = Transport.open(dst, smartAuthBasicURI);
 		try {
 			try {
@@ -306,11 +306,11 @@ public class HttpClientTests extends HttpTestCase {
 	}
 
 	public void testListRemote_Smart_UploadPackDisabled() throws Exception {
-		FileRepository src = remoteRepository.getRepository();
+		Repository src = remoteRepository.getRepository();
 		src.getConfig().setBoolean("http", null, "uploadpack", false);
 		src.getConfig().save();
 
-		FileRepository dst = createBareRepository();
+		Repository dst = createBareRepository();
 		Transport t = Transport.open(dst, smartAuthNoneURI);
 		try {
 			try {

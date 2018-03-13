@@ -48,7 +48,7 @@ import java.text.MessageFormat;
 import java.util.HashMap;
 
 import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.storage.file.FileRepository;
+import org.eclipse.jgit.lib.Repository;
 
 /**
  * A method of combining two or more trees together to form an output tree.
@@ -138,5 +138,5 @@ public abstract class MergeStrategy {
 	 *            write results back to.
 	 * @return the new merge instance which implements this strategy.
 	 */
-	public abstract Merger newMerger(FileRepository db);
+	public abstract Merger newMerger(Repository db);
 }

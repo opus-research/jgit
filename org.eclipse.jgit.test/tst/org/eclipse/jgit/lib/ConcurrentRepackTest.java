@@ -55,9 +55,6 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.file.FileRepository;
-import org.eclipse.jgit.storage.file.WindowCache;
-import org.eclipse.jgit.storage.file.WindowCacheConfig;
 
 public class ConcurrentRepackTest extends RepositoryTestCase {
 	public void setUp() throws Exception {
@@ -77,7 +74,7 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 			IOException {
 		// Create a new object in a new pack, and test that it is present.
 		//
-		final FileRepository eden = createBareRepository();
+		final Repository eden = createBareRepository();
 		final RevObject o1 = writeBlob(eden, "o1");
 		pack(eden, o1);
 		assertEquals(o1.name(), parse(o1).name());
@@ -89,7 +86,7 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 		// object into a different pack file, with some other object. We
 		// still should be able to access the objects.
 		//
-		final FileRepository eden = createBareRepository();
+		final Repository eden = createBareRepository();
 		final RevObject o1 = writeBlob(eden, "o1");
 		final File[] out1 = pack(eden, o1);
 		assertEquals(o1.name(), parse(o1).name());
@@ -113,7 +110,7 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 			throws IncorrectObjectTypeException, IOException {
 		// Create an object and pack it.
 		//
-		final FileRepository eden = createBareRepository();
+		final Repository eden = createBareRepository();
 		final RevObject o1 = writeBlob(eden, "o1");
 		final File[] out1 = pack(eden, o1);
 		assertEquals(o1.name(), parse(o1).name());
@@ -146,7 +143,7 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 		// object into a different pack file, with some other object. We
 		// still should be able to access the objects.
 		//
-		final FileRepository eden = createBareRepository();
+		final Repository eden = createBareRepository();
 		final RevObject o1 = writeBlob(eden, "o1");
 		final File[] out1 = pack(eden, o1);
 		assertEquals(o1.name(), parse(o1).name());
@@ -190,7 +187,7 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 		return new RevWalk(db).parseAny(id);
 	}
 
-	private File[] pack(final FileRepository src, final RevObject... list)
+	private File[] pack(final Repository src, final RevObject... list)
 			throws IOException {
 		final PackWriter pw = new PackWriter(src, NullProgressMonitor.INSTANCE);
 		for (final RevObject o : list) {
@@ -252,7 +249,7 @@ public class ConcurrentRepackTest extends RepositoryTestCase {
 		return new File(packdir, "pack-" + name.name() + suffix);
 	}
 
-	private RevObject writeBlob(final FileRepository repo, final String data)
+	private RevObject writeBlob(final Repository repo, final String data)
 			throws IOException {
 		final RevWalk revWalk = new RevWalk(repo);
 		final byte[] bytes = Constants.encode(data);
