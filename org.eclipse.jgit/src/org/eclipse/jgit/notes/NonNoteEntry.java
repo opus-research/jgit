@@ -75,7 +75,7 @@ class NonNoteEntry extends ObjectId {
 	}
 
 	int pathCompare(byte[] bBuf, int bPos, int bLen, FileMode bMode) {
-		return Paths.compare(
+		return Paths.pathCompare(
 				name, 0, name.length, mode.getBits(),
 				bBuf, bPos, bLen, bMode.getBits());
 	}

@@ -694,7 +694,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 	private static final Comparator<Entry> ENTRY_CMP = new Comparator<Entry>() {
 		public int compare(Entry a, Entry b) {
-			return Paths.compare(
+			return Paths.pathCompare(
 					a.encodedName, 0, a.encodedNameLen, a.getMode().getBits(),
 					b.encodedName, 0, b.encodedNameLen, b.getMode().getBits());
 		}
