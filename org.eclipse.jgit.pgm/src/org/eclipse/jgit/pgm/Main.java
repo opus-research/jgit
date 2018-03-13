@@ -232,16 +232,16 @@ public class Main {
 	/**
 	 * Evaluate the {@code --git-dir} option and open the repository.
 	 *
-	 * @param aGitdir
+	 * @param gitdir
 	 *            the {@code --git-dir} option given on the command line. May be
 	 *            null if it was not supplied.
 	 * @return the repository to operate on.
 	 * @throws IOException
 	 *             the repository cannot be opened.
 	 */
-	protected Repository openGitDir(String aGitdir) throws IOException {
+	protected Repository openGitDir(String gitdir) throws IOException {
 		RepositoryBuilder rb = new RepositoryBuilder() //
-				.setGitDir(aGitdir != null ? new File(aGitdir) : null) //
+				.setGitDir(gitdir != null ? new File(gitdir) : null) //
 				.readEnvironment() //
 				.findGitDir();
 		if (rb.getGitDir() == null)
