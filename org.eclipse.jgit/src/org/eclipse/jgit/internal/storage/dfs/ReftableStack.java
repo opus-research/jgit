@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, IBM Corporation and others.
+ * Copyright (C) 2017, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,38 +40,69 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api.errors;
 
-import java.text.MessageFormat;
+package org.eclipse.jgit.internal.storage.dfs;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.patch.FormatError;
+import org.eclipse.jgit.internal.storage.reftable.Reftable;
 
-/**
- * Exception thrown when applying a patch fails due to an invalid format
- *
- * @since 2.0
- *
- */
-public class PatchFormatException extends GitAPIException {
-	private static final long serialVersionUID = 1L;
-
-	private List<FormatError> errors;
-
+/** Tracks multiple open {@link Reftable} instances. */
+public class ReftableStack implements AutoCloseable {
 	/**
-	 * @param errors
+	 * Opens a stack of tables for reading.
+	 *
+	 * @param ctx
+	 *            context to read the tables with. This {@code ctx} will be
+	 *            retained by the stack and each of the table readers.
+	 * @param tables
+	 *            the tables to open.
+	 * @return stack reference to close the tables.
+	 * @throws IOException
+	 *             a table could not be opened
 	 */
-	public PatchFormatException(List<FormatError> errors) {
-		super(MessageFormat.format(JGitText.get().patchFormatException, errors));
-		this.errors = errors;
+	public static ReftableStack open(DfsReader ctx, List<DfsReftable> tables)
+			throws IOException {
+		ReftableStack stack = new ReftableStack(tables.size());
+		boolean close = true;
+		try {
+			for (DfsReftable t : tables) {
+				stack.tables.add(t.open(ctx));
+			}
+			close = false;
+			return stack;
+		} finally {
+			if (close) {
+				stack.close();
+			}
+		}
+	}
+
+	private final List<Reftable> tables;
+
+	private ReftableStack(int tableCnt) {
+		this.tables = new ArrayList<>(tableCnt);
 	}
 
 	/**
-	 * @return all the errors where unresolved conflicts have been detected
+	 * @return unmodifiable list of tables, in the same order the files were
+	 *         passed to {@link #open(DfsReader, List)}.
 	 */
-	public List<FormatError> getErrors() {
-		return errors;
+	public List<Reftable> readers() {
+		return Collections.unmodifiableList(tables);
 	}
 
+	@Override
+	public void close() {
+		for (Reftable t : tables) {
+			try {
+				t.close();
+			} catch (IOException e) {
+				// Ignore close failures.
+			}
+		}
+	}
 }
