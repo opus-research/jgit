@@ -90,11 +90,10 @@ final class DeltaTask implements Callable<Object> {
 					}
 				}
 				if (maxTask == null)
-					break;
+					return null;
 				if (maxTask.tryStealWork(maxSlice))
 					return maxSlice;
 			}
-			return null;
 		}
 	}
 
