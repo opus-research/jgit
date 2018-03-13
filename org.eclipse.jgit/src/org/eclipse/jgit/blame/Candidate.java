@@ -55,12 +55,10 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.PersonIdent;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
-import org.eclipse.jgit.util.LfsHelper;
 
 /**
  * A source that may have supplied some (or all) of the result file.
@@ -111,11 +109,7 @@ class Candidate {
 	 */
 	int renameScore;
 
-	/** repository used for LFS blob handling */
-	private Repository sourceRepository;
-
-	Candidate(Repository repo, RevCommit commit, PathFilter path) {
-		sourceRepository = repo;
+	Candidate(RevCommit commit, PathFilter path) {
 		sourceCommit = commit;
 		sourcePath = path;
 	}
@@ -156,12 +150,12 @@ class Candidate {
 		return sourceCommit.getAuthorIdent();
 	}
 
-	Candidate create(Repository repo, RevCommit commit, PathFilter path) {
-		return new Candidate(repo, commit, path);
+	Candidate create(RevCommit commit, PathFilter path) {
+		return new Candidate(commit, path);
 	}
 
 	Candidate copy(RevCommit commit) {
-		Candidate r = create(sourceRepository, commit, sourcePath);
+		Candidate r = create(commit, sourcePath);
 		r.sourceBlob = sourceBlob;
 		r.sourceText = sourceText;
 		r.regionList = regionList;
@@ -170,11 +164,7 @@ class Candidate {
 	}
 
 	void loadText(ObjectReader reader) throws IOException {
-		ObjectLoader ldr = LfsHelper.getSmudgeFiltered(sourceRepository,
-				reader.open(sourceBlob, Constants.OBJ_BLOB),
-				LfsHelper.getAttributesForPath(sourceRepository,
-						sourcePath.getPath(), sourceCommit)
-						.get(Constants.ATTR_DIFF));
+		ObjectLoader ldr = reader.open(sourceBlob, Constants.OBJ_BLOB);
 		sourceText = new RawText(ldr.getCachedBytes(Integer.MAX_VALUE));
 	}
 
@@ -358,9 +348,8 @@ class Candidate {
 	 * children pointers, allowing reverse navigation of history.
 	 */
 	static final class ReverseCandidate extends Candidate {
-		ReverseCandidate(Repository repo, ReverseCommit commit,
-				PathFilter path) {
-			super(repo, commit, path);
+		ReverseCandidate(ReverseCommit commit, PathFilter path) {
+			super(commit, path);
 		}
 
 		@Override
@@ -380,8 +369,8 @@ class Candidate {
 		}
 
 		@Override
-		Candidate create(Repository repo, RevCommit commit, PathFilter path) {
-			return new ReverseCandidate(repo, (ReverseCommit) commit, path);
+		Candidate create(RevCommit commit, PathFilter path) {
+			return new ReverseCandidate((ReverseCommit) commit, path);
 		}
 
 		@Override
@@ -410,8 +399,8 @@ class Candidate {
 		/** Author name to refer to this blob with. */
 		String description;
 
-		BlobCandidate(Repository repo, String name, PathFilter path) {
-			super(repo, null, path);
+		BlobCandidate(String name, PathFilter path) {
+			super(null, path);
 			description = name;
 		}
 
