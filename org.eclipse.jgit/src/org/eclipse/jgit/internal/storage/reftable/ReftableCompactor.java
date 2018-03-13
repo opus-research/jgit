@@ -178,7 +178,7 @@ public class ReftableCompactor {
 	 * @return {@code true} if the compactor accepted this table; {@code false}
 	 *         if the compactor has reached its limit.
 	 * @throws IOException
-	 *             size of {@code reader} cannot be read.
+	 *             if size of {@code reader} cannot be read.
 	 */
 	public boolean tryAddFirst(ReftableReader reader) throws IOException {
 		long sz = reader.size();
@@ -197,7 +197,7 @@ public class ReftableCompactor {
 	 *            stream to write the compacted tables to. Caller is responsible
 	 *            for closing {@code out}.
 	 * @throws IOException
-	 *             tables cannot be read, or cannot be written.
+	 *             if tables cannot be read, or cannot be written.
 	 */
 	public void compact(OutputStream out) throws IOException {
 		MergedReftable mr = new MergedReftable(new ArrayList<>(tables));
