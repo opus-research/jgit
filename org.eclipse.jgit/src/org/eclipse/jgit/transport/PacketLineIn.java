@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2010, Google Inc.
+ * Copyright (C) 2008-2009, Google Inc.
  * Copyright (C) 2008-2009, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
@@ -51,6 +51,7 @@ import java.io.InputStream;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
+import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 
@@ -72,11 +73,15 @@ class PacketLineIn {
 
 	private final InputStream in;
 
-	private final byte[] lineBuffer;
+	private final byte[] lenbuffer;
 
 	PacketLineIn(final InputStream i) {
 		in = i;
-		lineBuffer = new byte[SideBandOutputStream.SMALL_BUF];
+		lenbuffer = new byte[4];
+	}
+
+	InputStream sideband(final ProgressMonitor pm) {
+		return new SideBandInputStream(this, in, pm);
 	}
 
 	AckNackResult readACK(final MutableObjectId returnedId) throws IOException {
@@ -124,27 +129,22 @@ class PacketLineIn {
 
 		len -= 4; // length header (4 bytes)
 
-		byte[] raw;
-		if (len <= lineBuffer.length)
-			raw = lineBuffer;
-		else
-			raw = new byte[len];
-
+		final byte[] raw = new byte[len];
 		IO.readFully(in, raw, 0, len);
 		return RawParseUtils.decode(Constants.CHARSET, raw, 0, len);
 	}
 
 	int readLength() throws IOException {
-		IO.readFully(in, lineBuffer, 0, 4);
+		IO.readFully(in, lenbuffer, 0, 4);
 		try {
-			final int len = RawParseUtils.parseHexInt16(lineBuffer, 0);
+			final int len = RawParseUtils.parseHexInt16(lenbuffer, 0);
 			if (len != 0 && len < 4)
 				throw new ArrayIndexOutOfBoundsException();
 			return len;
 		} catch (ArrayIndexOutOfBoundsException err) {
 			throw new IOException("Invalid packet line header: "
-					+ (char) lineBuffer[0] + (char) lineBuffer[1]
-					+ (char) lineBuffer[2] + (char) lineBuffer[3]);
+					+ (char) lenbuffer[0] + (char) lenbuffer[1]
+					+ (char) lenbuffer[2] + (char) lenbuffer[3]);
 		}
 	}
 }

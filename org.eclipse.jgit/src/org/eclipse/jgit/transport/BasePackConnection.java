@@ -1,4 +1,5 @@
 /*
+ * Copyright (C) 2009, Constantine Plotnikov <constantine.plotnikov@gmail.com>
  * Copyright (C) 2008-2010, Google Inc.
  * Copyright (C) 2008, Marek Zawirski <marek.zawirski@gmail.com>
  * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
@@ -46,6 +47,8 @@
 
 package org.eclipse.jgit.transport;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -56,7 +59,6 @@ import java.util.Set;
 
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.errors.PackProtocolException;
-import org.eclipse.jgit.errors.RemoteRepositoryException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
@@ -94,10 +96,10 @@ abstract class BasePackConnection extends BaseConnection {
 	/** Timer to manage {@link #timeoutIn} and {@link #timeoutOut}. */
 	private InterruptTimer myTimer;
 
-	/** Input stream reading from the remote. */
+	/** Buffered input stream reading from the remote. */
 	protected InputStream in;
 
-	/** Output stream sending to the remote. */
+	/** Buffered output stream sending to the remote. */
 	protected OutputStream out;
 
 	/** Packet line decoder around {@link #in}. */
@@ -124,17 +126,6 @@ abstract class BasePackConnection extends BaseConnection {
 		uri = transport.uri;
 	}
 
-	/**
-	 * Configure this connection with the directional pipes.
-	 *
-	 * @param myIn
-	 *            input stream to receive data from the peer. Caller must ensure
-	 *            the input is buffered, otherwise read performance may suffer.
-	 * @param myOut
-	 *            output stream to transmit data to the peer. Caller must ensure
-	 *            the output is buffered, otherwise write performance may
-	 *            suffer.
-	 */
 	protected final void init(InputStream myIn, OutputStream myOut) {
 		final int timeout = transport.getTimeout();
 		if (timeout > 0) {
@@ -148,27 +139,16 @@ abstract class BasePackConnection extends BaseConnection {
 			myOut = timeoutOut;
 		}
 
-		in = myIn;
-		out = myOut;
+		in = myIn instanceof BufferedInputStream ? myIn
+				: new BufferedInputStream(myIn, IndexPack.BUFFER_SIZE);
+		out = myOut instanceof BufferedOutputStream ? myOut
+				: new BufferedOutputStream(myOut);
 
 		pckIn = new PacketLineIn(in);
 		pckOut = new PacketLineOut(out);
 		outNeedsEnd = true;
 	}
 
-	/**
-	 * Reads the advertised references through the initialized stream.
-	 * <p>
-	 * Subclass implementations may call this method only after setting up the
-	 * input and output streams with {@link #init(InputStream, OutputStream)}.
-	 * <p>
-	 * If any errors occur, this connection is automatically closed by invoking
-	 * {@link #close()} and the exception is wrapped (if necessary) and thrown
-	 * as a {@link TransportException}.
-	 *
-	 * @throws TransportException
-	 *             the reference list could not be scanned.
-	 */
 	protected void readAdvertisedRefs() throws TransportException {
 		try {
 			readAdvertisedRefsImpl();
@@ -198,12 +178,6 @@ abstract class BasePackConnection extends BaseConnection {
 			}
 			if (line == PacketLineIn.END)
 				break;
-
-			if (line.startsWith("ERR ")) {
-				// This is a customized remote service error.
-				// Users should be informed about it.
-				throw new RemoteRepositoryException(uri, line.substring(4));
-			}
 
 			if (avail.isEmpty()) {
 				final int nul = line.indexOf('\0');

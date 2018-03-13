@@ -146,7 +146,7 @@ class FetchProcess {
 				// Connection was used for object transfer. If we
 				// do another fetch we must open a new connection.
 				//
-				closeConnection(result);
+				closeConnection();
 			} else {
 				includedTags = false;
 			}
@@ -170,7 +170,7 @@ class FetchProcess {
 				}
 			}
 		} finally {
-			closeConnection(result);
+			closeConnection();
 		}
 
 		final RevWalk walk = new RevWalk(transport.local);
@@ -210,10 +210,9 @@ class FetchProcess {
 					"peer did not supply a complete object graph");
 	}
 
-	private void closeConnection(final FetchResult result) {
+	private void closeConnection() {
 		if (conn != null) {
 			conn.close();
-			result.addMessages(conn.getMessages());
 			conn = null;
 		}
 	}
