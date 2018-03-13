@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2013, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,65 +40,47 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm;
 
-import static org.junit.Assert.assertArrayEquals;
+package org.eclipse.jgit.util;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.lib.CLIRepositoryTestCase;
-import org.eclipse.jgit.util.SystemReader;
+import java.io.File;
+import java.io.IOException;
+
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-public class ConfigTest extends CLIRepositoryTestCase {
-	@Override
+public class FileUtils7Test {
+
+	private final File trash = new File(new File("target"), "trash");
+
 	@Before
 	public void setUp() throws Exception {
-		super.setUp();
-		new Git(db).commit().setMessage("initial commit").call();
+		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY | FileUtils.SKIP_MISSING);
+		assertTrue(trash.mkdirs());
+	}
+
+	@After
+	public void tearDown() throws Exception {
+		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY);
 	}
 
 	@Test
-	public void testListConfig() throws Exception {
-		boolean isWindows = SystemReader.getInstance().getProperty("os.name")
-				.startsWith("Windows");
-		boolean isMac = SystemReader.getInstance().getProperty("os.name")
-				.equals("Mac OS X");
-
-		String[] output = execute("git config --list");
-		List<String> expect = new ArrayList<String>();
-		expect.add("core.filemode=" + !isWindows);
-		expect.add("core.logallrefupdates=true");
-		if (isMac)
-			expect.add("core.precomposeunicode=true");
-		expect.add("core.repositoryformatversion=0");
-		if (SystemReader.getInstance().isWindows() && osVersion() < 6
-				|| javaVersion() < 1.7) {
-			expect.add("core.symlinks=false");
-		}
-		expect.add(""); // ends with LF (last line empty)
-		assertArrayEquals("expected default configuration", expect.toArray(),
-				output);
-	}
-
-	private static float javaVersion() {
-		String versionString = System.getProperty("java.version");
-		Matcher matcher = Pattern.compile("(\\d+\\.\\d+).*").matcher(
-				versionString);
-		matcher.matches();
-		return Float.parseFloat(matcher.group(1));
-	}
-
-	private static float osVersion() {
-		String versionString = System.getProperty("os.version");
-		Matcher matcher = Pattern.compile("(\\d+\\.\\d+).*").matcher(
-				versionString);
-		matcher.matches();
-		return Float.parseFloat(matcher.group(1));
+	public void testDeleteSymlinkToDirectoryDoesNotDeleteTarget()
+			throws IOException {
+		FS fs = FS.DETECTED;
+		File dir = new File(trash, "dir");
+		File file = new File(dir, "file");
+		File link = new File(trash, "link");
+		FileUtils.mkdirs(dir);
+		FileUtils.createNewFile(file);
+		fs.createSymLink(link, "dir");
+		FileUtils.delete(link, FileUtils.RECURSIVE);
+		assertFalse(link.exists());
+		assertTrue(dir.exists());
+		assertTrue(file.exists());
 	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2012-2013, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,65 +40,32 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm;
+package org.eclipse.jgit.treewalk;
 
-import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.io.File;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.lib.CLIRepositoryTestCase;
-import org.eclipse.jgit.util.SystemReader;
-import org.junit.Before;
+import org.eclipse.jgit.junit.RepositoryTestCase;
+import org.eclipse.jgit.util.FS;
 import org.junit.Test;
 
-public class ConfigTest extends CLIRepositoryTestCase {
-	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
-		new Git(db).commit().setMessage("initial commit").call();
-	}
-
+public class TreeWalkJava7Test extends RepositoryTestCase {
 	@Test
-	public void testListConfig() throws Exception {
-		boolean isWindows = SystemReader.getInstance().getProperty("os.name")
-				.startsWith("Windows");
-		boolean isMac = SystemReader.getInstance().getProperty("os.name")
-				.equals("Mac OS X");
-
-		String[] output = execute("git config --list");
-		List<String> expect = new ArrayList<String>();
-		expect.add("core.filemode=" + !isWindows);
-		expect.add("core.logallrefupdates=true");
-		if (isMac)
-			expect.add("core.precomposeunicode=true");
-		expect.add("core.repositoryformatversion=0");
-		if (SystemReader.getInstance().isWindows() && osVersion() < 6
-				|| javaVersion() < 1.7) {
-			expect.add("core.symlinks=false");
-		}
-		expect.add(""); // ends with LF (last line empty)
-		assertArrayEquals("expected default configuration", expect.toArray(),
-				output);
-	}
-
-	private static float javaVersion() {
-		String versionString = System.getProperty("java.version");
-		Matcher matcher = Pattern.compile("(\\d+\\.\\d+).*").matcher(
-				versionString);
-		matcher.matches();
-		return Float.parseFloat(matcher.group(1));
-	}
-
-	private static float osVersion() {
-		String versionString = System.getProperty("os.version");
-		Matcher matcher = Pattern.compile("(\\d+\\.\\d+).*").matcher(
-				versionString);
-		matcher.matches();
-		return Float.parseFloat(matcher.group(1));
+	public void testSymlinkToDirNotRecursingViaSymlink() throws Exception {
+		FS fs = db.getFS();
+		assertTrue(fs.supportsSymlinks());
+		writeTrashFile("target/data", "targetdata");
+		fs.createSymLink(new File(trash, "link"), "target");
+		TreeWalk tw = new TreeWalk(db);
+		tw.setRecursive(true);
+		tw.addTree(new FileTreeIterator(db));
+		assertTrue(tw.next());
+		assertEquals("link", tw.getPathString());
+		assertTrue(tw.next());
+		assertEquals("target/data", tw.getPathString());
+		assertFalse(tw.next());
 	}
 }

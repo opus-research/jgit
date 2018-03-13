@@ -48,6 +48,8 @@ import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
 import org.eclipse.jgit.lib.CoreConfig.CheckStat;
+import org.eclipse.jgit.lib.CoreConfig.HideDotFiles;
+import org.eclipse.jgit.lib.CoreConfig.SymLinks;
 
 /** Options used by the {@link WorkingTreeIterator}. */
 public class WorkingTreeOptions {
@@ -64,6 +66,10 @@ public class WorkingTreeOptions {
 
 	private final CheckStat checkStat;
 
+	private final SymLinks symlinks;
+
+	private final HideDotFiles hideDotFiles;
+
 	private WorkingTreeOptions(final Config rc) {
 		fileMode = rc.getBoolean(ConfigConstants.CONFIG_CORE_SECTION,
 				ConfigConstants.CONFIG_KEY_FILEMODE, true);
@@ -71,6 +77,11 @@ public class WorkingTreeOptions {
 				ConfigConstants.CONFIG_KEY_AUTOCRLF, AutoCRLF.FALSE);
 		checkStat = rc.getEnum(ConfigConstants.CONFIG_CORE_SECTION, null,
 				ConfigConstants.CONFIG_KEY_CHECKSTAT, CheckStat.DEFAULT);
+		symlinks = rc.getEnum(ConfigConstants.CONFIG_CORE_SECTION, null,
+				ConfigConstants.CONFIG_KEY_SYMLINKS, SymLinks.TRUE);
+		hideDotFiles = rc.getEnum(ConfigConstants.CONFIG_CORE_SECTION, null,
+				ConfigConstants.CONFIG_KEY_HIDEDOTFILES,
+				HideDotFiles.DOTGITONLY);
 	}
 
 	/** @return true if the execute bit on working files should be trusted. */
@@ -89,5 +100,21 @@ public class WorkingTreeOptions {
 	 */
 	public CheckStat getCheckStat() {
 		return checkStat;
+	}
+
+	/**
+	 * @return how we handle symbolic links
+	 * @since 3.3
+	 */
+	public SymLinks getSymLinks() {
+		return symlinks;
+	}
+
+	/**
+	 * @return how we create '.'-files (on Windows)
+	 * @since 3.3
+	 */
+	public HideDotFiles getHideDotFiles() {
+		return hideDotFiles;
 	}
 }
