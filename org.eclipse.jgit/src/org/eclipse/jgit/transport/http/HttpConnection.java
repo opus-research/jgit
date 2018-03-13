@@ -252,7 +252,7 @@ public interface HttpConnection {
 
 	/**
 	 * Configure the connection so that it can be used for https communication.
-	 * 
+	 *
 	 * @param km
 	 *            the keymanager managing the key material used to authenticate
 	 *            the local SSLSocket to its peer
@@ -263,7 +263,6 @@ public interface HttpConnection {
 	 * @param random
 	 *            the source of randomness for this generator or null. See
 	 *            {@link SSLContext#init(KeyManager[], TrustManager[], SecureRandom)}
-	 *
 	 * @throws NoSuchAlgorithmException
 	 * @throws KeyManagementException
 	 */
