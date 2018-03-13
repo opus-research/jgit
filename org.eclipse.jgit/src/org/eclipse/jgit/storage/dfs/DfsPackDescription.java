@@ -44,7 +44,6 @@
 package org.eclipse.jgit.storage.dfs;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -80,9 +79,7 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 
 	private PackWriter.Statistics stats;
 
-	private final Set<PackExt> extensions;
-
-	private int indexVersion;
+	private int extensions;
 
 	/**
 	 * Initialize a description by pack name and repository.
@@ -104,7 +101,6 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 		int dot = name.lastIndexOf('.');
 		this.packName = (dot < 0) ? name : name.substring(0, dot);
 		this.sizeMap = new HashMap<PackExt, Long>(PackExt.values().length * 2);
-		this.extensions = new HashSet<PackExt>(PackExt.values().length * 2);
 	}
 
 	/** @return description of the repository. */
@@ -119,7 +115,7 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	 *            the file extension
 	 */
 	public void addFileExt(PackExt ext) {
-		extensions.add(ext);
+		extensions |= ext.getBit();
 	}
 
 	/**
@@ -128,7 +124,7 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	 * @return whether the pack file extensions is known to exist.
 	 */
 	public boolean hasFileExt(PackExt ext) {
-		return extensions.contains(ext);
+		return (extensions & ext.getBit()) != 0;
 	}
 
 	/**
@@ -260,21 +256,6 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	 */
 	public DfsPackDescription clearPackStats() {
 		stats = null;
-		return this;
-	}
-
-	/** @return the version of the index file written. */
-	public int getIndexVersion() {
-		return indexVersion;
-	}
-
-	/**
-	 * @param version
-	 *            the version of the index file written.
-	 * @return {@code this}
-	 */
-	public DfsPackDescription setIndexVersion(int version) {
-		indexVersion = version;
 		return this;
 	}
 
