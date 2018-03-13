@@ -65,8 +65,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.dircache.DirCacheCheckout;
-import org.eclipse.jgit.dircache.InvalidPathException;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -1152,14 +1150,6 @@ public abstract class Repository {
 			return false;
 		if (refName.endsWith(".lock")) //$NON-NLS-1$
 			return false;
-
-		// Borrow logic for filterig out invalid paths. These
-		// are also invalid ref
-		try {
-			DirCacheCheckout.checkValidPath(refName);
-		} catch (InvalidPathException e) {
-			return false;
-		}
 
 		int components = 1;
 		char p = '\0';
