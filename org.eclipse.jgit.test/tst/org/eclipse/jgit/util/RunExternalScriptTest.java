@@ -93,12 +93,11 @@ public class RunExternalScriptTest {
 
 	@Test
 	public void testArguments() throws IOException, InterruptedException {
-		File script = writeTempFile("echo -n $#,$1,$2,$3,$4,$5,$6");
-		int rc = FS.DETECTED.runProcess(
-				new ProcessBuilder("/bin/sh", script.getPath(), "a", "b", "c"),
-				out, err, (InputStream) null);
+		File script = writeTempFile("echo $#,$1,$2,$3,$4,$5,$6");
+		int rc = FS.DETECTED.runProcess(new ProcessBuilder("/bin/bash",
+				script.getPath(), "a", "b", "c"), out, err, (InputStream) null);
 		assertEquals(0, rc);
-		assertEquals("3,a,b,c,,,", new String(out.toByteArray()));
+		assertEquals("3,a,b,c,,,\n", new String(out.toByteArray()));
 		assertEquals("", new String(err.toByteArray()));
 	}
 
