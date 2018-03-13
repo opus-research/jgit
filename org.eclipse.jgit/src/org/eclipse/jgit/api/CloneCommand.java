@@ -61,7 +61,6 @@ import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
@@ -236,7 +235,7 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 		}
 
 		if (head == null || head.getObjectId() == null)
-			return; // TODO throw exception?
+			return; // throw exception?
 
 		if (head.getName().startsWith(Constants.R_HEADS)) {
 			final RefUpdate newHead = clonedRepo.updateRef(Constants.HEAD);
@@ -288,24 +287,20 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 
 	private Ref findBranchToCheckout(FetchResult result) {
 		final Ref idHEAD = result.getAdvertisedRef(Constants.HEAD);
-		ObjectId headId = idHEAD != null ? idHEAD.getObjectId() : null;
-		if (headId == null) {
+		if (idHEAD == null)
 			return null;
-		}
 
 		Ref master = result.getAdvertisedRef(Constants.R_HEADS
 				+ Constants.MASTER);
-		ObjectId objectId = master != null ? master.getObjectId() : null;
-		if (headId.equals(objectId)) {
+		if (master != null && master.getObjectId().equals(idHEAD.getObjectId()))
 			return master;
-		}
 
 		Ref foundBranch = null;
 		for (final Ref r : result.getAdvertisedRefs()) {
 			final String n = r.getName();
 			if (!n.startsWith(Constants.R_HEADS))
 				continue;
-			if (headId.equals(r.getObjectId())) {
+			if (r.getObjectId().equals(idHEAD.getObjectId())) {
 				foundBranch = r;
 				break;
 			}
