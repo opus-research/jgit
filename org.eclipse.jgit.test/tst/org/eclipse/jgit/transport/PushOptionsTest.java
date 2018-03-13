@@ -46,18 +46,16 @@ package org.eclipse.jgit.transport;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
-import static org.junit.Assert.fail;
 
 import java.io.IOException;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.PushCommand;
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.api.errors.TransportException;
 import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
 import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
@@ -92,7 +90,6 @@ public class PushOptionsTest extends RepositoryTestCase {
 
 		server = newRepo("server");
 		client = newRepo("client");
-
 		testProtocol = new TestProtocol<>(null,
 				new ReceivePackFactory<Object>() {
 					@Override
@@ -106,7 +103,6 @@ public class PushOptionsTest extends RepositoryTestCase {
 						return receivePack;
 					}
 				});
-
 		uri = testProtocol.register(ctx, server);
 
 		try (ObjectInserter ins = client.newObjectInserter()) {
@@ -138,25 +134,6 @@ public class PushOptionsTest extends RepositoryTestCase {
 		return cmds;
 	}
 
-	private void connectLocalToRemote(Git local, Git remote)
-			throws URISyntaxException, IOException {
-		StoredConfig config = local.getRepository().getConfig();
-		RemoteConfig remoteConfig = new RemoteConfig(config, "test");
-		remoteConfig.addURI(new URIish(
-				remote.getRepository().getDirectory().toURI().toURL()));
-		remoteConfig.addFetchRefSpec(
-				new RefSpec("+refs/heads/*:refs/remotes/origin/*"));
-		remoteConfig.update(config);
-		config.save();
-	}
-
-	private RevCommit addCommit(Git git)
-			throws IOException, NoFilepatternException, GitAPIException {
-		writeTrashFile("f", "content of f");
-		git.add().addFilepattern("f").call();
-		return git.commit().setMessage("adding f").call();
-	}
-
 	@Test
 	public void testNonAtomicPushWithOptions() throws Exception {
 		PushResult r;
@@ -166,6 +143,11 @@ public class PushOptionsTest extends RepositoryTestCase {
 		try (Transport tn = testProtocol.open(uri, client, "server")) {
 			tn.setPushAtomic(false);
 			tn.setPushOptions(pushOptions);
+
+			Map<String, RemoteRefUpdate> updates = new HashMap<>();
+			for (RemoteRefUpdate rru : commands(false)) {
+				updates.put(rru.getRemoteName(), rru);
+			}
 
 			r = tn.push(NullProgressMonitor.INSTANCE, commands(false));
 		}
@@ -210,6 +192,11 @@ public class PushOptionsTest extends RepositoryTestCase {
 			tn.setPushAtomic(true);
 			tn.setPushOptions(pushOptions);
 
+			Map<String, RemoteRefUpdate> updates = new HashMap<>();
+			for (RemoteRefUpdate rru : commands(false)) {
+				updates.put(rru.getRemoteName(), rru);
+			}
+
 			r = tn.push(NullProgressMonitor.INSTANCE, commands(false));
 		}
 
@@ -232,6 +219,11 @@ public class PushOptionsTest extends RepositoryTestCase {
 			tn.setPushThin(true);
 			tn.setPushOptions(pushOptions);
 
+			Map<String, RemoteRefUpdate> updates = new HashMap<>();
+			for (RemoteRefUpdate rru : commands(false)) {
+				updates.put(rru.getRemoteName(), rru);
+			}
+
 			r = tn.push(NullProgressMonitor.INSTANCE, commands(false));
 		}
 
@@ -246,118 +238,160 @@ public class PushOptionsTest extends RepositoryTestCase {
 
 	@Test
 	public void testPushWithoutOptions() throws Exception {
-		try (Git local = new Git(db);
-				Git remote = new Git(createBareRepository())) {
-			connectLocalToRemote(local, remote);
+		try (Git git = new Git(db);
+				Git git2 = new Git(createBareRepository())) {
+			final StoredConfig config = git.getRepository().getConfig();
+			RemoteConfig remoteConfig = new RemoteConfig(config, "test");
+			remoteConfig.addURI(new URIish(
+					git2.getRepository().getDirectory().toURI().toURL()));
+			remoteConfig.addFetchRefSpec(
+					new RefSpec("+refs/heads/*:refs/remotes/origin/*"));
+			remoteConfig.update(config);
+			config.save();
 
-			final StoredConfig config2 = remote.getRepository().getConfig();
+			final StoredConfig config2 = git2.getRepository().getConfig();
 			config2.setBoolean("receive", null, "pushoptions", true);
 			config2.save();
 
-			RevCommit commit = addCommit(local);
+			writeTrashFile("f", "content of f");
+			git.add().addFilepattern("f").call();
+			RevCommit commit = git.commit().setMessage("adding f").call();
 
-			local.checkout().setName("not-pushed").setCreateBranch(true).call();
-			local.checkout().setName("branchtopush").setCreateBranch(true).call();
+			git.checkout().setName("not-pushed").setCreateBranch(true).call();
+			git.checkout().setName("branchtopush").setCreateBranch(true).call();
 
-			assertNull(remote.getRepository().resolve("refs/heads/branchtopush"));
-			assertNull(remote.getRepository().resolve("refs/heads/not-pushed"));
-			assertNull(remote.getRepository().resolve("refs/heads/master"));
+			assertNull(git2.getRepository().resolve("refs/heads/branchtopush"));
+			assertNull(git2.getRepository().resolve("refs/heads/not-pushed"));
+			assertNull(git2.getRepository().resolve("refs/heads/master"));
 
-			PushCommand pushCommand = local.push().setRemote("test");
+			PushCommand pushCommand = git.push().setRemote("test");
 			pushCommand.call();
 
 			assertEquals(commit.getId(),
-					remote.getRepository().resolve("refs/heads/branchtopush"));
-			assertNull(remote.getRepository().resolve("refs/heads/not-pushed"));
-			assertNull(remote.getRepository().resolve("refs/heads/master"));
+					git2.getRepository().resolve("refs/heads/branchtopush"));
+			assertNull(git2.getRepository().resolve("refs/heads/not-pushed"));
+			assertNull(git2.getRepository().resolve("refs/heads/master"));
 		}
 	}
 
 	@Test
 	public void testPushWithEmptyOptions() throws Exception {
-		try (Git local = new Git(db);
-				Git remote = new Git(createBareRepository())) {
-			connectLocalToRemote(local, remote);
+		try (Git git = new Git(db);
+				Git git2 = new Git(createBareRepository())) {
+			final StoredConfig config = git.getRepository().getConfig();
+			RemoteConfig remoteConfig = new RemoteConfig(config, "test");
+			remoteConfig.addURI(new URIish(
+					git2.getRepository().getDirectory().toURI().toURL()));
+			remoteConfig.addFetchRefSpec(
+					new RefSpec("+refs/heads/*:refs/remotes/origin/*"));
+			remoteConfig.update(config);
+			config.save();
 
-			final StoredConfig config2 = remote.getRepository().getConfig();
+			final StoredConfig config2 = git2.getRepository().getConfig();
 			config2.setBoolean("receive", null, "pushoptions", true);
 			config2.save();
 
-			RevCommit commit = addCommit(local);
+			writeTrashFile("f", "content of f");
+			git.add().addFilepattern("f").call();
+			RevCommit commit = git.commit().setMessage("adding f").call();
 
-			local.checkout().setName("not-pushed").setCreateBranch(true).call();
-			local.checkout().setName("branchtopush").setCreateBranch(true).call();
-			assertNull(remote.getRepository().resolve("refs/heads/branchtopush"));
-			assertNull(remote.getRepository().resolve("refs/heads/not-pushed"));
-			assertNull(remote.getRepository().resolve("refs/heads/master"));
+			git.checkout().setName("not-pushed").setCreateBranch(true).call();
+			git.checkout().setName("branchtopush").setCreateBranch(true).call();
+			assertNull(git2.getRepository().resolve("refs/heads/branchtopush"));
+			assertNull(git2.getRepository().resolve("refs/heads/not-pushed"));
+			assertNull(git2.getRepository().resolve("refs/heads/master"));
 
 			List<String> pushOptions = new ArrayList<>();
-			PushCommand pushCommand = local.push().setRemote("test")
+			PushCommand pushCommand = git.push().setRemote("test")
 					.setPushOptions(pushOptions);
 			pushCommand.call();
 
 			assertEquals(commit.getId(),
-					remote.getRepository().resolve("refs/heads/branchtopush"));
-			assertNull(remote.getRepository().resolve("refs/heads/not-pushed"));
-			assertNull(remote.getRepository().resolve("refs/heads/master"));
+					git2.getRepository().resolve("refs/heads/branchtopush"));
+			assertNull(git2.getRepository().resolve("refs/heads/not-pushed"));
+			assertNull(git2.getRepository().resolve("refs/heads/master"));
 		}
 	}
 
 	@Test
 	public void testAdvertisedButUnusedPushOptions() throws Exception {
-		try (Git local = new Git(db);
-				Git remote = new Git(createBareRepository())) {
-			connectLocalToRemote(local, remote);
+		try (Git git = new Git(db);
+				Git git2 = new Git(createBareRepository())) {
+			final StoredConfig config = git.getRepository().getConfig();
+			RemoteConfig remoteConfig = new RemoteConfig(config, "test");
+			remoteConfig.addURI(new URIish(
+					git2.getRepository().getDirectory().toURI().toURL()));
+			remoteConfig.addFetchRefSpec(
+					new RefSpec("+refs/heads/*:refs/remotes/origin/*"));
+			remoteConfig.update(config);
+			config.save();
 
-			final StoredConfig config2 = remote.getRepository().getConfig();
+			final StoredConfig config2 = git2.getRepository().getConfig();
 			config2.setBoolean("receive", null, "pushoptions", true);
 			config2.save();
 
-			RevCommit commit = addCommit(local);
+			writeTrashFile("f", "content of f");
+			git.add().addFilepattern("f").call();
+			RevCommit commit = git.commit().setMessage("adding f").call();
 
-			local.checkout().setName("not-pushed").setCreateBranch(true).call();
-			local.checkout().setName("branchtopush").setCreateBranch(true).call();
+			git.checkout().setName("not-pushed").setCreateBranch(true).call();
+			git.checkout().setName("branchtopush").setCreateBranch(true).call();
 
-			assertNull(remote.getRepository().resolve("refs/heads/branchtopush"));
-			assertNull(remote.getRepository().resolve("refs/heads/not-pushed"));
-			assertNull(remote.getRepository().resolve("refs/heads/master"));
+			assertNull(
+					git2.getRepository().resolve("refs/heads/branchtopush"));
+			assertNull(
+					git2.getRepository().resolve("refs/heads/not-pushed"));
+			assertNull(
+					git2.getRepository().resolve("refs/heads/master"));
 
-			PushCommand pushCommand = local.push().setRemote("test")
+			PushCommand pushCommand = git.push().setRemote("test")
 					.setPushOptions(null);
 			pushCommand.call();
 
 			assertEquals(commit.getId(),
-					remote.getRepository().resolve("refs/heads/branchtopush"));
-			assertNull(remote.getRepository().resolve("refs/heads/not-pushed"));
-			assertNull(remote.getRepository().resolve("refs/heads/master"));
+					git2.getRepository().resolve("refs/heads/branchtopush"));
+			assertNull(git2.getRepository().resolve("refs/heads/not-pushed"));
+			assertNull(git2.getRepository().resolve("refs/heads/master"));
 		}
 	}
 
 	@Test(expected = TransportException.class)
 	public void testPushOptionsNotSupported() throws Exception {
-		try (Git local = new Git(db);
-				Git remote = new Git(createBareRepository())) {
-			connectLocalToRemote(local, remote);
+		try (Git git = new Git(db);
+				Git git2 = new Git(createBareRepository())) {
+			final StoredConfig config = git.getRepository().getConfig();
+			RemoteConfig remoteConfig = new RemoteConfig(config, "test");
+			remoteConfig.addURI(new URIish(
+					git2.getRepository().getDirectory().toURI().toURL()));
+			remoteConfig.addFetchRefSpec(
+					new RefSpec("+refs/heads/*:refs/remotes/origin/*"));
+			remoteConfig.update(config);
+			config.save();
 
-			final StoredConfig config2 = remote.getRepository().getConfig();
+			final StoredConfig config2 = git2.getRepository().getConfig();
 			config2.setBoolean("receive", null, "pushoptions", false);
 			config2.save();
 
-			addCommit(local);
+			writeTrashFile("f", "content of f");
+			git.add().addFilepattern("f").call();
+			RevCommit commit = git.commit().setMessage("adding f").call();
 
-			local.checkout().setName("not-pushed").setCreateBranch(true).call();
-			local.checkout().setName("branchtopush").setCreateBranch(true).call();
+			git.checkout().setName("not-pushed").setCreateBranch(true).call();
+			git.checkout().setName("branchtopush").setCreateBranch(true).call();
 
-			assertNull(remote.getRepository().resolve("refs/heads/branchtopush"));
-			assertNull(remote.getRepository().resolve("refs/heads/not-pushed"));
-			assertNull(remote.getRepository().resolve("refs/heads/master"));
+			assertNull(git2.getRepository().resolve("refs/heads/branchtopush"));
+			assertNull(git2.getRepository().resolve("refs/heads/not-pushed"));
+			assertNull(git2.getRepository().resolve("refs/heads/master"));
 
 			List<String> pushOptions = new ArrayList<>();
-			PushCommand pushCommand = local.push().setRemote("test")
+			PushCommand pushCommand = git.push().setRemote("test")
 					.setPushOptions(pushOptions);
 			pushCommand.call();
 
-			fail("should already have thrown TransportException");
+			assertEquals(commit.getId(),
+					git2.getRepository().resolve("refs/heads/branchtopush"));
+			assertNull(git2.getRepository().resolve("refs/heads/not-pushed"));
+			assertNull(git2.getRepository().resolve("refs/heads/master"));
 		}
 	}
 }
