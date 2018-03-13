@@ -858,8 +858,10 @@ public class ConfigTest {
 
 	private static String pathToString(File file) {
 		final String path = file.getPath();
-		return SystemReader.getInstance().isWindows() ? path.replace('\\', '/')
-				: path;
+		if (SystemReader.getInstance().isWindows()) {
+			return path.replace('\\', '/');
+		}
+		return path;
 	}
 
 	private static void assertReadLong(long exp) throws ConfigInvalidException {
