@@ -44,9 +44,9 @@ import org.eclipse.jgit.api.JGitInternalException;
 import org.eclipse.jgit.api.NoHeadException;
 import org.eclipse.jgit.api.NoMessageException;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.util.RawParseUtils;
 import org.kohsuke.args4j.Option;
 
 @Command(common = true, usage = "usage_recordChangesToRepository")
@@ -65,7 +65,7 @@ class Commit extends TextBuiltin {
 			ConcurrentRefUpdateException, JGitInternalException, Exception {
 		CommitCommand commitCmd = new Git(db).commit();
 		if (author != null)
-			commitCmd.setAuthor(new PersonIdent(author));
+			commitCmd.setAuthor(RawParseUtils.parsePersonIdent(author));
 		if (message != null)
 			commitCmd.setMessage(message);
 		Ref head = db.getRef(Constants.HEAD);
