@@ -57,18 +57,17 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.http.server.GitServlet;
 import org.eclipse.jgit.http.server.GitSmartHttpTools;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.junit.http.HttpTestCase;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevBlob;
-import org.eclipse.jgit.storage.file.FileBasedConfig;
-import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.transport.PacketLineIn;
 import org.eclipse.jgit.transport.PacketLineOut;
 import org.eclipse.jgit.transport.URIish;
@@ -79,7 +78,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class ProtocolErrorTest extends HttpTestCase {
-	private FileRepository remoteRepository;
+	private Repository remoteRepository;
 
 	private URIish remoteURI;
 
@@ -89,7 +88,7 @@ public class ProtocolErrorTest extends HttpTestCase {
 	public void setUp() throws Exception {
 		super.setUp();
 
-		final TestRepository<FileRepository> src = createTestRepository();
+		final TestRepository<Repository> src = createTestRepository();
 		final String srcName = src.getRepository().getDirectory().getName();
 
 		ServletContextHandler app = server.addContext("/git");
@@ -113,7 +112,7 @@ public class ProtocolErrorTest extends HttpTestCase {
 		remoteRepository = src.getRepository();
 		remoteURI = toURIish(app, srcName);
 
-		FileBasedConfig cfg = remoteRepository.getConfig();
+		StoredConfig cfg = remoteRepository.getConfig();
 		cfg.setBoolean("http", null, "receivepack", true);
 		cfg.save();
 
@@ -176,7 +175,7 @@ public class ProtocolErrorTest extends HttpTestCase {
 		}
 	}
 
-	private void packHeader(ByteArrayOutputStream tinyPack, int cnt)
+	private static void packHeader(ByteArrayOutputStream tinyPack, int cnt)
 			throws IOException {
 		final byte[] hdr = new byte[8];
 		NB.encodeInt32(hdr, 0, 2);

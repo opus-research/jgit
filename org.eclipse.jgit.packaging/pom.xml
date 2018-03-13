@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-   Copyright (C) 2009-2011, Matthias Sohn <matthias.sohn@sap.com>
+   Copyright (C) 2009-2012, Matthias Sohn <matthias.sohn@sap.com>
    and other copyright owners as documented in the project's IP log.
 
    This program and the accompanying materials are made available
@@ -53,37 +53,52 @@
 
   <groupId>org.eclipse.jgit</groupId>
   <artifactId>jgit.tycho.parent</artifactId>
-  <version>1.2.0-SNAPSHOT</version>
+  <version>3.1.0-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <name>JGit Tycho Parent</name>
 
   <properties>
-    <tycho-version>0.12.0</tycho-version>
-    <eclipse-site>http://download.eclipse.org/releases/galileo</eclipse-site>
+    <tycho-version>0.18.0</tycho-version>
   </properties>
 
   <modules>
+    <module>org.eclipse.jgit.target</module>
     <module>org.eclipse.jgit.feature</module>
+    <module>org.eclipse.jgit.java7.feature</module>
+    <module>org.eclipse.jgit.pgm.feature</module>
     <module>org.eclipse.jgit.source.feature</module>
+    <module>org.eclipse.jgit.pgm.source.feature</module>
     <module>org.eclipse.jgit.junit.feature</module>
-    <module>org.eclipse.jgit.updatesite</module>
+    <module>org.eclipse.jgit.repository</module>
   </modules>
 
-  <repositories>
+  <distributionManagement>
     <repository>
-      <id>ganymede</id>
-      <layout>p2</layout>
-      <url>${eclipse-site}</url>
+      <id>repo.eclipse.org</id>
+      <name>JGit Maven Repository - Releases</name>
+      <url>https://repo.eclipse.org/content/repositories/jgit-releases/</url>
     </repository>
-  </repositories>
+    <snapshotRepository>
+      <id>repo.eclipse.org</id>
+      <name>JGit Maven Repository - Snapshots</name>
+      <url>https://repo.eclipse.org/content/repositories/jgit-snapshots/</url>
+      <uniqueVersion>true</uniqueVersion>
+    </snapshotRepository>
+  </distributionManagement>
 
   <dependencies>
     <!-- sources artifacts so that we can place them in the features -->
     <dependency>
       <groupId>org.eclipse.jgit</groupId>
       <artifactId>org.eclipse.jgit</artifactId>
-      <version>1.2.0-SNAPSHOT</version>
+      <version>${project.version}</version>
+      <classifier>sources</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jgit</groupId>
+      <artifactId>org.eclipse.jgit.pgm</artifactId>
+      <version>${project.version}</version>
       <classifier>sources</classifier>
     </dependency>
   </dependencies>
@@ -130,6 +145,13 @@
           <configuration>
             <resolver>p2</resolver>
             <pomDependencies>consider</pomDependencies>
+            <target>
+              <artifact>
+                <groupId>org.eclipse.jgit</groupId>
+                <artifactId>org.eclipse.jgit.target</artifactId>
+                <version>${project.version}</version>
+              </artifact>
+            </target>
             <environments>
               <environment>
                 <os>linux</os>
@@ -162,5 +184,6 @@
       </plugins>
     </pluginManagement>
   </build>
+
 </project>
 

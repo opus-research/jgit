@@ -42,6 +42,7 @@
  */
 package org.eclipse.jgit.api;
 
+import java.util.List;
 import java.util.Map;
 
 import org.eclipse.jgit.merge.ResolveMerger;
@@ -93,6 +94,15 @@ public class RebaseResult {
 			}
 		},
 		/**
+		 * Conflicts: checkout of target HEAD failed
+		 */
+		CONFLICTS {
+			@Override
+			public boolean isSuccessful() {
+				return false;
+			}
+		},
+		/**
 		 * Already up-to-date
 		 */
 		UP_TO_DATE {
@@ -108,6 +118,18 @@ public class RebaseResult {
 			@Override
 			public boolean isSuccessful() {
 				return true;
+			}
+		},
+
+		/**
+		 * Continue with nothing left to commit (possibly want skip).
+		 *
+		 * @since 2.0
+		 */
+		NOTHING_TO_COMMIT {
+			@Override
+			public boolean isSuccessful() {
+				return false;
 			}
 		};
 
@@ -127,14 +149,19 @@ public class RebaseResult {
 	static final RebaseResult FAST_FORWARD_RESULT = new RebaseResult(
 			Status.FAST_FORWARD);
 
-	private final Status mySatus;
+	static final RebaseResult NOTHING_TO_COMMIT_RESULT = new RebaseResult(
+			Status.NOTHING_TO_COMMIT);
+
+	private final Status status;
 
 	private final RevCommit currentCommit;
 
 	private Map<String, MergeFailureReason> failingPaths;
 
+	private List<String> conflicts;
+
 	private RebaseResult(Status status) {
-		this.mySatus = status;
+		this.status = status;
 		currentCommit = null;
 	}
 
@@ -145,7 +172,7 @@ public class RebaseResult {
 	 *            current commit
 	 */
 	RebaseResult(RevCommit commit) {
-		mySatus = Status.STOPPED;
+		status = Status.STOPPED;
 		currentCommit = commit;
 	}
 
@@ -156,16 +183,28 @@ public class RebaseResult {
 	 *            list of paths causing this rebase to fail
 	 */
 	RebaseResult(Map<String, MergeFailureReason> failingPaths) {
-		mySatus = Status.FAILED;
+		status = Status.FAILED;
 		currentCommit = null;
 		this.failingPaths = failingPaths;
+	}
+
+	/**
+	 * Create <code>RebaseResult</code> with status {@link Status#CONFLICTS}
+	 *
+	 * @param conflicts
+	 *            the list of conflicting paths
+	 */
+	RebaseResult(List<String> conflicts) {
+		status = Status.CONFLICTS;
+		currentCommit = null;
+		this.conflicts = conflicts;
 	}
 
 	/**
 	 * @return the overall status
 	 */
 	public Status getStatus() {
-		return mySatus;
+		return status;
 	}
 
 	/**
@@ -183,5 +222,12 @@ public class RebaseResult {
 	 */
 	public Map<String, MergeFailureReason> getFailingPaths() {
 		return failingPaths;
+	}
+
+	/**
+	 * @return the list of conflicts if status is {@link Status#CONFLICTS}
+	 */
+	public List<String> getConflicts() {
+		return conflicts;
 	}
 }
