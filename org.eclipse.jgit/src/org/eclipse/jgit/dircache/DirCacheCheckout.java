@@ -4,7 +4,6 @@
  * Copyright (C) 2008, Roger C. Soares <rogersoares@intelinet.com.br>
  * Copyright (C) 2006, Shawn O. Pearce <spearce@spearce.org>
  * Copyright (C) 2010, Chrisian Halstrick <christian.halstrick@sap.com> and
- * Copyright (C) 2016, Rüdiger Herrmann <ruediger.herrmann@gmx.de> and
  * other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available under the
@@ -141,8 +140,6 @@ public class DirCacheCheckout {
 	private WorkingTreeIterator workingTree;
 
 	private boolean failOnConflict = true;
-
-	private boolean skipConflicts;
 
 	private ArrayList<String> toBeDeleted = new ArrayList<String>();
 
@@ -462,7 +459,7 @@ public class DirCacheCheckout {
 			if (!conflicts.isEmpty()) {
 				if (failOnConflict)
 					throw new CheckoutConflictException(conflicts.toArray(new String[conflicts.size()]));
-				else if (!skipConflicts)
+				else
 					cleanUpConflicts();
 			}
 
@@ -721,23 +718,10 @@ public class DirCacheCheckout {
 			return;
 		}
 
-		if ((ffMask & 0x222) == 0) {
-			// HEAD, MERGE and index don't contain a file (e.g. all contain a
-			// folder)
-			if (f == null || FileMode.TREE.equals(f.getEntryFileMode())) {
-				// the workingtree entry doesn't exist or also contains a folder
-				// -> no problem
-				return;
-			} else {
-				// the workingtree entry exists and is not a folder
-				if (!idEqual(h, m)) {
-					// Because HEAD and MERGE differ we will try to update the
-					// workingtree with a folder -> return a conflict
-					conflict(name, null, null, null);
-				}
-				return;
-			}
-		}
+		// if we have no file at all then there is nothing to do
+		if ((ffMask & 0x222) == 0
+				&& (f == null || FileMode.TREE.equals(f.getEntryFileMode())))
+			return;
 
 		if ((ffMask == 0x00F) && f != null && FileMode.TREE.equals(f.getEntryFileMode())) {
 			// File/Directory conflict case #20
@@ -999,15 +983,7 @@ public class DirCacheCheckout {
 						// -> Standard case when switching between branches:
 						// Nothing new in index but something different in
 						// Merge. Update index and file
-						boolean update = true;
-						for (String conflict : conflicts) {
-							if (name.startsWith(conflict + "/")) { //$NON-NLS-1$
-								update = false;
-							}
-						}
-						if (update) {
-							update(name, mId, mMode);
-						}
+						update(name, mId, mMode);
 					}
 				} else {
 					// Head differs from index or merge is same as index
@@ -1026,17 +1002,6 @@ public class DirCacheCheckout {
 				}
 			}
 		}
-	}
-
-	private static boolean idEqual(AbstractTreeIterator a,
-			AbstractTreeIterator b) {
-		if (a == b) {
-			return true;
-		}
-		if (a == null || b == null) {
-			return false;
-		}
-		return a.getEntryObjectId().equals(b.getEntryObjectId());
 	}
 
 	/**
@@ -1102,21 +1067,6 @@ public class DirCacheCheckout {
 	 */
 	public void setFailOnConflict(boolean failOnConflict) {
 		this.failOnConflict = failOnConflict;
-	}
-
-	/**
-	 * If <code>true</code>, conflicts will be skipped and the file in the work
-	 * directory will remain unchanged. Otherwise it will silently deal with the
-	 * problem. The default value is <code>false</code>.
-	 * <p>
-	 * Note that {@link #setFailOnConflict(boolean) failOnConflict} must be set
-	 * to <code>false</code> for this setting to take effect.
-	 *
-	 * @param skipConflicts
-	 * @since 4.5
-	 */
-	public void setSkipConflicts(boolean skipConflicts) {
-		this.skipConflicts = skipConflicts;
 	}
 
 	/**
