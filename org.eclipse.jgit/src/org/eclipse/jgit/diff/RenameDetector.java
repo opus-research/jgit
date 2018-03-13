@@ -351,10 +351,8 @@ public class RenameDetector {
 				List<DiffEntry> list = (List<DiffEntry>) del;
 				DiffEntry best = null;
 				for (DiffEntry e : list) {
-					if (sameType(e.oldMode, dst.newMode)) {
+					if (best == null && sameType(e.oldMode, dst.newMode))
 						best = e;
-						break;
-					}
 				}
 				if (best != null) {
 					if (best.changeType == ChangeType.DELETE) {
