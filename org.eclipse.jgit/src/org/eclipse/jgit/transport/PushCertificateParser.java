@@ -306,15 +306,7 @@ public class PushCertificateParser {
 	public void addCommand(String rawLine) throws PackProtocolException {
 		checkCommandLine(rawLine);
 		String line = rawLine.substring(0, rawLine.length() - 1);
-		ReceiveCommand cmd;
-		try {
-			cmd = parseCommand(line);
-		} catch (IllegalArgumentException | StringIndexOutOfBoundsException e) {
-			throw new PackProtocolException(MessageFormat.format(
-					JGitText.get().pushCertificateInvalidFieldValue,
-					"command", rawLine), e); //$NON-NLS-1$
-		}
-		commands.add(cmd);
+		commands.add(parseCommand(line));
 		rawCommands.append(rawLine);
 	}
 
