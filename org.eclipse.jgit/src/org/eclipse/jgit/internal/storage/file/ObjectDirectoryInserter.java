@@ -64,6 +64,7 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.PackParser;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.IO;
@@ -132,7 +133,7 @@ class ObjectDirectoryInserter extends ObjectInserter {
 	}
 
 	@Override
-	public ObjectReader newReader() {
+	public ObjectReader newReader(Repository notUsed) {
 		return new WindowCursor(db);
 	}
 
