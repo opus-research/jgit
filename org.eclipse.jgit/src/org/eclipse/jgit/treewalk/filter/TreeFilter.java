@@ -198,14 +198,6 @@ public abstract class TreeFilter {
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException;
 
-
-	public int matchFilter(final TreeWalk walker)
-			throws MissingObjectException, IncorrectObjectTypeException,
-			IOException
-	{
-		return include(walker) ? 0 : 1;
-	}
-
 	/**
 	 * Does this tree filter require a recursive walk to match everything?
 	 * <p>
