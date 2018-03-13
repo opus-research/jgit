@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2009, Google Inc.
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2007-2008, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,35 +42,50 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.pgm;
+package org.eclipse.jgit.lib;
 
-import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.IOException;
 
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
-import org.eclipse.jgit.lib.TextProgressMonitor;
+import junit.textui.TestRunner;
 
-class IndexPack extends TextBuiltin {
-	@Option(name = "--fix-thin", usage = "usage_fixAThinPackToBeComplete")
-	private boolean fixThin;
+public class T0005_ShallowSpeedTest extends SpeedTestBase {
 
-	@Option(name = "--index-version", usage = "usage_indexFileFormatToCreate")
-	private int indexVersion = -1;
+	protected void setUp() throws Exception {
+		prepare(new String[] { "git", "rev-list", "365bbe0d0caaf2ba74d56556827babf0bc66965d" });
+	}
 
-	@Argument(index = 0, required = true, metaVar = "metaVar_base")
-	private File base;
+	public void testShallowHistoryScan() throws IOException {
+		long start = System.currentTimeMillis();
+		Repository db = new Repository(new File(kernelrepo));
+		Commit commit = db.mapCommit("365bbe0d0caaf2ba74d56556827babf0bc66965d");
+		int n = 1;
+		for (;;) {
+			ObjectId[] parents = commit.getParentIds();
+			if (parents.length == 0)
+				break;
+			ObjectId parentId = parents[0];
+			commit = db.mapCommit(parentId);
+			commit.getCommitId().name();
+			++n;
+		}
+		assertEquals(12275, n);
+		long stop = System.currentTimeMillis();
+		long time = stop - start;
+		System.out.println("native="+nativeTime);
+		System.out.println("jgit="+time);
+		// ~0.750s (hot cache), ok
+		/*
+native=1795
+jgit=722
+		 */
+		// native git seems to run SLOWER than jgit here, at roughly half the speed
+		// creating the git process is not the issue here, btw.
+		long factor10 = (nativeTime*150/time+50)/100;
+		assertEquals(3, factor10);
+	}
 
-	@Override
-	protected void run() throws Exception {
-		if (indexVersion == -1)
-			indexVersion = db.getConfig().getCore().getPackIndexVersion();
-		final BufferedInputStream in;
-		final org.eclipse.jgit.transport.IndexPack ip;
-		in = new BufferedInputStream(System.in);
-		ip = new org.eclipse.jgit.transport.IndexPack(db, in, base);
-		ip.setFixThin(fixThin);
-		ip.setIndexVersion(indexVersion);
-		ip.index(new TextProgressMonitor());
+	public static void main(String[] args) {
+		TestRunner.run(T0005_ShallowSpeedTest.class);
 	}
 }
