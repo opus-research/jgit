@@ -536,7 +536,7 @@ public class RevWalk implements Iterable<RevCommit> {
 	 * <p>
 	 * If non-null and not {@link TreeFilter#ALL} then the tree filter will be
 	 * installed. Commits will have their ancestry simplified to hide commits that
-	 * that do not contain tree entries matched by the filter, unless
+	 * do not contain tree entries matched by the filter, unless
 	 * {@code setRewriteParents(false)} is called.
 	 * <p>
 	 * Usually callers should be inserting a filter graph including
@@ -565,6 +565,7 @@ public class RevWalk implements Iterable<RevCommit> {
 	 *
 	 * @param rewrite
 	 *            whether to rewrite parents; defaults to true.
+	 * @since 3.4
 	 */
 	public void setRewriteParents(boolean rewrite) {
 		rewriteParents = rewrite;
