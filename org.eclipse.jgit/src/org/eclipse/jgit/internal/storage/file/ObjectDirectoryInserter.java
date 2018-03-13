@@ -93,10 +93,8 @@ class ObjectDirectoryInserter extends ObjectInserter {
 	 * Insert a loose object into the database.  If createDuplicate is
 	 * true, write the loose object even if we already have it in the
 	 * loose or packed ODB.
-	 *
-	 * @since 4.7
 	 */
-	public ObjectId insert(int type, byte[] data, int off, int len, boolean createDuplicate)
+	ObjectId insert(int type, byte[] data, int off, int len, boolean createDuplicate)
 			throws IOException {
 		ObjectId id = idFor(type, data, off, len);
 		if (!createDuplicate && db.has(id)) {
@@ -117,10 +115,8 @@ class ObjectDirectoryInserter extends ObjectInserter {
 	 * Insert a loose object into the database.  If createDuplicate is
 	 * true, write the loose object even if we already have it in the
 	 * loose or packed ODB.
-	 *
-	 * @since 4.7
 	 */
-	public ObjectId insert(final int type, long len, final InputStream is, boolean createDuplicate)
+	ObjectId insert(final int type, long len, final InputStream is, boolean createDuplicate)
 			throws IOException {
 		if (len <= buffer().length) {
 			byte[] buf = buffer();
