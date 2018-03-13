@@ -40,43 +40,51 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.archive;
 
-package org.eclipse.jgit.pgm;
+import java.io.IOException;
+import java.io.OutputStream;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.archive.ArchiveFormats;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.pgm.TextBuiltin;
-import org.eclipse.jgit.pgm.internal.CLIText;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
+import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarConstants;
+import org.eclipse.jgit.api.ArchiveCommand;
+import org.eclipse.jgit.lib.FileMode;
+import org.eclipse.jgit.lib.ObjectLoader;
 
-@Command(common = true, usage = "usage_archive")
-class Archive extends TextBuiltin {
-	static {
-		ArchiveFormats.registerAll();
+/**
+ * Unix TAR format (ustar + old GNU long filename extension).
+ */
+public class TarFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
+	public ArchiveOutputStream createArchiveOutputStream(OutputStream s) {
+		return new TarArchiveOutputStream(s);
 	}
 
-	@Argument(index = 0, metaVar = "metaVar_treeish")
-	private ObjectId tree;
-
-	@Option(name = "--format", metaVar = "metaVar_archiveFormat", usage = "usage_archiveFormat")
-	private String format = "zip";
-
-	@Override
-	protected void run() throws Exception {
-		if (tree == null)
-			throw die(CLIText.get().treeIsRequired);
-
-		try {
-			new Git(db).archive()
-				.setTree(tree)
-				.setFormat(format)
-				.setOutputStream(outs)
-				.call();
-		} catch (GitAPIException e) {
-			throw die(e.getMessage());
+	public void putEntry(ArchiveOutputStream out,
+			String path, FileMode mode, ObjectLoader loader)
+			throws IOException {
+		if (mode == FileMode.SYMLINK) {
+			final TarArchiveEntry entry = new TarArchiveEntry(
+					path, TarConstants.LF_SYMLINK);
+			entry.setLinkName(new String(
+					loader.getCachedBytes(100), "UTF-8")); //$NON-NLS-1$
+			out.putArchiveEntry(entry);
+			out.closeArchiveEntry();
+			return;
 		}
+
+		final TarArchiveEntry entry = new TarArchiveEntry(path);
+		if (mode == FileMode.REGULAR_FILE ||
+		    mode == FileMode.EXECUTABLE_FILE) {
+			entry.setMode(mode.getBits());
+		} else {
+			// TODO(jrn): Let the caller know the tree contained
+			// an entry with unsupported mode (e.g., a submodule).
+		}
+		entry.setSize(loader.getSize());
+		out.putArchiveEntry(entry);
+		loader.copyTo(out);
+		out.closeArchiveEntry();
 	}
 }

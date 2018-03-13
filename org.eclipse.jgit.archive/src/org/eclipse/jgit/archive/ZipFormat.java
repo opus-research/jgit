@@ -40,43 +40,43 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.archive;
 
-package org.eclipse.jgit.pgm;
+import java.io.IOException;
+import java.io.OutputStream;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.archive.ArchiveFormats;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.pgm.TextBuiltin;
-import org.eclipse.jgit.pgm.internal.CLIText;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
+import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
+import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream;
+import org.eclipse.jgit.api.ArchiveCommand;
+import org.eclipse.jgit.lib.FileMode;
+import org.eclipse.jgit.lib.ObjectLoader;
 
-@Command(common = true, usage = "usage_archive")
-class Archive extends TextBuiltin {
-	static {
-		ArchiveFormats.registerAll();
+/**
+ * PKWARE's ZIP format.
+ */
+public class ZipFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
+	public ArchiveOutputStream createArchiveOutputStream(OutputStream s) {
+		return new ZipArchiveOutputStream(s);
 	}
 
-	@Argument(index = 0, metaVar = "metaVar_treeish")
-	private ObjectId tree;
+	public void putEntry(ArchiveOutputStream out,
+			String path, FileMode mode, ObjectLoader loader)
+			throws IOException {
+		final ZipArchiveEntry entry = new ZipArchiveEntry(path);
 
-	@Option(name = "--format", metaVar = "metaVar_archiveFormat", usage = "usage_archiveFormat")
-	private String format = "zip";
-
-	@Override
-	protected void run() throws Exception {
-		if (tree == null)
-			throw die(CLIText.get().treeIsRequired);
-
-		try {
-			new Git(db).archive()
-				.setTree(tree)
-				.setFormat(format)
-				.setOutputStream(outs)
-				.call();
-		} catch (GitAPIException e) {
-			throw die(e.getMessage());
+		if (mode == FileMode.REGULAR_FILE) {
+			// ok
+		} else if (mode == FileMode.EXECUTABLE_FILE
+				|| mode == FileMode.SYMLINK) {
+			entry.setUnixMode(mode.getBits());
+		} else {
+			// TODO(jrn): Let the caller know the tree contained
+			// an entry with unsupported mode (e.g., a submodule).
 		}
+		entry.setSize(loader.getSize());
+		out.putArchiveEntry(entry);
+		loader.copyTo(out);
+		out.closeArchiveEntry();
 	}
 }

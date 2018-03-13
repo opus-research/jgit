@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-   Copyright (C) 2012, Matthias Sohn <matthias.sohn@sap.com>
+   Copyright (C) 2013, Matthias Sohn <matthias.sohn@sap.com>
    and other copyright owners as documented in the project's IP log.
 
    This program and the accompanying materials are made available
@@ -41,7 +41,6 @@
    ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
    ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
-
 <project xmlns="http://maven.apache.org/POM/4.0.0"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
@@ -53,37 +52,7 @@
     <version>3.0.0-SNAPSHOT</version>
   </parent>
 
-  <groupId>org.eclipse.jgit.feature</groupId>
-  <artifactId>org.eclipse.jgit.pgm</artifactId>
-  <packaging>eclipse-feature</packaging>
-
-  <name>JGit Command Line Interface Feature</name>
-
-  <dependencies>
-
-    <dependency>
-      <groupId>org.eclipse.jgit</groupId>
-      <artifactId>org.eclipse.jgit</artifactId>
-      <version>3.0.0-SNAPSHOT</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.eclipse.jgit</groupId>
-      <artifactId>org.eclipse.jgit.java7</artifactId>
-      <version>3.0.0-SNAPSHOT</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.eclipse.jgit</groupId>
-      <artifactId>org.eclipse.jgit.pgm</artifactId>
-      <version>3.0.0-SNAPSHOT</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.eclipse.jgit</groupId>
-      <artifactId>org.eclipse.jgit.ui</artifactId>
-      <version>3.0.0-SNAPSHOT</version>
-    </dependency>
-  </dependencies>
-
+  <artifactId>org.eclipse.jgit.target</artifactId>
+  <packaging>eclipse-target-definition</packaging>
+  <name>JGit Target Platform</name>
 </project>

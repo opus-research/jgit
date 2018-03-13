@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Google Inc.
+ * Copyright (C) 2013 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,43 +40,42 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.archive;
 
-package org.eclipse.jgit.pgm;
+import org.osgi.framework.BundleActivator;
+import org.osgi.framework.BundleContext;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.archive.ArchiveFormats;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.pgm.TextBuiltin;
-import org.eclipse.jgit.pgm.internal.CLIText;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
-
-@Command(common = true, usage = "usage_archive")
-class Archive extends TextBuiltin {
-	static {
+/**
+ * This activator registers all format types from the
+ * org.eclipse.jgit.archive package for use via the ArchiveCommand
+ * API.
+ *
+ * This registration happens automatically behind the scenes
+ * when the package is loaded as an OSGi bundle (and the corresponding
+ * deregistration happens when the bundle is unloaded, to avoid
+ * leaks).
+ */
+public class FormatActivator implements BundleActivator {
+	/**
+	 * Registers all included archive formats by calling
+	 * {@link ArchiveFormats#registerAll()}. This method is called by the OSGi
+	 * framework when the bundle is started.
+	 *
+	 * @param context
+	 *            unused
+	 */
+	public void start(BundleContext context) {
 		ArchiveFormats.registerAll();
 	}
 
-	@Argument(index = 0, metaVar = "metaVar_treeish")
-	private ObjectId tree;
-
-	@Option(name = "--format", metaVar = "metaVar_archiveFormat", usage = "usage_archiveFormat")
-	private String format = "zip";
-
-	@Override
-	protected void run() throws Exception {
-		if (tree == null)
-			throw die(CLIText.get().treeIsRequired);
-
-		try {
-			new Git(db).archive()
-				.setTree(tree)
-				.setFormat(format)
-				.setOutputStream(outs)
-				.call();
-		} catch (GitAPIException e) {
-			throw die(e.getMessage());
-		}
+	/**
+	 * Cleans up after {@link #start(BundleContext)} by calling
+	 * {@link ArchiveFormats#unregisterAll}.
+	 *
+	 * @param context
+	 *            unused
+	 */
+	public void stop(BundleContext context) {
+		ArchiveFormats.unregisterAll();
 	}
 }
