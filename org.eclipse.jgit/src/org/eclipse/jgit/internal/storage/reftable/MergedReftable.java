@@ -102,7 +102,7 @@ public class MergedReftable extends Reftable {
 	public RefCursor seekRef(String name) throws IOException {
 		boolean isPrefix = name.endsWith("/"); //$NON-NLS-1$
 		MergedRefCursor m = new MergedRefCursor();
-		for (int i = 0; i < tables.length; i++) {
+		for (int i = tables.length - 1; i >= 0; i--) {
 			m.add(new RefQueueEntry(tables[i].seekRef(name), i));
 			if (!isPrefix && !m.queue.isEmpty()) {
 				return m;
