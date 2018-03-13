@@ -83,7 +83,6 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
-import org.eclipse.jgit.util.io.CountingInputStream;
 
 /**
  * Parses a pack stream and imports it for an {@link ObjectInserter}.
@@ -121,7 +120,7 @@ public abstract class PackParser {
 
 	private final MutableObjectId tempObjectId;
 
-	private CountingInputStream in;
+	private InputStream in;
 
 	byte[] buf;
 
@@ -187,9 +186,6 @@ public abstract class PackParser {
 	/** Git object size limit */
 	private long maxObjectSizeLimit;
 
-	private final ReceivedPackStatistics.Builder stats =
-			new ReceivedPackStatistics.Builder();
-
 	/**
 	 * Initialize a pack parser.
 	 *
@@ -200,7 +196,7 @@ public abstract class PackParser {
 	 */
 	protected PackParser(final ObjectDatabase odb, final InputStream src) {
 		objectDatabase = odb.newCachedDatabase();
-		in = new CountingInputStream(src);
+		in = src;
 
 		inflater = new InflaterStream();
 		readCurs = objectDatabase.newReader();
@@ -459,7 +455,7 @@ public abstract class PackParser {
 	}
 
 	/**
-	 * Get the size of the newly created pack.
+	 * Get the size of the parsed pack.
 	 *
 	 * This will also include the pack index size if an index was created. This
 	 * method should only be called after pack parsing is finished.
@@ -470,17 +466,6 @@ public abstract class PackParser {
 	 */
 	public long getPackSize() {
 		return -1;
-	}
-
-	/**
-	 * Returns the statistics of the parsed pack.
-	 *
-	 * This should only be called after pack parsing is finished.
-	 * @return {@link ReceivedPackStatistics}
-	 * @since 4.5
-	 */
-	public ReceivedPackStatistics getReceivedPackStatistics() {
-		return stats.build();
 	}
 
 	/**
@@ -641,7 +626,6 @@ public abstract class PackParser {
 	private void resolveDeltas(DeltaVisit visit, final int type,
 			ObjectTypeAndSize info, ProgressMonitor progress)
 			throws IOException {
-		stats.addDeltaObject(type);
 		do {
 			progress.update(1);
 			info = openDatabase(visit.delta, info);
@@ -935,7 +919,6 @@ public abstract class PackParser {
 
 	// Cleanup all resources associated with our input parsing.
 	private void endInput() {
-		stats.setNumBytesRead(in.getCount());
 		in = null;
 	}
 
@@ -964,14 +947,12 @@ public abstract class PackParser {
 		case Constants.OBJ_TREE:
 		case Constants.OBJ_BLOB:
 		case Constants.OBJ_TAG:
-			stats.addWholeObject(typeCode);
 			onBeginWholeObject(streamPosition, typeCode, sz);
 			onObjectHeader(Source.INPUT, hdrBuf, 0, hdrPtr);
 			whole(streamPosition, typeCode, sz);
 			break;
 
 		case Constants.OBJ_OFS_DELTA: {
-			stats.addOffsetDelta();
 			c = readFrom(Source.INPUT);
 			hdrBuf[hdrPtr++] = (byte) c;
 			long ofs = c & 127;
@@ -994,7 +975,6 @@ public abstract class PackParser {
 		}
 
 		case Constants.OBJ_REF_DELTA: {
-			stats.addRefDelta();
 			c = fill(Source.INPUT, 20);
 			final ObjectId base = ObjectId.fromRaw(buf, c);
 			System.arraycopy(buf, c, hdrBuf, hdrPtr, 20);
