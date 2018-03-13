@@ -78,7 +78,7 @@ public class NotesCommandTest extends RepositoryTestCase {
 	@Test
 	public void testListNotes() throws Exception {
 		List<Note> notes = git.notesList().call();
-		assertEquals(1, notes.size());
+		assertEquals(1, notes.size() );
 	}
 
 	@Test
@@ -92,7 +92,7 @@ public class NotesCommandTest extends RepositoryTestCase {
 		git.notesRemove().setObjectId(commit2).call();
 
 		List<Note> notes = git.notesList().call();
-		assertEquals(1, notes.size());
+		assertEquals(1, notes.size() );
 	}
 
 }
