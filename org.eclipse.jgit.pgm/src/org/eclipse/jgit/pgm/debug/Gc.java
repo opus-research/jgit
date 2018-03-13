@@ -51,6 +51,6 @@ import org.eclipse.jgit.pgm.TextBuiltin;
 class Gc extends TextBuiltin {
 	@Override
 	protected void run() throws Exception {
-		GC.gc(new TextProgressMonitor(), (FileRepository) db);
+		GC.gc(new TextProgressMonitor(), (FileRepository) db, 14);
 	}
 }

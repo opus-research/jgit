@@ -55,6 +55,7 @@ import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.junit.TestRepository.BranchBuilder;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.storage.file.PackIndex.MutableEntry;
+import org.eclipse.jgit.util.FileUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -81,7 +82,7 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 				.create();
 		assertEquals(4, looseObjectIDs().size());
 		assertEquals(0, packedObjectIDs().size());
-		GC.gc(null, repo);
+		GC.gc(null, repo, 14);
 		assertEquals(0, looseObjectIDs().size());
 		assertEquals(4, packedObjectIDs().size());
 		assertEquals(1, repo.getObjectDatabase().getPacks().size());
@@ -92,7 +93,7 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		tr.commit().add("A", "A").add("B", "B").create();
 		assertEquals(4, looseObjectIDs().size());
 		assertEquals(0, packedObjectIDs().size());
-		GC.gc(null, repo);
+		GC.gc(null, repo, 14);
 		assertEquals(4, looseObjectIDs().size());
 		assertEquals(0, packedObjectIDs().size());
 		assertEquals(0, repo.getObjectDatabase().getPacks().size());
@@ -106,8 +107,8 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 
 		assertEquals(8, looseObjectIDs().size());
 		assertEquals(0, packedObjectIDs().size());
-		GC.gc(null, repo);
-		assertEquals(0, looseObjectIDs().size()); // todo, should be 0
+		GC.gc(null, repo, 14);
+		assertEquals(0, looseObjectIDs().size());
 		assertEquals(8, packedObjectIDs().size());
 		assertEquals(1, repo.getObjectDatabase().getPacks().size());
 	}
@@ -122,8 +123,68 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 
 		assertEquals(8, looseObjectIDs().size());
 		assertEquals(0, packedObjectIDs().size());
-		GC.gc(null, repo);
-		assertEquals(4, looseObjectIDs().size()); // todo, should be 0
+		GC.gc(null, repo, 14);
+		assertEquals(0, looseObjectIDs().size());
+		assertEquals(8, packedObjectIDs().size());
+		assertEquals(2, repo.getObjectDatabase().getPacks().size());
+	}
+
+	@Test
+	public void testPackCommitsAndLooseOneNoReflog() throws Exception {
+		BranchBuilder bb = tr.branch("refs/heads/master");
+		RevCommit first = bb.commit().add("A", "A").add("B", "B").create();
+		bb.commit().add("A", "A2").add("B", "B2").create();
+		tr.update("refs/heads/master", first);
+
+		assertEquals(8, looseObjectIDs().size());
+		assertEquals(0, packedObjectIDs().size());
+
+		FileUtils.delete(new File(repo.getDirectory(), "logs/HEAD"),
+				FileUtils.RETRY | FileUtils.SKIP_MISSING);
+		FileUtils.delete(
+				new File(repo.getDirectory(), "logs/refs/heads/master"),
+				FileUtils.RETRY | FileUtils.SKIP_MISSING);
+		GC.gc(null, repo, 14);
+
+		assertEquals(4, looseObjectIDs().size());
+		assertEquals(4, packedObjectIDs().size());
+		assertEquals(1, repo.getObjectDatabase().getPacks().size());
+	}
+
+	@Test
+	public void testPackCommitsAndLooseOneWithPruneNow() throws Exception {
+		BranchBuilder bb = tr.branch("refs/heads/master");
+		RevCommit first = bb.commit().add("A", "A").add("B", "B").create();
+		bb.commit().add("A", "A2").add("B", "B2").create();
+		tr.update("refs/heads/master", first);
+
+		assertEquals(8, looseObjectIDs().size());
+		assertEquals(0, packedObjectIDs().size());
+		GC.gc(null, repo, 0);
+		assertEquals(0, looseObjectIDs().size());
+		assertEquals(8, packedObjectIDs().size());
+		assertEquals(2, repo.getObjectDatabase().getPacks().size());
+	}
+
+	@Test
+	public void testPackCommitsAndLooseOneWithPruneNowNoReflog()
+			throws Exception {
+		BranchBuilder bb = tr.branch("refs/heads/master");
+		RevCommit first = bb.commit().add("A", "A").add("B", "B").create();
+		bb.commit().add("A", "A2").add("B", "B2").create();
+		tr.update("refs/heads/master", first);
+
+		assertEquals(8, looseObjectIDs().size());
+		assertEquals(0, packedObjectIDs().size());
+
+		FileUtils.delete(new File(repo.getDirectory(), "logs/HEAD"),
+				FileUtils.RETRY | FileUtils.SKIP_MISSING);
+		FileUtils.delete(
+				new File(repo.getDirectory(), "logs/refs/heads/master"),
+				FileUtils.RETRY | FileUtils.SKIP_MISSING);
+		GC.gc(null, repo, 0);
+
+		assertEquals(0, looseObjectIDs().size());
 		assertEquals(4, packedObjectIDs().size());
 		assertEquals(1, repo.getObjectDatabase().getPacks().size());
 	}
@@ -136,8 +197,22 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 		bb.commit().add("A", "A3"); // this new content in index should survive
 		assertEquals(9, looseObjectIDs().size());
 		assertEquals(0, packedObjectIDs().size());
-		GC.gc(null, repo);
-		assertEquals(1, looseObjectIDs().size()); // todo, should be 0
+		GC.gc(null, repo, 14);
+		assertEquals(1, looseObjectIDs().size());
+		assertEquals(8, packedObjectIDs().size());
+		assertEquals(1, repo.getObjectDatabase().getPacks().size());
+	}
+
+	@Test
+	public void testIndexSavesObjectsWithPruneNow() throws Exception {
+		BranchBuilder bb = tr.branch("refs/heads/master");
+		bb.commit().add("A", "A").add("B", "B").create();
+		bb.commit().add("A", "A2").add("B", "B2").create();
+		bb.commit().add("A", "A3"); // this new content in index should survive
+		assertEquals(9, looseObjectIDs().size());
+		assertEquals(0, packedObjectIDs().size());
+		GC.gc(null, repo, 0);
+		assertEquals(0, looseObjectIDs().size());
 		assertEquals(8, packedObjectIDs().size());
 		assertEquals(1, repo.getObjectDatabase().getPacks().size());
 	}
@@ -163,6 +238,7 @@ public class GCTest extends LocalDiskRepositoryTestCase {
 				MutableEntry enty = ei.next();
 				ret.add(enty.name());
 			}
+			pf.close();
 		}
 		return ret;
 	}
