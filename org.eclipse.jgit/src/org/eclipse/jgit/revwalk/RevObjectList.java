@@ -48,7 +48,7 @@ package org.eclipse.jgit.revwalk;
 import java.text.MessageFormat;
 import java.util.AbstractList;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 
 /**
  * An ordered list of {@link RevObject} subclasses.
