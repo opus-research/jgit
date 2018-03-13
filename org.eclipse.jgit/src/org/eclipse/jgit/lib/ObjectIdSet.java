@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Ugur Zongur <zongur@gmail.com>
+ * Copyright (C) 2015, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,30 +43,22 @@
 
 package org.eclipse.jgit.lib;
 
-import static org.junit.Assert.*;
-
-import java.io.IOException;
-
-import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
-import org.junit.Test;
-
-public class RepositoryCreateTest extends LocalDiskRepositoryTestCase {
-
-	@Test
-	public void testCreateBareRepository() throws IOException {
-		Repository repo = new RepositoryBuilder()
-				.setGitDir(getTemporaryDirectory()).setBare().build();
-		repo.create();
-		addRepoToClose(repo);
-		assertTrue(repo.isBare());
-	}
-
-	@Test
-	public void testCreateNonBareRepository() throws IOException {
-		Repository repo = new RepositoryBuilder()
-				.setWorkTree(getTemporaryDirectory()).build();
-		repo.create();
-		addRepoToClose(repo);
-		assertFalse(repo.isBare());
-	}
+/**
+ * Simple set of ObjectIds.
+ * <p>
+ * Usually backed by a read-only data structure such as
+ * {@link org.eclipse.jgit.internal.storage.file.PackIndex}. Mutable types like
+ * {@link ObjectIdOwnerMap} also implement the interface by checking keys.
+ *
+ * @since 4.2
+ */
+public interface ObjectIdSet {
+	/**
+	 * Returns true if the objectId is contained within the collection.
+	 *
+	 * @param objectId
+	 *            the objectId to find
+	 * @return whether the collection contains the objectId.
+	 */
+	boolean contains(AnyObjectId objectId);
 }

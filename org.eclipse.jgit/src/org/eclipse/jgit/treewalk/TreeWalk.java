@@ -57,6 +57,7 @@ import org.eclipse.jgit.attributes.Attributes;
 import org.eclipse.jgit.attributes.AttributesNode;
 import org.eclipse.jgit.attributes.AttributesNodeProvider;
 import org.eclipse.jgit.attributes.AttributesProvider;
+import org.eclipse.jgit.dircache.DirCacheBuildIterator;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -256,7 +257,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 
 	private boolean postOrderTraversal;
 
-	private int depth;
+	int depth;
 
 	private boolean advance;
 
@@ -665,9 +666,26 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 				return true;
 			}
 		} catch (StopWalkException stop) {
-			for (final AbstractTreeIterator t : trees)
-				t.stopWalk();
+			stopWalk();
 			return false;
+		}
+	}
+
+	/**
+	 * Notify iterators the walk is aborting.
+	 * <p>
+	 * Primarily to notify {@link DirCacheBuildIterator} the walk is aborting so
+	 * that it can copy any remaining entries.
+	 *
+	 * @throws IOException
+	 *             if traversal of remaining entries throws an exception during
+	 *             object access. This should never occur as remaining trees
+	 *             should already be in memory, however the methods used to
+	 *             finish traversal are declared to throw IOException.
+	 */
+	void stopWalk() throws IOException {
+		for (AbstractTreeIterator t : trees) {
+			t.stopWalk();
 		}
 	}
 
@@ -861,10 +879,13 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 	 * Test if the supplied path matches the current entry's path.
 	 * <p>
 	 * This method tests that the supplied path is exactly equal to the current
-	 * entry, or is one of its parent directories. It is faster to use this
+	 * entry or is one of its parent directories. It is faster to use this
 	 * method then to use {@link #getPathString()} to first create a String
 	 * object, then test <code>startsWith</code> or some other type of string
 	 * match function.
+	 * <p>
+	 * If the current entry is a subtree, then all paths within the subtree
+	 * are considered to match it.
 	 *
 	 * @param p
 	 *            path buffer to test. Callers should ensure the path does not
@@ -900,7 +921,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 			// If p[ci] == '/' then pattern matches this subtree,
 			// otherwise we cannot be certain so we return -1.
 			//
-			return p[ci] == '/' ? 0 : -1;
+			return p[ci] == '/' && FileMode.TREE.equals(t.mode) ? 0 : -1;
 		}
 
 		// Both strings are identical.
@@ -1062,7 +1083,7 @@ public class TreeWalk implements AutoCloseable, AttributesProvider {
 		}
 	}
 
-	private void exitSubtree() {
+	void exitSubtree() {
 		depth--;
 		for (int i = 0; i < trees.length; i++)
 			trees[i] = trees[i].parent;

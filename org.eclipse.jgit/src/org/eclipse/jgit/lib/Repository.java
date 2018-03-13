@@ -126,9 +126,6 @@ public abstract class Repository implements AutoCloseable {
 	/** If not bare, the index file caching the working file states. */
 	private final File indexFile;
 
-	/** True only if the caller wants to force bare behavior. */
-	private boolean bare;
-
 	/**
 	 * Initialize a new repository instance.
 	 *
@@ -140,7 +137,6 @@ public abstract class Repository implements AutoCloseable {
 		fs = options.getFS();
 		workTree = options.getWorkTree();
 		indexFile = options.getIndexFile();
-		bare = options.isBare();
 	}
 
 	/** @return listeners observing only events on this repository. */
@@ -166,12 +162,15 @@ public abstract class Repository implements AutoCloseable {
 
 	/**
 	 * Create a new Git repository.
+	 * <p>
+	 * Repository with working tree is created using this method. This method is
+	 * the same as {@code create(false)}.
 	 *
 	 * @throws IOException
 	 * @see #create(boolean)
 	 */
 	public void create() throws IOException {
-		create(bare);
+		create(false);
 	}
 
 	/**
@@ -912,12 +911,16 @@ public abstract class Repository implements AutoCloseable {
 	@Nullable
 	public String getFullBranch() throws IOException {
 		Ref head = getRef(Constants.HEAD);
-		if (head == null)
+		if (head == null) {
 			return null;
-		if (head.isSymbolic())
+		}
+		if (head.isSymbolic()) {
 			return head.getTarget().getName();
-		if (head.getObjectId() != null)
-			return head.getObjectId().name();
+		}
+		ObjectId objectId = head.getObjectId();
+		if (objectId != null) {
+			return objectId.name();
+		}
 		return null;
 	}
 

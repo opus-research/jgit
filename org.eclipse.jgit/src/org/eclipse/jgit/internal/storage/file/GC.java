@@ -53,6 +53,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
+import java.nio.file.StandardCopyOption;
 import java.text.MessageFormat;
 import java.text.ParseException;
 import java.util.ArrayList;
@@ -67,6 +68,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 
@@ -78,13 +80,12 @@ import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.eclipse.jgit.internal.storage.pack.PackWriter;
-import org.eclipse.jgit.internal.storage.pack.PackWriter.ObjectIdSet;
-import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectIdSet;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
@@ -483,9 +484,10 @@ public class GC {
 				return false;
 			return r1.getTarget().getName().equals(r2.getTarget().getName());
 		} else {
-			if (r2.isSymbolic())
+			if (r2.isSymbolic()) {
 				return false;
-			return r1.getObjectId().equals(r2.getObjectId());
+			}
+			return Objects.equals(r1.getObjectId(), r2.getObjectId());
 		}
 	}
 
@@ -550,7 +552,7 @@ public class GC {
 		List<ObjectIdSet> excluded = new LinkedList<ObjectIdSet>();
 		for (final PackFile f : repo.getObjectDatabase().getPacks())
 			if (f.shouldBeKept())
-				excluded.add(objectIdSet(f.getIndex()));
+				excluded.add(f.getIndex());
 
 		tagTargets.addAll(allHeads);
 		nonHeads.addAll(indexObjects);
@@ -562,7 +564,7 @@ public class GC {
 					tagTargets, excluded);
 			if (heads != null) {
 				ret.add(heads);
-				excluded.add(0, objectIdSet(heads.getIndex()));
+				excluded.add(0, heads.getIndex());
 			}
 		}
 		if (!nonHeads.isEmpty()) {
@@ -788,39 +790,33 @@ public class GC {
 						break;
 					}
 			tmpPack.setReadOnly();
-			boolean delete = true;
-			try {
-				FileUtils.rename(tmpPack, realPack);
-				delete = false;
-				for (Map.Entry<PackExt, File> tmpEntry : tmpExts.entrySet()) {
-					File tmpExt = tmpEntry.getValue();
-					tmpExt.setReadOnly();
 
-					File realExt = nameFor(
-							id, "." + tmpEntry.getKey().getExtension()); //$NON-NLS-1$
+			FileUtils.rename(tmpPack, realPack, StandardCopyOption.ATOMIC_MOVE);
+			for (Map.Entry<PackExt, File> tmpEntry : tmpExts.entrySet()) {
+				File tmpExt = tmpEntry.getValue();
+				tmpExt.setReadOnly();
+
+				File realExt = nameFor(id,
+						"." + tmpEntry.getKey().getExtension()); //$NON-NLS-1$
+				try {
+					FileUtils.rename(tmpExt, realExt,
+							StandardCopyOption.ATOMIC_MOVE);
+				} catch (IOException e) {
+					File newExt = new File(realExt.getParentFile(),
+							realExt.getName() + ".new"); //$NON-NLS-1$
 					try {
-						FileUtils.rename(tmpExt, realExt);
-					} catch (IOException e) {
-						File newExt = new File(realExt.getParentFile(),
-								realExt.getName() + ".new"); //$NON-NLS-1$
-						if (!tmpExt.renameTo(newExt))
-							newExt = tmpExt;
-						throw new IOException(MessageFormat.format(
-								JGitText.get().panicCantRenameIndexFile, newExt,
-								realExt));
+						FileUtils.rename(tmpExt, newExt,
+								StandardCopyOption.ATOMIC_MOVE);
+					} catch (IOException e2) {
+						newExt = tmpExt;
+						e = e2;
 					}
-				}
-
-			} finally {
-				if (delete) {
-					if (tmpPack.exists())
-						tmpPack.delete();
-					for (File tmpExt : tmpExts.values()) {
-						if (tmpExt.exists())
-							tmpExt.delete();
-					}
+					throw new IOException(MessageFormat.format(
+							JGitText.get().panicCantRenameIndexFile, newExt,
+							realExt), e);
 				}
 			}
+
 			return repo.getObjectDatabase().openPack(realPack);
 		} finally {
 			if (tmpPack != null && tmpPack.exists())
@@ -997,13 +993,5 @@ public class GC {
 	public void setExpire(Date expire) {
 		this.expire = expire;
 		expireAgeMillis = -1;
-	}
-
-	private static ObjectIdSet objectIdSet(final PackIndex idx) {
-		return new ObjectIdSet() {
-			public boolean contains(AnyObjectId objectId) {
-				return idx.hasObject(objectId);
-			}
-		};
 	}
 }
