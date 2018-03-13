@@ -212,9 +212,6 @@ class PushProcess {
 				}
 				continue;
 			}
-			if (!rru.isExpectingOldObjectId()) {
-				rru.setExpectedOldObjectId(advertisedOld);
-			}
 
 			// create ref (hasn't existed on remote side) and delete ref
 			// are always fast-forward commands, feasible at this level
