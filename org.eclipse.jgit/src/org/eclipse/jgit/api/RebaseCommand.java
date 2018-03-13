@@ -1250,8 +1250,10 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				throws IOException {
 			byte[] content = IO.readFully(new File(directory, fileName));
 			// strip off the last LF
-			int end = RawParseUtils.prevLF(content, content.length);
-			return RawParseUtils.decode(content, 0, end + 1);
+			int end = content.length;
+			while (0 < end && content[end - 1] == '\n')
+				end--;
+			return RawParseUtils.decode(content, 0, end);
 		}
 
 		private static void createFile(File parentDir, String name,
