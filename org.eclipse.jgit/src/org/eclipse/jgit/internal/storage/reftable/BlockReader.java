@@ -56,7 +56,7 @@ import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_NONE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_TEXT;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VALUE_TYPE_MASK;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.reverseTime;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.reverseUpdateIndex;
 import static org.eclipse.jgit.lib.Constants.OBJECT_ID_LENGTH;
 import static org.eclipse.jgit.lib.Constants.OBJECT_ID_STRING_LENGTH;
 import static org.eclipse.jgit.lib.Ref.Storage.NEW;
@@ -65,7 +65,6 @@ import static org.eclipse.jgit.lib.Ref.Storage.PACKED;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.concurrent.TimeUnit;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
@@ -200,8 +199,8 @@ class BlockReader {
 
 	IntList readBlockList() {
 		int n = valueType & VALUE_TYPE_MASK;
-		if (n == VALUE_TYPE_MASK) {
-			n += readVarint32();
+		if (n == 0) {
+			n = readVarint32();
 		}
 		IntList b = new IntList(n);
 		b.add(readVarint32());
@@ -212,13 +211,14 @@ class BlockReader {
 		return b;
 	}
 
-	long readLogTimeUsec() {
-		return reverseTime(NB.decodeInt64(nameBuf, nameLen - 8));
+	long readLogUpdateIndex() {
+		return reverseUpdateIndex(NB.decodeUInt64(nameBuf, nameLen - 8));
 	}
 
-	ReflogEntry readLog(long timeUsec) {
+	ReflogEntry readLog() {
 		ObjectId oldId = readValueId();
 		ObjectId newId = readValueId();
+		long ms = readVarint64() * 1000L;
 		short tz = readInt16();
 		String name = readValueString();
 		String email = readValueString();
@@ -237,7 +237,6 @@ class BlockReader {
 
 			@Override
 			public PersonIdent getWho() {
-				long ms = TimeUnit.MICROSECONDS.toMillis(timeUsec);
 				return new PersonIdent(name, email, ms, tz);
 			}
 
@@ -470,8 +469,8 @@ class BlockReader {
 
 		case OBJ_BLOCK_TYPE: {
 			int n = valueType & VALUE_TYPE_MASK;
-			if (n == VALUE_TYPE_MASK) {
-				n += readVarint32();
+			if (n == 0) {
+				n = readVarint32();
 			}
 			while (n-- > 0) {
 				readVarint32();
@@ -484,7 +483,9 @@ class BlockReader {
 			return;
 
 		case LOG_BLOCK_TYPE:
-			ptr += 2 * OBJECT_ID_LENGTH + 2; // 2x id, 2-byte tz
+			ptr += 2 * OBJECT_ID_LENGTH; // 2x id;
+			readVarint64(); // time
+			ptr += 2; // 2-byte tz
 			skipString(); // name
 			skipString(); // email
 			skipString(); // comment
