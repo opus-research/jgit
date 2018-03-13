@@ -51,6 +51,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -271,84 +272,6 @@ public abstract class Repository {
 	}
 
 	/**
-	 * Access a Commit object using a symbolic reference. This reference may
-	 * be a SHA-1 or ref in combination with a number of symbols translating
-	 * from one ref or SHA1-1 to another, such as HEAD^ etc.
-	 *
-	 * @param revstr a reference to a git commit object
-	 * @return a Commit named by the specified string
-	 * @throws IOException for I/O error or unexpected object type.
-	 *
-	 * @see #resolve(String)
-	 * @deprecated Use {@link #resolve(String)} and pass its return value to
-	 * {@link org.eclipse.jgit.revwalk.RevWalk#parseCommit(AnyObjectId)}.
-	 */
-	@Deprecated
-	public Commit mapCommit(final String revstr) throws IOException {
-		final ObjectId id = resolve(revstr);
-		return id != null ? mapCommit(id) : null;
-	}
-
-	/**
-	 * Access any type of Git object by id and
-	 *
-	 * @param id
-	 *            SHA-1 of object to read
-	 * @param refName optional, only relevant for simple tags
-	 * @return The Git object if found or null
-	 * @throws IOException
-	 * @deprecated Use {@link org.eclipse.jgit.revwalk.RevWalk#parseCommit(AnyObjectId)},
-	 *  or {@link org.eclipse.jgit.revwalk.RevWalk#parseTag(AnyObjectId)}.
-	 *  To read a tree, use {@link org.eclipse.jgit.treewalk.TreeWalk#addTree(AnyObjectId)}.
-	 *  To read a blob, open it with {@link #open(AnyObjectId)}.
-	 */
-	@Deprecated
-	public Object mapObject(final ObjectId id, final String refName) throws IOException {
-		final ObjectLoader or;
-		try {
-			or = open(id);
-		} catch (MissingObjectException notFound) {
-			return null;
-		}
-		final byte[] raw = or.getCachedBytes();
-		switch (or.getType()) {
-		case Constants.OBJ_TREE:
-			return new Tree(this, id, raw);
-
-		case Constants.OBJ_COMMIT:
-			return new Commit(this, id, raw);
-
-		case Constants.OBJ_TAG:
-			return new Tag(this, id, refName, raw);
-
-		case Constants.OBJ_BLOB:
-			return raw;
-
-		default:
-			throw new IncorrectObjectTypeException(id,
-				JGitText.get().incorrectObjectType_COMMITnorTREEnorBLOBnorTAG);
-		}
-	}
-
-	/**
-	 * Access a Commit by SHA'1 id.
-	 * @param id
-	 * @return Commit or null
-	 * @throws IOException for I/O error or unexpected object type.
-	 * @deprecated Use {@link org.eclipse.jgit.revwalk.RevWalk#parseCommit(AnyObjectId)}.
-	 */
-	@Deprecated
-	public Commit mapCommit(final ObjectId id) throws IOException {
-		final ObjectLoader or;
-		try {
-			or = open(id, Constants.OBJ_COMMIT);
-		} catch (MissingObjectException notFound) {
-			return null;
-		}
-		return new Commit(this, id, or.getCachedBytes());
-	}
-
-	/**
 	 * Access a Tree object using a symbolic reference. This reference may
 	 * be a SHA-1 or ref in combination with a number of symbols translating
 	 * from one ref or SHA1-1 to another, such as HEAD^{tree} etc.
@@ -393,42 +316,6 @@ public abstract class Repository {
 		default:
 			throw new IncorrectObjectTypeException(id, Constants.TYPE_TREE);
 		}
-	}
-
-	/**
-	 * Access a tag by symbolic name.
-	 *
-	 * @param revstr
-	 * @return a Tag or null
-	 * @throws IOException on I/O error or unexpected type
-	 * @deprecated Use {@link #resolve(String)} and feed its return value to
-	 * {@link org.eclipse.jgit.revwalk.RevWalk#parseTag(AnyObjectId)}.
-	 */
-	@Deprecated
-	public Tag mapTag(String revstr) throws IOException {
-		final ObjectId id = resolve(revstr);
-		return id != null ? mapTag(revstr, id) : null;
-	}
-
-	/**
-	 * Access a Tag by SHA'1 id
-	 * @param refName
-	 * @param id
-	 * @return Commit or null
-	 * @throws IOException for I/O error or unexpected object type.
-	 * @deprecated Use {@link org.eclipse.jgit.revwalk.RevWalk#parseTag(AnyObjectId)}.
-	 */
-	@Deprecated
-	public Tag mapTag(final String refName, final ObjectId id) throws IOException {
-		final ObjectLoader or;
-		try {
-			or = open(id);
-		} catch (MissingObjectException notFound) {
-			return null;
-		}
-		if (or.getType() == Constants.OBJ_TAG)
-			return new Tag(this, id, refName, or.getCachedBytes());
-		return new Tag(this, id, refName, null);
 	}
 
 	/**
@@ -487,6 +374,8 @@ public abstract class Repository {
 	 * Currently supported is combinations of these.
 	 * <ul>
 	 * <li>SHA-1 - a SHA-1</li>
+	 * <li>SHA-1 abbreviation - a leading prefix of a SHA-1. At least the first
+	 * two bytes must be supplied.</li>
 	 * <li>refs/... - a ref name</li>
 	 * <li>ref^n - nth parent reference</li>
 	 * <li>ref~n - distance via parent reference</li>
@@ -497,8 +386,8 @@ public abstract class Repository {
 	 *
 	 * Not supported is:
 	 * <ul>
+	 * <li>tag-NNN-gcommit - a non tagged revision from git describe</li>
 	 * <li>timestamps in reflogs, ref@{full or relative timestamp}</li>
-	 * <li>abbreviated SHA-1's</li>
 	 * </ul>
 	 *
 	 * @param revstr
@@ -683,8 +572,24 @@ public abstract class Repository {
 	private ObjectId resolveSimple(final String revstr) throws IOException {
 		if (ObjectId.isId(revstr))
 			return ObjectId.fromString(revstr);
-		final Ref r = getRefDatabase().getRef(revstr);
-		return r != null ? r.getObjectId() : null;
+
+		Ref r = getRefDatabase().getRef(revstr);
+		if (r != null)
+			return r.getObjectId();
+
+		if (AbbreviatedObjectId.isId(revstr)) {
+			AbbreviatedObjectId id = AbbreviatedObjectId.fromString(revstr);
+			ObjectReader reader = newObjectReader();
+			try {
+				Collection<ObjectId> matches = reader.resolve(id);
+				if (matches.size() == 1)
+					return matches.iterator().next();
+			} finally {
+				reader.release();
+			}
+		}
+
+		return null;
 	}
 
 	/** Increment the use counter by one, requiring a matched {@link #close()}. */
@@ -1205,7 +1110,7 @@ public abstract class Repository {
 	 * file operations triggering a merge will store the IDs of all heads which
 	 * should be merged together with HEAD.
 	 *
-	 * @return a list of {@link Commit}s which IDs are listed in the MERGE_HEAD
+	 * @return a list of commits which IDs are listed in the MERGE_HEAD
 	 *         file or {@code null} if this file doesn't exist. Also if the file
 	 *         exists but is empty {@code null} will be returned
 	 * @throws IOException
@@ -1244,7 +1149,7 @@ public abstract class Repository {
 	 * the file will be deleted
 	 *
 	 * @param heads
-	 *            a list of {@link Commit}s which IDs should be written to
+	 *            a list of commits which IDs should be written to
 	 *            $GIT_DIR/MERGE_HEAD or <code>null</code> to delete the file
 	 * @throws IOException
 	 */
