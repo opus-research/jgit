@@ -43,36 +43,70 @@
 package org.eclipse.jgit.util;
 
 /**
- * An enum describing the different hooks a user can implement to customize his
- * repositories.
+ * Describes the result of running an external process.
  *
  * @since 3.6
  */
-public enum Hook {
+public class ProcessResult {
 	/**
-	 * Literal for the "pre-commit" git hook.
-	 * <p>
-	 * This hook is invoked by git commit, and can be bypassed with the
-	 * "no-verify" option. It takes no parameter, and is invoked before
-	 * obtaining the proposed commit log message and making a commit.
-	 * </p>
-	 * <p>
-	 * A non-zero exit code from the called hook means that the commit should be
-	 * aborted.
-	 * </p>
+	 * Status of a process' execution.
 	 */
-	PRE_COMMIT("pre-commit"); //$NON-NLS-1$
+	public static enum Status {
+		/**
+		 * The process was found and launched properly. It may still have exited
+		 * with a non-zero {@link #exitCode}.
+		 */
+		OK,
 
-	private final String name;
+		/** The process was not found on disk and thus could not be launched. */
+		NOT_PRESENT,
 
-	private Hook(String name) {
-		this.name = name;
+		/**
+		 * The process was found but could not be launched since it was not
+		 * supported by the current {@link FS}.
+		 */
+		NOT_SUPPORTED;
+	}
+
+	/** The exit code of the process. */
+	private final int exitCode;
+
+	/** Status of the process' execution. */
+	private final Status status;
+
+	/**
+	 * Instantiates a process result with the given status and an exit code of
+	 * <code>-1</code>.
+	 *
+	 * @param status
+	 *            Status describing the execution of the external process.
+	 */
+	public ProcessResult(Status status) {
+		this(-1, status);
 	}
 
 	/**
-	 * @return The name of this hook.
+	 * @param exitCode
+	 *            Exit code of the process.
+	 * @param status
+	 *            Status describing the execution of the external process.
 	 */
-	public String getName() {
-		return name;
+	public ProcessResult(int exitCode, Status status) {
+		this.exitCode = exitCode;
+		this.status = status;
+	}
+
+	/**
+	 * @return The exit code of the process.
+	 */
+	public int getExitCode() {
+		return exitCode;
+	}
+
+	/**
+	 * @return The status of the process' execution.
+	 */
+	public Status getStatus() {
+		return status;
 	}
 }

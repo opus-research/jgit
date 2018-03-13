@@ -177,6 +177,9 @@ public class FS_POSIX_Java7 extends FS_POSIX {
 		return FileUtil.normalize(name);
 	}
 
+	/**
+	 * @since 3.6
+	 */
 	@Override
 	public File tryFindHook(Repository repository, Hook hook) {
 		final File gitdir = repository.getDirectory();
