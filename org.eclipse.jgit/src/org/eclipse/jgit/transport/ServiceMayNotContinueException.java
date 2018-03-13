@@ -45,6 +45,8 @@ package org.eclipse.jgit.transport;
 
 import java.io.IOException;
 
+import javax.servlet.http.HttpServletResponse;
+
 import org.eclipse.jgit.internal.JGitText;
 
 /**
@@ -53,7 +55,6 @@ import org.eclipse.jgit.internal.JGitText;
  * @since 2.0
  */
 public class ServiceMayNotContinueException extends IOException {
-	private static final int FORBIDDEN = 403;
 	private static final long serialVersionUID = 1L;
 
 	private final int statusCode;
@@ -62,7 +63,7 @@ public class ServiceMayNotContinueException extends IOException {
 	/** Initialize with no message. */
 	public ServiceMayNotContinueException() {
 		// Do not set a message.
-		statusCode = FORBIDDEN;
+		statusCode = HttpServletResponse.SC_FORBIDDEN;
 	}
 
 	/**
@@ -72,7 +73,7 @@ public class ServiceMayNotContinueException extends IOException {
 	 */
 	public ServiceMayNotContinueException(String msg) {
 		super(msg);
-		statusCode = FORBIDDEN;
+		statusCode = HttpServletResponse.SC_FORBIDDEN;
 	}
 
 	/**
@@ -98,7 +99,7 @@ public class ServiceMayNotContinueException extends IOException {
 	 */
 	public ServiceMayNotContinueException(String msg, Throwable cause) {
 		super(msg, cause);
-		statusCode = FORBIDDEN;
+		statusCode = HttpServletResponse.SC_FORBIDDEN;
 	}
 
 	/**

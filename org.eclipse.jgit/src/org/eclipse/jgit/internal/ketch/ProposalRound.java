@@ -122,7 +122,6 @@ class ProposalRound extends Round {
 		return a == null && b == null;
 	}
 
-	@Override
 	void start() throws IOException {
 		for (Proposal p : todo) {
 			p.notifyState(RUNNING);
@@ -269,7 +268,6 @@ class ProposalRound extends Round {
 		}
 	}
 
-	@Override
 	void success() {
 		for (Proposal p : todo) {
 			p.success();

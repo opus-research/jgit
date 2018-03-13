@@ -58,6 +58,8 @@ import org.eclipse.jgit.internal.JGitText;
 /**
  * Various {@link String} related utility methods, written mostly to avoid
  * generation of new String objects (e.g. via splitting Strings etc).
+ *
+ * @since 3.6
  */
 public class Strings {
 
@@ -148,7 +150,7 @@ public class Strings {
 		if (count < 1)
 			throw new IllegalStateException(
 					"Pattern must have at least two segments: " + pattern); //$NON-NLS-1$
-		List<String> segments = new ArrayList<>(count);
+		List<String> segments = new ArrayList<String>(count);
 		int right = 0;
 		while (true) {
 			int left = right;

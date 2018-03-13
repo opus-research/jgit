@@ -64,7 +64,6 @@ import org.junit.Test;
 public class CleanCommandTest extends RepositoryTestCase {
 	private Git git;
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
@@ -144,7 +143,7 @@ public class CleanCommandTest extends RepositoryTestCase {
 		assertTrue(files.size() > 0);
 
 		// run clean with setPaths
-		Set<String> paths = new TreeSet<>();
+		Set<String> paths = new TreeSet<String>();
 		paths.add("File3.txt");
 		Set<String> cleanedFiles = git.clean().setPaths(paths).call();
 

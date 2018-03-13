@@ -87,27 +87,6 @@ public final class Constants {
 			* 2;
 
 	/**
-	 * LFS upload operation.
-	 *
-	 * @since 4.7
-	 */
-	public static final String UPLOAD = "upload";
-
-	/**
-	 * LFS download operation.
-	 *
-	 * @since 4.7
-	 */
-	public static final String DOWNLOAD = "download";
-
-	/**
-	 * LFS verify operation.
-	 *
-	 * @since 4.7
-	 */
-	public static final String VERIFY = "verify";
-
-	/**
 	 * Create a new digest function for objects.
 	 *
 	 * @return a new digest object.

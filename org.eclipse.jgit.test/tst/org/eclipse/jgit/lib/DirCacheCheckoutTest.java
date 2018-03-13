@@ -130,7 +130,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		if ((args.length % 2) > 0)
 			throw new IllegalArgumentException("needs to be pairs");
 
-		HashMap<String, String> map = new HashMap<>();
+		HashMap<String, String> map = new HashMap<String, String>();
 		for (int i = 0; i < args.length; i += 2) {
 			map.put(args[i], args[i + 1]);
 		}
@@ -228,7 +228,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 	@Test
 	public void testInitialCheckout() throws Exception {
 		try (Git git = new Git(db)) {
-			TestRepository<Repository> db_t = new TestRepository<>(db);
+			TestRepository<Repository> db_t = new TestRepository<Repository>(db);
 			BranchBuilder master = db_t.branch("master");
 			master.commit().add("f", "1").message("m0").create();
 			assertFalse(new File(db.getWorkTree(), "f").exists());
@@ -377,7 +377,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		// rules 4 and 5
 		HashMap<String, String> idxMap;
 
-		idxMap = new HashMap<>();
+		idxMap = new HashMap<String, String>();
 		idxMap.put("foo", "foo");
 		setupCase(null, null, idxMap);
 		go();
@@ -387,7 +387,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		assertTrue(getConflicts().isEmpty());
 
 		// rules 6 and 7
-		idxMap = new HashMap<>();
+		idxMap = new HashMap<String, String>();
 		idxMap.put("foo", "foo");
 		setupCase(null, idxMap, idxMap);
 		go();
@@ -396,7 +396,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 
 		// rules 8 and 9
 		HashMap<String, String> mergeMap;
-		mergeMap = new HashMap<>();
+		mergeMap = new HashMap<String, String>();
 
 		mergeMap.put("foo", "merge");
 		setupCase(null, mergeMap, idxMap);
@@ -408,7 +408,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 
 		// rule 10
 
-		HashMap<String, String> headMap = new HashMap<>();
+		HashMap<String, String> headMap = new HashMap<String, String>();
 		headMap.put("foo", "foo");
 		setupCase(headMap, null, idxMap);
 		go();
@@ -1672,20 +1672,6 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 		}
 	}
 
-	@Test
-	public void testLongFilename() throws Exception {
-		char[] bytes = new char[253];
-		Arrays.fill(bytes, 'f');
-		String longFileName = new String(bytes);
-		// 1
-		doit(mkmap(longFileName, "a"), mkmap(longFileName, "b"),
-				mkmap(longFileName, "a"));
-		writeTrashFile(longFileName, "a");
-		checkout();
-		assertNoConflicts();
-		assertUpdated(longFileName);
-	}
-
 	public void assertWorkDir(Map<String, String> i)
 			throws CorruptObjectException,
 			IOException {
@@ -1719,8 +1705,7 @@ public class DirCacheCheckoutTest extends RepositoryTestCase {
 							+ " in workDir. ", buffer, i.get(path).getBytes());
 					nrFiles++;
 				} else if (file.isDirectory()) {
-					String[] files = file.list();
-					if (files != null && files.length == 0) {
+					if (file.list().length == 0) {
 						assertEquals("found unexpected empty folder for path "
 								+ path + " in workDir. ", "/", i.get(path));
 						nrFiles++;

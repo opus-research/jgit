@@ -107,7 +107,6 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 		return rng;
 	}
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
@@ -117,11 +116,10 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 		cfg.install();
 
 		repo = createBareRepository();
-		tr = new TestRepository<>(repo);
+		tr = new TestRepository<Repository>(repo);
 		wc = (WindowCursor) repo.newObjectReader();
 	}
 
-	@Override
 	@After
 	public void tearDown() throws Exception {
 		if (wc != null)
@@ -291,7 +289,7 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 
 			f = new FileOutputStream(idxName);
 			try {
-				List<PackedObjectInfo> list = new ArrayList<>();
+				List<PackedObjectInfo> list = new ArrayList<PackedObjectInfo>();
 				list.add(a);
 				list.add(b);
 				Collections.sort(list);

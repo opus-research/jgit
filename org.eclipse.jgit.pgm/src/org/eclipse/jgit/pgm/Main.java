@@ -44,11 +44,8 @@
 
 package org.eclipse.jgit.pgm;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-
 import java.io.File;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
@@ -56,11 +53,6 @@ import java.net.URL;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jgit.awtui.AwtAuthenticator;
 import org.eclipse.jgit.awtui.AwtCredentialsProvider;
@@ -98,11 +90,9 @@ public class Main {
 	private TextBuiltin subcommand;
 
 	@Argument(index = 1, metaVar = "metaVar_arg")
-	private List<String> arguments = new ArrayList<>();
+	private List<String> arguments = new ArrayList<String>();
 
 	PrintWriter writer;
-
-	private ExecutorService gcExecutor;
 
 	/**
 	 *
@@ -111,17 +101,6 @@ public class Main {
 		HttpTransport.setConnectionFactory(new HttpClientConnectionFactory());
 		CleanFilter.register();
 		SmudgeFilter.register();
-		gcExecutor = Executors.newSingleThreadExecutor(new ThreadFactory() {
-			private final ThreadFactory baseFactory = Executors
-					.defaultThreadFactory();
-
-			@Override
-			public Thread newThread(Runnable taskBody) {
-				Thread thr = baseFactory.newThread(taskBody);
-				thr.setName("JGit-autoGc"); //$NON-NLS-1$
-				return thr;
-			}
-		});
 	}
 
 	/**
@@ -209,12 +188,10 @@ public class Main {
 			// broken pipe
 			exit(1, null);
 		}
-		gcExecutor.shutdown();
-		gcExecutor.awaitTermination(10, TimeUnit.MINUTES);
 	}
 
 	PrintWriter createErrorWriter() {
-		return new PrintWriter(new OutputStreamWriter(System.err, UTF_8));
+		return new PrintWriter(System.err);
 	}
 
 	private void execute(final String[] argv) throws Exception {
@@ -263,8 +240,7 @@ public class Main {
 		}
 
 		if (version) {
-			String cmdId = Version.class.getSimpleName()
-					.toLowerCase(Locale.ROOT);
+			String cmdId = Version.class.getSimpleName().toLowerCase();
 			subcommand = CommandCatalog.get(cmdId).create();
 		}
 

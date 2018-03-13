@@ -82,7 +82,6 @@ public class StashCreateCommandTest extends RepositoryTestCase {
 
 	private File untrackedFile;
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();

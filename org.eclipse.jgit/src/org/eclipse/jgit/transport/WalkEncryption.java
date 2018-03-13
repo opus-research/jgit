@@ -52,7 +52,6 @@ import java.security.GeneralSecurityException;
 import java.security.spec.AlgorithmParameterSpec;
 import java.security.spec.KeySpec;
 import java.text.MessageFormat;
-import java.util.Locale;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -193,7 +192,7 @@ abstract class WalkEncryption {
 
 			// Standard names are not case-sensitive.
 			// http://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html
-			String cryptoName = cryptoAlg.toUpperCase(Locale.ROOT);
+			String cryptoName = cryptoAlg.toUpperCase();
 
 			if (!cryptoName.startsWith("PBE")) //$NON-NLS-1$
 				throw new GeneralSecurityException(JGitText.get().encryptionOnlyPBE);
@@ -374,7 +373,7 @@ abstract class WalkEncryption {
 
 			SecretKey keyBase = factory.generateSecret(keySpec);
 
-			String name = cipherAlgo.toUpperCase(Locale.ROOT);
+			String name = cipherAlgo.toUpperCase();
 			Matcher matcherPBE = Pattern.compile(REGEX_PBE).matcher(name);
 			Matcher matcherTrans = Pattern.compile(REGEX_TRANS).matcher(name);
 			if (matcherPBE.matches()) {
@@ -507,7 +506,7 @@ abstract class WalkEncryption {
 		JGitV1(String algo, String pass)
 				throws GeneralSecurityException {
 			super(wrap(algo, pass));
-			String name = cipherAlgo.toUpperCase(Locale.ROOT);
+			String name = cipherAlgo.toUpperCase();
 			Matcher matcherPBE = Pattern.compile(REGEX_PBE).matcher(name);
 			if (!matcherPBE.matches())
 				throw new GeneralSecurityException(

@@ -153,7 +153,6 @@ public class LsRemoteCommand extends
 	 * @throws org.eclipse.jgit.api.errors.TransportException
 	 *             for errors that occurs during transport
 	 */
-	@Override
 	public Collection<Ref> call() throws GitAPIException,
 			InvalidRemoteException,
 			org.eclipse.jgit.api.errors.TransportException {
@@ -188,14 +187,14 @@ public class LsRemoteCommand extends
 				: Transport.open(new URIish(remote))) {
 			transport.setOptionUploadPack(uploadPack);
 			configure(transport);
-			Collection<RefSpec> refSpecs = new ArrayList<>(1);
+			Collection<RefSpec> refSpecs = new ArrayList<RefSpec>(1);
 			if (tags)
 				refSpecs.add(new RefSpec(
 						"refs/tags/*:refs/remotes/origin/tags/*")); //$NON-NLS-1$
 			if (heads)
 				refSpecs.add(new RefSpec("refs/heads/*:refs/remotes/origin/*")); //$NON-NLS-1$
 			Collection<Ref> refs;
-			Map<String, Ref> refmap = new HashMap<>();
+			Map<String, Ref> refmap = new HashMap<String, Ref>();
 			try (FetchConnection fc = transport.openFetch()) {
 				refs = fc.getRefs();
 				if (refSpecs.isEmpty())

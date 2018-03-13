@@ -59,6 +59,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -375,7 +376,7 @@ public abstract class FS {
 	public File userHome() {
 		Holder<File> p = userHome;
 		if (p == null) {
-			p = new Holder<>(userHomeImpl());
+			p = new Holder<File>(userHomeImpl());
 			userHome = p;
 		}
 		return p.value;
@@ -390,7 +391,7 @@ public abstract class FS {
 	 * @return {@code this}.
 	 */
 	public FS setUserHome(File path) {
-		userHome = new Holder<>(path);
+		userHome = new Holder<File>(path);
 		return this;
 	}
 
@@ -409,7 +410,6 @@ public abstract class FS {
 	protected File userHomeImpl() {
 		final String home = AccessController
 				.doPrivileged(new PrivilegedAction<String>() {
-					@Override
 					public String run() {
 						return System.getProperty("user.home"); //$NON-NLS-1$
 					}
@@ -497,13 +497,7 @@ public abstract class FS {
 			if (env != null) {
 				pb.environment().putAll(env);
 			}
-			Process p;
-			try {
-				p = pb.start();
-			} catch (IOException e) {
-				// Process failed to start
-				throw new CommandFailedException(-1, e.getMessage(), e);
-			}
+			Process p = pb.start();
 			p.getOutputStream().close();
 			GobblerThread gobbler = new GobblerThread(p, command, dir);
 			gobbler.start();
@@ -656,7 +650,7 @@ public abstract class FS {
 	 */
 	public File getGitSystemConfig() {
 		if (gitSystemConfig == null) {
-			gitSystemConfig = new Holder<>(discoverGitSystemConfig());
+			gitSystemConfig = new Holder<File>(discoverGitSystemConfig());
 		}
 		return gitSystemConfig.value;
 	}
@@ -670,7 +664,7 @@ public abstract class FS {
 	 * @since 4.0
 	 */
 	public FS setGitSystemConfig(File configFile) {
-		gitSystemConfig = new Holder<>(configFile);
+		gitSystemConfig = new Holder<File>(configFile);
 		return this;
 	}
 
@@ -783,7 +777,7 @@ public abstract class FS {
 	}
 
 	/**
-	 * See {@link FileUtils#relativizePath(String, String, String, boolean)}.
+	 * See {@link FileUtils#relativize(String, String)}.
 	 *
 	 * @param base
 	 *            The path against which <code>other</code> should be
@@ -792,11 +786,11 @@ public abstract class FS {
 	 *            The path that will be made relative to <code>base</code>.
 	 * @return A relative path that, when resolved against <code>base</code>,
 	 *         will yield the original <code>other</code>.
-	 * @see FileUtils#relativizePath(String, String, String, boolean)
+	 * @see FileUtils#relativize(String, String)
 	 * @since 3.7
 	 */
 	public String relativize(String base, String other) {
-		return FileUtils.relativizePath(base, other, File.separator, this.isCaseSensitive());
+		return FileUtils.relativize(base, other);
 	}
 
 	/**
@@ -1017,13 +1011,16 @@ public abstract class FS {
 		IOException ioException = null;
 		try {
 			process = processBuilder.start();
-			executor.execute(
-					new StreamGobbler(process.getErrorStream(), errRedirect));
-			executor.execute(
-					new StreamGobbler(process.getInputStream(), outRedirect));
+			final Callable<Void> errorGobbler = new StreamGobbler(
+					process.getErrorStream(), errRedirect);
+			final Callable<Void> outputGobbler = new StreamGobbler(
+					process.getInputStream(), outRedirect);
+			executor.submit(errorGobbler);
+			executor.submit(outputGobbler);
 			OutputStream outputStream = process.getOutputStream();
 			if (inRedirect != null) {
-				new StreamGobbler(inRedirect, outputStream).copy();
+				new StreamGobbler(inRedirect, outputStream)
+						.call();
 			}
 			try {
 				outputStream.close();
@@ -1339,7 +1336,7 @@ public abstract class FS {
 	 * streams.
 	 * </p>
 	 */
-	private static class StreamGobbler implements Runnable {
+	private static class StreamGobbler implements Callable<Void> {
 		private InputStream in;
 
 		private OutputStream out;
@@ -1349,16 +1346,7 @@ public abstract class FS {
 			this.out = output;
 		}
 
-		@Override
-		public void run() {
-			try {
-				copy();
-			} catch (IOException e) {
-				// Do nothing on read failure; leave streams open.
-			}
-		}
-
-		void copy() throws IOException {
+		public Void call() throws IOException {
 			boolean writeFailure = false;
 			byte buffer[] = new byte[4096];
 			int readBytes;
@@ -1375,6 +1363,7 @@ public abstract class FS {
 					}
 				}
 			}
+			return null;
 		}
 	}
 }

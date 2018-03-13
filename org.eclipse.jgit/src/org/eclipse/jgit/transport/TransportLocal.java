@@ -100,7 +100,6 @@ class TransportLocal extends Transport implements PackTransport {
 			return JGitText.get().transportProtoLocal;
 		}
 
-		@Override
 		public Set<String> getSchemes() {
 			return Collections.singleton("file"); //$NON-NLS-1$
 		}
@@ -133,7 +132,6 @@ class TransportLocal extends Transport implements PackTransport {
 			return new TransportLocal(local, uri, gitDir);
 		}
 
-		@Override
 		public Transport open(URIish uri) throws NotSupportedException,
 				TransportException {
 			File path = FS.DETECTED.resolve(new File("."), uri.getPath()); //$NON-NLS-1$
@@ -191,7 +189,7 @@ class TransportLocal extends Transport implements PackTransport {
 				return createUploadPack(db);
 			}
 		};
-		return new InternalFetchConnection<>(this, upf, null, openRepo());
+		return new InternalFetchConnection<Void>(this, upf, null, openRepo());
 	}
 
 	@Override
@@ -207,7 +205,7 @@ class TransportLocal extends Transport implements PackTransport {
 				return createReceivePack(db);
 			}
 		};
-		return new InternalPushConnection<>(this, rpf, null, openRepo());
+		return new InternalPushConnection<Void>(this, rpf, null, openRepo());
 	}
 
 	@Override
