@@ -1,5 +1,7 @@
 /*
- * Copyright (C) 2016, Google Inc.
+ * Copyright (C) 2009, Jonas Fonseca <fonseca@diku.dk>
+ * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,22 +43,45 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.lib;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
+/**
+ * A tree entry representing a gitlink entry used for submodules.
+ *
+ * Note. Java cannot really handle these as file system objects.
+ *
+ * @deprecated To look up information about a single path, use
+ * {@link org.eclipse.jgit.treewalk.TreeWalk#forPath(Repository, String, org.eclipse.jgit.revwalk.RevTree)}.
+ * To lookup information about multiple paths at once, use a
+ * {@link org.eclipse.jgit.treewalk.TreeWalk} and obtain the current entry's
+ * information from its getter methods.
+ */
+@Deprecated
+public class GitlinkTreeEntry extends TreeEntry {
 
-import org.junit.Test;
+	/**
+	 * Construct a {@link GitlinkTreeEntry} with the specified name and SHA-1 in
+	 * the specified parent
+	 *
+	 * @param parent
+	 * @param id
+	 * @param nameUTF8
+	 */
+	public GitlinkTreeEntry(final Tree parent, final ObjectId id,
+			final byte[] nameUTF8) {
+		super(parent, id, nameUTF8);
+	}
 
-public class PathsTest {
-	@Test
-	public void testStripTrailingSeparator() {
-		assertNull(Paths.stripTrailingSeparator(null));
-		assertEquals("", Paths.stripTrailingSeparator(""));
-		assertEquals("a", Paths.stripTrailingSeparator("a"));
-		assertEquals("a/boo", Paths.stripTrailingSeparator("a/boo"));
-		assertEquals("a/boo", Paths.stripTrailingSeparator("a/boo/"));
-		assertEquals("a/boo", Paths.stripTrailingSeparator("a/boo//"));
-		assertEquals("a/boo", Paths.stripTrailingSeparator("a/boo///"));
+	public FileMode getMode() {
+		return FileMode.GITLINK;
+	}
+
+	@Override
+	public String toString() {
+		final StringBuilder r = new StringBuilder();
+		r.append(ObjectId.toString(getId()));
+		r.append(" G "); //$NON-NLS-1$
+		r.append(getFullName());
+		return r.toString();
 	}
 }
