@@ -24,7 +24,6 @@ org.eclipse.jgit.pgm.Tag
 org.eclipse.jgit.pgm.UploadPack
 org.eclipse.jgit.pgm.Version
 
-org.eclipse.jgit.pgm.debug.DiffAlgorithms
 org.eclipse.jgit.pgm.debug.MakeCacheTree
 org.eclipse.jgit.pgm.debug.ReadDirCache
 org.eclipse.jgit.pgm.debug.RebuildCommitGraph
@@ -32,7 +31,6 @@ org.eclipse.jgit.pgm.debug.ShowCacheTree
 org.eclipse.jgit.pgm.debug.ShowCommands
 org.eclipse.jgit.pgm.debug.ShowDirCache
 org.eclipse.jgit.pgm.debug.ShowPackDelta
-org.eclipse.jgit.pgm.debug.TextHashFunctions
 org.eclipse.jgit.pgm.debug.WriteDirCache
 
 org.eclipse.jgit.pgm.eclipse.Iplog
