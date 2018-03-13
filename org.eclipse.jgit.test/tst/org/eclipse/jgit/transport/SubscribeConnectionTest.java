@@ -45,6 +45,7 @@ package org.eclipse.jgit.transport;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -329,6 +330,27 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 				.getLeaf().getObjectId().name();
 		assertEquals(id2.name(), pubsubId2);
 		assertEquals("5678", subscriber.getLastPackNumber());
+	}
+
+	@Test
+	public void testBadUpdate() throws Exception {
+		// Setup server response
+		publisherLineOut.writeString("restart-token server-token");
+		publisherLineOut.writeString("heartbeat-interval 10");
+		publisherLineOut.end();
+		writeHeartbeat();
+		// Add refs/heads/master (bad command, master already exists)
+		ObjectId id = db.getRef("refs/heads/master").getLeaf().getObjectId();
+		writeUpdate(ObjectId.zeroId(), id, "refs/heads/master", "1234");
+
+		try {
+			executeSubscribe();
+			fail("Should have failed creating refs/heads/master");
+		} catch (TransportException e) {
+			// Expected
+		} catch (InterruptedIOException e) {
+			// Stream timeout
+		}
 	}
 
 	private void writeHeartbeat() throws IOException {
