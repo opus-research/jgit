@@ -279,18 +279,11 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 				walk.reset(rw.parseTree(tree));
 				while (walk.next()) {
 					final String name = pfx + walk.getPathString();
-					FileMode mode = walk.getFileMode(0);
+					final FileMode mode = walk.getFileMode(0);
 
-					if (walk.isSubtree())
-						walk.enterSubtree();
-
-					if (FileMode.GITLINK.equals(mode))
-						// TODO(jrn): Take a callback to recurse
-						// into submodules.
-						mode = FileMode.TREE;
-
-					if (FileMode.TREE.equals(mode)) {
+					if (walk.isSubtree()) {
 						fmt.putEntry(outa, name + "/", mode, null);
+						walk.enterSubtree();
 						continue;
 					}
 					walk.getObjectId(idBuf, 0);
