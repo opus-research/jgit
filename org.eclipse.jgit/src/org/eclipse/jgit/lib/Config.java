@@ -834,15 +834,9 @@ public class Config {
 				out.append(e.section);
 				if (e.subsection != null) {
 					out.append(' ');
-					String escaped = escapeValue(e.subsection);
-					// make sure to avoid double quotes here
-					boolean quoted = escaped.startsWith("\"")
-							&& escaped.endsWith("\"");
-					if (!quoted)
-						out.append('"');
-					out.append(escaped);
-					if (!quoted)
-						out.append('"');
+					out.append('"');
+					out.append(escapeValue(e.subsection));
+					out.append('"');
 				}
 				out.append(']');
 			} else if (e.section != null && e.name != null) {
