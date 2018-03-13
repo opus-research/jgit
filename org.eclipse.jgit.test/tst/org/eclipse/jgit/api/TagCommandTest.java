@@ -139,7 +139,7 @@ public class TagCommandTest extends RepositoryTestCase {
 		RevTag tag = git.tag().setName("tag").call();
 		assertEquals(1, db.getTags().size());
 
-		List<String> deleted = git.tagDelete().setTags(tag.getTagName())
+		List<String> deleted = git.tagDelete().setTagNames(tag.getTagName())
 				.call();
 		assertEquals(1, deleted.size());
 		assertEquals(tag.getTagName(),
@@ -150,7 +150,7 @@ public class TagCommandTest extends RepositoryTestCase {
 		RevTag tag2 = git.tag().setName("tag2").call();
 		assertEquals(2, db.getTags().size());
 		deleted = git.tagDelete()
-				.setTags(tag1.getTagName(), tag2.getTagName()).call();
+				.setTagNames(tag1.getTagName(), tag2.getTagName()).call();
 		assertEquals(2, deleted.size());
 		assertEquals(0, db.getTags().size());
 	}
@@ -163,7 +163,7 @@ public class TagCommandTest extends RepositoryTestCase {
 		assertEquals(1, db.getTags().size());
 
 		List<String> deleted = git.tagDelete()
-				.setTags(Constants.R_TAGS + tag.getTagName()).call();
+				.setTagNames(Constants.R_TAGS + tag.getTagName()).call();
 		assertEquals(1, deleted.size());
 		assertEquals(Constants.R_TAGS + tag.getTagName(), deleted.get(0));
 		assertEquals(0, db.getTags().size());
@@ -174,7 +174,7 @@ public class TagCommandTest extends RepositoryTestCase {
 		Git git = new Git(db);
 		git.commit().setMessage("initial commit").call();
 
-		List<String> deleted = git.tagDelete().setTags().call();
+		List<String> deleted = git.tagDelete().setTagNames().call();
 		assertEquals(0, deleted.size());
 	}
 
@@ -183,7 +183,7 @@ public class TagCommandTest extends RepositoryTestCase {
 		Git git = new Git(db);
 		git.commit().setMessage("initial commit").call();
 
-		List<String> deleted = git.tagDelete().setTags("tag").call();
+		List<String> deleted = git.tagDelete().setTagNames("tag").call();
 		assertEquals(0, deleted.size());
 	}
 
@@ -192,7 +192,7 @@ public class TagCommandTest extends RepositoryTestCase {
 		Git git = new Git(db);
 		git.commit().setMessage("initial commit").call();
 
-		List<String> deleted = git.tagDelete().setTags("bad~tag~name")
+		List<String> deleted = git.tagDelete().setTagNames("bad~tag~name")
 				.call();
 		assertEquals(0, deleted.size());
 	}

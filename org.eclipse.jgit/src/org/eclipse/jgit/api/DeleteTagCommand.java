@@ -67,7 +67,7 @@ import org.eclipse.jgit.lib.Repository;
  */
 public class DeleteTagCommand extends GitCommand<List<String>> {
 
-	private final Set<String> tags = new HashSet<String>();
+	private final Set<String> tagNames = new HashSet<String>();
 
 	/**
 	 * @param repo
@@ -76,20 +76,14 @@ public class DeleteTagCommand extends GitCommand<List<String>> {
 		super(repo);
 	}
 
-	/**
-	 * @throws JGitInternalException
-	 *             when trying to delete a tag that doesn't exist
-	 *
-	 * @return the list with the full names of the deleted tags
-	 */
-	public List<String> call() throws JGitInternalException {
+	public List<String> call() throws Exception {
 		checkCallable();
 		List<String> result = new ArrayList<String>();
-		if (tags.isEmpty())
+		if (tagNames.isEmpty())
 			return result;
 		try {
 			setCallable(false);
-			for (String tagName : tags) {
+			for (String tagName : tagNames) {
 				if (tagName == null)
 					continue;
 				Ref currentRef = repo.getRef(tagName);
@@ -97,6 +91,7 @@ public class DeleteTagCommand extends GitCommand<List<String>> {
 					continue;
 				String fullName = currentRef.getName();
 				RefUpdate update = repo.updateRef(fullName);
+				update.setRefLogMessage("tag deleted", false);
 				update.setForceUpdate(true);
 				Result deleteResult = update.delete();
 
@@ -125,16 +120,16 @@ public class DeleteTagCommand extends GitCommand<List<String>> {
 	}
 
 	/**
-	 * @param tags
+	 * @param tagNames
 	 *            the names of the tags to delete; if not set, this will do
 	 *            nothing; invalid tag names will simply be ignored
 	 * @return this instance
 	 */
-	public DeleteTagCommand setTags(String... tags) {
+	public DeleteTagCommand setTagNames(String... tagNames) {
 		checkCallable();
-		this.tags.clear();
-		for (String tagName : tags)
-			this.tags.add(tagName);
+		this.tagNames.clear();
+		for (String tagName : tagNames)
+			this.tagNames.add(tagName);
 		return this;
 	}
 }
