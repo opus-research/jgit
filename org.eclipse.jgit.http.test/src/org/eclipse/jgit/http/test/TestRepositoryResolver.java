@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Google Inc.
+ * Copyright (C) 2016, 2017 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,52 +42,44 @@
  */
 package org.eclipse.jgit.http.test;
 
-import java.io.IOException;
+import javax.servlet.http.HttpServletRequest;
 
-import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
-import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
-import org.eclipse.jgit.lib.RefDatabase;
+import org.eclipse.jgit.errors.RepositoryNotFoundException;
+import org.eclipse.jgit.junit.TestRepository;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.resolver.RepositoryResolver;
+import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
-/**
- * An {@link InMemoryRepository} whose refs can be made unreadable for testing
- * purposes.
- */
-class RefsUnreadableInMemoryRepository extends InMemoryRepository {
+/** A simple repository resolver for tests. */
+public final class TestRepositoryResolver
+		implements RepositoryResolver<HttpServletRequest> {
 
-	private final RefsUnreadableRefDatabase refs;
+	private final TestRepository<Repository> repo;
 
-	private volatile boolean failing;
+	private final String repoName;
 
-	RefsUnreadableInMemoryRepository(DfsRepositoryDescription repoDesc) {
-		super(repoDesc);
-		refs = new RefsUnreadableRefDatabase();
-		failing = false;
+	/**
+	 * Creates a new {@link TestRepositoryResolver} that resolves the given name to
+	 * the given repository.
+	 *
+	 * @param repo
+	 *            to resolve to
+	 * @param repoName
+	 *            to match
+	 */
+	public TestRepositoryResolver(TestRepository<Repository> repo, String repoName) {
+		this.repo = repo;
+		this.repoName = repoName;
 	}
 
 	@Override
-	public RefDatabase getRefDatabase() {
-		return refs;
-	}
-
-	/**
-	 * Make the ref database unable to scan its refs.
-	 * <p>
-	 * It may be useful to follow a call to startFailing with a call to
-	 * {@link RefDatabase#refresh()}, ensuring the next ref read fails.
-	 */
-	void startFailing() {
-		failing = true;
-	}
-
-	private class RefsUnreadableRefDatabase extends MemRefDatabase {
-
-		@Override
-		protected RefCache scanAllRefs() throws IOException {
-			if (failing) {
-				throw new IOException("disk failed, no refs found");
-			} else {
-				return super.scanAllRefs();
-			}
+	public Repository open(HttpServletRequest req, String name)
+			throws RepositoryNotFoundException, ServiceNotEnabledException {
+		if (!name.equals(repoName)) {
+			throw new RepositoryNotFoundException(name);
 		}
+		Repository db = repo.getRepository();
+		db.incrementOpen();
+		return db;
 	}
 }

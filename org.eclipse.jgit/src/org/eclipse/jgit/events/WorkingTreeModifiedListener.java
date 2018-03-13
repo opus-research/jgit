@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Google Inc.
+ * Copyright (C) 2017, Thomas Wolf <thomas.wolf@paranor.ch>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,54 +40,22 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.http.test;
 
-import java.io.IOException;
-
-import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
-import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
-import org.eclipse.jgit.lib.RefDatabase;
+package org.eclipse.jgit.events;
 
 /**
- * An {@link InMemoryRepository} whose refs can be made unreadable for testing
- * purposes.
+ * Receives {@link WorkingTreeModifiedEvent}s, which are fired whenever a
+ * {@link org.eclipse.jgit.dircache.DirCacheCheckout} modifies
+ * (adds/deletes/updates) files in the working tree.
+ *
+ * @since 4.9
  */
-class RefsUnreadableInMemoryRepository extends InMemoryRepository {
-
-	private final RefsUnreadableRefDatabase refs;
-
-	private volatile boolean failing;
-
-	RefsUnreadableInMemoryRepository(DfsRepositoryDescription repoDesc) {
-		super(repoDesc);
-		refs = new RefsUnreadableRefDatabase();
-		failing = false;
-	}
-
-	@Override
-	public RefDatabase getRefDatabase() {
-		return refs;
-	}
+public interface WorkingTreeModifiedListener extends RepositoryListener {
 
 	/**
-	 * Make the ref database unable to scan its refs.
-	 * <p>
-	 * It may be useful to follow a call to startFailing with a call to
-	 * {@link RefDatabase#refresh()}, ensuring the next ref read fails.
+	 * Respond to working tree modifications.
+	 *
+	 * @param event
 	 */
-	void startFailing() {
-		failing = true;
-	}
-
-	private class RefsUnreadableRefDatabase extends MemRefDatabase {
-
-		@Override
-		protected RefCache scanAllRefs() throws IOException {
-			if (failing) {
-				throw new IOException("disk failed, no refs found");
-			} else {
-				return super.scanAllRefs();
-			}
-		}
-	}
+	void onWorkingTreeModified(WorkingTreeModifiedEvent event);
 }

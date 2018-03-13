@@ -100,13 +100,27 @@ public class MergedReftable extends Reftable {
 
 	@Override
 	public RefCursor seekRef(String name) throws IOException {
-		boolean isPrefix = name.endsWith("/"); //$NON-NLS-1$
+		if (name.endsWith("/")) { //$NON-NLS-1$
+			return seekRefPrefix(name);
+		}
+		return seekSingleRef(name);
+	}
+
+	private RefCursor seekRefPrefix(String name) throws IOException {
 		MergedRefCursor m = new MergedRefCursor();
-		for (int i = tables.length - 1; i >= 0; i--) {
+		for (int i = 0; i < tables.length; i++) {
 			m.add(new RefQueueEntry(tables[i].seekRef(name), i));
-			if (!isPrefix && !m.queue.isEmpty()) {
-				return m;
-			}
+		}
+		return m;
+	}
+
+	private RefCursor seekSingleRef(String name) throws IOException {
+		// Walk the tables from highest priority (end of list) to lowest.
+		// As soon as the reference is found (queue not empty), all lower
+		// priority tables are irrelevant as current table shadows them.
+		MergedRefCursor m = new MergedRefCursor();
+		for (int i = tables.length - 1; i >= 0 && m.queue.isEmpty(); i--) {
+			m.add(new RefQueueEntry(tables[i].seekRef(name), i));
 		}
 		return m;
 	}
@@ -152,6 +166,7 @@ public class MergedReftable extends Reftable {
 
 	private class MergedRefCursor extends RefCursor {
 		private final PriorityQueue<RefQueueEntry> queue;
+		private RefQueueEntry head;
 		private Ref ref;
 
 		MergedRefCursor() {
@@ -159,17 +174,32 @@ public class MergedReftable extends Reftable {
 		}
 
 		void add(RefQueueEntry t) throws IOException {
-			if (t.rc.next()) {
+			// Common case is many iterations over the same RefQueueEntry
+			// for the bottom of the stack (scanning all refs). Its almost
+			// always less than the top of the queue. Avoid the queue's
+			// O(log N) insertion and removal costs for this common case.
+			if (!t.rc.next()) {
+				t.rc.close();
+			} else if (head == null) {
+				RefQueueEntry p = queue.peek();
+				if (p == null || RefQueueEntry.compare(t, p) < 0) {
+					head = t;
+				} else {
+					head = queue.poll();
+					queue.add(t);
+				}
+			} else if (RefQueueEntry.compare(t, head) > 0) {
 				queue.add(t);
 			} else {
-				t.rc.close();
+				queue.add(head);
+				head = t;
 			}
 		}
 
 		@Override
 		public boolean next() throws IOException {
 			for (;;) {
-				RefQueueEntry t = queue.poll();
+				RefQueueEntry t = poll();
 				if (t == null) {
 					return false;
 				}
@@ -184,11 +214,20 @@ public class MergedReftable extends Reftable {
 			}
 		}
 
+		private RefQueueEntry poll() {
+			RefQueueEntry e = head;
+			if (e != null) {
+				head = null;
+				return e;
+			}
+			return queue.poll();
+		}
+
 		private void skipShadowedRefs(String name) throws IOException {
 			for (;;) {
-				RefQueueEntry t = queue.peek();
+				RefQueueEntry t = head != null ? head : queue.peek();
 				if (t != null && name.equals(t.name())) {
-					add(queue.remove());
+					add(poll());
 				} else {
 					break;
 				}
@@ -266,7 +305,6 @@ public class MergedReftable extends Reftable {
 				if (include) {
 					return true;
 				}
-				return true;
 			}
 		}
 

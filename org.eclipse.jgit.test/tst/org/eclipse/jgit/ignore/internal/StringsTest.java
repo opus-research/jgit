@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Google Inc.
+ * Copyright (C) 2017, Thomas Wolf <thomas.wolf@paranor.ch>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,54 +40,34 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.http.test;
+package org.eclipse.jgit.ignore.internal;
 
-import java.io.IOException;
+import static org.junit.Assert.assertEquals;
 
-import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
-import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
-import org.eclipse.jgit.lib.RefDatabase;
+import org.junit.Test;
 
-/**
- * An {@link InMemoryRepository} whose refs can be made unreadable for testing
- * purposes.
- */
-class RefsUnreadableInMemoryRepository extends InMemoryRepository {
+public class StringsTest {
 
-	private final RefsUnreadableRefDatabase refs;
-
-	private volatile boolean failing;
-
-	RefsUnreadableInMemoryRepository(DfsRepositoryDescription repoDesc) {
-		super(repoDesc);
-		refs = new RefsUnreadableRefDatabase();
-		failing = false;
+	private void testString(String string, int n, int m) {
+		assertEquals(string, n, Strings.count(string, '/', false));
+		assertEquals(string, m, Strings.count(string, '/', true));
 	}
 
-	@Override
-	public RefDatabase getRefDatabase() {
-		return refs;
-	}
-
-	/**
-	 * Make the ref database unable to scan its refs.
-	 * <p>
-	 * It may be useful to follow a call to startFailing with a call to
-	 * {@link RefDatabase#refresh()}, ensuring the next ref read fails.
-	 */
-	void startFailing() {
-		failing = true;
-	}
-
-	private class RefsUnreadableRefDatabase extends MemRefDatabase {
-
-		@Override
-		protected RefCache scanAllRefs() throws IOException {
-			if (failing) {
-				throw new IOException("disk failed, no refs found");
-			} else {
-				return super.scanAllRefs();
-			}
-		}
+	@Test
+	public void testCount() {
+		testString("", 0, 0);
+		testString("/", 1, 0);
+		testString("//", 2, 0);
+		testString("///", 3, 1);
+		testString("////", 4, 2);
+		testString("foo", 0, 0);
+		testString("/foo", 1, 0);
+		testString("foo/", 1, 0);
+		testString("/foo/", 2, 0);
+		testString("foo/bar", 1, 1);
+		testString("/foo/bar/", 3, 1);
+		testString("/foo/bar//", 4, 2);
+		testString("/foo//bar/", 4, 2);
+		testString(" /foo/ ", 2, 2);
 	}
 }
