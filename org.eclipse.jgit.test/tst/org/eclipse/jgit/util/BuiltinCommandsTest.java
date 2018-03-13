@@ -88,7 +88,6 @@ public class BuiltinCommandsTest extends RepositoryTestCase {
 		assertEquals(
 				"[.gitattributes, mode:100644, content:*.txt filter=test][Test.txt, mode:100644, content:cHceclclcoc cacgcacicn]",
 				indexState(CONTENT));
-		git.commit().setMessage("modify").call();
 
 		writeTrashFile("Test.bin", "Hello again");
 		git.add().addFilepattern("Test.bin").call();

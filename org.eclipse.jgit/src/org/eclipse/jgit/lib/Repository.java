@@ -149,7 +149,7 @@ public abstract class Repository implements AutoCloseable {
 	 *            unregister a factory
 	 * @return the previous factory associated with <tt>commandName</tt>, or
 	 *         <tt>null</tt> if there was no mapping for <tt>commandName</tt>
-	 * @since 4.4
+	 * @since 4.5
 	 */
 	public BuiltinCommandFactory registerComand(String commandName,
 			BuiltinCommandFactory fact) {
@@ -166,7 +166,7 @@ public abstract class Repository implements AutoCloseable {
 	 * @param commandName
 	 *            the name for which the registry should be checked
 	 * @return <code>true</code> if some factory was registered for the name
-	 * @since 4.4
+	 * @since 4.5
 	 */
 	public boolean isRegistered(String commandName) {
 		return commandRegistry.containsKey(commandName);
@@ -189,10 +189,11 @@ public abstract class Repository implements AutoCloseable {
 	 *            write to
 	 * @return the command if a command could be created or <code>null</code> if
 	 *         there was no factory registered for that name
-	 * @since 4.4
+	 * @throws IOException
+	 * @since 4.5
 	 */
 	public BuiltinCommand getCommand(String commandName, Repository db,
-			InputStream in, OutputStream out) {
+			InputStream in, OutputStream out) throws IOException {
 		BuiltinCommandFactory cf = commandRegistry.get(commandName);
 		return (cf == null) ? null : cf.create(db, in, out);
 	}
