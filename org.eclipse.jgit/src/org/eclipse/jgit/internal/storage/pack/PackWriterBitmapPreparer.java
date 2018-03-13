@@ -512,8 +512,8 @@ class PackWriterBitmapPreparer {
 
 		final List<BitmapBuilderEntry> tipCommitBitmaps;
 		final Iterable<BitmapCommit> reusedCommits;
-		final RevCommit[] commitsByOldest;
-		final int commitStartPos;
+		private final RevCommit[] commitsByOldest;
+		private final int commitStartPos;
 
 		CommitSelectionHelper(Set<? extends ObjectId> peeledWant,
 				RevCommit[] commitsByOldest, int commitStartPos,

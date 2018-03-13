@@ -119,7 +119,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 	private int activeCopyRawData;
 
-	int packLastModified;
+	private int packLastModified;
 
 	private volatile boolean invalid;
 
