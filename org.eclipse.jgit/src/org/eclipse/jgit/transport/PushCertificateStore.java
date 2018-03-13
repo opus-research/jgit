@@ -65,6 +65,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 
 import org.eclipse.jgit.dircache.DirCache;
+import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
@@ -447,10 +448,13 @@ public class PushCertificateStore implements AutoCloseable {
 	}
 
 	private DirCache newDirCache() throws IOException {
+		DirCache dc = DirCache.newInCore();
 		if (commit != null) {
-			return DirCache.read(reader, commit.getTree());
+			DirCacheBuilder b = dc.builder();
+			b.addTree(new byte[0], DirCacheEntry.STAGE_0, reader, commit.getTree());
+			b.finish();
 		}
-		return DirCache.newInCore();
+		return dc;
 	}
 
 	private ObjectId saveCert(ObjectInserter inserter, DirCache dc,

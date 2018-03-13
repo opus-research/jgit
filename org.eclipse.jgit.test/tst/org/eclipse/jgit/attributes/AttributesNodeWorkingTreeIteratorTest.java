@@ -53,9 +53,12 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.eclipse.jgit.attributes.Attribute.State;
+import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.junit.JGitTestUtil;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.FileMode;
@@ -219,21 +222,17 @@ public class AttributesNodeWorkingTreeIteratorTest extends RepositoryTestCase {
 	}
 
 	private void assertAttributesNode(String pathName,
-			AttributesNode attributesNode, List<Attribute> nodeAttrs)
-					throws IOException {
+			AttributesNode attributesNode, List<Attribute> nodeAttrs) {
 		if (attributesNode == null)
 			assertTrue(nodeAttrs == null || nodeAttrs.isEmpty());
 		else {
 
-			Attributes entryAttributes = new Attributes();
-			new AttributesHandler(walk).mergeAttributes(attributesNode,
-					pathName, false,
-					entryAttributes);
+			Map<String, Attribute> entryAttributes = new LinkedHashMap<String, Attribute>();
+			attributesNode.getAttributes(pathName, false, entryAttributes);
 
 			if (nodeAttrs != null && !nodeAttrs.isEmpty()) {
 				for (Attribute attribute : nodeAttrs) {
-					assertThat(entryAttributes.getAll(),
-							hasItem(attribute));
+					assertThat(entryAttributes.values(), hasItem(attribute));
 				}
 			} else {
 				assertTrue(
@@ -254,7 +253,7 @@ public class AttributesNodeWorkingTreeIteratorTest extends RepositoryTestCase {
 		writeTrashFile(name, data.toString());
 	}
 
-	private TreeWalk beginWalk() {
+	private TreeWalk beginWalk() throws CorruptObjectException {
 		TreeWalk newWalk = new TreeWalk(db);
 		newWalk.addTree(new FileTreeIterator(db));
 		return newWalk;

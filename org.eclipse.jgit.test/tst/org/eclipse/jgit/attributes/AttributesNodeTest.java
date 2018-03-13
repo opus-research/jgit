@@ -49,10 +49,11 @@ import static org.junit.Assert.assertEquals;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 
-import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
-import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
-import org.eclipse.jgit.treewalk.TreeWalk;
 import org.junit.After;
 import org.junit.Test;
 
@@ -60,8 +61,6 @@ import org.junit.Test;
  * Test {@link AttributesNode}
  */
 public class AttributesNodeTest {
-	private static final TreeWalk DUMMY_WALK = new TreeWalk(
-			new InMemoryRepository(new DfsRepositoryDescription("FooBar")));
 
 	private static final Attribute A_SET_ATTR = new Attribute("A", SET);
 
@@ -105,8 +104,8 @@ public class AttributesNodeTest {
 		is = new ByteArrayInputStream(attributeFileContent.getBytes());
 		AttributesNode node = new AttributesNode();
 		node.parse(is);
-		assertAttribute("file.type1", node, new Attributes());
-		assertAttribute("file.type2", node, new Attributes());
+		assertAttribute("file.type1", node, Collections.<Attribute> emptySet());
+		assertAttribute("file.type2", node, Collections.<Attribute> emptySet());
 	}
 
 	@Test
@@ -116,7 +115,7 @@ public class AttributesNodeTest {
 		is = new ByteArrayInputStream(attributeFileContent.getBytes());
 		AttributesNode node = new AttributesNode();
 		node.parse(is);
-		assertAttribute("file.type1", node, new Attributes());
+		assertAttribute("file.type1", node, Collections.<Attribute> emptySet());
 		assertAttribute("file.type2", node, asSet(A_UNSET_ATTR));
 	}
 
@@ -128,8 +127,8 @@ public class AttributesNodeTest {
 		is = new ByteArrayInputStream(attributeFileContent.getBytes());
 		AttributesNode node = new AttributesNode();
 		node.parse(is);
-		assertAttribute("file.type1", node, new Attributes());
-		assertAttribute("file.type2", node, new Attributes());
+		assertAttribute("file.type1", node, Collections.<Attribute> emptySet());
+		assertAttribute("file.type2", node, Collections.<Attribute> emptySet());
 		assertAttribute("file.type3", node, asSet(new Attribute("attr", "")));
 	}
 
@@ -167,15 +166,17 @@ public class AttributesNodeTest {
 	}
 
 	private void assertAttribute(String path, AttributesNode node,
-			Attributes attrs) throws IOException {
-		Attributes attributes = new Attributes();
-		new AttributesHandler(DUMMY_WALK).mergeAttributes(node, path, false,
-				attributes);
-		assertEquals(attrs, attributes);
+			Set<Attribute> attrs) {
+		HashMap<String, Attribute> attributes = new HashMap<String, Attribute>();
+		node.getAttributes(path, false, attributes);
+		assertEquals(attrs, new HashSet<Attribute>(attributes.values()));
 	}
 
-	static Attributes asSet(Attribute... attrs) {
-		return new Attributes(attrs);
+	static Set<Attribute> asSet(Attribute... attrs) {
+		Set<Attribute> result = new HashSet<Attribute>();
+		for (Attribute attr : attrs)
+			result.add(attr);
+		return result;
 	}
 
 }

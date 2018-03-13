@@ -43,8 +43,6 @@
  */
 package org.eclipse.jgit.api;
 
-import static org.eclipse.jgit.lib.Constants.MASTER;
-import static org.eclipse.jgit.lib.Constants.R_HEADS;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
@@ -139,7 +137,7 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 	@Test
 	public void testCreateBranchOnCheckout() throws Exception {
 		git.checkout().setCreateBranch(true).setName("test2").call();
-		assertNotNull(db.exactRef("refs/heads/test2"));
+		assertNotNull(db.getRef("test2"));
 	}
 
 	@Test
@@ -242,8 +240,8 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 				.setStartPoint("origin/test")
 				.setUpstreamMode(SetupUpstreamMode.TRACK).call();
 
-		assertEquals("refs/heads/test",
-				db2.exactRef(Constants.HEAD).getTarget().getName());
+		assertEquals("refs/heads/test", db2.getRef(Constants.HEAD).getTarget()
+				.getName());
 		StoredConfig config = db2.getConfig();
 		assertEquals("origin", config.getString(
 				ConfigConstants.CONFIG_BRANCH_SECTION, "test",
@@ -350,7 +348,7 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 		CheckoutCommand co = git.checkout();
 		co.setName("master").call();
 
-		String commitId = db.exactRef(R_HEADS + MASTER).getObjectId().name();
+		String commitId = db.getRef(Constants.MASTER).getObjectId().name();
 		co = git.checkout();
 		co.setName(commitId).call();
 
@@ -417,20 +415,20 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 			InvalidRemoteException, TransportException {
 		// create second repository
 		Repository db2 = createWorkRepository();
-		try (Git git2 = new Git(db2)) {
-			// setup the second repository to fetch from the first repository
-			final StoredConfig config = db2.getConfig();
-			RemoteConfig remoteConfig = new RemoteConfig(config, "origin");
-			URIish uri = new URIish(db.getDirectory().toURI().toURL());
-			remoteConfig.addURI(uri);
-			remoteConfig.update(config);
-			config.save();
+		Git git2 = new Git(db2);
 
-			// fetch from first repository
-			RefSpec spec = new RefSpec("+refs/heads/*:refs/remotes/origin/*");
-			git2.fetch().setRemote("origin").setRefSpecs(spec).call();
-			return db2;
-		}
+		// setup the second repository to fetch from the first repository
+		final StoredConfig config = db2.getConfig();
+		RemoteConfig remoteConfig = new RemoteConfig(config, "origin");
+		URIish uri = new URIish(db.getDirectory().toURI().toURL());
+		remoteConfig.addURI(uri);
+		remoteConfig.update(config);
+		config.save();
+
+		// fetch from first repository
+		RefSpec spec = new RefSpec("+refs/heads/*:refs/remotes/origin/*");
+		git2.fetch().setRemote("origin").setRefSpecs(spec).call();
+		return db2;
 	}
 
 	private CheckoutCommand newOrphanBranchCommand() {
@@ -448,7 +446,7 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 	}
 
 	private void assertHeadDetached() throws IOException {
-		Ref head = db.exactRef(Constants.HEAD);
+		Ref head = db.getRef(Constants.HEAD);
 		assertFalse(head.isSymbolic());
 		assertSame(head, head.getTarget());
 	}
@@ -562,10 +560,10 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 
 	@Test
 	public void testSmudgeFilter_modifyExisting() throws IOException, GitAPIException {
-		File script = writeTempFile("sed s/o/e/g");
+		File script = writeTempFile("tr o e");
 		StoredConfig config = git.getRepository().getConfig();
 		config.setString("filter", "tstFilter", "smudge",
-				"sh " + slashify(script.getPath()));
+				"sh " + script.getPath());
 		config.save();
 
 		writeTrashFile(".gitattributes", "*.txt filter=tstFilter");
@@ -573,15 +571,13 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 		git.commit().setMessage("add filter").call();
 
 		writeTrashFile("src/a.tmp", "x");
-		// Caution: we need a trailing '\n' since sed on mac always appends
-		// linefeeds if missing
-		writeTrashFile("src/a.txt", "x\n");
+		writeTrashFile("src/a.txt", "x");
 		git.add().addFilepattern("src/a.tmp").addFilepattern("src/a.txt")
 				.call();
 		RevCommit content1 = git.commit().setMessage("add content").call();
 
 		writeTrashFile("src/a.tmp", "foo");
-		writeTrashFile("src/a.txt", "foo\n");
+		writeTrashFile("src/a.txt", "foo");
 		git.add().addFilepattern("src/a.tmp").addFilepattern("src/a.txt")
 				.call();
 		RevCommit content2 = git.commit().setMessage("changed content").call();
@@ -590,20 +586,20 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 		git.checkout().setName(content2.getName()).call();
 
 		assertEquals(
-				"[.gitattributes, mode:100644, content:*.txt filter=tstFilter][Test.txt, mode:100644, content:Some change][src/a.tmp, mode:100644, content:foo][src/a.txt, mode:100644, content:foo\n]",
+				"[.gitattributes, mode:100644, content:*.txt filter=tstFilter][Test.txt, mode:100644, content:Some change][src/a.tmp, mode:100644, content:foo][src/a.txt, mode:100644, content:foo]",
 				indexState(CONTENT));
 		assertEquals(Sets.of("src/a.txt"), git.status().call().getModified());
 		assertEquals("foo", read("src/a.tmp"));
-		assertEquals("fee\n", read("src/a.txt"));
+		assertEquals("fee", read("src/a.txt"));
 	}
 
 	@Test
 	public void testSmudgeFilter_createNew()
 			throws IOException, GitAPIException {
-		File script = writeTempFile("sed s/o/e/g");
+		File script = writeTempFile("tr o e");
 		StoredConfig config = git.getRepository().getConfig();
 		config.setString("filter", "tstFilter", "smudge",
-				"sh " + slashify(script.getPath()));
+				"sh " + script.getPath());
 		config.save();
 
 		writeTrashFile("foo", "foo");
@@ -615,9 +611,7 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 		git.commit().setMessage("add filter").call();
 
 		writeTrashFile("src/a.tmp", "foo");
-		// Caution: we need a trailing '\n' since sed on mac always appends
-		// linefeeds if missing
-		writeTrashFile("src/a.txt", "foo\n");
+		writeTrashFile("src/a.txt", "foo");
 		git.add().addFilepattern("src/a.tmp").addFilepattern("src/a.txt")
 				.call();
 		RevCommit content = git.commit().setMessage("added content").call();
@@ -626,10 +620,11 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 		git.checkout().setName(content.getName()).call();
 
 		assertEquals(
-				"[.gitattributes, mode:100644, content:*.txt filter=tstFilter][Test.txt, mode:100644, content:Some change][foo, mode:100644, content:foo][src/a.tmp, mode:100644, content:foo][src/a.txt, mode:100644, content:foo\n]",
+				"[.gitattributes, mode:100644, content:*.txt filter=tstFilter][Test.txt, mode:100644, content:Some change][foo, mode:100644, content:foo][src/a.tmp, mode:100644, content:foo][src/a.txt, mode:100644, content:foo]",
 				indexState(CONTENT));
+		assertEquals(Sets.of("src/a.txt"), git.status().call().getModified());
 		assertEquals("foo", read("src/a.tmp"));
-		assertEquals("fee\n", read("src/a.txt"));
+		assertEquals("fee", read("src/a.txt"));
 	}
 
 	@Test
@@ -639,41 +634,40 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 		File clean_filter = writeTempFile("sed s/V1/@version/g -");
 		File smudge_filter = writeTempFile("sed s/@version/V1/g -");
 
-		try (Git git2 = new Git(db)) {
-			StoredConfig config = git.getRepository().getConfig();
-			config.setString("filter", "tstFilter", "smudge",
-					"sh " + slashify(smudge_filter.getPath()));
-			config.setString("filter", "tstFilter", "clean",
-					"sh " + slashify(clean_filter.getPath()));
-			config.save();
-			writeTrashFile(".gitattributes", "*.txt filter=tstFilter");
-			git2.add().addFilepattern(".gitattributes").call();
-			git2.commit().setMessage("add attributes").call();
+		Git git = new Git(db);
+		StoredConfig config = git.getRepository().getConfig();
+		config.setString("filter", "tstFilter", "smudge",
+				"sh " + smudge_filter.getPath());
+		config.setString("filter", "tstFilter", "clean",
+				"sh " + clean_filter.getPath());
+		config.save();
+		writeTrashFile(".gitattributes", "*.txt filter=tstFilter");
+		git.add().addFilepattern(".gitattributes").call();
+		git.commit().setMessage("add attributes").call();
 
-			writeTrashFile("filterTest.txt", "hello world, V1");
-			git2.add().addFilepattern("filterTest.txt").call();
-			git2.commit().setMessage("add filterText.txt").call();
-			assertEquals(
-					"[.gitattributes, mode:100644, content:*.txt filter=tstFilter][Test.txt, mode:100644, content:Some other change][filterTest.txt, mode:100644, content:hello world, @version]",
-					indexState(CONTENT));
+		writeTrashFile("filterTest.txt", "hello world, V1");
+		git.add().addFilepattern("filterTest.txt").call();
+		git.commit().setMessage("add filterText.txt").call();
+		assertEquals(
+				"[.gitattributes, mode:100644, content:*.txt filter=tstFilter][Test.txt, mode:100644, content:Some other change][filterTest.txt, mode:100644, content:hello world, @version]",
+				indexState(CONTENT));
 
-			git2.checkout().setCreateBranch(true).setName("test2").call();
-			writeTrashFile("filterTest.txt", "bon giorno world, V1");
-			git2.add().addFilepattern("filterTest.txt").call();
-			git2.commit().setMessage("modified filterText.txt").call();
+		git.checkout().setCreateBranch(true).setName("test2").call();
+		writeTrashFile("filterTest.txt", "bon giorno world, V1");
+		git.add().addFilepattern("filterTest.txt").call();
+		git.commit().setMessage("modified filterText.txt").call();
 
-			assertTrue(git2.status().call().isClean());
-			assertEquals(
-					"[.gitattributes, mode:100644, content:*.txt filter=tstFilter][Test.txt, mode:100644, content:Some other change][filterTest.txt, mode:100644, content:bon giorno world, @version]",
-					indexState(CONTENT));
+		assertTrue(git.status().call().isClean());
+		assertEquals(
+				"[.gitattributes, mode:100644, content:*.txt filter=tstFilter][Test.txt, mode:100644, content:Some other change][filterTest.txt, mode:100644, content:bon giorno world, @version]",
+				indexState(CONTENT));
 
-			git2.checkout().setName("refs/heads/test").call();
-			assertTrue(git2.status().call().isClean());
-			assertEquals(
-					"[.gitattributes, mode:100644, content:*.txt filter=tstFilter][Test.txt, mode:100644, content:Some other change][filterTest.txt, mode:100644, content:hello world, @version]",
-					indexState(CONTENT));
-			assertEquals("hello world, V1", read("filterTest.txt"));
-		}
+		git.checkout().setName("refs/heads/test").call();
+		assertTrue(git.status().call().isClean());
+		assertEquals(
+				"[.gitattributes, mode:100644, content:*.txt filter=tstFilter][Test.txt, mode:100644, content:Some other change][filterTest.txt, mode:100644, content:hello world, @version]",
+				indexState(CONTENT));
+		assertEquals("hello world, V1", read("filterTest.txt"));
 	}
 
 	private File writeTempFile(String body) throws IOException {

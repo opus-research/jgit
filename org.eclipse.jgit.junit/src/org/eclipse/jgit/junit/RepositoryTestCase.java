@@ -108,17 +108,6 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 		return JGitTestUtil.writeTrashFile(db, name, data);
 	}
 
-	/**
-	 * Create a symbolic link
-	 *
-	 * @param link
-	 *            the path of the symbolic link to create
-	 * @param target
-	 *            the target of the symbolic link
-	 * @return the path to the symbolic link
-	 * @throws Exception
-	 * @since 4.2
-	 */
 	protected Path writeLink(final String link, final String target)
 			throws Exception {
 		return JGitTestUtil.writeLink(db, link, target);
@@ -283,19 +272,6 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 	}
 
 	/**
-	 * Replaces '\' by '/'
-	 *
-	 * @param str
-	 *            the string in which backslashes should be replaced
-	 * @return the resulting string with slashes
-         * @since 4.2
-	 */
-	public static String slashify(String str) {
-		str = str.replace('\\', '/');
-		return str;
-	}
-
-	/**
 	 * Waits until it is guaranteed that a subsequent file modification has a
 	 * younger modification timestamp than the modification timestamp of the
 	 * given file. This is done by touching a temporary file, reading the
@@ -401,7 +377,8 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 	 * @return the created commit
 	 */
 	protected RevCommit commitFile(String filename, String contents, String branch) {
-		try (Git git = new Git(db)) {
+		try {
+			Git git = new Git(db);
 			Repository repo = git.getRepository();
 			String originalBranch = repo.getFullBranch();
 			boolean empty = repo.resolve(Constants.HEAD) == null;
@@ -442,10 +419,8 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 			final int stage, final String content) {
 		final DirCacheEntry entry = new DirCacheEntry(path, stage);
 		entry.setFileMode(mode);
-		try (ObjectInserter.Formatter formatter = new ObjectInserter.Formatter()) {
-			entry.setObjectId(formatter.idFor(
-					Constants.OBJ_BLOB, Constants.encode(content)));
-		}
+		entry.setObjectId(new ObjectInserter.Formatter().idFor(
+				Constants.OBJ_BLOB, Constants.encode(content)));
 		return entry;
 	}
 

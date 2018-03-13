@@ -98,7 +98,7 @@ import org.eclipse.jgit.storage.pack.PackConfig;
  * Transport instances and the connections they create are not thread-safe.
  * Callers must ensure a transport is accessed by only one thread at a time.
  */
-public abstract class Transport implements AutoCloseable {
+public abstract class Transport {
 	/** Type of operation a Transport is being opened for. */
 	public enum Operation {
 		/** Transport is to fetch objects locally. */
@@ -752,9 +752,6 @@ public abstract class Transport implements AutoCloseable {
 	/** Should push produce thin-pack when sending objects to remote repository. */
 	private boolean pushThin = DEFAULT_PUSH_THIN;
 
-	/** Should push be all-or-nothing atomic behavior? */
-	private boolean pushAtomic;
-
 	/** Should push just check for operation result, not really push. */
 	private boolean dryRun;
 
@@ -970,31 +967,6 @@ public abstract class Transport implements AutoCloseable {
 	 */
 	public void setPushThin(final boolean pushThin) {
 		this.pushThin = pushThin;
-	}
-
-	/**
-	 * Default setting is false.
-	 *
-	 * @return true if push requires all-or-nothing atomic behavior.
-	 * @since 4.2
-	 */
-	public boolean isPushAtomic() {
-		return pushAtomic;
-	}
-
-	/**
-	 * Request atomic push (all references succeed, or none do).
-	 * <p>
-	 * Server must also support atomic push. If the server does not support the
-	 * feature the push will abort without making changes.
-	 *
-	 * @param atomic
-	 *            true when push should be an all-or-nothing operation.
-	 * @see PackTransport
-	 * @since 4.2
-	 */
-	public void setPushAtomic(final boolean atomic) {
-		this.pushAtomic = atomic;
 	}
 
 	/**
@@ -1353,10 +1325,6 @@ public abstract class Transport implements AutoCloseable {
 	 * must close that network socket, disconnecting the two peers. If the
 	 * remote repository is actually local (same system) this method must close
 	 * any open file handles used to read the "remote" repository.
-	 * <p>
-	 * {@code AutoClosable.close()} declares that it throws {@link Exception}.
-	 * Implementers shouldn't throw checked exceptions. This override narrows
-	 * the signature to prevent them from doing so.
 	 */
 	public abstract void close();
 }
