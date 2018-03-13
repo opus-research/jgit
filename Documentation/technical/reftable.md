@@ -31,8 +31,9 @@ and read the `$GIT_DIR/refs` directory.
 - Near constant time verification a SHA-1 is referred to by at least
   one reference (for allow-tip-sha1-in-want).
 - Efficient lookup of an entire namespace, such as `refs/tags/`.
-- Support atomic push `O(size_of_update)` operations.
-- Combine reflog storage with ref storage.
+- Support atomic push with `O(size_of_update)` operations.
+- Combine reflog storage with ref storage for small transactions.
+- Separate reflog storage for base refs and historical logs.
 
 ### Description
 
@@ -53,7 +54,7 @@ repository | packed-refs | reftable | % original | avg ref  | avg obj
 android    |      62.2 M |   34.4 M |     55.2%  | 33 bytes | 8 bytes
 rails      |       1.8 M |    1.1 M |     57.7%  | 29 bytes | 6 bytes
 git        |      78.7 K |   44.0 K |     60.0%  | 50 bytes | 6 bytes
-git (heads)|       332 b |    239 b |     72.0%  | 31 bytes | 0 bytes
+git (heads)|       332 b |    276 b |     83.1%  | 34 bytes | 0 bytes
 
 Scan (read 866k refs), by reference name lookup (single ref from 866k
 refs), and by SHA-1 lookup (refs with that SHA-1, from 866k refs):
@@ -68,10 +69,10 @@ reftable    | hot   |         |      20.2 usec |     320.8 usec
 Space used for 149,932 log entries for 43,061 refs,
 reflog vs. reftable:
 
-format        | size  | avg log
+format        | size  | avg entry
 --------------|------:|-----------:
 $GIT_DIR/logs | 173 M | 1209 bytes
-reftable      |   4 M |   30 bytes
+reftable      |   5 M |   37 bytes
 
 ## Details
 
@@ -120,12 +121,25 @@ A reftable file has the following high-level structure:
     log_index?
     footer
 
+A log-only file omits the `ref_blocks`, `ref_index`, `obj_blocks` and
+`obj_index` sections, containing only the file header and log blocks:
+
+    first_block {
+      header
+    }
+    log_blocks*
+    log_index?
+    footer
+
+in a log-only file the first log block immediately follows the file
+header, without padding to block alignment.
+
 ### Block size
 
 The `block_size` is arbitrarily determined by the writer, and does not
 have to be a power of 2.  The block size must be larger than the
-longest reference name or deflated log entry used in the repository,
-as references cannot span blocks.
+longest reference name or log entry used in the repository, as
+references cannot span blocks.
 
 Powers of two that are friendly to the virtual memory system or
 filesystem (such as 4k or 8k) are recommended.  Larger sizes (64k) can
@@ -136,24 +150,35 @@ The largest block size is `16777215` bytes (15.99 MiB).
 
 ### Header
 
-An 8-byte header appears at the beginning of the file:
+A 24-byte header appears at the beginning of the file:
 
-    '\1REF'
+    'REFT'
     uint8( version_number = 1 )
     uint24( block_size )
+    uint64( min_update_index )
+    uint64( max_update_index )
+
+The `min_update_index` and `max_update_index` describe bounds for the
+`update_index` field of all log records in this file.  When reftables
+are used in a stack for transactions (see below), these fields can
+order the files such that the prior file's `max_update_index + 1` is
+the next file's `min_update_index`.
 
 ### First ref block
 
-The first ref block shares the same block as the file header, and is 8
-bytes smaller than all other blocks in the file.  The first block
-immediately begins after the file header, at offset 8.
+The first ref block shares the same block as the file header, and is
+24 bytes smaller than all other blocks in the file.  The first block
+immediately begins after the file header, at offset 24.
+
+If the first block is a log block (a log only table), its block header
+begins immediately at offset 24.
 
 ### Ref block format
 
 A ref block is written as:
 
     'r'
-    uint24 ( block_len )
+    uint24( block_len )
     ref_record+
     uint32( restart_offset )+
     uint16( restart_count )
@@ -162,7 +187,7 @@ A ref block is written as:
 Blocks begin with `block_type = 'r'` and a 3-byte `block_len` which
 encodes the number of bytes in the block up to, but not including the
 optional `padding`.  This is almost always shorter than the file's
-`block_size`.  In the first ref block, `block_len` includes 8 bytes
+`block_size`.  In the first ref block, `block_len` includes 24 bytes
 for the file header.
 
 The 4-byte block header is followed by a variable number of
@@ -174,9 +199,12 @@ records.  Offsets are relative to the start of the block and refer to
 the first byte of any `ref_record` whose name has not been prefix
 compressed.  Entries in the `restart_offset` list must be sorted,
 ascending.  Readers can start linear scans from any of these records.
-Offsets in the first block are relative to the start of the file
-(position 0), and include the file header.  This requires the first
-restart in the first block to be at offset 8.
+
+As the first ref block shares the first file block with the file
+header, offsets in the first block are relative to the start of the
+file (position 0), and include the file header.  This requires the
+first restart in the first block to be at offset 24.  Restarts in
+subsequent ref blocks are relative to the start of the ref block.
 
 The 2-byte `restart_count` stores the number of entries in the
 `restart_offset` list, which must not be empty.
@@ -186,11 +214,11 @@ before starting a linear scan.  The `restart_count` field must be
 the last 2 bytes of the block as specified by `block_len` from the
 block header.
 
-The end of the record may be filled with `padding` NUL bytes to fill
+The end of the block may be filled with `padding` NUL bytes to fill
 out the block to the common `block_size` as specified in the file
 header.  Padding may be necessary to ensure the following block starts
 at a block alignment, and does not spill into the tail of this block.
-Padding may be omitted if the block is the last block of the file, or
+Padding may be omitted if the block is the last block of the file, and
 there is no index block.  This allows reftable to efficiently scale
 down to a small number of refs.
 
@@ -239,17 +267,17 @@ Types `0x6..0x7` are reserved for future use.
 
 The ref index stores the name of the last reference from every ref
 block in the file, enabling constant O(1) disk seeks for all lookups.
-Any reference can be found by binary searching the index, identifying
-the containing block, and searching within that block.
+Any reference can be found by searching the index, identifying the
+containing block, and searching within that block.
 
-If present, the ref index block appears after the last ref block.  The
+If present the ref index block appears after the last ref block.  The
 prior ref block should be padded to ensure the ref index starts on a
 block alignment.
 
 An index block should only be written if there are at least 4 blocks
-in the file, as cold reads using the index requires 2 disk reads, and
-binary searching <= 4 blocks also requires <= 2 reads.  Omitting the
-index block from smaller files saves space.
+in the file, as cold reads using the index requires 2 disk reads (read
+index, read block), and binary searching <= 4 blocks also requires <=
+2 reads.  Omitting the index block from smaller files saves space.
 
 Index block format:
 
@@ -272,8 +300,8 @@ format, meaning and usage as in ref blocks.
 To reduce the number of reads required for random access in very large
 files, the index block may be larger than the other blocks.  However,
 readers must hold the entire index in memory to benefit from this, so
-it's a time-space tradeoff in both file size, and reader memory.
-Increasing the block size in the writer decreases the index size.
+it's a time-space tradeoff in both file size and reader memory.
+Increasing the block size decreases the index size.
 
 When object blocks are present the ref index block is padded with
 `padding` to maintain alignment for the next block. No padding is
@@ -287,13 +315,14 @@ Index records are written as:
     varint( prefix_length )
     varint( (suffix_length << 3) | 0x4 )
     suffix
-    varint( block_offset )
+    varint( block_position )
 
 Index records use prefix compression exactly like `ref_record`.
 
-Index records store `block_offset` after the suffix, specifying the
-offset in bytes (from the start of the file) of the block that ends
-with this reference.
+Index records store `block_position` after the suffix, specifying the
+absolute position in bytes (from the start of the file) of the block
+that ends with this reference. Readers can seek to `block_position` to
+begin reading the block header.
 
 #### Reading the index
 
@@ -302,7 +331,7 @@ obtain `ref_index_offset`. If not present, the offset will be 0.
 
 ### Obj block format
 
-Object blocks use unique, abbreviated 2-20 byte SHA-1s keys, mapping
+Object blocks use unique, abbreviated 2-20 byte SHA-1 keys, mapping
 to ref blocks containing references pointing to that object directly,
 or as the peeled value of an annotated tag.  Like ref blocks, object
 blocks use the file's standard `block_size`.
@@ -314,7 +343,7 @@ linear search of all references to lookup by SHA-1.
 An object block is written as:
 
     'o'
-    uint24 ( block_len )
+    uint24( block_len )
     obj_record+
     uint32( restart_offset )+
     uint16( restart_count )
@@ -340,27 +369,18 @@ containing references using that unique abbreviation:
     varint( prefix_length )
     varint( (suffix_length << 3) | cnt_3 )
     suffix
-    varint( cnt_rest )?
+    varint( cnt_large )?
     varint( block_delta )+
 
 Like in reference blocks, abbreviations are prefix compressed within
-an obj block.  On large reftable files with many unique objects,
-higher block sizes (64k), and higher restart interval (128), a
+an obj block.  On large reftables with many unique objects, higher
+block sizes (64k), and higher restart interval (128), a
 `prefix_length` of 2 or 3 and `suffix_length` of 3 may be common in
 obj records (unique abbreviation of 5-6 raw bytes, 10-12 hex digits).
 
 Each record contains `block_count` number of block identifiers for ref
-blocks.  The `block_count` is determined by:
-
-    block_count = cnt_3
-    if (cnt_3 == 0x7) {
-      block_count += cnt_rest
-    }
-
-The `cnt_rest` field is only present when `block_count >= 0x7` and
-could overflow the `cnt_3` field available in the record start.  This
-encoding scheme is used as the vast majority of abbreviations are
-only one reference (or at most a few), and unlikely to exceed 6 blocks.
+blocks.  For 1-7 blocks the block count is stored in `cnt_3`.  When
+`cnt_3 = 0` the actual block count follows in a varint, `cnt_large`.
 
 The first `block_delta` is the absolute block identifier counting from
 the start of the file. The offset of that block can be obtained by
@@ -417,11 +437,11 @@ A log block is written as:
 
 Log blocks look similar to ref blocks, except `block_type = 'g'`.
 
-The 4-block header is followed by the deflated block contents using
-zlib deflate.  The `block_len` in the header is the inflated size
-(including 4-byte block header), and should be used by readers to
+The 4-byte block header is followed by the deflated block contents
+using zlib deflate.  The `block_len` in the header is the inflated
+size (including 4-byte block header), and should be used by readers to
 preallocate the inflation output buffer.  Offsets within the block
-(e.g. `restart_offset`) still include the 4-byte header.  Readers may
+(e.g.  `restart_offset`) still include the 4-byte header.  Readers may
 prefer prefixing the inflation output buffer with the 4-byte header.
 
 Within the deflate container, a variable number of `log_record`
@@ -442,25 +462,23 @@ know where the next log block begins.
 
 Log record keys are structured as:
 
-    ref_name '\0' reverse_int64( time_usec )
+    ref_name '\0' reverse_int64( update_index )
 
-where `time_usec` is the update time in microseconds since the epoch.
+where `update_index` is the unique transaction identifier.  The
+`update_index` field must be unique within the scope of a `ref_name`.
+See the update index section below for further details.
+
 The `reverse_int64` function inverses the value so lexographical
-ordering the network byte order time sorts more recent records first:
+ordering the network byte order encoding sorts the more recent records
+with higher `update_index` values first:
 
     reverse_int64(int64 t) {
       return 0xffffffffffffffff - t;
     }
 
-The `time_usec` field must be unique within the scope of a `ref_name`.
-Writers working from seconds precision source are recomended to add
-`999999` microseconds to the timestamp, and decrement microseconds
-from older entries within the same second to prevent duplicates.
-Truncating to seconds on read will restore the original values.
-
 Log records have a similar starting structure to ref and index
 records, utilizing the same prefix compression scheme applied to the
-key described above.
+log record key described above.
 
 ```
     varint( prefix_length )
@@ -469,15 +487,17 @@ key described above.
 
     old_id
     new_id
+    varint( time_seconds )
     sint16( tz_offset )
-    varint( name_length  )   name
-    varint( email_length )   email
-    varint( message_length ) message
+    varint( name_length    )  name
+    varint( email_length   )  email
+    varint( message_length )  message
 ```
 
 The value data following the key suffix is complex:
 
 - two 20-byte SHA-1s (old id, new id)
+- varint time in seconds since epoch (Jan 1, 1970)
 - 2-byte timezone offset (signed)
 - varint string of committer's name
 - varint string of committer's email
@@ -485,7 +505,7 @@ The value data following the key suffix is complex:
 
 `tz_offset` is the absolute number of minutes from GMT the committer
 was at the time of the update.  For example `GMT-0800` is encoded in
-reftable as `int16(-480)` and `GMT+0230` is `int16(150)`.
+reftable as `sint16(-480)` and `GMT+0230` is `sint16(150)`.
 
 The `message_length` may be 0, in which case there was no message
 supplied for the update.
@@ -497,20 +517,27 @@ determine the `log_offset`.  The first block of the log begins at
 `log_offset` bytes since the start of the file.  The `log_offset` is
 not block aligned.
 
+#### Importing logs
+
+When importing from `$GIT_DIR/logs` writers should globally order all
+log records roughly by timestamp while preserving file order, and
+assign unique, increasing `update_index` values for each log line.
+
 ### Log index
 
-The log index stores the log key (`refname \0 reverse_int64(time_sec)`)
+The log index stores the log key (`refname \0 reverse_int64(update_index)`)
 for the last log record of every log block in the file, supporting
 bounded-time lookup.
 
 A log index block must be written if 2 or more log blocks are written
-to the file.  If present, the log index appears after the first log
+to the file.  If present, the log index appears after the last log
 block.  There is no padding used to align the log index to block
 alignment.
 
-Log index format is identical to ref index, except the keys are 5
-bytes longer to include `'\0'` and the 4-byte `reverse_int64(time)`.
-Records use `block_offset` to refer to the start of a log block.
+Log index format is identical to ref index, except the keys are 9
+bytes longer to include `'\0'` and the 8-byte
+`reverse_int64(update_index)`.  Records use `block_position` to
+refer to the start of a log block.
 
 #### Reading the index
 
@@ -522,21 +549,23 @@ obtain `log_index_offset`. If not present, the offset will be 0.
 After the last block of the file, a file footer is written.  It begins
 like the file header, but is extended with additional data.
 
-A 52-byte footer appears at the end:
+A 68-byte footer appears at the end:
 
 ```
-    '\1REF'
+    'REFT'
     uint8( version_number = 1 )
     uint24( block_size )
-    uint64( ref_index_offset )
+    uint64( min_update_index )
+    uint64( max_update_index )
 
+    uint64( ref_index_offset )
     uint64( obj_offset )
     uint64( obj_index_offset )
 
     uint64( log_offset )
     uint64( log_index_offset )
 
-    uint32( CRC-32 of prior )
+    uint32( CRC-32 of above )
 ```
 
 If a section is missing (e.g. ref index) the corresponding offset
@@ -550,13 +579,13 @@ field (e.g. `ref_index_offset`) will be 0.
 
 #### Reading the footer
 
-Readers must seek to `file_length - 64` to access the footer.  A
+Readers must seek to `file_length - 68` to access the footer.  A
 trusted external source (such as `stat(2)`) is necessary to obtain
 `file_length`.  When reading the footer, readers must verify:
 
 - 4-byte magic is correct
 - 1-byte version number is recognized
-- 4-byte CRC-32 matches the other 48 bytes (including magic, and version)
+- 4-byte CRC-32 matches the other 64 bytes (including magic, and version)
 
 Once verified, the other fields of the footer can be accessed.
 
@@ -570,9 +599,7 @@ Decoder works such as:
     val = buf[ptr] & 0x7f
     while (buf[ptr] & 0x80) {
       ptr++
-      val++
-      val = val << 7
-      val = val | (buf[ptr] & 0x7f)
+      val = ((val + 1) << 7) | (buf[ptr] & 0x7f)
     }
 
 ### Binary search
@@ -622,7 +649,7 @@ bytes per reference.
 ### Low overhead
 
 A reftable with very few references (e.g. git.git with 5 heads)
-is 251 bytes for reftable, vs. 332 bytes for packed-refs.  This
+is 276 bytes for reftable, vs. 332 bytes for packed-refs.  This
 supports reftable scaling down for transaction logs (below).
 
 ### Block size
@@ -644,7 +671,7 @@ containing block.
 ### Scans and lookups dominate
 
 Scanning all references and lookup by name (or namespace such as
-`refs/heads/`) is the most common activity performed by repositories.
+`refs/heads/`) are the most common activities performed by repositories.
 SHA-1s are stored twice when obj blocks are present, avoiding disk
 seeks for the common cases of scan and lookup by name.
 
@@ -654,12 +681,14 @@ Logs are infrequently accessed, but can be large.  Deflating log
 blocks saves disk space, with some increased penalty at read time.
 
 Logs are stored in an isolated section from refs, reducing the burden
-on reference readers that want to ignore logs.
+on reference readers that want to ignore logs.  Further, historical
+logs can be isolated into log-only reftables.
 
 ### Logs are read backwards
 
-Logs are frequently accessed backwards (most recent N records for master),
-so log records are grouped by reference, and sorted descending by time.
+Logs are frequently accessed backwards (most recent N records for
+master to answer `master@{4}`), so log records are grouped by
+reference, and sorted descending by update index.
 
 ## Repository format
 
@@ -680,21 +709,21 @@ directory.  This prevents loose references from being stored.
 A collection of reftable files are stored in the `$GIT_DIR/reftable/`
 directory:
 
-    1500398516_UF4paF
-    1500398517_bUVgy4
+    00000001_UF4paF
+    00000002_bUVgy4
 
 where reftable files are named by a unique name such as produced by
 the function:
 
-    mktemp "${seconds_since_epoch}_XXXXXX"
+    mktemp "${update_index}_XXXXXX"
 
 The stack ordering file is `$GIT_DIR/refs` and lists the current
 files, one per line, in order, from oldest (base) to newest (most
 recent):
 
     $ cat .git/refs
-    1500398516_UF4paF
-    1500398517_bUVgy4
+    00000001_UF4paF
+    00000002_bUVgy4
 
 Readers must read `$GIT_DIR/refs` to determine which files are
 relevant right now, and search through the stack in reverse order
@@ -708,27 +737,26 @@ to the stack by the active writer), or ancient and ready to be pruned.
 Although reftables are immutable, mutations are supported by writing a
 new reftable and atomically appending it to the stack:
 
-1. Read `refs` to determine current reftables.
-2. Prepare new reftable `${time}_XXXXXX`, including log entries.
-3. Acquire `refs.lock`.
-4. If `refs` differs from (1), verify file from (2) does not conflict.
-5. Copy `refs` to `refs.lock`, appending file from (2).
+1. Acquire `refs.lock`.
+2. Read `refs` to determine current reftables.
+3. Select `update_index` to be most recent file's `max_update_index + 1`.
+4. Prepare new reftable `${update_index}_XXXXXX`, including log entries.
+5. Copy `refs` to `refs.lock`, appending file from (4).
 6. Rename `refs.lock` to `refs`.
+
+During step 4 the new file's `min_update_index` and `max_update_index`
+are both set to the `update_index` selected by step 3.  All log
+records for the transaction use the same `update_index` in their keys.
+This enables later correlation of which references were updated by the
+same transaction.
 
 Because a single `refs.lock` file is used to manage locking, the
 repository is single-threaded for writers.  Writers may have to
-busy-spin (with some small backoff) around creating `refs.lock`,
-for up to an acceptable wait period, aborting if the repository is too
-busy to mutate.  Application servers wrapped around repositories (e.g.
-Gerrit Code Review) can layer their own in memory thread lock/wait
-queue to improve fairness.
-
-By preparing the update in steps 1-2 without the lock held, concurrent
-updaters may be able to update unrelated references in a safe way,
-with a minimal critical section.  This requires updaters to verify in
-4 that the stack has not changed in a meaningful way, and to
-gracefully abort by deleting `${time}_XXXXXX` if a conflict is
-detected.
+busy-spin (with backoff) around creating `refs.lock`, for up to an
+acceptable wait period, aborting if the repository is too busy to
+mutate.  Application servers wrapped around repositories (e.g.  Gerrit
+Code Review) can layer their own lock/wait queue to improve fairness
+to writers.
 
 ### Reference deletions
 
@@ -743,6 +771,10 @@ using a straightforward merge join across reftables, selecting the
 most recent value for output, and omitting deleted references that do
 not appear in remaining, lower reftables.
 
+A compacted reftable should set its `min_update_index` to the smallest of
+the input files' `min_update_index`, and its `max_update_index`
+likewise to the largest input `max_update_index`.
+
 For sake of illustration, assume the stack currently consists of
 reftable files (from oldest to newest): A, B, C, and D. The compactor
 is going to compact B and C, leaving A and D alone.
@@ -752,8 +784,7 @@ is going to compact B and C, leaving A and D alone.
     Ownership of these locks prevents other processes from trying
     to compact these files.
 3.  Release `refs.lock`.
-4.  Compact `B` and `C` into a new file `${time}_XXXXXX`, where `${time}`
-    is the latest time prefix, likely from `C`.
+4.  Compact `B` and `C` into a new file `${min_update_index}_XXXXXX`.
 5.  Reacquire lock `refs.lock`.
 6.  Verify that `B` and `C` are still in the stack, in that order. This
     should always be the case, assuming that other processes are adhering
