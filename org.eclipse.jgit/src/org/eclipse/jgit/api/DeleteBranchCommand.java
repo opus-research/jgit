@@ -50,18 +50,17 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.CannotDeleteCurrentBranchException;
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NotMergedException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
-import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.StoredConfig;
+import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 
@@ -96,7 +95,7 @@ public class DeleteBranchCommand extends GitCommand<List<String>> {
 	 *             the currently checked out branch without force
 	 * @return the list with the (full) names of the deleted branches
 	 */
-	public List<String> call() throws GitAPIException, JGitInternalException,
+	public List<String> call() throws JGitInternalException,
 			NotMergedException, CannotDeleteCurrentBranchException {
 		checkCallable();
 		List<String> result = new ArrayList<String>();

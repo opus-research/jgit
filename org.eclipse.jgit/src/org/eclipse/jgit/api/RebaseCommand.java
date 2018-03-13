@@ -60,8 +60,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.RebaseResult.Status;
+import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
@@ -74,6 +74,7 @@ import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.dircache.DirCacheIterator;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
@@ -189,7 +190,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	 *
 	 * @return an object describing the result of this command
 	 */
-	public RebaseResult call() throws GitAPIException, NoHeadException, RefNotFoundException,
+	public RebaseResult call() throws NoHeadException, RefNotFoundException,
 			JGitInternalException, GitAPIException {
 		RevCommit newHead = null;
 		boolean lastStepWasForward = false;
@@ -219,8 +220,18 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			if (monitor.isCancelled())
 				return abort(RebaseResult.ABORTED_RESULT);
 
-			if (operation == Operation.CONTINUE)
+			if (operation == Operation.CONTINUE) {
 				newHead = continueRebase();
+
+				if (newHead == null) {
+					// continueRebase() returns null only if no commit was
+					// neccessary. This means that no changes where left over
+					// after resolving all conflicts. In this case, cgit stops
+					// and displays a nice message to the user, telling him to
+					// either do changes or skip the commit instead of continue.
+					return RebaseResult.NOTHING_TO_COMMIT_RESULT;
+				}
+			}
 
 			if (operation == Operation.SKIP)
 				newHead = checkoutCurrentHead();
@@ -506,8 +517,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		}
 	}
 
-	private RebaseResult initFilesAndRewind() throws IOException,
-			JGitInternalException, GitAPIException {
+	private RebaseResult initFilesAndRewind() throws RefNotFoundException,
+			IOException, NoHeadException, JGitInternalException {
 		// we need to store everything into files so that we can implement
 		// --skip, --continue, and --abort
 
@@ -554,7 +565,10 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		for (RevCommit commit : commitsToUse) {
 			if (commit.getParentCount() != 1)
 				throw new JGitInternalException(
-						JGitText.get().canOnlyCherryPickCommitsWithOneParent);
+						MessageFormat.format(
+								JGitText.get().canOnlyCherryPickCommitsWithOneParent,
+								commit.name(),
+								Integer.valueOf(commit.getParentCount())));
 			cherryPickList.add(commit);
 		}
 
@@ -612,12 +626,11 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	 *
 	 * @param newCommit
 	 * @return the new head, or null
+	 * @throws RefNotFoundException
 	 * @throws IOException
-	 * @throws GitAPIException
-	 * @throws JGitInternalException
 	 */
-	public RevCommit tryFastForward(RevCommit newCommit) throws IOException,
-			JGitInternalException, GitAPIException {
+	public RevCommit tryFastForward(RevCommit newCommit)
+			throws RefNotFoundException, IOException {
 		Ref head = repo.getRef(Constants.HEAD);
 		if (head == null || head.getObjectId() == null)
 			throw new RefNotFoundException(MessageFormat.format(
@@ -640,8 +653,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	}
 
 	private RevCommit tryFastForward(String headName, RevCommit oldCommit,
-			RevCommit newCommit) throws IOException, JGitInternalException,
-			GitAPIException {
+			RevCommit newCommit) throws IOException, JGitInternalException {
 		boolean tryRebase = false;
 		for (RevCommit parentCommit : newCommit.getParents())
 			if (parentCommit.equals(oldCommit))
@@ -674,6 +686,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		} catch (RefNotFoundException e) {
 			throw new JGitInternalException(e.getMessage(), e);
 		} catch (InvalidRefNameException e) {
+			throw new JGitInternalException(e.getMessage(), e);
+		} catch (CheckoutConflictException e) {
 			throw new JGitInternalException(e.getMessage(), e);
 		}
 	}
@@ -941,11 +955,9 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		static Action parse(String token) {
 			if (token.equals("pick") || token.equals("p"))
 				return PICK;
-			throw new JGitInternalException(
-					MessageFormat
-							.format(
-									"Unknown or unsupported command \"{0}\", only  \"pick\" is allowed",
-									token));
+			throw new JGitInternalException(MessageFormat.format(
+					JGitText.get().unknownOrUnsupportedCommand, token,
+					PICK.toToken()));
 		}
 	}
 

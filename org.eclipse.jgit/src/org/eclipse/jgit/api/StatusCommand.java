@@ -44,7 +44,6 @@ package org.eclipse.jgit.api;
 
 import java.io.IOException;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.IndexDiff;
@@ -81,7 +80,7 @@ public class StatusCommand extends GitCommand<Status> {
 	 * @return a {@link Status} object telling about each path where working
 	 *         tree, index or HEAD differ from each other.
 	 */
-	public Status call() throws GitAPIException, IOException, NoWorkTreeException {
+	public Status call() throws IOException, NoWorkTreeException {
 		if (workingTreeIt == null)
 			workingTreeIt = new FileTreeIterator(repo);
 
@@ -96,8 +95,11 @@ public class StatusCommand extends GitCommand<Status> {
 	 * method is not called a standard {@link FileTreeIterator} is used.
 	 *
 	 * @param workingTreeIt
+	 *            a working tree iterator
+	 * @return {@code this}
 	 */
-	public void setWorkingTreeIt(WorkingTreeIterator workingTreeIt) {
+	public StatusCommand setWorkingTreeIt(WorkingTreeIterator workingTreeIt) {
 		this.workingTreeIt = workingTreeIt;
+		return this;
 	}
 }
