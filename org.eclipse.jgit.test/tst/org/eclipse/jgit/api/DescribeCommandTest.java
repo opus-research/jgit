@@ -42,19 +42,16 @@
  */
 package org.eclipse.jgit.api;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.junit.RepositoryTestCase;
+import org.eclipse.jgit.lib.ObjectId;
+import org.junit.Test;
 
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.RefNotFoundException;
-import org.eclipse.jgit.junit.RepositoryTestCase;
-import org.eclipse.jgit.lib.ObjectId;
-import org.junit.Test;
+import static org.junit.Assert.*;
 
 public class DescribeCommandTest extends RepositoryTestCase {
 
@@ -66,7 +63,7 @@ public class DescribeCommandTest extends RepositoryTestCase {
 		git = new Git(db);
 	}
 
-	@Test(expected = RefNotFoundException.class)
+	@Test(expected = IllegalArgumentException.class)
 	public void noTargetSet() throws Exception {
 		git.describe().call();
 	}
