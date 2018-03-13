@@ -52,7 +52,7 @@ import org.apache.commons.compress.archivers.tar.TarConstants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectLoader;
 
-public class TarFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
+class TarFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
 	public ArchiveOutputStream createArchiveOutputStream(OutputStream s) {
 		return new TarArchiveOutputStream(s);
 	}
