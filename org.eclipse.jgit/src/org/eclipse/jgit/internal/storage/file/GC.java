@@ -555,9 +555,7 @@ public class GC {
 		for (ReflogEntry e : rlEntries) {
 			if (e.getWho().getWhen().getTime() < minTime)
 				break;
-			ObjectId newId = e.getNewId();
-			if (newId != null && !ObjectId.zeroId().equals(newId))
-				ret.add(newId);
+			ret.add(e.getNewId());
 			ObjectId oldId = e.getOldId();
 			if (oldId != null && !ObjectId.zeroId().equals(oldId))
 				ret.add(oldId);
