@@ -45,7 +45,6 @@ package org.eclipse.jgit.blame;
 
 import java.io.IOException;
 
-import org.eclipse.jgit.blame.ReverseWalk.ReverseCommit;
 import org.eclipse.jgit.diff.Edit;
 import org.eclipse.jgit.diff.EditList;
 import org.eclipse.jgit.diff.RawText;
@@ -53,9 +52,7 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 
 /**
@@ -112,40 +109,11 @@ class Candidate {
 		sourcePath = path;
 	}
 
-	int getParentCount() {
-		return sourceCommit.getParentCount();
-	}
-
-	RevCommit getParent(int idx) {
-		return sourceCommit.getParent(idx);
-	}
-
-	Candidate getNextCandidate(@SuppressWarnings("unused") int idx) {
-		return null;
-	}
-
-	void add(RevFlag flag) {
-		sourceCommit.add(flag);
-	}
-
-	int getTime() {
-		return sourceCommit.getCommitTime();
-	}
-
-	PersonIdent getAuthor() {
-		return sourceCommit.getAuthorIdent();
-	}
-
-	Candidate create(RevCommit commit, PathFilter path) {
-		return new Candidate(commit, path);
-	}
-
 	Candidate copy(RevCommit commit) {
-		Candidate r = create(commit, sourcePath);
+		Candidate r = new Candidate(commit, sourcePath);
 		r.sourceBlob = sourceBlob;
 		r.sourceText = sourceText;
 		r.regionList = regionList;
-		r.renameScore = renameScore;
 		return r;
 	}
 
@@ -286,101 +254,5 @@ class Candidate {
 			r.append(" regions:").append(regionList);
 		r.append("]");
 		return r.toString();
-	}
-
-	/**
-	 * Special candidate type used for reverse blame.
-	 * <p>
-	 * Reverse blame inverts the commit history graph to follow from a commit to
-	 * its descendant children, rather than the normal history direction of
-	 * child to parent. These types require a {@link ReverseCommit} which keeps
-	 * children pointers, allowing reverse navigation of history.
-	 */
-	static final class ReverseCandidate extends Candidate {
-		ReverseCandidate(ReverseCommit commit, PathFilter path) {
-			super(commit, path);
-		}
-
-		@Override
-		int getParentCount() {
-			return ((ReverseCommit) sourceCommit).getChildCount();
-		}
-
-		@Override
-		RevCommit getParent(int idx) {
-			return ((ReverseCommit) sourceCommit).getChild(idx);
-		}
-
-		@Override
-		int getTime() {
-			// Invert the timestamp so newer dates sort older.
-			return -sourceCommit.getCommitTime();
-		}
-
-		@Override
-		Candidate create(RevCommit commit, PathFilter path) {
-			return new ReverseCandidate((ReverseCommit) commit, path);
-		}
-
-		@Override
-		public String toString() {
-			return "Reverse" + super.toString();
-		}
-	}
-
-	/**
-	 * Candidate loaded from a file source, and not a commit.
-	 * <p>
-	 * The {@link Candidate#sourceCommit} field is always null on this type of
-	 * candidate. Instead history traversal follows the single {@link #parent}
-	 * field to discover the next Candidate. Often this is a normal Candidate
-	 * type that has a valid sourceCommit.
-	 */
-	static final class BlobCandidate extends Candidate {
-		/**
-		 * Next candidate to pass blame onto.
-		 * <p>
-		 * When computing the differences that this candidate introduced to the
-		 * file content, the parent's sourceText is used as the base.
-		 */
-		Candidate parent;
-
-		/** Author name to refer to this blob with. */
-		String description;
-
-		BlobCandidate(String name, PathFilter path) {
-			super(null, path);
-			description = name;
-		}
-
-		@Override
-		int getParentCount() {
-			return parent != null ? 1 : 0;
-		}
-
-		@Override
-		RevCommit getParent(int idx) {
-			return null;
-		}
-
-		@Override
-		Candidate getNextCandidate(int idx) {
-			return parent;
-		}
-
-		@Override
-		void add(RevFlag flag) {
-			// Do nothing, sourceCommit is null.
-		}
-
-		@Override
-		int getTime() {
-			return Integer.MAX_VALUE;
-		}
-
-		@Override
-		PersonIdent getAuthor() {
-			return new PersonIdent(description, null);
-		}
 	}
 }
