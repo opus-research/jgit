@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2013, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,68 +41,46 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.file;
+package org.eclipse.jgit.util;
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Collection;
-import java.util.Set;
 
-import org.eclipse.jgit.internal.storage.pack.ObjectToPack;
-import org.eclipse.jgit.internal.storage.pack.PackWriter;
-import org.eclipse.jgit.lib.AbbreviatedObjectId;
-import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.ObjectDatabase;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectLoader;
-import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.util.FS;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
-abstract class FileObjectDatabase extends ObjectDatabase {
-	static enum InsertLooseObjectResult {
-		INSERTED, EXISTS_PACKED, EXISTS_LOOSE, FAILURE;
+public class FileUtils7Test {
+
+	private final File trash = new File(new File("target"), "trash");
+
+	@Before
+	public void setUp() throws Exception {
+		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY | FileUtils.SKIP_MISSING);
+		assertTrue(trash.mkdirs());
 	}
 
-	@Override
-	public ObjectReader newReader() {
-		return new WindowCursor(this);
+	@After
+	public void tearDown() throws Exception {
+		FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY);
 	}
 
-	@Override
-	public ObjectDirectoryInserter newInserter() {
-		return new ObjectDirectoryInserter(this, getConfig());
+	@Test
+	public void testDeleteSymlinkToDirectoryDoesNotDeleteTarget()
+			throws IOException {
+		FS fs = FS.DETECTED;
+		File dir = new File(trash, "dir");
+		File file = new File(dir, "file");
+		File link = new File(trash, "link");
+		FileUtils.mkdirs(dir);
+		FileUtils.createNewFile(file);
+		fs.createSymLink(link, "dir");
+		FileUtils.delete(link, FileUtils.RECURSIVE);
+		assertFalse(link.exists());
+		assertTrue(dir.exists());
+		assertTrue(file.exists());
 	}
-
-	abstract void resolve(Set<ObjectId> matches, AbbreviatedObjectId id)
-			throws IOException;
-
-	abstract Config getConfig();
-
-	abstract FS getFS();
-
-	abstract Set<ObjectId> getShallowCommits() throws IOException;
-
-	abstract void selectObjectRepresentation(PackWriter packer,
-			ObjectToPack otp, WindowCursor curs) throws IOException;
-
-	abstract File getDirectory();
-
-	abstract File fileFor(AnyObjectId id);
-
-	abstract ObjectLoader openObject(WindowCursor curs, AnyObjectId objectId)
-			throws IOException;
-
-	abstract long getObjectSize(WindowCursor curs, AnyObjectId objectId)
-			throws IOException;
-
-	abstract ObjectLoader openLooseObject(WindowCursor curs, AnyObjectId id)
-			throws IOException;
-
-	abstract InsertLooseObjectResult insertUnpackedObject(File tmp,
-			ObjectId id, boolean createDuplicate) throws IOException;
-
-	abstract PackFile openPack(File pack) throws IOException;
-
-	abstract Collection<PackFile> getPacks();
 }
