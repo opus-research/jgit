@@ -109,18 +109,6 @@ public class RebaseResult {
 			public boolean isSuccessful() {
 				return true;
 			}
-		},
-
-		/**
-		 * Continue with nothing left to commit (possibly want skip).
-		 *
-		 * @since 2.0
-		 */
-		NOTHING_TO_COMMIT {
-			@Override
-			public boolean isSuccessful() {
-				return false;
-			}
 		};
 
 		/**
@@ -139,17 +127,14 @@ public class RebaseResult {
 	static final RebaseResult FAST_FORWARD_RESULT = new RebaseResult(
 			Status.FAST_FORWARD);
 
-	static final RebaseResult NOTHING_TO_COMMIT_RESULT = new RebaseResult(
-			Status.NOTHING_TO_COMMIT);
-
-	private final Status status;
+	private final Status mySatus;
 
 	private final RevCommit currentCommit;
 
 	private Map<String, MergeFailureReason> failingPaths;
 
 	private RebaseResult(Status status) {
-		this.status = status;
+		this.mySatus = status;
 		currentCommit = null;
 	}
 
@@ -160,7 +145,7 @@ public class RebaseResult {
 	 *            current commit
 	 */
 	RebaseResult(RevCommit commit) {
-		status = Status.STOPPED;
+		mySatus = Status.STOPPED;
 		currentCommit = commit;
 	}
 
@@ -171,7 +156,7 @@ public class RebaseResult {
 	 *            list of paths causing this rebase to fail
 	 */
 	RebaseResult(Map<String, MergeFailureReason> failingPaths) {
-		status = Status.FAILED;
+		mySatus = Status.FAILED;
 		currentCommit = null;
 		this.failingPaths = failingPaths;
 	}
@@ -180,7 +165,7 @@ public class RebaseResult {
 	 * @return the overall status
 	 */
 	public Status getStatus() {
-		return status;
+		return mySatus;
 	}
 
 	/**

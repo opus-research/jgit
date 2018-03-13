@@ -58,10 +58,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.errors.TooLargeObjectInPackException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.BatchingProgressMonitor;
 import org.eclipse.jgit.lib.Constants;
@@ -180,9 +179,6 @@ public abstract class PackParser {
 
 	/** Message to protect the pack data from garbage collection. */
 	private String lockMessage;
-
-	/** Git object size limit */
-	private long maxObjectSizeLimit;
 
 	/**
 	 * Initialize a pack parser.
@@ -370,19 +366,6 @@ public abstract class PackParser {
 	}
 
 	/**
-	 * Set the maximum allowed Git object size.
-	 * <p>
-	 * If an object is larger than the given size the pack-parsing will throw an
-	 * exception aborting the parsing.
-	 *
-	 * @param limit
-	 *            the Git object size limit. If zero then there is not limit.
-	 */
-	public void setMaxObjectSizeLimit(long limit) {
-		maxObjectSizeLimit = limit;
-	}
-
-	/**
 	 * Get the number of objects in the stream.
 	 * <p>
 	 * The object count is only available after {@link #parse(ProgressMonitor)}
@@ -506,17 +489,17 @@ public abstract class PackParser {
 				resolveDeltas(resolving);
 				if (entryCount < objectCount) {
 					if (!isAllowThin()) {
-						throw new IOException(MessageFormat.format(
-								JGitText.get().packHasUnresolvedDeltas,
-								Long.valueOf(objectCount - entryCount)));
+						throw new IOException(MessageFormat.format(JGitText
+								.get().packHasUnresolvedDeltas,
+								(objectCount - entryCount)));
 					}
 
 					resolveDeltasWithExternalBases(resolving);
 
 					if (entryCount < objectCount) {
-						throw new IOException(MessageFormat.format(
-								JGitText.get().packHasUnresolvedDeltas,
-								Long.valueOf(objectCount - entryCount)));
+						throw new IOException(MessageFormat.format(JGitText
+								.get().packHasUnresolvedDeltas,
+								(objectCount - entryCount)));
 					}
 				}
 				resolving.endTask();
@@ -573,14 +556,13 @@ public abstract class PackParser {
 			break;
 		default:
 			throw new IOException(MessageFormat.format(
-					JGitText.get().unknownObjectType,
-					Integer.valueOf(info.type)));
+					JGitText.get().unknownObjectType, info.type));
 		}
 
 		if (!checkCRC(oe.getCRC())) {
 			throw new IOException(MessageFormat.format(
-					JGitText.get().corruptionDetectedReReadingAt,
-					Long.valueOf(oe.getOffset())));
+					JGitText.get().corruptionDetectedReReadingAt, oe
+							.getOffset()));
 		}
 
 		resolveDeltas(visit.next(), info.type, info, progress);
@@ -599,20 +581,16 @@ public abstract class PackParser {
 
 			default:
 				throw new IOException(MessageFormat.format(
-						JGitText.get().unknownObjectType,
-						Integer.valueOf(info.type)));
+						JGitText.get().unknownObjectType, info.type));
 			}
 
-			byte[] delta = inflateAndReturn(Source.DATABASE, info.size);
-			checkIfTooLarge(type, BinaryDelta.getResultSize(delta));
-
-			visit.data = BinaryDelta.apply(visit.parent.data, delta);
-			delta = null;
+			visit.data = BinaryDelta.apply(visit.parent.data, //
+					inflateAndReturn(Source.DATABASE, info.size));
 
 			if (!checkCRC(visit.delta.crc))
 				throw new IOException(MessageFormat.format(
 						JGitText.get().corruptionDetectedReReadingAt,
-						Long.valueOf(visit.delta.position)));
+						visit.delta.position));
 
 			objectDigest.update(Constants.encodedTypeString(type));
 			objectDigest.update((byte) ' ');
@@ -633,27 +611,6 @@ public abstract class PackParser {
 			visit.nextChild = firstChildOf(oe);
 			visit = visit.next();
 		} while (visit != null);
-	}
-
-	private final void checkIfTooLarge(int typeCode, long size)
-			throws IOException {
-		if (0 < maxObjectSizeLimit && maxObjectSizeLimit < size)
-			switch (typeCode) {
-			case Constants.OBJ_COMMIT:
-			case Constants.OBJ_TREE:
-			case Constants.OBJ_BLOB:
-			case Constants.OBJ_TAG:
-				throw new TooLargeObjectInPackException(size, maxObjectSizeLimit);
-
-			case Constants.OBJ_OFS_DELTA:
-			case Constants.OBJ_REF_DELTA:
-				throw new TooLargeObjectInPackException(maxObjectSizeLimit);
-
-			default:
-				throw new IOException(MessageFormat.format(
-						JGitText.get().unknownObjectType,
-						Integer.valueOf(typeCode)));
-			}
 	}
 
 	/**
@@ -684,7 +641,7 @@ public abstract class PackParser {
 		while ((c & 0x80) != 0) {
 			c = readFrom(Source.DATABASE);
 			hdrBuf[hdrPtr++] = (byte) c;
-			sz += ((long) (c & 0x7f)) << shift;
+			sz += (c & 0x7f) << shift;
 			shift += 7;
 		}
 		info.size = sz;
@@ -716,8 +673,7 @@ public abstract class PackParser {
 
 		default:
 			throw new IOException(MessageFormat.format(
-					JGitText.get().unknownObjectType,
-					Integer.valueOf(info.type)));
+					JGitText.get().unknownObjectType, info.type));
 		}
 		return info;
 	}
@@ -835,7 +791,7 @@ public abstract class PackParser {
 		final long vers = NB.decodeUInt32(buf, p + 4);
 		if (vers != 2 && vers != 3)
 			throw new IOException(MessageFormat.format(
-					JGitText.get().unsupportedPackVersion, Long.valueOf(vers)));
+					JGitText.get().unsupportedPackVersion, vers));
 		objectCount = NB.decodeUInt32(buf, p + 8);
 		use(hdrln);
 
@@ -896,11 +852,9 @@ public abstract class PackParser {
 		while ((c & 0x80) != 0) {
 			c = readFrom(Source.INPUT);
 			hdrBuf[hdrPtr++] = (byte) c;
-			sz += ((long) (c & 0x7f)) << shift;
+			sz += (c & 0x7f) << shift;
 			shift += 7;
 		}
-
-		checkIfTooLarge(typeCode, sz);
 
 		switch (typeCode) {
 		case Constants.OBJ_COMMIT:
@@ -956,9 +910,8 @@ public abstract class PackParser {
 		}
 
 		default:
-			throw new IOException(
-					MessageFormat.format(JGitText.get().unknownObjectType,
-							Integer.valueOf(typeCode)));
+			throw new IOException(MessageFormat.format(
+					JGitText.get().unknownObjectType, typeCode));
 		}
 	}
 
@@ -1043,8 +996,7 @@ public abstract class PackParser {
 
 			if (info.type != Constants.OBJ_BLOB)
 				throw new IOException(MessageFormat.format(
-						JGitText.get().unknownObjectType,
-						Integer.valueOf(info.type)));
+						JGitText.get().unknownObjectType, info.type));
 
 			ObjectStream cur = readCurs.open(obj, info.type).openStream();
 			try {

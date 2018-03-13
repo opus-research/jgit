@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
- * Copyright (C) 2011-2012, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2011, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -56,7 +56,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 
 import org.eclipse.jgit.api.CheckoutResult.Status;
-import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
@@ -92,7 +91,7 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 		git.add().addFilepattern("Test.txt").call();
 		initialCommit = git.commit().setMessage("Initial commit").call();
 
-		// create a test branch and switch to it
+		// create a master branch and switch to it
 		git.branchCreate().setName("test").call();
 		RefUpdate rup = db.updateRef(Constants.HEAD);
 		rup.link("refs/heads/test");
@@ -104,33 +103,44 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testSimpleCheckout() throws Exception {
-		git.checkout().setName("test").call();
+	public void testSimpleCheckout() {
+		try {
+			git.checkout().setName("test").call();
+		} catch (Exception e) {
+			fail(e.getMessage());
+		}
 	}
 
 	@Test
-	public void testCheckout() throws Exception {
-		git.checkout().setName("test").call();
-		assertEquals("[Test.txt, mode:100644, content:Some change]",
-				indexState(CONTENT));
-		Ref result = git.checkout().setName("master").call();
-		assertEquals("[Test.txt, mode:100644, content:Hello world]",
-				indexState(CONTENT));
-		assertEquals("refs/heads/master", result.getName());
-		assertEquals("refs/heads/master", git.getRepository().getFullBranch());
+	public void testCheckout() {
+		try {
+			git.checkout().setName("test").call();
+			assertEquals("[Test.txt, mode:100644, content:Some change]",
+					indexState(CONTENT));
+			Ref result = git.checkout().setName("master").call();
+			assertEquals("[Test.txt, mode:100644, content:Hello world]",
+					indexState(CONTENT));
+			assertEquals("refs/heads/master", result.getName());
+			assertEquals("refs/heads/master", git.getRepository()
+					.getFullBranch());
+		} catch (Exception e) {
+			fail(e.getMessage());
+		}
 	}
 
 	@Test
-	public void testCreateBranchOnCheckout() throws Exception {
-		git.checkout().setCreateBranch(true).setName("test2").call();
+	public void testCreateBranchOnCheckout() throws IOException {
+		try {
+			git.checkout().setCreateBranch(true).setName("test2").call();
+		} catch (Exception e) {
+			fail(e.getMessage());
+		}
 		assertNotNull(db.getRef("test2"));
-		assertEquals("test2", db.getBranch());
 	}
 
 	@Test
 	public void testCheckoutToNonExistingBranch() throws JGitInternalException,
-			RefAlreadyExistsException, InvalidRefNameException,
-			CheckoutConflictException {
+			RefAlreadyExistsException, InvalidRefNameException {
 		try {
 			git.checkout().setName("badbranch").call();
 			fail("Should have failed");
@@ -190,42 +200,51 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testCheckoutCommit() throws Exception {
-		Ref result = git.checkout().setName(initialCommit.name()).call();
-		assertEquals("[Test.txt, mode:100644, content:Hello world]",
-				indexState(CONTENT));
-		assertNull(result);
-		assertEquals(initialCommit.name(), git.getRepository().getFullBranch());
+	public void testCheckoutCommit() {
+		try {
+			Ref result = git.checkout().setName(initialCommit.name()).call();
+			assertEquals("[Test.txt, mode:100644, content:Hello world]",
+					indexState(CONTENT));
+			assertNull(result);
+			assertEquals(initialCommit.name(), git.getRepository()
+					.getFullBranch());
+		} catch (Exception e) {
+			fail(e.getMessage());
+		}
 	}
 
 	@Test
-	public void testCheckoutRemoteTrackingWithoutLocalBranch() throws Exception {
-		// create second repository
-		Repository db2 = createWorkRepository();
-		Git git2 = new Git(db2);
+	public void testCheckoutRemoteTrackingWithoutLocalBranch() {
+		try {
+			// create second repository
+			Repository db2 = createWorkRepository();
+			Git git2 = new Git(db2);
 
-		// setup the second repository to fetch from the first repository
-		final StoredConfig config = db2.getConfig();
-		RemoteConfig remoteConfig = new RemoteConfig(config, "origin");
-		URIish uri = new URIish(db.getDirectory().toURI().toURL());
-		remoteConfig.addURI(uri);
-		remoteConfig.update(config);
-		config.save();
+			// setup the second repository to fetch from the first repository
+			final StoredConfig config = db2.getConfig();
+			RemoteConfig remoteConfig = new RemoteConfig(config, "origin");
+			URIish uri = new URIish(db.getDirectory().toURI().toURL());
+			remoteConfig.addURI(uri);
+			remoteConfig.update(config);
+			config.save();
 
-		// fetch from first repository
-		RefSpec spec = new RefSpec("+refs/heads/*:refs/remotes/origin/*");
-		git2.fetch().setRemote("origin").setRefSpecs(spec).call();
-		// checkout remote tracking branch in second repository
-		// (no local branches exist yet in second repository)
-		git2.checkout().setName("remotes/origin/test").call();
-		assertEquals("[Test.txt, mode:100644, content:Some change]",
-				indexState(db2, CONTENT));
+			// fetch from first repository
+			RefSpec spec = new RefSpec("+refs/heads/*:refs/remotes/origin/*");
+			git2.fetch().setRemote("origin").setRefSpecs(spec).call();
+			// checkout remote tracking branch in second repository
+			// (no local branches exist yet in second repository)
+			git2.checkout().setName("remotes/origin/test").call();
+			assertEquals("[Test.txt, mode:100644, content:Some change]",
+					indexState(db2, CONTENT));
+		} catch (Exception e) {
+			fail(e.getMessage());
+		}
 	}
 
 	@Test
 	public void testDetachedHeadOnCheckout() throws JGitInternalException,
 			RefAlreadyExistsException, RefNotFoundException,
-			InvalidRefNameException, IOException, CheckoutConflictException {
+			InvalidRefNameException, IOException {
 		CheckoutCommand co = git.checkout();
 		co.setName("master").call();
 
@@ -236,23 +255,5 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 		Ref head = db.getRef(Constants.HEAD);
 		assertFalse(head.isSymbolic());
 		assertSame(head, head.getTarget());
-	}
-
-	@Test
-	public void testCreateBranchOnTagCheckout() throws Exception {
-		git.tag().setName("tag").call();
-
-		writeTrashFile("Test.txt", "not tagged");
-		git.add().addFilepattern("Test.txt").call();
-		git.commit().setMessage("Third commit").call();
-
-		// git checkout -b tag refs/tags/tag
-		git.checkout().setName("tag").setCreateBranch(true)
-				.setStartPoint("refs/tags/tag").call();
-
-		assertNotNull(db.getRef("tag"));
-		assertEquals("tag", db.getBranch());
-		assertEquals("[Test.txt, mode:100644, content:Some change]",
-				indexState(db, CONTENT));
 	}
 }

@@ -60,9 +60,6 @@ public class ConfigConstants {
 	/** The "diff" section */
 	public static final String CONFIG_DIFF_SECTION = "diff";
 
-	/** The "dfs" section */
-	public static final String CONFIG_DFS_SECTION = "dfs";
-
 	/** The "user" section */
 	public static final String CONFIG_USER_SECTION = "user";
 
@@ -71,12 +68,6 @@ public class ConfigConstants {
 
 	/** The "workflow" section */
 	public static final String CONFIG_WORKFLOW_SECTION = "workflow";
-
-	/** The "submodule" section */
-	public static final String CONFIG_SUBMODULE_SECTION = "submodule";
-
-	/** The "pack" section */
-	public static final String CONFIG_PACK_SECTION = "pack";
 
 	/** The "algorithm" key */
 	public static final String CONFIG_KEY_ALGORITHM = "algorithm";
@@ -101,24 +92,6 @@ public class ConfigConstants {
 
 	/** The "worktree" key */
 	public static final String CONFIG_KEY_WORKTREE = "worktree";
-
-	/** The "blockLimit" key */
-	public static final String CONFIG_KEY_BLOCK_LIMIT = "blockLimit";
-
-	/** The "blockSize" key */
-	public static final String CONFIG_KEY_BLOCK_SIZE = "blockSize";
-
-	/** The "readAheadLimit" key */
-	public static final String CONFIG_KEY_READ_AHEAD_LIMIT = "readAheadLimit";
-
-	/** The "readAheadThreads" key */
-	public static final String CONFIG_KEY_READ_AHEAD_THREADS = "readAheadThreads";
-
-	/** The "deltaBaseCacheLimit" key */
-	public static final String CONFIG_KEY_DELTA_BASE_CACHE_LIMIT = "deltaBaseCacheLimit";
-
-	/** The "streamFileThreshold" key */
-	public static final String CONFIG_KEY_STREAM_FILE_TRESHOLD = "streamFileThreshold";
 
 	/** The "remote" key */
 	public static final String CONFIG_KEY_REMOTE = "remote";
@@ -166,16 +139,4 @@ public class ConfigConstants {
 
 	/** The "defaultsourceref" key */
 	public static final String CONFIG_KEY_DEFBRANCHSTARTPOINT = "defbranchstartpoint";
-
-	/** The "path" key */
-	public static final String CONFIG_KEY_PATH = "path";
-
-	/** The "update" key */
-	public static final String CONFIG_KEY_UPDATE = "update";
-
-	/** The "compression" key */
-	public static final String CONFIG_KEY_COMPRESSION = "compression";
-
-	/** The "indexversion" key */
-	public static final String CONFIG_KEY_INDEXVERSION = "indexversion";
 }
