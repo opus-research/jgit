@@ -403,12 +403,10 @@ public class NoteMapTest extends RepositoryTestCase {
 		}
 
 		RevCommit n = commitNoteMap(map);
-		try (TreeWalk tw = new TreeWalk(reader)) {
-			tw.reset(n.getTree());
-			while (tw.next()) {
-				assertFalse("no fan-out subtree", tw.isSubtree());
-			}
-		}
+		TreeWalk tw = new TreeWalk(reader);
+		tw.reset(n.getTree());
+		while (tw.next())
+			assertFalse("no fan-out subtree", tw.isSubtree());
 
 		for (int i = 254; i < 256; i++) {
 			idBuf.setByte(Constants.OBJECT_ID_LENGTH - 1, i);
@@ -420,15 +418,13 @@ public class NoteMapTest extends RepositoryTestCase {
 
 		// The 00 bucket is fully split.
 		String path = fanout(38, idBuf.name());
-		try (TreeWalk tw = TreeWalk.forPath(reader, path, n.getTree())) {
-			assertNotNull("has " + path, tw);
-		}
+		tw = TreeWalk.forPath(reader, path, n.getTree());
+		assertNotNull("has " + path, tw);
 
 		// The other bucket is not.
 		path = fanout(2, data1.name());
-		try (TreeWalk tw = TreeWalk.forPath(reader, path, n.getTree())) {
-			assertNotNull("has " + path, tw);
-		}
+		tw = TreeWalk.forPath(reader, path, n.getTree());
+		assertNotNull("has " + path, tw);
 	}
 
 	@Test

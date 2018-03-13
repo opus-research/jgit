@@ -59,7 +59,6 @@ import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
-import org.eclipse.jgit.dircache.DirCacheCheckout.CheckoutMetadata;
 import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
@@ -69,7 +68,6 @@ import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.CoreConfig.EolStreamType;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
@@ -224,12 +222,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			}
 
 			Ref headRef = repo.getRef(Constants.HEAD);
-			if (headRef == null) {
-				// TODO Git CLI supports checkout from unborn branch, we should
-				// also allow this
-				throw new UnsupportedOperationException(
-						JGitText.get().cannotCheckoutFromUnbornBranch);
-			}
 			String shortHeadRef = getShortBranchName(headRef);
 			String refLogMessage = "checkout: moving from " + shortHeadRef; //$NON-NLS-1$
 			ObjectId branch;
@@ -333,16 +325,9 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	}
 
 	private String getShortBranchName(Ref headRef) {
-		if (headRef.isSymbolic()) {
-			return Repository.shortenRefName(headRef.getTarget().getName());
-		}
-		// Detached HEAD. Every non-symbolic ref in the ref database has an
-		// object id, so this cannot be null.
-		ObjectId id = headRef.getObjectId();
-		if (id == null) {
-			throw new NullPointerException();
-		}
-		return id.getName();
+		if (headRef.getTarget().getName().equals(headRef.getName()))
+			return headRef.getTarget().getObjectId().getName();
+		return Repository.shortenRefName(headRef.getTarget().getName());
 	}
 
 	/**
@@ -397,8 +382,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			RefNotFoundException {
 		DirCache dc = repo.lockDirCache();
 		try (RevWalk revWalk = new RevWalk(repo);
-				TreeWalk treeWalk = new TreeWalk(repo,
-						revWalk.getObjectReader())) {
+				TreeWalk treeWalk = new TreeWalk(revWalk.getObjectReader())) {
 			treeWalk.setRecursive(true);
 			if (!checkoutAllPaths)
 				treeWalk.setFilter(PathFilterGroup.createFromStrings(paths));
@@ -429,23 +413,20 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			if (path.equals(previousPath))
 				continue;
 
-			final EolStreamType eolStreamType = treeWalk.getEolStreamType();
 			editor.add(new PathEdit(path) {
 				public void apply(DirCacheEntry ent) {
 					int stage = ent.getStage();
 					if (stage > DirCacheEntry.STAGE_0) {
 						if (checkoutStage != null) {
 							if (stage == checkoutStage.number)
-								checkoutPath(ent, r, new CheckoutMetadata(
-										eolStreamType, null));
+								checkoutPath(ent, r);
 						} else {
 							UnmergedPathException e = new UnmergedPathException(
 									ent);
 							throw new JGitInternalException(e.getMessage(), e);
 						}
 					} else {
-						checkoutPath(ent, r,
-								new CheckoutMetadata(eolStreamType, null));
+						checkoutPath(ent, r);
 					}
 				}
 			});
@@ -463,24 +444,20 @@ public class CheckoutCommand extends GitCommand<Ref> {
 		while (treeWalk.next()) {
 			final ObjectId blobId = treeWalk.getObjectId(0);
 			final FileMode mode = treeWalk.getFileMode(0);
-			final EolStreamType eolStreamType = treeWalk.getEolStreamType();
 			editor.add(new PathEdit(treeWalk.getPathString()) {
 				public void apply(DirCacheEntry ent) {
 					ent.setObjectId(blobId);
 					ent.setFileMode(mode);
-					checkoutPath(ent, r,
-							new CheckoutMetadata(eolStreamType, null));
+					checkoutPath(ent, r);
 				}
 			});
 		}
 		editor.commit();
 	}
 
-	private void checkoutPath(DirCacheEntry entry, ObjectReader reader,
-			CheckoutMetadata checkoutMetadata) {
+	private void checkoutPath(DirCacheEntry entry, ObjectReader reader) {
 		try {
-			DirCacheCheckout.checkoutEntry(repo, entry, reader, true,
-					checkoutMetadata);
+			DirCacheCheckout.checkoutEntry(repo, entry, reader);
 		} catch (IOException e) {
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().checkoutConflictWithFile,

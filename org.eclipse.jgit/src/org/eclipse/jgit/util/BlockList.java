@@ -74,9 +74,9 @@ public class BlockList<T> extends AbstractList<T> {
 
 	private static final int BLOCK_MASK = BLOCK_SIZE - 1;
 
-	T[][] directory;
+	private T[][] directory;
 
-	int size;
+	private int size;
 
 	private int tailDirIdx;
 
@@ -282,11 +282,11 @@ public class BlockList<T> extends AbstractList<T> {
 		return new MyIterator();
 	}
 
-	static final int toDirectoryIndex(int index) {
+	private static final int toDirectoryIndex(int index) {
 		return index >>> BLOCK_BITS;
 	}
 
-	static final int toBlockIndex(int index) {
+	private static final int toBlockIndex(int index) {
 		return index & BLOCK_MASK;
 	}
 

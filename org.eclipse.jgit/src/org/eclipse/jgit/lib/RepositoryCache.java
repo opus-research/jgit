@@ -207,6 +207,7 @@ public class RepositoryCache {
 	}
 
 	private void registerRepository(final Key location, final Repository db) {
+		db.incrementOpen();
 		SoftReference<Repository> newRef = new SoftReference<Repository>(db);
 		Reference<Repository> oldRef = cacheMap.put(location, newRef);
 		Repository oldDb = oldRef != null ? oldRef.get() : null;

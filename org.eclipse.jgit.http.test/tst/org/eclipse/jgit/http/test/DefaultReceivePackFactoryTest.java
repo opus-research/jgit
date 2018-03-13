@@ -79,7 +79,6 @@ public class DefaultReceivePackFactoryTest extends LocalDiskRepositoryTestCase {
 		factory = new DefaultReceivePackFactory();
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test
 	public void testDisabledSingleton() throws ServiceNotAuthorizedException {
 		factory = (ReceivePackFactory<HttpServletRequest>) ReceivePackFactory.DISABLED;

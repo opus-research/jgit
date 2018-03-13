@@ -286,25 +286,25 @@ class TextHashFunctions extends TextBuiltin {
 			else
 				rb.findGitDir(dir);
 
-			Repository repo = rb.build();
+			Repository db = rb.build();
 			try {
-				run(repo);
+				run(db);
 			} finally {
-				repo.close();
+				db.close();
 			}
 		}
 	}
 
-	private void run(Repository repo) throws Exception {
+	private void run(Repository db) throws Exception {
 		List<Function> all = init();
 
 		long fileCnt = 0;
 		long lineCnt = 0;
-		try (ObjectReader or = repo.newObjectReader();
-			RevWalk rw = new RevWalk(or);
-			TreeWalk tw = new TreeWalk(or)) {
+		try (ObjectReader or = db.newObjectReader()) {
 			final MutableObjectId id = new MutableObjectId();
-			tw.reset(rw.parseTree(repo.resolve(Constants.HEAD)));
+			RevWalk rw = new RevWalk(or);
+			TreeWalk tw = new TreeWalk(or);
+			tw.reset(rw.parseTree(db.resolve(Constants.HEAD)));
 			tw.setRecursive(true);
 
 			while (tw.next()) {
@@ -341,18 +341,17 @@ class TextHashFunctions extends TextBuiltin {
 			}
 		}
 
-		File directory = repo.getDirectory();
-		if (directory != null) {
-			String name = directory.getName();
-			File parent = directory.getParentFile();
+		if (db.getDirectory() != null) {
+			String name = db.getDirectory().getName();
+			File parent = db.getDirectory().getParentFile();
 			if (name.equals(Constants.DOT_GIT) && parent != null)
 				name = parent.getName();
 			outw.println(name + ":"); //$NON-NLS-1$
 		}
-		outw.format("  %6d files; %5d avg. unique lines/file\n", //$NON-NLS-1$
+		outw.format("  %6d files; %5d avg. unique lines/file\n", //
 				valueOf(fileCnt), //
 				valueOf(lineCnt / fileCnt));
-		outw.format("%-20s %-15s %9s\n", "Hash", "Fold", "Max Len"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
+		outw.format("%-20s %-15s %9s\n", "Hash", "Fold", "Max Len");
 		outw.println("-----------------------------------------------"); //$NON-NLS-1$
 		String lastHashName = null;
 		for (Function fun : all) {
@@ -405,9 +404,9 @@ class TextHashFunctions extends TextBuiltin {
 				}
 			}
 		} catch (IllegalArgumentException e) {
-			throw new RuntimeException("Cannot determine names", e); //$NON-NLS-1$
+			throw new RuntimeException("Cannot determine names", e);
 		} catch (IllegalAccessException e) {
-			throw new RuntimeException("Cannot determine names", e); //$NON-NLS-1$
+			throw new RuntimeException("Cannot determine names", e);
 		}
 
 		List<Function> all = new ArrayList<Function>();

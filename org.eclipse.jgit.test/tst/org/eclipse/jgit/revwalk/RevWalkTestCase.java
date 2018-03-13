@@ -70,8 +70,8 @@ public abstract class RevWalkTestCase extends RepositoryTestCase {
 		return new RevWalk(db);
 	}
 
-	protected Date getDate() {
-		return util.getDate();
+	protected Date getClock() {
+		return util.getClock();
 	}
 
 	protected void tick(final int secDelta) {
