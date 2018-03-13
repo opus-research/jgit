@@ -57,7 +57,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.gitrepo.RepoProject.CopyFile;
 import org.eclipse.jgit.gitrepo.internal.RepoText;
@@ -132,8 +131,8 @@ public class ManifestParser extends DefaultHandler {
 			lastIndex--;
 		this.baseUrl = baseUrl.substring(0, lastIndex + 1);
 
-		plusGroups = new HashSet<>();
-		minusGroups = new HashSet<>();
+		plusGroups = new HashSet<String>();
+		minusGroups = new HashSet<String>();
 		if (groups == null || groups.length() == 0
 				|| groups.equals("default")) { //$NON-NLS-1$
 			// default means "all,-notdefault"
@@ -147,9 +146,9 @@ public class ManifestParser extends DefaultHandler {
 			}
 		}
 
-		remotes = new HashMap<>();
-		projects = new ArrayList<>();
-		filteredProjects = new ArrayList<>();
+		remotes = new HashMap<String, Remote>();
+		projects = new ArrayList<RepoProject>();
+		filteredProjects = new ArrayList<RepoProject>();
 	}
 
 	/**
@@ -216,13 +215,10 @@ public class ManifestParser extends DefaultHandler {
 						attributes.getValue("dest"))); //$NON-NLS-1$
 		} else if ("include".equals(qName)) { //$NON-NLS-1$
 			String name = attributes.getValue("name"); //$NON-NLS-1$
+			InputStream is = null;
 			if (includedReader != null) {
-				try (InputStream is = includedReader.readIncludeFile(name)) {
-					if (is == null) {
-						throw new SAXException(
-								RepoText.get().errorIncludeNotImplemented);
-					}
-					read(is);
+				try {
+					is = includedReader.readIncludeFile(name);
 				} catch (Exception e) {
 					throw new SAXException(MessageFormat.format(
 							RepoText.get().errorIncludeFile, name), e);
@@ -230,12 +226,21 @@ public class ManifestParser extends DefaultHandler {
 			} else if (filename != null) {
 				int index = filename.lastIndexOf('/');
 				String path = filename.substring(0, index + 1) + name;
-				try (InputStream is = new FileInputStream(path)) {
-					read(is);
+				try {
+					is = new FileInputStream(path);
 				} catch (IOException e) {
 					throw new SAXException(MessageFormat.format(
 							RepoText.get().errorIncludeFile, path), e);
 				}
+			}
+			if (is == null) {
+				throw new SAXException(
+						RepoText.get().errorIncludeNotImplemented);
+			}
+			try {
+				read(is);
+			} catch (IOException e) {
+				throw new SAXException(e);
 			}
 		}
 	}
@@ -258,7 +263,7 @@ public class ManifestParser extends DefaultHandler {
 			return;
 
 		// Only do the following after we finished reading everything.
-		Map<String, String> remoteUrls = new HashMap<>();
+		Map<String, String> remoteUrls = new HashMap<String, String>();
 		URI baseUri;
 		try {
 			baseUri = new URI(baseUrl);
@@ -325,7 +330,7 @@ public class ManifestParser extends DefaultHandler {
 	 *
 	 * @return filtered projects list reference, never null
 	 */
-	public @NonNull List<RepoProject> getFilteredProjects() {
+	public List<RepoProject> getFilteredProjects() {
 		return filteredProjects;
 	}
 

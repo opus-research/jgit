@@ -68,12 +68,10 @@ public abstract class BatchingProgressMonitor implements ProgressMonitor {
 		delayStartUnit = unit;
 	}
 
-	@Override
 	public void start(int totalTasks) {
 		// Ignore the number of tasks.
 	}
 
-	@Override
 	public void beginTask(String title, int work) {
 		endTask();
 		task = new Task(title, work);
@@ -81,13 +79,11 @@ public abstract class BatchingProgressMonitor implements ProgressMonitor {
 			task.delay(delayStartTime, delayStartUnit);
 	}
 
-	@Override
 	public void update(int completed) {
 		if (task != null)
 			task.update(this, completed);
 	}
 
-	@Override
 	public void endTask() {
 		if (task != null) {
 			task.end(this);
@@ -95,7 +91,6 @@ public abstract class BatchingProgressMonitor implements ProgressMonitor {
 		}
 	}
 
-	@Override
 	public boolean isCancelled() {
 		return false;
 	}
@@ -183,7 +178,6 @@ public abstract class BatchingProgressMonitor implements ProgressMonitor {
 			timerFuture = WorkQueue.getExecutor().schedule(this, time, unit);
 		}
 
-		@Override
 		public void run() {
 			display = true;
 		}
