@@ -50,7 +50,7 @@
   <parent>
     <groupId>org.eclipse.jgit</groupId>
     <artifactId>org.eclipse.jgit-parent</artifactId>
-    <version>3.0.3.201309161630-r</version>
+    <version>3.1.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>org.eclipse.jgit.pgm</artifactId>
@@ -74,6 +74,12 @@
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-compress</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.eclipse.jgit</groupId>
+      <artifactId>org.eclipse.jgit.archive</artifactId>
+      <version>${project.version}</version>
     </dependency>
 
     <dependency>
