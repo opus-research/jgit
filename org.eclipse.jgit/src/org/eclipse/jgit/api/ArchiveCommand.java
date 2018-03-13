@@ -111,6 +111,7 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	 *		for (...) {
 	 *			format.putEntry(out, path, mode, repo.open(objectId));
 	 *		}
+	 *	} finally {
 	 *		out.close();
 	 *	}
 	 *
@@ -286,9 +287,8 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 					walk.getObjectId(idBuf, 0);
 					fmt.putEntry(outa, name, mode, reader.open(idBuf));
 				}
-				outa.close();
 			} finally {
-				out.close();
+				outa.close();
 			}
 			return out;
 		} catch (IOException e) {
