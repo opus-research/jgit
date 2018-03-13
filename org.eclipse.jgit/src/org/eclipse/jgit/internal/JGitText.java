@@ -358,6 +358,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String flagsAlreadyCreated;
 	/***/ public String funnyRefname;
 	/***/ public String gcFailed;
+	/***/ public String gcLogExists;
 	/***/ public String gitmodulesNotFound;
 	/***/ public String headRequiredToStash;
 	/***/ public String hoursAgo;
@@ -669,6 +670,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String theFactoryMustNotBeNull;
 	/***/ public String timeIsUncertain;
 	/***/ public String timerAlreadyTerminated;
+	/***/ public String tooManyCommands;
 	/***/ public String tooManyIncludeRecursions;
 	/***/ public String topologicalSortRequired;
 	/***/ public String transportExceptionBadRef;
