@@ -40,85 +40,53 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs;
+package org.eclipse.jgit.util;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-
-import org.eclipse.jgit.lfs.lib.LongObjectId;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 /**
- * Helper class for dealing with LFS issues
+ * An abstraction for JGits builtin implementations for hooks and filters.
+ * Instead of spawning an external processes to start a filter/hook and to pump
+ * data from/to stdin/stdout these builtin coammnds may be used. They are
+ * constructed by {@link FilterCommandFactory}.
  *
  * @since 4.5
  */
-public class LfsUtil {
-	private Path root;
-
-	private Path objDir;
-
-	private Path tmpDir;
+public abstract class FilterCommand {
+	/**
+	 * The {@link InputStream} this command should read from
+	 */
+	protected InputStream in;
 
 	/**
-	 * @param root
-	 *            the path to the LFS directory. Most of the times this will be
-	 *            "<repo>/.git/lfs"
+	 * The {@link OutputStream} this command should write to
 	 */
-	public LfsUtil(Path root) {
-		this.root = root;
+	protected OutputStream out;
+
+	/**
+	 * @param in
+	 * @param out
+	 */
+	public FilterCommand(InputStream in, OutputStream out) {
+		this.in = in;
+		this.out = out;
 	}
 
 	/**
-	 * @return the path to the LFS directory
-	 */
-	public Path getLfsRoot() {
-		return root;
-	}
-
-	/**
-	 * @return the path to the temp directory used by LFS. Most of the times
-	 *         this will be "<repo>/.git/lfs/tmp"
-	 */
-	public Path getLfsTmpDir() {
-		if (tmpDir == null) {
-			tmpDir = root.resolve("tmp");
-		}
-		return tmpDir;
-	}
-
-	/**
-	 * @return the path to the object directory used by LFS. Most of the times
-	 *         this will be "<repo>/.git/lfs/objects"
-	 */
-	public Path getLfsObjDir() {
-		if (objDir == null) {
-			objDir = root.resolve("objects");
-		}
-		return objDir;
-	}
-
-	/**
-	 * @param id
-	 *            the id of the mediafile
-	 * @return the file which stores the original content. This will be files
-	 *         underneath
-	 *         "<repo>/.git/lfs/objects/<firstTwoLettersOfID>/<remainingLettersOfID>"
-	 */
-	public Path getMediaFile(LongObjectId id) {
-		String idStr = LongObjectId.toString(id);
-		return getLfsObjDir().resolve(idStr.substring(0, 2))
-				.resolve(idStr.substring(2));
-	}
-
-	/**
-	 * Create a new temp file in the LFS directory
+	 * Execute the command. The command is supposed to read data from
+	 * {@link #in} and to write the result to {@link #out}. It returns the
+	 * number of bytes it read from {@link #in}. It should be called in a loop
+	 * until it returns -1 signaling that the {@link InputStream} is completely
+	 * processed.
 	 *
-	 * @return a new temporary file in the lfs directory
+	 * @return the number of bytes read from the {@link InputStream} or -1. -1
+	 *         means that the {@link InputStream} is completely processed.
 	 * @throws IOException
+	 *             when {@link IOException} occured while reading from
+	 *             {@link #in} or writing to {@link #out}
+	 *
 	 */
-	public Path getTmpFile() throws IOException {
-		return Files.createTempFile(getLfsTmpDir(), null, null);
-	}
-
+	public abstract int run() throws IOException;
 }
