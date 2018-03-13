@@ -56,9 +56,7 @@ import org.apache.commons.compress.archivers.zip.ZipArchiveOutputStream;
 import org.eclipse.jgit.api.ArchiveCommand;
 import org.eclipse.jgit.archive.internal.ArchiveText;
 import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
-import org.eclipse.jgit.revwalk.RevCommit;
 
 /**
  * PKWARE's ZIP format.
@@ -82,17 +80,8 @@ public final class ZipFormat extends BaseFormat implements
 		return applyFormatOptions(new ZipArchiveOutputStream(s), o);
 	}
 
-	/**
-	 * @deprecated
-	 */
 	public void putEntry(ArchiveOutputStream out,
 			String path, FileMode mode, ObjectLoader loader)
-			throws IOException {
-		putEntry(out, null, path, mode,loader);
-	}
-
-	public void putEntry(ArchiveOutputStream out,
-			ObjectId tree, String path, FileMode mode, ObjectLoader loader)
 			throws IOException {
 		// ZipArchiveEntry detects directories by checking
 		// for '/' at the end of the filename.
@@ -103,12 +92,6 @@ public final class ZipFormat extends BaseFormat implements
 			path = path + "/"; //$NON-NLS-1$
 
 		final ZipArchiveEntry entry = new ZipArchiveEntry(path);
-
-		if(tree instanceof RevCommit){
-			long commitTime = ((RevCommit) tree).getCommitTime();
-			entry.setTime(commitTime);
-		}
-
 		if (mode == FileMode.TREE) {
 			out.putArchiveEntry(entry);
 			out.closeArchiveEntry();
@@ -125,7 +108,6 @@ public final class ZipFormat extends BaseFormat implements
 			throw new IllegalArgumentException(MessageFormat.format(
 					ArchiveText.get().unsupportedMode, mode));
 		}
-
 		entry.setSize(loader.getSize());
 		out.putArchiveEntry(entry);
 		loader.copyTo(out);
