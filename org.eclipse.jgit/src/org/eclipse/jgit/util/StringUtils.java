@@ -121,28 +121,6 @@ public final class StringUtils {
 	}
 
 	/**
-	 * Parse a string as a standard Git boolean value. See
-	 * {@link #toBooleanOrNull(String)}.
-	 *
-	 * @param stringValue
-	 *            the string to parse.
-	 * @return the boolean interpretation of {@code value}.
-	 * @throws IllegalArgumentException
-	 *             if {@code value} is not recognized as one of the standard
-	 *             boolean names.
-	 */
-	public static boolean toBoolean(final String stringValue) {
-		if (stringValue == null)
-			throw new NullPointerException(JGitText.get().expectedBooleanStringValue);
-
-		final Boolean bool = toBooleanOrNull(stringValue);
-		if (bool == null)
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().notABoolean, stringValue));
-
-		return bool.booleanValue();
-	}
-
-	/**
 	 * Parse a string as a standard Git boolean value.
 	 * <p>
 	 * The terms {@code yes}, {@code true}, {@code 1}, {@code on} can all be
@@ -155,25 +133,30 @@ public final class StringUtils {
 	 *
 	 * @param stringValue
 	 *            the string to parse.
-	 * @return the boolean interpretation of {@code value} or null in case the
-	 *         string does not represent a boolean value
+	 * @return the boolean interpretation of {@code value}.
+	 * @throws IllegalArgumentException
+	 *             if {@code value} is not recognized as one of the standard
+	 *             boolean names.
 	 */
-	public static Boolean toBooleanOrNull(final String stringValue) {
+	public static boolean toBoolean(final String stringValue) {
 		if (stringValue == null)
-			return null;
+			throw new NullPointerException(JGitText.get().expectedBooleanStringValue);
 
 		if (equalsIgnoreCase("yes", stringValue)
 				|| equalsIgnoreCase("true", stringValue)
 				|| equalsIgnoreCase("1", stringValue)
-				|| equalsIgnoreCase("on", stringValue))
-			return Boolean.TRUE;
-		else if (equalsIgnoreCase("no", stringValue)
+				|| equalsIgnoreCase("on", stringValue)) {
+			return true;
+
+		} else if (equalsIgnoreCase("no", stringValue)
 				|| equalsIgnoreCase("false", stringValue)
 				|| equalsIgnoreCase("0", stringValue)
-				|| equalsIgnoreCase("off", stringValue))
-			return Boolean.FALSE;
-		else
-			return null;
+				|| equalsIgnoreCase("off", stringValue)) {
+			return false;
+
+		} else {
+			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().notABoolean, stringValue));
+		}
 	}
 
 	/**

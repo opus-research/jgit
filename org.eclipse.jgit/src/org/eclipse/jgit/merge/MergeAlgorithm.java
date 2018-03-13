@@ -47,37 +47,24 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import org.eclipse.jgit.diff.DiffAlgorithm;
 import org.eclipse.jgit.diff.Edit;
 import org.eclipse.jgit.diff.EditList;
-import org.eclipse.jgit.diff.HistogramDiff;
+import org.eclipse.jgit.diff.MyersDiff;
 import org.eclipse.jgit.diff.Sequence;
 import org.eclipse.jgit.diff.SequenceComparator;
 import org.eclipse.jgit.merge.MergeChunk.ConflictState;
 
 /**
  * Provides the merge algorithm which does a three-way merge on content provided
- * as RawText. By default {@link HistogramDiff} is used as diff algorithm.
+ * as RawText. Makes use of {@link MyersDiff} to compute the diffs.
  */
 public final class MergeAlgorithm {
-	private final DiffAlgorithm diffAlg;
 
 	/**
-	 * Creates a new MergeAlgorithm which uses {@link HistogramDiff} as diff
-	 * algorithm
+	 * Since this class provides only static methods I add a private default
+	 * constructor to prevent instantiation.
 	 */
-	public MergeAlgorithm() {
-		this(new HistogramDiff());
-	}
-
-	/**
-	 * Creates a new MergeAlgorithm
-	 *
-	 * @param diff
-	 *            the diff algorithm used by this merge
-	 */
-	public MergeAlgorithm(DiffAlgorithm diff) {
-		this.diffAlg = diff;
+	private MergeAlgorithm() {
 	}
 
 	// An special edit which acts as a sentinel value by marking the end the
@@ -96,16 +83,16 @@ public final class MergeAlgorithm {
 	 * @param theirs the second sequence to be merged
 	 * @return the resulting content
 	 */
-	public <S extends Sequence> MergeResult<S> merge(
+	public static <S extends Sequence> MergeResult<S> merge(
 			SequenceComparator<S> cmp, S base, S ours, S theirs) {
 		List<S> sequences = new ArrayList<S>(3);
 		sequences.add(base);
 		sequences.add(ours);
 		sequences.add(theirs);
-		MergeResult<S> result = new MergeResult<S>(sequences);
-		EditList oursEdits = diffAlg.diff(cmp, base, ours);
+		MergeResult result = new MergeResult<S>(sequences);
+		EditList oursEdits = MyersDiff.INSTANCE.diff(cmp, base, ours);
 		Iterator<Edit> baseToOurs = oursEdits.iterator();
-		EditList theirsEdits = diffAlg.diff(cmp, base, theirs);
+		EditList theirsEdits = MyersDiff.INSTANCE.diff(cmp, base, theirs);
 		Iterator<Edit> baseToTheirs = theirsEdits.iterator();
 		int current = 0; // points to the next line (first line is 0) of base
 		                 // which was not handled yet
