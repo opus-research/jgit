@@ -45,12 +45,9 @@ package org.eclipse.jgit.util;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.DirectoryNotEmptyException;
-import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributeView;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
@@ -58,7 +55,6 @@ import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFileAttributes;
 import java.nio.file.attribute.PosixFilePermission;
 import java.text.Normalizer;
-import java.text.Normalizer.Form;
 
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.util.FS.Attributes;
@@ -67,81 +63,6 @@ import org.eclipse.jgit.util.FS.Attributes;
  * File utilities using Java 7 NIO2
  */
 public class FileUtil {
-
-	/**
-	 * @param path
-	 * @return target path of the symlink
-	 * @throws IOException
-	 */
-	public static String readSymlink(File path) throws IOException {
-		Path nioPath = path.toPath();
-		Path target = Files.readSymbolicLink(nioPath);
-		String targetString = target.toString();
-		if (SystemReader.getInstance().isWindows())
-			targetString = targetString.replace('\\', '/');
-		else if (SystemReader.getInstance().isMacOS())
-			targetString = Normalizer.normalize(targetString, Form.NFC);
-		return targetString;
-	}
-
-	/**
-	 * @param path
-	 *            path of the symlink to be created
-	 * @param target
-	 *            target of the symlink to be created
-	 * @throws IOException
-	 */
-	public static void createSymLink(File path, String target)
-			throws IOException {
-		Path nioPath = path.toPath();
-		delete(nioPath, true);
-		if (SystemReader.getInstance().isWindows()) {
-			target = target.replace('/', '\\');
-		}
-		Path nioTarget = new File(target).toPath();
-		Files.createSymbolicLink(nioPath, nioTarget);
-	}
-
-	/**
-	 * Deletes the given path, independently if the path is corresponding to the
-	 * file or directory. If the path corresponds to the non empty directory,
-	 * and the 'recursive' flag is not specified, the method will throw an
-	 * exception.
-	 *
-	 * @param path
-	 * @param recursive
-	 * @throws IOException
-	 * @since 4.1
-	 */
-	public static void delete(final Path path, boolean recursive)
-			throws IOException {
-		if (!Files.exists(path, LinkOption.NOFOLLOW_LINKS)) {
-			return;
-		}
-		try {
-			Files.delete(path);
-		} catch (DirectoryNotEmptyException e) {
-			if (!recursive) {
-				throw e;
-			}
-			// delete children in the directory
-			Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
-				@Override
-				public FileVisitResult visitFile(Path file,
-						BasicFileAttributes attrs) throws IOException {
-					Files.delete(file);
-					return FileVisitResult.CONTINUE;
-				}
-
-				@Override
-				public FileVisitResult postVisitDirectory(Path dir,
-						IOException exc) throws IOException {
-					Files.delete(dir);
-					return FileVisitResult.CONTINUE;
-				}
-			});
-		}
-	}
 
 	/**
 	 * @param path
@@ -242,15 +163,6 @@ public class FileUtil {
 		if (!isFile(path))
 			return false;
 		return path.canExecute();
-	}
-
-	/**
-	 * @param path
-	 * @throws IOException
-	 */
-	public static void delete(File path) throws IOException {
-		Path nioPath = path.toPath();
-		Files.delete(nioPath);
 	}
 
 	static Attributes getFileAttributesBasic(FS fs, File path) {

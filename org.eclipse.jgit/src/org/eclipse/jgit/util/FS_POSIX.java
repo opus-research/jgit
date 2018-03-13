@@ -261,11 +261,6 @@ public class FS_POSIX extends FS {
 	}
 
 	@Override
-	public void delete(File path) throws IOException {
-		FileUtil.delete(path);
-	}
-
-	@Override
 	public long length(File f) throws IOException {
 		return FileUtil.getLength(f);
 	}
@@ -293,16 +288,6 @@ public class FS_POSIX extends FS {
 	@Override
 	public void setHidden(File path, boolean hidden) throws IOException {
 		// no action on POSIX
-	}
-
-	@Override
-	public String readSymLink(File path) throws IOException {
-		return FileUtil.readSymlink(path);
-	}
-
-	@Override
-	public void createSymLink(File path, String target) throws IOException {
-		FileUtil.createSymLink(path, target);
 	}
 
 	/**
