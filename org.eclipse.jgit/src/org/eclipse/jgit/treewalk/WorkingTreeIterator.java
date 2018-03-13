@@ -62,7 +62,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 
-import org.eclipse.jgit.api.errors.FilterFailedException;
 import org.eclipse.jgit.attributes.AttributesNode;
 import org.eclipse.jgit.attributes.AttributesRule;
 import org.eclipse.jgit.diff.RawText;
@@ -79,7 +78,6 @@ import org.eclipse.jgit.internal.storage.file.GlobalAttributesNode;
 import org.eclipse.jgit.internal.storage.file.InfoAttributesNode;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig;
-import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
 import org.eclipse.jgit.lib.CoreConfig.CheckStat;
 import org.eclipse.jgit.lib.CoreConfig.SymLinks;
 import org.eclipse.jgit.lib.FileMode;
@@ -89,7 +87,6 @@ import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.submodule.SubmoduleWalk;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FS.ExecutionResult;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.io.EolCanonicalizingInputStream;
@@ -106,8 +103,6 @@ import org.eclipse.jgit.util.io.EolCanonicalizingInputStream;
  * @see FileTreeIterator
  */
 public abstract class WorkingTreeIterator extends AbstractTreeIterator {
-	private static final int MAX_EXCEPTION_TEXT_SIZE = 10 * 1024;
-
 	/** An empty entry array, suitable for {@link #init(Entry[])}. */
 	protected static final Entry[] EOF = {};
 
@@ -143,8 +138,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 	/** If there is a .gitattributes file present, the parsed rules from it. */
 	private AttributesNode attributesNode;
-
-	private String cleanFilterCommand;
 
 	/** Repository that is the root level being iterated over */
 	protected Repository repository;
@@ -213,7 +206,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		state = p.state;
 		infoAttributesNode = p.infoAttributesNode;
 		globalAttributesNode = p.globalAttributesNode;
-		repository = p.repository;
 	}
 
 	/**
@@ -380,8 +372,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 	private InputStream possiblyFilteredInputStream(final Entry e,
 			final InputStream is, final long len) throws IOException {
-		boolean mightNeedCleaning = mightNeedCleaning();
-		if (!mightNeedCleaning) {
+		if (!mightNeedCleaning()) {
 			canonLen = len;
 			return is;
 		}
@@ -399,8 +390,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			return new ByteArrayInputStream(raw, 0, n);
 		}
 
-		// @TODO: fix autocrlf causing mightneedcleaning
-		if (!mightNeedCleaning && isBinary(e)) {
+		if (isBinary(e)) {
 			canonLen = len;
 			return is;
 		}
@@ -424,12 +414,10 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private boolean mightNeedCleaning() throws IOException {
+	private boolean mightNeedCleaning() {
 		switch (getOptions().getAutoCRLF()) {
 		case FALSE:
 		default:
-			if (getCleanFilterCommand() != null)
-				return true;
 			return false;
 
 		case TRUE:
@@ -451,7 +439,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private ByteBuffer filterClean(byte[] src, int n) throws IOException {
+	private static ByteBuffer filterClean(byte[] src, int n)
+			throws IOException {
 		InputStream in = new ByteArrayInputStream(src);
 		try {
 			return IO.readWholeStream(filterClean(in), n);
@@ -460,40 +449,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private InputStream filterClean(InputStream in) throws IOException {
-		in = handleAutoCRLF(in);
-		String filterCommand = getCleanFilterCommand();
-		if (filterCommand != null) {
-			FS fs = repository.getFS();
-			ProcessBuilder filterProcessBuilder = fs.runInShell(filterCommand,
-					new String[0]);
-
-			ExecutionResult result;
-			try {
-				result = fs.execute(filterProcessBuilder, in);
-			} catch (IOException | InterruptedException e) {
-				throw new IOException(new FilterFailedException(e,
-						filterCommand, getEntryPathString()));
-			}
-			int rc = result.getRc();
-			if (rc != 0) {
-				throw new IOException(new FilterFailedException(rc,
-						filterCommand, getEntryPathString(),
-						result.getStdout().toByteArray(MAX_EXCEPTION_TEXT_SIZE),
-						RawParseUtils.decode(result.getStderr()
-								.toByteArray(MAX_EXCEPTION_TEXT_SIZE))));
-			}
-			return result.getStdout().openInputStream();
-		}
-		return in;
-	}
-
-	private InputStream handleAutoCRLF(InputStream in) {
-		AutoCRLF autoCRLF = getOptions().getAutoCRLF();
-		if (autoCRLF == AutoCRLF.TRUE || autoCRLF == AutoCRLF.INPUT) {
-			in = new EolCanonicalizingInputStream(in, true);
-		}
-		return in;
+	private static InputStream filterClean(InputStream in) {
+		return new EolCanonicalizingInputStream(in, true);
 	}
 
 	/**
@@ -552,7 +509,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		System.arraycopy(e.encodedName, 0, path, pathOffset, nameLen);
 		pathLen = pathOffset + nameLen;
 		canonLen = -1;
-		cleanFilterCommand = null;
 	}
 
 	/**
@@ -1373,19 +1329,5 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				contentReadBuffer = new byte[BUFFER_SIZE];
 			}
 		}
-	}
-
-	/**
-	 * @return the clean filter command for the current entry or
-	 *         <code>null</code> if no such command is defined
-	 * @throws IOException
-	 * @since 4.2
-	 */
-	public String getCleanFilterCommand() throws IOException {
-		if (cleanFilterCommand == null && state.walk != null) {
-			cleanFilterCommand = state.walk
-					.getFilterCommand(Constants.ATTR_FILTER_TYPE_CLEAN);
-		}
-		return cleanFilterCommand;
 	}
 }

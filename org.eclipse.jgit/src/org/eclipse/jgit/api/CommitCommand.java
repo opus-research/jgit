@@ -332,9 +332,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 			treeWalk.setOperationType(OperationType.CHECKIN_OP);
 			int dcIdx = treeWalk
 					.addTree(new DirCacheBuildIterator(existingBuilder));
-			FileTreeIterator fti = new FileTreeIterator(repo);
-			fti.setDirCacheIterator(treeWalk, 0);
-			int fIdx = treeWalk.addTree(fti);
+			int fIdx = treeWalk.addTree(new FileTreeIterator(repo));
 			int hIdx = -1;
 			if (headId != null)
 				hIdx = treeWalk.addTree(rw.parseTree(headId));
