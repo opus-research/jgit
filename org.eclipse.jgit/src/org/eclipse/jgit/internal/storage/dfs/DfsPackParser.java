@@ -155,7 +155,7 @@ public class DfsPackParser extends PackParser {
 			objdb.commitPack(Collections.singletonList(packDsc), null);
 			rollback = false;
 
-			DfsPackFile p = new DfsPackFile(blockCache, packDsc);
+			DfsPackFile p = blockCache.getOrCreate(packDsc, packKey);
 			p.setBlockSize(blockSize);
 			if (packIndex != null)
 				p.setPackIndex(packIndex);
@@ -206,9 +206,9 @@ public class DfsPackParser extends PackParser {
 		}
 
 		packDsc = objdb.newPack(DfsObjDatabase.PackSource.RECEIVE);
-		out = objdb.writeFile(packDsc, PACK);
-		packKey = packDsc.getStreamKey(PACK);
+		packKey = new DfsStreamKey();
 
+		out = objdb.writeFile(packDsc, PACK);
 		int size = out.blockSize();
 		if (size <= 0)
 			size = blockCache.getBlockSize();
