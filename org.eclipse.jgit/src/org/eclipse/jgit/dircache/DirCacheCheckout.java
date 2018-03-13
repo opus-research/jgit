@@ -274,9 +274,8 @@ public class DirCacheCheckout {
 			WorkingTreeIterator f) {
 		if (m != null) {
 			if (i == null || f == null || !m.idEqual(i)
-					|| (i.getDirCacheEntry() != null && f.isModified(i
-							.getDirCacheEntry(), true, config_filemode(), repo
-							.getFS()))) {
+					|| f.isModified(i.getDirCacheEntry(), true,
+							config_filemode(), repo.getFS())) {
 				update(m.getEntryPathString(), m.getEntryObjectId(),
 						m.getEntryFileMode());
 			} else
