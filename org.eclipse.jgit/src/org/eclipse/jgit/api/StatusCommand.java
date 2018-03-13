@@ -69,7 +69,6 @@ public class StatusCommand extends GitCommand<Status> {
 	 */
 	protected StatusCommand(Repository repo) {
 		super(repo);
-		// TODO Auto-generated constructor stub
 	}
 
 	/**
@@ -96,8 +95,11 @@ public class StatusCommand extends GitCommand<Status> {
 	 * method is not called a standard {@link FileTreeIterator} is used.
 	 *
 	 * @param workingTreeIt
+	 *            a working tree iterator
+	 * @return {@code this}
 	 */
-	public void setWorkingTreeIt(WorkingTreeIterator workingTreeIt) {
+	public StatusCommand setWorkingTreeIt(WorkingTreeIterator workingTreeIt) {
 		this.workingTreeIt = workingTreeIt;
+		return this;
 	}
 }

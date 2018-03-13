@@ -178,6 +178,7 @@ public class BlameGenerator {
 		SEEN = revPool.newFlag("SEEN");
 		reader = revPool.getObjectReader();
 		treeWalk = new TreeWalk(reader);
+		treeWalk.setRecursive(true);
 	}
 
 	/** @return repository being scanned for revision history. */
@@ -945,6 +946,7 @@ public class BlameGenerator {
 
 		treeWalk.setFilter(TreeFilter.ANY_DIFF);
 		treeWalk.reset(parent.getTree(), commit.getTree());
+		renameDetector.reset();
 		renameDetector.addAll(DiffEntry.scan(treeWalk));
 		for (DiffEntry ent : renameDetector.compute()) {
 			if (isRename(ent) && ent.getNewPath().equals(path.getPath()))
