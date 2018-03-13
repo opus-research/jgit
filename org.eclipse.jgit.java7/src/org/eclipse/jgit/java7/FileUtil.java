@@ -62,7 +62,7 @@ class FileUtil {
 
 	public static void setHidden(File path, boolean hidden) throws IOException {
 		Path nioPath = path.toPath();
-		Files.setAttribute(nioPath, "dos:hidden", Boolean.valueOf(hidden),
+		Files.setAttribute(nioPath, "dos:hidden", Boolean.valueOf(hidden), //$NON-NLS-1$
 				LinkOption.NOFOLLOW_LINKS);
 	}
 
