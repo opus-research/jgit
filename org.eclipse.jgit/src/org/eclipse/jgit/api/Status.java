@@ -138,13 +138,6 @@ public class Status {
 	}
 
 	/**
-	 * @return set of directories that are not ignored, and not in the index.
-	 */
-	public Set<String> getUntrackedFolders() {
-		return Collections.unmodifiableSet(diff.getUntrackedFolders());
-	}
-
-	/**
 	 * @return list of files that are in conflict. (e.g what you get if you
 	 *         modify file that was modified by someone else in the meantime)
 	 */
