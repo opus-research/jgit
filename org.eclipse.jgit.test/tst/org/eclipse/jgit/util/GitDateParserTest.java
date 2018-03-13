@@ -50,7 +50,6 @@ import java.util.Date;
 import java.util.GregorianCalendar;
 
 import org.eclipse.jgit.junit.MockSystemReader;
-import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -60,11 +59,6 @@ public class GitDateParserTest {
 	public void setUp() {
 		MockSystemReader mockSystemReader = new MockSystemReader();
 		SystemReader.setInstance(mockSystemReader);
-	}
-
-	@After
-	public void tearDown() {
-		SystemReader.setInstance(null);
 	}
 
 	@Test
