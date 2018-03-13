@@ -15,6 +15,7 @@ for t in TESTS:
       '//lib:hamcrest-library',
       '//lib:junit',
     ],
+    source_under_test = ['//org.eclipse.jgit.lfs:jgit-lfs'],
   )
 
 java_library(

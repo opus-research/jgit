@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2014 Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2016, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2015, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,83 +41,76 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.transport.http.apache;
+package org.eclipse.jgit.lfs;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-
-import org.apache.http.HttpEntity;
-import org.apache.http.entity.AbstractHttpEntity;
-import org.eclipse.jgit.util.TemporaryBuffer;
+import java.util.List;
+import java.util.Map;
 
 /**
- * A {@link HttpEntity} which takes it's content from a {@link TemporaryBuffer}
+ * This interface describes the network protocol used between lfs client and lfs
+ * server
  *
- * @since 3.3
+ * @since 4.6
  */
-public class TemporaryBufferEntity extends AbstractHttpEntity
-		implements AutoCloseable {
-	private TemporaryBuffer buffer;
+public interface Protocol {
+	/** A request sent to an LFS server */
+	class Request {
+		/** The operation of this request */
+		public String operation;
 
-	private Integer contentLength;
+		/** The objects of this request */
+		public List<ObjectSpec> objects;
+	}
 
-	/**
-	 * Construct a new {@link HttpEntity} which will contain the content stored
-	 * in the specified buffer
-	 *
-	 * @param buffer
-	 */
-	public TemporaryBufferEntity(TemporaryBuffer buffer) {
-		this.buffer = buffer;
+	/** A response received from an LFS server */
+	class Response {
+		public List<ObjectInfo> objects;
 	}
 
 	/**
-	 * @return buffer containing the content
+	 * MetaData of an LFS object. Needs to be specified when requesting objects
+	 * from the LFS server and is also returned in the response
 	 */
-	public TemporaryBuffer getBuffer() {
-		return buffer;
-	}
+	class ObjectSpec {
+		public String oid; // the objectid
 
-	public boolean isRepeatable() {
-		return true;
-	}
-
-	public long getContentLength() {
-		if (contentLength != null)
-			return contentLength.intValue();
-		return buffer.length();
-	}
-
-	public InputStream getContent() throws IOException, IllegalStateException {
-		return buffer.openInputStream();
-	}
-
-	public void writeTo(OutputStream outstream) throws IOException {
-		// TODO: dont we need a progressmonitor
-		buffer.writeTo(outstream, null);
-	}
-
-	public boolean isStreaming() {
-		return false;
+		public long size; // the size of the object
 	}
 
 	/**
-	 * @param contentLength
+	 * Describes in a response all actions the LFS server offers for a single
+	 * object
 	 */
-	public void setContentLength(int contentLength) {
-		this.contentLength = new Integer(contentLength);
+	class ObjectInfo extends ObjectSpec {
+		public Map<String, Action> actions; // Maps operation to action
+
+		public Error error;
 	}
 
 	/**
-	 * Close destroys the associated buffer used to buffer the entity
-	 *
-	 * @since 4.5
+	 * Describes in a Response a single action the client can execute on a
+	 * single object
 	 */
-	@Override
-	public void close() {
-		if (buffer != null) {
-			buffer.destroy();
-		}
+	class Action {
+		public String href;
+
+		public Map<String, String> header;
 	}
+
+	/** Describes an error to be returned by the LFS batch API */
+	class Error {
+		public int code;
+
+		public String message;
+	}
+
+	/**
+	 * The "download" operation
+	 */
+	String OPERATION_DOWNLOAD = "download"; //$NON-NLS-1$
+
+	/**
+	 * The contenttype used in LFS requests
+	 */
+	String CONTENTTYPE_VND_GIT_LFS_JSON = "application/vnd.git-lfs+json; charset=utf-8"; //$NON-NLS-1$
 }
