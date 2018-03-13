@@ -62,8 +62,6 @@ import org.eclipse.jgit.lib.RepositoryBuilder;
 import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.pgm.opt.CmdLineParser;
 import org.eclipse.jgit.pgm.opt.SubcommandHandler;
-import org.eclipse.jgit.transport.HttpTransport;
-import org.eclipse.jgit.transport.http.apache.HttpClientConnectionFactory;
 import org.eclipse.jgit.util.CachedAuthenticator;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
@@ -97,7 +95,6 @@ public class Main {
 	 *            arguments.
 	 */
 	public static void main(final String[] argv) {
-		HttpTransport.setConnectionFactory(new HttpClientConnectionFactory());
 		new Main().run(argv);
 	}
 
@@ -170,7 +167,7 @@ public class Main {
 	}
 
 	private void execute(final String[] argv) throws Exception {
-		final CmdLineParser clp = new SubcommandLineParser(this);
+		final CmdLineParser clp = new CmdLineParser(this);
 		PrintWriter writer = new PrintWriter(System.err);
 		try {
 			clp.parseArgument(argv);
@@ -333,21 +330,6 @@ public class Main {
 						new CachedAuthenticator.CachedAuthentication(proxyHost,
 								proxyPort, user, pass));
 			}
-		}
-	}
-
-	/**
-	 * Parser for subcommands which doesn't stop parsing on help options and so
-	 * proceeds all specified options
-	 */
-	static class SubcommandLineParser extends CmdLineParser {
-		public SubcommandLineParser(Object bean) {
-			super(bean);
-		}
-
-		@Override
-		protected boolean containsHelp(String... args) {
-			return false;
 		}
 	}
 }

@@ -43,9 +43,6 @@
  */
 package org.eclipse.jgit.api;
 
-import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
-import static org.eclipse.jgit.lib.FileMode.GITLINK;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collection;
@@ -61,8 +58,8 @@ import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
@@ -138,12 +135,15 @@ public class AddCommand extends GitCommand<DirCache> {
 			throw new NoFilepatternException(JGitText.get().atLeastOnePatternIsRequired);
 		checkCallable();
 		DirCache dc = null;
-		boolean addAll = filepatterns.contains("."); //$NON-NLS-1$
+		boolean addAll = false;
+		if (filepatterns.contains(".")) //$NON-NLS-1$
+			addAll = true;
 
 		try (ObjectInserter inserter = repo.newObjectInserter();
 				final TreeWalk tw = new TreeWalk(repo)) {
 			tw.setOperationType(OperationType.CHECKIN_OP);
 			dc = repo.lockDirCache();
+			DirCacheIterator c;
 
 			DirCacheBuilder builder = dc.builder();
 			tw.addTree(new DirCacheBuildIterator(builder));
@@ -155,69 +155,58 @@ public class AddCommand extends GitCommand<DirCache> {
 			if (!addAll)
 				tw.setFilter(PathFilterGroup.createFromStrings(filepatterns));
 
-			byte[] lastAdded = null;
+			String lastAddedFile = null;
 
 			while (tw.next()) {
-				DirCacheIterator c = tw.getTree(0, DirCacheIterator.class);
+				String path = tw.getPathString();
+
 				WorkingTreeIterator f = tw.getTree(1, WorkingTreeIterator.class);
-				if (c == null && f != null && f.isEntryIgnored()) {
+				if (tw.getTree(0, DirCacheIterator.class) == null &&
+						f != null && f.isEntryIgnored()) {
 					// file is not in index but is ignored, do nothing
-					continue;
-				} else if (c == null && update) {
-					// Only update of existing entries was requested.
-					continue;
 				}
+				// In case of an existing merge conflict the
+				// DirCacheBuildIterator iterates over all stages of
+				// this path, we however want to add only one
+				// new DirCacheEntry per path.
+				else if (!(path.equals(lastAddedFile))) {
+					if (!(update && tw.getTree(0, DirCacheIterator.class) == null)) {
+						c = tw.getTree(0, DirCacheIterator.class);
+						if (f != null) { // the file exists
+							long sz = f.getEntryLength();
+							DirCacheEntry entry = new DirCacheEntry(path);
+							if (c == null || c.getDirCacheEntry() == null
+									|| !c.getDirCacheEntry().isAssumeValid()) {
+								FileMode mode = f.getIndexFileMode(c);
+								entry.setFileMode(mode);
 
-				DirCacheEntry entry = c != null ? c.getDirCacheEntry() : null;
-				if (entry != null && entry.getStage() > 0
-						&& lastAdded != null
-						&& lastAdded.length == tw.getPathLength()
-						&& tw.isPathPrefix(lastAdded, lastAdded.length) == 0) {
-					// In case of an existing merge conflict the
-					// DirCacheBuildIterator iterates over all stages of
-					// this path, we however want to add only one
-					// new DirCacheEntry per path.
-					continue;
-				}
+								if (FileMode.GITLINK != mode) {
+									entry.setLength(sz);
+									entry.setLastModified(f
+											.getEntryLastModified());
+									long contentSize = f
+											.getEntryContentLength();
+									InputStream in = f.openEntryStream();
+									try {
+										entry.setObjectId(inserter.insert(
+												Constants.OBJ_BLOB, contentSize, in));
+									} finally {
+										in.close();
+									}
+								} else
+									entry.setObjectId(f.getEntryObjectId());
+								builder.add(entry);
+								lastAddedFile = path;
+							} else {
+								builder.add(c.getDirCacheEntry());
+							}
 
-				if (f == null) { // working tree file does not exist
-					if (c != null
-							&& (!update || GITLINK == c.getEntryFileMode())) {
-						builder.add(entry);
+						} else if (c != null
+								&& (!update || FileMode.GITLINK == c
+										.getEntryFileMode()))
+							builder.add(c.getDirCacheEntry());
 					}
-					continue;
 				}
-
-				if (entry != null && entry.isAssumeValid()) {
-					// Index entry is marked assume valid. Even though
-					// the user specified the file to be added JGit does
-					// not consider the file for addition.
-					builder.add(entry);
-					continue;
-				}
-
-				byte[] path = tw.getRawPath();
-				if (entry == null || entry.getStage() > 0) {
-					entry = new DirCacheEntry(path);
-				}
-				FileMode mode = f.getIndexFileMode(c);
-				entry.setFileMode(mode);
-
-				if (GITLINK != mode) {
-					entry.setLength(f.getEntryLength());
-					entry.setLastModified(f.getEntryLastModified());
-					long len = f.getEntryContentLength();
-					try (InputStream in = f.openEntryStream()) {
-						ObjectId id = inserter.insert(OBJ_BLOB, len, in);
-						entry.setObjectId(id);
-					}
-				} else {
-					entry.setLength(0);
-					entry.setLastModified(0);
-					entry.setObjectId(f.getEntryObjectId());
-				}
-				builder.add(entry);
-				lastAdded = path;
 			}
 			inserter.flush();
 			builder.commit();
