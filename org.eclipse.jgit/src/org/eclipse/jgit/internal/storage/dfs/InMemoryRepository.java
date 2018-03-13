@@ -24,7 +24,6 @@ import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
-import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.SymbolicRef;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
@@ -55,7 +54,7 @@ public class InMemoryRepository extends DfsRepository {
 	static final AtomicInteger packId = new AtomicInteger();
 
 	private final DfsObjDatabase objdb;
-	private final RefDatabase refdb;
+	private final DfsRefDatabase refdb;
 	private boolean performsAtomicTransactions = true;
 
 	/**
@@ -81,7 +80,7 @@ public class InMemoryRepository extends DfsRepository {
 	}
 
 	@Override
-	public RefDatabase getRefDatabase() {
+	public DfsRefDatabase getRefDatabase() {
 		return refdb;
 	}
 
@@ -311,11 +310,6 @@ public class InMemoryRepository extends DfsRepository {
 			Map<ObjectId, ObjectId> peeled = new HashMap<>();
 			try (RevWalk rw = new RevWalk(getRepository())) {
 				for (ReceiveCommand c : cmds) {
-					if (c.getResult() != ReceiveCommand.Result.NOT_ATTEMPTED) {
-						reject(cmds);
-						return;
-					}
-
 					if (!ObjectId.zeroId().equals(c.getNewId())) {
 						try {
 							RevObject o = rw.parseAny(c.getNewId());
@@ -340,14 +334,11 @@ public class InMemoryRepository extends DfsRepository {
 						reject(cmds);
 						return;
 					}
-				} else {
-					ObjectId objectId = r.getObjectId();
-					if (r.isSymbolic() || objectId == null
-							|| !objectId.equals(c.getOldId())) {
-						c.setResult(ReceiveCommand.Result.LOCK_FAILURE);
-						reject(cmds);
-						return;
-					}
+				} else if (r.isSymbolic() || r.getObjectId() == null
+						|| !r.getObjectId().equals(c.getOldId())) {
+					c.setResult(ReceiveCommand.Result.LOCK_FAILURE);
+					reject(cmds);
+					return;
 				}
 			}
 

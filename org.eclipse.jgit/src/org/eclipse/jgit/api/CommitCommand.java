@@ -179,7 +179,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 
 			processOptions(state, rw);
 
-			if (all && !repo.isBare() && repo.getWorkTree() != null) {
+			if (all && !repo.isBare()) {
 				try (Git git = new Git(repo)) {
 					git.add()
 							.addFilepattern(".") //$NON-NLS-1$
@@ -681,7 +681,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 */
 	public CommitCommand setAll(boolean all) {
 		checkCallable();
-		if (all && !only.isEmpty())
+		if (!only.isEmpty())
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().illegalCombinationOfArguments, "--all", //$NON-NLS-1$
 					"--only")); //$NON-NLS-1$
