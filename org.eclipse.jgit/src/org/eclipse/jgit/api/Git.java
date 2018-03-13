@@ -138,17 +138,6 @@ public class Git {
 	}
 
 	/**
-	 * Returns a command to list remote branches/tags without a local
-	 * repository.
-	 *
-	 * @return a {@link LsRemoteCommand}
-	 * @since 3.1
-	 */
-	public static LsRemoteCommand lsRemoteRepository() {
-		return new LsRemoteCommand(null);
-	}
-
-	/**
 	 * Returns a command object to execute a {@code init} command
 	 *
 	 * @see <a
@@ -661,17 +650,6 @@ public class Git {
 	 */
 	public NameRevCommand nameRev() {
 		return new NameRevCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to come up with a short name that describes a
-	 * commit in terms of the nearest git tag.
-	 *
-	 * @return a {@link DescribeCommand}.
-	 * @since 3.2
-	 */
-	public DescribeCommand describe() {
-		return new DescribeCommand(repo);
 	}
 
 	/**

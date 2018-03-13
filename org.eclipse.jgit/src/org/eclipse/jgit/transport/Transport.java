@@ -46,8 +46,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -646,9 +644,8 @@ public abstract class Transport {
 	}
 
 	private static Collection<RefSpec> expandPushWildcardsFor(
-			final Repository db, final Collection<RefSpec> specs)
-			throws IOException {
-		final Map<String, Ref> localRefs = db.getRefDatabase().getRefs(ALL);
+			final Repository db, final Collection<RefSpec> specs) {
+		final Map<String, Ref> localRefs = db.getAllRefs();
 		final Collection<RefSpec> procRefs = new HashSet<RefSpec>();
 
 		for (final RefSpec spec : specs) {

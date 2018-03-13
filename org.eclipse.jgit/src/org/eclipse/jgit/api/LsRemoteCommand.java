@@ -61,7 +61,6 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.FetchConnection;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.Transport;
-import org.eclipse.jgit.transport.URIish;
 
 /**
  * The ls-remote command
@@ -83,8 +82,6 @@ public class LsRemoteCommand extends
 
 	/**
 	 * @param repo
-	 *            local repository or null for operation without local
-	 *            repository
 	 */
 	public LsRemoteCommand(Repository repo) {
 		super(repo);
@@ -158,10 +155,7 @@ public class LsRemoteCommand extends
 		Transport transport = null;
 		FetchConnection fc = null;
 		try {
-			if (repo != null)
-				transport = Transport.open(repo, remote);
-			else
-				transport = Transport.open(new URIish(remote));
+			transport = Transport.open(repo, remote);
 			transport.setOptionUploadPack(uploadPack);
 			configure(transport);
 			Collection<RefSpec> refSpecs = new ArrayList<RefSpec>(1);

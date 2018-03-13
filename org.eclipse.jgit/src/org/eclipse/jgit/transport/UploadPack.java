@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
-
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -1131,7 +1129,7 @@ public class UploadPack {
 				new ReachableCommitTipRequestValidator().checkWants(up, wants);
 			else if (!wants.isEmpty()) {
 				Set<ObjectId> refIds =
-					refIdSet(up.getRepository().getRefDatabase().getRefs(ALL).values());
+					refIdSet(up.getRepository().getAllRefs().values());
 				for (ObjectId obj : wants) {
 					if (!refIds.contains(obj))
 						throw new PackProtocolException(MessageFormat.format(
@@ -1151,7 +1149,7 @@ public class UploadPack {
 		public void checkWants(UploadPack up, List<ObjectId> wants)
 				throws PackProtocolException, IOException {
 			checkNotAdvertisedWants(up.getRevWalk(), wants,
-					refIdSet(up.getRepository().getRefDatabase().getRefs(ALL).values()));
+					refIdSet(up.getRepository().getAllRefs().values()));
 		}
 	}
 
