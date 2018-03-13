@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>,
- * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2010-2012, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
