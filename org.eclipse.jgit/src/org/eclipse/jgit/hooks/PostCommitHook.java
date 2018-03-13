@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2015 Obeo.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,40 +40,45 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.hooks;
 
-package org.eclipse.jgit.revwalk;
+import java.io.IOException;
+import java.io.PrintStream;
 
-import static org.junit.Assert.assertNull;
+import org.eclipse.jgit.api.errors.AbortedByHookException;
+import org.eclipse.jgit.lib.Repository;
 
-import org.junit.experimental.theories.DataPoints;
-import org.junit.experimental.theories.Theories;
-import org.junit.experimental.theories.Theory;
-import org.junit.runner.RunWith;
+/**
+ * The <code>post-commit</code> hook implementation. This hook is run after the
+ * commit was successfully executed.
+ *
+ * @since 4.5
+ */
+public class PostCommitHook extends GitHook<Void> {
 
-@RunWith(Theories.class)
-public class RevWalkCommitsSameDateTest extends RevWalkTestCase {
-	@DataPoints
-	public static int[] deltaBetweenCommits = { 1, 0 };
+	/** The post-commit hook name. */
+	public static final String NAME = "post-commit"; //$NON-NLS-1$
 
-	@Theory
-	public void testRevwalkOnMergedCommits_SameDate(int delta)
-			throws Exception {
-		final RevCommit a = commit(delta);
-		final RevCommit b = commit(delta, a);
-		// add some content to make sure this commit doesn't get the same
-		// commitid as the previous
-		final RevCommit c = commit(delta, tree(file("f", blob("b"))), a);
-		final RevCommit d = commit(delta, c);
-		final RevCommit e = commit(delta, b, d);
-
-		System.out.println("a:" + a.getId().abbreviate(6) + ", b:"
-				+ b.getId().abbreviate(6) + ", c:" + c.getId().abbreviate(6)
-				+ ", d:" + d.getId().abbreviate(6) + ", e:"
-				+ e.getId().abbreviate(6));
-
-		markStart(d);
-		markUninteresting(e);
-		assertNull("Found an unexpected commit. Delta between commits was "
-				+ delta, rw.next());
+	/**
+	 * @param repo
+	 *            The repository
+	 * @param outputStream
+	 *            The output stream the hook must use. {@code null} is allowed,
+	 *            in which case the hook will use {@code System.out}.
+	 */
+	protected PostCommitHook(Repository repo, PrintStream outputStream) {
+		super(repo, outputStream);
 	}
+
+	@Override
+	public Void call() throws IOException, AbortedByHookException {
+		doRun();
+		return null;
+	}
+
+	@Override
+	public String getHookName() {
+		return NAME;
+	}
+
 }
