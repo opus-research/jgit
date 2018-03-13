@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>,
+ * Copyright (C) 2010, Stefan Lay <stefan.lay@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,22 +41,29 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.errors;
 
-package org.eclipse.jgit.notes;
-
-import java.io.IOException;
-
-import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.transport.CredentialItem;
+import org.eclipse.jgit.transport.CredentialsProvider;
+import org.eclipse.jgit.transport.URIish;
 
 /**
- * A tree that stores note objects.
- *
- * @see FanoutBucket
- * @see LeafBucket
+ * An exception thrown when a {@link CredentialItem} is requested from a
+ * {@link CredentialsProvider} which is not supported by this provider.
  */
-abstract class NoteBucket {
-	abstract ObjectId get(AnyObjectId objId, ObjectReader reader)
-			throws IOException;
+public class UnsupportedCredentialItem extends RuntimeException {
+	private static final long serialVersionUID = 1L;
+
+	/**
+	 * Constructs an UnsupportedCredentialItem with the specified detail message
+	 * prefixed with provided URI.
+	 *
+	 * @param uri
+	 *            URI used for transport
+	 * @param s
+	 *            message
+	 */
+	public UnsupportedCredentialItem(final URIish uri, final String s) {
+		super(uri.setPass(null) + ": " + s);
+	}
 }

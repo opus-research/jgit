@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,21 +41,31 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.notes;
+package org.eclipse.jgit.pgm;
 
-import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
-import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.api.AddCommand;
+import org.eclipse.jgit.api.Git;
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.Option;
 
-/**
- * A tree that stores note objects.
- *
- * @see FanoutBucket
- * @see LeafBucket
- */
-abstract class NoteBucket {
-	abstract ObjectId get(AnyObjectId objId, ObjectReader reader)
-			throws IOException;
+@Command(common = true, usage = "usage_addFileContentsToTheIndex")
+class Add extends TextBuiltin {
+
+	@Option(name = "--update", aliases = { "-u" }, usage = "usage_onlyMatchAgainstAlreadyTrackedFiles")
+	private boolean update = false;
+
+	@Argument(required = true, metaVar = "metavar_filepattern", usage = "usage_filesToAddContentFrom")
+	private List<String> filepatterns = new ArrayList<String>();
+
+	@Override
+	protected void run() throws Exception {
+		AddCommand addCmd = new Git(db).add();
+		addCmd.setUpdate(update);
+		for (String p : filepatterns)
+			addCmd.addFilepattern(p);
+		addCmd.call();
+	}
 }
