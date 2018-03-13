@@ -47,13 +47,13 @@ package org.eclipse.jgit.storage.pack;
 import java.util.concurrent.Executor;
 import java.util.zip.Deflater;
 
-import org.eclipse.jgit.internal.storage.file.PackIndexWriter;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.storage.file.PackIndexWriter;
 
 /**
- * Configuration used by a pack writer when constructing the stream.
- * 
+ * Configuration used by a {@link PackWriter} when constructing the stream.
+ *
  * A configuration may be modified once created, but should not be modified
  * while it is being used by a PackWriter. If a configuration is not modified it
  * is safe to share the same configuration instance between multiple concurrent
@@ -684,23 +684,5 @@ public class PackConfig {
 		setDeltaCompress(rc.getBoolean(
 				"pack", "deltacompression", isDeltaCompress())); //$NON-NLS-1$ //$NON-NLS-2$
 		setBuildBitmaps(rc.getBoolean("pack", "buildbitmaps", isBuildBitmaps())); //$NON-NLS-1$ //$NON-NLS-2$
-	}
-
-	public String toString() {
-		final StringBuilder b = new StringBuilder();
-		b.append("maxDeltaDepth=").append(getMaxDeltaDepth()); //$NON-NLS-1$
-		b.append("deltaSearchWindowSize=").append(getDeltaSearchWindowSize()); //$NON-NLS-1$
-		b.append("deltaSearchMemoryLimit=").append(getDeltaSearchMemoryLimit()); //$NON-NLS-1$
-		b.append("deltaCacheSize=").append(getDeltaCacheSize()); //$NON-NLS-1$
-		b.append("deltaCacheLimit=").append(getDeltaCacheLimit()); //$NON-NLS-1$
-		b.append("compressionLevel=").append(getCompressionLevel()); //$NON-NLS-1$
-		b.append("indexVersion=").append(getIndexVersion()); //$NON-NLS-1$
-		b.append("bigFileThreshold=").append(getBigFileThreshold()); //$NON-NLS-1$
-		b.append("threads=").append(getThreads()); //$NON-NLS-1$
-		b.append("reuseDeltas=").append(isReuseDeltas()); //$NON-NLS-1$
-		b.append("reuseObjects=").append(isReuseObjects()); //$NON-NLS-1$
-		b.append("deltaCompress=").append(isDeltaCompress()); //$NON-NLS-1$
-		b.append("buildBitmaps=").append(isBuildBitmaps()); //$NON-NLS-1$
-		return b.toString();
 	}
 }
