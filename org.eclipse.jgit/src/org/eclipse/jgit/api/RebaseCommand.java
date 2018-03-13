@@ -321,7 +321,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			}
 			return finishRebase(newHead, lastStepWasForward);
 		} catch (CheckoutConflictException cce) {
-			return RebaseResult.conflicts(cce.getConflictingPaths());
+			return new RebaseResult(cce.getConflictingPaths());
 		} catch (IOException ioe) {
 			throw new JGitInternalException(ioe.getMessage(), ioe);
 		}
@@ -340,7 +340,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		RevCommit commitToPick = walk.parseCommit(ids.iterator().next());
 		if (shouldPick) {
 			if (monitor.isCancelled())
-				return RebaseResult.result(Status.STOPPED, commitToPick);
+				return new RebaseResult(commitToPick, Status.STOPPED);
 			RebaseResult result = cherryPickCommit(commitToPick);
 			if (result != null)
 				return result;
@@ -403,8 +403,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				switch (cherryPickResult.getStatus()) {
 				case FAILED:
 					if (operation == Operation.BEGIN)
-						return abort(RebaseResult.failed(cherryPickResult
-								.getFailingPaths()));
+						return abort(new RebaseResult(
+								cherryPickResult.getFailingPaths()));
 					else
 						return stop(commitToPick, Status.STOPPED);
 				case CONFLICTING:
@@ -550,7 +550,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		} else {
 			sb.append("# The ").append(count).append(ordinal)
 					.append(" commit message will be skipped:\n# ");
-			sb.append(commitToPick.getFullMessage().replaceAll("([\n\r])",
+			sb.append(commitToPick.getFullMessage().replaceAll("([\n\r]+)",
 					"$1# "));
 		}
 		// Add the previous message without header (i.e first line)
@@ -735,7 +735,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		// Remove cherry pick state file created by CherryPickCommand, it's not
 		// needed for rebase
 		repo.writeCherryPickHead(null);
-		return RebaseResult.result(status, commitToPick);
+		return new RebaseResult(commitToPick, status);
 	}
 
 	String toAuthorScript(PersonIdent author) {
