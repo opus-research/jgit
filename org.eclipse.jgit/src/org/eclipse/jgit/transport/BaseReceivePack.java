@@ -67,7 +67,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import org.eclipse.jgit.errors.InvalidObjectIdException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.TooLargePackException;
@@ -1148,7 +1147,7 @@ public abstract class BaseReceivePack {
 		try {
 			oldId = ObjectId.fromString(oldStr);
 			newId = ObjectId.fromString(newStr);
-		} catch (InvalidObjectIdException e) {
+		} catch (IllegalArgumentException e) {
 			throw new PackProtocolException(
 					JGitText.get().errorInvalidProtocolWantedOldNewRef, e);
 		}

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2016, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,27 +40,34 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs.internal;
+package org.eclipse.jgit.util;
 
-import org.eclipse.jgit.nls.NLS;
-import org.eclipse.jgit.nls.TranslationBundle;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
+import org.eclipse.jgit.lib.Repository;
 
 /**
- * Translation bundle for JGit LFS server
+ * The factory responsible for creating instances of {@link BuiltinCommand}.
+ *
+ * @since 4.5
  */
-public class LfsText extends TranslationBundle {
-
+public interface BuiltinCommandFactory {
 	/**
-	 * @return an instance of this translation bundle
+	 * Creates a new {@link BuiltinCommand}.
+	 *
+	 * @param db
+	 *            the repository this command should work on
+	 * @param in
+	 *            the {@link InputStream} this command should read from
+	 * @param out
+	 *            the {@link OutputStream} this command should write to
+	 * @return the create {@link BuiltinCommand}
+	 * @throws IOException
+	 *             thrown when the command constructor throws a IOException
 	 */
-	public static LfsText get() {
-		return NLS.getBundleFor(LfsText.class);
-	}
+	public BuiltinCommand create(Repository db, InputStream in,
+			OutputStream out) throws IOException;
 
-	// @formatter:off
-	/***/ public String inconsistentMediafileLength;
-	/***/ public String incorrectLONG_OBJECT_ID_LENGTH;
-	/***/ public String invalidLongId;
-	/***/ public String invalidLongIdLength;
-	/***/ public String requiredHashFunctionNotAvailable;
 }

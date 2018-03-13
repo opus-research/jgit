@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2016, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,27 +40,79 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs.internal;
+package org.eclipse.jgit.lfs;
 
-import org.eclipse.jgit.nls.NLS;
-import org.eclipse.jgit.nls.TranslationBundle;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import org.eclipse.jgit.lfs.lib.LongObjectId;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.util.BuiltinCommand;
+import org.eclipse.jgit.util.BuiltinCommandFactory;
 
 /**
- * Translation bundle for JGit LFS server
+ * @since 4.5
  */
-public class LfsText extends TranslationBundle {
+public class SmudgeFilter extends BuiltinCommand {
+	/**
+	 *
+	 */
+	public final static BuiltinCommandFactory FACTORY = new BuiltinCommandFactory() {
+		@Override
+		public BuiltinCommand create(Repository db, InputStream in,
+				OutputStream out) throws IOException {
+			return new SmudgeFilter(db, in, out);
+		}
+	};
 
 	/**
-	 * @return an instance of this translation bundle
+	 * Registers this filter to JGit by calling
+	 * {@link Repository#registerCommand(String, BuiltinCommandFactory)}
 	 */
-	public static LfsText get() {
-		return NLS.getBundleFor(LfsText.class);
+	public final static void register() {
+		Repository.registerCommand(
+				org.eclipse.jgit.lib.Constants.BUILTIN_FILTER_PREFIX
+						+ "lfs/smudge", //$NON-NLS-1$
+				FACTORY);
+	};
+
+	LongObjectId id;
+
+	private InputStream mIn;
+
+	private LfsUtil lfsUtil;
+
+	/**
+	 * @param db
+	 * @param in
+	 * @param out
+	 * @throws IOException
+	 */
+	public SmudgeFilter(Repository db, InputStream in, OutputStream out)
+			throws IOException {
+		super(in, out);
+		lfsUtil = new LfsUtil(db.getDirectory().toPath().resolve("lfs")); //$NON-NLS-1$
+		LfsPointer res = LfsPointer.parseLfsPointer(in);
+		if (res != null) {
+			Path mediaFile = lfsUtil.getMediaFile(res.getOid());
+			if (Files.exists(mediaFile)) {
+				mIn = Files.newInputStream(mediaFile);
+			}
+		}
 	}
 
-	// @formatter:off
-	/***/ public String inconsistentMediafileLength;
-	/***/ public String incorrectLONG_OBJECT_ID_LENGTH;
-	/***/ public String invalidLongId;
-	/***/ public String invalidLongIdLength;
-	/***/ public String requiredHashFunctionNotAvailable;
+	@Override
+	public int run() throws IOException {
+		int b;
+		if (mIn != null) {
+			while ((b = mIn.read()) != -1)
+				out.write(b);
+			mIn.close();
+		}
+		out.close();
+		return -1;
+	}
 }
