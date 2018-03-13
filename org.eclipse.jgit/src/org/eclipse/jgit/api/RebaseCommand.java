@@ -302,7 +302,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				RevCommit commitToPick = walk
 						.parseCommit(ids.iterator().next());
 				if (monitor.isCancelled())
-					return new RebaseResult(commitToPick, Status.STOPPED);
+					return new RebaseResult(commitToPick);
 				try {
 					monitor.beginTask(MessageFormat.format(
 							JGitText.get().applyingCommit,
@@ -328,9 +328,9 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 								return abort(new RebaseResult(
 										cherryPickResult.getFailingPaths()));
 							else
-								return stop(commitToPick, Status.STOPPED);
+								return stop(commitToPick);
 						case CONFLICTING:
-							return stop(commitToPick, Status.STOPPED);
+							return stop(commitToPick);
 						case OK:
 							newHead = cherryPickResult.getNewHead();
 						}
@@ -348,7 +348,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 						continue;
 					case EDIT:
 						rebaseState.createFile(AMEND, commitToPick.name());
-						return stop(commitToPick, Status.EDIT);
+						return stop(commitToPick);
 					case COMMENT:
 						break;
 					case SQUASH:
@@ -361,11 +361,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 						File messageFixupFile = rebaseState.getFile(MESSAGE_FIXUP);
 						File messageSquashFile = rebaseState
 								.getFile(MESSAGE_SQUASH);
-						if (isSquash) {
-							if (messageFixupFile.exists()) {
+						if (isSquash && messageFixupFile.exists())
 								messageFixupFile.delete();
-							}
-						}
 						newHead = doSquashFixup(isSquash, commitToPick,
 								nextStep, messageFixupFile, messageSquashFile);
 					}
@@ -428,9 +425,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		String content = composeSquashMessage(isSquash,
 				commitToPick, currSquashMessage, count);
 		rebaseState.createFile(MESSAGE_SQUASH, content);
-		if (messageFixup.exists()) {
+		if (messageFixup.exists())
 			rebaseState.createFile(MESSAGE_FIXUP, content);
-		}
 
 		return squashIntoPrevious(
 				!messageFixup.exists(),
@@ -488,13 +484,11 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	private static String stripCommentLines(String commitMessage) {
 		StringBuilder result = new StringBuilder();
 		for (String line : commitMessage.split("\n")) { //$NON-NLS-1$
-			if (!line.trim().startsWith("#")) { //$NON-NLS-1$
+			if (!line.trim().startsWith("#")) //$NON-NLS-1$
 				result.append(line).append("\n"); //$NON-NLS-1$
-			}
 		}
-		if (!commitMessage.endsWith("\n")) { //$NON-NLS-1$
+		if (!commitMessage.endsWith("\n")) //$NON-NLS-1$
 			result.deleteCharAt(result.length() - 1);
-		}
 		return result.toString();
 	}
 
@@ -679,8 +673,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		return parseAuthor(raw);
 	}
 
-	private RebaseResult stop(RevCommit commitToPick, RebaseResult.Status status)
-			throws IOException {
+	private RebaseResult stop(RevCommit commitToPick) throws IOException {
 		PersonIdent author = commitToPick.getAuthorIdent();
 		String authorScript = toAuthorScript(author);
 		rebaseState.createFile(AUTHOR_SCRIPT, authorScript);
@@ -698,7 +691,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		// Remove cherry pick state file created by CherryPickCommand, it's not
 		// needed for rebase
 		repo.writeCherryPickHead(null);
-		return new RebaseResult(commitToPick, status);
+		return new RebaseResult(commitToPick);
 	}
 
 	String toAuthorScript(PersonIdent author) {

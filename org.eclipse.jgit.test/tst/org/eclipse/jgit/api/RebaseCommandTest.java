@@ -1941,7 +1941,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 						return ""; // not used
 					}
 				}).call();
-		assertEquals(Status.EDIT, res.getStatus());
+		assertEquals(Status.STOPPED, res.getStatus());
 		RevCommit toBeEditted = git.log().call().iterator().next();
 		assertEquals("updated file1 on master", toBeEditted.getFullMessage());
 
@@ -2264,7 +2264,6 @@ public class RebaseCommandTest extends RepositoryTestCase {
 						return commit;
 					}
 				}).call();
-
 	}
 
 	@Test(expected = InvalidRebaseStepException.class)
@@ -2293,7 +2292,6 @@ public class RebaseCommandTest extends RepositoryTestCase {
 						return commit;
 					}
 				}).call();
-
 	}
 
 	private File getTodoFile() {
