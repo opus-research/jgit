@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2008-2010, Google Inc.
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2011, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -45,7 +46,6 @@
 package org.eclipse.jgit.dircache;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
@@ -60,9 +60,12 @@ import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Comparator;
 
-import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.errors.LockFailedException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.UnmergedPathException;
+import org.eclipse.jgit.events.IndexChangedEvent;
+import org.eclipse.jgit.events.IndexChangedListener;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
@@ -73,6 +76,7 @@ import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.MutableInteger;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.TemporaryBuffer;
+import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
  * Support for the Git dircache (aka index file).
@@ -93,6 +97,8 @@ public class DirCache {
 	private static final int EXT_TREE = 0x54524545 /* 'TREE' */;
 
 	private static final DirCacheEntry[] NO_ENTRIES = {};
+
+	private static final byte[] NO_CHECKSUM = {};
 
 	static final Comparator<DirCacheEntry> ENT_CMP = new Comparator<DirCacheEntry>() {
 		public int compare(final DirCacheEntry o1, final DirCacheEntry o2) {
@@ -185,7 +191,7 @@ public class DirCache {
 			throws CorruptObjectException, IOException {
 		final DirCache c = new DirCache(indexLocation, fs);
 		if (!c.lock())
-			throw new IOException(MessageFormat.format(JGitText.get().cannotLock, indexLocation));
+			throw new LockFailedException(indexLocation);
 
 		try {
 			c.read();
@@ -200,6 +206,39 @@ public class DirCache {
 			throw e;
 		}
 
+		return c;
+	}
+
+	/**
+	 * Create a new in-core index representation, lock it, and read from disk.
+	 * <p>
+	 * The new index will be locked and then read before it is returned to the
+	 * caller. Read failures are reported as exceptions and therefore prevent
+	 * the method from returning a partially populated index. On read failure,
+	 * the lock is released.
+	 *
+	 * @param indexLocation
+	 *            location of the index file on disk.
+	 * @param fs
+	 *            the file system abstraction which will be necessary to perform
+	 *            certain file system operations.
+	 * @param indexChangedListener
+	 *            listener to be informed when DirCache is committed
+	 * @return a cache representing the contents of the specified index file (if
+	 *         it exists) or an empty cache if the file does not exist.
+	 * @throws IOException
+	 *             the index file is present but could not be read, or the lock
+	 *             could not be obtained.
+	 * @throws CorruptObjectException
+	 *             the index file is using a format or extension that this
+	 *             library does not support.
+	 */
+	public static DirCache lock(final File indexLocation, final FS fs,
+			IndexChangedListener indexChangedListener)
+			throws CorruptObjectException,
+			IOException {
+		DirCache c = lock(indexLocation, fs);
+		c.registerIndexChangedListener(indexChangedListener);
 		return c;
 	}
 
@@ -223,6 +262,15 @@ public class DirCache {
 
 	/** Keep track of whether the index has changed or not */
 	private FileSnapshot snapshot;
+
+	/** index checksum when index was read from disk */
+	private byte[] readIndexChecksum;
+
+	/** index checksum when index was written to disk */
+	private byte[] writeIndexChecksum;
+
+	/** listener to be informed on commit */
+	private IndexChangedListener indexChangedListener;
 
 	/**
 	 * Create a new in-core index representation.
@@ -330,6 +378,7 @@ public class DirCache {
 		sortedEntries = NO_ENTRIES;
 		entryCnt = 0;
 		tree = null;
+		readIndexChecksum = NO_CHECKSUM;
 	}
 
 	private void readFrom(final InputStream inStream) throws IOException,
@@ -412,8 +461,8 @@ public class DirCache {
 			}
 		}
 
-		final byte[] exp = md.digest();
-		if (!Arrays.equals(exp, hdr)) {
+		readIndexChecksum = md.digest();
+		if (!Arrays.equals(readIndexChecksum, hdr)) {
 			throw new CorruptObjectException(JGitText.get().DIRCChecksumMismatch);
 		}
 	}
@@ -487,7 +536,7 @@ public class DirCache {
 		final LockFile tmp = myLock;
 		requireLocked(tmp);
 		try {
-			writeTo(new BufferedOutputStream(tmp.getOutputStream()));
+			writeTo(new SafeBufferedOutputStream(tmp.getOutputStream()));
 		} catch (IOException err) {
 			tmp.unlock();
 			throw err;
@@ -544,8 +593,8 @@ public class DirCache {
 			dos.write(tmp, 0, 8);
 			bb.writeTo(dos, null);
 		}
-
-		os.write(foot.digest());
+		writeIndexChecksum = foot.digest();
+		os.write(writeIndexChecksum);
 		os.close();
 	}
 
@@ -567,6 +616,9 @@ public class DirCache {
 		if (!tmp.commit())
 			return false;
 		snapshot = tmp.getCommitSnapshot();
+		if (indexChangedListener != null
+				&& !Arrays.equals(readIndexChecksum, writeIndexChecksum))
+			indexChangedListener.onIndexChanged(new IndexChangedEvent());
 		return true;
 	}
 
@@ -712,6 +764,11 @@ public class DirCache {
 	 * @return all entries recursively contained within the subtree.
 	 */
 	public DirCacheEntry[] getEntriesWithin(String path) {
+		if (path.length() == 0) {
+			final DirCacheEntry[] r = new DirCacheEntry[sortedEntries.length];
+			System.arraycopy(sortedEntries, 0, r, 0, sortedEntries.length);
+			return r;
+		}
 		if (!path.endsWith("/"))
 			path += "/";
 		final byte[] p = Constants.encode(path);
@@ -788,5 +845,9 @@ public class DirCache {
 			}
 		}
 		return false;
+	}
+
+	private void registerIndexChangedListener(IndexChangedListener listener) {
+		this.indexChangedListener = listener;
 	}
 }

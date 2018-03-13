@@ -60,6 +60,7 @@ import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 import org.junit.Test;
 import org.junit.experimental.theories.DataPoints;
@@ -80,6 +81,13 @@ public class MergeCommandTest extends RepositoryTestCase {
 
 		MergeResult result = git.merge().include(db.getRef(Constants.HEAD)).call();
 		assertEquals(MergeResult.MergeStatus.ALREADY_UP_TO_DATE, result.getMergeStatus());
+		// no reflog entry written by merge
+		assertEquals("commit: initial commit",
+				db
+				.getReflogReader(Constants.HEAD).getLastEntry().getComment());
+		assertEquals("commit: initial commit",
+				db
+				.getReflogReader(db.getBranch()).getLastEntry().getComment());
 	}
 
 	@Test
@@ -92,7 +100,11 @@ public class MergeCommandTest extends RepositoryTestCase {
 		MergeResult result = git.merge().include(db.getRef("refs/heads/branch1")).call();
 		assertEquals(MergeResult.MergeStatus.ALREADY_UP_TO_DATE, result.getMergeStatus());
 		assertEquals(second, result.getNewHead());
-
+		// no reflog entry written by merge
+		assertEquals("commit: second commit", db
+				.getReflogReader(Constants.HEAD).getLastEntry().getComment());
+		assertEquals("commit: second commit", db
+				.getReflogReader(db.getBranch()).getLastEntry().getComment());
 	}
 
 	@Test
@@ -109,57 +121,10 @@ public class MergeCommandTest extends RepositoryTestCase {
 
 		assertEquals(MergeResult.MergeStatus.FAST_FORWARD, result.getMergeStatus());
 		assertEquals(second, result.getNewHead());
-	}
-
-	@Test
-	public void testFastForwardFailsDueToDirtyWorktree() throws Exception {
-		Git git = new Git(db);
-		File a = writeTrashFile("a", "a(1)");
-		writeTrashFile("c", "c");
-		RevCommit first = addAllAndCommit(git);
-
-		createBranch(first, "refs/heads/branch1");
-		writeTrashFile("a", "a(2)");
-		git.add().addFilepattern("a").call();
-		git.commit().setMessage("second commit").call();
-
-		checkoutBranch("refs/heads/branch1");
-		writeTrashFile("a", "a(modified)");
-
-		// get current index state
-		String indexState = indexState(CONTENT);
-
-		MergeResult result = git.merge().include(db.getRef(Constants.MASTER))
-				.call();
-
-		checkMergeFailedResult(result, MergeFailureReason.DIRTY_WORKTREE,
-				indexState, a);
-	}
-
-	@Test
-	public void testFastForwardFailsDueToDirtyIndex() throws Exception {
-		Git git = new Git(db);
-		File a = writeTrashFile("a", "a(1)");
-		writeTrashFile("c", "c");
-		RevCommit first = addAllAndCommit(git);
-
-		createBranch(first, "refs/heads/branch1");
-		writeTrashFile("a", "a(2)");
-		git.add().addFilepattern("a").call();
-		git.commit().setMessage("second commit").call();
-
-		checkoutBranch("refs/heads/branch1");
-		writeTrashFile("a", "a(modified)");
-		git.add().addFilepattern("a").call();
-
-		// get current index state
-		String indexState = indexState(CONTENT);
-
-		MergeResult result = git.merge().include(db.getRef(Constants.MASTER))
-				.call();
-
-		checkMergeFailedResult(result, MergeFailureReason.DIRTY_INDEX,
-				indexState, a);
+		assertEquals("merge refs/heads/master: Fast-forward",
+				db.getReflogReader(Constants.HEAD).getLastEntry().getComment());
+		assertEquals("merge refs/heads/master: Fast-forward",
+				db.getReflogReader(db.getBranch()).getLastEntry().getComment());
 	}
 
 	@Test
@@ -187,6 +152,10 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertTrue(new File(db.getWorkTree(), "file2").exists());
 		assertEquals(MergeResult.MergeStatus.FAST_FORWARD, result.getMergeStatus());
 		assertEquals(second, result.getNewHead());
+		assertEquals("merge refs/heads/master: Fast-forward",
+				db.getReflogReader(Constants.HEAD).getLastEntry().getComment());
+		assertEquals("merge refs/heads/master: Fast-forward",
+				db.getReflogReader(db.getBranch()).getLastEntry().getComment());
 	}
 
 	@Test
@@ -241,6 +210,14 @@ public class MergeCommandTest extends RepositoryTestCase {
 		MergeResult result = git.merge().setStrategy(mergeStrategy)
 				.include(db.getRef(Constants.MASTER)).call();
 		assertEquals(MergeStatus.MERGED, result.getMergeStatus());
+		assertEquals(
+				"merge refs/heads/master: Merge made by "
+						+ mergeStrategy.getName() + ".",
+				db.getReflogReader(Constants.HEAD).getLastEntry().getComment());
+		assertEquals(
+				"merge refs/heads/master: Merge made by "
+						+ mergeStrategy.getName() + ".",
+				db.getReflogReader(db.getBranch()).getLastEntry().getComment());
 	}
 
 	@Test
@@ -421,6 +398,14 @@ public class MergeCommandTest extends RepositoryTestCase {
 				.setStrategy(MergeStrategy.RESOLVE).call();
 		assertEquals(MergeStatus.MERGED, result.getMergeStatus());
 		assertEquals("1\nb(1)\n3\n", read(new File(db.getWorkTree(), "b")));
+		assertEquals("merge " + secondCommit.getId().getName()
+				+ ": Merge made by resolve.", db
+				.getReflogReader(Constants.HEAD)
+				.getLastEntry().getComment());
+		assertEquals("merge " + secondCommit.getId().getName()
+				+ ": Merge made by resolve.", db
+				.getReflogReader(db.getBranch())
+				.getLastEntry().getComment());
 	}
 
 	@Test
@@ -1037,6 +1022,88 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertEquals(commit2, result.getNewHead());
 		assertFalse(folder1.exists());
 		assertFalse(folder2.exists());
+	}
+
+	@Test
+	public void testFileModeMerge() throws Exception {
+		if (!FS.DETECTED.supportsExecute())
+			return;
+		// Only Java6
+		Git git = new Git(db);
+
+		writeTrashFile("mergeableMode", "a");
+		setExecutable(git, "mergeableMode", false);
+		writeTrashFile("conflictingModeWithBase", "a");
+		setExecutable(git, "conflictingModeWithBase", false);
+		RevCommit initialCommit = addAllAndCommit(git);
+
+		// switch branch
+		createBranch(initialCommit, "refs/heads/side");
+		checkoutBranch("refs/heads/side");
+		setExecutable(git, "mergeableMode", true);
+		writeTrashFile("conflictingModeNoBase", "b");
+		setExecutable(git, "conflictingModeNoBase", true);
+		RevCommit sideCommit = addAllAndCommit(git);
+
+		// switch branch
+		createBranch(initialCommit, "refs/heads/side2");
+		checkoutBranch("refs/heads/side2");
+		setExecutable(git, "mergeableMode", false);
+		assertFalse(new File(git.getRepository().getWorkTree(),
+				"conflictingModeNoBase").exists());
+		writeTrashFile("conflictingModeNoBase", "b");
+		setExecutable(git, "conflictingModeNoBase", false);
+		addAllAndCommit(git);
+
+		// merge
+		MergeResult result = git.merge().include(sideCommit.getId())
+				.setStrategy(MergeStrategy.RESOLVE).call();
+		assertEquals(MergeStatus.CONFLICTING, result.getMergeStatus());
+		assertTrue(canExecute(git, "mergeableMode"));
+		assertFalse(canExecute(git, "conflictingModeNoBase"));
+	}
+
+	@Test
+	public void testFileModeMergeWithDirtyWorkTree() throws Exception {
+		if (!FS.DETECTED.supportsExecute())
+			return;
+		// Only Java6 (or set x bit in index)
+
+		Git git = new Git(db);
+
+		writeTrashFile("mergeableButDirty", "a");
+		setExecutable(git, "mergeableButDirty", false);
+		RevCommit initialCommit = addAllAndCommit(git);
+
+		// switch branch
+		createBranch(initialCommit, "refs/heads/side");
+		checkoutBranch("refs/heads/side");
+		setExecutable(git, "mergeableButDirty", true);
+		RevCommit sideCommit = addAllAndCommit(git);
+
+		// switch branch
+		createBranch(initialCommit, "refs/heads/side2");
+		checkoutBranch("refs/heads/side2");
+		setExecutable(git, "mergeableButDirty", false);
+		addAllAndCommit(git);
+
+		writeTrashFile("mergeableButDirty", "b");
+
+		// merge
+		MergeResult result = git.merge().include(sideCommit.getId())
+				.setStrategy(MergeStrategy.RESOLVE).call();
+		assertEquals(MergeStatus.FAILED, result.getMergeStatus());
+		assertFalse(canExecute(git, "mergeableButDirty"));
+	}
+
+	private void setExecutable(Git git, String path, boolean executable) {
+		FS.DETECTED.setExecute(
+				new File(git.getRepository().getWorkTree(), path), executable);
+	}
+
+	private boolean canExecute(Git git, String path) {
+		return FS.DETECTED.canExecute(new File(git.getRepository()
+				.getWorkTree(), path));
 	}
 
 	private RevCommit addAllAndCommit(final Git git) throws Exception {
