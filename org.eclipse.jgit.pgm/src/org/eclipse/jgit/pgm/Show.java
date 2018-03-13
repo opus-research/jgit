@@ -184,7 +184,8 @@ class Show extends TextBuiltin {
 			else
 				objectId = db.resolve(objectName);
 
-			try (RevWalk rw = new RevWalk(db)) {
+			RevWalk rw = new RevWalk(db);
+			try {
 				RevObject obj = rw.parseAny(objectId);
 				while (obj instanceof RevTag) {
 					show((RevTag) obj);
@@ -215,9 +216,11 @@ class Show extends TextBuiltin {
 							CLIText.get().cannotReadBecause, obj.name(),
 							obj.getType()));
 				}
+			} finally {
+				rw.release();
 			}
 		} finally {
-			diffFmt.close();
+			diffFmt.release();
 		}
 	}
 
@@ -251,17 +254,16 @@ class Show extends TextBuiltin {
 
 	private void show(RevTree obj) throws MissingObjectException,
 			IncorrectObjectTypeException, CorruptObjectException, IOException {
-		try (final TreeWalk walk = new TreeWalk(db)) {
-			walk.reset();
-			walk.addTree(obj);
+		final TreeWalk walk = new TreeWalk(db);
+		walk.reset();
+		walk.addTree(obj);
 
-			while (walk.next()) {
-				outw.print(walk.getPathString());
-				final FileMode mode = walk.getFileMode(0);
-				if (mode == FileMode.TREE)
-					outw.print("/"); //$NON-NLS-1$
-				outw.println();
-			}
+		while (walk.next()) {
+			outw.print(walk.getPathString());
+			final FileMode mode = walk.getFileMode(0);
+			if (mode == FileMode.TREE)
+				outw.print("/"); //$NON-NLS-1$
+			outw.println();
 		}
 	}
 

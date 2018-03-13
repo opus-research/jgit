@@ -76,34 +76,7 @@ import org.eclipse.jgit.util.FS;
 /**
  * Walker that visits all submodule entries found in a tree
  */
-public class SubmoduleWalk implements AutoCloseable {
-
-	/**
-	 * The values for the config param submodule.<name>.ignore
-	 *
-	 * @since 3.6
-	 */
-	public enum IgnoreSubmoduleMode {
-		/**
-		 * Ignore all modifications to submodules
-		 */
-		ALL,
-
-		/**
-		 * Ignore changes to the working tree of a submodule
-		 */
-		DIRTY,
-
-		/**
-		 * Ignore changes to untracked files in the working tree of a submodule
-		 */
-		UNTRACKED,
-
-		/**
-		 * Ignore nothing. That's the default
-		 */
-		NONE;
-	}
+public class SubmoduleWalk {
 
 	/**
 	 * Create a generator to walk over the submodule entries currently in the
@@ -122,7 +95,7 @@ public class SubmoduleWalk implements AutoCloseable {
 			DirCache index = repository.readDirCache();
 			generator.setTree(new DirCacheIterator(index));
 		} catch (IOException e) {
-			generator.close();
+			generator.release();
 			throw e;
 		}
 		return generator;
@@ -152,10 +125,10 @@ public class SubmoduleWalk implements AutoCloseable {
 				if (filter.isDone(generator.walk))
 					return generator;
 		} catch (IOException e) {
-			generator.close();
+			generator.release();
 			throw e;
 		}
-		generator.close();
+		generator.release();
 		return null;
 	}
 
@@ -183,10 +156,10 @@ public class SubmoduleWalk implements AutoCloseable {
 				if (filter.isDone(generator.walk))
 					return generator;
 		} catch (IOException e) {
-			generator.close();
+			generator.release();
 			throw e;
 		}
-		generator.close();
+		generator.release();
 		return null;
 	}
 
@@ -419,7 +392,8 @@ public class SubmoduleWalk implements AutoCloseable {
 			config.load();
 			modulesConfig = config;
 		} else {
-			try (TreeWalk configWalk = new TreeWalk(repository)) {
+			TreeWalk configWalk = new TreeWalk(repository);
+			try {
 				configWalk.addTree(rootTree);
 
 				// The root tree may be part of the submodule walk, so we need to revert
@@ -445,32 +419,11 @@ public class SubmoduleWalk implements AutoCloseable {
 					if (idx > 0)
 						rootTree.next(idx);
 				}
+			} finally {
+				configWalk.release();
 			}
 		}
 		return this;
-	}
-
-	/**
-	 * Checks whether the working tree contains a .gitmodules file. That's a
-	 * hint that the repo contains submodules.
-	 *
-	 * @param repository
-	 *            the repository to check
-	 * @return <code>true</code> if the working tree contains a .gitmodules file,
-	 *         <code>false</code> otherwise. Always returns <code>false</code>
-	 *         for bare repositories.
-	 * @throws IOException
-	 * @throws CorruptObjectException
-	 * @since 3.6
-	 */
-	public static boolean containsGitModulesFile(Repository repository)
-			throws IOException {
-		if (repository.isBare()) {
-			return false;
-		}
-		File modulesFile = new File(repository.getWorkTree(),
-				Constants.DOT_GIT_MODULES);
-		return (modulesFile.exists());
 	}
 
 	private void lazyLoadModulesConfig() throws IOException, ConfigInvalidException {
@@ -647,26 +600,6 @@ public class SubmoduleWalk implements AutoCloseable {
 	}
 
 	/**
-	 * Get the configured ignore field for the current entry. This will be the
-	 * value from the .gitmodules file in the current repository's working tree.
-	 *
-	 * @return ignore value
-	 * @throws ConfigInvalidException
-	 * @throws IOException
-	 * @since 3.6
-	 */
-	public IgnoreSubmoduleMode getModulesIgnore() throws IOException,
-			ConfigInvalidException {
-		lazyLoadModulesConfig();
-		String name = modulesConfig.getString(
-				ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
-				ConfigConstants.CONFIG_KEY_IGNORE);
-		if (name == null)
-			return null;
-		return IgnoreSubmoduleMode.valueOf(name.trim().toUpperCase());
-	}
-
-	/**
 	 * Get repository for current submodule entry
 	 *
 	 * @return repository or null if non-existent
@@ -726,13 +659,8 @@ public class SubmoduleWalk implements AutoCloseable {
 		return url != null ? getSubmoduleRemoteUrl(repository, url) : null;
 	}
 
-	/**
-	 * Release any resources used by this walker's reader.
-	 *
-	 * @since 4.0
-	 */
-	@Override
-	public void close() {
-		walk.close();
+	/** Release any resources used by this walker's reader. */
+	public void release() {
+		walk.release();
 	}
 }

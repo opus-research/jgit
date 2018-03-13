@@ -62,8 +62,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 
-import org.eclipse.jgit.attributes.AttributesNode;
-import org.eclipse.jgit.attributes.AttributesRule;
+import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
@@ -71,11 +70,9 @@ import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
-import org.eclipse.jgit.ignore.FastIgnoreRule;
 import org.eclipse.jgit.ignore.IgnoreNode;
+import org.eclipse.jgit.ignore.IgnoreRule;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.file.GlobalAttributesNode;
-import org.eclipse.jgit.internal.storage.file.InfoAttributesNode;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig;
 import org.eclipse.jgit.lib.CoreConfig.CheckStat;
@@ -136,9 +133,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	/** If there is a .gitignore file present, the parsed rules from it. */
 	private IgnoreNode ignoreNode;
 
-	/** If there is a .gitattributes file present, the parsed rules from it. */
-	private AttributesNode attributesNode;
-
 	/** Repository that is the root level being iterated over */
 	protected Repository repository;
 
@@ -147,19 +141,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 	/** The offset of the content id in {@link #idBuffer()} */
 	private int contentIdOffset;
-
-	/**
-	 * Holds the {@link AttributesNode} that is stored in
-	 * $GIT_DIR/info/attributes file.
-	 */
-	private AttributesNode infoAttributesNode;
-
-	/**
-	 * Holds the {@link AttributesNode} that is stored in global attribute file.
-	 *
-	 * @see CoreConfig#getAttributesFile()
-	 */
-	private AttributesNode globalAttributesNode;
 
 	/**
 	 * Create a new iterator with no parent.
@@ -204,8 +185,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	protected WorkingTreeIterator(final WorkingTreeIterator p) {
 		super(p);
 		state = p.state;
-		infoAttributesNode = p.infoAttributesNode;
-		globalAttributesNode = p.globalAttributesNode;
 	}
 
 	/**
@@ -225,10 +204,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		else
 			entry = null;
 		ignoreNode = new RootIgnoreNode(entry, repo);
-
-		infoAttributesNode = new InfoAttributesNode(repo);
-
-		globalAttributesNode = new GlobalAttributesNode(repo);
 	}
 
 	/**
@@ -598,26 +573,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *             a relevant ignore rule file exists but cannot be read.
 	 */
 	protected boolean isEntryIgnored(final int pLen) throws IOException {
-		return isEntryIgnored(pLen, mode, false);
-	}
-
-	/**
-	 * Determine if the entry path is ignored by an ignore rule. Consider
-	 * possible rule negation from child iterator.
-	 *
-	 * @param pLen
-	 *            the length of the path in the path buffer.
-	 * @param fileMode
-	 *            the original iterator file mode
-	 * @param negatePrevious
-	 *            true if the previous matching iterator rule was negation
-	 * @return true if the entry is ignored by an ignore rule.
-	 * @throws IOException
-	 *             a relevant ignore rule file exists but cannot be read.
-	 */
-	private boolean isEntryIgnored(final int pLen, int fileMode,
-			boolean negatePrevious)
-			throws IOException {
 		IgnoreNode rules = getIgnoreNode();
 		if (rules != null) {
 			// The ignore code wants path to start with a '/' if possible.
@@ -628,23 +583,17 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			if (0 < pOff)
 				pOff--;
 			String p = TreeWalk.pathOf(path, pOff, pLen);
-			switch (rules.isIgnored(p, FileMode.TREE.equals(fileMode),
-					negatePrevious)) {
+			switch (rules.isIgnored(p, FileMode.TREE.equals(mode))) {
 			case IGNORED:
 				return true;
 			case NOT_IGNORED:
 				return false;
 			case CHECK_PARENT:
-				negatePrevious = false;
-				break;
-			case CHECK_PARENT_NEGATE_FIRST_MATCH:
-				negatePrevious = true;
 				break;
 			}
 		}
 		if (parent instanceof WorkingTreeIterator)
-			return ((WorkingTreeIterator) parent).isEntryIgnored(pLen, fileMode,
-					negatePrevious);
+			return ((WorkingTreeIterator) parent).isEntryIgnored(pLen);
 		return false;
 	}
 
@@ -652,56 +601,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		if (ignoreNode instanceof PerDirectoryIgnoreNode)
 			ignoreNode = ((PerDirectoryIgnoreNode) ignoreNode).load();
 		return ignoreNode;
-	}
-
-	/**
-	 * Retrieves the {@link AttributesNode} for the current entry.
-	 *
-	 * @return {@link AttributesNode} for the current entry.
-	 * @throws IOException
-	 *             if an error is raised while parsing the .gitattributes file
-	 * @since 3.7
-	 */
-	public AttributesNode getEntryAttributesNode() throws IOException {
-		if (attributesNode instanceof PerDirectoryAttributesNode)
-			attributesNode = ((PerDirectoryAttributesNode) attributesNode)
-					.load();
-		return attributesNode;
-	}
-
-	/**
-	 * Retrieves the {@link AttributesNode} that holds the information located
-	 * in $GIT_DIR/info/attributes file.
-	 *
-	 * @return the {@link AttributesNode} that holds the information located in
-	 *         $GIT_DIR/info/attributes file.
-	 * @throws IOException
-	 *             if an error is raised while parsing the attributes file
-	 * @since 3.7
-	 */
-	public AttributesNode getInfoAttributesNode() throws IOException {
-		if (infoAttributesNode instanceof InfoAttributesNode)
-			infoAttributesNode = ((InfoAttributesNode) infoAttributesNode).load();
-		return infoAttributesNode;
-	}
-
-	/**
-	 * Retrieves the {@link AttributesNode} that holds the information located
-	 * in system-wide file.
-	 *
-	 * @return the {@link AttributesNode} that holds the information located in
-	 *         system-wide file.
-	 * @throws IOException
-	 *             IOException if an error is raised while parsing the
-	 *             attributes file
-	 * @see CoreConfig#getAttributesFile()
-	 * @since 3.7
-	 */
-	public AttributesNode getGlobalAttributesNode() throws IOException {
-		if (globalAttributesNode instanceof GlobalAttributesNode)
-			globalAttributesNode = ((GlobalAttributesNode) globalAttributesNode)
-					.load();
-		return globalAttributesNode;
 	}
 
 	private static final Comparator<Entry> ENTRY_CMP = new Comparator<Entry>() {
@@ -757,8 +656,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				continue;
 			if (Constants.DOT_GIT_IGNORE.equals(name))
 				ignoreNode = new PerDirectoryIgnoreNode(e);
-			if (Constants.DOT_GIT_ATTRIBUTES.equals(name))
-				attributesNode = new PerDirectoryAttributesNode(e);
 			if (i != o)
 				entries[o] = e;
 			e.encodeName(nameEncoder);
@@ -888,6 +785,32 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			return MetadataDiff.EQUAL;
 		else
 			return MetadataDiff.SMUDGED;
+	}
+
+	/**
+	 * Checks whether this entry differs from a given entry from the
+	 * {@link DirCache}.
+	 *
+	 * File status information is used and if status is same we consider the
+	 * file identical to the state in the working directory. Native git uses
+	 * more stat fields than we have accessible in Java.
+	 *
+	 * @param entry
+	 *            the entry from the dircache we want to compare against
+	 * @param forceContentCheck
+	 *            True if the actual file content should be checked if
+	 *            modification time differs.
+	 * @return true if content is most likely different.
+	 * @deprecated Use {@link #isModified(DirCacheEntry, boolean, ObjectReader)}
+	 */
+	@Deprecated
+	public boolean isModified(DirCacheEntry entry, boolean forceContentCheck) {
+		try {
+			return isModified(entry, forceContentCheck,
+					repository.newObjectReader());
+		} catch (IOException e) {
+			throw new JGitInternalException(e.getMessage(), e);
+		}
 	}
 
 	/**
@@ -1209,7 +1132,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		final Entry entry;
 
 		PerDirectoryIgnoreNode(Entry entry) {
-			super(Collections.<FastIgnoreRule> emptyList());
+			super(Collections.<IgnoreRule> emptyList());
 			this.entry = entry;
 		}
 
@@ -1276,28 +1199,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			}
 		}
 	}
-
-	/** Magic type indicating we know rules exist, but they aren't loaded. */
-	private static class PerDirectoryAttributesNode extends AttributesNode {
-		final Entry entry;
-
-		PerDirectoryAttributesNode(Entry entry) {
-			super(Collections.<AttributesRule> emptyList());
-			this.entry = entry;
-		}
-
-		AttributesNode load() throws IOException {
-			AttributesNode r = new AttributesNode();
-			InputStream in = entry.openInputStream();
-			try {
-				r.parse(in);
-			} finally {
-				in.close();
-			}
-			return r.getRules().isEmpty() ? null : r;
-		}
-	}
-
 
 	private static final class IteratorState {
 		/** Options used to process the working tree. */

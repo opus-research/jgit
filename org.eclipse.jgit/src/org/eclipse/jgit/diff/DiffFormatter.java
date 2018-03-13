@@ -104,7 +104,7 @@ import org.eclipse.jgit.util.io.DisabledOutputStream;
 /**
  * Format a Git style patch script.
  */
-public class DiffFormatter implements AutoCloseable {
+public class DiffFormatter {
 	private static final int DEFAULT_BINARY_FILE_THRESHOLD = PackConfig.DEFAULT_BIG_FILE_THRESHOLD;
 
 	private static final byte[] noNewLine = encodeASCII("\\ No newline at end of file\n"); //$NON-NLS-1$
@@ -173,7 +173,7 @@ public class DiffFormatter implements AutoCloseable {
 	 */
 	public void setRepository(Repository repository) {
 		if (reader != null)
-			reader.close();
+			reader.release();
 
 		db = repository;
 		reader = db.newObjectReader();
@@ -380,15 +380,10 @@ public class DiffFormatter implements AutoCloseable {
 		out.flush();
 	}
 
-	/**
-	 * Release the internal ObjectReader state.
-	 *
-	 * @since 4.0
-	 */
-	@Override
-	public void close() {
+	/** Release the internal ObjectReader state. */
+	public void release() {
 		if (reader != null)
-			reader.close();
+			reader.release();
 	}
 
 	/**
@@ -414,11 +409,10 @@ public class DiffFormatter implements AutoCloseable {
 			throws IOException {
 		assertHaveRepository();
 
-		try (RevWalk rw = new RevWalk(reader)) {
-			RevTree aTree = a != null ? rw.parseTree(a) : null;
-			RevTree bTree = b != null ? rw.parseTree(b) : null;
-			return scan(aTree, bTree);
-		}
+		RevWalk rw = new RevWalk(reader);
+		RevTree aTree = a != null ? rw.parseTree(a) : null;
+		RevTree bTree = b != null ? rw.parseTree(b) : null;
+		return scan(aTree, bTree);
 	}
 
 	/**
@@ -665,9 +659,16 @@ public class DiffFormatter implements AutoCloseable {
 		format(res.header, res.a, res.b);
 	}
 
-	private static byte[] writeGitLinkText(AbbreviatedObjectId id) {
-		return encodeASCII("Subproject commit " + id.name() //$NON-NLS-1$
-				+ "\n"); //$NON-NLS-1$
+	private static void writeGitLinkDiffText(OutputStream o, DiffEntry ent)
+			throws IOException {
+		if (ent.getOldMode() == GITLINK) {
+			o.write(encodeASCII("-Subproject commit " + ent.getOldId().name() //$NON-NLS-1$
+					+ "\n")); //$NON-NLS-1$
+		}
+		if (ent.getNewMode() == GITLINK) {
+			o.write(encodeASCII("+Subproject commit " + ent.getNewId().name() //$NON-NLS-1$
+					+ "\n")); //$NON-NLS-1$
+		}
 	}
 
 	private String format(AbbreviatedObjectId id) {
@@ -736,10 +737,10 @@ public class DiffFormatter implements AutoCloseable {
 			final int endIdx = findCombinedEnd(edits, curIdx);
 			final Edit endEdit = edits.get(endIdx);
 
-			int aCur = (int) Math.max(0, (long) curEdit.getBeginA() - context);
-			int bCur = (int) Math.max(0, (long) curEdit.getBeginB() - context);
-			final int aEnd = (int) Math.min(a.size(), (long) endEdit.getEndA() + context);
-			final int bEnd = (int) Math.min(b.size(), (long) endEdit.getEndB() + context);
+			int aCur = Math.max(0, curEdit.getBeginA() - context);
+			int bCur = Math.max(0, curEdit.getBeginB() - context);
+			final int aEnd = Math.min(a.size(), endEdit.getEndA() + context);
+			final int bEnd = Math.min(b.size(), endEdit.getEndB() + context);
 
 			writeHunkHeader(aCur, aEnd, bCur, bEnd);
 
@@ -931,7 +932,13 @@ public class DiffFormatter implements AutoCloseable {
 
 		formatHeader(buf, ent);
 
-		if (ent.getOldId() == null || ent.getNewId() == null) {
+		if (ent.getOldMode() == GITLINK || ent.getNewMode() == GITLINK) {
+			formatOldNewPaths(buf, ent);
+			writeGitLinkDiffText(buf, ent);
+			editList = new EditList();
+			type = PatchType.UNIFIED;
+
+		} else if (ent.getOldId() == null || ent.getNewId() == null) {
 			// Content not changed (e.g. only mode, pure rename)
 			editList = new EditList();
 			type = PatchType.UNIFIED;
@@ -939,15 +946,8 @@ public class DiffFormatter implements AutoCloseable {
 		} else {
 			assertHaveRepository();
 
-			byte[] aRaw, bRaw;
-
-			if (ent.getOldMode() == GITLINK || ent.getNewMode() == GITLINK) {
-				aRaw = writeGitLinkText(ent.getOldId());
-				bRaw = writeGitLinkText(ent.getNewId());
-			} else {
-				aRaw = open(OLD, ent);
-				bRaw = open(NEW, ent);
-			}
+			byte[] aRaw = open(OLD, ent);
+			byte[] bRaw = open(NEW, ent);
 
 			if (aRaw == BINARY || bRaw == BINARY //
 					|| RawText.isBinary(aRaw) || RawText.isBinary(bRaw)) {

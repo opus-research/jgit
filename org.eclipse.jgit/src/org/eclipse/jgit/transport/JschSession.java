@@ -55,7 +55,6 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.util.io.StreamCopyThread;
 
 import com.jcraft.jsch.Channel;
@@ -71,13 +70,13 @@ import com.jcraft.jsch.Session;
  * to the constructor.
  */
 public class JschSession implements RemoteSession {
-	final Session sock;
-	final URIish uri;
+	private final Session sock;
+	private final URIish uri;
 
 	/**
 	 * Create a new session object by passing the real Jsch session and the URI
 	 * information.
-	 *
+	 * 
 	 * @param session
 	 *            the real Jsch session created elsewhere.
 	 * @param uri
@@ -119,7 +118,7 @@ public class JschSession implements RemoteSession {
 	private class JschProcess extends Process {
 		private ChannelExec channel;
 
-		final int timeout;
+		private final int timeout;
 
 		private InputStream inputStream;
 
@@ -141,7 +140,7 @@ public class JschSession implements RemoteSession {
 		 * @throws IOException
 		 *             on problems opening streams
 		 */
-		JschProcess(final String commandName, int tms)
+		private JschProcess(final String commandName, int tms)
 				throws TransportException, IOException {
 			timeout = tms;
 			try {
@@ -150,8 +149,7 @@ public class JschSession implements RemoteSession {
 				setupStreams();
 				channel.connect(timeout > 0 ? timeout * 1000 : 0);
 				if (!channel.isConnected())
-					throw new TransportException(uri,
-							JGitText.get().connectionFailed);
+					throw new TransportException(uri, "connection failed");
 			} catch (JSchException e) {
 				throw new TransportException(uri, e.getMessage(), e);
 			}

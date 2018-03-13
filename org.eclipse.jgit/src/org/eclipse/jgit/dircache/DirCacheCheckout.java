@@ -58,6 +58,7 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.IndexWriteException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
 import org.eclipse.jgit.lib.CoreConfig.SymLinks;
 import org.eclipse.jgit.lib.FileMode;
@@ -403,7 +404,8 @@ public class DirCacheCheckout {
 			MissingObjectException, IncorrectObjectTypeException,
 			CheckoutConflictException, IndexWriteException {
 		toBeDeleted.clear();
-		try (ObjectReader objectReader = repo.getObjectDatabase().newReader()) {
+		ObjectReader objectReader = repo.getObjectDatabase().newReader();
+		try {
 			if (headCommitTree != null)
 				preScanTwoTrees();
 			else
@@ -445,14 +447,26 @@ public class DirCacheCheckout {
 				removeEmptyParents(file);
 
 			for (String path : updated.keySet()) {
+				// ... create/overwrite this file ...
+				file = new File(repo.getWorkTree(), path);
+				if (!file.getParentFile().mkdirs()) {
+					// ignore
+				}
+
 				DirCacheEntry entry = dc.getEntry(path);
-				if (!FileMode.GITLINK.equals(entry.getRawMode()))
-					checkoutEntry(repo, entry, objectReader, false);
+
+				// submodules are handled with separate operations
+				if (FileMode.GITLINK.equals(entry.getRawMode()))
+					continue;
+
+				checkoutEntry(repo, file, entry, objectReader);
 			}
 
 			// commit the index builder - a new index is persisted
 			if (!builder.commit())
 				throw new IndexWriteException();
+		} finally {
+			objectReader.release();
 		}
 		return toBeDeleted.size() == 0;
 	}
@@ -684,7 +698,7 @@ public class DirCacheCheckout {
 			// Nothing in Index
 			// At least one of Head, Index, Merge is not empty
 			// make sure not to overwrite untracked files
-			if (f != null && !f.isEntryIgnored()) {
+			if (f != null) {
 				// A submodule is not a file. We should ignore it
 				if (!FileMode.GITLINK.equals(mMode)) {
 					// a dirty worktree: the index is empty but we have a
@@ -1053,7 +1067,8 @@ public class DirCacheCheckout {
 	 */
 	private boolean isModifiedSubtree_IndexWorkingtree(String path)
 			throws CorruptObjectException, IOException {
-		try (NameConflictTreeWalk tw = new NameConflictTreeWalk(repo)) {
+		NameConflictTreeWalk tw = new NameConflictTreeWalk(repo);
+		try {
 			tw.addTree(new DirCacheIterator(dc));
 			tw.addTree(new FileTreeIterator(repo));
 			tw.setRecursive(true);
@@ -1071,6 +1086,8 @@ public class DirCacheCheckout {
 				}
 			}
 			return false;
+		} finally {
+			tw.release();
 		}
 	}
 
@@ -1099,7 +1116,8 @@ public class DirCacheCheckout {
 	 */
 	private boolean isModifiedSubtree_IndexTree(String path, ObjectId tree)
 			throws CorruptObjectException, IOException {
-		try (NameConflictTreeWalk tw = new NameConflictTreeWalk(repo)) {
+		NameConflictTreeWalk tw = new NameConflictTreeWalk(repo);
+		try {
 			tw.addTree(new DirCacheIterator(dc));
 			tw.addTree(tree);
 			tw.setRecursive(true);
@@ -1117,6 +1135,42 @@ public class DirCacheCheckout {
 					return true;
 			}
 			return false;
+		} finally {
+			tw.release();
+		}
+	}
+
+	/**
+	 * Updates the file in the working tree with content and mode from an entry
+	 * in the index. The new content is first written to a new temporary file in
+	 * the same directory as the real file. Then that new file is renamed to the
+	 * final filename. Use this method only for checkout of a single entry.
+	 * Otherwise use
+	 * {@code checkoutEntry(Repository, File f, DirCacheEntry, ObjectReader)}
+	 * instead which allows to reuse one {@code ObjectReader} for multiple
+	 * entries.
+	 *
+	 * <p>
+	 * TODO: this method works directly on File IO, we may need another
+	 * abstraction (like WorkingTreeIterator). This way we could tell e.g.
+	 * Eclipse that Files in the workspace got changed
+	 * </p>
+	 *
+	 * @param repository
+	 * @param f
+	 *            the file to be modified. The parent directory for this file
+	 *            has to exist already
+	 * @param entry
+	 *            the entry containing new mode and content
+	 * @throws IOException
+	 */
+	public static void checkoutEntry(final Repository repository, File f,
+			DirCacheEntry entry) throws IOException {
+		ObjectReader or = repository.newObjectReader();
+		try {
+			checkoutEntry(repository, f, entry, repository.newObjectReader());
+		} finally {
+			or.release();
 		}
 	}
 
@@ -1127,125 +1181,73 @@ public class DirCacheCheckout {
 	 * final filename.
 	 *
 	 * <p>
-	 * <b>Note:</b> if the entry path on local file system exists as a non-empty
-	 * directory, and the target entry type is a link or file, the checkout will
-	 * fail with {@link IOException} since existing non-empty directory cannot
-	 * be renamed to file or link without deleting it recursively.
-	 * </p>
-	 *
-	 * <p>
 	 * TODO: this method works directly on File IO, we may need another
 	 * abstraction (like WorkingTreeIterator). This way we could tell e.g.
 	 * Eclipse that Files in the workspace got changed
 	 * </p>
 	 *
 	 * @param repo
-	 *            repository managing the destination work tree.
+	 * @param f
+	 *            the file to be modified. The parent directory for this file
+	 *            has to exist already
 	 * @param entry
 	 *            the entry containing new mode and content
 	 * @param or
 	 *            object reader to use for checkout
 	 * @throws IOException
-	 * @since 3.6
 	 */
-	public static void checkoutEntry(Repository repo, DirCacheEntry entry,
-			ObjectReader or) throws IOException {
-		checkoutEntry(repo, entry, or, false);
-	}
-
-	/**
-	 * Updates the file in the working tree with content and mode from an entry
-	 * in the index. The new content is first written to a new temporary file in
-	 * the same directory as the real file. Then that new file is renamed to the
-	 * final filename.
-	 *
-	 * <p>
-	 * <b>Note:</b> if the entry path on local file system exists as a file, it
-	 * will be deleted and if it exists as a directory, it will be deleted
-	 * recursively, independently if has any content.
-	 * </p>
-	 *
-	 * <p>
-	 * TODO: this method works directly on File IO, we may need another
-	 * abstraction (like WorkingTreeIterator). This way we could tell e.g.
-	 * Eclipse that Files in the workspace got changed
-	 * </p>
-	 *
-	 * @param repo
-	 *            repository managing the destination work tree.
-	 * @param entry
-	 *            the entry containing new mode and content
-	 * @param or
-	 *            object reader to use for checkout
-	 * @param deleteRecursive
-	 *            true to recursively delete final path if it exists on the file
-	 *            system
-	 *
-	 * @throws IOException
-	 * @since 4.2
-	 */
-	public static void checkoutEntry(Repository repo, DirCacheEntry entry,
-			ObjectReader or, boolean deleteRecursive) throws IOException {
+	public static void checkoutEntry(final Repository repo, File f,
+			DirCacheEntry entry, ObjectReader or) throws IOException {
 		ObjectLoader ol = or.open(entry.getObjectId());
-		File f = new File(repo.getWorkTree(), entry.getPathString());
 		File parentDir = f.getParentFile();
-		FileUtils.mkdirs(parentDir, true);
+		parentDir.mkdirs();
 		FS fs = repo.getFS();
 		WorkingTreeOptions opt = repo.getConfig().get(WorkingTreeOptions.KEY);
 		if (entry.getFileMode() == FileMode.SYMLINK
 				&& opt.getSymLinks() == SymLinks.TRUE) {
 			byte[] bytes = ol.getBytes();
 			String target = RawParseUtils.decode(bytes);
-			if (deleteRecursive && f.isDirectory()) {
-				FileUtils.delete(f, FileUtils.RECURSIVE);
-			}
 			fs.createSymLink(f, target);
 			entry.setLength(bytes.length);
 			entry.setLastModified(fs.lastModified(f));
-			return;
-		}
-
-		File tmpFile = File.createTempFile(
-				"._" + f.getName(), null, parentDir); //$NON-NLS-1$
-		OutputStream channel = new FileOutputStream(tmpFile);
-		if (opt.getAutoCRLF() == AutoCRLF.TRUE)
-			channel = new AutoCRLFOutputStream(channel);
-		try {
-			ol.copyTo(channel);
-		} finally {
-			channel.close();
-		}
-		entry.setLength(opt.getAutoCRLF() == AutoCRLF.TRUE ? //
-				tmpFile.length() // AutoCRLF wants on-disk-size
-				: (int) ol.getSize());
-
-		if (opt.isFileMode() && fs.supportsExecute()) {
-			if (FileMode.EXECUTABLE_FILE.equals(entry.getRawMode())) {
-				if (!fs.canExecute(tmpFile))
-					fs.setExecute(tmpFile, true);
-			} else {
-				if (fs.canExecute(tmpFile))
-					fs.setExecute(tmpFile, false);
+		} else {
+			File tmpFile = File.createTempFile(
+					"._" + f.getName(), null, parentDir); //$NON-NLS-1$
+			FileOutputStream rawChannel = new FileOutputStream(tmpFile);
+			OutputStream channel;
+			if (opt.getAutoCRLF() == AutoCRLF.TRUE)
+				channel = new AutoCRLFOutputStream(rawChannel);
+			else
+				channel = rawChannel;
+			try {
+				ol.copyTo(channel);
+			} finally {
+				channel.close();
 			}
-		}
-		try {
-			if (deleteRecursive && f.isDirectory()) {
-				FileUtils.delete(f, FileUtils.RECURSIVE);
+			if (opt.isFileMode() && fs.supportsExecute()) {
+				if (FileMode.EXECUTABLE_FILE.equals(entry.getRawMode())) {
+					if (!fs.canExecute(tmpFile))
+						fs.setExecute(tmpFile, true);
+				} else {
+					if (fs.canExecute(tmpFile))
+						fs.setExecute(tmpFile, false);
+				}
 			}
-			FileUtils.rename(tmpFile, f);
-		} catch (IOException e) {
-			throw new IOException(MessageFormat.format(
-					JGitText.get().renameFileFailed, tmpFile.getPath(),
-					f.getPath()));
-		} finally {
-			if (tmpFile.exists()) {
-				FileUtils.delete(tmpFile);
+			try {
+				FileUtils.rename(tmpFile, f);
+			} catch (IOException e) {
+				throw new IOException(MessageFormat.format(
+						JGitText.get().renameFileFailed, tmpFile.getPath(),
+						f.getPath()));
 			}
 		}
 		entry.setLastModified(f.lastModified());
+		if (opt.getAutoCRLF() != AutoCRLF.FALSE)
+			entry.setLength(f.length()); // AutoCRLF wants on-disk-size
+		else
+			entry.setLength((int) ol.getSize());
 	}
 
-	@SuppressWarnings("deprecation")
 	private static void checkValidPath(CanonicalTreeParser t)
 			throws InvalidPathException {
 		ObjectChecker chk = new ObjectChecker()
@@ -1263,13 +1265,23 @@ public class DirCacheCheckout {
 	 *             if the path is invalid
 	 * @since 3.3
 	 */
-	static void checkValidPath(String path) throws InvalidPathException {
+	public static void checkValidPath(String path) throws InvalidPathException {
+		ObjectChecker chk = new ObjectChecker()
+			.setSafeForWindows(SystemReader.getInstance().isWindows())
+			.setSafeForMacOS(SystemReader.getInstance().isMacOS());
+
+		byte[] bytes = Constants.encode(path);
+		int segmentStart = 0;
 		try {
-			SystemReader.getInstance().checkPath(path);
+			for (int i = 0; i < bytes.length; i++) {
+				if (bytes[i] == '/') {
+					chk.checkPathSegment(bytes, segmentStart, i);
+					segmentStart = i + 1;
+				}
+			}
+			chk.checkPathSegment(bytes, segmentStart, bytes.length);
 		} catch (CorruptObjectException e) {
-			InvalidPathException p = new InvalidPathException(path);
-			p.initCause(e);
-			throw p;
+			throw new InvalidPathException(e.getMessage());
 		}
 	}
 

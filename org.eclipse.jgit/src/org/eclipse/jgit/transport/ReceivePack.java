@@ -43,7 +43,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_ATOMIC;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_REPORT_STATUS;
 
 import java.io.IOException;
@@ -200,14 +199,8 @@ public class ReceivePack extends BaseReceivePack {
 			}
 
 			if (unpackError == null) {
-				boolean atomic = isCapabilityEnabled(CAPABILITY_ATOMIC);
 				validateCommands();
-				if (atomic && anyRejects())
-					failPendingCommands();
-
 				preReceive.onPreReceive(this, filterCommands(Result.NOT_ATTEMPTED));
-				if (atomic && anyRejects())
-					failPendingCommands();
 				executeCommands();
 			}
 			unlockPack();
@@ -240,17 +233,10 @@ public class ReceivePack extends BaseReceivePack {
 				});
 			}
 
-			if (unpackError != null) {
-				// we already know which exception to throw. Ignore
-				// potential additional exceptions raised in postReceiveHooks
-				try {
-					postReceive.onPostReceive(this, filterCommands(Result.OK));
-				} catch (Throwable e) {
-					// empty
-				}
-				throw new UnpackException(unpackError);
-			}
 			postReceive.onPostReceive(this, filterCommands(Result.OK));
+
+			if (unpackError != null)
+				throw new UnpackException(unpackError);
 		}
 	}
 

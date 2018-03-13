@@ -68,8 +68,6 @@ import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.filter.RevFilter;
-import org.eclipse.jgit.treewalk.AbstractTreeIterator;
-import org.eclipse.jgit.treewalk.EmptyTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 
@@ -196,12 +194,10 @@ public class RecursiveMerger extends ResolveMerger {
 							Integer.valueOf(MAX_BASES), a.name(), b.name(),
 									Integer.valueOf(baseCommits.size())));
 				parents.add(nextBase);
-				RevCommit bc = getBaseCommit(currentBase, nextBase,
-						callDepth + 1);
-				AbstractTreeIterator bcTree = (bc == null) ? new EmptyTreeIterator()
-						: openTree(bc.getTree());
-				if (mergeTrees(bcTree, currentBase.getTree(),
-						nextBase.getTree(), true))
+				if (mergeTrees(
+						openTree(getBaseCommit(currentBase, nextBase,
+								callDepth + 1).getTree()),
+						currentBase.getTree(), nextBase.getTree(), true))
 					currentBase = createCommitForTree(resultTree, parents);
 				else
 					throw new NoMergeBaseException(
@@ -269,15 +265,14 @@ public class RecursiveMerger extends ResolveMerger {
 	private DirCache dircacheFromTree(ObjectId treeId) throws IOException {
 		DirCache ret = DirCache.newInCore();
 		DirCacheBuilder aBuilder = ret.builder();
-		try (TreeWalk atw = new TreeWalk(reader)) {
-			atw.addTree(treeId);
-			atw.setRecursive(true);
-			while (atw.next()) {
-				DirCacheEntry e = new DirCacheEntry(atw.getRawPath());
-				e.setFileMode(atw.getFileMode(0));
-				e.setObjectId(atw.getObjectId(0));
-				aBuilder.add(e);
-			}
+		TreeWalk atw = new TreeWalk(reader);
+		atw.addTree(treeId);
+		atw.setRecursive(true);
+		while (atw.next()) {
+			DirCacheEntry e = new DirCacheEntry(atw.getRawPath());
+			e.setFileMode(atw.getFileMode(0));
+			e.setObjectId(atw.getObjectId(0));
+			aBuilder.add(e);
 		}
 		aBuilder.finish();
 		return ret;

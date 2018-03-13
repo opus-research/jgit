@@ -64,8 +64,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.eclipse.jgit.attributes.AttributesNodeProvider;
 import org.eclipse.jgit.dircache.DirCache;
+import org.eclipse.jgit.dircache.DirCacheCheckout;
+import org.eclipse.jgit.dircache.InvalidPathException;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -89,7 +90,6 @@ import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
-import org.eclipse.jgit.util.SystemReader;
 import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
@@ -100,7 +100,7 @@ import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
  * <p>
  * This class is thread-safe.
  */
-public abstract class Repository implements AutoCloseable {
+public abstract class Repository {
 	private static final ListenerList globalListeners = new ListenerList();
 
 	/** @return the global listener list observing all events in this JVM. */
@@ -209,16 +209,6 @@ public abstract class Repository implements AutoCloseable {
 	 * @return the configuration of this repository
 	 */
 	public abstract StoredConfig getConfig();
-
-	/**
-	 * @return a new {@link AttributesNodeProvider}. This
-	 *         {@link AttributesNodeProvider} is lazy loaded only once. It means
-	 *         that it will not be updated after loading. Prefer creating new
-	 *         instance for each use.
-	 * @since 4.2
-	 */
-	public abstract AttributesNodeProvider createAttributesNodeProvider();
-
 
 	/**
 	 * @return the used file system abstraction
@@ -390,7 +380,8 @@ public abstract class Repository implements AutoCloseable {
 	public ObjectId resolve(final String revstr)
 			throws AmbiguousObjectException, IncorrectObjectTypeException,
 			RevisionSyntaxException, IOException {
-		try (RevWalk rw = new RevWalk(this)) {
+		RevWalk rw = new RevWalk(this);
+		try {
 			Object resolved = resolve(rw, revstr);
 			if (resolved instanceof String) {
 				final Ref ref = getRef((String)resolved);
@@ -398,6 +389,8 @@ public abstract class Repository implements AutoCloseable {
 			} else {
 				return (ObjectId) resolved;
 			}
+		} finally {
+			rw.release();
 		}
 	}
 
@@ -414,7 +407,8 @@ public abstract class Repository implements AutoCloseable {
 	 */
 	public String simplify(final String revstr)
 			throws AmbiguousObjectException, IOException {
-		try (RevWalk rw = new RevWalk(this)) {
+		RevWalk rw = new RevWalk(this);
+		try {
 			Object resolved = resolve(rw, revstr);
 			if (resolved != null)
 				if (resolved instanceof String)
@@ -422,6 +416,8 @@ public abstract class Repository implements AutoCloseable {
 				else
 					return ((AnyObjectId) resolved).getName();
 			return null;
+		} finally {
+			rw.release();
 		}
 	}
 
@@ -762,11 +758,8 @@ public abstract class Repository implements AutoCloseable {
 
 	private String resolveReflogCheckout(int checkoutNo)
 			throws IOException {
-		ReflogReader reader = getReflogReader(Constants.HEAD);
-		if (reader == null) {
-			return null;
-		}
-		List<ReflogEntry> reflogEntries = reader.getReverseEntries();
+		List<ReflogEntry> reflogEntries = getReflogReader(Constants.HEAD)
+				.getReverseEntries();
 		for (ReflogEntry entry : reflogEntries) {
 			CheckoutEntry checkout = entry.parseCheckout();
 			if (checkout != null)
@@ -787,11 +780,6 @@ public abstract class Repository implements AutoCloseable {
 		}
 		assert number >= 0;
 		ReflogReader reader = getReflogReader(ref.getName());
-		if (reader == null) {
-			throw new RevisionSyntaxException(
-					MessageFormat.format(JGitText.get().reflogEntryNotFound,
-							Integer.valueOf(number), ref.getName()));
-		}
 		ReflogEntry entry = reader.getReverseEntry(number);
 		if (entry == null)
 			throw new RevisionSyntaxException(MessageFormat.format(
@@ -804,7 +792,8 @@ public abstract class Repository implements AutoCloseable {
 	private ObjectId resolveAbbreviation(final String revstr) throws IOException,
 			AmbiguousObjectException {
 		AbbreviatedObjectId id = AbbreviatedObjectId.fromString(revstr);
-		try (ObjectReader reader = newObjectReader()) {
+		ObjectReader reader = newObjectReader();
+		try {
 			Collection<ObjectId> matches = reader.resolve(id);
 			if (matches.size() == 0)
 				return null;
@@ -812,6 +801,8 @@ public abstract class Repository implements AutoCloseable {
 				return matches.iterator().next();
 			else
 				throw new AmbiguousObjectException(id, matches);
+		} finally {
+			reader.release();
 		}
 	}
 
@@ -860,9 +851,8 @@ public abstract class Repository implements AutoCloseable {
 	 * Except when HEAD is detached, in which case this method returns the
 	 * current ObjectId in hexadecimal string format.
 	 *
-	 * @return name of current branch (for example {@code refs/heads/master}),
-	 *         an ObjectId in hex format if the current branch is detached,
-	 *         or null if the repository is corrupt and has no HEAD reference.
+	 * @return name of current branch (for example {@code refs/heads/master}) or
+	 *         an ObjectId in hex format if the current branch is detached.
 	 * @throws IOException
 	 */
 	public String getFullBranch() throws IOException {
@@ -883,9 +873,8 @@ public abstract class Repository implements AutoCloseable {
 	 * leading prefix {@code refs/heads/} is removed from the reference before
 	 * it is returned to the caller.
 	 *
-	 * @return name of current branch (for example {@code master}), an
-	 *         ObjectId in hex format if the current branch is detached,
-	 *         or null if the repository is corrupt and has no HEAD reference.
+	 * @return name of current branch (for example {@code master}), or an
+	 *         ObjectId in hex format if the current branch is detached.
 	 * @throws IOException
 	 */
 	public String getBranch() throws IOException {
@@ -1165,11 +1154,11 @@ public abstract class Repository implements AutoCloseable {
 		if (refName.endsWith(".lock")) //$NON-NLS-1$
 			return false;
 
-		// Refs may be stored as loose files so invalid paths
-		// on the local system must also be invalid refs.
+		// Borrow logic for filtering out invalid paths. These
+		// are also invalid ref
 		try {
-			SystemReader.getInstance().checkPath(refName);
-		} catch (CorruptObjectException e) {
+			DirCacheCheckout.checkValidPath(refName);
+		} catch (InvalidPathException e) {
 			return false;
 		}
 
@@ -1361,40 +1350,6 @@ public abstract class Repository implements AutoCloseable {
 	public void writeMergeCommitMsg(String msg) throws IOException {
 		File mergeMsgFile = new File(gitDir, Constants.MERGE_MSG);
 		writeCommitMsg(mergeMsgFile, msg);
-	}
-
-	/**
-	 * Return the information stored in the file $GIT_DIR/COMMIT_EDITMSG. In
-	 * this file hooks triggered by an operation may read or modify the current
-	 * commit message.
-	 *
-	 * @return a String containing the content of the COMMIT_EDITMSG file or
-	 *         {@code null} if this file doesn't exist
-	 * @throws IOException
-	 * @throws NoWorkTreeException
-	 *             if this is bare, which implies it has no working directory.
-	 *             See {@link #isBare()}.
-	 * @since 4.0
-	 */
-	public String readCommitEditMsg() throws IOException, NoWorkTreeException {
-		return readCommitMsgFile(Constants.COMMIT_EDITMSG);
-	}
-
-	/**
-	 * Write new content to the file $GIT_DIR/COMMIT_EDITMSG. In this file hooks
-	 * triggered by an operation may read or modify the current commit message.
-	 * If {@code null} is specified as message the file will be deleted.
-	 *
-	 * @param msg
-	 *            the message which should be written or {@code null} to delete
-	 *            the file
-	 *
-	 * @throws IOException
-	 * @since 4.0
-	 */
-	public void writeCommitEditMsg(String msg) throws IOException {
-		File commiEditMsgFile = new File(gitDir, Constants.COMMIT_EDITMSG);
-		writeCommitMsg(commiEditMsgFile, msg);
 	}
 
 	/**

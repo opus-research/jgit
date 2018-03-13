@@ -71,9 +71,6 @@ class Checkout extends TextBuiltin {
 	@Option(name = "--force", aliases = { "-f" }, usage = "usage_forceCheckout")
 	private boolean force = false;
 
-	@Option(name = "--orphan", usage = "usage_orphan")
-	private boolean orphan = false;
-
 	@Argument(required = true, index = 0, metaVar = "metaVar_name", usage = "usage_checkout")
 	private String name;
 
@@ -89,49 +86,47 @@ class Checkout extends TextBuiltin {
 				throw die(CLIText.get().onBranchToBeBorn);
 		}
 
-		try (Git git = new Git(db)) {
-			CheckoutCommand command = git.checkout();
-			if (paths.size() > 0) {
-				command.setStartPoint(name);
-				for (String path : paths)
-					command.addPath(path);
-			} else {
-				command.setCreateBranch(createBranch);
-				command.setName(name);
-				command.setForce(force);
-				command.setOrphan(orphan);
-			}
-			try {
-				String oldBranch = db.getBranch();
-				Ref ref = command.call();
-				if (ref == null)
-					return;
-				if (Repository.shortenRefName(ref.getName()).equals(oldBranch)) {
-					outw.println(MessageFormat.format(
-							CLIText.get().alreadyOnBranch,
-							name));
-					return;
-				}
-				if (createBranch || orphan)
-					outw.println(MessageFormat.format(
-							CLIText.get().switchedToNewBranch, name));
-				else
-					outw.println(MessageFormat.format(
-							CLIText.get().switchedToBranch,
-							Repository.shortenRefName(ref.getName())));
-			} catch (RefNotFoundException e) {
+		CheckoutCommand command = new Git(db).checkout();
+		if (paths.size() > 0) {
+			command.setStartPoint(name);
+			for (String path : paths)
+				command.addPath(path);
+		} else {
+			command.setCreateBranch(createBranch);
+			command.setName(name);
+			command.setForce(force);
+		}
+		try {
+			String oldBranch = db.getBranch();
+			Ref ref = command.call();
+			if (ref == null)
+				return;
+			if (Repository.shortenRefName(ref.getName()).equals(oldBranch)) {
 				outw.println(MessageFormat.format(
-						CLIText.get().pathspecDidNotMatch,
+						CLIText.get().alreadyOnBranch,
 						name));
-			} catch (RefAlreadyExistsException e) {
-				throw die(MessageFormat.format(CLIText.get().branchAlreadyExists,
-						name));
-			} catch (CheckoutConflictException e) {
-				outw.println(CLIText.get().checkoutConflict);
-				for (String path : e.getConflictingPaths())
-					outw.println(MessageFormat.format(
-							CLIText.get().checkoutConflictPathLine, path));
+				return;
 			}
+			if (createBranch)
+				outw.println(MessageFormat.format(
+						CLIText.get().switchedToNewBranch,
+						Repository.shortenRefName(ref.getName())));
+			else
+				outw.println(MessageFormat.format(
+						CLIText.get().switchedToBranch,
+						Repository.shortenRefName(ref.getName())));
+		} catch (RefNotFoundException e) {
+			outw.println(MessageFormat.format(
+					CLIText.get().pathspecDidNotMatch,
+					name));
+		} catch (RefAlreadyExistsException e) {
+			throw die(MessageFormat.format(CLIText.get().branchAlreadyExists,
+					name));
+		} catch (CheckoutConflictException e) {
+			outw.println(CLIText.get().checkoutConflict);
+			for (String path : e.getConflictingPaths())
+				outw.println(MessageFormat.format(
+						CLIText.get().checkoutConflictPathLine, path));
 		}
 	}
 }

@@ -121,42 +121,6 @@ public class ObjectCheckerTest {
 	}
 
 	@Test
-	public void testCommitCorruptAuthor() throws CorruptObjectException {
-		StringBuilder b = new StringBuilder();
-		b.append("tree be9bfa841874ccc9f2ef7c48d0c76226f89b7189\n");
-		b.append("author b <b@c> <b@c> 0 +0000\n");
-		b.append("committer <> 0 +0000\n");
-
-		byte[] data = Constants.encodeASCII(b.toString());
-		try {
-			checker.checkCommit(data);
-			fail("Did not catch corrupt object");
-		} catch (CorruptObjectException e) {
-			assertEquals("invalid author", e.getMessage());
-		}
-		checker.setAllowInvalidPersonIdent(true);
-		checker.checkCommit(data);
-	}
-
-	@Test
-	public void testCommitCorruptCommitter() throws CorruptObjectException {
-		StringBuilder b = new StringBuilder();
-		b.append("tree be9bfa841874ccc9f2ef7c48d0c76226f89b7189\n");
-		b.append("author <> 0 +0000\n");
-		b.append("committer b <b@c> <b@c> 0 +0000\n");
-
-		byte[] data = Constants.encodeASCII(b.toString());
-		try {
-			checker.checkCommit(data);
-			fail("Did not catch corrupt object");
-		} catch (CorruptObjectException e) {
-			assertEquals("invalid committer", e.getMessage());
-		}
-		checker.setAllowInvalidPersonIdent(true);
-		checker.checkCommit(data);
-	}
-
-	@Test
 	public void testValidCommit1Parent() throws CorruptObjectException {
 		final StringBuilder b = new StringBuilder();
 
@@ -976,8 +940,7 @@ public class ObjectCheckerTest {
 	}
 
 	@Test
-	public void testInvalidTagInvalidTaggerHeader1()
-			throws CorruptObjectException {
+	public void testInvalidTagInvalidTaggerHeader1() {
 		final StringBuilder b = new StringBuilder();
 
 		b.append("object ");
@@ -995,8 +958,6 @@ public class ObjectCheckerTest {
 		} catch (CorruptObjectException e) {
 			assertEquals("invalid tagger", e.getMessage());
 		}
-		checker.setAllowInvalidPersonIdent(true);
-		checker.checkTag(data);
 	}
 
 	@Test
@@ -1334,11 +1295,12 @@ public class ObjectCheckerTest {
 	}
 
 	@Test
-	public void testInvalidTreeNameIsMixedCaseGit() {
+	public void testInvalidTreeNameIsMixedCaseGitWindows() {
 		StringBuilder b = new StringBuilder();
 		entry(b, "100644 .GiT");
 		byte[] data = Constants.encodeASCII(b.toString());
 		try {
+			checker.setSafeForWindows(true);
 			checker.checkTree(data);
 			fail("incorrectly accepted an invalid tree");
 		} catch (CorruptObjectException e) {
@@ -1347,253 +1309,17 @@ public class ObjectCheckerTest {
 	}
 
 	@Test
-	public void testInvalidTreeNameIsMacHFSGit() {
+	public void testInvalidTreeNameIsMixedCaseGitMacOS() {
 		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .gi\u200Ct");
-		byte[] data = Constants.encode(b.toString());
+		entry(b, "100644 .GiT");
+		byte[] data = Constants.encodeASCII(b.toString());
 		try {
 			checker.setSafeForMacOS(true);
 			checker.checkTree(data);
 			fail("incorrectly accepted an invalid tree");
 		} catch (CorruptObjectException e) {
-			assertEquals(
-					"invalid name '.gi\u200Ct' contains ignorable Unicode characters",
-					e.getMessage());
+			assertEquals("invalid name '.GiT'", e.getMessage());
 		}
-	}
-
-	@Test
-	public void testInvalidTreeNameIsMacHFSGit2() {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 \u206B.git");
-		byte[] data = Constants.encode(b.toString());
-		try {
-			checker.setSafeForMacOS(true);
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals(
-					"invalid name '\u206B.git' contains ignorable Unicode characters",
-					e.getMessage());
-		}
-	}
-
-	@Test
-	public void testInvalidTreeNameIsMacHFSGit3() {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .git\uFEFF");
-		byte[] data = Constants.encode(b.toString());
-		try {
-			checker.setSafeForMacOS(true);
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals(
-					"invalid name '.git\uFEFF' contains ignorable Unicode characters",
-					e.getMessage());
-		}
-	}
-
-	private static byte[] concat(byte[] b1, byte[] b2) {
-		byte[] data = new byte[b1.length + b2.length];
-		System.arraycopy(b1, 0, data, 0, b1.length);
-		System.arraycopy(b2, 0, data, b1.length, b2.length);
-		return data;
-	}
-
-	@Test
-	public void testInvalidTreeNameIsMacHFSGitCorruptUTF8AtEnd() {
-		byte[] data = concat(Constants.encode("100644 .git"),
-				new byte[] { (byte) 0xef });
-		StringBuilder b = new StringBuilder();
-		entry(b, "");
-		data = concat(data, Constants.encode(b.toString()));
-		try {
-			checker.setSafeForMacOS(true);
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals(
-					"invalid name contains byte sequence '0xef' which is not a valid UTF-8 character",
-					e.getMessage());
-		}
-	}
-
-	@Test
-	public void testInvalidTreeNameIsMacHFSGitCorruptUTF8AtEnd2() {
-		byte[] data = concat(Constants.encode("100644 .git"), new byte[] {
-				(byte) 0xe2, (byte) 0xab });
-		StringBuilder b = new StringBuilder();
-		entry(b, "");
-		data = concat(data, Constants.encode(b.toString()));
-		try {
-			checker.setSafeForMacOS(true);
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals(
-					"invalid name contains byte sequence '0xe2ab' which is not a valid UTF-8 character",
-					e.getMessage());
-		}
-	}
-
-	@Test
-	public void testInvalidTreeNameIsNotMacHFSGit()
-			throws CorruptObjectException {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .git\u200Cx");
-		byte[] data = Constants.encode(b.toString());
-		checker.setSafeForMacOS(true);
-		checker.checkTree(data);
-	}
-
-	@Test
-	public void testInvalidTreeNameIsNotMacHFSGit2()
-			throws CorruptObjectException {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .kit\u200C");
-		byte[] data = Constants.encode(b.toString());
-		checker.setSafeForMacOS(true);
-		checker.checkTree(data);
-	}
-
-	@Test
-	public void testInvalidTreeNameIsNotMacHFSGitOtherPlatform()
-			throws CorruptObjectException {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .git\u200C");
-		byte[] data = Constants.encode(b.toString());
-		checker.checkTree(data);
-	}
-
-	@Test
-	public void testInvalidTreeNameIsDotGitDot() {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .git.");
-		byte[] data = Constants.encodeASCII(b.toString());
-		try {
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals("invalid name '.git.'", e.getMessage());
-		}
-	}
-
-	@Test
-	public void testValidTreeNameIsDotGitDotDot()
-			throws CorruptObjectException {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .git..");
-		checker.checkTree(Constants.encodeASCII(b.toString()));
-	}
-
-	@Test
-	public void testInvalidTreeNameIsDotGitSpace() {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .git ");
-		byte[] data = Constants.encodeASCII(b.toString());
-		try {
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals("invalid name '.git '", e.getMessage());
-		}
-	}
-
-	@Test
-	public void testInvalidTreeNameIsDotGitSomething()
-			throws CorruptObjectException {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .gitfoobar");
-		byte[] data = Constants.encodeASCII(b.toString());
-		checker.checkTree(data);
-	}
-
-	@Test
-	public void testInvalidTreeNameIsDotGitSomethingSpaceSomething()
-			throws CorruptObjectException {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .gitfoo bar");
-		byte[] data = Constants.encodeASCII(b.toString());
-		checker.checkTree(data);
-	}
-
-	@Test
-	public void testInvalidTreeNameIsDotGitSomethingDot()
-			throws CorruptObjectException {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .gitfoobar.");
-		byte[] data = Constants.encodeASCII(b.toString());
-		checker.checkTree(data);
-	}
-
-	@Test
-	public void testInvalidTreeNameIsDotGitSomethingDotDot()
-			throws CorruptObjectException {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .gitfoobar..");
-		byte[] data = Constants.encodeASCII(b.toString());
-		checker.checkTree(data);
-	}
-
-	@Test
-	public void testInvalidTreeNameIsDotGitDotSpace() {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .git. ");
-		byte[] data = Constants.encodeASCII(b.toString());
-		try {
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals("invalid name '.git. '", e.getMessage());
-		}
-	}
-
-	@Test
-	public void testInvalidTreeNameIsDotGitSpaceDot() {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 .git . ");
-		byte[] data = Constants.encodeASCII(b.toString());
-		try {
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals("invalid name '.git . '", e.getMessage());
-		}
-	}
-
-	@Test
-	public void testInvalidTreeNameIsGITTilde1() {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 GIT~1");
-		byte[] data = Constants.encodeASCII(b.toString());
-		try {
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals("invalid name 'GIT~1'", e.getMessage());
-		}
-	}
-
-	@Test
-	public void testInvalidTreeNameIsGiTTilde1() {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 GiT~1");
-		byte[] data = Constants.encodeASCII(b.toString());
-		try {
-			checker.checkTree(data);
-			fail("incorrectly accepted an invalid tree");
-		} catch (CorruptObjectException e) {
-			assertEquals("invalid name 'GiT~1'", e.getMessage());
-		}
-	}
-
-	@Test
-	public void testValidTreeNameIsGitTilde11() throws CorruptObjectException {
-		StringBuilder b = new StringBuilder();
-		entry(b, "100644 GIT~11");
-		byte[] data = Constants.encodeASCII(b.toString());
-		checker.checkTree(data);
 	}
 
 	@Test
@@ -1807,17 +1533,6 @@ public class ObjectCheckerTest {
 		} catch (CorruptObjectException e) {
 			assertEquals("invalid name ends with ' '", e.getMessage());
 		}
-	}
-
-	@Test
-	public void testBug477090() throws CorruptObjectException {
-		checker.setSafeForMacOS(true);
-		final byte[] bytes = {
-				// U+221E 0xe2889e INFINITY ∞
-				(byte) 0xe2, (byte) 0x88, (byte) 0x9e,
-				// .html
-				0x2e, 0x68, 0x74, 0x6d, 0x6c };
-		checker.checkPathSegment(bytes, 0, bytes.length);
 	}
 
 	@Test

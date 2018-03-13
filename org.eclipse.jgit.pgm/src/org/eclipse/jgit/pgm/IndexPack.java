@@ -63,15 +63,18 @@ class IndexPack extends TextBuiltin {
 	@Override
 	protected void run() throws Exception {
 		BufferedInputStream in = new BufferedInputStream(ins);
-		try (ObjectInserter inserter = db.newObjectInserter()) {
+		ObjectInserter inserter = db.newObjectInserter();
+		try {
 			PackParser p = inserter.newPackParser(in);
 			p.setAllowThin(fixThin);
 			if (indexVersion != -1 && p instanceof ObjectDirectoryPackParser) {
 				ObjectDirectoryPackParser imp = (ObjectDirectoryPackParser) p;
 				imp.setIndexVersion(indexVersion);
 			}
-			p.parse(new TextProgressMonitor(errw));
+			p.parse(new TextProgressMonitor());
 			inserter.flush();
+		} finally {
+			inserter.release();
 		}
 	}
 }
