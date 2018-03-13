@@ -44,9 +44,9 @@
 
 package org.eclipse.jgit.dircache;
 
-import static org.eclipse.jgit.lib.FileMode.TREE;
-import static org.eclipse.jgit.lib.TreeFormatter.entrySize;
+import static org.eclipse.jgit.lib.Constants.OBJECT_ID_LENGTH;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
@@ -55,9 +55,9 @@ import java.util.Comparator;
 
 import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
-import org.eclipse.jgit.lib.TreeFormatter;
 import org.eclipse.jgit.util.MutableInteger;
 import org.eclipse.jgit.util.RawParseUtils;
 
@@ -315,8 +315,8 @@ public class DirCacheTree {
 			throws UnmergedPathException, IOException {
 		if (id == null) {
 			final int endIdx = cIdx + entrySpan;
-			final TreeFormatter fmt = new TreeFormatter(computeSize(cache,
-					cIdx, pathOffset, ow));
+			final int size = computeSize(cache, cIdx, pathOffset, ow);
+			final ByteArrayOutputStream out = new ByteArrayOutputStream(size);
 			int childIdx = 0;
 			int entryIdx = cIdx;
 
@@ -326,19 +326,27 @@ public class DirCacheTree {
 				if (childIdx < childCnt) {
 					final DirCacheTree st = children[childIdx];
 					if (st.contains(ep, pathOffset, ep.length)) {
-						fmt.append(st.encodedName, TREE, st.id);
+						FileMode.TREE.copyTo(out);
+						out.write(' ');
+						out.write(st.encodedName);
+						out.write(0);
+						st.id.copyRawTo(out);
+
 						entryIdx += st.entrySpan;
 						childIdx++;
 						continue;
 					}
 				}
 
-				fmt.append(ep, pathOffset, ep.length - pathOffset, e
-						.getFileMode(), e.idBuffer(), e.idOffset());
+				e.getFileMode().copyTo(out);
+				out.write(' ');
+				out.write(ep, pathOffset, ep.length - pathOffset);
+				out.write(0);
+				out.write(e.idBuffer(), e.idOffset(), OBJECT_ID_LENGTH);
 				entryIdx++;
 			}
 
-			id = fmt.insert(ow);
+			id = ow.insert(Constants.OBJ_TREE, out.toByteArray());
 		}
 		return id;
 	}
@@ -363,7 +371,9 @@ public class DirCacheTree {
 					final int stOffset = pathOffset + st.nameLength() + 1;
 					st.writeTree(cache, entryIdx, stOffset, ow);
 
-					size += entrySize(TREE, st.nameLength());
+					size += FileMode.TREE.copyToLength();
+					size += st.nameLength();
+					size += OBJECT_ID_LENGTH + 2;
 
 					entryIdx += st.entrySpan;
 					childIdx++;
@@ -371,7 +381,10 @@ public class DirCacheTree {
 				}
 			}
 
-			size += entrySize(e.getFileMode(), ep.length - pathOffset);
+			final FileMode mode = e.getFileMode();
+			size += mode.copyToLength();
+			size += ep.length - pathOffset;
+			size += OBJECT_ID_LENGTH + 2;
 			entryIdx++;
 		}
 
