@@ -463,10 +463,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			String oldMessage = commitToPick.getFullMessage();
 			String newMessage = interactiveHandler
 					.modifyCommitMessage(oldMessage);
-			try (Git git = new Git(repo)) {
-				newHead = git.commit().setMessage(newMessage).setAmend(true)
-						.setNoVerify(true).call();
-			}
+			newHead = new Git(repo).commit().setMessage(newMessage)
+					.setAmend(true).setNoVerify(true).call();
 			return null;
 		case EDIT:
 			rebaseState.createFile(AMEND, commitToPick.name());
@@ -755,12 +753,12 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			GitAPIException, CheckoutConflictException {
 		Ref ref = repo.exactRef(Constants.ORIG_HEAD);
 		ObjectId orig_head = ref == null ? null : ref.getObjectId();
-		try (Git git = Git.wrap(repo)) {
-			// we have already committed the cherry-picked commit.
+		try {
+			// we have already commited the cherry-picked commit.
 			// what we need is to have changes introduced by this
 			// commit to be on the index
 			// resetting is a workaround
-			git.reset().setMode(ResetType.SOFT)
+			Git.wrap(repo).reset().setMode(ResetType.SOFT)
 					.setRef("HEAD~1").call(); //$NON-NLS-1$
 		} finally {
 			// set ORIG_HEAD back to where we started because soft
