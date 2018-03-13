@@ -64,12 +64,12 @@ import java.util.Set;
 
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.junit.JGitTestUtil;
-import org.eclipse.jgit.junit.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.junit.TestRepository.BranchBuilder;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
@@ -298,7 +298,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		copyFile(JGitTestUtil.getTestResourceFile(
 				"pack-34be9032ac282b11fa9babdc2b2a93ca996c9c2f.idxV2"),
 				crc32Idx);
-		db.openPack(crc32Pack, crc32Idx);
+		db.openPack(crc32Pack);
 
 		writeVerifyPack2(true);
 	}

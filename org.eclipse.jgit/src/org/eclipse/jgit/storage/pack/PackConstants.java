@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2013, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,60 +41,17 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.iplog;
+package org.eclipse.jgit.storage.pack;
 
-import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
+/** Misc. constants used with pack files. */
+public class PackConstants {
 
-/** A project contributor (non-committer). */
-class Contributor {
-	/** Sorts contributors by their name first name, then last name. */
-	static final Comparator<Contributor> COMPARATOR = new Comparator<Contributor>() {
-		public int compare(Contributor a, Contributor b) {
-			return a.name.compareTo(b.name);
-		}
-	};
+	/** A pack file extension. */
+	public static final String PACK_EXT = "pack"; //$NON-NLS-1$
 
-	private final String id;
+	/** A pack index file extension. */
+	public static final String PACK_INDEX_EXT = "idx"; //$NON-NLS-1$
 
-	private final String name;
-
-	private final List<SingleContribution> contributions = new ArrayList<SingleContribution>();
-
-	/**
-	 * @param id
-	 * @param name
-	 */
-	Contributor(String id, String name) {
-		this.id = id;
-		this.name = name;
-	}
-
-	/** @return unique identity of this contributor in the foundation database. */
-	String getID() {
-		return id;
-	}
-
-	/** @return name of the contributor. */
-	String getName() {
-		return name;
-	}
-
-	/** @return all known contributions. */
-	Collection<SingleContribution> getContributions() {
-		return Collections.unmodifiableCollection(contributions);
-	}
-
-	void add(SingleContribution bug) {
-		contributions.add(bug);
-	}
-
-	@Override
-	public String toString() {
-		return MessageFormat.format(IpLogText.get().contributorString, getName());
+	private PackConstants() {
 	}
 }

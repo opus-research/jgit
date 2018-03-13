@@ -289,6 +289,28 @@ public class ConfigTest {
 
 		c = parse("[s \"b\"]\n\tc = one two\n");
 		assertSame(TestEnum.ONE_TWO, c.getEnum("s", "b", "c", TestEnum.ONE_TWO));
+
+		c = parse("[s \"b\"]\n\tc = one-two\n");
+		assertSame(TestEnum.ONE_TWO, c.getEnum("s", "b", "c", TestEnum.ONE_TWO));
+	}
+
+	@Test
+	public void testGetInvalidEnum() throws ConfigInvalidException {
+		Config c = parse("[a]\n\tb = invalid\n");
+		try {
+			c.getEnum("a", null, "b", TestEnum.ONE_TWO);
+			fail();
+		} catch (IllegalArgumentException e) {
+			assertEquals("Invalid value: a.b=invalid", e.getMessage());
+		}
+
+		c = parse("[a \"b\"]\n\tc = invalid\n");
+		try {
+			c.getEnum("a", "b", "c", TestEnum.ONE_TWO);
+			fail();
+		} catch (IllegalArgumentException e) {
+			assertEquals("Invalid value: a.b.c=invalid", e.getMessage());
+		}
 	}
 
 	@Test
