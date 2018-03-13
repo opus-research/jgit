@@ -51,7 +51,7 @@
   <groupId>org.eclipse.jgit</groupId>
   <artifactId>org.eclipse.jgit-parent</artifactId>
   <packaging>pom</packaging>
-  <version>4.1.0-SNAPSHOT</version>
+  <version>4.0.3-SNAPSHOT</version>
 
   <name>JGit - Parent</name>
   <url>${jgit-url}</url>
@@ -192,7 +192,7 @@
     <maven.build.timestamp.format>yyyyMMddHHmm</maven.build.timestamp.format>
     <bundle-manifest>${project.build.directory}/META-INF/MANIFEST.MF</bundle-manifest>
 
-    <jgit-last-release-version>4.0.0.201506090130-r</jgit-last-release-version>
+    <jgit-last-release-version>3.7.0.201502260915-r</jgit-last-release-version>
     <jsch-version>0.1.53</jsch-version>
     <javaewah-version>0.7.9</javaewah-version>
     <junit-version>4.11</junit-version>
@@ -201,7 +201,7 @@
     <commons-compress-version>1.6</commons-compress-version>
     <osgi-core-version>4.3.1</osgi-core-version>
     <servlet-api-version>3.1.0</servlet-api-version>
-    <jetty-version>9.2.13.v20150730</jetty-version>
+    <jetty-version>9.2.10.v20150310</jetty-version>
     <clirr-version>2.6.1</clirr-version>
     <httpclient-version>4.3.6</httpclient-version>
     <slf4j-version>1.7.2</slf4j-version>
