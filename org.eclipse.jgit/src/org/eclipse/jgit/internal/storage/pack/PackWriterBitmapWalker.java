@@ -84,8 +84,7 @@ final class PackWriterBitmapWalker {
 		return countOfBitmapIndexMisses;
 	}
 
-	BitmapBuilder findObjects(Iterable<? extends ObjectId> start, BitmapBuilder seen,
-			boolean ignoreMissing)
+	BitmapBuilder findObjects(Iterable<? extends ObjectId> start, BitmapBuilder seen, boolean ignoreMissing)
 			throws MissingObjectException, IncorrectObjectTypeException,
 				   IOException {
 		if (!ignoreMissing) {
@@ -133,11 +132,9 @@ final class PackWriterBitmapWalker {
 		return result;
 	}
 
-	private BitmapBuilder findObjectsWalk(Iterable<? extends ObjectId> start, BitmapBuilder seen,
-			boolean ignoreMissingStart)
+	private BitmapBuilder findObjectsWalk(Iterable<? extends ObjectId> start, BitmapBuilder seen, boolean ignoreMissingStart)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
-		walker.reset();
 		final BitmapBuilder bitmapResult = bitmapIndex.newBitmapBuilder();
 
 		for (ObjectId obj : start) {
@@ -190,6 +187,10 @@ final class PackWriterBitmapWalker {
 		}
 
 		return bitmapResult;
+	}
+
+	void reset() {
+		walker.reset();
 	}
 
 	/**
