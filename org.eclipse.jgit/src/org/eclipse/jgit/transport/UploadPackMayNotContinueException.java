@@ -43,14 +43,13 @@
 
 package org.eclipse.jgit.transport;
 
-/**
- * Indicates UploadPack may not continue execution.
- *
- * @deprecated use {@link ServiceMayNotContinueException} instead.
- */
-@Deprecated
-public class UploadPackMayNotContinueException extends ServiceMayNotContinueException {
+import java.io.IOException;
+
+/** Indicates UploadPack may not continue execution. */
+public class UploadPackMayNotContinueException extends IOException {
 	private static final long serialVersionUID = 1L;
+
+	private boolean output;
 
 	/** Initialize with no message. */
 	public UploadPackMayNotContinueException() {
@@ -64,5 +63,15 @@ public class UploadPackMayNotContinueException extends ServiceMayNotContinueExce
 	 */
 	public UploadPackMayNotContinueException(String msg) {
 		super(msg);
+	}
+
+	/** @return true if the message was already output to the client. */
+	public boolean isOutput() {
+		return output;
+	}
+
+	/** Mark this message has being sent to the client. */
+	public void setOutput() {
+		output = true;
 	}
 }
