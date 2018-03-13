@@ -146,7 +146,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String checkoutConflictWithFile;
 	/***/ public String checkoutConflictWithFiles;
 	/***/ public String classCastNotA;
-	/***/ public String cloneNonEmptyDirectory;
 	/***/ public String collisionOn;
 	/***/ public String commandWasCalledInTheWrongState;
 	/***/ public String commitAlreadyExists;
