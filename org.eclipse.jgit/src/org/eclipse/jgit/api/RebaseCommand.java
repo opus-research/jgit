@@ -75,7 +75,6 @@ import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
-import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
@@ -826,22 +825,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	 */
 	public RebaseCommand setUpstream(RevCommit upstream) {
 		this.upstreamCommit = upstream;
-		return this;
-	}
-
-	/**
-	 * @param upstream
-	 *            id of the upstream commit
-	 * @return {@code this}
-	 */
-	public RebaseCommand setUpstream(AnyObjectId upstream) {
-		try {
-			this.upstreamCommit = walk.parseCommit(upstream);
-		} catch (IOException e) {
-			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().couldNotReadObjectWhileParsingCommit,
-					upstream.name()), e);
-		}
 		return this;
 	}
 

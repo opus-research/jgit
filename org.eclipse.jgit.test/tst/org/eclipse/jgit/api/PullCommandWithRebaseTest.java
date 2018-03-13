@@ -140,9 +140,8 @@ public class PullCommandWithRebaseTest extends RepositoryTestCase {
 				.call();
 		StoredConfig config = target.getRepository().getConfig();
 		config.setString("branch", "basedOnMaster", "remote", ".");
-		config.setString("branch", "basedOnMaster", "merge",
+		config.setString("branch", "basedOnMaster", "rebase",
 				"refs/heads/master");
-		config.setBoolean("branch", "basedOnMaster", "rebase", true);
 		config.save();
 		target.getRepository().updateRef(Constants.HEAD).link(
 				"refs/heads/basedOnMaster");
@@ -213,9 +212,9 @@ public class PullCommandWithRebaseTest extends RepositoryTestCase {
 		target.checkout().setStartPoint("refs/remotes/origin/master").setName(
 				"master").call();
 
-		targetConfig
-				.setString("branch", "master", "merge", "refs/heads/master");
-		targetConfig.setBoolean("branch", "master", "rebase", true);
+		targetConfig.setString("branch", "master", "rebase",
+				"refs/remotes/origin/master");
+		targetConfig.unset("branch", "master", "merge");
 		targetConfig.save();
 
 		assertFileContentsEqual(targetFile, "Hello world");
