@@ -70,7 +70,6 @@ public class NameMatcher extends AbstractMatcher {
 			this.subPattern = pattern.substring(1);
 	}
 
-	@Override
 	public boolean matches(String path, boolean assumeDirectory) {
 		int end = 0;
 		int firstChar = 0;
@@ -87,7 +86,6 @@ public class NameMatcher extends AbstractMatcher {
 		return false;
 	}
 
-	@Override
 	public boolean matches(String segment, int startIncl, int endExcl,
 			boolean assumeDirectory) {
 		// faster local access, same as in string.indexOf()

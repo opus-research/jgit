@@ -153,7 +153,6 @@ public class LsRemoteCommand extends
 	 * @throws org.eclipse.jgit.api.errors.TransportException
 	 *             for errors that occurs during transport
 	 */
-	@Override
 	public Collection<Ref> call() throws GitAPIException,
 			InvalidRemoteException,
 			org.eclipse.jgit.api.errors.TransportException {

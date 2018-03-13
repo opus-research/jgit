@@ -69,7 +69,6 @@ import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 public class DefaultReceivePackFactory implements
 		ReceivePackFactory<HttpServletRequest> {
 	private static final SectionParser<ServiceConfig> CONFIG = new SectionParser<ServiceConfig>() {
-		@Override
 		public ServiceConfig parse(final Config cfg) {
 			return new ServiceConfig(cfg);
 		}
@@ -86,7 +85,6 @@ public class DefaultReceivePackFactory implements
 		}
 	}
 
-	@Override
 	public ReceivePack create(final HttpServletRequest req, final Repository db)
 			throws ServiceNotEnabledException, ServiceNotAuthorizedException {
 		final ServiceConfig cfg = db.getConfig().get(CONFIG);

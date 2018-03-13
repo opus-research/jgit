@@ -311,7 +311,6 @@ public class OpenSshConfig {
 
 	static String userName() {
 		return AccessController.doPrivileged(new PrivilegedAction<String>() {
-			@Override
 			public String run() {
 				return System.getProperty("user.name"); //$NON-NLS-1$
 			}

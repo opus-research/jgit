@@ -213,7 +213,6 @@ final class DeltaTask implements Callable<Object> {
 
 			// Sort by starting index to identify gaps later.
 			Collections.sort(topPaths, new Comparator<WeightedPath>() {
-				@Override
 				public int compare(WeightedPath a, WeightedPath b) {
 					return a.slice.beginIndex - b.slice.beginIndex;
 				}
@@ -245,7 +244,6 @@ final class DeltaTask implements Callable<Object> {
 			this.slice = s;
 		}
 
-		@Override
 		public int compareTo(WeightedPath o) {
 			int cmp = Long.signum(weight - o.weight);
 			if (cmp != 0) {
@@ -292,7 +290,6 @@ final class DeltaTask implements Callable<Object> {
 		slices.add(s);
 	}
 
-	@Override
 	public Object call() throws Exception {
 		or = block.templateReader.newReader();
 		try {

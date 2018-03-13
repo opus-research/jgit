@@ -137,7 +137,6 @@ public class SubmoduleUpdateCommand extends
 	 * @throws WrongRepositoryStateException
 	 * @throws GitAPIException
 	 */
-	@Override
 	public Collection<String> call() throws InvalidConfigurationException,
 			NoHeadException, ConcurrentRefUpdateException,
 			CheckoutConflictException, InvalidMergeHeadsException,

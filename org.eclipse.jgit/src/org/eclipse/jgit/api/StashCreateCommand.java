@@ -236,7 +236,6 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 	 * @return stashed commit or null if no changes to stash
 	 * @throws GitAPIException
 	 */
-	@Override
 	public RevCommit call() throws GitAPIException {
 		checkCallable();
 
@@ -306,7 +305,6 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 							untracked.add(entry);
 						else
 							wtEdits.add(new PathEdit(entry) {
-								@Override
 								public void apply(DirCacheEntry ent) {
 									ent.copyMetaData(entry);
 								}
