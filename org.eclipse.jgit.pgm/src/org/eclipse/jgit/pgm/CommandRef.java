@@ -165,12 +165,4 @@ public class CommandRef {
 		r.setCommandName(getName());
 		return r;
 	}
-
-	@SuppressWarnings("nls")
-	@Override
-	public String toString() {
-		return "CommandRef [impl=" + impl + ", name=" + name + ", usage="
-				+ CLIText.get().resourceBundle().getString(usage) + ", common="
-				+ common + "]";
-	}
 }

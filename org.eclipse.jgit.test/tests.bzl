@@ -29,10 +29,6 @@ def tests(tests):
       additional_deps = [
         '//org.eclipse.jgit:insecure_cipher_factory',
       ]
-    if src.endswith("OpenSshConfigTest.java"):
-      additional_deps = [
-        '//lib:jsch',
-      ]
 
     junit_tests(
       name = name,
