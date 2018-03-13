@@ -52,6 +52,7 @@ import static org.eclipse.jgit.lib.FileMode.TYPE_GITLINK;
 import static org.eclipse.jgit.lib.FileMode.TYPE_SYMLINK;
 import static org.eclipse.jgit.lib.Ref.Storage.NEW;
 import static org.eclipse.jgit.lib.Ref.Storage.PACKED;
+import static org.eclipse.jgit.lib.RefDatabase.MAX_SYMBOLIC_REF_DEPTH;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.LOCK_FAILURE;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.NOT_ATTEMPTED;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.REJECTED_OTHER_REASON;
@@ -104,11 +105,9 @@ import org.eclipse.jgit.util.RawParseUtils;
  * {@code HEAD} is a special case and stored as {@code "..HEAD"}.
  */
 public class RefTree {
-	private static final int MAX_SYMBOLIC_REF_DEPTH = 5;
-	static final String ROOT_DOTDOT = ".."; //$NON-NLS-1$
-
 	/** Suffix applied to GITLINK to indicate its the peeled value of a tag. */
 	public static final String PEELED_SUFFIX = "^{}"; //$NON-NLS-1$
+	static final String ROOT_DOTDOT = ".."; //$NON-NLS-1$
 
 	/**
 	 * Create an empty reference tree.
@@ -116,16 +115,14 @@ public class RefTree {
 	 * @return a new empty reference tree.
 	 */
 	public static RefTree newEmptyTree() {
-		return new RefTree(null, DirCache.newInCore());
+		return new RefTree(DirCache.newInCore());
 	}
 
 	/**
 	 * Load a reference tree.
 	 *
 	 * @param reader
-	 *            reader to scan the reference tree with. This reader may be
-	 *            retained by the RefTree for the life of the tree in order to
-	 *            support lazy loading of entries.
+	 *            reader to scan the reference tree with.
 	 * @param tree
 	 *            the tree to read.
 	 * @return the ref tree read from the commit.
@@ -141,22 +138,21 @@ public class RefTree {
 	public static RefTree read(ObjectReader reader, RevTree tree)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			CorruptObjectException, IOException {
-		return new RefTree(reader, DirCache.read(reader, tree));
+		return new RefTree(DirCache.read(reader, tree));
 	}
 
-	/** Borrowed reader to access the repository. */
-	private final ObjectReader reader;
 	private DirCache contents;
 	private Map<ObjectId, String> pendingBlobs;
 
-	private RefTree(ObjectReader reader, DirCache dc) {
-		this.reader = reader;
+	private RefTree(DirCache dc) {
 		this.contents = dc;
 	}
 
 	/**
 	 * Read one reference.
 	 *
+	 * @param reader
+	 *            to access objects necessary to read the requested reference.
 	 * @param name
 	 *            name of the reference to read.
 	 * @return the reference; null if it does not exist.
@@ -164,12 +160,12 @@ public class RefTree {
 	 *             cannot read a symbolic reference target.
 	 */
 	@Nullable
-	public Ref exactRef(String name) throws IOException {
-		Ref r = readRef(name);
+	public Ref exactRef(ObjectReader reader, String name) throws IOException {
+		Ref r = readRef(reader, name);
 		if (r == null) {
 			return null;
 		} else if (r.isSymbolic()) {
-			return resolve(r, 0);
+			return resolve(reader, r, 0);
 		}
 
 		DirCacheEntry p = contents.getEntry(peeledPath(name));
@@ -180,12 +176,13 @@ public class RefTree {
 		return r;
 	}
 
-	private Ref readRef(String name) throws IOException {
+	private Ref readRef(ObjectReader reader, String name) throws IOException {
 		DirCacheEntry e = contents.getEntry(refPath(name));
-		return e != null ? toRef(e, name) : null;
+		return e != null ? toRef(reader, e, name) : null;
 	}
 
-	private Ref toRef(DirCacheEntry e, String name) throws IOException {
+	private Ref toRef(ObjectReader reader, DirCacheEntry e, String name)
+			throws IOException {
 		int mode = e.getRawMode();
 		if (mode == TYPE_GITLINK) {
 			ObjectId id = e.getObjectId();
@@ -206,13 +203,14 @@ public class RefTree {
 		return null; // garbage file or something; not a reference.
 	}
 
-	private Ref resolve(Ref ref, int depth) throws IOException {
+	private Ref resolve(ObjectReader reader, Ref ref, int depth)
+			throws IOException {
 		if (ref.isSymbolic() && depth < MAX_SYMBOLIC_REF_DEPTH) {
-			Ref r = readRef(ref.getTarget().getName());
+			Ref r = readRef(reader, ref.getTarget().getName());
 			if (r == null) {
 				return ref;
 			}
-			Ref dst = resolve(r, depth + 1);
+			Ref dst = resolve(reader, r, depth + 1);
 			return new SymbolicRef(ref.getName(), dst);
 		}
 		return ref;
@@ -385,7 +383,7 @@ public class RefTree {
 
 	/** @return a deep copy of this RefTree. */
 	public RefTree copy() {
-		RefTree r = new RefTree(null, DirCache.newInCore());
+		RefTree r = new RefTree(DirCache.newInCore());
 		DirCacheBuilder b = r.contents.builder();
 		for (int i = 0; i < contents.getEntryCount(); i++) {
 			b.add(new DirCacheEntry(contents.getEntry(i)));
@@ -395,13 +393,6 @@ public class RefTree {
 			r.pendingBlobs = new HashMap<>(pendingBlobs);
 		}
 		return r;
-	}
-
-	/** Releases the ObjectReader remembered by the tree. */
-	public void close() {
-		if (reader != null) {
-			reader.close();
-		}
 	}
 
 	private static class LockFailureException extends RuntimeException {

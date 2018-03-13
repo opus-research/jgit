@@ -70,6 +70,7 @@ import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.SymbolicRef;
 import org.eclipse.jgit.revwalk.RevBlob;
@@ -93,9 +94,10 @@ public class RefTreeTest {
 	@Test
 	public void testEmptyTree() throws IOException {
 		RefTree tree = RefTree.newEmptyTree();
-		assertNull(HEAD, tree.exactRef(HEAD));
-		assertNull("master", tree.exactRef(R_MASTER));
-		tree.close(); // Should not throw.
+		try (ObjectReader reader = repo.newObjectReader()) {
+			assertNull(HEAD, tree.exactRef(reader, HEAD));
+			assertNull("master", tree.exactRef(reader, R_MASTER));
+		}
 	}
 
 	@Test
@@ -106,11 +108,13 @@ public class RefTreeTest {
 		assertTrue(tree.apply(Collections.singletonList(cmd)));
 		assertSame(NOT_ATTEMPTED, cmd.getResult());
 
-		Ref m = tree.exactRef(R_MASTER);
-		assertNotNull(R_MASTER, m);
-		assertEquals(R_MASTER, m.getName());
-		assertEquals(id, m.getObjectId());
-		assertTrue("peeled", m.isPeeled());
+		try (ObjectReader reader = repo.newObjectReader()) {
+			Ref m = tree.exactRef(reader, R_MASTER);
+			assertNotNull(R_MASTER, m);
+			assertEquals(R_MASTER, m.getName());
+			assertEquals(id, m.getObjectId());
+			assertTrue("peeled", m.isPeeled());
+		}
 	}
 
 	@Test
@@ -126,11 +130,13 @@ public class RefTreeTest {
 		assertTrue(tree.apply(Collections.singletonList(cmd2)));
 		assertSame(NOT_ATTEMPTED, cmd2.getResult());
 
-		Ref m = tree.exactRef(R_MASTER);
-		assertNotNull(R_MASTER, m);
-		assertEquals(R_MASTER, m.getName());
-		assertEquals(id2, m.getObjectId());
-		assertTrue("peeled", m.isPeeled());
+		try (ObjectReader reader = repo.newObjectReader()) {
+			Ref m = tree.exactRef(reader, R_MASTER);
+			assertNotNull(R_MASTER, m);
+			assertEquals(R_MASTER, m.getName());
+			assertEquals(id2, m.getObjectId());
+			assertTrue("peeled", m.isPeeled());
+		}
 	}
 
 	@Test
@@ -143,21 +149,24 @@ public class RefTreeTest {
 		assertSame(NOT_ATTEMPTED, cmd1.getResult());
 		assertSame(NOT_ATTEMPTED, cmd2.getResult());
 
-		Ref m = tree.exactRef(HEAD);
-		assertNotNull(HEAD, m);
-		assertEquals(HEAD, m.getName());
-		assertTrue("symbolic", m.isSymbolic());
-		assertNotNull(m.getTarget());
-		assertEquals(R_MASTER, m.getTarget().getName());
-		assertEquals(id, m.getTarget().getObjectId());
+		try (ObjectReader reader = repo.newObjectReader()) {
+			Ref m = tree.exactRef(reader, HEAD);
+			assertNotNull(HEAD, m);
+			assertEquals(HEAD, m.getName());
+			assertTrue("symbolic", m.isSymbolic());
+			assertNotNull(m.getTarget());
+			assertEquals(R_MASTER, m.getTarget().getName());
+			assertEquals(id, m.getTarget().getObjectId());
+		}
 
 		// Writing flushes some buffers, re-read from blob.
 		ObjectId newId = write(tree);
-		try (RevWalk rw = new RevWalk(repo)) {
-			tree = RefTree.read(rw.getObjectReader(), rw.parseTree(newId));
+		try (ObjectReader reader = repo.newObjectReader();
+				RevWalk rw = new RevWalk(reader)) {
+			tree = RefTree.read(reader, rw.parseTree(newId));
+			Ref m = tree.exactRef(reader, HEAD);
+			assertEquals(R_MASTER, m.getTarget().getName());
 		}
-		m = tree.exactRef(HEAD);
-		assertEquals(R_MASTER, m.getTarget().getName());
 	}
 
 	@Test
@@ -172,12 +181,14 @@ public class RefTreeTest {
 		assertTrue(tree.apply(Collections.singletonList(cmd)));
 		assertSame(NOT_ATTEMPTED, cmd.getResult());
 
-		Ref m = tree.exactRef(ref);
-		assertNotNull(ref, m);
-		assertEquals(ref, m.getName());
-		assertEquals(tag, m.getObjectId());
-		assertTrue("peeled", m.isPeeled());
-		assertEquals(id, m.getPeeledObjectId());
+		try (ObjectReader reader = repo.newObjectReader()) {
+			Ref m = tree.exactRef(reader, ref);
+			assertNotNull(ref, m);
+			assertEquals(ref, m.getName());
+			assertEquals(tag, m.getObjectId());
+			assertTrue("peeled", m.isPeeled());
+			assertEquals(id, m.getPeeledObjectId());
+		}
 	}
 
 	@Test
