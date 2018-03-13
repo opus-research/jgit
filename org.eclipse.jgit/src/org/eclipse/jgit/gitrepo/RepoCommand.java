@@ -53,10 +53,8 @@ import java.nio.channels.FileChannel;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -105,11 +103,6 @@ import org.xml.sax.helpers.XMLReaderFactory;
  *
  * If called against a bare repository, it will replace all the existing content
  * of the repository with the contents populated from the manifest.
- *
- * repo manifest allows projects overlapping, e.g. one project's path is
- * &quot;foo&quot; and another project's path is &quot;foo/bar&quot;. This won't
- * work in git submodule, so we'll skip all the sub projects
- * (&quot;foo/bar&quot; in the example) while converting.
  *
  * @see <a href="https://code.google.com/p/git-repo/">git-repo project page</a>
  * @since 3.4
@@ -256,7 +249,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 		}
 	}
 
-	private static class Project implements Comparable<Project> {
+	private static class Project {
 		final String name;
 		final String path;
 		final String revision;
@@ -276,35 +269,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 		void addCopyFile(CopyFile copyfile) {
 			copyfiles.add(copyfile);
 		}
-
-		String getPathWithSlash() {
-			if (path.endsWith("/")) //$NON-NLS-1$
-				return path;
-			else
-				return path + "/"; //$NON-NLS-1$
-		}
-
-		boolean isAncestorOf(Project that) {
-			return that.getPathWithSlash().startsWith(this.getPathWithSlash());
-		}
-
-		@Override
-		public boolean equals(Object o) {
-			if (o instanceof Project) {
-				Project that = (Project) o;
-				return this.getPathWithSlash().equals(that.getPathWithSlash());
-			}
-			return false;
-		}
-
-		@Override
-		public int hashCode() {
-			return this.getPathWithSlash().hashCode();
-		}
-
-		public int compareTo(Project that) {
-			return this.getPathWithSlash().compareTo(that.getPathWithSlash());
-		}
 	}
 
 	private static class XmlManifest extends DefaultHandler {
@@ -313,9 +277,9 @@ public class RepoCommand extends GitCommand<RevCommit> {
 		private final String filename;
 		private final String baseUrl;
 		private final Map<String, String> remotes;
+		private final List<Project> projects;
 		private final Set<String> plusGroups;
 		private final Set<String> minusGroups;
-		private List<Project> projects;
 		private String defaultRemote;
 		private String defaultRevision;
 		private Project currentProject;
@@ -325,13 +289,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			this.command = command;
 			this.inputStream = inputStream;
 			this.filename = filename;
-
-			// Strip trailing /s to match repo behavior.
-			int lastIndex = baseUrl.length() - 1;
-			while (lastIndex >= 0 && baseUrl.charAt(lastIndex) == '/')
-				lastIndex--;
-			this.baseUrl = baseUrl.substring(0, lastIndex + 1);
-
+			this.baseUrl = baseUrl;
 			remotes = new HashMap<String, String>();
 			projects = new ArrayList<Project>();
 			plusGroups = new HashSet<String>();
@@ -425,38 +383,14 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			} catch (URISyntaxException e) {
 				throw new SAXException(e);
 			}
-			removeNotInGroup();
-			removeOverlaps();
 			for (Project proj : projects) {
-				command.addSubmodule(remoteUrl + proj.name,
-						proj.path,
-						proj.revision == null
-								? defaultRevision : proj.revision,
-						proj.copyfiles);
-			}
-		}
-
-		/** Remove projects that are not in our desired groups. */
-		void removeNotInGroup() {
-			Iterator<Project> iter = projects.iterator();
-			while (iter.hasNext())
-				if (!inGroups(iter.next()))
-					iter.remove();
-		}
-
-		/** Remove projects that sits in a subdirectory of any other project. */
-		void removeOverlaps() {
-			Collections.sort(projects);
-			Iterator<Project> iter = projects.iterator();
-			if (!iter.hasNext())
-				return;
-			Project last = iter.next();
-			while (iter.hasNext()) {
-				Project p = iter.next();
-				if (last.isAncestorOf(p))
-					iter.remove();
-				else
-					last = p;
+				if (inGroups(proj)) {
+					command.addSubmodule(remoteUrl + proj.name,
+							proj.path,
+							proj.revision == null
+									? defaultRevision : proj.revision,
+							proj.copyfiles);
+				}
 			}
 		}
 
