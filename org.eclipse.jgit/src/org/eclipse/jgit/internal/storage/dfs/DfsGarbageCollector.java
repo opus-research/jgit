@@ -354,11 +354,6 @@ public class DfsGarbageCollector {
 				packGarbage(pm);
 				objdb.commitPack(newPackDesc, toPrune());
 				rollback = false;
-
-				if (refdb instanceof DfsReftableDatabase) {
-					objdb.clearCache();
-					((DfsReftableDatabase) refdb).clearCache();
-				}
 				return true;
 			} finally {
 				if (rollback) {

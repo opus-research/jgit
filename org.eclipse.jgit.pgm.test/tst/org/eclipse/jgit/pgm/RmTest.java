@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2012, IBM Corporation and others.
- * and other copyright owners as documented in the project's IP log.
+ * Copyright (C) 2013 Robin Stocker <robin@nibor.org> and others.
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -40,38 +39,42 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api.errors;
+package org.eclipse.jgit.pgm;
 
-import java.text.MessageFormat;
-import java.util.List;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.patch.FormatError;
+import java.io.File;
 
-/**
- * Exception thrown when applying a patch fails due to an invalid format
- *
- * @since 2.0
- *
- */
-public class PatchFormatException extends GitAPIException {
-	private static final long serialVersionUID = 1L;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.dircache.DirCache;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.junit.Before;
+import org.junit.Test;
 
-	private List<FormatError> errors;
+public class RmTest extends CLIRepositoryTestCase {
+	private Git git;
 
-	/**
-	 * @param errors
-	 */
-	public PatchFormatException(List<FormatError> errors) {
-		super(MessageFormat.format(JGitText.get().patchFormatException, errors));
-		this.errors = errors;
+	@Override
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		git = new Git(db);
 	}
 
-	/**
-	 * @return all the errors where unresolved conflicts have been detected
-	 */
-	public List<FormatError> getErrors() {
-		return errors;
-	}
+	@Test
+	public void multiplePathsShouldBeRemoved() throws Exception {
+		File a = writeTrashFile("a", "Hello");
+		File b = writeTrashFile("b", "world!");
+		git.add().addFilepattern("a").addFilepattern("b").call();
 
+		String[] result = execute("git rm a b");
+		assertArrayEquals(new String[] { "" }, result);
+		DirCache cache = db.readDirCache();
+		assertNull(cache.getEntry("a"));
+		assertNull(cache.getEntry("b"));
+		assertFalse(a.exists());
+		assertFalse(b.exists());
+	}
 }
