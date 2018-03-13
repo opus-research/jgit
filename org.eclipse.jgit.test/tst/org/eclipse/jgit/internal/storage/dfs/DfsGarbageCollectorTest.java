@@ -685,7 +685,7 @@ public class DfsGarbageCollectorTest {
 		assertTrue(desc.hasFileExt(PackExt.REFTABLE));
 		ReftableWriter.Stats stats = desc.getReftableStats();
 		assertNotNull(stats);
-		assertTrue(stats.refIndexSize() > 0);
+		assertTrue(stats.totalBytes() > 0);
 		DfsReftable table = new DfsReftable(DfsBlockCache.getInstance(), desc);
 		try (DfsReader ctx = odb.newReader();
 				ReftableReader rr = table.open(ctx);
