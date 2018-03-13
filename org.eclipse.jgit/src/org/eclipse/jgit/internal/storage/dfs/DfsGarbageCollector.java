@@ -390,26 +390,8 @@ public class DfsGarbageCollector {
 			pw.setTagTargets(tagTargets);
 			pw.preparePack(pm, allHeads, PackWriter.NONE);
 			if (0 < pw.getObjectCount())
-				writePack(GC, pw, pm, estimateGcPackSize());
+				writePack(GC, pw, pm);
 		}
-	}
-
-	private long estimateGcPackSize() {
-		long size = 0;
-		for (DfsPackDescription pack : getSourcePacks()) {
-			switch (pack.getPackSource()) {
-			// Any of the new packs might get combined into an existing GC pack.
-			case INSERT:
-			case RECEIVE:
-			case COMPACT:
-			case GC:
-				size += pack.getFileSize(PACK);
-				break;
-			default:
-				break;
-			}
-		}
-		return size;
 	}
 
 	private void packRest(ProgressMonitor pm) throws IOException {
@@ -421,27 +403,8 @@ public class DfsGarbageCollector {
 				pw.excludeObjects(packedObjs);
 			pw.preparePack(pm, nonHeads, allHeads);
 			if (0 < pw.getObjectCount())
-				writePack(GC_REST, pw, pm, estimateGcRestPackSize());
+				writePack(GC_REST, pw, pm);
 		}
-	}
-
-	private long estimateGcRestPackSize() {
-		long size = 0;
-		for (DfsPackDescription pack : getSourcePacks()) {
-			switch (pack.getPackSource()) {
-			// Any of the new packs might get combined into an existing GC_REST
-			// pack.
-			case INSERT:
-			case RECEIVE:
-			case COMPACT:
-			case GC_REST:
-				size += pack.getFileSize(PACK);
-				break;
-			default:
-				break;
-			}
-		}
-		return size;
 	}
 
 	private void packRefTreeGraph(ProgressMonitor pm) throws IOException {
@@ -453,7 +416,7 @@ public class DfsGarbageCollector {
 				pw.excludeObjects(packedObjs);
 			pw.preparePack(pm, txnHeads, PackWriter.NONE);
 			if (0 < pw.getObjectCount())
-				writePack(GC_TXN, pw, pm, 0 /* unknown pack size */);
+				writePack(GC_TXN, pw, pm);
 		}
 	}
 
@@ -483,8 +446,7 @@ public class DfsGarbageCollector {
 			}
 			pm.endTask();
 			if (0 < pw.getObjectCount())
-				writePack(UNREACHABLE_GARBAGE, pw, pm,
-						0 /* unknown pack size */);
+				writePack(UNREACHABLE_GARBAGE, pw, pm);
 		}
 	}
 
@@ -518,9 +480,8 @@ public class DfsGarbageCollector {
 	}
 
 	private DfsPackDescription writePack(PackSource source, PackWriter pw,
-			ProgressMonitor pm, long estimatedPackSize) throws IOException {
-		DfsPackDescription pack = repo.getObjectDatabase().newPack(source,
-				estimatedPackSize);
+			ProgressMonitor pm) throws IOException {
+		DfsPackDescription pack = repo.getObjectDatabase().newPack(source);
 		newPackDesc.add(pack);
 
 		try (DfsOutputStream out = objdb.writeFile(pack, PACK)) {
