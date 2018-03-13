@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, GitHub Inc.
+ * Copyright (C) 2011, Tomasz Zarna <Tomasz.Zarna@pl.ibm.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,25 +40,57 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.submodule;
+package org.eclipse.jgit.revwalk.filter;
+
+import java.io.IOException;
+
+import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.errors.StopWalkException;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevWalk;
 
 /**
- * Enumeration of different statuses that a submodule can be in
+ * Limits the number of commits output.
  */
-public enum SubmoduleStatusType {
+public class MaxCountRevFilter extends RevFilter {
 
-	/** Submodule's configuration is missing */
-	MISSING,
+	private int maxCount;
 
-	/** Submodule's Git repository is not initialized */
-	UNINITIALIZED,
-
-	/** Submodule's Git repository is initialized */
-	INITIALIZED,
+	private int count;
 
 	/**
-	 * Submodule commit checked out is different than the commit referenced in
-	 * the index tree
+	 * Create a new max count filter.
+	 *
+	 * @param maxCount
+	 *            the limit
+	 * @return a new filter
 	 */
-	REV_CHECKED_OUT;
+	public static RevFilter create(int maxCount) {
+		if (maxCount < 0)
+			throw new IllegalArgumentException(
+					JGitText.get().maxCountMustBeNonNegative);
+		return new MaxCountRevFilter(maxCount);
+	}
+
+	private MaxCountRevFilter(int maxCount) {
+		this.count = 0;
+		this.maxCount = maxCount;
+	}
+
+	@Override
+	public boolean include(RevWalk walker, RevCommit cmit)
+			throws StopWalkException, MissingObjectException,
+			IncorrectObjectTypeException, IOException {
+		count++;
+		if (count > maxCount)
+			throw StopWalkException.INSTANCE;
+		return true;
+	}
+
+	@Override
+	public RevFilter clone() {
+		return new MaxCountRevFilter(maxCount);
+	}
 }
