@@ -53,10 +53,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeSet;
 
 import org.eclipse.jgit.dircache.DirCache;
@@ -108,7 +106,7 @@ public abstract class LocalDiskRepositoryTestCase {
 	 */
 	protected MockSystemReader mockSystemReader;
 
-	private final Set<Repository> toClose = new HashSet<>();
+	private final List<Repository> toClose = new ArrayList<Repository>();
 	private File tmp;
 
 	@Before
@@ -364,7 +362,7 @@ public abstract class LocalDiskRepositoryTestCase {
 		FileRepository db = new FileRepository(gitdir);
 		assertFalse(gitdir.exists());
 		db.create(bare);
-		addRepoToClose(db);
+		toClose.add(db);
 		return db;
 	}
 
