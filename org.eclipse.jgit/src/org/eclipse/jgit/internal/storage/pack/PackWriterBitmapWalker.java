@@ -129,7 +129,7 @@ final class PackWriterBitmapWalker {
 
 			RevObject ro;
 			while ((ro = walker.nextObject()) != null) {
-				bitmapResult.addObject(ro, ro.getType());
+				bitmapResult.add(ro, ro.getType());
 				pm.update(1);
 			}
 		}
@@ -148,31 +148,30 @@ final class PackWriterBitmapWalker {
 		return new AddToBitmapFilter(bitmapResult);
 	}
 
-	private static class AddToBitmapFilter extends NoCommitBodyRevFilter {
+	/**
+	 * A RevFilter that adds the visited commits to {@code bitmap} as a side
+	 * effect.
+	 * <p>
+	 * When the walk hits a commit that is part of {@code bitmap}'s
+	 * BitmapIndex, that entire bitmap is ORed into {@code bitmap} and the
+	 * commit and its parents are marked as SEEN so that the walk does not
+	 * have to visit its ancestors.  This ensures the walk is very short if
+	 * there is good bitmap coverage.
+	 */
+	private static class AddToBitmapFilter extends RevFilter {
 		private final BitmapBuilder bitmap;
 
-		/**
-		 * A RevFilter that adds the visited commits to {@code bitmap} as a
-		 * side effect.
-		 * <p>
-		 * When the walk hits a commit that is part of {@code bitmap}'s
-		 * BitmapIndex, that entire bitmap is ORed into {@code bitmap} and
-		 * the commit and its parents are marked as SEEN so that the walk
-		 * does not have to visit its ancestors.  This ensures the walk
-		 * is very short if there is good bitmap coverage.
-		 */
 		AddToBitmapFilter(BitmapBuilder bitmap) {
 			this.bitmap = bitmap;
 		}
 
 		@Override
 		public final boolean include(RevWalk walker, RevCommit cmit) {
-			BitmapIndex index = bitmap.getBitmapIndex();
 			Bitmap visitedBitmap;
 
 			if (bitmap.contains(cmit)) {
 				// already included
-			} else if ((visitedBitmap = index.getBitmap(cmit)) != null) {
+			} else if ((visitedBitmap = bitmap.getBitmapIndex().getBitmap(cmit)) != null) {
 				bitmap.or(visitedBitmap);
 			} else {
 				bitmap.addObject(cmit, Constants.OBJ_COMMIT);
@@ -184,26 +183,36 @@ final class PackWriterBitmapWalker {
 			}
 			return false;
 		}
+
+		@Override
+		public final RevFilter clone() {
+			throw new UnsupportedOperationException();
+		}
+
+		@Override
+		public final boolean requiresCommitBody() {
+			return false;
+		}
 	}
 
-	private static class AddUnseenToBitmapFilter extends NoCommitBodyRevFilter {
+	/**
+	 * A RevFilter that adds the visited commits to {@code bitmap} as a side
+	 * effect.
+	 * <p>
+	 * When the walk hits a commit that is part of {@code bitmap}'s
+	 * BitmapIndex, that entire bitmap is ORed into {@code bitmap} and the
+	 * commit and its parents are marked as SEEN so that the walk does not
+	 * have to visit its ancestors.  This ensures the walk is very short if
+	 * there is good bitmap coverage.
+	 * <p>
+	 * Commits named in {@code seen} are considered already seen.  If one is
+	 * encountered, that commit and its parents will be marked with the SEEN
+	 * flag to prevent the walk from visiting its ancestors.
+	 */
+	private static class AddUnseenToBitmapFilter extends RevFilter {
 		private final BitmapBuilder seen;
 		private final BitmapBuilder bitmap;
 
-		/**
-		 * A RevFilter that adds the visited commits to {@code bitmap} as a
-		 * side effect.
-		 * <p>
-		 * When the walk hits a commit that is part of {@code bitmap}'s
-		 * BitmapIndex, that entire bitmap is ORed into {@code bitmap} and
-		 * the commit and its parents are marked as SEEN so that the walk
-		 * does not have to visit its ancestors.  This ensures the walk
-		 * is very short if there is good bitmap coverage.
-		 * <p>
-		 * Commits named in {@code seen} are considered already seen.
-		 * If one is encountered, that commit and its parents will be marked
-		 * with the SEEN flag to prevent the walk from visiting its ancestors.
-		 */
 		AddUnseenToBitmapFilter(BitmapBuilder seen, BitmapBuilder bitmapResult) {
 			this.seen = seen;
 			this.bitmap = bitmapResult;
@@ -211,12 +220,11 @@ final class PackWriterBitmapWalker {
 
 		@Override
 		public final boolean include(RevWalk walker, RevCommit cmit) {
-			BitmapIndex index = bitmap.getBitmapIndex();
 			Bitmap visitedBitmap;
 
 			if (seen.contains(cmit) || bitmap.contains(cmit)) {
 				// already seen or included
-			} else if ((visitedBitmap = index.getBitmap(cmit)) != null) {
+			} else if ((visitedBitmap = bitmap.getBitmapIndex().getBitmap(cmit)) != null) {
 				bitmap.or(visitedBitmap);
 			} else {
 				bitmap.addObject(cmit, Constants.OBJ_COMMIT);
@@ -228,12 +236,10 @@ final class PackWriterBitmapWalker {
 			}
 			return false;
 		}
-	}
 
-	private static abstract class NoCommitBodyRevFilter extends RevFilter {
 		@Override
 		public final RevFilter clone() {
-			return this;
+			throw new UnsupportedOperationException();
 		}
 
 		@Override
