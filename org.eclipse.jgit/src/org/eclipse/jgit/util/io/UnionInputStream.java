@@ -69,6 +69,25 @@ public class UnionInputStream extends InputStream {
 
 	private final LinkedList<InputStream> streams = new LinkedList<InputStream>();
 
+	/** Create an empty InputStream that is currently at EOF state. */
+	public UnionInputStream() {
+		// Do nothing.
+	}
+
+	/**
+	 * Create an InputStream that is a union of the individual streams.
+	 * <p>
+	 * As each stream reaches EOF, it will be automatically closed before bytes
+	 * from the next stream are read.
+	 *
+	 * @param inputStreams
+	 *            streams to be pushed onto this stream.
+	 */
+	public UnionInputStream(InputStream... inputStreams) {
+		for (InputStream i : inputStreams)
+			add(i);
+	}
+
 	private InputStream head() {
 		return streams.isEmpty() ? EOF : streams.getFirst();
 	}
@@ -80,6 +99,8 @@ public class UnionInputStream extends InputStream {
 
 	/**
 	 * Add the given InputStream onto the end of the stream queue.
+	 * <p>
+	 * When the stream reaches EOF it will be automatically closed.
 	 *
 	 * @param in
 	 *            the stream to add; must not be null.

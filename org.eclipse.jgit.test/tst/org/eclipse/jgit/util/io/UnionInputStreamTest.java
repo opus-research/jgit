@@ -105,6 +105,20 @@ public class UnionInputStreamTest extends TestCase {
 		assertEquals(-1, u.read(r, 0, 5));
 	}
 
+	public void testArrayConstructor() throws IOException {
+		final UnionInputStream u = new UnionInputStream(
+				new ByteArrayInputStream(new byte[] { 1, 0, 2 }),
+				new ByteArrayInputStream(new byte[] { 3 }),
+				new ByteArrayInputStream(new byte[] { 4, 5 }));
+
+		final byte[] r = new byte[5];
+		assertEquals(5, u.read(r, 0, 5));
+		assertTrue(Arrays.equals(new byte[] { 1, 0, 2, 3, 4 }, r));
+		assertEquals(1, u.read(r, 0, 5));
+		assertEquals(5, r[0]);
+		assertEquals(-1, u.read(r, 0, 5));
+	}
+
 	public void testMarkSupported() {
 		final UnionInputStream u = new UnionInputStream();
 		assertFalse(u.markSupported());
