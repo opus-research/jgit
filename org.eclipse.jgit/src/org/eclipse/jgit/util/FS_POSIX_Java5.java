@@ -1,6 +1,4 @@
 /*
- * Copyright (C) 2007, Robin Rosenberg <me@lathund.dewire.com>
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -43,97 +41,34 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.util.internal;
+package org.eclipse.jgit.util;
 
 import java.io.File;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 
-import org.eclipse.jgit.util.FS;
-
-/**
- * FS implementation for POSIX systems using Java6
- */
-public class FS_POSIX_Java6 extends FS_POSIX {
-	private static final Method canExecute;
-
-	private static final Method setExecute;
-
-	static {
-		canExecute = needMethod(File.class, "canExecute");
-		setExecute = needMethod(File.class, "setExecutable", Boolean.TYPE);
-	}
-
-	/**
-	 * @return true if Java has the ability to set and get the executable flag
-	 *         on files
-	 */
-	public static boolean hasExecute() {
-		return canExecute != null && setExecute != null;
-	}
-
-	private static Method needMethod(final Class<?> on, final String name,
-			final Class<?>... args) {
-		try {
-			return on.getMethod(name, args);
-		} catch (SecurityException e) {
-			return null;
-		} catch (NoSuchMethodException e) {
-			return null;
-		}
-	}
-
-	/**
-	 * Constructor
-	 */
-	public FS_POSIX_Java6() {
+class FS_POSIX_Java5 extends FS_POSIX {
+	FS_POSIX_Java5() {
 		super();
 	}
 
-	/**
-	 * Constructor
-	 *
-	 * @param src
-	 *            instance whose attributes to copy
-	 */
-	public FS_POSIX_Java6(FS src) {
+	FS_POSIX_Java5(FS src) {
 		super(src);
 	}
 
 	@Override
 	public FS newInstance() {
-		return new FS_POSIX_Java6(this);
+		return new FS_POSIX_Java5(this);
 	}
 
 	public boolean supportsExecute() {
-		return true;
+		return false;
 	}
 
 	public boolean canExecute(final File f) {
-		try {
-			final Object r = canExecute.invoke(f, (Object[]) null);
-			return ((Boolean) r).booleanValue();
-		} catch (IllegalArgumentException e) {
-			throw new Error(e);
-		} catch (IllegalAccessException e) {
-			throw new Error(e);
-		} catch (InvocationTargetException e) {
-			throw new Error(e);
-		}
+		return false;
 	}
 
 	public boolean setExecute(final File f, final boolean canExec) {
-		try {
-			final Object r;
-			r = setExecute.invoke(f, new Object[] { Boolean.valueOf(canExec) });
-			return ((Boolean) r).booleanValue();
-		} catch (IllegalArgumentException e) {
-			throw new Error(e);
-		} catch (IllegalAccessException e) {
-			throw new Error(e);
-		} catch (InvocationTargetException e) {
-			throw new Error(e);
-		}
+		return false;
 	}
 
 	@Override

@@ -53,11 +53,6 @@ import java.security.PrivilegedAction;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.eclipse.jgit.util.internal.FS_POSIX_Java5;
-import org.eclipse.jgit.util.internal.FS_POSIX_Java6;
-import org.eclipse.jgit.util.internal.FS_Win32;
-import org.eclipse.jgit.util.internal.FS_Win32_Cygwin;
-
 /** Abstraction to support various file system operations not in Java. */
 public abstract class FS {
 	/** The auto-detected implementation selected for this operating system and JRE. */
@@ -248,7 +243,7 @@ public abstract class FS {
 		final String home = AccessController
 				.doPrivileged(new PrivilegedAction<String>() {
 					public String run() {
-						return System.getProperty("user.home");
+						return System.getProperty("user.home"); //$NON-NLS-1$
 					}
 				});
 		if (home == null || home.length() == 0)
@@ -266,7 +261,7 @@ public abstract class FS {
 	 *            Files to search for in the given path
 	 * @return the first match found, or null
 	 **/
-	protected static File searchPath(final String path, final String... lookFor) {
+	static File searchPath(final String path, final String... lookFor) {
 		if (path == null)
 			return null;
 
@@ -292,10 +287,10 @@ public abstract class FS {
 	 */
 	protected static String readPipe(File dir, String[] command, String encoding) {
 		final boolean debug = Boolean.parseBoolean(SystemReader.getInstance()
-				.getProperty("jgit.fs.debug"));
+				.getProperty("jgit.fs.debug")); //$NON-NLS-1$
 		try {
 			if (debug)
-				System.err.println("readpipe " + Arrays.asList(command) + ","
+				System.err.println("readpipe " + Arrays.asList(command) + "," //$NON-NLS-1$ //$NON-NLS-2$
 						+ dir);
 			final Process p = Runtime.getRuntime().exec(command, null, dir);
 			final BufferedReader lineRead = new BufferedReader(
@@ -335,8 +330,8 @@ public abstract class FS {
 			try {
 				r = lineRead.readLine();
 				if (debug) {
-					System.err.println("readpipe may return '" + r + "'");
-					System.err.println("(ignoring remaing output:");
+					System.err.println("readpipe may return '" + r + "'"); //$NON-NLS-1$ //$NON-NLS-2$
+					System.err.println("(ignoring remaing output:"); //$NON-NLS-1$
 				}
 				String l;
 				while ((l = lineRead.readLine()) != null) {
@@ -356,7 +351,7 @@ public abstract class FS {
 							&& !gooblerFail.get())
 						return r;
 					if (debug)
-						System.err.println("readpipe rc=" + rc);
+						System.err.println("readpipe rc=" + rc); //$NON-NLS-1$
 					break;
 				} catch (InterruptedException ie) {
 					// Stop bothering me, I have a zombie to reap.
@@ -368,7 +363,7 @@ public abstract class FS {
 			// Ignore error (but report)
 		}
 		if (debug)
-			System.err.println("readpipe returns null");
+			System.err.println("readpipe returns null"); //$NON-NLS-1$
 		return null;
 	}
 
@@ -377,7 +372,7 @@ public abstract class FS {
 		Holder<File> p = gitPrefix;
 		if (p == null) {
 			String overrideGitPrefix = SystemReader.getInstance().getProperty(
-					"jgit.gitprefix");
+					"jgit.gitprefix"); //$NON-NLS-1$
 			if (overrideGitPrefix != null)
 				p = new Holder<File>(new File(overrideGitPrefix));
 			else

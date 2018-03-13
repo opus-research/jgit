@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2010, Robin Rosenberg
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,53 +40,64 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-package org.eclipse.jgit.util.internal;
+package org.eclipse.jgit.util;
 
 import java.io.File;
+import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
-import org.eclipse.jgit.util.FS;
+abstract class FS_POSIX extends FS {
+	@Override
+	protected File discoverGitPrefix() {
+		String path = SystemReader.getInstance().getenv("PATH"); //$NON-NLS-1$
+		File gitExe = searchPath(path, "git"); //$NON-NLS-1$
+		if (gitExe != null)
+			return gitExe.getParentFile().getParentFile();
 
-/**
- * FS implementaton for Java5
- */
-public class FS_POSIX_Java5 extends FS_POSIX {
-	/**
-	 * Constructor
-	 */
-	public FS_POSIX_Java5() {
+		if (SystemReader.getInstance().isMacOS()) {
+			// On MacOSX, PATH is shorter when Eclipse is launched from the
+			// Finder than from a terminal. Therefore try to launch bash as a
+			// login shell and search using that.
+			//
+			String w = readPipe(userHome(), //
+					new String[] { "bash", "--login", "-c", "which git" }, // //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
+					Charset.defaultCharset().name());
+			if (w == null || w.length() == 0)
+				return null;
+			File parentFile = new File(w).getParentFile();
+			if (parentFile == null)
+				return null;
+			return parentFile.getParentFile();
+		}
+
+		return null;
+	}
+
+	FS_POSIX() {
 		super();
 	}
 
-	/**
-	 * Constructor
-	 *
-	 * @param src
-	 *            instance whose attributes to copy
-	 */
-	public FS_POSIX_Java5(FS src) {
+	FS_POSIX(FS src) {
 		super(src);
 	}
 
 	@Override
-	public FS newInstance() {
-		return new FS_POSIX_Java5(this);
-	}
-
-	public boolean supportsExecute() {
-		return false;
-	}
-
-	public boolean canExecute(final File f) {
-		return false;
-	}
-
-	public boolean setExecute(final File f, final boolean canExec) {
-		return false;
+	public boolean isCaseSensitive() {
+		return !SystemReader.getInstance().isMacOS();
 	}
 
 	@Override
-	public boolean retryFailedLockFileCommit() {
-		return false;
+	public ProcessBuilder runInShell(String cmd, String[] args) {
+		List<String> argv = new ArrayList<String>(4 + args.length);
+		argv.add("sh"); //$NON-NLS-1$
+		argv.add("-c"); //$NON-NLS-1$
+		argv.add(cmd + " \"$@\""); //$NON-NLS-1$
+		argv.add(cmd);
+		argv.addAll(Arrays.asList(args));
+		ProcessBuilder proc = new ProcessBuilder();
+		proc.command(argv);
+		return proc;
 	}
 }

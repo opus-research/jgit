@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Robin Rosenberg
+ * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,75 +40,77 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util.internal;
+
+package org.eclipse.jgit.util;
 
 import java.io.File;
-import java.nio.charset.Charset;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.SystemReader;
+class FS_Win32_Cygwin extends FS_Win32 {
+	private static String cygpath;
 
-/**
- * Base FS for POSIX based systems
- */
-public abstract class FS_POSIX extends FS {
-	@Override
-	protected File discoverGitPrefix() {
-		String path = SystemReader.getInstance().getenv("PATH");
-		File gitExe = searchPath(path, "git");
-		if (gitExe != null)
-			return gitExe.getParentFile().getParentFile();
-
-		if (SystemReader.getInstance().isMacOS()) {
-			// On MacOSX, PATH is shorter when Eclipse is launched from the
-			// Finder than from a terminal. Therefore try to launch bash as a
-			// login shell and search using that.
-			//
-			String w = readPipe(userHome(), //
-					new String[] { "bash", "--login", "-c", "which git" }, //
-					Charset.defaultCharset().name());
-			if (w == null || w.length() == 0)
-				return null;
-			File parentFile = new File(w).getParentFile();
-			if (parentFile == null)
-				return null;
-			return parentFile.getParentFile();
-		}
-
-		return null;
+	static boolean isCygwin() {
+		final String path = AccessController
+				.doPrivileged(new PrivilegedAction<String>() {
+					public String run() {
+						return System.getProperty("java.library.path"); //$NON-NLS-1$
+					}
+				});
+		if (path == null)
+			return false;
+		File found = FS.searchPath(path, "cygpath.exe"); //$NON-NLS-1$
+		if (found != null)
+			cygpath = found.getPath();
+		return cygpath != null;
 	}
 
-	/**
-	 * Default constructor
-	 */
-	protected FS_POSIX() {
+	FS_Win32_Cygwin() {
 		super();
 	}
 
-	/**
-	 * Constructore
-	 * 
-	 * @param src
-	 *            FS to copy some settings from
-	 */
-	protected FS_POSIX(FS src) {
+	FS_Win32_Cygwin(FS src) {
 		super(src);
 	}
 
+	public FS newInstance() {
+		return new FS_Win32_Cygwin(this);
+	}
+
+	public File resolve(final File dir, final String pn) {
+		String useCygPath = System.getProperty("jgit.usecygpath"); //$NON-NLS-1$
+		if (useCygPath != null && useCygPath.equals("true")) { //$NON-NLS-1$
+			String w = readPipe(dir, //
+					new String[] { cygpath, "--windows", "--absolute", pn }, // //$NON-NLS-1$ //$NON-NLS-2$
+					"UTF-8"); //$NON-NLS-1$
+			if (w != null)
+				return new File(w);
+		}
+		return super.resolve(dir, pn);
+	}
+
 	@Override
-	public boolean isCaseSensitive() {
-		return !SystemReader.getInstance().isMacOS();
+	protected File userHomeImpl() {
+		final String home = AccessController
+				.doPrivileged(new PrivilegedAction<String>() {
+					public String run() {
+						return System.getenv("HOME"); //$NON-NLS-1$
+					}
+				});
+		if (home == null || home.length() == 0)
+			return super.userHomeImpl();
+		return resolve(new File("."), home); //$NON-NLS-1$
 	}
 
 	@Override
 	public ProcessBuilder runInShell(String cmd, String[] args) {
 		List<String> argv = new ArrayList<String>(4 + args.length);
-		argv.add("sh");
-		argv.add("-c");
-		argv.add(cmd + " \"$@\"");
+		argv.add("sh.exe"); //$NON-NLS-1$
+		argv.add("-c"); //$NON-NLS-1$
+		argv.add(cmd + " \"$@\""); //$NON-NLS-1$
 		argv.add(cmd);
 		argv.addAll(Arrays.asList(args));
 		ProcessBuilder proc = new ProcessBuilder();

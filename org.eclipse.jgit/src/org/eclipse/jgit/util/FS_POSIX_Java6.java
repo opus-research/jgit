@@ -1,4 +1,6 @@
 /*
+ * Copyright (C) 2007, Robin Rosenberg <me@lathund.dewire.com>
+ * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -41,97 +43,83 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.util.internal;
+package org.eclipse.jgit.util;
 
 import java.io.File;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 
-import org.eclipse.jgit.util.FS;
+class FS_POSIX_Java6 extends FS_POSIX {
+	private static final Method canExecute;
 
-/**
- * FS implementation for Cygwin on Windows
- */
-public class FS_Win32_Cygwin extends FS_Win32 {
-	private static String cygpath;
+	private static final Method setExecute;
 
-	/**
-	 * @return true if cygwin is found
-	 */
-	public static boolean isCygwin() {
-		final String path = AccessController
-				.doPrivileged(new PrivilegedAction<String>() {
-					public String run() {
-						return System.getProperty("java.library.path");
-					}
-				});
-		if (path == null)
-			return false;
-		File found = FS.searchPath(path, "cygpath.exe");
-		if (found != null)
-			cygpath = found.getPath();
-		return cygpath != null;
+	static {
+		canExecute = needMethod(File.class, "canExecute"); //$NON-NLS-1$
+		setExecute = needMethod(File.class, "setExecutable", Boolean.TYPE); //$NON-NLS-1$
 	}
 
-	/**
-	 * Constructor
-	 */
-	public FS_Win32_Cygwin() {
+	static boolean hasExecute() {
+		return canExecute != null && setExecute != null;
+	}
+
+	private static Method needMethod(final Class<?> on, final String name,
+			final Class<?>... args) {
+		try {
+			return on.getMethod(name, args);
+		} catch (SecurityException e) {
+			return null;
+		} catch (NoSuchMethodException e) {
+			return null;
+		}
+	}
+
+	FS_POSIX_Java6() {
 		super();
 	}
 
-	/**
-	 * Constructor
-	 *
-	 * @param src
-	 *            instance whose attributes to copy
-	 */
-	protected FS_Win32_Cygwin(FS src) {
+	FS_POSIX_Java6(FS src) {
 		super(src);
 	}
 
+	@Override
 	public FS newInstance() {
-		return new FS_Win32_Cygwin(this);
+		return new FS_POSIX_Java6(this);
 	}
 
-	public File resolve(final File dir, final String pn) {
-		String useCygPath = System.getProperty("jgit.usecygpath");
-		if (useCygPath != null && useCygPath.equals("true")) {
-			String w = readPipe(dir, //
-					new String[] { cygpath, "--windows", "--absolute", pn }, //
-					"UTF-8");
-			if (w != null)
-				return new File(w);
+	public boolean supportsExecute() {
+		return true;
+	}
+
+	public boolean canExecute(final File f) {
+		try {
+			final Object r = canExecute.invoke(f, (Object[]) null);
+			return ((Boolean) r).booleanValue();
+		} catch (IllegalArgumentException e) {
+			throw new Error(e);
+		} catch (IllegalAccessException e) {
+			throw new Error(e);
+		} catch (InvocationTargetException e) {
+			throw new Error(e);
 		}
-		return super.resolve(dir, pn);
+	}
+
+	public boolean setExecute(final File f, final boolean canExec) {
+		try {
+			final Object r;
+			r = setExecute.invoke(f, new Object[] { Boolean.valueOf(canExec) });
+			return ((Boolean) r).booleanValue();
+		} catch (IllegalArgumentException e) {
+			throw new Error(e);
+		} catch (IllegalAccessException e) {
+			throw new Error(e);
+		} catch (InvocationTargetException e) {
+			throw new Error(e);
+		}
 	}
 
 	@Override
-	protected File userHomeImpl() {
-		final String home = AccessController
-				.doPrivileged(new PrivilegedAction<String>() {
-					public String run() {
-						return System.getenv("HOME");
-					}
-				});
-		if (home == null || home.length() == 0)
-			return super.userHomeImpl();
-		return resolve(new File("."), home);
-	}
-
-	@Override
-	public ProcessBuilder runInShell(String cmd, String[] args) {
-		List<String> argv = new ArrayList<String>(4 + args.length);
-		argv.add("sh.exe");
-		argv.add("-c");
-		argv.add(cmd + " \"$@\"");
-		argv.add(cmd);
-		argv.addAll(Arrays.asList(args));
-		ProcessBuilder proc = new ProcessBuilder();
-		proc.command(argv);
-		return proc;
+	public boolean retryFailedLockFileCommit() {
+		return false;
 	}
 }
