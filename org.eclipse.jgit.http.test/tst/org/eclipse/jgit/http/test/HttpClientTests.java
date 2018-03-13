@@ -123,9 +123,7 @@ public class HttpClientTests extends HttpTestCase {
 
 		ServletContextHandler ctx = server.addContext(path);
 		ctx.setResourceBase(base.toString());
-		ServletHolder holder = ctx.addServlet(DefaultServlet.class, "/");
-		// The tmp directory is symlinked on OS X
-		holder.setInitParameter("aliases", "true");
+		ctx.addServlet(DefaultServlet.class, "/");
 		return ctx;
 	}
 
