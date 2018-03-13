@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
- * and other copyright owners as documented in the project's IP log.
+ * Copyright (C) 2012, Roberto Tyley <roberto.tyley@gmail.com>
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -41,60 +40,38 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.iplog;
+package org.eclipse.jgit.storage.file;
 
-import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.junit.Test;
 
-/** A project contributor (non-committer). */
-class Contributor {
-	/** Sorts contributors by their name first name, then last name. */
-	static final Comparator<Contributor> COMPARATOR = new Comparator<Contributor>() {
-		public int compare(Contributor a, Contributor b) {
-			return a.name.compareTo(b.name);
+import java.util.*;
+import java.util.concurrent.*;
+
+public class ObjectDirectoryTest extends RepositoryTestCase {
+
+	@Test
+	public void testConcurrentInsertionOfBlobsToTheSameNewFanOutDirectory()
+			throws Exception {
+		ExecutorService e = Executors.newCachedThreadPool();
+		for (int i=0; i < 100; ++i) {
+			ObjectDirectory db = createBareRepository().getObjectDatabase();
+			for (Future f : e.invokeAll(blobInsertersForTheSameFanOutDir(db))) {
+				f.get();
+			}
 		}
-	};
-
-	private final String id;
-
-	private final String name;
-
-	private final List<SingleContribution> contributions = new ArrayList<SingleContribution>();
-
-	/**
-	 * @param id
-	 * @param name
-	 */
-	Contributor(String id, String name) {
-		this.id = id;
-		this.name = name;
 	}
 
-	/** @return unique identity of this contributor in the foundation database. */
-	String getID() {
-		return id;
+	private Collection<Callable<ObjectId>> blobInsertersForTheSameFanOutDir(
+			final ObjectDirectory db) {
+		Callable<ObjectId> callable = new Callable<ObjectId>() {
+			public ObjectId call() throws Exception {
+				return db.newInserter().insert(Constants.OBJ_BLOB, new byte[0]);
+			}
+		};
+		return Collections.nCopies(4, callable);
 	}
 
-	/** @return name of the contributor. */
-	String getName() {
-		return name;
-	}
-
-	/** @return all known contributions. */
-	Collection<SingleContribution> getContributions() {
-		return Collections.unmodifiableCollection(contributions);
-	}
-
-	void add(SingleContribution bug) {
-		contributions.add(bug);
-	}
-
-	@Override
-	public String toString() {
-		return MessageFormat.format(IpLogText.get().contributorString, getName());
-	}
 }
