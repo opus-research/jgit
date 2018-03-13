@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2016, David Pursehouse <david.pursehouse@gmail.com>
- * and other copyright owners as documented in the project's IP log.
+ * Copyright (C) 2015, Google Inc.
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -41,21 +40,46 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.lfs.errors;
+package org.eclipse.jgit.transport;
 
-/**
- * Thrown when the repository does not exist for the user.
- *
- * @since 4.5
- */
-public class LfsRepositoryNotFound extends LfsException {
-	private static final long serialVersionUID = 1L;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
-	/**
-	 * @param name
-	 *
-	 */
-	public LfsRepositoryNotFound(String name) {
-		super("repository " + name + " not found"); //$NON-NLS-1$ //$NON-NLS-2$
+import org.eclipse.jgit.errors.PackProtocolException;
+import org.eclipse.jgit.lib.ObjectId;
+import org.junit.Test;
+
+/** Tests for base receive-pack utilities. */
+public class BaseReceivePackTest {
+	@Test
+	public void parseCommand() throws Exception {
+		String o = "0000000000000000000000000000000000000000";
+		String n = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
+		String r = "refs/heads/master";
+		ReceiveCommand cmd = BaseReceivePack.parseCommand(o + " " + n + " " + r);
+		assertEquals(ObjectId.zeroId(), cmd.getOldId());
+		assertEquals("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+				cmd.getNewId().name());
+		assertEquals("refs/heads/master", cmd.getRefName());
+
+		assertParseCommandFails(null);
+		assertParseCommandFails("");
+		assertParseCommandFails(o.substring(35) + " " + n.substring(35)
+				+ " " + r + "\n");
+		assertParseCommandFails(o + " " + n + " " + r + "\n");
+		assertParseCommandFails(o + " " + n + " " + "refs^foo");
+		assertParseCommandFails(o + " " + n.substring(10) + " " + r);
+		assertParseCommandFails(o.substring(10) + " " + n + " " + r);
+		assertParseCommandFails("X" + o.substring(1) + " " + n + " " + r);
+		assertParseCommandFails(o + " " + "X" + n.substring(1) + " " + r);
+	}
+
+	private void assertParseCommandFails(String input) {
+		try {
+			BaseReceivePack.parseCommand(input);
+			fail();
+		} catch (PackProtocolException e) {
+			// Expected.
+		}
 	}
 }
