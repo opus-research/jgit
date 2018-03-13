@@ -62,11 +62,15 @@ public class CLIRepositoryTestCase extends LocalDiskRepositoryTestCase {
 	/** Test repository, initialized for this test case. */
 	protected Repository db;
 
+	/** Working directory of {@link #db}. */
+	protected File trash;
+
 	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
 		db = createWorkRepository();
+		trash = db.getWorkTree();
 	}
 
 	/**

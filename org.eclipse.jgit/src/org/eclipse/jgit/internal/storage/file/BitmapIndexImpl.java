@@ -47,6 +47,9 @@ import java.text.MessageFormat;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+import com.googlecode.javaewah.EWAHCompressedBitmap;
+import com.googlecode.javaewah.IntIterator;
+
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.BitmapIndex;
@@ -55,9 +58,6 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdOwnerMap;
 import org.eclipse.jgit.util.BlockList;
-
-import com.googlecode.javaewah.EWAHCompressedBitmap;
-import com.googlecode.javaewah.IntIterator;
 
 /** A compressed bitmap representation of the entire object graph. */
 public class BitmapIndexImpl implements BitmapIndex {
@@ -504,10 +504,10 @@ public class BitmapIndexImpl implements BitmapIndex {
 	static final EWAHCompressedBitmap ones(int sizeInBits) {
 		EWAHCompressedBitmap mask = new EWAHCompressedBitmap();
 		mask.addStreamOfEmptyWords(
-				true, sizeInBits / EWAHCompressedBitmap.WORD_IN_BITS);
-		int remaining = sizeInBits % EWAHCompressedBitmap.WORD_IN_BITS;
+				true, sizeInBits / EWAHCompressedBitmap.wordinbits);
+		int remaining = sizeInBits % EWAHCompressedBitmap.wordinbits;
 		if (remaining > 0)
-			mask.addWord((1L << remaining) - 1, remaining);
+			mask.add((1L << remaining) - 1, remaining);
 		return mask;
 	}
 }
