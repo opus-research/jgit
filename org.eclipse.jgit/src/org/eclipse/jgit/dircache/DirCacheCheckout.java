@@ -332,8 +332,14 @@ public class DirCacheCheckout {
 					// conflict
 					update(m.getEntryPathString(), m.getEntryObjectId(),
 							m.getEntryFileMode());
-				else
-					keep(i.getDirCacheEntry());
+				else {
+					// update the timestamp of the index with the one from the
+					// file if not set, as we are sure to be in sync here.
+					DirCacheEntry entry = i.getDirCacheEntry();
+					if (entry.getLastModified() == 0)
+						entry.setLastModified(f.getEntryLastModified());
+					keep(entry);
+				}
 			} else
 				// The index contains a folder
 				keep(i.getDirCacheEntry());
@@ -1015,10 +1021,9 @@ public class DirCacheCheckout {
 	}
 
 	private static boolean isValidPathSegment(CanonicalTreeParser t) {
-		boolean isWindows = "Windows".equals(SystemReader.getInstance()
-				.getProperty("os.name"));
-		boolean isOSX = "Mac OS X".equals(SystemReader.getInstance()
-				.getProperty("os.name"));
+		String osName = SystemReader.getInstance().getProperty("os.name");
+		boolean isWindows = "Windows".equals(osName);
+		boolean isOSX = "Darwin".equals(osName) || "Mac OS X".equals(osName);
 		boolean ignCase = isOSX || isWindows;
 
 		int ptr = t.getNameOffset();
