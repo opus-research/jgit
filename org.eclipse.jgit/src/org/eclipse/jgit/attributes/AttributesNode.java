@@ -58,6 +58,8 @@ import org.eclipse.jgit.lib.Constants;
  * Represents a bundle of attributes inherited from a base directory.
  *
  * This class is not thread safe, it maintains state about the last match.
+ *
+ * @since 3.7
  */
 public class AttributesNode {
 	/** The rules that have been parsed into this node. */
@@ -79,7 +81,7 @@ public class AttributesNode {
 	}
 
 	/**
-	 * Parse files according to gitignore standards.
+	 * Parse files according to gitattribute standards.
 	 *
 	 * @param in
 	 *            input stream holding the standard ignore format. The caller is
@@ -150,9 +152,8 @@ public class AttributesNode {
 				// read since the last entry should be used
 				while (attributeIte.hasPrevious()) {
 					Attribute attr = attributeIte.previous();
-					if (!attributes.containsKey(attr.getKey())) {
+					if (!attributes.containsKey(attr.getKey()))
 						attributes.put(attr.getKey(), attr);
-					}
 				}
 			}
 		}

@@ -59,7 +59,7 @@ import org.eclipse.jgit.ignore.internal.PathMatcher;
  *
  * Inspiration from: {@link FastIgnoreRule}
  *
- * @since 3.6
+ * @since 3.7
  */
 public class AttributesRule {
 
@@ -99,7 +99,6 @@ public class AttributesRule {
 		return result;
 	}
 
-
 	private final String pattern;
 	private final List<Attribute> attributes;
 
@@ -125,32 +124,29 @@ public class AttributesRule {
 		nameOnly = false;
 		dirOnly = false;
 
-		int endIndex = pattern.length();
-
 		if (pattern.endsWith("/")) { //$NON-NLS-1$
-			endIndex--;
+			pattern = pattern.substring(0, pattern.length() - 1);
 			dirOnly = true;
 		}
 
-		String pattern2 = pattern.substring(0, endIndex);
-		boolean hasSlash = pattern2.contains("/"); //$NON-NLS-1$
+		boolean hasSlash = pattern.contains("/"); //$NON-NLS-1$
 
 		if (!hasSlash)
 			nameOnly = true;
-		else if (!pattern2.startsWith("/")) { //$NON-NLS-1$
+		else if (!pattern.startsWith("/")) { //$NON-NLS-1$
 			// Contains "/" but does not start with one
 			// Adding / to the start should not interfere with matching
-			pattern2 = "/" + pattern2; //$NON-NLS-1$
+			pattern = "/" + pattern; //$NON-NLS-1$
 		}
 
 		try {
-			matcher = PathMatcher.createPathMatcher(pattern2,
+			matcher = PathMatcher.createPathMatcher(pattern,
 					Character.valueOf(FastIgnoreRule.PATH_SEPARATOR), dirOnly);
 		} catch (InvalidPatternException e) {
 			matcher = NO_MATCH;
 		}
 
-		this.pattern = pattern2;
+		this.pattern = pattern;
 	}
 
 	/**

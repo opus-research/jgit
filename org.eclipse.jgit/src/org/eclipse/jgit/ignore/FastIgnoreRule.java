@@ -212,6 +212,4 @@ public class FastIgnoreRule {
 			return false;
 		return matcher.equals(other.matcher);
 	}
-
-
 }

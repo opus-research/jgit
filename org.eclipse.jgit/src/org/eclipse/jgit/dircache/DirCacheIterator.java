@@ -46,7 +46,6 @@ package org.eclipse.jgit.dircache;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Arrays;
 import java.util.Collections;
 
 import org.eclipse.jgit.attributes.AttributesNode;
@@ -59,6 +58,7 @@ import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.EmptyTreeIterator;
+import org.eclipse.jgit.util.RawParseUtils;
 
 /**
  * Iterate a {@link DirCache} as part of a <code>TreeWalk</code>.
@@ -269,9 +269,7 @@ public class DirCacheIterator extends AbstractTreeIterator {
 		pathLen = cep.length;
 		currentSubtree = null;
 		// Checks if this entry is a .gitattributes file
-		byte[] entryName = new byte[pathLen - pathOffset];
-		System.arraycopy(path, pathOffset, entryName, 0, pathLen - pathOffset);
-		if (Arrays.equals(entryName, DOT_GIT_ATTRIBUTES_BYTES))
+		if (RawParseUtils.match(path, pathOffset, DOT_GIT_ATTRIBUTES_BYTES) == path.length)
 			attributesNode = new LazyLoadingAttributesNode(
 					currentEntry.getObjectId());
 	}
@@ -293,6 +291,7 @@ public class DirCacheIterator extends AbstractTreeIterator {
 	 *            {@link ObjectReader} used to parse the .gitattributes entry.
 	 * @return {@link AttributesNode} for the current entry.
 	 * @throws IOException
+	 * @since 3.7
 	 */
 	public AttributesNode getEntryAttributesNode(ObjectReader reader)
 			throws IOException {
@@ -305,9 +304,6 @@ public class DirCacheIterator extends AbstractTreeIterator {
 	/**
 	 * {@link AttributesNode} implementation that provides lazy loading
 	 * facilities.
-	 *
-	 * @author <a href="mailto:arthur.daussy@obeo.fr">Arthur Daussy</a>
-	 *
 	 */
 	private static class LazyLoadingAttributesNode extends AttributesNode {
 		final ObjectId objectId;

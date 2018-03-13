@@ -40,9 +40,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 package org.eclipse.jgit.attributes;
-
 
 /**
  * Represents an attribute.
@@ -57,7 +55,7 @@ package org.eclipse.jgit.attributes;
  * </ul>
  * </p>
  *
- * @since 3.6
+ * @since 3.7
  */
 public final class Attribute {
 
@@ -85,19 +83,25 @@ public final class Attribute {
 	 * @param key
 	 *            the attribute key. Should not be <code>null</code>.
 	 * @param state
-	 *            the attribute state
+	 *            the attribute state. It should be either {@link State#SET} or
+	 *            {@link State#UNSET}. In order to create a custom value
+	 *            attribute prefer the use of {@link #Attribute(String, String)}
+	 *            constructor.
 	 */
 	public Attribute(String key, State state) {
 		this(key, state, null);
 	}
 
-
 	private Attribute(String key, State state, String value) {
 		if (key == null)
 			throw new NullPointerException(
 					"The key of an attribute should not be null"); //$NON-NLS-1$
+		if (state == null)
+			throw new NullPointerException(
+					"The state of an attribute should not be null"); //$NON-NLS-1$
+
 		this.key = key;
-		this.state = state != null ? state : State.CUSTOM;
+		this.state = state;
 		this.value = value;
 	}
 
@@ -105,14 +109,13 @@ public final class Attribute {
 	 * Creates a new instance.
 	 *
 	 * @param key
-	 *            the attribute key
+	 *            the attribute key. Should not be <code>null</code>.
 	 * @param value
 	 *            the custom attribute value
 	 */
 	public Attribute(String key, String value) {
 		this(key, State.CUSTOM, value);
 	}
-
 
 	@Override
 	public boolean equals(Object obj) {
@@ -149,14 +152,12 @@ public final class Attribute {
 		return state;
 	}
 
-
 	/**
 	 * @return the attribute value (may be <code>null</code>)
 	 */
 	public String getValue() {
 		return value;
 	}
-
 
 	@Override
 	public int hashCode() {
@@ -167,7 +168,6 @@ public final class Attribute {
 		result = prime * result + ((value == null) ? 0 : value.hashCode());
 		return result;
 	}
-
 
 	@Override
 	public String toString() {

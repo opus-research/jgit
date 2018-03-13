@@ -102,6 +102,8 @@ public class CoreConfig {
 
 	private final String excludesfile;
 
+	private final String attributesfile;
+
 	/**
 	 * Options for symlink handling
 	 *
@@ -127,8 +129,6 @@ public class CoreConfig {
 		/** Hide only .git */
 		DOTGITONLY
 	}
-
-	private final String attributesfile;
 
 	private CoreConfig(final Config rc) {
 		compression = rc.getInt(ConfigConstants.CONFIG_CORE_SECTION,
@@ -173,6 +173,7 @@ public class CoreConfig {
 
 	/**
 	 * @return path of attributesfile
+	 * @since 3.7
 	 */
 	public String getAttributesFile() {
 		return attributesfile;

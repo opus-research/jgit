@@ -49,7 +49,6 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
-
 /**
  * Tests git attributes pattern matches
  * <p>

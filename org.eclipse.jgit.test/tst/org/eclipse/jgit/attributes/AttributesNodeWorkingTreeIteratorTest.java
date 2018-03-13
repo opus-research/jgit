@@ -135,7 +135,6 @@ public class AttributesNodeWorkingTreeIteratorTest extends RepositoryTestCase {
 		endWalk();
 	}
 
-
 	/**
 	 * Checks that if there is no .gitattributes file in the repository
 	 * everything still work fine.

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014, Arthur Daussy <arthur.daussy@obeo.fr>
+ * Copyright (C) 2014, Andrey Loskutov <loskutov@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,45 +40,43 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.treewalk;
-
-import java.io.IOException;
-
-import org.eclipse.jgit.attributes.AttributesNode;
-import org.eclipse.jgit.lib.CoreConfig;
+package org.eclipse.jgit.ignore.internal;
 
 /**
- * An internal interface use to retrieve {@link AttributesNode}s.
- * <p>
- * Implementor of this interface should be able to retrieve the global
- * {@link AttributesNode} and the info {@link AttributesNode}
- * </p>
+ * Matcher for simple patterns ending with an asterisk, e.g. "Makefile.*"
  *
+ * @since 3.6
  */
-interface AttributeNodeProvider {
+public class TrailingAsteriskMatcher extends NameMatcher {
 
-	/**
-	 * Retrieves the {@link AttributesNode} that holds the information located
-	 * in $GIT_DIR/info/attributes file.
-	 *
-	 * @return the {@link AttributesNode} that holds the information located in
-	 *         $GIT_DIR/info/attributes file.
-	 * @throws IOException
-	 *             if an error is raised while parsing the attributes file
-	 */
-	public AttributesNode getInfoAttributesNode() throws IOException;
+	TrailingAsteriskMatcher(String pattern, Character pathSeparator, boolean dirOnly) {
+		super(pattern, pathSeparator, dirOnly);
 
-	/**
-	 * Retrieves the {@link AttributesNode} that holds the information located
-	 * in system-wide file.
-	 *
-	 * @return the {@link AttributesNode} that holds the information located in
-	 *         system-wide file.
-	 * @throws IOException
-	 *             IOException if an error is raised while parsing the
-	 *             attributes file
-	 * @see CoreConfig#getAttributesFile()
-	 */
-	public AttributesNode getGlobalAttributesNode() throws IOException;
+		if (subPattern.charAt(subPattern.length() - 1) != '*')
+			throw new IllegalArgumentException(
+					"Pattern must have trailing asterisk: " + pattern); //$NON-NLS-1$
+	}
+
+	public boolean matches(String segment, int startIncl, int endExcl,
+			boolean assumeDirectory) {
+		// faster local access, same as in string.indexOf()
+		String s = subPattern;
+		// we don't need to count '*' character itself
+		int subLenth = s.length() - 1;
+		// simple /*/ pattern
+		if (subLenth == 0)
+			return true;
+
+		if (subLenth > (endExcl - startIncl))
+			return false;
+
+		for (int i = 0; i < subLenth; i++) {
+			char c1 = s.charAt(i);
+			char c2 = segment.charAt(i + startIncl);
+			if (c1 != c2)
+				return false;
+		}
+		return true;
+	}
 
 }

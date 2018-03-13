@@ -72,6 +72,7 @@ import org.eclipse.jgit.internal.storage.pack.PackWriter;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Config;
+import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.lib.ObjectId;
@@ -606,7 +607,18 @@ public class ObjectDirectory extends FileObjectDatabase {
 	}
 
 	private boolean searchPacksAgain(PackList old) {
-		return old.snapshot.isModified(packDirectory) && old != scanPacks(old);
+		// Whether to trust the pack folder's modification time. If set
+		// to false we will always scan the .git/objects/pack folder to
+		// check for new pack files. If set to true (default) we use the
+		// lastmodified attribute of the folder and assume that no new
+		// pack files can be in this folder if his modification time has
+		// not changed.
+		boolean trustFolderStat = config.getBoolean(
+				ConfigConstants.CONFIG_CORE_SECTION,
+				ConfigConstants.CONFIG_KEY_TRUSTFOLDERSTAT, true);
+
+		return ((!trustFolderStat) || old.snapshot.isModified(packDirectory))
+				&& old != scanPacks(old);
 	}
 
 	Config getConfig() {
