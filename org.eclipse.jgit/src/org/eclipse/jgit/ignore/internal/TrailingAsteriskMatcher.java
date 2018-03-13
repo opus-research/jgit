@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Obeo.
+ * Copyright (C) 2014, Andrey Loskutov <loskutov@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,39 +40,43 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.ignore.internal;
 
 /**
- * An enum describing the different hooks a user can implement to customize his
- * repositories.
+ * Matcher for simple patterns ending with an asterisk, e.g. "Makefile.*"
  *
  * @since 3.6
  */
-public enum Hook {
-	/**
-	 * Literal for the "pre-commit" git hook.
-	 * <p>
-	 * This hook is invoked by git commit, and can be bypassed with the
-	 * "no-verify" option. It takes no parameter, and is invoked before
-	 * obtaining the proposed commit log message and making a commit.
-	 * </p>
-	 * <p>
-	 * A non-zero exit code from the called hook means that the commit should be
-	 * aborted.
-	 * </p>
-	 */
-	PRE_COMMIT("pre-commit"); //$NON-NLS-1$
+public class TrailingAsteriskMatcher extends NameMatcher {
 
-	private final String name;
+	TrailingAsteriskMatcher(String pattern, Character pathSeparator, boolean dirOnly) {
+		super(pattern, pathSeparator, dirOnly);
 
-	private Hook(String name) {
-		this.name = name;
+		if (subPattern.charAt(subPattern.length() - 1) != '*')
+			throw new IllegalArgumentException(
+					"Pattern must have trailing asterisk: " + pattern); //$NON-NLS-1$
 	}
 
-	/**
-	 * @return The name of this hook.
-	 */
-	public String getName() {
-		return name;
+	public boolean matches(String segment, int startIncl, int endExcl,
+			boolean assumeDirectory) {
+		// faster local access, same as in string.indexOf()
+		String s = subPattern;
+		// we don't need to count '*' character itself
+		int subLenth = s.length() - 1;
+		// simple /*/ pattern
+		if (subLenth == 0)
+			return true;
+
+		if (subLenth > (endExcl - startIncl))
+			return false;
+
+		for (int i = 0; i < subLenth; i++) {
+			char c1 = s.charAt(i);
+			char c2 = segment.charAt(i + startIncl);
+			if (c1 != c2)
+				return false;
+		}
+		return true;
 	}
+
 }

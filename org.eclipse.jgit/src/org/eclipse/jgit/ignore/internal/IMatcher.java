@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Obeo.
+ * Copyright (C) 2014, Andrey Loskutov <loskutov@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,73 +40,41 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.ignore.internal;
 
 /**
- * Describes the result of running an external process.
+ * Generic string matcher
  *
  * @since 3.6
  */
-public class ProcessResult {
-	/**
-	 * Status of a process' execution.
-	 */
-	public static enum Status {
-		/**
-		 * The process was found and launched properly. It may still have exited
-		 * with a non-zero {@link #exitCode}.
-		 */
-		OK,
-
-		/** The process was not found on disk and thus could not be launched. */
-		NOT_PRESENT,
-
-		/**
-		 * The process was found but could not be launched since it was not
-		 * supported by the current {@link FS}.
-		 */
-		NOT_SUPPORTED;
-	}
-
-	/** The exit code of the process. */
-	private final int exitCode;
-
-	/** Status of the process' execution. */
-	private final Status status;
+public interface IMatcher {
 
 	/**
-	 * Instantiates a process result with the given status and an exit code of
-	 * <code>-1</code>.
+	 * Matches entire given string
 	 *
-	 * @param status
-	 *            Status describing the execution of the external process.
+	 * @param path
+	 *            string which is not null, but might be empty
+	 * @param assumeDirectory
+	 *            true to assume this path as directory (even if it doesn't end
+	 *            with a slash)
+	 * @return true if this matcher pattern matches given string
 	 */
-	public ProcessResult(Status status) {
-		this(-1, status);
-	}
+	boolean matches(String path, boolean assumeDirectory);
 
 	/**
-	 * @param exitCode
-	 *            Exit code of the process.
-	 * @param status
-	 *            Status describing the execution of the external process.
+	 * Matches only part of given string
+	 *
+	 * @param segment
+	 *            string which is not null, but might be empty
+	 * @param startIncl
+	 *            start index, inclusive
+	 * @param endExcl
+	 *            end index, exclusive
+	 * @param assumeDirectory
+	 *            true to assume this path as directory (even if it doesn't end
+	 *            with a slash)
+	 * @return true if this matcher pattern matches given string
 	 */
-	public ProcessResult(int exitCode, Status status) {
-		this.exitCode = exitCode;
-		this.status = status;
-	}
-
-	/**
-	 * @return The exit code of the process.
-	 */
-	public int getExitCode() {
-		return exitCode;
-	}
-
-	/**
-	 * @return The status of the process' execution.
-	 */
-	public Status getStatus() {
-		return status;
-	}
+	boolean matches(String segment, int startIncl, int endExcl,
+			boolean assumeDirectory);
 }

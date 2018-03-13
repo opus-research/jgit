@@ -698,7 +698,7 @@ public class DirCacheCheckout {
 			// Nothing in Index
 			// At least one of Head, Index, Merge is not empty
 			// make sure not to overwrite untracked files
-			if (f != null) {
+			if (f != null && !f.isEntryIgnored()) {
 				// A submodule is not a file. We should ignore it
 				if (!FileMode.GITLINK.equals(mMode)) {
 					// a dirty worktree: the index is empty but we have a
@@ -1163,7 +1163,9 @@ public class DirCacheCheckout {
 	 * @param entry
 	 *            the entry containing new mode and content
 	 * @throws IOException
+	 * @deprecated Use the overloaded form that accepts {@link ObjectReader}.
 	 */
+	@Deprecated
 	public static void checkoutEntry(final Repository repository, File f,
 			DirCacheEntry entry) throws IOException {
 		ObjectReader or = repository.newObjectReader();
