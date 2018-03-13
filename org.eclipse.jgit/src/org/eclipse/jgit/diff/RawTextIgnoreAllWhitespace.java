@@ -48,8 +48,6 @@ import static org.eclipse.jgit.util.RawCharUtil.isWhitespace;
 
 /**
  * A version of {@link RawText} that ignores all whitespace.
- *
- * @author jeffschu@google.com (Jeff Schumacher)
  */
 public class RawTextIgnoreAllWhitespace extends RawText {
 
@@ -73,53 +71,64 @@ public class RawTextIgnoreAllWhitespace extends RawText {
 
 	private static boolean equals(final RawText a, final int ai,
 			final RawText b, final int bi) {
-		if (a.hashes.get(ai) != b.hashes.get(bi)) {
+		if (a.hashes.get(ai) != b.hashes.get(bi))
 			return false;
-		}
 
 		int as = a.lines.get(ai);
 		int bs = b.lines.get(bi);
-		final int ae = a.lines.get(ai + 1);
-		final int be = b.lines.get(bi + 1);
+		int ae = a.lines.get(ai + 1);
+		int be = b.lines.get(bi + 1);
+
+		as = trimLeadingWhitespace(a.content, as, ae);
+		bs = trimLeadingWhitespace(b.content, bs, be);
+		ae = trimTrailingWhitespace(a.content, as, ae);
+		be = trimTrailingWhitespace(b.content, bs, be);
 
 		while (as < ae && bs < be) {
-			while (as < ae - 1 && isWhitespace(a.content[as])) {
+			byte ac = a.content[as];
+			byte bc = b.content[bs];
+
+			while (as < ae - 1 && isWhitespace(ac)) {
 				as++;
+				ac = a.content[as];
 			}
 
-			while (bs < be - 1 && isWhitespace(b.content[bs])) {
+			while (bs < be - 1 && isWhitespace(bc)) {
 				bs++;
+				bc = b.content[bs];
 			}
 
-			if (a.content[as] != b.content[bs]) {
+			if (ac != bc)
 				return false;
-			}
 
 			as++;
 			bs++;
 		}
 
-		while (as < ae) {
-			if (!isWhitespace(a.content[as++])) {
-				return false;
-			}
-		}
-
-		while (bs < be) {
-			if (!isWhitespace(b.content[bs++])) {
-				return false;
-			}
-		}
 		return true;
+	}
+
+	private static int trimTrailingWhitespace(byte[] raw, int start, int end) {
+		while (end > start && isWhitespace(raw[end - 1]))
+			end--;
+
+		return end;
+	}
+
+	private static int trimLeadingWhitespace(byte[] raw, int start, int end) {
+		while (start < end && isWhitespace(raw[start]))
+			start++;
+
+		return start;
 	}
 
 	@Override
 	protected int hashLine(final byte[] raw, int ptr, final int end) {
 		int hash = 5381;
 		for (; ptr < end; ptr++) {
-			if (!isWhitespace(raw[ptr])) {
-				hash = (hash << 5) ^ (raw[ptr] & 0xff);
-			}
+			byte c = raw[ptr];
+			if (!isWhitespace(c))
+				hash = (hash << 5) ^ (c & 0xff);
 		}
 		return hash;
 	}
