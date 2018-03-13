@@ -259,7 +259,7 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	 * the --format= option)
 	 */
 	private static final ConcurrentMap<String, FormatEntry> formats =
-			new ConcurrentHashMap<>();
+			new ConcurrentHashMap<String, FormatEntry>();
 
 	/**
 	 * Replaces the entry for a key only if currently mapped to a given
@@ -377,7 +377,7 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	private String prefix;
 	private String format;
 	private Map<String, Object> formatOptions = new HashMap<>();
-	private List<String> paths = new ArrayList<>();
+	private List<String> paths = new ArrayList<String>();
 
 	/** Filename suffix, for automatically choosing a format. */
 	private String suffix;

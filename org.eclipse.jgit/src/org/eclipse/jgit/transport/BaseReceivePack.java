@@ -124,7 +124,7 @@ public abstract class BaseReceivePack {
 		 *            line from the client.
 		 */
 		public FirstLine(String line) {
-			final HashSet<String> caps = new HashSet<>();
+			final HashSet<String> caps = new HashSet<String>();
 			final int nul = line.indexOf('\0');
 			if (nul >= 0) {
 				for (String c : line.substring(nul + 1).split(" ")) //$NON-NLS-1$
@@ -325,8 +325,8 @@ public abstract class BaseReceivePack {
 		maxDiscardBytes = rc.maxDiscardBytes;
 		advertiseRefsHook = AdvertiseRefsHook.DEFAULT;
 		refFilter = RefFilter.DEFAULT;
-		advertisedHaves = new HashSet<>();
-		clientShallowCommits = new HashSet<>();
+		advertisedHaves = new HashSet<ObjectId>();
+		clientShallowCommits = new HashSet<ObjectId>();
 		signedPushConfig = rc.signedPush;
 	}
 
@@ -1058,12 +1058,20 @@ public abstract class BaseReceivePack {
 			rawOut = o;
 		}
 
+		if (maxPackSizeLimit >= 0)
+			rawIn = new LimitedInputStream(rawIn, maxPackSizeLimit) {
+				@Override
+				protected void limitExceeded() throws TooLargePackException {
+					throw new TooLargePackException(limit);
+				}
+			};
+
 		pckIn = new PacketLineIn(rawIn);
 		pckOut = new PacketLineOut(rawOut);
 		pckOut.setFlushOnEnd(false);
 
-		enabledCapabilities = new HashSet<>();
-		commands = new ArrayList<>();
+		enabledCapabilities = new HashSet<String>();
+		commands = new ArrayList<ReceiveCommand>();
 	}
 
 	/** @return advertised refs, or the default if not explicitly advertised. */
@@ -1361,7 +1369,7 @@ public abstract class BaseReceivePack {
 			if (getRefLogIdent() != null)
 				lockMsg += " from " + getRefLogIdent().toExternalString(); //$NON-NLS-1$
 
-			parser = ins.newPackParser(packInputStream());
+			parser = ins.newPackParser(rawIn);
 			parser.setAllowThin(true);
 			parser.setNeedNewObjectIds(checkReferencedIsReachable);
 			parser.setNeedBaseObjectIds(checkReferencedIsReachable);
@@ -1379,19 +1387,6 @@ public abstract class BaseReceivePack {
 
 		if (timeoutIn != null)
 			timeoutIn.setTimeout(timeout * 1000);
-	}
-
-	private InputStream packInputStream() {
-		InputStream packIn = rawIn;
-		if (maxPackSizeLimit >= 0) {
-			packIn = new LimitedInputStream(packIn, maxPackSizeLimit) {
-				@Override
-				protected void limitExceeded() throws TooLargePackException {
-					throw new TooLargePackException(limit);
-				}
-			};
-		}
-		return packIn;
 	}
 
 	private boolean needCheckConnectivity() {

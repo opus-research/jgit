@@ -94,7 +94,7 @@ public class SubmoduleUpdateCommand extends
 	 */
 	public SubmoduleUpdateCommand(final Repository repo) {
 		super(repo);
-		paths = new ArrayList<>();
+		paths = new ArrayList<String>();
 	}
 
 	/**
@@ -148,7 +148,7 @@ public class SubmoduleUpdateCommand extends
 		try (SubmoduleWalk generator = SubmoduleWalk.forIndex(repo)) {
 			if (!paths.isEmpty())
 				generator.setFilter(PathFilterGroup.createFromStrings(paths));
-			List<String> updated = new ArrayList<>();
+			List<String> updated = new ArrayList<String>();
 			while (generator.next()) {
 				// Skip submodules not registered in .gitmodules file
 				if (generator.getModulesPath() == null)

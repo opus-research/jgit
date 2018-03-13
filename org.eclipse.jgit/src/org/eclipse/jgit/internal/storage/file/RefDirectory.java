@@ -153,10 +153,10 @@ public class RefDirectory extends RefDatabase {
 	 * converted into resolved references during a get operation, ensuring the
 	 * live value is always returned.
 	 */
-	private final AtomicReference<RefList<LooseRef>> looseRefs = new AtomicReference<>();
+	private final AtomicReference<RefList<LooseRef>> looseRefs = new AtomicReference<RefList<LooseRef>>();
 
 	/** Immutable sorted list of packed references. */
-	final AtomicReference<PackedRefList> packedRefs = new AtomicReference<>();
+	final AtomicReference<PackedRefList> packedRefs = new AtomicReference<PackedRefList>();
 
 	/**
 	 * Number of modifications made to this database.
@@ -352,7 +352,7 @@ public class RefDirectory extends RefDatabase {
 
 	@Override
 	public List<Ref> getAdditionalRefs() throws IOException {
-		List<Ref> ret = new LinkedList<>();
+		List<Ref> ret = new LinkedList<Ref>();
 		for (String name : additionalRefsNames) {
 			Ref r = getRef(name);
 			if (r != null)
@@ -371,7 +371,7 @@ public class RefDirectory extends RefDatabase {
 
 		private int curIdx;
 
-		final RefList.Builder<Ref> symbolic = new RefList.Builder<>(4);
+		final RefList.Builder<Ref> symbolic = new RefList.Builder<Ref>(4);
 
 		RefList.Builder<LooseRef> newLoose;
 
@@ -819,7 +819,7 @@ public class RefDirectory extends RefDatabase {
 
 	private RefList<Ref> parsePackedRefs(final BufferedReader br)
 			throws IOException {
-		RefList.Builder<Ref> all = new RefList.Builder<>();
+		RefList.Builder<Ref> all = new RefList.Builder<Ref>();
 		Ref last = null;
 		boolean peeled = false;
 		boolean needSort = false;

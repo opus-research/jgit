@@ -57,7 +57,7 @@ import org.junit.Test;
 
 public class FileSnapshotTest {
 
-	private List<File> files = new ArrayList<>();
+	private List<File> files = new ArrayList<File>();
 
 	private File trash;
 

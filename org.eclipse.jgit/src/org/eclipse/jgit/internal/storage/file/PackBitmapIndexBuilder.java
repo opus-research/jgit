@@ -75,9 +75,9 @@ public class PackBitmapIndexBuilder extends BasePackBitmapIndex {
 	private final EWAHCompressedBitmap tags;
 	private final BlockList<PositionEntry> byOffset;
 	final BlockList<StoredBitmap>
-			byAddOrder = new BlockList<>();
+			byAddOrder = new BlockList<StoredBitmap>();
 	final ObjectIdOwnerMap<PositionEntry>
-			positionEntries = new ObjectIdOwnerMap<>();
+			positionEntries = new ObjectIdOwnerMap<PositionEntry>();
 
 	/**
 	 * Creates a PackBitmapIndex used for building the contents of an index

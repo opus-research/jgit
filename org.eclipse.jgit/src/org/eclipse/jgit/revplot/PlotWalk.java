@@ -107,7 +107,7 @@ public class PlotWalk extends RevWalk {
 			if (set == null)
 				set = Collections.singleton(ref);
 			else {
-				set = new HashSet<>(set);
+				set = new HashSet<Ref>(set);
 				set.add(ref);
 			}
 			reverseRefMap.put(ref.getObjectId(), set);

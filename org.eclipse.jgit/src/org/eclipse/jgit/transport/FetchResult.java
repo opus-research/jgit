@@ -59,7 +59,7 @@ public class FetchResult extends OperationResult {
 	private final List<FetchHeadRecord> forMerge;
 
 	FetchResult() {
-		forMerge = new ArrayList<>();
+		forMerge = new ArrayList<FetchHeadRecord>();
 	}
 
 	void add(final FetchHeadRecord r) {

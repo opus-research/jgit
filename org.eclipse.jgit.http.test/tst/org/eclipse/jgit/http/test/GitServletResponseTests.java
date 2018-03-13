@@ -269,7 +269,7 @@ public class GitServletResponseTests extends HttpTestCase {
 		Transport t;
 
 		// this maxPackSize leads to an unPackError
-		maxPackSize = 100;
+		maxPackSize = 400;
 		// this PostReceiveHook when called after an unsuccesfull unpack will
 		// lead to an IllegalStateException
 		postHook = new PostReceiveHook() {

@@ -490,7 +490,7 @@ public class FileRepository extends Repository {
 	 */
 	@Override
 	public Set<ObjectId> getAdditionalHaves() {
-		HashSet<ObjectId> r = new HashSet<>();
+		HashSet<ObjectId> r = new HashSet<ObjectId>();
 		for (AlternateHandle d : objectDatabase.myAlternates()) {
 			if (d instanceof AlternateRepository) {
 				Repository repo;

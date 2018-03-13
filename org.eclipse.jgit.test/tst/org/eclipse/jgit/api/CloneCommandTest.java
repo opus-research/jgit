@@ -88,7 +88,7 @@ public class CloneCommandTest extends RepositoryTestCase {
 	@Override
 	public void setUp() throws Exception {
 		super.setUp();
-		tr = new TestRepository<>(db);
+		tr = new TestRepository<Repository>(db);
 
 		git = new Git(db);
 		// commit something

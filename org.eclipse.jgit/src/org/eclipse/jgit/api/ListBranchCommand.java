@@ -106,7 +106,7 @@ public class ListBranchCommand extends GitCommand<List<Ref>> {
 		checkCallable();
 		List<Ref> resultRefs;
 		try {
-			Collection<Ref> refs = new ArrayList<>();
+			Collection<Ref> refs = new ArrayList<Ref>();
 
 			// Also return HEAD if it's detached
 			Ref head = repo.exactRef(Constants.HEAD);
@@ -121,7 +121,7 @@ public class ListBranchCommand extends GitCommand<List<Ref>> {
 				refs.addAll(getRefs(Constants.R_HEADS));
 				refs.addAll(getRefs(Constants.R_REMOTES));
 			}
-			resultRefs = new ArrayList<>(filterRefs(refs));
+			resultRefs = new ArrayList<Ref>(filterRefs(refs));
 		} catch (IOException e) {
 			throw new JGitInternalException(e.getMessage(), e);
 		}
