@@ -340,7 +340,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 			if (ldr != null)
 				return ldr;
 			else
-				unpackedObjectCache.remove(objectId);
+				unpackedObjectCache.clear();
 		}
 
 		PackList pList = packList.get();

@@ -43,42 +43,38 @@
 
 package org.eclipse.jgit.storage.file;
 
-import java.util.concurrent.atomic.AtomicReferenceArray;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 
 /** Remembers objects that are currently unpacked. */
 class UnpackedObjectCache {
-	private static final int INITIAL_BITS = 5; // size = 32
+	private static final int PUT_LIMIT = 2048;
 
-	private static final int MAX_BITS = 11; // size = 2048
-
-	private volatile Table table;
+	private final ConcurrentHashMap<ObjectId, ObjectId> ids;
 
 	UnpackedObjectCache() {
-		table = new Table(INITIAL_BITS);
+		ids = new ConcurrentHashMap<ObjectId, ObjectId>(8, 0.75f, 1);
 	}
 
 	boolean isUnpacked(AnyObjectId objectId) {
-		return table.contains(objectId);
+		return ids.containsKey(objectId);
 	}
 
 	void add(AnyObjectId objectId) {
-		Table t = table;
-		if (t.add(objectId)) {
-			// The object either already exists in the table, or was
-			// successfully added. Either way leave the table alone.
-			//
-		} else {
-			// The object won't fit into the table. Implement a crude
-			// cache removal by just dropping the table away, but double
-			// it in size for the next incarnation.
-			//
-			Table n = new Table(Math.min(t.bits + 1, MAX_BITS));
-			n.add(objectId);
-			table = n;
-		}
+		ObjectId id = objectId.copy();
+		if (ids.putIfAbsent(id, id) != null) // already existed
+			return;
+
+		if (ids.size() < PUT_LIMIT)
+			return;
+
+		// Rather than do proper LRU, dump the table and restart once
+		// the put limit has been reached.
+		//
+		ids.clear();
+		ids.putIfAbsent(id, id);
 	}
 
 	void remove(AnyObjectId objectId) {
@@ -87,63 +83,6 @@ class UnpackedObjectCache {
 	}
 
 	void clear() {
-		table = new Table(INITIAL_BITS);
-	}
-
-	private static class Table {
-		private static final int MAX_CHAIN = 8;
-
-		private final AtomicReferenceArray<ObjectId> ids;
-
-		private final int shift;
-
-		final int bits;
-
-		Table(int bits) {
-			this.ids = new AtomicReferenceArray<ObjectId>(1 << bits);
-			this.shift = 32 - bits;
-			this.bits = bits;
-		}
-
-		boolean contains(AnyObjectId toFind) {
-			int i = index(toFind);
-			for (int n = 0; n < MAX_CHAIN; n++) {
-				ObjectId obj = ids.get(i);
-				if (obj == null)
-					break;
-
-				if (AnyObjectId.equals(obj, toFind))
-					return true;
-
-				if (++i == ids.length())
-					i = 0;
-			}
-			return false;
-		}
-
-		boolean add(AnyObjectId toAdd) {
-			int i = index(toAdd);
-			for (int n = 0; n < MAX_CHAIN;) {
-				ObjectId obj = ids.get(i);
-				if (obj == null) {
-					if (ids.compareAndSet(i, null, toAdd.copy()))
-						return true;
-					else
-						continue;
-				}
-
-				if (AnyObjectId.equals(obj, toAdd))
-					return true;
-
-				if (++i == ids.length())
-					i = 0;
-				n++;
-			}
-			return false;
-		}
-
-		private int index(AnyObjectId id) {
-			return id.hashCode() >>> shift;
-		}
+		ids.clear();
 	}
 }
