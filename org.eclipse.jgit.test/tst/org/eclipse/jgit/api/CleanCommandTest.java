@@ -48,7 +48,6 @@ import java.io.IOException;
 import java.util.Set;
 import java.util.TreeSet;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.junit.Before;
@@ -76,8 +75,7 @@ public class CleanCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testClean() throws NoWorkTreeException, IOException,
-			GitAPIException {
+	public void testClean() throws NoWorkTreeException, IOException {
 		// create status
 		StatusCommand command = git.status();
 		Status status = command.call();
@@ -96,8 +94,7 @@ public class CleanCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testCleanWithPaths() throws NoWorkTreeException, IOException,
-			GitAPIException {
+	public void testCleanWithPaths() throws NoWorkTreeException, IOException {
 		// create status
 		StatusCommand command = git.status();
 		Status status = command.call();
@@ -117,8 +114,7 @@ public class CleanCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testCleanWithDryRun() throws NoWorkTreeException, IOException,
-			GitAPIException {
+	public void testCleanWithDryRun() throws NoWorkTreeException, IOException {
 		// create status
 		StatusCommand command = git.status();
 		Status status = command.call();
