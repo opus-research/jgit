@@ -44,16 +44,20 @@
 package org.eclipse.jgit.transport;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 
-import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.junit.RepositoryTestCase;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.transport.OpenSshConfig.Host;
+import org.eclipse.jgit.util.FileUtils;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -69,10 +73,10 @@ public class OpenSshConfigTest extends RepositoryTestCase {
 		super.setUp();
 
 		home = new File(trash, "home");
-		home.mkdir();
+		FileUtils.mkdir(home);
 
-		configFile = new File(new File(home, ".ssh"), "config");
-		configFile.getParentFile().mkdir();
+		configFile = new File(new File(home, ".ssh"), Constants.CONFIG);
+		FileUtils.mkdir(configFile.getParentFile());
 
 		System.setProperty("user.name", "jex_junit");
 		osc = new OpenSshConfig(home, configFile);
@@ -226,7 +230,7 @@ public class OpenSshConfigTest extends RepositoryTestCase {
 	public void testAlias_BatchModeDefault() throws Exception {
 		final Host h = osc.lookup("orcz");
 		assertNotNull(h);
-		assertEquals(false, h.isBatchMode());
+		assertFalse(h.isBatchMode());
 	}
 
 	@Test
@@ -234,7 +238,7 @@ public class OpenSshConfigTest extends RepositoryTestCase {
 		config("Host orcz\n" + "\tBatchMode yes\n");
 		final Host h = osc.lookup("orcz");
 		assertNotNull(h);
-		assertEquals(true, h.isBatchMode());
+		assertTrue(h.isBatchMode());
 	}
 
 	@Test
@@ -243,6 +247,6 @@ public class OpenSshConfigTest extends RepositoryTestCase {
 				+ "\tBatchMode yes\n");
 		final Host h = osc.lookup("orcz");
 		assertNotNull(h);
-		assertEquals(true, h.isBatchMode());
+		assertTrue(h.isBatchMode());
 	}
 }

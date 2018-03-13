@@ -50,7 +50,7 @@ import java.io.IOException;
 import java.nio.channels.FileLock;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.internal.JGitText;
 
 /**
  * File Utilities
@@ -76,6 +76,20 @@ public class FileUtils {
 	 * Option to skip deletion if file doesn't exist
 	 */
 	public static final int SKIP_MISSING = 4;
+
+	/**
+	 * Option not to throw exceptions when a deletion finally doesn't succeed.
+	 * @since 2.0
+	 */
+	public static final int IGNORE_ERRORS = 8;
+
+	/**
+	 * Option to only delete empty directories. This option can be combined with
+	 * {@link #RECURSIVE}
+	 *
+	 * @since 2.4
+	 */
+	public static final int EMPTY_DIRECTORIES_ONLY = 16;
 
 	/**
 	 * Delete file or empty folder
@@ -106,7 +120,8 @@ public class FileUtils {
 	 *             if deletion of {@code f} fails. This may occur if {@code f}
 	 *             didn't exist when the method was called. This can therefore
 	 *             cause IOExceptions during race conditions when multiple
-	 *             concurrent threads all try to delete the same file.
+	 *             concurrent threads all try to delete the same file. This
+	 *             exception is not thrown when IGNORE_ERRORS is set.
 	 */
 	public static void delete(final File f, int options) throws IOException {
 		if ((options & SKIP_MISSING) != 0 && !f.exists())
@@ -119,7 +134,22 @@ public class FileUtils {
 					delete(c, options);
 			}
 		}
-		if (!f.delete()) {
+
+		boolean delete = false;
+		if ((options & EMPTY_DIRECTORIES_ONLY) != 0) {
+			if (f.isDirectory()) {
+				delete = true;
+			} else {
+				if ((options & IGNORE_ERRORS) == 0)
+					throw new IOException(MessageFormat.format(
+							JGitText.get().deleteFileFailed,
+							f.getAbsolutePath()));
+			}
+		} else {
+			delete = true;
+		}
+
+		if (delete && !f.delete()) {
 			if ((options & RETRY) != 0 && f.exists()) {
 				for (int i = 1; i < 10; i++) {
 					try {
@@ -131,8 +161,9 @@ public class FileUtils {
 						return;
 				}
 			}
-			throw new IOException(MessageFormat.format(
-					JGitText.get().deleteFileFailed, f.getAbsolutePath()));
+			if ((options & IGNORE_ERRORS) == 0)
+				throw new IOException(MessageFormat.format(
+						JGitText.get().deleteFileFailed, f.getAbsolutePath()));
 		}
 	}
 

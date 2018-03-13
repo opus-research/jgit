@@ -55,6 +55,7 @@ import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -72,12 +73,11 @@ import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.FilterMapping;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
-import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.errors.RemoteRepositoryException;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.http.server.GitServlet;
-import org.eclipse.jgit.http.server.resolver.RepositoryResolver;
-import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.junit.TestRng;
 import org.eclipse.jgit.junit.http.AccessEvent;
@@ -89,6 +89,7 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.storage.file.ReflogEntry;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.storage.file.ReflogReader;
@@ -98,6 +99,8 @@ import org.eclipse.jgit.transport.RemoteRefUpdate;
 import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.TransportHttp;
 import org.eclipse.jgit.transport.URIish;
+import org.eclipse.jgit.transport.resolver.RepositoryResolver;
+import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -123,7 +126,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 
 		ServletContextHandler app = server.addContext("/git");
 		GitServlet gs = new GitServlet();
-		gs.setRepositoryResolver(new RepositoryResolver() {
+		gs.setRepositoryResolver(new RepositoryResolver<HttpServletRequest>() {
 			public Repository open(HttpServletRequest req, String name)
 					throws RepositoryNotFoundException,
 					ServiceNotEnabledException {
@@ -224,6 +227,36 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 	}
 
 	@Test
+	public void testListRemote_BadName() throws IOException, URISyntaxException {
+		Repository dst = createBareRepository();
+		URIish uri = new URIish(this.remoteURI.toString() + ".invalid");
+		Transport t = Transport.open(dst, uri);
+		try {
+			try {
+				t.openFetch();
+				fail("fetch connection opened");
+			} catch (RemoteRepositoryException notFound) {
+				assertEquals(uri + ": Git repository not found",
+						notFound.getMessage());
+			}
+		} finally {
+			t.close();
+		}
+
+		List<AccessEvent> requests = getRequests();
+		assertEquals(1, requests.size());
+
+		AccessEvent info = requests.get(0);
+		assertEquals("GET", info.getMethod());
+		assertEquals(join(uri, "info/refs"), info.getPath());
+		assertEquals(1, info.getParameters().size());
+		assertEquals("git-upload-pack", info.getParameter("service"));
+		assertEquals(200, info.getStatus());
+		assertEquals("application/x-git-upload-pack-advertisement",
+				info.getResponseHeader(HDR_CONTENT_TYPE));
+	}
+
+	@Test
 	public void testInitialClone_Small() throws Exception {
 		Repository dst = createBareRepository();
 		assertFalse(dst.hasObject(A_txt));
@@ -260,8 +293,6 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 				.getRequestHeader(HDR_CONTENT_LENGTH));
 		assertNull("not chunked", service
 				.getRequestHeader(HDR_TRANSFER_ENCODING));
-		assertNull("no compression (too small)", service
-				.getRequestHeader(HDR_CONTENT_ENCODING));
 
 		assertEquals(200, service.getStatus());
 		assertEquals("application/x-git-upload-pack-result", service
@@ -269,7 +300,70 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 	}
 
 	@Test
-	public void testFetchUpdateExisting() throws Exception {
+	public void testFetch_FewLocalCommits() throws Exception {
+		// Bootstrap by doing the clone.
+		//
+		TestRepository dst = createTestRepository();
+		Transport t = Transport.open(dst.getRepository(), remoteURI);
+		try {
+			t.fetch(NullProgressMonitor.INSTANCE, mirror(master));
+		} finally {
+			t.close();
+		}
+		assertEquals(B, dst.getRepository().getRef(master).getObjectId());
+		List<AccessEvent> cloneRequests = getRequests();
+
+		// Only create a few new commits.
+		TestRepository.BranchBuilder b = dst.branch(master);
+		for (int i = 0; i < 4; i++)
+			b.commit().tick(3600 /* 1 hour */).message("c" + i).create();
+
+		// Create a new commit on the remote.
+		//
+		b = new TestRepository<Repository>(remoteRepository).branch(master);
+		RevCommit Z = b.commit().message("Z").create();
+
+		// Now incrementally update.
+		//
+		t = Transport.open(dst.getRepository(), remoteURI);
+		try {
+			t.fetch(NullProgressMonitor.INSTANCE, mirror(master));
+		} finally {
+			t.close();
+		}
+		assertEquals(Z, dst.getRepository().getRef(master).getObjectId());
+
+		List<AccessEvent> requests = getRequests();
+		requests.removeAll(cloneRequests);
+		assertEquals(2, requests.size());
+
+		AccessEvent info = requests.get(0);
+		assertEquals("GET", info.getMethod());
+		assertEquals(join(remoteURI, "info/refs"), info.getPath());
+		assertEquals(1, info.getParameters().size());
+		assertEquals("git-upload-pack", info.getParameter("service"));
+		assertEquals(200, info.getStatus());
+		assertEquals("application/x-git-upload-pack-advertisement",
+				info.getResponseHeader(HDR_CONTENT_TYPE));
+
+		// We should have needed one request to perform the fetch.
+		//
+		AccessEvent service = requests.get(1);
+		assertEquals("POST", service.getMethod());
+		assertEquals(join(remoteURI, "git-upload-pack"), service.getPath());
+		assertEquals(0, service.getParameters().size());
+		assertNotNull("has content-length",
+				service.getRequestHeader(HDR_CONTENT_LENGTH));
+		assertNull("not chunked",
+				service.getRequestHeader(HDR_TRANSFER_ENCODING));
+
+		assertEquals(200, service.getStatus());
+		assertEquals("application/x-git-upload-pack-result",
+				service.getResponseHeader(HDR_CONTENT_TYPE));
+	}
+
+	@Test
+	public void testFetch_TooManyLocalCommits() throws Exception {
 		// Bootstrap by doing the clone.
 		//
 		TestRepository dst = createTestRepository();
@@ -292,7 +386,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 
 		// Create a new commit on the remote.
 		//
-		b = new TestRepository(remoteRepository).branch(master);
+		b = new TestRepository<Repository>(remoteRepository).branch(master);
 		RevCommit Z = b.commit().message("Z").create();
 
 		// Now incrementally update.
@@ -465,7 +559,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		final ReflogReader log = remoteRepository.getReflogReader(dstName);
 		assertNotNull("has log for " + dstName);
 
-		final ReflogReader.Entry last = log.getLastEntry();
+		final ReflogEntry last = log.getLastEntry();
 		assertNotNull("has last entry", last);
 		assertEquals(ObjectId.zeroId(), last.getOldId());
 		assertEquals(Q, last.getNewId());

@@ -47,12 +47,16 @@ import java.text.MessageFormat;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.MultipleParentsNotAllowedException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.api.errors.MultipleParentsNotAllowedException;
 import org.eclipse.jgit.api.errors.NoHeadException;
+import org.eclipse.jgit.api.errors.NoMessageException;
+import org.eclipse.jgit.api.errors.UnmergedPathsException;
+import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -60,6 +64,7 @@ import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.merge.MergeMessageFormatter;
 import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.merge.ResolveMerger;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -76,10 +81,10 @@ import org.eclipse.jgit.treewalk.FileTreeIterator;
  *      href="http://www.kernel.org/pub/software/scm/git/docs/git-cherry-pick.html"
  *      >Git documentation about cherry-pick</a>
  */
-public class CherryPickCommand extends GitCommand<RevCommit> {
+public class CherryPickCommand extends GitCommand<CherryPickResult> {
 	private List<Ref> commits = new LinkedList<Ref>();
 
-	private List<Ref> cherryPickedRefs = new LinkedList<Ref>();
+	private String ourCommitName = null;
 
 	/**
 	 * @param repo
@@ -94,14 +99,19 @@ public class CherryPickCommand extends GitCommand<RevCommit> {
 	 * this class. Each instance of this class should only be used for one
 	 * invocation of the command. Don't call this method twice on an instance.
 	 *
-	 * @return on success the {@link RevCommit} pointed to by the new HEAD is
-	 *         returned. If a failure occurred during cherry-pick
-	 *         <code>null</code> is returned. The list of successfully
-	 *         cherry-picked {@link Ref}'s can be obtained by calling
-	 *         {@link #getCherryPickedRefs()}
+	 * @return the result of the cherry-pick
+	 * @throws GitAPIException
+	 * @throws WrongRepositoryStateException
+	 * @throws ConcurrentRefUpdateException
+	 * @throws UnmergedPathsException
+	 * @throws NoMessageException
+	 * @throws NoHeadException
 	 */
-	public RevCommit call() throws GitAPIException {
+	public CherryPickResult call() throws GitAPIException, NoMessageException,
+			UnmergedPathsException, ConcurrentRefUpdateException,
+			WrongRepositoryStateException, NoHeadException {
 		RevCommit newHead = null;
+		List<Ref> cherryPickedRefs = new LinkedList<Ref>();
 		checkCallable();
 
 		RevWalk revWalk = new RevWalk(repo);
@@ -126,18 +136,26 @@ public class CherryPickCommand extends GitCommand<RevCommit> {
 				RevCommit srcCommit = revWalk.parseCommit(srcObjectId);
 
 				// get the parent of the commit to cherry-pick
-				if (srcCommit.getParentCount() != 1) {
+				if (srcCommit.getParentCount() != 1)
 					throw new MultipleParentsNotAllowedException(
-							JGitText.get().canOnlyCherryPickCommitsWithOneParent);
-				}
+							MessageFormat.format(
+									JGitText.get().canOnlyCherryPickCommitsWithOneParent,
+									srcCommit.name(),
+									Integer.valueOf(srcCommit.getParentCount())));
+
 				RevCommit srcParent = srcCommit.getParent(0);
 				revWalk.parseHeaders(srcParent);
+
+				String ourName = calculateOurName(headRef);
+				String cherryPickName = srcCommit.getId().abbreviate(7).name()
+						+ " " + srcCommit.getShortMessage(); //$NON-NLS-1$
 
 				ResolveMerger merger = (ResolveMerger) MergeStrategy.RESOLVE
 						.newMerger(repo);
 				merger.setWorkingTreeIterator(new FileTreeIterator(repo));
 				merger.setBase(srcParent.getTree());
-
+				merger.setCommitNames(new String[] { "BASE", ourName,
+						cherryPickName });
 				if (merger.merge(headCommit, srcCommit)) {
 					if (AnyObjectId.equals(headCommit.getTree().getId(), merger
 							.getResultTreeId()))
@@ -149,10 +167,25 @@ public class CherryPickCommand extends GitCommand<RevCommit> {
 					dco.checkout();
 					newHead = new Git(getRepository()).commit()
 							.setMessage(srcCommit.getFullMessage())
+							.setReflogComment(
+									"cherry-pick: " //$NON-NLS-1$
+											+ srcCommit.getShortMessage())
 							.setAuthor(srcCommit.getAuthorIdent()).call();
 					cherryPickedRefs.add(src);
 				} else {
-					return null;
+					if (merger.failed())
+						return new CherryPickResult(merger.getFailingPaths());
+
+					// there are merge conflicts
+
+					String message = new MergeMessageFormatter()
+							.formatWithConflicts(srcCommit.getFullMessage(),
+									merger.getUnmergedPaths());
+
+					repo.writeCherryPickHead(srcCommit.getId());
+					repo.writeMergeCommitMsg(message);
+
+					return CherryPickResult.CONFLICT;
 				}
 			}
 		} catch (IOException e) {
@@ -163,7 +196,7 @@ public class CherryPickCommand extends GitCommand<RevCommit> {
 		} finally {
 			revWalk.release();
 		}
-		return newHead;
+		return new CherryPickResult(newHead, cherryPickedRefs);
 	}
 
 	/**
@@ -200,11 +233,22 @@ public class CherryPickCommand extends GitCommand<RevCommit> {
 	}
 
 	/**
-	 * @return the list of successfully cherry-picked {@link Ref}'s. Never
-	 *         <code>null</code> but maybe an empty list if no commit was
-	 *         successfully cherry-picked
+	 * @param ourCommitName
+	 *            the name that should be used in the "OURS" place for conflict
+	 *            markers
+	 * @return {@code this}
 	 */
-	public List<Ref> getCherryPickedRefs() {
-		return cherryPickedRefs;
+	public CherryPickCommand setOurCommitName(String ourCommitName) {
+		this.ourCommitName = ourCommitName;
+		return this;
+	}
+
+	private String calculateOurName(Ref headRef) {
+		if (ourCommitName != null)
+			return ourCommitName;
+
+		String targetRefName = headRef.getTarget().getName();
+		String headName = Repository.shortenRefName(targetRefName);
+		return headName;
 	}
 }

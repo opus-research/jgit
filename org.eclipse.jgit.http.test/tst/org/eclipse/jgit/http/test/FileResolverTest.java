@@ -47,17 +47,18 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
 
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
-import org.eclipse.jgit.http.server.resolver.FileResolver;
-import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.resolver.FileResolver;
+import org.eclipse.jgit.transport.resolver.RepositoryResolver;
+import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
+import org.eclipse.jgit.util.FileUtils;
 import org.junit.Test;
 
 public class FileResolverTest extends LocalDiskRepositoryTestCase {
@@ -80,9 +81,10 @@ public class FileResolverTest extends LocalDiskRepositoryTestCase {
 			assertUnreasonable("C:/windows");
 	}
 
-	private void assertUnreasonable(String name)
+	private static void assertUnreasonable(String name)
 			throws ServiceNotEnabledException {
-		FileResolver r = new FileResolver(new File("."), false);
+		FileResolver<RepositoryResolver> r = new FileResolver<RepositoryResolver>(
+				new File("."), false);
 		try {
 			r.open(null, name);
 			fail("Opened unreasonable name \"" + name + "\"");
@@ -98,10 +100,13 @@ public class FileResolverTest extends LocalDiskRepositoryTestCase {
 		final String name = a.getDirectory().getName();
 		final File base = a.getDirectory().getParentFile();
 		final File export = new File(a.getDirectory(), "git-daemon-export-ok");
-		FileResolver resolver;
+		FileResolver<RepositoryResolver> resolver;
 
 		assertFalse("no git-daemon-export-ok", export.exists());
-		resolver = new FileResolver(base, false /* require flag */);
+		resolver = new FileResolver<RepositoryResolver>(base, false /*
+																	 * require
+																	 * flag
+																	 */);
 		try {
 			resolver.open(null, name);
 			fail("opened non-exported repository");
@@ -109,16 +114,21 @@ public class FileResolverTest extends LocalDiskRepositoryTestCase {
 			assertEquals("Service not enabled", e.getMessage());
 		}
 
-		resolver = new FileResolver(base, true /* export all */);
+		resolver = new FileResolver<RepositoryResolver>(base, true /*
+																	 * export
+																	 * all
+																	 */);
 		try {
 			resolver.open(null, name).close();
 		} catch (ServiceNotEnabledException e) {
 			fail("did not honor export-all flag");
 		}
 
-		export.createNewFile();
-		assertTrue("has git-daemon-export-ok", export.exists());
-		resolver = new FileResolver(base, false /* require flag */);
+		FileUtils.createNewFile(export);
+		resolver = new FileResolver<RepositoryResolver>(base, false /*
+																	 * require
+																	 * flag
+																	 */);
 		try {
 			resolver.open(null, name).close();
 		} catch (ServiceNotEnabledException e) {
@@ -132,7 +142,8 @@ public class FileResolverTest extends LocalDiskRepositoryTestCase {
 		final Repository a = createBareRepository();
 		final String name = a.getDirectory().getName() + "-not-a-git";
 		final File base = a.getDirectory().getParentFile();
-		FileResolver resolver = new FileResolver(base, false);
+		FileResolver<RepositoryResolver> resolver = new FileResolver<RepositoryResolver>(
+				base, false);
 
 		try {
 			resolver.open(null, name);

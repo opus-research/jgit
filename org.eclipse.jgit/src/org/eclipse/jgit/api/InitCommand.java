@@ -46,13 +46,14 @@ import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.Callable;
 
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryBuilder;
 
 /**
- * Create an empty git repository
+ * Create an empty git repository or reinitalize an existing one
  *
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-init.html"
  *      >Git documentation about init</a>
@@ -65,11 +66,9 @@ public class InitCommand implements Callable<Git> {
 	/**
 	 * Executes the {@code Init} command.
 	 *
-	 * @throws JGitInternalException
-	 *             if the repository can't be created
 	 * @return the newly created {@code Git} object with associated repository
 	 */
-	public Git call() throws JGitInternalException {
+	public Git call() throws GitAPIException {
 		try {
 			RepositoryBuilder builder = new RepositoryBuilder();
 			if (bare)
@@ -81,13 +80,16 @@ public class InitCommand implements Callable<Git> {
 					d = new File(d, Constants.DOT_GIT);
 				builder.setGitDir(d);
 			} else if (builder.getGitDir() == null) {
-				File d = new File(".");
+				File d = new File("."); //$NON-NLS-1$
+				if (d.getParentFile() != null)
+					d = d.getParentFile();
 				if (!bare)
 					d = new File(d, Constants.DOT_GIT);
 				builder.setGitDir(d);
 			}
 			Repository repository = builder.build();
-			repository.create(bare);
+			if (!repository.getObjectDatabase().exists())
+				repository.create(bare);
 			return new Git(repository);
 		} catch (IOException e) {
 			throw new JGitInternalException(e.getMessage(), e);

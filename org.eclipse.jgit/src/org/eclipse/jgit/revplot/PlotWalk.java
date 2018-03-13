@@ -51,13 +51,15 @@ import static org.eclipse.jgit.lib.Constants.R_TAGS;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
@@ -91,6 +93,27 @@ public class PlotWalk extends RevWalk {
 		reverseRefMap = repo.getAllRefsByPeeledObjectId();
 	}
 
+	/**
+	 * Add additional refs to the walk
+	 *
+	 * @param refs
+	 *            additional refs
+	 *
+	 * @throws IOException
+	 */
+	public void addAdditionalRefs(Iterable<Ref> refs) throws IOException {
+		for (Ref ref : refs) {
+			Set<Ref> set = reverseRefMap.get(ref.getObjectId());
+			if (set == null)
+				set = Collections.singleton(ref);
+			else {
+				set = new HashSet<Ref>(set);
+				set.add(ref);
+			}
+			reverseRefMap.put(ref.getObjectId(), set);
+		}
+	}
+
 	@Override
 	public void sort(final RevSort s, final boolean use) {
 		if (s == RevSort.TOPO && !use)
@@ -108,20 +131,19 @@ public class PlotWalk extends RevWalk {
 			IncorrectObjectTypeException, IOException {
 		PlotCommit<?> pc = (PlotCommit) super.next();
 		if (pc != null)
-			pc.refs = getTags(pc);
+			pc.refs = getRefs(pc);
 		return pc;
 	}
 
-	private Ref[] getTags(final AnyObjectId commitId) {
+	private Ref[] getRefs(final AnyObjectId commitId) {
 		Collection<Ref> list = reverseRefMap.get(commitId);
-		Ref[] tags;
 		if (list == null)
-			tags = null;
+			return PlotCommit.NO_REFS;
 		else {
-			tags = list.toArray(new Ref[list.size()]);
+			Ref[] tags = list.toArray(new Ref[list.size()]);
 			Arrays.sort(tags, new PlotRefComparator());
+			return tags;
 		}
-		return tags;
 	}
 
 	class PlotRefComparator implements Comparator<Ref> {
@@ -150,6 +172,11 @@ public class PlotWalk extends RevWalk {
 				return ((RevCommit) o).getCommitTime();
 			if (o instanceof RevTag) {
 				RevTag tag = (RevTag) o;
+				try {
+					parseBody(tag);
+				} catch (IOException e) {
+					return 0;
+				}
 				PersonIdent who = tag.getTaggerIdent();
 				return who != null ? who.getWhen().getTime() : 0;
 			}

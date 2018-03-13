@@ -46,8 +46,8 @@ package org.eclipse.jgit.storage.file;
 import java.text.MessageFormat;
 import java.util.Arrays;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.storage.file.PackIndex.MutableEntry;
 
@@ -61,7 +61,7 @@ import org.eclipse.jgit.storage.file.PackIndex.MutableEntry;
  * @see PackIndex
  * @see PackFile
  */
-class PackReverseIndex {
+public class PackReverseIndex {
 	/** Index we were created from, and that has our ObjectId data. */
 	private final PackIndex index;
 
@@ -88,7 +88,7 @@ class PackReverseIndex {
 	 * @param packIndex
 	 *            forward index - entries to (reverse) index.
 	 */
-	PackReverseIndex(final PackIndex packIndex) {
+	public PackReverseIndex(final PackIndex packIndex) {
 		index = packIndex;
 
 		final long cnt = index.getObjectCount();
@@ -108,7 +108,7 @@ class PackReverseIndex {
 		int i64 = 0;
 		for (final MutableEntry me : index) {
 			final long o = me.getOffset();
-			if (o < Integer.MAX_VALUE)
+			if (o <= Integer.MAX_VALUE)
 				offsets32[i32++] = (int) o;
 			else
 				offsets64[i64++] = o;
@@ -120,7 +120,7 @@ class PackReverseIndex {
 		int nth = 0;
 		for (final MutableEntry me : index) {
 			final long o = me.getOffset();
-			if (o < Integer.MAX_VALUE)
+			if (o <= Integer.MAX_VALUE)
 				nth32[Arrays.binarySearch(offsets32, (int) o)] = nth++;
 			else
 				nth64[Arrays.binarySearch(offsets64, o)] = nth++;
@@ -135,7 +135,7 @@ class PackReverseIndex {
 	 *            start offset of object to find.
 	 * @return object id for this offset, or null if no object was found.
 	 */
-	ObjectId findObject(final long offset) {
+	public ObjectId findObject(final long offset) {
 		if (offset <= Integer.MAX_VALUE) {
 			final int i32 = Arrays.binarySearch(offsets32, (int) offset);
 			if (i32 < 0)
@@ -164,14 +164,15 @@ class PackReverseIndex {
 	 * @throws CorruptObjectException
 	 *             when there is no object with the provided offset.
 	 */
-	long findNextOffset(final long offset, final long maxOffset)
+	public long findNextOffset(final long offset, final long maxOffset)
 			throws CorruptObjectException {
 		if (offset <= Integer.MAX_VALUE) {
 			final int i32 = Arrays.binarySearch(offsets32, (int) offset);
 			if (i32 < 0)
-				throw new CorruptObjectException(MessageFormat.format(
-						JGitText.get().cantFindObjectInReversePackIndexForTheSpecifiedOffset
-						, offset));
+				throw new CorruptObjectException(
+						MessageFormat.format(
+								JGitText.get().cantFindObjectInReversePackIndexForTheSpecifiedOffset,
+								Long.valueOf(offset)));
 
 			if (i32 + 1 == offsets32.length) {
 				if (offsets64.length > 0)
@@ -182,13 +183,35 @@ class PackReverseIndex {
 		} else {
 			final int i64 = Arrays.binarySearch(offsets64, offset);
 			if (i64 < 0)
-				throw new CorruptObjectException(MessageFormat.format(
-						JGitText.get().cantFindObjectInReversePackIndexForTheSpecifiedOffset
-						, offset));
+				throw new CorruptObjectException(
+						MessageFormat.format(
+								JGitText.get().cantFindObjectInReversePackIndexForTheSpecifiedOffset,
+								Long.valueOf(offset)));
 
 			if (i64 + 1 == offsets64.length)
 				return maxOffset;
 			return offsets64[i64 + 1];
 		}
+	}
+
+	int findPostion(long offset) {
+		if (offset <= Integer.MAX_VALUE) {
+			final int i32 = Arrays.binarySearch(offsets32, (int) offset);
+			if (i32 < 0)
+				return -1;
+			return i32;
+		} else {
+			final int i64 = Arrays.binarySearch(offsets64, offset);
+			if (i64 < 0)
+				return -1;
+			return nth32.length + i64;
+		}
+	}
+
+	ObjectId findObjectByPosition(int nthPosition) {
+		if (nthPosition < nth32.length)
+			return index.getObjectId(nth32[nthPosition]);
+		final int i64 = nthPosition - nth32.length;
+		return index.getObjectId(nth64[i64]);
 	}
 }

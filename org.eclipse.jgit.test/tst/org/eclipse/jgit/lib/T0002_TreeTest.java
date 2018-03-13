@@ -55,13 +55,16 @@ import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.eclipse.jgit.junit.SampleDataRepositoryTestCase;
 import org.junit.Test;
 
+@SuppressWarnings("deprecation")
 public class T0002_TreeTest extends SampleDataRepositoryTestCase {
 	private static final ObjectId SOME_FAKE_ID = ObjectId.fromString(
 			"0123456789abcdef0123456789abcdef01234567");
 
-	private int compareNamesUsingSpecialCompare(String a,String b) throws UnsupportedEncodingException {
+	private static int compareNamesUsingSpecialCompare(String a, String b)
+			throws UnsupportedEncodingException {
 		char lasta = '\0';
 		byte[] abytes;
 		if (a.length() > 0 && a.charAt(a.length()-1) == '/') {
@@ -123,10 +126,9 @@ public class T0002_TreeTest extends SampleDataRepositoryTestCase {
 		assertTrue("no name", t.getName() == null);
 		assertTrue("no nameUTF8", t.getNameUTF8() == null);
 		assertTrue("has entries array", t.members() != null);
-		assertTrue("entries is empty", t.members().length == 0);
+		assertEquals("entries is empty", 0, t.members().length);
 		assertEquals("full name is empty", "", t.getFullName());
 		assertTrue("no id", t.getId() == null);
-		assertTrue("tree is self", t.getTree() == t);
 		assertTrue("database is r", t.getRepository() == db);
 		assertTrue("no foo child", t.findTreeMember("foo") == null);
 		assertTrue("no foo child", t.findBlobMember("foo") == null);
@@ -178,7 +180,6 @@ public class T0002_TreeTest extends SampleDataRepositoryTestCase {
 		assertTrue("isLoaded", f.isLoaded());
 		assertFalse("has items", f.members().length > 0);
 		assertFalse("is root", f.isRoot());
-		assertTrue("tree is self", f.getTree() == f);
 		assertTrue("parent is modified", t.isModified());
 		assertTrue("parent has no id", t.getId() == null);
 		assertTrue("found bob child", t.findTreeMember(f.getName()) == f);
@@ -186,7 +187,7 @@ public class T0002_TreeTest extends SampleDataRepositoryTestCase {
 		final TreeEntry[] i = t.members();
 		assertTrue("iterator is not empty", i.length > 0);
 		assertTrue("iterator returns file", i[0] == f);
-		assertTrue("iterator is empty", i.length == 1);
+		assertEquals("iterator is empty", 1, i.length);
 	}
 
 	@Test
@@ -305,9 +306,14 @@ public class T0002_TreeTest extends SampleDataRepositoryTestCase {
 
 	@Test
 	public void test009_SymlinkAndGitlink() throws IOException {
-		final Tree symlinkTree = db.mapTree("symlink");
+		final Tree symlinkTree = mapTree("symlink");
 		assertTrue("Symlink entry exists", symlinkTree.existsBlob("symlink.txt"));
-		final Tree gitlinkTree = db.mapTree("gitlink");
+		final Tree gitlinkTree = mapTree("gitlink");
 		assertTrue("Gitlink entry exists", gitlinkTree.existsBlob("submodule"));
+	}
+
+	private Tree mapTree(String name) throws IOException {
+		ObjectId id = db.resolve(name + "^{tree}");
+		return new Tree(db, id, db.open(id).getCachedBytes());
 	}
 }

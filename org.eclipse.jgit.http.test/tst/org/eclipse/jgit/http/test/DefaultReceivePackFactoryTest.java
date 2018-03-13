@@ -50,25 +50,26 @@ import static org.junit.Assert.fail;
 
 import java.io.IOException;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jgit.http.server.resolver.DefaultReceivePackFactory;
-import org.eclipse.jgit.http.server.resolver.ReceivePackFactory;
-import org.eclipse.jgit.http.server.resolver.ServiceNotAuthorizedException;
-import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.transport.ReceivePack;
+import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
+import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
+import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 import org.junit.Before;
 import org.junit.Test;
 
 public class DefaultReceivePackFactoryTest extends LocalDiskRepositoryTestCase {
 	private Repository db;
 
-	private ReceivePackFactory factory;
+	private ReceivePackFactory<HttpServletRequest> factory;
 
 	@Before
 	public void setUp() throws Exception {
@@ -80,7 +81,7 @@ public class DefaultReceivePackFactoryTest extends LocalDiskRepositoryTestCase {
 
 	@Test
 	public void testDisabledSingleton() throws ServiceNotAuthorizedException {
-		factory = ReceivePackFactory.DISABLED;
+		factory = (ReceivePackFactory<HttpServletRequest>) ReceivePackFactory.DISABLED;
 
 		try {
 			factory.create(new R(null, "localhost"), db);

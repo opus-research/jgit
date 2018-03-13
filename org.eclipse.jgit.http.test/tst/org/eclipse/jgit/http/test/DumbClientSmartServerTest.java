@@ -65,8 +65,6 @@ import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.http.server.GitServlet;
-import org.eclipse.jgit.http.server.resolver.RepositoryResolver;
-import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.junit.http.AccessEvent;
 import org.eclipse.jgit.junit.http.HttpTestCase;
@@ -76,11 +74,14 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.transport.FetchConnection;
 import org.eclipse.jgit.transport.HttpTransport;
 import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.TransportHttp;
 import org.eclipse.jgit.transport.URIish;
+import org.eclipse.jgit.transport.resolver.RepositoryResolver;
+import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -97,12 +98,12 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 	public void setUp() throws Exception {
 		super.setUp();
 
-		final TestRepository src = createTestRepository();
+		final TestRepository<FileRepository> src = createTestRepository();
 		final String srcName = src.getRepository().getDirectory().getName();
 
 		ServletContextHandler app = server.addContext("/git");
 		GitServlet gs = new GitServlet();
-		gs.setRepositoryResolver(new RepositoryResolver() {
+		gs.setRepositoryResolver(new RepositoryResolver<HttpServletRequest>() {
 			public Repository open(HttpServletRequest req, String name)
 					throws RepositoryNotFoundException,
 					ServiceNotEnabledException {
@@ -217,7 +218,7 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 
 	@Test
 	public void testInitialClone_Packed() throws Exception {
-		new TestRepository(remoteRepository).packAndPrune();
+		new TestRepository<Repository>(remoteRepository).packAndPrune();
 
 		Repository dst = createBareRepository();
 		assertFalse(dst.hasObject(A_txt));

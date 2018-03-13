@@ -54,6 +54,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.IOException;
 import java.util.Iterator;
 
+import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
@@ -61,7 +62,6 @@ import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
@@ -520,6 +520,14 @@ public class NoteMapTest extends RepositoryTestCase {
 
 		Iterator it = NoteMap.read(reader, r).iterator();
 		assertEquals(2, count(it));
+	}
+
+	public void testShorteningNoteRefName() throws Exception {
+		String expectedShortName = "review";
+		String noteRefName = Constants.R_NOTES + expectedShortName;
+		assertEquals(expectedShortName, NoteMap.shortenRefName(noteRefName));
+		String nonNoteRefName = Constants.R_HEADS + expectedShortName;
+		assertEquals(nonNoteRefName, NoteMap.shortenRefName(expectedShortName));
 	}
 
 	private RevCommit commitNoteMap(NoteMap map) throws IOException {

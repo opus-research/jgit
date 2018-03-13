@@ -45,7 +45,6 @@
 package org.eclipse.jgit.treewalk;
 
 import java.io.IOException;
-import java.util.Collections;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -59,7 +58,7 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevTree;
-import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
+import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.RawParseUtils;
 
@@ -114,12 +113,20 @@ public class TreeWalk {
 	public static TreeWalk forPath(final ObjectReader reader, final String path,
 			final AnyObjectId... trees) throws MissingObjectException,
 			IncorrectObjectTypeException, CorruptObjectException, IOException {
-		final TreeWalk r = new TreeWalk(reader);
-		r.setFilter(PathFilterGroup.createFromStrings(Collections
-				.singleton(path)));
-		r.setRecursive(r.getFilter().shouldBeRecursive());
-		r.reset(trees);
-		return r.next() ? r : null;
+		TreeWalk tw = new TreeWalk(reader);
+		PathFilter f = PathFilter.create(path);
+		tw.setFilter(f);
+		tw.reset(trees);
+		tw.setRecursive(false);
+
+		while (tw.next()) {
+			if (f.isDone(tw)) {
+				return tw;
+			} else if (tw.isSubtree()) {
+				tw.enterSubtree();
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -587,6 +594,7 @@ public class TreeWalk {
 	 * @return r the current iterator of the requested type; null if the tree
 	 *         has no entry to match the current path.
 	 */
+	@SuppressWarnings("unchecked")
 	public <T extends AbstractTreeIterator> T getTree(final int nth,
 			final Class<T> clazz) {
 		final AbstractTreeIterator t = trees[nth];
@@ -749,6 +757,13 @@ public class TreeWalk {
 	}
 
 	/**
+	 * @return The path length of the current entry.
+	 */
+	public int getPathLength() {
+		return currentHead.pathLen;
+	}
+
+	/**
 	 * Test if the supplied path matches the current entry's path.
 	 * <p>
 	 * This method tests that the supplied path is exactly equal to the current
@@ -900,6 +915,7 @@ public class TreeWalk {
 		System.arraycopy(tmp, 0, trees, 0, trees.length);
 	}
 
+	@SuppressWarnings("unused")
 	AbstractTreeIterator min() throws CorruptObjectException {
 		int i = 0;
 		AbstractTreeIterator minRef = trees[i];

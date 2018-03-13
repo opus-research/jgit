@@ -49,19 +49,22 @@ import static org.eclipse.jgit.lib.Constants.R_REMOTES;
 import static org.eclipse.jgit.lib.Constants.R_TAGS;
 
 import java.io.BufferedWriter;
-import java.io.File;
+import java.io.FileDescriptor;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.text.MessageFormat;
 import java.util.ResourceBundle;
 
-import org.kohsuke.args4j.CmdLineException;
-import org.kohsuke.args4j.Option;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.pgm.opt.CmdLineParser;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.util.io.ThrowingPrintWriter;
+import org.kohsuke.args4j.CmdLineException;
+import org.kohsuke.args4j.Option;
 
 /**
  * Abstract command which can be invoked from the command line.
@@ -80,14 +83,32 @@ public abstract class TextBuiltin {
 	@Option(name = "--help", usage = "usage_displayThisHelpText", aliases = { "-h" })
 	private boolean help;
 
-	/** Stream to output to, typically this is standard output. */
+	/**
+	 * Writer to output to, typically this is standard output.
+	 *
+	 * @since 2.2
+	 */
+	protected ThrowingPrintWriter outw;
+
+	/**
+	 * Stream to output to, typically this is standard output.
+	 *
+	 * @since 2.2
+	 */
+	protected OutputStream outs;
+
+	/**
+	 * Stream to output to, typically this is standard output.
+	 *
+	 * @deprecated Use outw instead
+	 */
 	protected PrintWriter out;
 
 	/** Git repository the command was invoked within. */
 	protected Repository db;
 
 	/** Directory supplied via --git-dir command line option. */
-	protected File gitdir;
+	protected String gitdir;
 
 	/** RevWalk used during command line parsing, if it was required. */
 	protected RevWalk argWalk;
@@ -101,26 +122,39 @@ public abstract class TextBuiltin {
 		return true;
 	}
 
-	void init(final Repository repo, final File gd) {
+	/**
+	 * Initialize the command to work with a repository.
+	 *
+	 * @param repository
+	 *            the opened repository that the command should work on.
+	 * @param gitDir
+	 *            value of the {@code --git-dir} command line option, if
+	 *            {@code repository} is null.
+	 */
+	protected void init(final Repository repository, final String gitDir) {
 		try {
-			final String outputEncoding = repo != null ? repo.getConfig()
-					.getString("i18n", null, "logOutputEncoding") : null;
+			final String outputEncoding = repository != null ? repository
+					.getConfig().getString("i18n", null, "logOutputEncoding") : null; //$NON-NLS-1$ //$NON-NLS-2$
+			if (outs == null)
+				outs = new FileOutputStream(FileDescriptor.out);
+			BufferedWriter bufw;
 			if (outputEncoding != null)
-				out = new PrintWriter(new BufferedWriter(
-						new OutputStreamWriter(System.out, outputEncoding)));
+				bufw = new BufferedWriter(new OutputStreamWriter(outs,
+						outputEncoding));
 			else
-				out = new PrintWriter(new BufferedWriter(
-						new OutputStreamWriter(System.out)));
+				bufw = new BufferedWriter(new OutputStreamWriter(outs));
+			out = new PrintWriter(bufw);
+			outw = new ThrowingPrintWriter(bufw);
 		} catch (IOException e) {
 			throw die(CLIText.get().cannotCreateOutputStream);
 		}
 
-		if (repo != null) {
-			db = repo;
-			gitdir = repo.getDirectory();
+		if (repository != null && repository.getDirectory() != null) {
+			db = repository;
+			gitdir = repository.getDirectory().getAbsolutePath();
 		} else {
-			db = null;
-			gitdir = gd;
+			db = repository;
+			gitdir = gitDir;
 		}
 	}
 
@@ -173,7 +207,7 @@ public abstract class TextBuiltin {
 	 * @param clp
 	 */
 	public void printUsageAndExit(final CmdLineParser clp) {
-		printUsageAndExit("", clp);
+		printUsageAndExit("", clp); //$NON-NLS-1$
 	}
 
 	/**
@@ -185,7 +219,7 @@ public abstract class TextBuiltin {
 	public void printUsageAndExit(final String message, final CmdLineParser clp) {
 		PrintWriter writer = new PrintWriter(System.err);
 		writer.println(message);
-		writer.print("jgit ");
+		writer.print("jgit "); //$NON-NLS-1$
 		writer.print(commandName);
 		clp.printSingleLineUsage(writer, getResourceBundle());
 		writer.println();

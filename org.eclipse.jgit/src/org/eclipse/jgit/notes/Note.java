@@ -58,7 +58,7 @@ public class Note extends ObjectId {
 	 * @param noteData
 	 *            the actual note data contained in this note
 	 */
-	Note(AnyObjectId noteOn, ObjectId noteData) {
+	public Note(AnyObjectId noteOn, ObjectId noteData) {
 		super(noteOn);
 		data = noteData;
 	}
@@ -72,6 +72,7 @@ public class Note extends ObjectId {
 		data = newData;
 	}
 
+	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
 		return "Note[" + name() + " -> " + data.name() + "]";

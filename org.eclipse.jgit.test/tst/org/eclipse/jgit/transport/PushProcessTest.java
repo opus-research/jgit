@@ -54,13 +54,13 @@ import java.util.Map;
 
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
+import org.eclipse.jgit.junit.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 import org.junit.Before;
@@ -99,7 +99,7 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 				"refs/heads/master", false, null, null);
 		final Ref ref = new ObjectIdRef.Unpeeled(Ref.Storage.LOOSE, "refs/heads/master",
 				ObjectId.fromString("ac7e7e44c1885efb472ad54a78327d66bfc4ecef"));
-		testOneUpdateStatus(rru, ref, Status.OK, true);
+		testOneUpdateStatus(rru, ref, Status.OK, Boolean.TRUE);
 	}
 
 	/**
@@ -146,7 +146,7 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 				"refs/heads/master", true, null, null);
 		final Ref ref = new ObjectIdRef.Unpeeled(Ref.Storage.LOOSE, "refs/heads/master",
 				ObjectId.fromString("2c349335b7f797072cf729c4f3bb0914ecb6dec9"));
-		testOneUpdateStatus(rru, ref, Status.OK, false);
+		testOneUpdateStatus(rru, ref, Status.OK, Boolean.FALSE);
 	}
 
 	/**
@@ -159,7 +159,7 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 		final RemoteRefUpdate rru = new RemoteRefUpdate(db,
 				"ac7e7e44c1885efb472ad54a78327d66bfc4ecef",
 				"refs/heads/master", false, null, null);
-		testOneUpdateStatus(rru, null, Status.OK, true);
+		testOneUpdateStatus(rru, null, Status.OK, Boolean.TRUE);
 	}
 
 	/**
@@ -169,11 +169,11 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 	 */
 	@Test
 	public void testUpdateDelete() throws IOException {
-		final RemoteRefUpdate rru = new RemoteRefUpdate(db, null,
+		final RemoteRefUpdate rru = new RemoteRefUpdate(db, (String) null,
 				"refs/heads/master", false, null, null);
 		final Ref ref = new ObjectIdRef.Unpeeled(Ref.Storage.LOOSE, "refs/heads/master",
 				ObjectId.fromString("2c349335b7f797072cf729c4f3bb0914ecb6dec9"));
-		testOneUpdateStatus(rru, ref, Status.OK, true);
+		testOneUpdateStatus(rru, ref, Status.OK, Boolean.TRUE);
 	}
 
 	/**
@@ -184,7 +184,7 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 	 */
 	@Test
 	public void testUpdateDeleteNonExisting() throws IOException {
-		final RemoteRefUpdate rru = new RemoteRefUpdate(db, null,
+		final RemoteRefUpdate rru = new RemoteRefUpdate(db, (String) null,
 				"refs/heads/master", false, null, null);
 		testOneUpdateStatus(rru, null, Status.NON_EXISTING, null);
 	}
@@ -217,7 +217,7 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 						.fromString("ac7e7e44c1885efb472ad54a78327d66bfc4ecef"));
 		final Ref ref = new ObjectIdRef.Unpeeled(Ref.Storage.LOOSE, "refs/heads/master",
 				ObjectId.fromString("ac7e7e44c1885efb472ad54a78327d66bfc4ecef"));
-		testOneUpdateStatus(rru, ref, Status.OK, true);
+		testOneUpdateStatus(rru, ref, Status.OK, Boolean.TRUE);
 	}
 
 	/**
@@ -279,18 +279,18 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 	 */
 	@Test
 	public void testUpdateMixedCases() throws IOException {
-		final RemoteRefUpdate rruOk = new RemoteRefUpdate(db, null,
+		final RemoteRefUpdate rruOk = new RemoteRefUpdate(db, (String) null,
 				"refs/heads/master", false, null, null);
 		final Ref refToChange = new ObjectIdRef.Unpeeled(Ref.Storage.LOOSE, "refs/heads/master",
 				ObjectId.fromString("2c349335b7f797072cf729c4f3bb0914ecb6dec9"));
-		final RemoteRefUpdate rruReject = new RemoteRefUpdate(db, null,
-				"refs/heads/nonexisting", false, null, null);
+		final RemoteRefUpdate rruReject = new RemoteRefUpdate(db,
+				(String) null, "refs/heads/nonexisting", false, null, null);
 		refUpdates.add(rruOk);
 		refUpdates.add(rruReject);
 		advertisedRefs.add(refToChange);
 		executePush();
 		assertEquals(Status.OK, rruOk.getStatus());
-		assertEquals(true, rruOk.isFastForward());
+		assertTrue(rruOk.isFastForward());
 		assertEquals(Status.NON_EXISTING, rruReject.getStatus());
 	}
 
@@ -384,7 +384,7 @@ public class PushProcessTest extends SampleDataRepositoryTestCase {
 		final PushResult result = executePush();
 		assertEquals(expectedStatus, rru.getStatus());
 		if (fastForward != null)
-			assertEquals(fastForward.booleanValue(), rru.isFastForward());
+			assertEquals(fastForward, Boolean.valueOf(rru.isFastForward()));
 		return result;
 	}
 

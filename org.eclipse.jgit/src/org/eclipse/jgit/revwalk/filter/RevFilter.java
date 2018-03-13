@@ -45,10 +45,10 @@ package org.eclipse.jgit.revwalk.filter;
 
 import java.io.IOException;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StopWalkException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 
@@ -108,8 +108,13 @@ public abstract class RevFilter {
 		}
 
 		@Override
+		public boolean requiresCommitBody() {
+			return false;
+		}
+
+		@Override
 		public String toString() {
-			return "ALL";
+			return "ALL"; //$NON-NLS-1$
 		}
 	}
 
@@ -128,8 +133,13 @@ public abstract class RevFilter {
 		}
 
 		@Override
+		public boolean requiresCommitBody() {
+			return false;
+		}
+
+		@Override
 		public String toString() {
-			return "NONE";
+			return "NONE"; //$NON-NLS-1$
 		}
 	}
 
@@ -148,8 +158,13 @@ public abstract class RevFilter {
 		}
 
 		@Override
+		public boolean requiresCommitBody() {
+			return false;
+		}
+
+		@Override
 		public String toString() {
-			return "NO_MERGES";
+			return "NO_MERGES"; //$NON-NLS-1$
 		}
 	}
 
@@ -175,8 +190,13 @@ public abstract class RevFilter {
 		}
 
 		@Override
+		public boolean requiresCommitBody() {
+			return false;
+		}
+
+		@Override
 		public String toString() {
-			return "MERGE_BASE";
+			return "MERGE_BASE"; //$NON-NLS-1$
 		}
 	}
 
@@ -189,6 +209,12 @@ public abstract class RevFilter {
 		return NotRevFilter.create(this);
 	}
 
+	/** @return true if the filter needs the commit body to be parsed. */
+	public boolean requiresCommitBody() {
+		// Assume true to be backward compatible with prior behavior.
+		return true;
+	}
+
 	/**
 	 * Determine if the supplied commit should be included in results.
 	 *
@@ -196,7 +222,8 @@ public abstract class RevFilter {
 	 *            the active walker this filter is being invoked from within.
 	 * @param cmit
 	 *            the commit currently being tested. The commit has been parsed
-	 *            and its body is available for inspection.
+	 *            and its body is available for inspection only if the filter
+	 *            returns true from {@link #requiresCommitBody()}.
 	 * @return true to include this commit in the results; false to have this
 	 *         commit be omitted entirely from the results.
 	 * @throws StopWalkException
