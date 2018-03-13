@@ -223,17 +223,12 @@ public class ApplyCommand extends GitCommand<ApplyResult> {
 					pos++;
 					break;
 				case '-':
-					if(hh.getNewStartLine() == 0) {
-						newLines.clear();
+					if (!newLines.get(hh.getNewStartLine() - 1 + pos).equals(
+							hunkLine.substring(1))) {
+						throw new PatchApplyException(MessageFormat.format(
+								JGitText.get().patchApplyException, hh));
 					}
-					else {
-						if (!newLines.get(hh.getNewStartLine() - 1 + pos).equals(
-								hunkLine.substring(1))) {
-							throw new PatchApplyException(MessageFormat.format(
-									JGitText.get().patchApplyException, hh));
-						}
-						newLines.remove(hh.getNewStartLine() - 1 + pos);
-					}
+					newLines.remove(hh.getNewStartLine() - 1 + pos);
 					break;
 				case '+':
 					newLines.add(hh.getNewStartLine() - 1 + pos,
@@ -255,8 +250,7 @@ public class ApplyCommand extends GitCommand<ApplyResult> {
 			// still there!
 			sb.append(l).append('\n');
 		}
-		if(sb.length() > 0)
-			sb.deleteCharAt(sb.length() - 1);
+		sb.deleteCharAt(sb.length() - 1);
 		FileWriter fw = new FileWriter(f);
 		fw.write(sb.toString());
 		fw.close();
