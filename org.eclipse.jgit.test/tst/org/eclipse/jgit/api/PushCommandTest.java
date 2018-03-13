@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
+ * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,59 +42,55 @@
  */
 package org.eclipse.jgit.api;
 
-import org.eclipse.jgit.transport.FetchResult;
+import java.io.IOException;
+import java.net.URISyntaxException;
 
-/**
- * Encapsulates the result of a {@link PullCommand}
- */
-public class PullResult {
-	private final FetchResult fetchResult;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.lib.Config;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevTag;
+import org.eclipse.jgit.transport.RefSpec;
+import org.eclipse.jgit.transport.RemoteConfig;
+import org.eclipse.jgit.transport.URIish;
 
-	private final MergeResult mergeResult;
+public class PushCommandTest extends RepositoryTestCase {
 
-	private final String fetchedFrom;
+	public void testPush() throws JGitInternalException, IOException,
+			GitAPIException, URISyntaxException {
 
-	PullResult(FetchResult fetchResult, String fetchedFrom,
-			MergeResult mergeResult) {
-		this.fetchResult = fetchResult;
-		this.fetchedFrom = fetchedFrom;
-		this.mergeResult = mergeResult;
+		// create other repository
+		Repository db2 = createWorkRepository();
+
+		// setup the first repository
+		final Config config = db.getConfig();
+		RemoteConfig remoteConfig = new RemoteConfig(config, "test");
+		URIish uri = new URIish(db2.getDirectory().toURI().toURL());
+		remoteConfig.addURI(uri);
+		remoteConfig.update(config);
+
+		Git git1 = new Git(db);
+		// create some refs via commits and tag
+		RevCommit commit = git1.commit().setMessage("initial commit").call();
+		RevTag tag = git1.tag().setName("tag").call();
+
+		try {
+			db2.resolve(commit.getId().getName() + "^{commit}");
+			fail("id shouldn't exist yet");
+		} catch (MissingObjectException e) {
+			// we should get here
+		}
+
+		RefSpec spec = new RefSpec("refs/heads/master:refs/heads/x");
+		git1.push().setRemote("test").setRefSpecs(spec)
+				.call();
+
+		assertEquals(commit.getId(),
+				db2.resolve(commit.getId().getName() + "^{commit}"));
+		assertEquals(tag.getId(), db2.resolve(tag.getId().getName()));
 	}
 
-	/**
-	 * @return the fetch result, or <code>null</code>
-	 */
-	public FetchResult getFetchResult() {
-		return this.fetchResult;
-	}
-
-	/**
-	 * @return the merge result, or <code>null</code>
-	 */
-	public MergeResult getMergeResult() {
-		return this.mergeResult;
-	}
-
-	/**
-	 * @return the name of the remote configuration from which fetch was tried,
-	 *         or <code>null</code>
-	 */
-	public String getFetchedFrom() {
-		return this.fetchedFrom;
-	}
-
-	@Override
-	public String toString() {
-		StringBuilder sb = new StringBuilder();
-		if (fetchResult != null)
-			sb.append(fetchResult.toString());
-		else
-			sb.append("No fetch result");
-		sb.append("\n");
-		if (mergeResult != null)
-			sb.append(mergeResult.toString());
-		else
-			sb.append("No merge result");
-		return sb.toString();
-	}
 }
