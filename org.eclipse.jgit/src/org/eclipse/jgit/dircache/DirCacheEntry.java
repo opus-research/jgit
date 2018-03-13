@@ -64,6 +64,7 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.MutableInteger;
 import org.eclipse.jgit.util.NB;
+import org.eclipse.jgit.util.SystemReader;
 
 /**
  * A single file (or stage of a file) in a {@link DirCache}.
@@ -258,10 +259,10 @@ public class DirCacheEntry {
 	 *             or DirCache file.  Or if {@code stage} is outside of the
 	 *             range 0..3, inclusive.
 	 */
+	@SuppressWarnings("boxing")
 	public DirCacheEntry(final byte[] newPath, final int stage) {
 		if (!isValidPath(newPath))
-			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidPath
-					, toString(newPath)));
+			throw new InvalidPathException(toString(newPath));
 		if (stage < 0 || 3 < stage)
 			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidStageForPath
 					, stage, toString(newPath)));
@@ -561,6 +562,7 @@ public class DirCacheEntry {
 	 * @param sz
 	 *            new cached size of the file, as bytes.
 	 */
+	@SuppressWarnings("boxing")
 	public void setLength(final long sz) {
 		setLength((int) sz);
 	}
@@ -638,10 +640,33 @@ public class DirCacheEntry {
 	 *            the entry to copy ObjectId and meta fields from.
 	 */
 	public void copyMetaData(final DirCacheEntry src) {
-		final int pLen = NB.decodeUInt16(info, infoOffset + P_FLAGS) & NAME_MASK;
+		copyMetaData(src, false);
+	}
+
+	/**
+	 * Copy the ObjectId and other meta fields from an existing entry.
+	 * <p>
+	 * This method copies everything except the path and possibly stage from one
+	 * entry to another, supporting renaming.
+	 *
+	 * @param src
+	 *            the entry to copy ObjectId and meta fields from.
+	 * @param keepStage
+	 *            if true, the stage attribute will not be copied
+	 */
+	void copyMetaData(final DirCacheEntry src, boolean keepStage) {
+		int origflags = NB.decodeUInt16(info, infoOffset + P_FLAGS);
+		int newflags = NB.decodeUInt16(src.info, src.infoOffset + P_FLAGS);
 		System.arraycopy(src.info, src.infoOffset, info, infoOffset, INFO_LEN);
-		NB.encodeInt16(info, infoOffset + P_FLAGS, pLen
-				| NB.decodeUInt16(info, infoOffset + P_FLAGS) & ~NAME_MASK);
+		final int pLen = origflags & NAME_MASK;
+		final int SHIFTED_STAGE_MASK = 0x3 << 12;
+		final int pStageShifted;
+		if (keepStage)
+			pStageShifted = origflags & SHIFTED_STAGE_MASK;
+		else
+			pStageShifted = newflags & SHIFTED_STAGE_MASK;
+		NB.encodeInt16(info, infoOffset + P_FLAGS, pStageShifted | pLen
+				| (newflags & ~NAME_MASK & ~SHIFTED_STAGE_MASK));
 	}
 
 	/**
@@ -691,7 +716,14 @@ public class DirCacheEntry {
 				else
 					return false;
 				break;
-
+			case '\\':
+			case ':':
+				// Tree's never have a backslash in them, not even on Windows
+				// but even there we regard it as an invalid path
+				if ("Windows".equals(SystemReader.getInstance().getProperty(
+						"os.name")))
+					return false;
+				//$FALL-THROUGH$
 			default:
 				componentHasChars = true;
 			}
