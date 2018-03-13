@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2012, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,35 +43,56 @@
 
 package org.eclipse.jgit.transport;
 
-import java.io.IOException;
+import java.util.List;
 
-/** Indicates UploadPack may not continue execution. */
-public class UploadPackMayNotContinueException extends IOException {
-	private static final long serialVersionUID = 1L;
-
-	private boolean output;
-
-	/** Initialize with no message. */
-	public UploadPackMayNotContinueException() {
-		// Do not set a message.
-	}
+/**
+ * {@link AdvertiseRefsHook} that delegates to a list of other hooks.
+ * <p>
+ * Hooks are run in the order passed to the constructor. A hook may inspect or
+ * modify the results of the previous hooks in the chain by calling
+ * {@link UploadSession#getAdvertisedRefs()}, or
+ * {@link ReceiveSession#getAdvertisedRefs()} or
+ * {@link ReceiveSession#getAdvertisedObjects()}.
+ */
+public class AdvertiseRefsHookChain implements AdvertiseRefsHook {
+	private final AdvertiseRefsHook[] hooks;
+	private final int count;
 
 	/**
-	 * @param msg
-	 *            a message explaining why it cannot continue. This message may
-	 *            be shown to an end-user.
+	 * Create a new hook chaining the given hooks together.
+	 *
+	 * @param hooks
+	 *            hooks to execute, in order.
+	 * @return a new hook chain of the given hooks.
 	 */
-	public UploadPackMayNotContinueException(String msg) {
-		super(msg);
+	public static AdvertiseRefsHook newChain(List<? extends AdvertiseRefsHook> hooks) {
+		AdvertiseRefsHook[] newHooks = new AdvertiseRefsHook[hooks.size()];
+		int i = 0;
+		for (AdvertiseRefsHook hook : hooks)
+			if (hook != AdvertiseRefsHook.DEFAULT)
+				newHooks[i++] = hook;
+		if (i == 0)
+			return AdvertiseRefsHook.DEFAULT;
+		else if (i == 1)
+			return newHooks[0];
+		else
+			return new AdvertiseRefsHookChain(newHooks, i);
 	}
 
-	/** @return true if the message was already output to the client. */
-	public boolean isOutput() {
-		return output;
+	public void advertiseRefs(ReceiveSession rp)
+			throws ServiceMayNotContinueException {
+		for (int i = 0; i < count; i++)
+			hooks[i].advertiseRefs(rp);
 	}
 
-	/** Mark this message has being sent to the client. */
-	public void setOutput() {
-		output = true;
+	public void advertiseRefs(UploadSession rp)
+			throws ServiceMayNotContinueException {
+		for (int i = 0; i < count; i++)
+			hooks[i].advertiseRefs(rp);
+	}
+
+	private AdvertiseRefsHookChain(AdvertiseRefsHook[] hooks, int count) {
+		this.hooks = hooks;
+		this.count = count;
 	}
 }
