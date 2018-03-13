@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2011, Robin Rosenberg
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,50 +41,86 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.util.io;
+package org.eclipse.jgit.util;
 
-import java.io.IOException;
-import java.io.OutputStream;
+import static org.junit.Assert.assertEquals;
 
-/** Counts the number of bytes written. */
-public class CountingOutputStream extends OutputStream {
-	private final OutputStream out;
-	private long cnt;
+import org.eclipse.jgit.junit.MockSystemReader;
+import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.util.GitDateFormatter.Format;
+import org.junit.Before;
+import org.junit.Test;
 
-	/**
-	 * Initialize a new counting stream.
-	 *
-	 * @param out
-	 *            stream to output all writes to.
-	 */
-	public CountingOutputStream(OutputStream out) {
-		this.out = out;
+public class GitDateFormatterTest {
+
+	private MockSystemReader mockSystemReader;
+
+	private PersonIdent ident;
+
+	@Before
+	public void setUp() {
+		mockSystemReader = new MockSystemReader() {
+			@Override
+			public long getCurrentTime() {
+				return 1318125997291L;
+			}
+		};
+		SystemReader.setInstance(mockSystemReader);
+		ident = RawParseUtils
+				.parsePersonIdent("A U Thor <author@example.com> 1316560165 -0400");
 	}
 
-	/** @return current number of bytes written. */
-	public long getCount() {
-		return cnt;
+	@Test
+	public void DEFAULT() {
+		assertEquals("Tue Sep 20 19:09:25 2011 -0400", new GitDateFormatter(
+				Format.DEFAULT).formatDate(ident));
 	}
 
-	@Override
-	public void write(int val) throws IOException {
-		out.write(val);
-		cnt++;
+	@Test
+	public void RELATIVE() {
+		assertEquals("3 weeks ago",
+				new GitDateFormatter(Format.RELATIVE).formatDate(ident));
 	}
 
-	@Override
-	public void write(byte[] buf, int off, int len) throws IOException {
-		out.write(buf, off, len);
-		cnt += len;
+	@Test
+	public void LOCAL() {
+		assertEquals("Tue Sep 20 19:39:25 2011", new GitDateFormatter(
+				Format.LOCAL).formatDate(ident));
 	}
 
-	@Override
-	public void flush() throws IOException {
-		out.flush();
+	@Test
+	public void ISO() {
+		assertEquals("2011-09-20 19:09:25 -0400", new GitDateFormatter(
+				Format.ISO).formatDate(ident));
 	}
 
-	@Override
-	public void close() throws IOException {
-		out.close();
+	@Test
+	public void RFC() {
+		assertEquals("Tue, 20 Sep 2011 19:09:25 -0400", new GitDateFormatter(
+				Format.RFC).formatDate(ident));
+	}
+
+	@Test
+	public void SHORT() {
+		assertEquals("2011-09-20",
+				new GitDateFormatter(Format.SHORT).formatDate(ident));
+	}
+
+	@Test
+	public void RAW() {
+		assertEquals("1316560165 -0400",
+				new GitDateFormatter(Format.RAW).formatDate(ident));
+	}
+
+	@Test
+	public void LOCALE() {
+		assertEquals("Sep 20, 2011 7:09:25 PM -0400", new GitDateFormatter(
+				Format.LOCALE).formatDate(ident));
+	}
+
+	@Test
+	public void LOCALELOCAL() {
+		assertEquals("Sep 20, 2011 7:39:25 PM", new GitDateFormatter(
+				Format.LOCALELOCAL).formatDate(ident));
 	}
 }

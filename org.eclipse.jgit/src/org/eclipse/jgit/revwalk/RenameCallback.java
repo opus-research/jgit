@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2011, GEBIT Solutions
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,51 +40,23 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.revwalk;
 
-package org.eclipse.jgit.storage.dfs;
+import org.eclipse.jgit.diff.DiffEntry;
 
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.storage.pack.ObjectToPack;
-import org.eclipse.jgit.storage.pack.StoredObjectRepresentation;
-
-class DfsObjectRepresentation extends StoredObjectRepresentation {
-	final ObjectToPack object;
-
-	DfsPackFile pack;
-
+/**
+ * An instance of this class can be used in conjunction with a
+ * {@link FollowFilter}. Whenever a rename has been detected during a revision
+ * walk, it will be reported here.
+ * @see FollowFilter#setRenameCallback(RenameCallback)
+ */
+public abstract class RenameCallback {
 	/**
-	 * Position of {@link #pack} in the reader's pack list. Lower numbers are
-	 * newer/more recent packs and less likely to contain the best format for a
-	 * base object. Higher numbered packs are bigger, more stable, and favored
-	 * by PackWriter when selecting representations... but only if they come
-	 * last in the representation ordering.
+	 * Called whenever a diff was found that is actually a rename or copy of a
+	 * file.
+	 *
+	 * @param entry
+	 *            the entry representing the rename/copy
 	 */
-	int packIndex;
-
-	long offset;
-
-	int format;
-
-	long length;
-
-	ObjectId baseId;
-
-	DfsObjectRepresentation(ObjectToPack object) {
-		this.object = object;
-	}
-
-	@Override
-	public int getFormat() {
-		return format;
-	}
-
-	@Override
-	public int getWeight() {
-		return (int) Math.min(length, Integer.MAX_VALUE);
-	}
-
-	@Override
-	public ObjectId getDeltaBase() {
-		return baseId;
-	}
+	public abstract void renamed(DiffEntry entry);
 }
