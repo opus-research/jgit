@@ -116,16 +116,13 @@ public class FileSnapshot {
 		this.cannotBeRacilyClean = notRacyClean(read);
 	}
 
-	/**
-	 * @return time of last snapshot update
-	 */
-	public long lastModified() {
+	long lastModified() {
 		return lastModified;
 	}
 
 	/**
-	 * Check if the path may have been modified since the snapshot was saved.
-	 * 
+	 * Check if the path has been modified since the snapshot was saved.
+	 *
 	 * @param path
 	 *            the path the snapshot describes.
 	 * @return true if the path needs to be read again.
@@ -191,10 +188,10 @@ public class FileSnapshot {
 
 	private boolean notRacyClean(final long read) {
 		// The last modified time granularity of FAT filesystems is 2 seconds.
-		// Using 2.5 seconds here provides a reasonably high assurance that
-		// a modification was not missed.
+		// Using 3 seconds here provides a reasonably high assurance that
+		// the a modification was not missed.
 		//
-		return read - lastModified > 2500;
+		return read - lastModified > 3 * 60 * 1000L;
 	}
 
 	private boolean isModified(final long currLastModified) {
@@ -215,12 +212,6 @@ public class FileSnapshot {
 			// but this thread may not have seen the change. The read
 			// of the volatile field lastRead should have fixed that.
 			//
-			return false;
-		}
-
-		// Our lastRead flag may be old, refresh and retry
-		lastRead = System.currentTimeMillis();
-		if (notRacyClean(lastRead)) {
 			return false;
 		}
 

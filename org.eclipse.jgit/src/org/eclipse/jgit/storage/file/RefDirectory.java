@@ -97,7 +97,6 @@ import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.RefList;
@@ -191,14 +190,13 @@ public class RefDirectory extends RefDatabase {
 	}
 
 	public void create() throws IOException {
-		FileUtils.mkdir(refsDir);
-		FileUtils.mkdir(logsDir);
-		FileUtils.mkdir(logsRefsDir);
+		refsDir.mkdir();
+		logsDir.mkdir();
+		logsRefsDir.mkdir();
 
-		FileUtils.mkdir(new File(refsDir, R_HEADS.substring(R_REFS.length())));
-		FileUtils.mkdir(new File(refsDir, R_TAGS.substring(R_REFS.length())));
-		FileUtils.mkdir(new File(logsRefsDir,
-				R_HEADS.substring(R_REFS.length())));
+		new File(refsDir, R_HEADS.substring(R_REFS.length())).mkdir();
+		new File(refsDir, R_TAGS.substring(R_REFS.length())).mkdir();
+		new File(logsRefsDir, R_HEADS.substring(R_REFS.length())).mkdir();
 	}
 
 	@Override
@@ -290,19 +288,17 @@ public class RefDirectory extends RefDatabase {
 
 		RefList.Builder<Ref> symbolic = scan.symbolic;
 		for (int idx = 0; idx < symbolic.size();) {
-			final Ref symbolicRef = symbolic.get(idx);
-			final Ref resolvedRef = resolve(symbolicRef, 0, prefix, loose, packed);
-			if (resolvedRef != null && resolvedRef.getObjectId() != null) {
-				symbolic.set(idx, resolvedRef);
+			Ref ref = symbolic.get(idx);
+			ref = resolve(ref, 0, prefix, loose, packed);
+			if (ref != null && ref.getObjectId() != null) {
+				symbolic.set(idx, ref);
 				idx++;
 			} else {
 				// A broken symbolic reference, we have to drop it from the
 				// collections the client is about to receive. Should be a
 				// rare occurrence so pay a copy penalty.
+				loose = loose.remove(idx);
 				symbolic.remove(idx);
-				final int toRemove = loose.find(symbolicRef.getName());
-				if (0 <= toRemove)
-					loose = loose.remove(toRemove);
 			}
 		}
 
@@ -491,22 +487,15 @@ public class RefDirectory extends RefDatabase {
 
 	public RefDirectoryUpdate newUpdate(String name, boolean detach)
 			throws IOException {
-		boolean detachingSymbolicRef = false;
 		final RefList<Ref> packed = getPackedRefs();
 		Ref ref = readRef(name, packed);
 		if (ref != null)
 			ref = resolve(ref, 0, null, null, packed);
 		if (ref == null)
 			ref = new ObjectIdRef.Unpeeled(NEW, name, null);
-		else {
-			detachingSymbolicRef = detach && ref.isSymbolic();
-			if (detachingSymbolicRef)
-				ref = new ObjectIdRef.Unpeeled(LOOSE, name, ref.getObjectId());
-		}
-		RefDirectoryUpdate refDirUpdate = new RefDirectoryUpdate(this, ref);
-		if (detachingSymbolicRef)
-			refDirUpdate.setDetachingSymbolicRef();
-		return refDirUpdate;
+		else if (detach && ref.isSymbolic())
+			ref = new ObjectIdRef.Unpeeled(LOOSE, name, ref.getObjectId());
+		return new RefDirectoryUpdate(this, ref);
 	}
 
 	@Override

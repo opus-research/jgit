@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
- * Copyright (C) 2011, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -47,15 +46,12 @@ import java.io.IOException;
 import java.text.MessageFormat;
 
 import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.api.CheckoutResult.Status;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
-import org.eclipse.jgit.errors.CheckoutConflictException;
-import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
@@ -63,7 +59,6 @@ import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 
 /**
@@ -85,8 +80,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	private String startPoint = Constants.HEAD;
 
 	private RevCommit startCommit;
-
-	private CheckoutResult status;
 
 	/**
 	 * @param repo
@@ -112,7 +105,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 		processOptions();
 		try {
 
-			if (createBranch) {
+			if(createBranch) {
 				Git git = new Git(repo);
 				CreateBranchCommand command = git.branchCreate();
 				command.setName(name);
@@ -122,44 +115,29 @@ public class CheckoutCommand extends GitCommand<Ref> {
 				command.call();
 			}
 
+			RevWalk revWalk = new RevWalk(repo);
 			Ref headRef = repo.getRef(Constants.HEAD);
+			RevCommit headCommit = revWalk.parseCommit(headRef.getObjectId());
 			String refLogMessage = "checkout: moving from "
 					+ headRef.getTarget().getName();
 			ObjectId branch = repo.resolve(name);
-			if (branch == null)
-				throw new RefNotFoundException(MessageFormat.format(JGitText
-						.get().refNotResolved, name));
-
-			RevWalk revWalk = new RevWalk(repo);
-			AnyObjectId headId = headRef.getObjectId();
-			RevCommit headCommit = headId == null ? null : revWalk
-					.parseCommit(headId);
-			RevCommit newCommit = revWalk.parseCommit(branch);
-			RevTree headTree = headCommit == null ? null : headCommit.getTree();
-			DirCacheCheckout dco = new DirCacheCheckout(repo, headTree,
-					repo.lockDirCache(), newCommit.getTree());
-			dco.setFailOnConflict(true);
-			try {
-				dco.checkout();
-			} catch (CheckoutConflictException e) {
-				status = new CheckoutResult(Status.CONFLICTS, dco
-						.getConflicts());
-				throw e;
-			}
 			Ref ref = repo.getRef(name);
-			if (ref != null && !ref.getName().startsWith(Constants.R_HEADS))
-				ref = null;
-			RefUpdate refUpdate = repo.updateRef(Constants.HEAD, ref == null);
+			if (branch == null)
+				throw new RefNotFoundException(MessageFormat.format(
+						JGitText.get().refNotResolved, name));
+
+			RevCommit newCommit = revWalk.parseCommit(branch);
+
+			DirCacheCheckout dco = new DirCacheCheckout(repo,
+					headCommit.getTree(), repo.lockDirCache(),
+					newCommit.getTree());
+			dco.setFailOnConflict(true);
+			dco.checkout();
+			RefUpdate refUpdate = repo.updateRef(Constants.HEAD);
 			refUpdate.setForceUpdate(force);
-			refUpdate.setRefLogMessage(refLogMessage + " to "
-					+ newCommit.getName(), false);
-			Result updateResult;
-			if (ref != null)
-				updateResult = refUpdate.link(ref.getName());
-			else {
-				refUpdate.setNewObjectId(newCommit);
-				updateResult = refUpdate.forceUpdate();
-			}
+			refUpdate.setRefLogMessage(
+					refLogMessage + "to " + newCommit.getName(), false);
+			Result updateResult = refUpdate.link(ref.getName());
 
 			setCallable(false);
 
@@ -178,21 +156,16 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			}
 
 			if (!ok)
-				throw new JGitInternalException(MessageFormat.format(JGitText
-						.get().checkoutUnexpectedResult, updateResult.name()));
+				throw new JGitInternalException(MessageFormat.format(
+						JGitText.get().checkoutUnexpectedResult,
+						updateResult
+						.name()));
 
-			if (!dco.getToBeDeleted().isEmpty()) {
-				status = new CheckoutResult(Status.NONDELETED, dco
-						.getToBeDeleted());
-			}
-			else
-				status = CheckoutResult.OK_RESULT;
-			return ref;
+			Ref result = repo.getRef(name);
+
+			return result;
 		} catch (IOException ioe) {
 			throw new JGitInternalException(ioe.getMessage(), ioe);
-		} finally {
-			if (status == null)
-				status = CheckoutResult.ERROR_RESULT;
 		}
 	}
 
@@ -295,14 +268,5 @@ public class CheckoutCommand extends GitCommand<Ref> {
 		checkCallable();
 		this.upstreamMode = mode;
 		return this;
-	}
-
-	/**
-	 * @return the result
-	 */
-	public CheckoutResult getResult() {
-		if (status == null)
-			return CheckoutResult.NOT_TRIED_RESULT;
-		return status;
 	}
 }

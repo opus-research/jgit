@@ -45,29 +45,25 @@ package org.eclipse.jgit.http.server;
 
 import java.io.File;
 import java.text.MessageFormat;
-import java.util.LinkedList;
-import java.util.List;
 
-import javax.servlet.Filter;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jgit.http.server.glue.ErrorServlet;
 import org.eclipse.jgit.http.server.glue.MetaServlet;
 import org.eclipse.jgit.http.server.glue.RegexGroupFilter;
 import org.eclipse.jgit.http.server.glue.ServletBinder;
-import org.eclipse.jgit.http.server.resolver.AsIsFileService;
 import org.eclipse.jgit.http.server.resolver.DefaultReceivePackFactory;
 import org.eclipse.jgit.http.server.resolver.DefaultUploadPackFactory;
+import org.eclipse.jgit.http.server.resolver.FileResolver;
+import org.eclipse.jgit.http.server.resolver.AsIsFileService;
+import org.eclipse.jgit.http.server.resolver.ReceivePackFactory;
+import org.eclipse.jgit.http.server.resolver.RepositoryResolver;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.http.server.resolver.UploadPackFactory;
 import org.eclipse.jgit.transport.ReceivePack;
 import org.eclipse.jgit.transport.UploadPack;
-import org.eclipse.jgit.transport.resolver.FileResolver;
-import org.eclipse.jgit.transport.resolver.ReceivePackFactory;
-import org.eclipse.jgit.transport.resolver.RepositoryResolver;
-import org.eclipse.jgit.transport.resolver.UploadPackFactory;
 import org.eclipse.jgit.util.StringUtils;
 
 /**
@@ -109,17 +105,13 @@ public class GitServlet extends MetaServlet {
 
 	private volatile boolean initialized;
 
-	private RepositoryResolver<HttpServletRequest> resolver;
+	private RepositoryResolver resolver;
 
 	private AsIsFileService asIs = new AsIsFileService();
 
-	private UploadPackFactory<HttpServletRequest> uploadPackFactory = new DefaultUploadPackFactory();
+	private UploadPackFactory uploadPackFactory = new DefaultUploadPackFactory();
 
-	private ReceivePackFactory<HttpServletRequest> receivePackFactory = new DefaultReceivePackFactory();
-
-	private final List<Filter> uploadPackFilters = new LinkedList<Filter>();
-
-	private final List<Filter> receivePackFilters = new LinkedList<Filter>();
+	private ReceivePackFactory receivePackFactory = new DefaultReceivePackFactory();
 
 	/**
 	 * New servlet that will load its base directory from {@code web.xml}.
@@ -140,7 +132,7 @@ public class GitServlet extends MetaServlet {
 	 *            parameter table during init, which usually comes from the
 	 *            {@code web.xml} file of the web application.
 	 */
-	public void setRepositoryResolver(RepositoryResolver<HttpServletRequest> resolver) {
+	public void setRepositoryResolver(RepositoryResolver resolver) {
 		assertNotInitialized();
 		this.resolver = resolver;
 	}
@@ -161,21 +153,9 @@ public class GitServlet extends MetaServlet {
 	 *            the factory to construct and configure an {@link UploadPack}
 	 *            session when a fetch or clone is requested by a client.
 	 */
-	@SuppressWarnings("unchecked")
-	public void setUploadPackFactory(UploadPackFactory<HttpServletRequest> f) {
+	public void setUploadPackFactory(UploadPackFactory f) {
 		assertNotInitialized();
-		this.uploadPackFactory = f != null ? f : (UploadPackFactory<HttpServletRequest>)UploadPackFactory.DISABLED;
-	}
-
-	/**
-	 * @param filter
-	 *            filter to apply before any of the UploadPack operations. The
-	 *            UploadPack instance is available in the request attribute
-	 *            {@link ServletUtils#ATTRIBUTE_HANDLER}.
-	 */
-	public void addUploadPackFilter(Filter filter) {
-		assertNotInitialized();
-		uploadPackFilters.add(filter);
+		this.uploadPackFactory = f != null ? f : UploadPackFactory.DISABLED;
 	}
 
 	/**
@@ -183,21 +163,9 @@ public class GitServlet extends MetaServlet {
 	 *            the factory to construct and configure a {@link ReceivePack}
 	 *            session when a push is requested by a client.
 	 */
-	@SuppressWarnings("unchecked")
-	public void setReceivePackFactory(ReceivePackFactory<HttpServletRequest> f) {
+	public void setReceivePackFactory(ReceivePackFactory f) {
 		assertNotInitialized();
-		this.receivePackFactory = f != null ? f : (ReceivePackFactory<HttpServletRequest>)ReceivePackFactory.DISABLED;
-	}
-
-	/**
-	 * @param filter
-	 *            filter to apply before any of the ReceivePack operations. The
-	 *            ReceivePack instance is available in the request attribute
-	 *            {@link ServletUtils#ATTRIBUTE_HANDLER}.
-	 */
-	public void addReceivePackFilter(Filter filter) {
-		assertNotInitialized();
-		receivePackFilters.add(filter);
+		this.receivePackFactory = f != null ? f : ReceivePackFactory.DISABLED;
 	}
 
 	private void assertNotInitialized() {
@@ -212,35 +180,29 @@ public class GitServlet extends MetaServlet {
 		if (resolver == null) {
 			final File root = getFile("base-path");
 			final boolean exportAll = getBoolean("export-all");
-			setRepositoryResolver(new FileResolver<HttpServletRequest>(root, exportAll));
+			setRepositoryResolver(new FileResolver(root, exportAll));
 		}
 
 		initialized = true;
 
 		if (uploadPackFactory != UploadPackFactory.DISABLED) {
-			ServletBinder b = serve("*/git-upload-pack");
-			b = b.through(new UploadPackServlet.Factory(uploadPackFactory));
-			for (Filter f : uploadPackFilters)
-				b = b.through(f);
-			b.with(new UploadPackServlet());
+			serve("*/git-upload-pack")//
+					.with(new UploadPackServlet(uploadPackFactory));
 		}
 
 		if (receivePackFactory != ReceivePackFactory.DISABLED) {
-			ServletBinder b = serve("*/git-receive-pack");
-			b = b.through(new ReceivePackServlet.Factory(receivePackFactory));
-			for (Filter f : receivePackFilters)
-				b = b.through(f);
-			b.with(new ReceivePackServlet());
+			serve("*/git-receive-pack")//
+					.with(new ReceivePackServlet(receivePackFactory));
 		}
 
 		ServletBinder refs = serve("*/" + Constants.INFO_REFS);
 		if (uploadPackFactory != UploadPackFactory.DISABLED) {
-			refs = refs.through(new UploadPackServlet.InfoRefs(
-					uploadPackFactory, uploadPackFilters));
+			refs = refs.through(//
+					new UploadPackServlet.InfoRefs(uploadPackFactory));
 		}
 		if (receivePackFactory != ReceivePackFactory.DISABLED) {
-			refs = refs.through(new ReceivePackServlet.InfoRefs(
-					receivePackFactory, receivePackFilters));
+			refs = refs.through(//
+					new ReceivePackServlet.InfoRefs(receivePackFactory));
 		}
 		if (asIs != AsIsFileService.DISABLED) {
 			refs = refs.through(new IsLocalFilter());

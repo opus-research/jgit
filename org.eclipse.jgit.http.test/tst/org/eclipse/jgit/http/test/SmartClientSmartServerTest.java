@@ -46,16 +46,9 @@ package org.eclipse.jgit.http.test;
 import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_ENCODING;
 import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_LENGTH;
 import static org.eclipse.jgit.util.HttpSupport.HDR_CONTENT_TYPE;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -74,10 +67,11 @@ import org.eclipse.jetty.servlet.FilterMapping;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.errors.RemoteRepositoryException;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.http.server.GitServlet;
+import org.eclipse.jgit.http.server.resolver.RepositoryResolver;
+import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.junit.TestRng;
 import org.eclipse.jgit.junit.http.AccessEvent;
@@ -98,10 +92,6 @@ import org.eclipse.jgit.transport.RemoteRefUpdate;
 import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.TransportHttp;
 import org.eclipse.jgit.transport.URIish;
-import org.eclipse.jgit.transport.resolver.RepositoryResolver;
-import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
-import org.junit.Before;
-import org.junit.Test;
 
 public class SmartClientSmartServerTest extends HttpTestCase {
 	private static final String HDR_TRANSFER_ENCODING = "Transfer-Encoding";
@@ -116,8 +106,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 
 	private RevCommit A, B;
 
-	@Before
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
 		super.setUp();
 
 		final TestRepository<FileRepository> src = createTestRepository();
@@ -125,7 +114,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 
 		ServletContextHandler app = server.addContext("/git");
 		GitServlet gs = new GitServlet();
-		gs.setRepositoryResolver(new RepositoryResolver<HttpServletRequest>() {
+		gs.setRepositoryResolver(new RepositoryResolver() {
 			public Repository open(HttpServletRequest req, String name)
 					throws RepositoryNotFoundException,
 					ServiceNotEnabledException {
@@ -176,7 +165,6 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		src.update("refs/garbage/a/very/long/ref/name/to/compress", B);
 	}
 
-	@Test
 	public void testListRemote() throws IOException {
 		Repository dst = createBareRepository();
 
@@ -225,37 +213,6 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		assertEquals("gzip", info.getResponseHeader(HDR_CONTENT_ENCODING));
 	}
 
-	@Test
-	public void testListRemote_BadName() throws IOException, URISyntaxException {
-		Repository dst = createBareRepository();
-		URIish uri = new URIish(this.remoteURI.toString() + ".invalid");
-		Transport t = Transport.open(dst, uri);
-		try {
-			try {
-				t.openFetch();
-				fail("fetch connection opened");
-			} catch (RemoteRepositoryException notFound) {
-				assertEquals(uri + ": Git repository not found",
-						notFound.getMessage());
-			}
-		} finally {
-			t.close();
-		}
-
-		List<AccessEvent> requests = getRequests();
-		assertEquals(1, requests.size());
-
-		AccessEvent info = requests.get(0);
-		assertEquals("GET", info.getMethod());
-		assertEquals(join(uri, "info/refs"), info.getPath());
-		assertEquals(1, info.getParameters().size());
-		assertEquals("git-upload-pack", info.getParameter("service"));
-		assertEquals(200, info.getStatus());
-		assertEquals("application/x-git-upload-pack-advertisement",
-				info.getResponseHeader(HDR_CONTENT_TYPE));
-	}
-
-	@Test
 	public void testInitialClone_Small() throws Exception {
 		Repository dst = createBareRepository();
 		assertFalse(dst.hasObject(A_txt));
@@ -300,7 +257,6 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 				.getResponseHeader(HDR_CONTENT_TYPE));
 	}
 
-	@Test
 	public void testFetchUpdateExisting() throws Exception {
 		// Bootstrap by doing the clone.
 		//
@@ -380,7 +336,6 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 				.getResponseHeader(HDR_CONTENT_TYPE));
 	}
 
-	@Test
 	public void testInitialClone_BrokenServer() throws Exception {
 		Repository dst = createBareRepository();
 		assertFalse(dst.hasObject(A_txt));
@@ -421,7 +376,6 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 				.getResponseHeader(HDR_CONTENT_TYPE));
 	}
 
-	@Test
 	public void testPush_NotAuthorized() throws Exception {
 		final TestRepository src = createTestRepository();
 		final RevBlob Q_txt = src.blob("new text");
@@ -464,7 +418,6 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		assertEquals(401, info.getStatus());
 	}
 
-	@Test
 	public void testPush_CreateBranch() throws Exception {
 		final TestRepository src = createTestRepository();
 		final RevBlob Q_txt = src.blob("new text");
@@ -537,7 +490,6 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 				.getResponseHeader(HDR_CONTENT_TYPE));
 	}
 
-	@Test
 	public void testPush_ChunkedEncoding() throws Exception {
 		final TestRepository<FileRepository> src = createTestRepository();
 		final RevBlob Q_bin = src.blob(new TestRng("Q").nextBytes(128 * 1024));

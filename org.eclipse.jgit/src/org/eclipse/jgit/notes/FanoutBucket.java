@@ -99,34 +99,15 @@ class FanoutBucket extends InMemoryNoteBucket {
 		table = new NoteBucket[256];
 	}
 
-	void setBucket(int cell, ObjectId id) {
+	void parseOneEntry(int cell, ObjectId id) {
 		table[cell] = new LazyNoteBucket(id);
 		cnt++;
 	}
 
-	void setBucket(int cell, InMemoryNoteBucket bucket) {
-		table[cell] = bucket;
-		cnt++;
-	}
-
 	@Override
-	Note getNote(AnyObjectId objId, ObjectReader or) throws IOException {
+	ObjectId get(AnyObjectId objId, ObjectReader or) throws IOException {
 		NoteBucket b = table[cell(objId)];
-		return b != null ? b.getNote(objId, or) : null;
-
-	}
-
-	NoteBucket getBucket(int cell) {
-		return table[cell];
-	}
-
-	static InMemoryNoteBucket loadIfLazy(NoteBucket b, AnyObjectId prefix,
-			ObjectReader or) throws IOException {
-		if (b == null)
-			return null;
-		if (b instanceof InMemoryNoteBucket)
-			return (InMemoryNoteBucket) b;
-		return ((LazyNoteBucket) b).load(prefix, or);
+		return b != null ? b.get(objId, or) : null;
 	}
 
 	@Override
@@ -228,7 +209,16 @@ class FanoutBucket extends InMemoryNoteBucket {
 				if (cnt == 0)
 					return null;
 
-				return contractIfTooSmall(noteOn, or);
+				if (estimateSize(noteOn, or) < LeafBucket.MAX_SIZE) {
+					// We are small enough to just contract to a single leaf.
+					InMemoryNoteBucket r = new LeafBucket(prefixLen);
+					for (Iterator<Note> i = iterator(noteOn, or); i.hasNext();)
+						r = r.append(i.next());
+					r.nonNotes = nonNotes;
+					return r;
+				}
+
+				return this;
 
 			} else if (n != b) {
 				table[cell] = n;
@@ -237,39 +227,11 @@ class FanoutBucket extends InMemoryNoteBucket {
 		}
 	}
 
-	InMemoryNoteBucket contractIfTooSmall(AnyObjectId noteOn, ObjectReader or)
-			throws IOException {
-		if (estimateSize(noteOn, or) < LeafBucket.MAX_SIZE) {
-			// We are small enough to just contract to a single leaf.
-			InMemoryNoteBucket r = new LeafBucket(prefixLen);
-			for (Iterator<Note> i = iterator(noteOn, or); i.hasNext();)
-				r = r.append(i.next());
-			r.nonNotes = nonNotes;
-			return r;
-		}
-
-		return this;
-	}
-
 	private static final byte[] hexchar = { '0', '1', '2', '3', '4', '5', '6',
 			'7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
 
 	@Override
 	ObjectId writeTree(ObjectInserter inserter) throws IOException {
-		return inserter.insert(build(true, inserter));
-	}
-
-	ObjectId getTreeId() {
-		try {
-			return new ObjectInserter.Formatter().idFor(build(false, null));
-		} catch (IOException e) {
-			// should never happen as we are not inserting
-			throw new RuntimeException(e);
-		}
-	}
-
-	private TreeFormatter build(boolean insert, ObjectInserter inserter)
-			throws IOException {
 		byte[] nameBuf = new byte[2];
 		TreeFormatter fmt = new TreeFormatter(treeSize());
 		NonNoteEntry e = nonNotes;
@@ -287,18 +249,12 @@ class FanoutBucket extends InMemoryNoteBucket {
 				e = e.next;
 			}
 
-			ObjectId id;
-			if (insert) {
-				id = b.writeTree(inserter);
-			} else {
-				id = b.getTreeId();
-			}
-			fmt.append(nameBuf, 0, 2, TREE, id);
+			fmt.append(nameBuf, 0, 2, TREE, b.writeTree(inserter));
 		}
 
 		for (; e != null; e = e.next)
 			e.format(fmt);
-		return fmt;
+		return inserter.insert(fmt);
 	}
 
 	private int treeSize() {
@@ -338,8 +294,8 @@ class FanoutBucket extends InMemoryNoteBucket {
 		}
 
 		@Override
-		Note getNote(AnyObjectId objId, ObjectReader or) throws IOException {
-			return load(objId, or).getNote(objId, or);
+		ObjectId get(AnyObjectId objId, ObjectReader or) throws IOException {
+			return load(objId, or).get(objId, or);
 		}
 
 		@Override
@@ -364,16 +320,11 @@ class FanoutBucket extends InMemoryNoteBucket {
 			return treeId;
 		}
 
-		@Override
-		ObjectId getTreeId() {
-			return treeId;
-		}
-
-		private InMemoryNoteBucket load(AnyObjectId prefix, ObjectReader or)
+		private NoteBucket load(AnyObjectId objId, ObjectReader or)
 				throws IOException {
-			AbbreviatedObjectId p = prefix.abbreviate(prefixLen + 2);
-			InMemoryNoteBucket self = NoteParser.parse(p, treeId, or);
-			table[cell(prefix)] = self;
+			AbbreviatedObjectId p = objId.abbreviate(prefixLen + 2);
+			NoteBucket self = NoteParser.parse(p, treeId, or);
+			table[cell(objId)] = self;
 			return self;
 		}
 	}

@@ -48,14 +48,6 @@ import static org.eclipse.jgit.lib.Constants.R_HEADS;
 import static org.eclipse.jgit.lib.Constants.R_TAGS;
 import static org.eclipse.jgit.lib.Ref.Storage.LOOSE;
 import static org.eclipse.jgit.lib.Ref.Storage.NEW;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
@@ -69,8 +61,6 @@ import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTag;
-import org.junit.Before;
-import org.junit.Test;
 
 public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 	private Repository diskRepo;
@@ -85,8 +75,7 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 
 	private RevTag v1_0;
 
-	@Before
-	public void setUp() throws Exception {
+	protected void setUp() throws Exception {
 		super.setUp();
 
 		diskRepo = createBareRepository();
@@ -99,7 +88,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		repo.getRevWalk().parseBody(v1_0);
 	}
 
-	@Test
 	public void testCreate() throws IOException {
 		// setUp above created the directory. We just have to test it.
 		File d = diskRepo.getDirectory();
@@ -123,7 +111,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals("ref: refs/heads/master\n", read(new File(d, HEAD)));
 	}
 
-	@Test
 	public void testGetRefs_EmptyDatabase() throws IOException {
 		Map<String, Ref> all;
 
@@ -137,7 +124,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertTrue("no references", all.isEmpty());
 	}
 
-	@Test
 	public void testGetRefs_HeadOnOneBranch() throws IOException {
 		Map<String, Ref> all;
 		Ref head, master;
@@ -163,7 +149,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(A, master.getObjectId());
 	}
 
-	@Test
 	public void testGetRefs_DeatchedHead1() throws IOException {
 		Map<String, Ref> all;
 		Ref head;
@@ -183,7 +168,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(A, head.getObjectId());
 	}
 
-	@Test
 	public void testGetRefs_DeatchedHead2() throws IOException {
 		Map<String, Ref> all;
 		Ref head, master;
@@ -209,7 +193,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(B, master.getObjectId());
 	}
 
-	@Test
 	public void testGetRefs_DeeplyNestedBranch() throws IOException {
 		String name = "refs/heads/a/b/c/d/e/f/g/h/i/j/k";
 		Map<String, Ref> all;
@@ -227,7 +210,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(A, r.getObjectId());
 	}
 
-	@Test
 	public void testGetRefs_HeadBranchNotBorn() throws IOException {
 		Map<String, Ref> all;
 		Ref a, b;
@@ -249,7 +231,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals("refs/heads/B", b.getName());
 	}
 
-	@Test
 	public void testGetRefs_LooseOverridesPacked() throws IOException {
 		Map<String, Ref> heads;
 		Ref a;
@@ -265,7 +246,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(B, a.getObjectId());
 	}
 
-	@Test
 	public void testGetRefs_IgnoresGarbageRef1() throws IOException {
 		Map<String, Ref> heads;
 		Ref a;
@@ -281,7 +261,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(A, a.getObjectId());
 	}
 
-	@Test
 	public void testGetRefs_IgnoresGarbageRef2() throws IOException {
 		Map<String, Ref> heads;
 		Ref a;
@@ -297,7 +276,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(A, a.getObjectId());
 	}
 
-	@Test
 	public void testGetRefs_IgnoresGarbageRef3() throws IOException {
 		Map<String, Ref> heads;
 		Ref a;
@@ -313,7 +291,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(A, a.getObjectId());
 	}
 
-	@Test
 	public void testGetRefs_IgnoresGarbageRef4() throws IOException {
 		Map<String, Ref> heads;
 		Ref a, b, c;
@@ -346,7 +323,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(A, c.getObjectId());
 	}
 
-	@Test
 	public void testGetRefs_InvalidName() throws IOException {
 		writeLooseRef("refs/heads/A", A);
 
@@ -355,7 +331,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertTrue("empty objects/", refdir.getRefs("objects/").isEmpty());
 	}
 
-	@Test
 	public void testGetRefs_HeadsOnly_AllLoose() throws IOException {
 		Map<String, Ref> heads;
 		Ref a, b;
@@ -377,7 +352,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(B, b.getObjectId());
 	}
 
-	@Test
 	public void testGetRefs_HeadsOnly_AllPacked1() throws IOException {
 		Map<String, Ref> heads;
 		Ref a;
@@ -394,7 +368,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(A, a.getObjectId());
 	}
 
-	@Test
 	public void testGetRefs_HeadsOnly_SymrefToPacked() throws IOException {
 		Map<String, Ref> heads;
 		Ref master, other;
@@ -416,7 +389,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertSame(master, other.getTarget());
 	}
 
-	@Test
 	public void testGetRefs_HeadsOnly_Mixed() throws IOException {
 		Map<String, Ref> heads;
 		Ref a, b;
@@ -438,7 +410,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(B, b.getObjectId());
 	}
 
-	@Test
 	public void testGetRefs_TagsOnly_AllLoose() throws IOException {
 		Map<String, Ref> tags;
 		Ref a;
@@ -455,7 +426,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(v1_0, a.getObjectId());
 	}
 
-	@Test
 	public void testGetRefs_TagsOnly_AllPacked() throws IOException {
 		Map<String, Ref> tags;
 		Ref a;
@@ -472,7 +442,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(v1_0, a.getObjectId());
 	}
 
-	@Test
 	public void testGetRefs_DiscoversNewLoose1() throws IOException {
 		Map<String, Ref> orig, next;
 		Ref orig_r, next_r;
@@ -501,7 +470,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(B, next_r.getObjectId());
 	}
 
-	@Test
 	public void testGetRefs_DiscoversNewLoose2() throws IOException {
 		Map<String, Ref> orig, next, news;
 
@@ -525,7 +493,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertTrue(news.containsKey("B"));
 	}
 
-	@Test
 	public void testGetRefs_DiscoversModifiedLoose() throws IOException {
 		Map<String, Ref> all;
 
@@ -539,7 +506,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(B, all.get(HEAD).getObjectId());
 	}
 
-	@Test
 	public void testGetRef_DiscoversModifiedLoose() throws IOException {
 		Map<String, Ref> all;
 
@@ -554,7 +520,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(B, master.getObjectId());
 	}
 
-	@Test
 	public void testGetRefs_DiscoversDeletedLoose1() throws IOException {
 		Map<String, Ref> orig, next;
 		Ref orig_r, next_r;
@@ -584,7 +549,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(B, orig_r.getObjectId());
 	}
 
-	@Test
 	public void testGetRef_DiscoversDeletedLoose() throws IOException {
 		Map<String, Ref> all;
 
@@ -597,7 +561,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertTrue(refdir.getRefs(RefDatabase.ALL).isEmpty());
 	}
 
-	@Test
 	public void testGetRefs_DiscoversDeletedLoose2() throws IOException {
 		Map<String, Ref> orig, next;
 
@@ -615,7 +578,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertFalse(next.containsKey("refs/heads/pu"));
 	}
 
-	@Test
 	public void testGetRefs_DiscoversDeletedLoose3() throws IOException {
 		Map<String, Ref> orig, next;
 
@@ -638,7 +600,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertFalse(next.containsKey("refs/heads/next"));
 	}
 
-	@Test
 	public void testGetRefs_DiscoversDeletedLoose4() throws IOException {
 		Map<String, Ref> orig, next;
 		Ref orig_r, next_r;
@@ -664,7 +625,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertSame("uses cached instance", orig_r, next_r);
 	}
 
-	@Test
 	public void testGetRefs_DiscoversDeletedLoose5() throws IOException {
 		Map<String, Ref> orig, next;
 
@@ -685,7 +645,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertTrue(next.containsKey("refs/tags/v1.0"));
 	}
 
-	@Test
 	public void testGetRefs_SkipsLockFiles() throws IOException {
 		Map<String, Ref> all;
 
@@ -700,7 +659,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertFalse(all.containsKey("refs/heads/pu.lock"));
 	}
 
-	@Test
 	public void testGetRefs_CycleInSymbolicRef() throws IOException {
 		Map<String, Ref> all;
 		Ref r;
@@ -753,7 +711,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertNull("mising 1 due to cycle", r);
 	}
 
-	@Test
 	public void testGetRefs_PackedNotPeeled_Sorted() throws IOException {
 		Map<String, Ref> all;
 
@@ -787,7 +744,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertNull(tag.getPeeledObjectId());
 	}
 
-	@Test
 	public void testGetRef_PackedNotPeeled_WrongSort() throws IOException {
 		writePackedRefs("" + //
 				v1_0.name() + " refs/tags/v1.0\n" + //
@@ -817,7 +773,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertNull(tag.getPeeledObjectId());
 	}
 
-	@Test
 	public void testGetRefs_PackedWithPeeled() throws IOException {
 		Map<String, Ref> all;
 
@@ -852,7 +807,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(v1_0.getObject(), tag.getPeeledObjectId());
 	}
 
-	@Test
 	public void testGetRef_EmptyDatabase() throws IOException {
 		Ref r;
 
@@ -871,7 +825,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertNull(refdir.getRef("v1.0"));
 	}
 
-	@Test
 	public void testGetRef_FetchHead() throws IOException {
 		// This is an odd special case where we need to make sure we read
 		// exactly the first 40 bytes of the file and nothing further on
@@ -888,7 +841,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertNull(r.getPeeledObjectId());
 	}
 
-	@Test
 	public void testGetRef_AnyHeadWithGarbage() throws IOException {
 		write(new File(diskRepo.getDirectory(), "refs/heads/A"), A.name()
 				+ "012345 . this is not a standard reference\n"
@@ -902,14 +854,12 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertNull(r.getPeeledObjectId());
 	}
 
-	@Test
 	public void testGetRefs_CorruptSymbolicReference() throws IOException {
 		String name = "refs/heads/A";
 		writeLooseRef(name, "ref: \n");
 		assertTrue(refdir.getRefs(RefDatabase.ALL).isEmpty());
 	}
 
-	@Test
 	public void testGetRef_CorruptSymbolicReference() throws IOException {
 		String name = "refs/heads/A";
 		writeLooseRef(name, "ref: \n");
@@ -922,7 +872,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testGetRefs_CorruptObjectIdReference() throws IOException {
 		String name = "refs/heads/A";
 		String content = "zoo" + A.name();
@@ -930,7 +879,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertTrue(refdir.getRefs(RefDatabase.ALL).isEmpty());
 	}
 
-	@Test
 	public void testGetRef_CorruptObjectIdReference() throws IOException {
 		String name = "refs/heads/A";
 		String content = "zoo" + A.name();
@@ -944,7 +892,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		}
 	}
 
-	@Test
 	public void testIsNameConflicting() throws IOException {
 		writeLooseRef("refs/heads/a/b", A);
 		writePackedRef("refs/heads/q", B);
@@ -966,7 +913,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertTrue(refdir.isNameConflicting("refs/heads/q/master"));
 	}
 
-	@Test
 	public void testPeelLooseTag() throws IOException {
 		writeLooseRef("refs/tags/v1_0", v1_0);
 		writeLooseRef("refs/tags/current", "ref: refs/tags/v1_0\n");
@@ -1015,7 +961,6 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertSame(tag_p2, refdir.peel(tag_p2));
 	}
 
-	@Test
 	public void testPeelCommit() throws IOException {
 		writeLooseRef("refs/heads/master", A);
 
@@ -1055,10 +1000,7 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 	private void writePackedRefs(String content) throws IOException {
 		File pr = new File(diskRepo.getDirectory(), "packed-refs");
 		write(pr, content);
-
-		final long now = System.currentTimeMillis();
-		final int oneHourAgo = 3600 * 1000;
-		pr.setLastModified(now - oneHourAgo);
+		pr.setLastModified(1250379778668L /* Aug 15 20:12:58 GMT-03:30 2009 */);
 	}
 
 	private void deleteLooseRef(String name) {
