@@ -1295,6 +1295,7 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 		retainOnReset = 0;
 		carryFlags = UNINTERESTING;
 		objects.clear();
+		reader.close();
 		roots.clear();
 		queue = new DateRevQueue();
 		pending = new StartGenerator(this);

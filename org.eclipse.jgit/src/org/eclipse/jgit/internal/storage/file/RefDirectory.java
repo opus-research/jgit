@@ -73,7 +73,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.InvalidObjectIdException;
 import org.eclipse.jgit.errors.LockFailedException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -139,7 +138,7 @@ public class RefDirectory extends RefDatabase {
 
 	private final File gitDir;
 
-	final File refsDir;
+	private final File refsDir;
 
 	private final ReflogWriter logWriter;
 
@@ -156,7 +155,7 @@ public class RefDirectory extends RefDatabase {
 	private final AtomicReference<RefList<LooseRef>> looseRefs = new AtomicReference<RefList<LooseRef>>();
 
 	/** Immutable sorted list of packed references. */
-	final AtomicReference<PackedRefList> packedRefs = new AtomicReference<PackedRefList>();
+	private final AtomicReference<PackedRefList> packedRefs = new AtomicReference<PackedRefList>();
 
 	/**
 	 * Number of modifications made to this database.
@@ -262,7 +261,6 @@ public class RefDirectory extends RefDatabase {
 		return loose;
 	}
 
-	@Nullable
 	private Ref readAndResolve(String name, RefList<Ref> packed) throws IOException {
 		try {
 			Ref ref = readRef(name, packed);
@@ -926,7 +924,7 @@ public class RefDirectory extends RefDatabase {
 		return n;
 	}
 
-	LooseRef scanRef(LooseRef ref, String name) throws IOException {
+	private LooseRef scanRef(LooseRef ref, String name) throws IOException {
 		final File path = fileFor(name);
 		FileSnapshot currentSnapshot = null;
 

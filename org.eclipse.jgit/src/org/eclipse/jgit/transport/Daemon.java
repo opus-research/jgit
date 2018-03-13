@@ -79,7 +79,7 @@ public class Daemon {
 
 	private boolean run;
 
-	Thread acceptThread;
+	private Thread acceptThread;
 
 	private int timeout;
 
@@ -87,9 +87,9 @@ public class Daemon {
 
 	private volatile RepositoryResolver<DaemonClient> repositoryResolver;
 
-	volatile UploadPackFactory<DaemonClient> uploadPackFactory;
+	private volatile UploadPackFactory<DaemonClient> uploadPackFactory;
 
-	volatile ReceivePackFactory<DaemonClient> receivePackFactory;
+	private volatile ReceivePackFactory<DaemonClient> receivePackFactory;
 
 	/** Configure a daemon to listen on any available network port. */
 	public Daemon() {
@@ -326,7 +326,7 @@ public class Daemon {
 		}
 	}
 
-	void startClient(final Socket s) {
+	private void startClient(final Socket s) {
 		final DaemonClient dc = new DaemonClient(this);
 
 		final SocketAddress peer = s.getRemoteSocketAddress();
