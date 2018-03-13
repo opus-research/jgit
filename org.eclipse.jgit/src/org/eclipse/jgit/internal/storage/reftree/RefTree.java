@@ -150,6 +150,15 @@ public class RefTree {
 
 	/**
 	 * Read one reference.
+	 * <p>
+	 * References are always returned peeled ({@link Ref#isPeeled()} is true).
+	 * If the reference points to an annotated tag, the returned reference will
+	 * be peeled and contain {@link Ref#getPeeledObjectId()}.
+	 * <p>
+	 * If the reference is a symbolic reference and the chain depth is less than
+	 * {@link org.eclipse.jgit.lib.RefDatabase#MAX_SYMBOLIC_REF_DEPTH} the
+	 * returned reference is resolved. If the chain depth is longer, the
+	 * symbolic reference is returned without resolving.
 	 *
 	 * @param reader
 	 *            to access objects necessary to read the requested reference.
