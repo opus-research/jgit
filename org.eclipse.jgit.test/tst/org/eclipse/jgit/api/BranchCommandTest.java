@@ -121,7 +121,7 @@ public class BranchCommandTest extends RepositoryTestCase {
 		Git localGit = new Git(localRepository);
 		StoredConfig config = localRepository.getConfig();
 		RemoteConfig rc = new RemoteConfig(config, "origin");
-		rc.addURI(new URIish(remoteRepository.getDirectory().getAbsolutePath()));
+		rc.addURI(new URIish(remoteRepository.getDirectory().getPath()));
 		rc.addFetchRefSpec(new RefSpec("+refs/heads/*:refs/remotes/origin/*"));
 		rc.update(config);
 		config.save();
@@ -194,20 +194,6 @@ public class BranchCommandTest extends RepositoryTestCase {
 	public void testListAllBranchesShouldNotDie() throws Exception {
 		Git git = setUpRepoWithRemote();
 		git.branchList().setListMode(ListMode.ALL).call();
-	}
-
-	@Test
-	public void testListBranchesWithContains() throws Exception {
-		git.branchCreate().setName("foo").setStartPoint(secondCommit).call();
-
-		List<Ref> refs = git.branchList().call();
-		assertEquals(2, refs.size());
-
-		List<Ref> refsContainingSecond = git.branchList()
-				.setContains(secondCommit.name()).call();
-		assertEquals(1, refsContainingSecond.size());
-		// master is on initial commit, so it should not be returned
-		assertEquals("refs/heads/foo", refsContainingSecond.get(0).getName());
 	}
 
 	@Test
@@ -473,16 +459,9 @@ public class BranchCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testCreationImplicitStart() throws Exception {
+	public void testCreationImplicitStart() throws JGitInternalException,
+			GitAPIException {
 		git.branchCreate().setName("topic").call();
-		assertEquals(db.resolve("HEAD"), db.resolve("topic"));
-	}
-
-	@Test
-	public void testCreationNullStartPoint() throws Exception {
-		String startPoint = null;
-		git.branchCreate().setName("topic").setStartPoint(startPoint).call();
-		assertEquals(db.resolve("HEAD"), db.resolve("topic"));
 	}
 
 	public Ref createBranch(Git actGit, String name, boolean force,

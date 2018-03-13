@@ -129,8 +129,7 @@ public class FileRepositoryBuilderTest extends LocalDiskRepositoryTestCase {
 		builder.setMustExist(true);
 		Repository repo2 = builder.build();
 
-		assertEquals(repo1.getDirectory().getAbsolutePath(), repo2
-				.getDirectory().getAbsolutePath());
+		assertEquals(repo1.getDirectory(), repo2.getDirectory());
 		assertEquals(dir, repo2.getWorkTree());
 	}
 
@@ -149,10 +148,7 @@ public class FileRepositoryBuilderTest extends LocalDiskRepositoryTestCase {
 		builder.setMustExist(true);
 		Repository repo2 = builder.build();
 
-		// The tmp directory may be a symlink so the actual path
-		// may not
-		assertEquals(repo1.getDirectory().getCanonicalPath(), repo2
-				.getDirectory().getCanonicalPath());
+		assertEquals(repo1.getDirectory(), repo2.getDirectory());
 		assertEquals(dir, repo2.getWorkTree());
 	}
 
@@ -168,14 +164,11 @@ public class FileRepositoryBuilderTest extends LocalDiskRepositoryTestCase {
 
 		builder.setWorkTree(dir);
 		builder.findGitDir(dir);
-		assertEquals(repo1.getDirectory().getAbsolutePath(), builder
-				.getGitDir().getAbsolutePath());
+		assertEquals(repo1.getDirectory(), builder.getGitDir());
 		builder.setMustExist(true);
 		Repository repo2 = builder.build();
 
-		// The tmp directory may be a symlink
-		assertEquals(repo1.getDirectory().getCanonicalPath(), repo2
-				.getDirectory().getCanonicalPath());
+		assertEquals(repo1.getDirectory(), repo2.getDirectory());
 		assertEquals(dir, repo2.getWorkTree());
 	}
 }
