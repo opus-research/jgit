@@ -41,7 +41,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.junit.http;
+package org.eclipse.jgit.http.test.util;
 
 import java.text.MessageFormat;
 import java.util.ArrayList;
