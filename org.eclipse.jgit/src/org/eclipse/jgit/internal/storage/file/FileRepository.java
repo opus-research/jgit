@@ -59,12 +59,11 @@ import org.eclipse.jgit.events.ConfigChangedEvent;
 import org.eclipse.jgit.events.ConfigChangedListener;
 import org.eclipse.jgit.events.IndexChangedEvent;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.file.FileObjectDatabase.AlternateHandle;
-import org.eclipse.jgit.internal.storage.file.FileObjectDatabase.AlternateRepository;
+import org.eclipse.jgit.internal.storage.file.ObjectDirectory.AlternateHandle;
+import org.eclipse.jgit.internal.storage.file.ObjectDirectory.AlternateRepository;
 import org.eclipse.jgit.lib.BaseRepositoryBuilder;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.CoreConfig.HideDotFiles;
 import org.eclipse.jgit.lib.CoreConfig.SymLinks;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
@@ -269,12 +268,6 @@ public class FileRepository extends Repository {
 					JGitText.get().repositoryAlreadyExists, getDirectory()));
 		}
 		FileUtils.mkdirs(getDirectory(), true);
-		HideDotFiles hideDotFiles = getConfig().getEnum(
-				ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_HIDEDOTFILES,
-				HideDotFiles.DOTGITONLY);
-		if (hideDotFiles != HideDotFiles.FALSE)
-			getFS().setHidden(getDirectory(), true);
 		refs.create();
 		objectDatabase.create();
 
@@ -391,7 +384,7 @@ public class FileRepository extends Repository {
 	 */
 	public Set<ObjectId> getAdditionalHaves() {
 		HashSet<ObjectId> r = new HashSet<ObjectId>();
-		for (AlternateHandle d : objectDatabase. myAlternates()) {
+		for (AlternateHandle d : objectDatabase.myAlternates()) {
 			if (d instanceof AlternateRepository) {
 				Repository repo;
 
