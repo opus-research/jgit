@@ -43,11 +43,8 @@
  */
 package org.eclipse.jgit.api;
 
-import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.LinkedList;
-import java.util.List;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.CheckoutResult.Status;
@@ -55,12 +52,7 @@ import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
-import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
-import org.eclipse.jgit.dircache.DirCacheEditor;
-import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
-import org.eclipse.jgit.dircache.DirCacheEntry;
-import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.CheckoutConflictException;
 import org.eclipse.jgit.lib.AnyObjectId;
@@ -73,8 +65,6 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 
 /**
  * Checkout a branch to the working tree
@@ -92,20 +82,17 @@ public class CheckoutCommand extends GitCommand<Ref> {
 
 	private CreateBranchCommand.SetupUpstreamMode upstreamMode;
 
-	private String startPoint = null;
+	private String startPoint = Constants.HEAD;
 
 	private RevCommit startCommit;
 
 	private CheckoutResult status;
-
-	private List<String> paths;
 
 	/**
 	 * @param repo
 	 */
 	protected CheckoutCommand(Repository repo) {
 		super(repo);
-		this.paths = new LinkedList<String>();
 	}
 
 	/**
@@ -124,12 +111,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 		checkCallable();
 		processOptions();
 		try {
-			if (!paths.isEmpty()) {
-				checkoutPaths();
-				status = CheckoutResult.OK_RESULT;
-				setCallable(false);
-				return null;
-			}
 
 			if (createBranch) {
 				Git git = new Git(repo);
@@ -215,67 +196,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 		}
 	}
 
-	/**
-	 * @param path
-	 *            Path to update in the working tree and index.
-	 * @return {@code this}
-	 */
-	public CheckoutCommand addPath(String path) {
-		checkCallable();
-		this.paths.add(path);
-		return this;
-	}
-
-	/**
-	 * Checkout paths into index and working directory
-	 *
-	 * @return this instance
-	 * @throws IOException
-	 * @throws RefNotFoundException
-	 */
-	protected CheckoutCommand checkoutPaths() throws IOException,
-			RefNotFoundException {
-		RevWalk revWalk = new RevWalk(repo);
-		DirCache dc = repo.lockDirCache();
-		try {
-			TreeWalk treeWalk = new TreeWalk(revWalk.getObjectReader());
-			treeWalk.setRecursive(true);
-			treeWalk.addTree(new DirCacheIterator(dc));
-			treeWalk.setFilter(PathFilterGroup.createFromStrings(paths));
-			List<String> files = new LinkedList<String>();
-			while (treeWalk.next())
-				files.add(treeWalk.getPathString());
-
-			if (startCommit != null || startPoint != null) {
-				DirCacheEditor editor = dc.editor();
-				TreeWalk startWalk = new TreeWalk(revWalk.getObjectReader());
-				startWalk.setRecursive(true);
-				startWalk.setFilter(treeWalk.getFilter());
-				startWalk.addTree(revWalk.parseCommit(getStartPoint())
-						.getTree());
-				while (startWalk.next()) {
-					final ObjectId blobId = startWalk.getObjectId(0);
-					editor.add(new PathEdit(startWalk.getPathString()) {
-
-						public void apply(DirCacheEntry ent) {
-							ent.setObjectId(blobId);
-						}
-					});
-				}
-				editor.commit();
-			}
-
-			File workTree = repo.getWorkTree();
-			for (String file : files)
-				DirCacheCheckout.checkoutEntry(repo, new File(workTree, file),
-						dc.getEntry(file));
-		} finally {
-			dc.unlock();
-			revWalk.release();
-		}
-		return this;
-	}
-
 	private ObjectId getStartPoint() throws AmbiguousObjectException,
 			RefNotFoundException, IOException {
 		if (startCommit != null)
@@ -295,9 +215,8 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	}
 
 	private void processOptions() throws InvalidRefNameException {
-		if (paths.isEmpty()
-				&& (name == null || !Repository
-						.isValidRefName(Constants.R_HEADS + name)))
+		if (name == null
+				|| !Repository.isValidRefName(Constants.R_HEADS + name))
 			throw new InvalidRefNameException(MessageFormat.format(JGitText
 					.get().branchNameInvalid, name == null ? "<null>" : name));
 	}
