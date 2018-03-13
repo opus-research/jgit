@@ -111,7 +111,7 @@ public abstract class LocalDiskRepositoryTestCase {
 
 	private final List<Repository> toClose = new ArrayList<Repository>();
 
-	protected MockSystemReader mockSystemReader;
+	private MockSystemReader mockSystemReader;
 
 	@Before
 	public void setUp() throws Exception {
