@@ -125,9 +125,6 @@ public class ChangeIdUtil {
 	private static final Pattern footerPattern = Pattern
 			.compile("(^[a-zA-Z0-9-]+:(?!//).*$)"); //$NON-NLS-1$
 
-	private static final Pattern changeIdPattern = Pattern
-			.compile("(^" + CHANGE_ID + " *I[a-f0-9]{40}$)"); //$NON-NLS-1$ //$NON-NLS-2$
-
 	private static final Pattern includeInFooterPattern = Pattern
 			.compile("^[ \\[].*$"); //$NON-NLS-1$
 
@@ -213,8 +210,7 @@ public class ChangeIdUtil {
 
 	/**
 	 * Find the index in the String {@code} message} where the Change-Id entry
-	 * begins. If there are more one one entries matching the pattern, the last
-	 * one is returned.
+	 * begins
 	 *
 	 * @param message
 	 * @param delimiter
@@ -225,23 +221,14 @@ public class ChangeIdUtil {
 	 */
 	public static int indexOfChangeId(String message, String delimiter) {
 		String[] lines = message.split(delimiter);
-		int indexOfChangeIdLine = lines.length;
-		boolean inFooter = false;
-		for (int i = lines.length - 1; i > 0; --i) {
-			if (!inFooter && lines[i].trim().length() == 0)
-				continue;
-			inFooter = true;
-			if (changeIdPattern.matcher(lines[i].trim()).matches()) {
-				indexOfChangeIdLine = i;
-				break;
-			} else if (lines[i].trim().length() == 0)
-				return -1;
-		}
-		int indexOfChangeIdLineinString = 0;
-		for (int i = 0; i < indexOfChangeIdLine; ++i)
-			indexOfChangeIdLineinString += lines[i].length()
-					+ delimiter.length();
-		return message.indexOf(CHANGE_ID, indexOfChangeIdLineinString);
+		int footerFirstLine = indexOfFirstFooterLine(lines);
+		if (footerFirstLine == lines.length)
+			return -1;
+
+		int indexOfFooter = 0;
+		for (int i = 0; i < footerFirstLine; ++i)
+			indexOfFooter += lines[i].length() + delimiter.length();
+		return message.indexOf(CHANGE_ID, indexOfFooter);
 	}
 
 	/**
