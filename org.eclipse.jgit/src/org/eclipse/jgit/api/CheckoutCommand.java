@@ -430,8 +430,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 				continue;
 
 			final EolStreamType eolStreamType = treeWalk.getEolStreamType();
-			final String filterCommand = treeWalk
-					.getFilterCommand(Constants.ATTR_FILTER_TYPE_SMUDGE);
 			editor.add(new PathEdit(path) {
 				public void apply(DirCacheEntry ent) {
 					int stage = ent.getStage();
@@ -439,15 +437,15 @@ public class CheckoutCommand extends GitCommand<Ref> {
 						if (checkoutStage != null) {
 							if (stage == checkoutStage.number)
 								checkoutPath(ent, r, new CheckoutMetadata(
-										eolStreamType, filterCommand));
+										eolStreamType, null));
 						} else {
 							UnmergedPathException e = new UnmergedPathException(
 									ent);
 							throw new JGitInternalException(e.getMessage(), e);
 						}
 					} else {
-						checkoutPath(ent, r, new CheckoutMetadata(eolStreamType,
-								filterCommand));
+						checkoutPath(ent, r,
+								new CheckoutMetadata(eolStreamType, null));
 					}
 				}
 			});
@@ -466,14 +464,12 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			final ObjectId blobId = treeWalk.getObjectId(0);
 			final FileMode mode = treeWalk.getFileMode(0);
 			final EolStreamType eolStreamType = treeWalk.getEolStreamType();
-			final String filterCommand = treeWalk
-					.getFilterCommand(Constants.ATTR_FILTER_TYPE_SMUDGE);
 			editor.add(new PathEdit(treeWalk.getPathString()) {
 				public void apply(DirCacheEntry ent) {
 					ent.setObjectId(blobId);
 					ent.setFileMode(mode);
 					checkoutPath(ent, r,
-							new CheckoutMetadata(eolStreamType, filterCommand));
+							new CheckoutMetadata(eolStreamType, null));
 				}
 			});
 		}
