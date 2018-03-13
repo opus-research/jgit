@@ -80,7 +80,6 @@ import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.eclipse.jgit.internal.storage.pack.PackWriter;
-import org.eclipse.jgit.internal.storage.reftree.RefTreeNames;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -535,10 +534,8 @@ public class GC {
 
 		Set<ObjectId> allHeads = new HashSet<ObjectId>();
 		Set<ObjectId> nonHeads = new HashSet<ObjectId>();
-		Set<ObjectId> txnHeads = new HashSet<ObjectId>();
 		Set<ObjectId> tagTargets = new HashSet<ObjectId>();
 		Set<ObjectId> indexObjects = listNonHEADIndexObjects();
-		RefDatabase refdb = repo.getRefDatabase();
 
 		for (Ref ref : refsBefore.values()) {
 			nonHeads.addAll(listRefLogObjects(ref, 0));
@@ -546,8 +543,6 @@ public class GC {
 				continue;
 			if (ref.getName().startsWith(Constants.R_HEADS))
 				allHeads.add(ref.getObjectId());
-			else if (RefTreeNames.isRefTree(refdb, ref.getName()))
-				txnHeads.add(ref.getObjectId());
 			else
 				nonHeads.add(ref.getObjectId());
 			if (ref.getPeeledObjectId() != null)
@@ -576,11 +571,6 @@ public class GC {
 			PackFile rest = writePack(nonHeads, allHeads, tagTargets, excluded);
 			if (rest != null)
 				ret.add(rest);
-		}
-		if (!txnHeads.isEmpty()) {
-			PackFile txn = writePack(txnHeads, null, null, excluded);
-			if (txn != null)
-				ret.add(txn);
 		}
 		try {
 			deleteOldPacks(toBeDeleted, ret);
