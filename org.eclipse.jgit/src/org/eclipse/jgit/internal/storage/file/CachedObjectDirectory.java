@@ -47,10 +47,8 @@ package org.eclipse.jgit.internal.storage.file;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.Set;
 
-import org.eclipse.jgit.internal.storage.file.ObjectDirectory.AlternateHandle;
 import org.eclipse.jgit.internal.storage.pack.ObjectToPack;
 import org.eclipse.jgit.internal.storage.pack.PackWriter;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
@@ -162,64 +160,43 @@ class CachedObjectDirectory extends FileObjectDatabase {
 		return alts;
 	}
 
-	Set<AlternateHandle.Id> skipMe(Set<AlternateHandle.Id> skips) {
-		Set<AlternateHandle.Id> withMe = new HashSet<AlternateHandle.Id>();
-		if (skips != null) {
-			withMe.addAll(skips);
-		}
-		withMe.add(getAlternateId());
-		return withMe;
-	}
-
 	@Override
 	void resolve(Set<ObjectId> matches, AbbreviatedObjectId id)
 			throws IOException {
+		// In theory we could accelerate the loose object scan using our
+		// unpackedObjects map, but its not worth the huge code complexity.
+		// Scanning a single loose directory is fast enough, and this is
+		// unlikely to be called anyway.
+		//
 		wrapped.resolve(matches, id);
 	}
 
 	@Override
 	public boolean has(final AnyObjectId objectId) throws IOException {
-		return has(objectId, null);
-	}
-
-	private boolean has(final AnyObjectId objectId, Set<AlternateHandle.Id> skips)
-			throws IOException {
 		if (unpackedObjects.contains(objectId))
 			return true;
 		if (wrapped.hasPackedObject(objectId))
 			return true;
-		skips = skipMe(skips);
 		for (CachedObjectDirectory alt : myAlternates()) {
-			if (!skips.contains(alt.getAlternateId())) {
-				if (alt.has(objectId, skips))
-					return true;
-			}
+			if (alt.has(objectId))
+				return true;
 		}
 		return false;
 	}
 
 	@Override
-	ObjectLoader openObject(final WindowCursor curs, final AnyObjectId objectId)
-			throws IOException {
-		return openObject(curs, objectId, null);
-	}
-
-	private ObjectLoader openObject(final WindowCursor curs,
-			final AnyObjectId objectId, Set<AlternateHandle.Id> skips)
-			throws IOException {
+	ObjectLoader openObject(final WindowCursor curs,
+			final AnyObjectId objectId) throws IOException {
 		ObjectLoader ldr = openLooseObject(curs, objectId);
 		if (ldr != null)
 			return ldr;
 		ldr = wrapped.openPackedObject(curs, objectId);
 		if (ldr != null)
 			return ldr;
-		skips = skipMe(skips);
 		for (CachedObjectDirectory alt : myAlternates()) {
-			if (!skips.contains(alt.getAlternateId())) {
-				ldr = alt.openObject(curs, objectId, skips);
-				if (ldr != null)
-					return ldr;
-			}
+			ldr = alt.openObject(curs, objectId);
+			if (ldr != null)
+				return ldr;
 		}
 		return null;
 	}
@@ -282,9 +259,5 @@ class CachedObjectDirectory extends FileObjectDatabase {
 		UnpackedObjectId(AnyObjectId id) {
 			super(id);
 		}
-	}
-
-	AlternateHandle.Id getAlternateId() {
-		return wrapped.getAlternateId();
 	}
 }
