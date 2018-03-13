@@ -45,22 +45,22 @@ package org.eclipse.jgit.api;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
 import org.eclipse.jgit.api.errors.InvalidTagNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoHeadException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryState;
 import org.eclipse.jgit.lib.TagBuilder;
 import org.eclipse.jgit.revwalk.RevObject;
-import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
 
 /**
@@ -71,7 +71,7 @@ import org.eclipse.jgit.revwalk.RevWalk;
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-tag.html"
  *      >Git documentation about Tag</a>
  */
-public class TagCommand extends GitCommand<RevTag> {
+public class TagCommand extends GitCommand<Ref> {
 	private RevObject id;
 
 	private String name;
@@ -97,7 +97,7 @@ public class TagCommand extends GitCommand<RevTag> {
 	 * class should only be used for one invocation of the command (means: one
 	 * call to {@link #call()})
 	 *
-	 * @return a {@link RevTag} object representing the successful tag
+	 * @return a {@link Ref} a ref pointing to a tag
 	 * @throws NoHeadException
 	 *             when called on a git repo without a HEAD reference
 	 * @throws JGitInternalException
@@ -105,8 +105,9 @@ public class TagCommand extends GitCommand<RevTag> {
 	 *             exception can be retrieved by calling
 	 *             {@link Exception#getCause()}. Expect only
 	 *             {@code IOException's} to be wrapped.
+	 * @since 2.0
 	 */
-	public RevTag call() throws JGitInternalException,
+	public Ref call() throws JGitInternalException,
 			ConcurrentRefUpdateException, InvalidTagNameException, NoHeadException {
 		checkCallable();
 
@@ -140,7 +141,6 @@ public class TagCommand extends GitCommand<RevTag> {
 
 				RevWalk revWalk = new RevWalk(repo);
 				try {
-					RevTag revTag = revWalk.parseTag(tagId);
 					String refName = Constants.R_TAGS + newTag.getTag();
 					RefUpdate tagRef = repo.updateRef(refName);
 					tagRef.setNewObjectId(tagId);
@@ -150,7 +150,7 @@ public class TagCommand extends GitCommand<RevTag> {
 					switch (updateResult) {
 					case NEW:
 					case FORCED:
-						return revTag;
+						return repo.getRef(refName);
 					case LOCK_FAILURE:
 						throw new ConcurrentRefUpdateException(
 								JGitText.get().couldNotLockHEAD,
