@@ -146,9 +146,6 @@ abstract class RevWalkTextBuiltin extends TextBuiltin {
 		revLimiter.add(MessageRevFilter.create(msg));
 	}
 
-	@Option(name = "--max-count", aliases = "-n", metaVar = "metaVar_n")
-	private int maxCount = -1;
-
 	@Override
 	protected void run() throws Exception {
 		walk = createWalk();
@@ -221,8 +218,7 @@ abstract class RevWalkTextBuiltin extends TextBuiltin {
 	protected int walkLoop() throws Exception {
 		int n = 0;
 		for (final RevCommit c : walk) {
-			if (++n > maxCount && maxCount >= 0)
-				break;
+			n++;
 			show(c);
 		}
 		if (walk instanceof ObjectWalk) {
