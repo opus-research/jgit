@@ -136,8 +136,7 @@ class PendingGenerator extends Generator {
 				if ((c.flags & UNINTERESTING) != 0)
 					produce = false;
 				else {
-					if (filter.requiresCommitBody())
-						c.parseBody(walker);
+					c.parseBody(walker);
 					produce = filter.include(walker, c);
 				}
 
