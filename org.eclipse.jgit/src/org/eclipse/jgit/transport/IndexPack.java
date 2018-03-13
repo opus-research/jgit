@@ -80,7 +80,6 @@ import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.storage.file.PackIndexWriter;
 import org.eclipse.jgit.storage.file.PackLock;
 import org.eclipse.jgit.storage.pack.BinaryDelta;
-import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.NB;
 
 /** Indexes Git pack files for local use. */
@@ -460,9 +459,9 @@ public class IndexPack {
 			}
 		} catch (IOException err) {
 			if (dstPack != null)
-				FileUtils.delete(dstPack);
+				dstPack.delete();
 			if (dstIdx != null)
-				FileUtils.delete(dstIdx);
+				dstIdx.delete();
 			throw err;
 		}
 	}
@@ -1145,8 +1144,8 @@ public class IndexPack {
 			repo.openPack(finalPack, finalIdx);
 		} catch (IOException err) {
 			keep.unlock();
-			FileUtils.delete(finalPack);
-			FileUtils.delete(finalIdx);
+			finalPack.delete();
+			finalIdx.delete();
 			throw err;
 		}
 

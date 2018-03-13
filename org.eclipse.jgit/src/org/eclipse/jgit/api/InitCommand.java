@@ -1,8 +1,4 @@
 /*
- * Copyright (C) 2009, Constantine Plotnikov <constantine.plotnikov@gmail.com>
- * Copyright (C) 2008, Google Inc.
- * Copyright (C) 2010, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -44,34 +40,81 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.api;
 
-package org.eclipse.jgit.pgm;
+import java.io.File;
+import java.io.IOException;
+import java.util.concurrent.Callable;
 
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.InitCommand;
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
-import org.kohsuke.args4j.Option;
+import org.eclipse.jgit.lib.RepositoryBuilder;
 
-@Command(common = true, usage = "usage_CreateAnEmptyGitRepository")
-class Init extends TextBuiltin {
-	@Option(name = "--bare", usage = "usage_CreateABareRepository")
+/**
+ * Create an empty git repository
+ *
+ * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-init.html"
+ *      >Git documentation about init</a>
+ */
+public class InitCommand implements Callable<Git> {
+	private File directory;
+
 	private boolean bare;
 
-	@Override
-	protected final boolean requiresRepository() {
-		return false;
+	/**
+	 * Executes the {@code Init} command.
+	 *
+	 * @throws JGitInternalException
+	 *             if the repository can't be created
+	 * @return the newly created {@code Git} object with associated repository
+	 */
+	public Git call() throws JGitInternalException {
+		try {
+			RepositoryBuilder builder = new RepositoryBuilder();
+			if (bare)
+				builder.setBare();
+			builder.readEnvironment();
+			if (directory != null) {
+				File d = directory;
+				if (!bare)
+					d = new File(d, Constants.DOT_GIT);
+				builder.setGitDir(d);
+			} else if (builder.getGitDir() == null) {
+				File d = new File(".");
+				if (!bare)
+					d = new File(d, Constants.DOT_GIT);
+				builder.setGitDir(d);
+			}
+			Repository repository = builder.build();
+			repository.create(bare);
+			return new Git(repository);
+		} catch (IOException e) {
+			throw new JGitInternalException(e.getMessage(), e);
+		}
 	}
 
-	@Override
-	protected void run() throws Exception {
-		InitCommand command = Git.init();
-		command.setBare(bare);
-		command.setDirectory(gitdir);
-		Repository repository = command.call().getRepository();
-		out.println(MessageFormat.format(
-				CLIText.get().initializedEmptyGitRepositoryIn, repository
-						.getDirectory().getAbsolutePath()));
+	/**
+	 * The optional directory associated with the init operation. If no
+	 * directory is set, we'll use the current directory
+	 *
+	 * @param directory
+	 *            the directory to init to
+	 * @return this instance
+	 */
+	public InitCommand setDirectory(File directory) {
+		this.directory = directory;
+		return this;
 	}
+
+	/**
+	 * @param bare
+	 *            whether the repository is bare or not
+	 * @return this instance
+	 */
+	public InitCommand setBare(boolean bare) {
+		this.bare = bare;
+		return this;
+	}
+
 }

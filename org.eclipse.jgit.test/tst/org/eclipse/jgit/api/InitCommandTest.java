@@ -1,8 +1,4 @@
 /*
- * Copyright (C) 2009, Constantine Plotnikov <constantine.plotnikov@gmail.com>
- * Copyright (C) 2008, Google Inc.
- * Copyright (C) 2010, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -44,34 +40,61 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.api;
 
-package org.eclipse.jgit.pgm;
+import java.io.File;
+import java.io.IOException;
 
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.InitCommand;
 import org.eclipse.jgit.lib.Repository;
-import org.kohsuke.args4j.Option;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 
-@Command(common = true, usage = "usage_CreateAnEmptyGitRepository")
-class Init extends TextBuiltin {
-	@Option(name = "--bare", usage = "usage_CreateABareRepository")
-	private boolean bare;
+public class InitCommandTest extends RepositoryTestCase {
 
 	@Override
-	protected final boolean requiresRepository() {
-		return false;
+	protected void setUp() throws Exception {
+		super.setUp();
 	}
 
-	@Override
-	protected void run() throws Exception {
-		InitCommand command = Git.init();
-		command.setBare(bare);
-		command.setDirectory(gitdir);
-		Repository repository = command.call().getRepository();
-		out.println(MessageFormat.format(
-				CLIText.get().initializedEmptyGitRepositoryIn, repository
-						.getDirectory().getAbsolutePath()));
+	public void testInitRepository() {
+		try {
+			File directory = createTempDirectory("testInitRepository");
+			InitCommand command = new InitCommand();
+			command.setDirectory(directory);
+			Repository repository = command.call().getRepository();
+			assertNotNull(repository);
+		} catch (Exception e) {
+			fail(e.getMessage());
+		}
 	}
+
+	public void testInitBareRepository() {
+		try {
+			File directory = createTempDirectory("testInitBareRepository");
+			InitCommand command = new InitCommand();
+			command.setDirectory(directory);
+			command.setBare(true);
+			Repository repository = command.call().getRepository();
+			assertNotNull(repository);
+			assertTrue(repository.isBare());
+		} catch (Exception e) {
+			fail(e.getMessage());
+		}
+	}
+
+	public static File createTempDirectory(String name) throws IOException {
+		final File temp;
+		temp = File.createTempFile(name, Long.toString(System.nanoTime()));
+
+		if (!(temp.delete())) {
+			throw new IOException("Could not delete temp file: "
+					+ temp.getAbsolutePath());
+		}
+
+		if (!(temp.mkdir())) {
+			throw new IOException("Could not create temp directory: "
+					+ temp.getAbsolutePath());
+		}
+		return temp;
+	}
+
 }
