@@ -659,7 +659,11 @@ public class RevWalk implements Iterable<RevCommit> {
 	public RevCommit parseCommit(final AnyObjectId id)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
-		RevObject c = peel(parseAny(id));
+		RevObject c = parseAny(id);
+		while (c instanceof RevTag) {
+			c = ((RevTag) c).getObject();
+			parseHeaders(c);
+		}
 		if (!(c instanceof RevCommit))
 			throw new IncorrectObjectTypeException(id.toObjectId(),
 					Constants.TYPE_COMMIT);
@@ -686,7 +690,11 @@ public class RevWalk implements Iterable<RevCommit> {
 	public RevTree parseTree(final AnyObjectId id)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
-		RevObject c = peel(parseAny(id));
+		RevObject c = parseAny(id);
+		while (c instanceof RevTag) {
+			c = ((RevTag) c).getObject();
+			parseHeaders(c);
+		}
 
 		final RevTree t;
 		if (c instanceof RevCommit)
@@ -792,29 +800,6 @@ public class RevWalk implements Iterable<RevCommit> {
 	public void parseBody(final RevObject obj)
 			throws MissingObjectException, IOException {
 		obj.parseBody(this);
-	}
-
-	/**
-	 * Peel back annotated tags until a non-tag object is found.
-	 *
-	 * @param obj
-	 *            the starting object.
-	 * @return If {@code obj} is not an annotated tag, {@code obj}. Otherwise
-	 *         the first non-tag object that {@code obj} references. The
-	 *         returned object's headers have been parsed.
-	 * @throws MissingObjectException
-	 *             a referenced object cannot be found.
-	 * @throws IOException
-	 *             a pack file or loose object could not be read.
-	 */
-	public RevObject peel(RevObject obj) throws MissingObjectException,
-			IOException {
-		while (obj instanceof RevTag) {
-			parseHeaders(obj);
-			obj = ((RevTag) obj).getObject();
-		}
-		parseHeaders(obj);
-		return obj;
 	}
 
 	/**
