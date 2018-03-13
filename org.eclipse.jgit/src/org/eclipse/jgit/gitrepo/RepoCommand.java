@@ -189,6 +189,20 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			}
 		}
 
+		/**
+		 * Read a file from the repository
+		 *
+		 * @param repo
+		 *            The repository containing the file
+		 * @param ref
+		 *            The ref (branch/tag/etc.) to read
+		 * @param path
+		 *            The relative path (inside the repo) to the file to read
+		 * @return the file's content
+		 * @throws GitAPIException
+		 * @throws IOException
+		 * @since 3.5
+		 */
 		protected byte[] readFileFromRepo(Repository repo,
 				String ref, String path) throws GitAPIException, IOException {
 			ObjectReader reader = repo.newObjectReader();
@@ -275,13 +289,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			this.command = command;
 			this.inputStream = inputStream;
 			this.filename = filename;
-
-			// Strip trailing /s to match repo behavior.
-			int lastIndex = baseUrl.length() - 1;
-			while (lastIndex >= 0 && baseUrl.charAt(lastIndex) == '/')
-				lastIndex--;
-			this.baseUrl = baseUrl.substring(0, lastIndex + 1);
-
+			this.baseUrl = baseUrl;
 			remotes = new HashMap<String, String>();
 			projects = new ArrayList<Project>();
 			plusGroups = new HashSet<String>();
@@ -324,7 +332,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				String qName,
 				Attributes attributes) throws SAXException {
 			if ("project".equals(qName)) { //$NON-NLS-1$
-				currentProject = new Project( //$NON-NLS-1$
+				currentProject = new Project(
 						attributes.getValue("name"), //$NON-NLS-1$
 						attributes.getValue("path"), //$NON-NLS-1$
 						attributes.getValue("revision"), //$NON-NLS-1$
