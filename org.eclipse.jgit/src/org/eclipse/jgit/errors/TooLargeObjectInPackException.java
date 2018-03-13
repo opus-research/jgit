@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2011, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,42 +41,42 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.http.server;
+package org.eclipse.jgit.errors;
 
-import org.eclipse.jgit.nls.NLS;
-import org.eclipse.jgit.nls.TranslationBundle;
+import java.io.IOException;
+import java.text.MessageFormat;
 
-/**
- * Translation bundle for JGit http server
- */
-public class HttpServerText extends TranslationBundle {
+import org.eclipse.jgit.JGitText;
+
+/** Thrown when PackParser finds an object larger than a predefined limit */
+public class TooLargeObjectInPackException extends IOException {
+	private static final long serialVersionUID = 1L;
 
 	/**
-	 * @return an instance of this translation bundle
+	 * Construct a too large object in pack exception when the exact size of the
+	 * too large object is not available. This will be used when we find out
+	 * that a delta sequence is already larger than the maxObjectSizeLimit but
+	 * don't want to inflate the delta just to find out the exact size of the
+	 * resulting object.
+	 *
+	 * @param maxObjectSizeLimit
+	 *            the maximum object size limit
 	 */
-	public static HttpServerText get() {
-		return NLS.getBundleFor(HttpServerText.class);
+	public TooLargeObjectInPackException(long maxObjectSizeLimit) {
+		super(MessageFormat.format(JGitText.get().receivePackObjectTooLarge1,
+				maxObjectSizeLimit));
 	}
 
-	/***/ public String alreadyInitializedByContainer;
-	/***/ public String cannotGetLengthOf;
-	/***/ public String encodingNotSupportedByThisLibrary;
-	/***/ public String expectedRepositoryAttribute;
-	/***/ public String filterMustNotBeNull;
-	/***/ public String internalErrorDuringReceivePack;
-	/***/ public String internalErrorDuringUploadPack;
-	/***/ public String internalServerErrorRequestAttributeWasAlreadySet;
-	/***/ public String invalidBoolean;
-	/***/ public String invalidIndex;
-	/***/ public String invalidRegexGroup;
-	/***/ public String noResolverAvailable;
-	/***/ public String parameterNotSet;
-	/***/ public String pathForParamNotFound;
-	/***/ public String pathNotSupported;
-	/***/ public String repositoryAccessForbidden;
-	/***/ public String repositoryNotFound;
-	/***/ public String servletAlreadyInitialized;
-	/***/ public String servletMustNotBeNull;
-	/***/ public String servletWasAlreadyBound;
-	/***/ public String unexpectedeOFOn;
+	/**
+	 * Construct a too large object in pack exception when the exact size of the
+	 * too large object is known.
+	 *
+	 * @param objectSize
+	 * @param maxObjectSizeLimit
+	 */
+	public TooLargeObjectInPackException(long objectSize,
+			long maxObjectSizeLimit) {
+		super(MessageFormat.format(JGitText.get().receivePackObjectTooLarge2,
+				objectSize, maxObjectSizeLimit));
+	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2011, GitHub Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,43 +40,52 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.api;
 
-package org.eclipse.jgit.http.server;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
-import org.eclipse.jgit.nls.NLS;
-import org.eclipse.jgit.nls.TranslationBundle;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
-/**
- * Translation bundle for JGit http server
- */
-public class HttpServerText extends TranslationBundle {
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.junit.Test;
 
-	/**
-	 * @return an instance of this translation bundle
-	 */
-	public static HttpServerText get() {
-		return NLS.getBundleFor(HttpServerText.class);
+public class LogCommandTest extends RepositoryTestCase {
+
+	@Test
+	public void logAllCommits() throws Exception {
+		List<RevCommit> commits = new ArrayList<RevCommit>();
+		Git git = Git.wrap(db);
+
+		writeTrashFile("Test.txt", "Hello world");
+		git.add().addFilepattern("Test.txt").call();
+		commits.add(git.commit().setMessage("initial commit").call());
+
+		git.branchCreate().setName("branch1").call();
+		Ref checkedOut = git.checkout().setName("branch1").call();
+		assertEquals("refs/heads/branch1", checkedOut.getName());
+		writeTrashFile("Test1.txt", "Hello world!");
+		git.add().addFilepattern("Test1.txt").call();
+		commits.add(git.commit().setMessage("branch1 commit").call());
+
+		checkedOut = git.checkout().setName("master").call();
+		assertEquals("refs/heads/master", checkedOut.getName());
+		writeTrashFile("Test2.txt", "Hello world!!");
+		git.add().addFilepattern("Test2.txt").call();
+		commits.add(git.commit().setMessage("branch1 commit").call());
+
+		Iterator<RevCommit> log = git.log().all().call().iterator();
+		assertTrue(log.hasNext());
+		assertTrue(commits.contains(log.next()));
+		assertTrue(log.hasNext());
+		assertTrue(commits.contains(log.next()));
+		assertTrue(log.hasNext());
+		assertTrue(commits.contains(log.next()));
+		assertFalse(log.hasNext());
 	}
-
-	/***/ public String alreadyInitializedByContainer;
-	/***/ public String cannotGetLengthOf;
-	/***/ public String encodingNotSupportedByThisLibrary;
-	/***/ public String expectedRepositoryAttribute;
-	/***/ public String filterMustNotBeNull;
-	/***/ public String internalErrorDuringReceivePack;
-	/***/ public String internalErrorDuringUploadPack;
-	/***/ public String internalServerErrorRequestAttributeWasAlreadySet;
-	/***/ public String invalidBoolean;
-	/***/ public String invalidIndex;
-	/***/ public String invalidRegexGroup;
-	/***/ public String noResolverAvailable;
-	/***/ public String parameterNotSet;
-	/***/ public String pathForParamNotFound;
-	/***/ public String pathNotSupported;
-	/***/ public String repositoryAccessForbidden;
-	/***/ public String repositoryNotFound;
-	/***/ public String servletAlreadyInitialized;
-	/***/ public String servletMustNotBeNull;
-	/***/ public String servletWasAlreadyBound;
-	/***/ public String unexpectedeOFOn;
 }
