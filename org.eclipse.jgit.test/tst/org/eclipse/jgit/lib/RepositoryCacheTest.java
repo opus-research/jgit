@@ -43,14 +43,11 @@
 
 package org.eclipse.jgit.lib;
 
-import static org.hamcrest.CoreMatchers.hasItem;
-import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -62,7 +59,6 @@ import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.RepositoryCache.FileKey;
 import org.junit.Test;
 
-@SuppressWarnings("boxing")
 public class RepositoryCacheTest extends RepositoryTestCase {
 	@Test
 	public void testNonBareFileKey() throws IOException {
@@ -151,28 +147,4 @@ public class RepositoryCacheTest extends RepositoryTestCase {
 		d2.close();
 		d2.close();
 	}
-
-	@Test
-	public void testGetRegisteredWhenEmpty() {
-		assertThat(RepositoryCache.getRegistered().size(), is(0));
-	}
-
-	@Test
-	public void testGetRegistered() {
-		RepositoryCache.register(db);
-
-		assertThat(RepositoryCache.getRegistered(),
-				hasItem(FileKey.exact(db.getDirectory(), db.getFS())));
-		assertThat(RepositoryCache.getRegistered().size(), is(1));
-	}
-
-	@Test
-	public void testUnregister() {
-		RepositoryCache.register(db);
-		RepositoryCache
-				.unregister(FileKey.exact(db.getDirectory(), db.getFS()));
-
-		assertThat(RepositoryCache.getRegistered().size(), is(0));
-	}
-
 }
