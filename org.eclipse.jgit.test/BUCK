@@ -36,12 +36,25 @@ DEPS = {
   ],
 }
 
-for t in TESTS:
-  n = t[len('tst/'):len(t)-len('.java')].replace('/', '.')
+for src in TESTS:
+  name = src[len('tst/'):len(src)-len('.java')].replace('/', '.')
+  labels = []
+  if name.startswith('org.eclipse.jgit.'):
+    l = name[len('org.eclipse.jgit.'):]
+    if l.startswith('internal.storage.'):
+      l = l[len('internal.storage.'):]
+    i = l.find('.')
+    if i > 0:
+      labels.append(l[:i])
+    else:
+      labels.append(i)
+  if 'lib' not in labels:
+    labels.append('lib')
+
   java_test(
-    name = n,
-    labels = ['lib'],
-    srcs = [t],
+    name = name,
+    labels = labels,
+    srcs = [src],
     deps = [
       ':helpers',
       ':tst_rsrc',
@@ -53,7 +66,7 @@ for t in TESTS:
       '//lib:junit',
       '//lib:slf4j-api',
       '//lib:slf4j-simple',
-    ] + DEPS.get(t, []),
+    ] + DEPS.get(src, []),
     source_under_test = ['//org.eclipse.jgit:jgit'],
   )
 
@@ -68,14 +81,14 @@ java_library(
   ],
 )
 
-genrule(
-  name = 'tst_rsrc_jar',
-  cmd = 'cd tst-rsrc ; zip -qr $OUT .',
-  srcs = glob(['tst-rsrc/**']),
-  out = 'tst_rsrc.jar',
-)
-
 prebuilt_jar(
   name = 'tst_rsrc',
   binary_jar = ':tst_rsrc_jar',
+)
+
+genrule(
+  name = 'tst_rsrc_jar',
+  cmd = 'cd $SRCDIR/tst-rsrc ; zip -qr $OUT .',
+  srcs = glob(['tst-rsrc/**']),
+  out = 'tst_rsrc.jar',
 )
