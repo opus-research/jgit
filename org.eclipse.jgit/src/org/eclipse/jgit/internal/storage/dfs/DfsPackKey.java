@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2013 Robin Stocker <robin@nibor.org> and others.
+ * Copyright (C) 2011, Google Inc.
+ * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -39,42 +40,21 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
+package org.eclipse.jgit.internal.storage.dfs;
 
-import java.io.File;
+import java.util.concurrent.atomic.AtomicLong;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.lib.CLIRepositoryTestCase;
-import org.junit.Before;
-import org.junit.Test;
+final class DfsPackKey {
+	final int hash;
 
-public class RmTest extends CLIRepositoryTestCase {
-	private Git git;
+	final AtomicLong cachedSize;
 
-	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
-		git = new Git(db);
-	}
-
-	@Test
-	public void multiplePathsShouldBeRemoved() throws Exception {
-		File a = writeTrashFile("a", "Hello");
-		File b = writeTrashFile("b", "world!");
-		git.add().addFilepattern("a").addFilepattern("b").call();
-
-		String[] result = execute("git rm a b");
-		assertArrayEquals(new String[] { "" }, result);
-		DirCache cache = db.readDirCache();
-		assertNull(cache.getEntry("a"));
-		assertNull(cache.getEntry("b"));
-		assertFalse(a.exists());
-		assertFalse(b.exists());
+	DfsPackKey() {
+		// Multiply by 31 here so we can more directly combine with another
+		// value without doing the multiply there.
+		//
+		hash = System.identityHashCode(this) * 31;
+		cachedSize = new AtomicLong();
 	}
 }

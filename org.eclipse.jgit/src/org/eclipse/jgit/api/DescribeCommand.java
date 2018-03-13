@@ -209,8 +209,7 @@ public class DescribeCommand extends GitCommand<String> {
 			// Find the first tag that matches one of the matchers; precedence according to matcher definition order
 			for (IMatcher matcher : matchers) {
 				Optional<Ref> match = tags.stream()
-						.filter(tag -> matcher.matches(tag.getName(), false,
-								false))
+						.filter(tag -> matcher.matches(tag.getName(), false))
 						.findFirst();
 				if (match.isPresent()) {
 					return match;

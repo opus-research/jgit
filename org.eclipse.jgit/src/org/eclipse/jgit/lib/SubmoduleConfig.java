@@ -43,6 +43,8 @@
 
 package org.eclipse.jgit.lib;
 
+import java.util.Locale;
+
 import org.eclipse.jgit.util.StringUtils;
 
 /**
@@ -77,7 +79,7 @@ public class SubmoduleConfig {
 
 		@Override
 		public String toConfigValue() {
-			return configValue;
+			return name().toLowerCase(Locale.ROOT).replace('_', '-');
 		}
 
 		@Override

@@ -42,13 +42,10 @@
  */
 package org.eclipse.jgit.api;
 
-import static java.util.stream.Collectors.toList;
-
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import org.eclipse.jgit.annotations.Nullable;
@@ -195,7 +192,6 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 							.setThin(thin).setRefSpecs(refSpecs)
 							.setDryRun(dryRun)
 							.setRecurseSubmodules(recurseMode);
-					configure(f);
 					if (callback != null) {
 						callback.fetchingSubmodule(walk.getPath());
 					}
@@ -395,21 +391,13 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 	 *
 	 * @param specs
 	 * @return {@code this}
-	 * @since 4.9
-	 */
-	public FetchCommand setRefSpecs(String... specs) {
-		return setRefSpecs(
-				Arrays.stream(specs).map(RefSpec::new).collect(toList()));
-	}
-
-	/**
-	 * The ref specs to be used in the fetch operation
-	 *
-	 * @param specs
-	 * @return {@code this}
 	 */
 	public FetchCommand setRefSpecs(RefSpec... specs) {
-		return setRefSpecs(Arrays.asList(specs));
+		checkCallable();
+		this.refSpecs.clear();
+		for (RefSpec spec : specs)
+			refSpecs.add(spec);
+		return this;
 	}
 
 	/**

@@ -106,10 +106,7 @@ java_library(
 
 java_library(
     name = "jsch",
-    visibility = [
-        "//org.eclipse.jgit:__pkg__",
-        "//org.eclipse.jgit.test:__pkg__",
-    ],
+    visibility = ["//org.eclipse.jgit:__pkg__"],
     exports = ["@jsch//jar"],
 )
 
@@ -118,9 +115,9 @@ java_library(
     testonly = 1,
     visibility = ["//visibility:public"],
     exports = [
-        "@hamcrest_core//jar",
-        "@hamcrest_library//jar",
-        "@junit//jar",
+       "@junit//jar",
+       "@hamcrest_core//jar",
+       "@hamcrest_library//jar",
     ],
 )
 

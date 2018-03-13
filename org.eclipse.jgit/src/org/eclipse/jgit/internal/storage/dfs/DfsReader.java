@@ -655,7 +655,7 @@ public class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 	/**
 	 * Copy bytes from the window to a caller supplied buffer.
 	 *
-	 * @param file
+	 * @param pack
 	 *            the file the desired window is stored within.
 	 * @param position
 	 *            position within the file to read from.
@@ -674,24 +674,24 @@ public class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 	 *             this cursor does not match the provider or id and the proper
 	 *             window could not be acquired through the provider's cache.
 	 */
-	int copy(BlockBasedFile file, long position, byte[] dstbuf, int dstoff,
-			int cnt) throws IOException {
+	int copy(DfsPackFile pack, long position, byte[] dstbuf, int dstoff, int cnt)
+			throws IOException {
 		if (cnt == 0)
 			return 0;
 
-		long length = file.length;
+		long length = pack.length;
 		if (0 <= length && length <= position)
 			return 0;
 
 		int need = cnt;
 		do {
-			pin(file, position);
+			pin(pack, position);
 			int r = block.copy(position, dstbuf, dstoff, need);
 			position += r;
 			dstoff += r;
 			need -= r;
 			if (length < 0)
-				length = file.length;
+				length = pack.length;
 		} while (0 < need && position < length);
 		return cnt - need;
 	}
@@ -756,14 +756,15 @@ public class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 			inf.reset();
 	}
 
-	void pin(BlockBasedFile file, long position) throws IOException {
-		if (block == null || !block.contains(file.key, position)) {
+	void pin(DfsPackFile pack, long position) throws IOException {
+		DfsBlock b = block;
+		if (b == null || !b.contains(pack.key, position)) {
 			// If memory is low, we may need what is in our window field to
 			// be cleaned up by the GC during the get for the next window.
 			// So we always clear it, even though we are just going to set
 			// it again.
 			block = null;
-			block = file.getOrLoadBlock(position, this);
+			block = pack.getOrLoadBlock(position, this);
 		}
 	}
 
