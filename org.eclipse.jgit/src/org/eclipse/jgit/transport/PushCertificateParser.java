@@ -280,7 +280,7 @@ public class PushCertificateParser {
 				|| !s.startsWith(header)
 				|| s.charAt(header.length()) != ' ') {
 			throw new PackProtocolException(MessageFormat.format(
-					JGitText.get().pushCertificateInvalidField, header));
+					JGitText.get().pushCertificateInvalidHeader, header));
 		}
 		return s.substring(header.length() + 1);
 	}
@@ -401,9 +401,11 @@ public class PushCertificateParser {
 	 * @param line
 	 *            the line read from the wire that produced this
 	 *            command, with optional trailing newline already trimmed.
+	 * @throws PackProtocolException
+	 *             if the raw line cannot be parsed to a command.
 	 * @since 4.0
 	 */
-	public void addCommand(String line) {
+	public void addCommand(String line) throws PackProtocolException {
 		commands.add(parseCommand(line));
 	}
 }
