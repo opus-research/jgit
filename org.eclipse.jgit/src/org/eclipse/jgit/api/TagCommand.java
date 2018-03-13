@@ -184,7 +184,7 @@ public class TagCommand extends GitCommand<Ref> {
 		switch (updateResult) {
 		case NEW:
 		case FORCED:
-			return repo.exactRef(refName);
+			return repo.getRef(refName);
 		case LOCK_FAILURE:
 			throw new ConcurrentRefUpdateException(
 					JGitText.get().couldNotLockHEAD, tagRef.getRef(),

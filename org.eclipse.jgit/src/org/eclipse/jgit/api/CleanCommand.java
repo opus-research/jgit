@@ -43,8 +43,6 @@
  */
 package org.eclipse.jgit.api;
 
-import static org.eclipse.jgit.lib.Constants.DOT_GIT;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
@@ -74,8 +72,6 @@ public class CleanCommand extends GitCommand<Set<String>> {
 	private boolean directories;
 
 	private boolean ignore = true;
-
-	private boolean force = false;
 
 	/**
 	 * @param repo
@@ -125,67 +121,23 @@ public class CleanCommand extends GitCommand<Set<String>> {
 
 			for (String file : notIgnoredFiles)
 				if (paths.isEmpty() || paths.contains(file)) {
-					files = cleanPath(file, files);
+					if (!dryRun)
+						FileUtils.delete(new File(repo.getWorkTree(), file));
+					files.add(file);
 				}
 
-			for (String dir : notIgnoredDirs)
-				if (paths.isEmpty() || paths.contains(dir)) {
-					files = cleanPath(dir, files);
-				}
+			if (directories)
+				for (String dir : notIgnoredDirs)
+					if (paths.isEmpty() || paths.contains(dir)) {
+						if (!dryRun)
+							FileUtils.delete(new File(repo.getWorkTree(), dir),
+									FileUtils.RECURSIVE);
+						files.add(dir + "/"); //$NON-NLS-1$
+					}
 		} catch (IOException e) {
 			throw new JGitInternalException(e.getMessage(), e);
 		}
 		return files;
-	}
-
-	/**
-	 * When dryRun is false, deletes the specified path from disk. If dryRun
-	 * is true, no paths are actually deleted. In both cases, the paths that
-	 * would have been deleted are added to inFiles and returned.
-	 *
-	 * Paths that are directories are recursively deleted when
-	 * {@link #directories} is true.
-	 * Paths that are git repositories are recursively deleted when
-	 * {@link #directories} and {@link #force} are both true.
-	 *
-	 * @param path
-	 * 			The path to be cleaned
-	 * @param inFiles
-	 * 			A set of strings representing the files that have been cleaned
-	 * 			already, the path to be cleaned will be added to this set
-	 * 			before being returned.
-	 *
-	 * @return a set of strings with the cleaned path added to it
-	 * @throws IOException
-	 */
-	private Set<String> cleanPath(String path, Set<String> inFiles)
-			throws IOException {
-		File curFile = new File(repo.getWorkTree(), path);
-		if (curFile.isDirectory()) {
-			if (directories) {
-				// Is this directory a git repository?
-				if (new File(curFile, DOT_GIT).exists()) {
-					if (force) {
-						if (!dryRun) {
-							FileUtils.delete(curFile, FileUtils.RECURSIVE);
-						}
-						inFiles.add(path + "/"); //$NON-NLS-1$
-					}
-				} else {
-					if (!dryRun) {
-						FileUtils.delete(curFile, FileUtils.RECURSIVE);
-					}
-					inFiles.add(path + "/"); //$NON-NLS-1$
-				}
-			}
-		} else {
-			if (!dryRun) {
-				FileUtils.delete(curFile, FileUtils.NONE);
-			}
-			inFiles.add(path);
-		}
-
-		return inFiles;
 	}
 
 	private Set<String> filterIgnorePaths(Set<String> inputPaths,
@@ -240,20 +192,6 @@ public class CleanCommand extends GitCommand<Set<String>> {
 	 */
 	public CleanCommand setDryRun(boolean dryRun) {
 		this.dryRun = dryRun;
-		return this;
-	}
-
-	/**
-	 * If force is set, directories that are git repositories will also be
-	 * deleted.
-	 *
-	 * @param force
-	 *            whether or not to delete git repositories
-	 * @return {@code this}
-	 * @since 4.5
-	 */
-	public CleanCommand setForce(boolean force) {
-		this.force = force;
 		return this;
 	}
 

@@ -114,30 +114,29 @@ class Merge extends TextBuiltin {
 		}
 
 		// determine the other revision we want to merge with HEAD
-		final Ref srcRef = db.findRef(ref);
+		final Ref srcRef = db.getRef(ref);
 		final ObjectId src = db.resolve(ref + "^{commit}"); //$NON-NLS-1$
 		if (src == null)
 			throw die(MessageFormat.format(
 					CLIText.get().refDoesNotExistOrNoCommit, ref));
 
-		Ref oldHead = getOldHead();
+		Ref oldHead = db.getRef(Constants.HEAD);
+		Git git = new Git(db);
+		MergeCommand mergeCmd = git.merge().setStrategy(mergeStrategy)
+				.setSquash(squash).setFastForward(ff).setCommit(!noCommit);
+		if (srcRef != null)
+			mergeCmd.include(srcRef);
+		else
+			mergeCmd.include(src);
+
+		if (message != null)
+			mergeCmd.setMessage(message);
+
 		MergeResult result;
-		try (Git git = new Git(db)) {
-			MergeCommand mergeCmd = git.merge().setStrategy(mergeStrategy)
-					.setSquash(squash).setFastForward(ff).setCommit(!noCommit);
-			if (srcRef != null)
-				mergeCmd.include(srcRef);
-			else
-				mergeCmd.include(src);
-
-			if (message != null)
-				mergeCmd.setMessage(message);
-
-			try {
-				result = mergeCmd.call();
-			} catch (CheckoutConflictException e) {
-				result = new MergeResult(e.getConflictingPaths()); // CHECKOUT_CONFLICT
-			}
+		try {
+			result = mergeCmd.call();
+		} catch (CheckoutConflictException e) {
+			result = new MergeResult(e.getConflictingPaths()); // CHECKOUT_CONFLICT
 		}
 
 		switch (result.getMergeStatus()) {
@@ -148,12 +147,9 @@ class Merge extends TextBuiltin {
 			break;
 		case FAST_FORWARD:
 			ObjectId oldHeadId = oldHead.getObjectId();
-			if (oldHeadId != null) {
-				String oldId = oldHeadId.abbreviate(7).name();
-				String newId = result.getNewHead().abbreviate(7).name();
-				outw.println(MessageFormat.format(CLIText.get().updating, oldId,
-						newId));
-			}
+			outw.println(MessageFormat.format(CLIText.get().updating, oldHeadId
+					.abbreviate(7).name(), result.getNewHead().abbreviate(7)
+					.name()));
 			outw.println(result.getMergeStatus().toString());
 			break;
 		case CHECKOUT_CONFLICT:
@@ -208,23 +204,14 @@ class Merge extends TextBuiltin {
 		}
 	}
 
-	private Ref getOldHead() throws IOException {
-		Ref oldHead = db.exactRef(Constants.HEAD);
-		if (oldHead == null) {
-			throw die(CLIText.get().onBranchToBeBorn);
-		}
-		return oldHead;
-	}
-
 	private boolean isMergedInto(Ref oldHead, AnyObjectId src)
 			throws IOException {
-		try (RevWalk revWalk = new RevWalk(db)) {
-			ObjectId oldHeadObjectId = oldHead.getPeeledObjectId();
-			if (oldHeadObjectId == null)
-				oldHeadObjectId = oldHead.getObjectId();
-			RevCommit oldHeadCommit = revWalk.lookupCommit(oldHeadObjectId);
-			RevCommit srcCommit = revWalk.lookupCommit(src);
-			return revWalk.isMergedInto(oldHeadCommit, srcCommit);
-		}
+		RevWalk revWalk = new RevWalk(db);
+		ObjectId oldHeadObjectId = oldHead.getPeeledObjectId();
+		if (oldHeadObjectId == null)
+			oldHeadObjectId = oldHead.getObjectId();
+		RevCommit oldHeadCommit = revWalk.lookupCommit(oldHeadObjectId);
+		RevCommit srcCommit = revWalk.lookupCommit(src);
+		return revWalk.isMergedInto(oldHeadCommit, srcCommit);
 	}
 }

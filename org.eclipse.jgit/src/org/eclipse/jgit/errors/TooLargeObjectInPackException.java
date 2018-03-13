@@ -43,13 +43,13 @@
 
 package org.eclipse.jgit.errors;
 
+import java.io.IOException;
 import java.text.MessageFormat;
 
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.transport.URIish;
 
 /** Thrown when PackParser finds an object larger than a predefined limit */
-public class TooLargeObjectInPackException extends TransportException {
+public class TooLargeObjectInPackException extends IOException {
 	private static final long serialVersionUID = 1L;
 
 	/**
@@ -78,18 +78,5 @@ public class TooLargeObjectInPackException extends TransportException {
 			long maxObjectSizeLimit) {
 		super(MessageFormat.format(JGitText.get().receivePackObjectTooLarge2,
 				Long.valueOf(objectSize), Long.valueOf(maxObjectSizeLimit)));
-	}
-
-	/**
-	 * Construct a too large object in pack exception.
-	 *
-	 * @param uri
-	 *            URI used for transport
-	 * @param s
-	 *            message
-	 * @since 4.4
-	 */
-	public TooLargeObjectInPackException(URIish uri, String s) {
-		super(uri.setPass(null) + ": " + s); //$NON-NLS-1$
 	}
 }

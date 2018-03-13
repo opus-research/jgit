@@ -61,7 +61,6 @@ import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
@@ -128,23 +127,16 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	 */
 	public Git call() throws GitAPIException, InvalidRemoteException,
 			org.eclipse.jgit.api.errors.TransportException {
-		Repository repository = null;
 		try {
 			URIish u = new URIish(uri);
-			repository = init(u);
+			Repository repository = init(u);
 			FetchResult result = fetch(repository, u);
 			if (!noCheckout)
 				checkout(repository, result);
-			return new Git(repository, true);
+			return new Git(repository);
 		} catch (IOException ioe) {
-			if (repository != null) {
-				repository.close();
-			}
 			throw new JGitInternalException(ioe.getMessage(), ioe);
 		} catch (URISyntaxException e) {
-			if (repository != null) {
-				repository.close();
-			}
 			throw new InvalidRemoteException(MessageFormat.format(
 					JGitText.get().invalidRemote, remote));
 		}
@@ -155,7 +147,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 		command.setBare(bare);
 		if (directory == null && gitDir == null)
 			directory = new File(u.getHumanishName(), Constants.DOT_GIT);
-		validateDirs(directory, gitDir, bare);
 		if (directory != null && directory.exists()
 				&& directory.listFiles().length != 0)
 			throw new JGitInternalException(MessageFormat.format(
@@ -237,7 +228,7 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 		}
 
 		if (head == null || head.getObjectId() == null)
-			return; // TODO throw exception?
+			return; // throw exception?
 
 		if (head.getName().startsWith(Constants.R_HEADS)) {
 			final RefUpdate newHead = clonedRepo.updateRef(Constants.HEAD);
@@ -289,24 +280,20 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 
 	private Ref findBranchToCheckout(FetchResult result) {
 		final Ref idHEAD = result.getAdvertisedRef(Constants.HEAD);
-		ObjectId headId = idHEAD != null ? idHEAD.getObjectId() : null;
-		if (headId == null) {
+		if (idHEAD == null)
 			return null;
-		}
 
 		Ref master = result.getAdvertisedRef(Constants.R_HEADS
 				+ Constants.MASTER);
-		ObjectId objectId = master != null ? master.getObjectId() : null;
-		if (headId.equals(objectId)) {
+		if (master != null && master.getObjectId().equals(idHEAD.getObjectId()))
 			return master;
-		}
 
 		Ref foundBranch = null;
 		for (final Ref r : result.getAdvertisedRefs()) {
 			final String n = r.getName();
 			if (!n.startsWith(Constants.R_HEADS))
 				continue;
-			if (headId.equals(r.getObjectId())) {
+			if (r.getObjectId().equals(idHEAD.getObjectId())) {
 				foundBranch = r;
 				break;
 			}
@@ -512,15 +499,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	private static void validateDirs(File directory, File gitDir, boolean bare)
 			throws IllegalStateException {
 		if (directory != null) {
-			if (directory.exists() && !directory.isDirectory()) {
-				throw new IllegalStateException(MessageFormat.format(
-						JGitText.get().initFailedDirIsNoDirectory, directory));
-			}
-			if (gitDir != null && gitDir.exists() && !gitDir.isDirectory()) {
-				throw new IllegalStateException(MessageFormat.format(
-						JGitText.get().initFailedGitDirIsNoDirectory,
-						gitDir));
-			}
 			if (bare) {
 				if (gitDir != null && !gitDir.equals(directory))
 					throw new IllegalStateException(MessageFormat.format(

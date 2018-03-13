@@ -52,7 +52,6 @@ import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.junit.TestRepository.CommitBuilder;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevWalk;
 import org.junit.After;
 import org.junit.Before;
 
@@ -66,8 +65,7 @@ public abstract class GcTestCase extends LocalDiskRepositoryTestCase {
 	public void setUp() throws Exception {
 		super.setUp();
 		repo = createWorkRepository();
-		tr = new TestRepository<FileRepository>(repo, new RevWalk(repo),
-				mockSystemReader);
+		tr = new TestRepository<FileRepository>((repo));
 		gc = new GC(repo);
 	}
 
@@ -105,9 +103,8 @@ public abstract class GcTestCase extends LocalDiskRepositoryTestCase {
 		return tip;
 	}
 
-	protected long lastModified(AnyObjectId objectId) throws IOException {
-		return repo.getFS().lastModified(
-				repo.getObjectDatabase().fileFor(objectId));
+	protected long lastModified(AnyObjectId objectId) {
+		return repo.getObjectDatabase().fileFor(objectId).lastModified();
 	}
 
 	protected static void fsTick() throws InterruptedException, IOException {

@@ -51,7 +51,6 @@ import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -150,12 +149,9 @@ abstract class HttpAuthMethod {
 	 *
 	 * @param conn
 	 *            the connection that failed.
-	 * @param ignoreTypes
-	 *            authentication types to be ignored.
 	 * @return new authentication method to try.
 	 */
-	static HttpAuthMethod scanResponse(final HttpConnection conn,
-			Collection<Type> ignoreTypes) {
+	static HttpAuthMethod scanResponse(final HttpConnection conn) {
 		final Map<String, List<String>> headers = conn.getHeaderFields();
 		HttpAuthMethod authentication = Type.NONE.method(EMPTY_STRING);
 
@@ -169,12 +165,6 @@ abstract class HttpAuthMethod {
 
 							try {
 								Type methodType = Type.valueOf(valuePart[0].toUpperCase());
-
-								if ((ignoreTypes != null)
-										&& (ignoreTypes.contains(methodType))) {
-									continue;
-								}
-
 								if (authentication.getType().compareTo(methodType) >= 0) {
 									continue;
 								}
@@ -229,8 +219,7 @@ abstract class HttpAuthMethod {
 			if (credentialsProvider.supports(u, p)
 					&& credentialsProvider.get(uri, u, p)) {
 				username = u.getValue();
-				char[] v = p.getValue();
-				password = (v == null) ? null : new String(p.getValue());
+				password = new String(p.getValue());
 				p.clear();
 			} else
 				return false;

@@ -76,11 +76,10 @@ public class InterIndexDiffFilterTest extends LocalDiskRepositoryTestCase {
 	public void testEmpty() throws IOException {
 		DirCache dc1 = DirCache.newInCore();
 		DirCache dc2 = DirCache.newInCore();
-		try (TreeWalk tw = new TreeWalk(db)) {
-			tw.addTree(new DirCacheIterator(dc1));
-			tw.addTree(new DirCacheIterator(dc2));
-			assertFalse(tw.next());
-		}
+		TreeWalk tw = new TreeWalk(db);
+		tw.addTree(new DirCacheIterator(dc1));
+		tw.addTree(new DirCacheIterator(dc2));
+		assertFalse(tw.next());
 	}
 
 	static final class AddEdit extends PathEdit {
@@ -125,15 +124,14 @@ public class InterIndexDiffFilterTest extends LocalDiskRepositoryTestCase {
 		editor.add(new AddEdit("a/a", FileMode.REGULAR_FILE, id("a"), 1, false));
 		editor.finish();
 
-		try (TreeWalk tw = new TreeWalk(db)) {
-			tw.setRecursive(true);
-			tw.addTree(new DirCacheIterator(dc1));
-			tw.addTree(new DirCacheIterator(dc2));
-			tw.setFilter(InterIndexDiffFilter.INSTANCE);
-			assertTrue(tw.next());
-			assertEquals("a/a", tw.getPathString());
-			assertFalse(tw.next());
-		}
+		TreeWalk tw = new TreeWalk(db);
+		tw.setRecursive(true);
+		tw.addTree(new DirCacheIterator(dc1));
+		tw.addTree(new DirCacheIterator(dc2));
+		tw.setFilter(InterIndexDiffFilter.INSTANCE);
+		assertTrue(tw.next());
+		assertEquals("a/a", tw.getPathString());
+		assertFalse(tw.next());
 	}
 
 	@Test
@@ -147,14 +145,13 @@ public class InterIndexDiffFilterTest extends LocalDiskRepositoryTestCase {
 		ed2.add(new AddEdit("a/a", FileMode.REGULAR_FILE, id("a"), 1, false));
 		ed2.finish();
 
-		try (TreeWalk tw = new TreeWalk(db)) {
-			tw.setRecursive(true);
-			tw.addTree(new DirCacheIterator(dc1));
-			tw.addTree(new DirCacheIterator(dc2));
-			tw.setFilter(InterIndexDiffFilter.INSTANCE);
+		TreeWalk tw = new TreeWalk(db);
+		tw.setRecursive(true);
+		tw.addTree(new DirCacheIterator(dc1));
+		tw.addTree(new DirCacheIterator(dc2));
+		tw.setFilter(InterIndexDiffFilter.INSTANCE);
 
-			assertFalse(tw.next());
-		}
+		assertFalse(tw.next());
 	}
 
 	@Test
@@ -168,16 +165,15 @@ public class InterIndexDiffFilterTest extends LocalDiskRepositoryTestCase {
 		ed2.add(new AddEdit("a/a", FileMode.REGULAR_FILE, id("a"), 1, true));
 		ed2.finish();
 
-		try (TreeWalk tw = new TreeWalk(db)) {
-			tw.setRecursive(true);
-			tw.addTree(new DirCacheIterator(dc1));
-			tw.addTree(new DirCacheIterator(dc2));
-			tw.setFilter(InterIndexDiffFilter.INSTANCE);
+		TreeWalk tw = new TreeWalk(db);
+		tw.setRecursive(true);
+		tw.addTree(new DirCacheIterator(dc1));
+		tw.addTree(new DirCacheIterator(dc2));
+		tw.setFilter(InterIndexDiffFilter.INSTANCE);
 
-			assertTrue(tw.next());
-			assertEquals("a/a", tw.getPathString());
-			assertFalse(tw.next());
-		}
+		assertTrue(tw.next());
+		assertEquals("a/a", tw.getPathString());
+		assertFalse(tw.next());
 	}
 
 	@Test
@@ -192,13 +188,12 @@ public class InterIndexDiffFilterTest extends LocalDiskRepositoryTestCase {
 		ed2.add(new AddEdit("a/a", FileMode.REGULAR_FILE, id("b"), 1, true));
 		ed2.finish();
 
-		try (TreeWalk tw = new TreeWalk(db)) {
-			tw.setRecursive(true);
-			tw.addTree(new DirCacheIterator(dc1));
-			tw.addTree(new DirCacheIterator(dc2));
-			tw.setFilter(InterIndexDiffFilter.INSTANCE);
+		TreeWalk tw = new TreeWalk(db);
+		tw.setRecursive(true);
+		tw.addTree(new DirCacheIterator(dc1));
+		tw.addTree(new DirCacheIterator(dc2));
+		tw.setFilter(InterIndexDiffFilter.INSTANCE);
 
-			assertFalse(tw.next());
-		}
+		assertFalse(tw.next());
 	}
 }

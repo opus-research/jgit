@@ -53,7 +53,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.PrintStream;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -71,11 +70,8 @@ import java.util.Map;
 import java.util.Vector;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import org.eclipse.jgit.api.errors.AbortedByHookException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.hooks.Hooks;
-import org.eclipse.jgit.hooks.PrePushHook;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -98,7 +94,7 @@ import org.eclipse.jgit.storage.pack.PackConfig;
  * Transport instances and the connections they create are not thread-safe.
  * Callers must ensure a transport is accessed by only one thread at a time.
  */
-public abstract class Transport implements AutoCloseable {
+public abstract class Transport {
 	/** Type of operation a Transport is being opened for. */
 	public enum Operation {
 		/** Transport is to fetch objects locally. */
@@ -561,13 +557,8 @@ public abstract class Transport implements AutoCloseable {
 				continue;
 			}
 
-			if (proto.canHandle(uri, local, remoteName)) {
-				Transport tn = proto.open(uri, local, remoteName);
-				tn.prePush = Hooks.prePush(local, tn.hookOutRedirect);
-				tn.prePush.setRemoteLocation(uri.toString());
-				tn.prePush.setRemoteName(remoteName);
-				return tn;
-			}
+			if (proto.canHandle(uri, local, remoteName))
+				return proto.open(uri, local, remoteName);
 		}
 
 		throw new NotSupportedException(MessageFormat.format(JGitText.get().URINotSupported, uri));
@@ -629,7 +620,7 @@ public abstract class Transport implements AutoCloseable {
 
 		for (final RefSpec spec : procRefs) {
 			String srcSpec = spec.getSource();
-			final Ref srcRef = db.findRef(srcSpec);
+			final Ref srcRef = db.getRef(srcSpec);
 			if (srcRef != null)
 				srcSpec = srcRef.getName();
 
@@ -752,9 +743,6 @@ public abstract class Transport implements AutoCloseable {
 	/** Should push produce thin-pack when sending objects to remote repository. */
 	private boolean pushThin = DEFAULT_PUSH_THIN;
 
-	/** Should push be all-or-nothing atomic behavior? */
-	private boolean pushAtomic;
-
 	/** Should push just check for operation result, not really push. */
 	private boolean dryRun;
 
@@ -773,12 +761,6 @@ public abstract class Transport implements AutoCloseable {
 	/** Assists with authentication the connection. */
 	private CredentialsProvider credentialsProvider;
 
-	/** The option strings associated with the push operation. */
-	private List<String> pushOptions;
-
-	private PrintStream hookOutRedirect;
-
-	private PrePushHook prePush;
 	/**
 	 * Create a new transport instance.
 	 *
@@ -796,7 +778,6 @@ public abstract class Transport implements AutoCloseable {
 		this.uri = uri;
 		this.objectChecker = tc.newObjectChecker();
 		this.credentialsProvider = CredentialsProvider.getDefault();
-		prePush = Hooks.prePush(local, hookOutRedirect);
 	}
 
 	/**
@@ -976,31 +957,6 @@ public abstract class Transport implements AutoCloseable {
 	}
 
 	/**
-	 * Default setting is false.
-	 *
-	 * @return true if push requires all-or-nothing atomic behavior.
-	 * @since 4.2
-	 */
-	public boolean isPushAtomic() {
-		return pushAtomic;
-	}
-
-	/**
-	 * Request atomic push (all references succeed, or none do).
-	 * <p>
-	 * Server must also support atomic push. If the server does not support the
-	 * feature the push will abort without making changes.
-	 *
-	 * @param atomic
-	 *            true when push should be an all-or-nothing operation.
-	 * @see PackTransport
-	 * @since 4.2
-	 */
-	public void setPushAtomic(final boolean atomic) {
-		this.pushAtomic = atomic;
-	}
-
-	/**
 	 * @return true if destination refs should be removed if they no longer
 	 *         exist at the source repository.
 	 */
@@ -1124,25 +1080,6 @@ public abstract class Transport implements AutoCloseable {
 	}
 
 	/**
-	 * @return the option strings associated with the push operation
-	 * @since 4.5
-	 */
-	public List<String> getPushOptions() {
-		return pushOptions;
-	}
-
-	/**
-	 * Sets the option strings associated with the push operation.
-	 *
-	 * @param pushOptions
-	 *            null if push options are unsupported
-	 * @since 4.5
-	 */
-	public void setPushOptions(final List<String> pushOptions) {
-		this.pushOptions = pushOptions;
-	}
-
-	/**
 	 * Fetch objects and refs from the remote repository to the local one.
 	 * <p>
 	 * This is a utility function providing standard fetch behavior. Local
@@ -1259,15 +1196,6 @@ public abstract class Transport implements AutoCloseable {
 			if (toPush.isEmpty())
 				throw new TransportException(JGitText.get().nothingToPush);
 		}
-		if (prePush != null) {
-			try {
-				prePush.setRefs(toPush);
-				prePush.call();
-			} catch (AbortedByHookException | IOException e) {
-				throw new TransportException(e.getMessage(), e);
-			}
-		}
-
 		final PushProcess pushProcess = new PushProcess(this, toPush, out);
 		return pushProcess.execute(monitor);
 	}
@@ -1375,10 +1303,6 @@ public abstract class Transport implements AutoCloseable {
 	 * must close that network socket, disconnecting the two peers. If the
 	 * remote repository is actually local (same system) this method must close
 	 * any open file handles used to read the "remote" repository.
-	 * <p>
-	 * {@code AutoClosable.close()} declares that it throws {@link Exception}.
-	 * Implementers shouldn't throw checked exceptions. This override narrows
-	 * the signature to prevent them from doing so.
 	 */
 	public abstract void close();
 }

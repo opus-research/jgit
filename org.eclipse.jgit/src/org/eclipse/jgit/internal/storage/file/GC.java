@@ -45,6 +45,7 @@ package org.eclipse.jgit.internal.storage.file;
 
 import static org.eclipse.jgit.internal.storage.pack.PackExt.BITMAP_INDEX;
 import static org.eclipse.jgit.internal.storage.pack.PackExt.INDEX;
+import static org.eclipse.jgit.lib.RefDatabase.ALL;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -52,7 +53,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
-import java.nio.file.StandardCopyOption;
 import java.text.MessageFormat;
 import java.text.ParseException;
 import java.util.ArrayList;
@@ -62,14 +62,14 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 
-import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -78,19 +78,18 @@ import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
 import org.eclipse.jgit.internal.storage.pack.PackWriter;
-import org.eclipse.jgit.internal.storage.reftree.RefTreeNames;
+import org.eclipse.jgit.internal.storage.pack.PackWriter.ObjectIdSet;
+import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdSet;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.ReflogEntry;
-import org.eclipse.jgit.lib.ReflogReader;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -111,8 +110,6 @@ import org.eclipse.jgit.util.SystemReader;
 public class GC {
 	private static final String PRUNE_EXPIRE_DEFAULT = "2.weeks.ago"; //$NON-NLS-1$
 
-	private static final String PRUNE_PACK_EXPIRE_DEFAULT = "1.hour.ago"; //$NON-NLS-1$
-
 	private final FileRepository repo;
 
 	private ProgressMonitor pm;
@@ -120,10 +117,6 @@ public class GC {
 	private long expireAgeMillis = -1;
 
 	private Date expire;
-
-	private long packExpireAgeMillis = -1;
-
-	private Date packExpire;
 
 	private PackConfig pconfig = null;
 
@@ -133,7 +126,7 @@ public class GC {
 	 * difference between the current refs and the refs which existed during
 	 * last {@link #repack()}.
 	 */
-	private Collection<Ref> lastPackedRefs;
+	private Map<String, Ref> lastPackedRefs;
 
 	/**
 	 * Holds the starting time of the last repack() execution. This is needed in
@@ -189,11 +182,10 @@ public class GC {
 	 * @param oldPacks
 	 * @param newPacks
 	 * @throws ParseException
-	 * @throws IOException
 	 */
 	private void deleteOldPacks(Collection<PackFile> oldPacks,
-			Collection<PackFile> newPacks) throws ParseException, IOException {
-		long packExpireDate = getPackExpireDate();
+			Collection<PackFile> newPacks) throws ParseException {
+		long expireDate = getExpireDate();
 		oldPackLoop: for (PackFile oldPack : oldPacks) {
 			String oldName = oldPack.getPackName();
 			// check whether an old pack file is also among the list of new
@@ -203,8 +195,7 @@ public class GC {
 					continue oldPackLoop;
 
 			if (!oldPack.shouldBeKept()
-					&& repo.getFS().lastModified(
-							oldPack.getPackFile()) < packExpireDate) {
+					&& oldPack.getPackFile().lastModified() < expireDate) {
 				oldPack.close();
 				prunePack(oldName);
 			}
@@ -340,7 +331,7 @@ public class GC {
 						String fName = f.getName();
 						if (fName.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
 							continue;
-						if (repo.getFS().lastModified(f) >= expireDate)
+						if (f.lastModified() >= expireDate)
 							continue;
 						try {
 							ObjectId id = ObjectId.fromString(d + fName);
@@ -369,20 +360,17 @@ public class GC {
 		// during last repack(). Only those refs will survive which have been
 		// added or modified since the last repack. Only these can save existing
 		// loose refs from being pruned.
-		Collection<Ref> newRefs;
+		Map<String, Ref> newRefs;
 		if (lastPackedRefs == null || lastPackedRefs.isEmpty())
 			newRefs = getAllRefs();
 		else {
-			Map<String, Ref> last = new HashMap<>();
-			for (Ref r : lastPackedRefs) {
-				last.put(r.getName(), r);
-			}
-			newRefs = new ArrayList<>();
-			for (Ref r : getAllRefs()) {
-				Ref old = last.get(r.getName());
-				if (!equals(r, old)) {
-					newRefs.add(r);
-				}
+			newRefs = new HashMap<String, Ref>();
+			for (Iterator<Map.Entry<String, Ref>> i = getAllRefs().entrySet()
+					.iterator(); i.hasNext();) {
+				Entry<String, Ref> newEntry = i.next();
+				Ref old = lastPackedRefs.get(newEntry.getKey());
+				if (!equals(newEntry.getValue(), old))
+					newRefs.put(newEntry.getKey(), newEntry.getValue());
 			}
 		}
 
@@ -394,10 +382,10 @@ public class GC {
 			// leave this method.
 			ObjectWalk w = new ObjectWalk(repo);
 			try {
-				for (Ref cr : newRefs)
+				for (Ref cr : newRefs.values())
 					w.markStart(w.parseAny(cr.getObjectId()));
 				if (lastPackedRefs != null)
-					for (Ref lpr : lastPackedRefs)
+					for (Ref lpr : lastPackedRefs.values())
 						w.markUninteresting(w.parseAny(lpr.getObjectId()));
 				removeReferenced(deletionCandidates, w);
 			} finally {
@@ -415,11 +403,11 @@ public class GC {
 		// additional reflog entries not handled during last repack()
 		ObjectWalk w = new ObjectWalk(repo);
 		try {
-			for (Ref ar : getAllRefs())
+			for (Ref ar : getAllRefs().values())
 				for (ObjectId id : listRefLogObjects(ar, lastRepackTime))
 					w.markStart(w.parseAny(id));
 			if (lastPackedRefs != null)
-				for (Ref lpr : lastPackedRefs)
+				for (Ref lpr : lastPackedRefs.values())
 					w.markUninteresting(w.parseAny(lpr.getObjectId()));
 			removeReferenced(deletionCandidates, w);
 		} finally {
@@ -455,26 +443,6 @@ public class GC {
 		if (expireAgeMillis != -1)
 			expireDate = System.currentTimeMillis() - expireAgeMillis;
 		return expireDate;
-	}
-
-	private long getPackExpireDate() throws ParseException {
-		long packExpireDate = Long.MAX_VALUE;
-
-		if (packExpire == null && packExpireAgeMillis == -1) {
-			String prunePackExpireStr = repo.getConfig().getString(
-					ConfigConstants.CONFIG_GC_SECTION, null,
-					ConfigConstants.CONFIG_KEY_PRUNEPACKEXPIRE);
-			if (prunePackExpireStr == null)
-				prunePackExpireStr = PRUNE_PACK_EXPIRE_DEFAULT;
-			packExpire = GitDateParser.parse(prunePackExpireStr, null,
-					SystemReader.getInstance().getLocale());
-			packExpireAgeMillis = -1;
-		}
-		if (packExpire != null)
-			packExpireDate = packExpire.getTime();
-		if (packExpireAgeMillis != -1)
-			packExpireDate = System.currentTimeMillis() - packExpireAgeMillis;
-		return packExpireDate;
 	}
 
 	/**
@@ -514,10 +482,9 @@ public class GC {
 				return false;
 			return r1.getTarget().getName().equals(r2.getTarget().getName());
 		} else {
-			if (r2.isSymbolic()) {
+			if (r2.isSymbolic())
 				return false;
-			}
-			return Objects.equals(r1.getObjectId(), r2.getObjectId());
+			return r1.getObjectId().equals(r2.getObjectId());
 		}
 	}
 
@@ -560,23 +527,19 @@ public class GC {
 		Collection<PackFile> toBeDeleted = repo.getObjectDatabase().getPacks();
 
 		long time = System.currentTimeMillis();
-		Collection<Ref> refsBefore = getAllRefs();
+		Map<String, Ref> refsBefore = getAllRefs();
 
 		Set<ObjectId> allHeads = new HashSet<ObjectId>();
 		Set<ObjectId> nonHeads = new HashSet<ObjectId>();
-		Set<ObjectId> txnHeads = new HashSet<ObjectId>();
 		Set<ObjectId> tagTargets = new HashSet<ObjectId>();
 		Set<ObjectId> indexObjects = listNonHEADIndexObjects();
-		RefDatabase refdb = repo.getRefDatabase();
 
-		for (Ref ref : refsBefore) {
+		for (Ref ref : refsBefore.values()) {
 			nonHeads.addAll(listRefLogObjects(ref, 0));
 			if (ref.isSymbolic() || ref.getObjectId() == null)
 				continue;
 			if (ref.getName().startsWith(Constants.R_HEADS))
 				allHeads.add(ref.getObjectId());
-			else if (RefTreeNames.isRefTree(refdb, ref.getName()))
-				txnHeads.add(ref.getObjectId());
 			else
 				nonHeads.add(ref.getObjectId());
 			if (ref.getPeeledObjectId() != null)
@@ -586,7 +549,7 @@ public class GC {
 		List<ObjectIdSet> excluded = new LinkedList<ObjectIdSet>();
 		for (final PackFile f : repo.getObjectDatabase().getPacks())
 			if (f.shouldBeKept())
-				excluded.add(f.getIndex());
+				excluded.add(objectIdSet(f.getIndex()));
 
 		tagTargets.addAll(allHeads);
 		nonHeads.addAll(indexObjects);
@@ -598,18 +561,13 @@ public class GC {
 					tagTargets, excluded);
 			if (heads != null) {
 				ret.add(heads);
-				excluded.add(0, heads.getIndex());
+				excluded.add(0, objectIdSet(heads.getIndex()));
 			}
 		}
 		if (!nonHeads.isEmpty()) {
 			PackFile rest = writePack(nonHeads, allHeads, tagTargets, excluded);
 			if (rest != null)
 				ret.add(rest);
-		}
-		if (!txnHeads.isEmpty()) {
-			PackFile txn = writePack(txnHeads, PackWriter.NONE, null, excluded);
-			if (txn != null)
-				ret.add(txn);
 		}
 		try {
 			deleteOldPacks(toBeDeleted, ret);
@@ -634,11 +592,7 @@ public class GC {
 	 * @throws IOException
 	 */
 	private Set<ObjectId> listRefLogObjects(Ref ref, long minTime) throws IOException {
-		ReflogReader reflogReader = repo.getReflogReader(ref.getName());
-		if (reflogReader == null) {
-			return Collections.emptySet();
-		}
-		List<ReflogEntry> rlEntries = reflogReader
+		List<ReflogEntry> rlEntries = repo.getReflogReader(ref.getName())
 				.getReverseEntries();
 		if (rlEntries == null || rlEntries.isEmpty())
 			return Collections.<ObjectId> emptySet();
@@ -657,32 +611,17 @@ public class GC {
 	}
 
 	/**
-	 * Returns a collection of all refs and additional refs.
+	 * Returns a map of all refs and additional refs (e.g. FETCH_HEAD,
+	 * MERGE_HEAD, ...)
 	 *
-	 * Additional refs which don't start with "refs/" are not returned because
-	 * they should not save objects from being garbage collected. Examples for
-	 * such references are ORIG_HEAD, MERGE_HEAD, FETCH_HEAD and
-	 * CHERRY_PICK_HEAD.
-	 *
-	 * @return a collection of refs pointing to live objects.
+	 * @return a map where names of refs point to ref objects
 	 * @throws IOException
 	 */
-	private Collection<Ref> getAllRefs() throws IOException {
-		RefDatabase refdb = repo.getRefDatabase();
-		Collection<Ref> refs = refdb.getRefs(RefDatabase.ALL).values();
-		List<Ref> addl = refdb.getAdditionalRefs();
-		if (!addl.isEmpty()) {
-			List<Ref> all = new ArrayList<>(refs.size() + addl.size());
-			all.addAll(refs);
-			// add additional refs which start with refs/
-			for (Ref r : addl) {
-				if (r.getName().startsWith(Constants.R_REFS)) {
-					all.add(r);
-				}
-			}
-			return all;
-		}
-		return refs;
+	private Map<String, Ref> getAllRefs() throws IOException {
+		Map<String, Ref> ret = repo.getRefDatabase().getRefs(ALL);
+		for (Ref ref : repo.getRefDatabase().getAdditionalRefs())
+			ret.put(ref.getName(), ref);
+		return ret;
 	}
 
 	/**
@@ -696,7 +635,10 @@ public class GC {
 	 */
 	private Set<ObjectId> listNonHEADIndexObjects()
 			throws CorruptObjectException, IOException {
-		if (repo.isBare()) {
+		try {
+			if (repo.getIndexFile() == null)
+				return Collections.emptySet();
+		} catch (NoWorkTreeException e) {
 			return Collections.emptySet();
 		}
 		try (TreeWalk treeWalk = new TreeWalk(repo)) {
@@ -737,8 +679,8 @@ public class GC {
 		}
 	}
 
-	private PackFile writePack(@NonNull Set<? extends ObjectId> want,
-			@NonNull Set<? extends ObjectId> have, Set<ObjectId> tagTargets,
+	private PackFile writePack(Set<? extends ObjectId> want,
+			Set<? extends ObjectId> have, Set<ObjectId> tagTargets,
 			List<ObjectIdSet> excludeObjects) throws IOException {
 		File tmpPack = null;
 		Map<PackExt, File> tmpExts = new TreeMap<PackExt, File>(
@@ -844,33 +786,39 @@ public class GC {
 						break;
 					}
 			tmpPack.setReadOnly();
+			boolean delete = true;
+			try {
+				FileUtils.rename(tmpPack, realPack);
+				delete = false;
+				for (Map.Entry<PackExt, File> tmpEntry : tmpExts.entrySet()) {
+					File tmpExt = tmpEntry.getValue();
+					tmpExt.setReadOnly();
 
-			FileUtils.rename(tmpPack, realPack, StandardCopyOption.ATOMIC_MOVE);
-			for (Map.Entry<PackExt, File> tmpEntry : tmpExts.entrySet()) {
-				File tmpExt = tmpEntry.getValue();
-				tmpExt.setReadOnly();
-
-				File realExt = nameFor(id,
-						"." + tmpEntry.getKey().getExtension()); //$NON-NLS-1$
-				try {
-					FileUtils.rename(tmpExt, realExt,
-							StandardCopyOption.ATOMIC_MOVE);
-				} catch (IOException e) {
-					File newExt = new File(realExt.getParentFile(),
-							realExt.getName() + ".new"); //$NON-NLS-1$
+					File realExt = nameFor(
+							id, "." + tmpEntry.getKey().getExtension()); //$NON-NLS-1$
 					try {
-						FileUtils.rename(tmpExt, newExt,
-								StandardCopyOption.ATOMIC_MOVE);
-					} catch (IOException e2) {
-						newExt = tmpExt;
-						e = e2;
+						FileUtils.rename(tmpExt, realExt);
+					} catch (IOException e) {
+						File newExt = new File(realExt.getParentFile(),
+								realExt.getName() + ".new"); //$NON-NLS-1$
+						if (!tmpExt.renameTo(newExt))
+							newExt = tmpExt;
+						throw new IOException(MessageFormat.format(
+								JGitText.get().panicCantRenameIndexFile, newExt,
+								realExt));
 					}
-					throw new IOException(MessageFormat.format(
-							JGitText.get().panicCantRenameIndexFile, newExt,
-							realExt), e);
+				}
+
+			} finally {
+				if (delete) {
+					if (tmpPack.exists())
+						tmpPack.delete();
+					for (File tmpExt : tmpExts.values()) {
+						if (tmpExt.exists())
+							tmpExt.delete();
+					}
 				}
 			}
-
 			return repo.getObjectDatabase().openPack(realPack);
 		} finally {
 			if (tmpPack != null && tmpPack.exists())
@@ -929,11 +877,6 @@ public class GC {
 		 */
 		public long numberOfPackedRefs;
 
-		/**
-		 * The number of bitmaps in the bitmap indices.
-		 */
-		public long numberOfBitmaps;
-
 		public String toString() {
 			final StringBuilder b = new StringBuilder();
 			b.append("numberOfPackedObjects=").append(numberOfPackedObjects); //$NON-NLS-1$
@@ -943,15 +886,15 @@ public class GC {
 			b.append(", numberOfPackedRefs=").append(numberOfPackedRefs); //$NON-NLS-1$
 			b.append(", sizeOfLooseObjects=").append(sizeOfLooseObjects); //$NON-NLS-1$
 			b.append(", sizeOfPackedObjects=").append(sizeOfPackedObjects); //$NON-NLS-1$
-			b.append(", numberOfBitmaps=").append(numberOfBitmaps); //$NON-NLS-1$
 			return b.toString();
 		}
 	}
 
 	/**
-	 * Returns information about objects and pack files for a FileRepository.
+	 * Returns the number of objects stored in pack files. If an object is
+	 * contained in multiple pack files it is counted as often as it occurs.
 	 *
-	 * @return information about objects and pack files for a FileRepository
+	 * @return the number of objects stored in pack files
 	 * @throws IOException
 	 */
 	public RepoStatistics getStatistics() throws IOException {
@@ -961,8 +904,6 @@ public class GC {
 			ret.numberOfPackedObjects += f.getIndex().getObjectCount();
 			ret.numberOfPackFiles++;
 			ret.sizeOfPackedObjects += f.getPackFile().length();
-			if (f.getBitmapIndex() != null)
-				ret.numberOfBitmaps += f.getBitmapIndex().getBitmapCount();
 		}
 		File objDir = repo.getObjectsDirectory();
 		String[] fanout = objDir.list();
@@ -1020,20 +961,6 @@ public class GC {
 	}
 
 	/**
-	 * During gc() or prune() packfiles which are created or modified in the
-	 * last <code>packExpireAgeMillis</code> milliseconds will not be deleted.
-	 * Only older packfiles may be deleted. If set to 0 then every packfile is a
-	 * candidate for deletion.
-	 *
-	 * @param packExpireAgeMillis
-	 *            minimal age of packfiles to be deleted in milliseconds.
-	 */
-	public void setPackExpireAgeMillis(long packExpireAgeMillis) {
-		this.packExpireAgeMillis = packExpireAgeMillis;
-		expire = null;
-	}
-
-	/**
 	 * Set the PackConfig used when (re-)writing packfiles. This allows to
 	 * influence how packs are written and to implement something similar to
 	 * "git gc --aggressive"
@@ -1063,17 +990,11 @@ public class GC {
 		expireAgeMillis = -1;
 	}
 
-	/**
-	 * During gc() or prune() packfiles which are created or modified after or
-	 * at <code>packExpire</code> will not be deleted. Only older packfiles may
-	 * be deleted. If set to null then every packfile is a candidate for
-	 * deletion.
-	 *
-	 * @param packExpire
-	 *            instant in time which defines packfile expiration
-	 */
-	public void setPackExpire(Date packExpire) {
-		this.packExpire = packExpire;
-		packExpireAgeMillis = -1;
+	private static ObjectIdSet objectIdSet(final PackIndex idx) {
+		return new ObjectIdSet() {
+			public boolean contains(AnyObjectId objectId) {
+				return idx.hasObject(objectId);
+			}
+		};
 	}
 }

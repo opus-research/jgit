@@ -207,7 +207,7 @@ public class Git implements AutoCloseable {
 		this(repo, false);
 	}
 
-	Git(Repository repo, boolean closeRepo) {
+	private Git(Repository repo, boolean closeRepo) {
 		if (repo == null)
 			throw new NullPointerException();
 		this.repo = repo;
@@ -713,48 +713,8 @@ public class Git implements AutoCloseable {
 	}
 
 	/**
-	 * Return a command used to list the available remotes.
-	 *
-	 * @return a {@link RemoteListCommand}
-	 * @since 4.2
-	 */
-	public RemoteListCommand remoteList() {
-		return new RemoteListCommand(repo);
-	}
-
-	/**
-	 * Return a command used to add a new remote.
-	 *
-	 * @return a {@link RemoteAddCommand}
-	 * @since 4.2
-	 */
-	public RemoteAddCommand remoteAdd() {
-		return new RemoteAddCommand(repo);
-	}
-
-	/**
-	 * Return a command used to remove an existing remote.
-	 *
-	 * @return a {@link RemoteRemoveCommand}
-	 * @since 4.2
-	 */
-	public RemoteRemoveCommand remoteRemove() {
-		return new RemoteRemoveCommand(repo);
-	}
-
-	/**
-	 * Return a command used to change the URL of an existing remote.
-	 *
-	 * @return a {@link RemoteSetUrlCommand}
-	 * @since 4.2
-	 */
-	public RemoteSetUrlCommand remoteSetUrl() {
-		return new RemoteSetUrlCommand(repo);
-	}
-
-	/**
-	 * @return the git repository this class is interacting with; see
-	 *         {@link #close()} for notes on closing this repository.
+	 * @return the git repository this class is interacting with; see {@link
+	 *         #close()} for notes on closing this repository.
 	 */
 	public Repository getRepository() {
 		return repo;

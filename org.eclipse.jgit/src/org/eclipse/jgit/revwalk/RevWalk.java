@@ -172,7 +172,7 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 
 	ObjectIdOwnerMap<RevObject> objects;
 
-	int freeFlags = APP_FLAGS;
+	private int freeFlags = APP_FLAGS;
 
 	private int delayFreeFlags;
 
@@ -1295,6 +1295,7 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 		retainOnReset = 0;
 		carryFlags = UNINTERESTING;
 		objects.clear();
+		reader.close();
 		roots.clear();
 		queue = new DateRevQueue();
 		pending = new StartGenerator(this);
@@ -1405,8 +1406,6 @@ public class RevWalk implements Iterable<RevCommit>, AutoCloseable {
 
 	/**
 	 * Assume additional commits are shallow (have no parents).
-	 * <p>
-	 * This method is a No-op if the collection is empty.
 	 *
 	 * @param ids
 	 *            commits that should be treated as shallow commits, in addition
