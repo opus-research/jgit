@@ -46,6 +46,7 @@ package org.eclipse.jgit.transport;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -174,6 +175,7 @@ public class Subscriber {
 		connection = transport.openSubscribe();
 		transport.setTimeout(timeout);
 		try {
+			connection.doSubscribeAdvertisment(this);
 			connection.doSubscribe(this, commands, monitor);
 		} finally {
 			close();
@@ -191,6 +193,13 @@ public class Subscriber {
 	 */
 	public SubscribedRepository getRepository(String r) {
 		return repoSubscriptions.get(r);
+	}
+
+	/**
+	 * @return the set of all repository names this subscriber will connect to.
+	 */
+	public Set<String> getAllRepositories() {
+		return Collections.unmodifiableSet(repoSubscriptions.keySet());
 	}
 
 	/** @return fast restart token, or null if none. */
