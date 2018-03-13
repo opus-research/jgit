@@ -61,7 +61,7 @@ public final class StringUtils {
 	 * This method does not honor the JVM locale, but instead always behaves as
 	 * though it is in the US-ASCII locale. Only characters in the range 'A'
 	 * through 'Z' are converted. All other characters are left as-is, even if
-	 * they otherwise would have a lowercase character equivalent.
+	 * they otherwise would have a lowercase character equivilant.
 	 *
 	 * @param c
 	 *            the input character.
@@ -77,7 +77,7 @@ public final class StringUtils {
 	 * This method does not honor the JVM locale, but instead always behaves as
 	 * though it is in the US-ASCII locale. Only characters in the range 'A'
 	 * through 'Z' are converted, all other characters are left as-is, even if
-	 * they otherwise would have a lowercase character equivalent.
+	 * they otherwise would have a lowercase character equivilant.
 	 *
 	 * @param in
 	 *            the input string. Must not be null.
@@ -113,6 +113,45 @@ public final class StringUtils {
 				return false;
 		}
 		return true;
+	}
+
+	/**
+	 * Parse a string as a standard Git boolean value.
+	 * <p>
+	 * The terms {@code yes}, {@code true}, {@code 1}, {@code on} can all be
+	 * used to mean {@code true}.
+	 * <p>
+	 * The terms {@code no}, {@code false}, {@code 0}, {@code off} can all be
+	 * used to mean {@code false}.
+	 * <p>
+	 * Comparisons ignore case, via {@link #equalsIgnoreCase(String, String)}.
+	 *
+	 * @param stringValue
+	 *            the string to parse.
+	 * @return the boolean interpretation of {@code value}.
+	 * @throws IllegalArgumentException
+	 *             if {@code value} is not recognized as one of the standard
+	 *             boolean names.
+	 */
+	public static boolean toBoolean(final String stringValue) {
+		if (stringValue == null)
+			throw new NullPointerException("Expected boolean string value");
+
+		if (equalsIgnoreCase("yes", stringValue)
+				|| equalsIgnoreCase("true", stringValue)
+				|| equalsIgnoreCase("1", stringValue)
+				|| equalsIgnoreCase("on", stringValue)) {
+			return true;
+
+		} else if (equalsIgnoreCase("no", stringValue)
+				|| equalsIgnoreCase("false", stringValue)
+				|| equalsIgnoreCase("0", stringValue)
+				|| equalsIgnoreCase("off", stringValue)) {
+			return false;
+
+		} else {
+			throw new IllegalArgumentException("Not a boolean: " + stringValue);
+		}
 	}
 
 	private StringUtils() {
