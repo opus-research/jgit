@@ -244,7 +244,6 @@ class BasePackPushConnection extends BasePackConnection implements
 		writer.preparePack(newObjects, remoteObjects);
 		final long start = System.currentTimeMillis();
 		writer.writePack(out);
-		out.flush();
 		packTransferTime = System.currentTimeMillis() - start;
 	}
 

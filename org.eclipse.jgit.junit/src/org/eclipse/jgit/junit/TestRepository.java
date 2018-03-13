@@ -43,11 +43,9 @@
 
 package org.eclipse.jgit.junit;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -572,10 +570,10 @@ public class TestRepository {
 		pw.preparePack(all, Collections.<ObjectId> emptySet());
 
 		final ObjectId name = pw.computeName();
-		OutputStream out;
+		FileOutputStream out;
 
 		final File pack = nameFor(odb, name, ".pack");
-		out = new BufferedOutputStream(new FileOutputStream(pack));
+		out = new FileOutputStream(pack);
 		try {
 			pw.writePack(out);
 		} finally {
@@ -584,7 +582,7 @@ public class TestRepository {
 		pack.setReadOnly();
 
 		final File idx = nameFor(odb, name, ".idx");
-		out = new BufferedOutputStream(new FileOutputStream(idx));
+		out = new FileOutputStream(idx);
 		try {
 			pw.writeIndex(out);
 		} finally {

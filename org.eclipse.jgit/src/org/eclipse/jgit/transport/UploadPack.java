@@ -583,9 +583,12 @@ public class UploadPack {
 			}
 		}
 		pw.writePack(packOut);
-		packOut.flush();
 
-		if (sideband)
+		if (sideband) {
+			packOut.flush();
 			pckOut.end();
+		} else {
+			rawOut.flush();
+		}
 	}
 }
