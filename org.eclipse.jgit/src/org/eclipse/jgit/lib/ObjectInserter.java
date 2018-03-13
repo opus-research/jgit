@@ -2,6 +2,7 @@
  * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -377,12 +378,15 @@ public abstract class ObjectInserter {
 			w.write(tag.getTag());
 			w.write("\n");
 
-			w.write("tagger ");
-			w.write(tag.getAuthor().toExternalString());
-			w.write('\n');
+			if (tag.getTagger() != null) {
+				w.write("tagger ");
+				w.write(tag.getTagger().toExternalString());
+				w.write('\n');
+			}
 
 			w.write('\n');
-			w.write(tag.getMessage());
+			if (tag.getMessage() != null)
+				w.write(tag.getMessage());
 			w.close();
 		} catch (IOException err) {
 			// This should never occur, the only way to get it above is

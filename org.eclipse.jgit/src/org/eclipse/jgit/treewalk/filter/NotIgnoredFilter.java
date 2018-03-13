@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2010, Jens Baumgart <jens.baumgart@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,47 +40,53 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.treewalk.filter;
 
-package org.eclipse.jgit.storage.pack;
+import java.io.IOException;
 
-import java.util.concurrent.locks.ReentrantLock;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 
-class ThreadSafeDeltaCache extends DeltaCache {
-	private final ReentrantLock lock;
+/**
+ * This filter includes workdir entries that are not ignored. This class is
+ * immutable.
+ */
+public class NotIgnoredFilter extends TreeFilter {
 
-	ThreadSafeDeltaCache(PackConfig pc) {
-		super(pc);
-		lock = new ReentrantLock();
+	private final int workdirTreeIndex;
+
+	/**
+	 * constructor
+	 *
+	 * @param workdirTreeIndex
+	 *            index of the workdir tree in the tree walk
+	 */
+	public NotIgnoredFilter(final int workdirTreeIndex) {
+		this.workdirTreeIndex = workdirTreeIndex;
 	}
 
 	@Override
-	boolean canCache(int length, ObjectToPack src, ObjectToPack res) {
-		lock.lock();
-		try {
-			return super.canCache(length, src, res);
-		} finally {
-			lock.unlock();
-		}
+	public boolean include(TreeWalk walker) throws MissingObjectException,
+			IncorrectObjectTypeException, IOException {
+		WorkingTreeIterator workingTreeIterator = walker.getTree(
+				workdirTreeIndex, WorkingTreeIterator.class);
+		if (workingTreeIterator != null)
+			// do not include ignored entries
+			return !workingTreeIterator.isEntryIgnored();
+		return true;
 	}
 
 	@Override
-	void credit(int reservedSize) {
-		lock.lock();
-		try {
-			super.credit(reservedSize);
-		} finally {
-			lock.unlock();
-		}
+	public boolean shouldBeRecursive() {
+		return false;
 	}
 
 	@Override
-	Ref cache(byte[] data, int actLen, int reservedSize) {
-		data = resize(data, actLen);
-		lock.lock();
-		try {
-			return super.cache(data, actLen, reservedSize);
-		} finally {
-			lock.unlock();
-		}
+	public TreeFilter clone() {
+		// immutable
+		return this;
 	}
+
 }
