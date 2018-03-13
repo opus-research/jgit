@@ -45,7 +45,6 @@
 
 package org.eclipse.jgit.lib;
 
-import static org.eclipse.jgit.junit.Assert.assertEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -59,7 +58,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Map;
 
-import org.eclipse.jgit.junit.SampleDataRepositoryTestCase;
 import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.junit.Test;

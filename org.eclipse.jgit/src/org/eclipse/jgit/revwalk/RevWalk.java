@@ -52,12 +52,12 @@ import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.RevWalkException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.AsyncObjectLoaderQueue;
 import org.eclipse.jgit.lib.Constants;
@@ -163,6 +163,9 @@ public class RevWalk implements Iterable<RevCommit> {
 
 	private static final int APP_FLAGS = -1 & ~((1 << RESERVED_FLAGS) - 1);
 
+	/** Exists <b>ONLY</b> to support legacy Tag and Commit objects. */
+	final Repository repository;
+
 	final ObjectReader reader;
 
 	final MutableObjectId idBuffer;
@@ -189,8 +192,6 @@ public class RevWalk implements Iterable<RevCommit> {
 
 	private boolean retainBody;
 
-	boolean shallowCommitsInitialized;
-
 	/**
 	 * Create a new revision walker for a given repository.
 	 *
@@ -200,7 +201,7 @@ public class RevWalk implements Iterable<RevCommit> {
 	 *            released by the caller.
 	 */
 	public RevWalk(final Repository repo) {
-		this(repo.newObjectReader());
+		this(repo, repo.newObjectReader());
 	}
 
 	/**
@@ -212,6 +213,11 @@ public class RevWalk implements Iterable<RevCommit> {
 	 *            required.
 	 */
 	public RevWalk(ObjectReader or) {
+		this(null, or);
+	}
+
+	private RevWalk(final Repository repo, final ObjectReader or) {
+		repository = repo;
 		reader = or;
 		idBuffer = new MutableObjectId();
 		objects = new ObjectIdOwnerMap<RevObject>();
@@ -614,9 +620,6 @@ public class RevWalk implements Iterable<RevCommit> {
 	 * <p>
 	 * The commit may or may not exist in the repository. It is impossible to
 	 * tell from this method's return value.
-	 * <p>
-	 * See {@link #parseHeaders(RevObject)} and {@link #parseBody(RevObject)}
-	 * for loading contents.
 	 *
 	 * @param id
 	 *            name of the commit object.
@@ -679,8 +682,7 @@ public class RevWalk implements Iterable<RevCommit> {
 				r = new RevTag(id);
 				break;
 			default:
-				throw new IllegalArgumentException(MessageFormat.format(
-						JGitText.get().invalidGitType, Integer.valueOf(type)));
+				throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidGitType, type));
 			}
 			objects.add(r);
 		}
@@ -841,8 +843,8 @@ public class RevWalk implements Iterable<RevCommit> {
 			break;
 		}
 		default:
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().badObjectType, Integer.valueOf(type)));
+			throw new IllegalArgumentException(MessageFormat.format(JGitText
+					.get().badObjectType, type));
 		}
 		objects.add(r);
 		return r;
@@ -1024,8 +1026,7 @@ public class RevWalk implements Iterable<RevCommit> {
 	int allocFlag() {
 		if (freeFlags == 0)
 			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().flagsAlreadyCreated,
-					Integer.valueOf(32 - RESERVED_FLAGS)));
+					JGitText.get().flagsAlreadyCreated, 32 - RESERVED_FLAGS));
 		final int m = Integer.lowestOneBit(freeFlags);
 		freeFlags &= ~m;
 		return m;
@@ -1203,7 +1204,6 @@ public class RevWalk implements Iterable<RevCommit> {
 		roots.clear();
 		queue = new DateRevQueue();
 		pending = new StartGenerator(this);
-		shallowCommitsInitialized = false;
 	}
 
 	/**
@@ -1306,19 +1306,5 @@ public class RevWalk implements Iterable<RevCommit> {
 		final int carry = c.flags & carryFlags;
 		if (carry != 0)
 			RevCommit.carryFlags(c, carry);
-	}
-
-	void initializeShallowCommits() throws IOException {
-		if (shallowCommitsInitialized)
-			throw new IllegalStateException(
-					JGitText.get().shallowCommitsAlreadyInitialized);
-
-		shallowCommitsInitialized = true;
-
-		if (reader == null)
-			return;
-
-		for (ObjectId id : reader.getShallowCommits())
-			lookupCommit(id).parents = RevCommit.NO_PARENTS;
 	}
 }

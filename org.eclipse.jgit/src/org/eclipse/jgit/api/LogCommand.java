@@ -47,12 +47,11 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -109,10 +108,9 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	 * method twice on an instance.
 	 *
 	 * @return an iteration over RevCommits
-	 * @throws NoHeadException
-	 *             of the references ref cannot be resolved
 	 */
-	public Iterable<RevCommit> call() throws GitAPIException, NoHeadException {
+	public Iterable<RevCommit> call() throws NoHeadException,
+			JGitInternalException {
 		checkCallable();
 		if (pathFilters.size() > 0)
 			walk.setTreeFilter(AndTreeFilter.create(
@@ -168,7 +166,7 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	 *             typically not wrapped here but thrown as original exception
 	 */
 	public LogCommand add(AnyObjectId start) throws MissingObjectException,
-			IncorrectObjectTypeException {
+			IncorrectObjectTypeException, JGitInternalException {
 		return add(true, start);
 	}
 
@@ -196,7 +194,7 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	 *             typically not wrapped here but thrown as original exception
 	 */
 	public LogCommand not(AnyObjectId start) throws MissingObjectException,
-			IncorrectObjectTypeException {
+			IncorrectObjectTypeException, JGitInternalException {
 		return add(false, start);
 	}
 
@@ -225,7 +223,8 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	 *             typically not wrapped here but thrown as original exception
 	 */
 	public LogCommand addRange(AnyObjectId since, AnyObjectId until)
-			throws MissingObjectException, IncorrectObjectTypeException {
+			throws MissingObjectException, IncorrectObjectTypeException,
+			JGitInternalException {
 		return not(since).add(until);
 	}
 
@@ -239,25 +238,10 @@ public class LogCommand extends GitCommand<Iterable<RevCommit>> {
 	 */
 	public LogCommand all() throws IOException {
 		for (Ref ref : getRepository().getAllRefs().values()) {
-			if(!ref.isPeeled())
-				ref = getRepository().peel(ref);
-
 			ObjectId objectId = ref.getPeeledObjectId();
 			if (objectId == null)
 				objectId = ref.getObjectId();
-			RevCommit commit = null;
-			try {
-				commit = walk.parseCommit(objectId);
-			} catch (MissingObjectException e) {
-				// ignore: the ref points to an object that does not exist;
-				// it should be ignored as traversal starting point.
-			} catch (IncorrectObjectTypeException e) {
-				// ignore: the ref points to an object that is not a commit
-				// (e.g. a tree or a blob);
-				// it should be ignored as traversal starting point.
-			}
-			if (commit != null)
-				add(commit);
+			add(objectId);
 		}
 		return this;
 	}

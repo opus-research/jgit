@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2012 Christian Halstrick <christian.halstrick@sap.com> and
+ * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com> and
  * other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available under the
@@ -48,7 +48,6 @@ import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.api.errors.NoMessageException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.kohsuke.args4j.Argument;
@@ -68,9 +67,6 @@ class Commit extends TextBuiltin {
 	@Option(name = "--only", aliases = { "-o" }, usage = "usage_CommitOnly")
 	private boolean only;
 
-	@Option(name = "--all", aliases = { "-a" }, usage = "usage_CommitAll")
-	private boolean all;
-
 	@Option(name = "--amend", usage = "usage_CommitAmend")
 	private boolean amend;
 
@@ -87,20 +83,12 @@ class Commit extends TextBuiltin {
 			commitCmd.setMessage(message);
 		if (only && paths.isEmpty())
 			throw die(CLIText.get().pathsRequired);
-		if (only && all)
-			throw die(CLIText.get().onlyOneOfIncludeOnlyAllInteractiveCanBeUsed);
 		if (!paths.isEmpty())
 			for (String p : paths)
 				commitCmd.setOnly(p);
 		commitCmd.setAmend(amend);
-		commitCmd.setAll(all);
 		Ref head = db.getRef(Constants.HEAD);
-		RevCommit commit;
-		try {
-			commit = commitCmd.call();
-		} catch (JGitInternalException e) {
-			throw die(e.getMessage());
-		}
+		RevCommit commit = commitCmd.call();
 
 		String branchName;
 		if (!head.isSymbolic())
@@ -110,7 +98,7 @@ class Commit extends TextBuiltin {
 			if (branchName.startsWith(Constants.R_HEADS))
 				branchName = branchName.substring(Constants.R_HEADS.length());
 		}
-		outw.println("[" + branchName + " " + commit.name() + "] " //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+		out.println("[" + branchName + " " + commit.name() + "] "
 				+ commit.getShortMessage());
 	}
 }

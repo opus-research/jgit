@@ -50,9 +50,8 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import org.eclipse.jgit.junit.RepositoryTestCase;
-import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.junit.Test;
 
@@ -90,46 +89,16 @@ public class LogCommandTest extends RepositoryTestCase {
 		assertFalse(log.hasNext());
 	}
 
-    @Test
-    public void logAllCommitsWithTag() throws Exception {
-		List<RevCommit> commits = new ArrayList<RevCommit>();
-		Git git = Git.wrap(db);
-
-		writeTrashFile("Test.txt", "Hello world");
-		git.add().addFilepattern("Test.txt").call();
-		commits.add(git.commit().setMessage("initial commit").call());
-
-		TagCommand tagCmd = git.tag();
-		tagCmd.setName("tagcommit");
-		tagCmd.setObjectId(commits.get(0));
-		tagCmd.setTagger(new PersonIdent(db));
-		Ref tag = tagCmd.call();
-
-		tagCmd = git.tag();
-		tagCmd.setName("tagtree");
-		tagCmd.setObjectId(commits.get(0).getTree());
-		tagCmd.setTagger(new PersonIdent(db));
-		tagCmd.call();
-
-		Iterator<RevCommit> log = git.log().all().call().iterator();
-		assertTrue(log.hasNext());
-		RevCommit commit = log.next();
-		tag = db.peel(tag);
-
-		assertEquals(commit.getName(), tag.getPeeledObjectId().getName());
-		assertTrue(commits.contains(commit));
-	}
-
 	private List<RevCommit> createCommits(Git git) throws Exception {
 		List<RevCommit> commits = new ArrayList<RevCommit>();
 		writeTrashFile("Test.txt", "Hello world");
 		git.add().addFilepattern("Test.txt").call();
 		commits.add(git.commit().setMessage("commit#1").call());
-		writeTrashFile("Test.txt", "Hello world!");
-		git.add().addFilepattern("Test.txt").call();
-		commits.add(git.commit().setMessage("commit#2").call());
-		writeTrashFile("Test1.txt", "Hello world!!");
+		writeTrashFile("Test1.txt", "Hello world!");
 		git.add().addFilepattern("Test1.txt").call();
+		commits.add(git.commit().setMessage("commit#2").call());
+		writeTrashFile("Test2.txt", "Hello world!!");
+		git.add().addFilepattern("Test2.txt").call();
 		commits.add(git.commit().setMessage("commit#3").call());
 		return commits;
 	}
@@ -149,34 +118,6 @@ public class LogCommandTest extends RepositoryTestCase {
 		commit = log.next();
 		assertTrue(commits.contains(commit));
 		assertEquals("commit#2", commit.getShortMessage());
-		assertFalse(log.hasNext());
-	}
-
-	@Test
-	public void logPathWithMaxCount() throws Exception {
-		Git git = Git.wrap(db);
-		List<RevCommit> commits = createCommits(git);
-
-		Iterator<RevCommit> log = git.log().addPath("Test.txt").setMaxCount(1)
-				.call().iterator();
-		assertTrue(log.hasNext());
-		RevCommit commit = log.next();
-		assertTrue(commits.contains(commit));
-		assertEquals("commit#2", commit.getShortMessage());
-		assertFalse(log.hasNext());
-	}
-
-	@Test
-	public void logPathWithSkip() throws Exception {
-		Git git = Git.wrap(db);
-		List<RevCommit> commits = createCommits(git);
-
-		Iterator<RevCommit> log = git.log().addPath("Test.txt").setSkip(1)
-				.call().iterator();
-		assertTrue(log.hasNext());
-		RevCommit commit = log.next();
-		assertTrue(commits.contains(commit));
-		assertEquals("commit#1", commit.getShortMessage());
 		assertFalse(log.hasNext());
 	}
 

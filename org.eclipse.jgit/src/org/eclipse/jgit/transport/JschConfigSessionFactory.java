@@ -57,8 +57,8 @@ import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.util.FS;
 
 import com.jcraft.jsch.JSch;
@@ -120,8 +120,7 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 					// if authentication failed maybe credentials changed at the
 					// remote end therefore reset credentials and retry
 					if (credentialsProvider != null && e.getCause() == null
-							&& e.getMessage().equals("Auth fail") //$NON-NLS-1$
-							&& retries < 3) {
+							&& e.getMessage().equals("Auth fail")) {
 						credentialsProvider.reset(uri);
 						session = createSession(credentialsProvider, fs, user,
 								pass, host, port, hc);
@@ -153,11 +152,11 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 		final String strictHostKeyCheckingPolicy = hc
 				.getStrictHostKeyChecking();
 		if (strictHostKeyCheckingPolicy != null)
-			session.setConfig("StrictHostKeyChecking", //$NON-NLS-1$
+			session.setConfig("StrictHostKeyChecking",
 					strictHostKeyCheckingPolicy);
 		final String pauth = hc.getPreferredAuthentications();
 		if (pauth != null)
-			session.setConfig("PreferredAuthentications", pauth); //$NON-NLS-1$
+			session.setConfig("PreferredAuthentications", pauth);
 		if (credentialsProvider != null
 				&& (!hc.isBatchMode() || !credentialsProvider.isInteractive())) {
 			session.setUserInfo(new CredentialsProviderUserInfo(session,
@@ -255,7 +254,7 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 		final File home = fs.userHome();
 		if (home == null)
 			return;
-		final File known_hosts = new File(new File(home, ".ssh"), "known_hosts"); //$NON-NLS-1$ //$NON-NLS-2$
+		final File known_hosts = new File(new File(home, ".ssh"), "known_hosts");
 		try {
 			final FileInputStream in = new FileInputStream(known_hosts);
 			try {
@@ -274,11 +273,11 @@ public abstract class JschConfigSessionFactory extends SshSessionFactory {
 		final File home = fs.userHome();
 		if (home == null)
 			return;
-		final File sshdir = new File(home, ".ssh"); //$NON-NLS-1$
+		final File sshdir = new File(home, ".ssh");
 		if (sshdir.isDirectory()) {
-			loadIdentity(sch, new File(sshdir, "identity")); //$NON-NLS-1$
-			loadIdentity(sch, new File(sshdir, "id_rsa")); //$NON-NLS-1$
-			loadIdentity(sch, new File(sshdir, "id_dsa")); //$NON-NLS-1$
+			loadIdentity(sch, new File(sshdir, "identity"));
+			loadIdentity(sch, new File(sshdir, "id_rsa"));
+			loadIdentity(sch, new File(sshdir, "id_dsa"));
 		}
 	}
 

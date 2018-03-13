@@ -46,7 +46,7 @@ package org.eclipse.jgit.errors;
 import java.io.IOException;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 
 /** Thrown when PackParser finds an object larger than a predefined limit */
 public class TooLargeObjectInPackException extends IOException {
@@ -64,7 +64,7 @@ public class TooLargeObjectInPackException extends IOException {
 	 */
 	public TooLargeObjectInPackException(long maxObjectSizeLimit) {
 		super(MessageFormat.format(JGitText.get().receivePackObjectTooLarge1,
-				Long.valueOf(maxObjectSizeLimit)));
+				maxObjectSizeLimit));
 	}
 
 	/**
@@ -77,6 +77,6 @@ public class TooLargeObjectInPackException extends IOException {
 	public TooLargeObjectInPackException(long objectSize,
 			long maxObjectSizeLimit) {
 		super(MessageFormat.format(JGitText.get().receivePackObjectTooLarge2,
-				Long.valueOf(objectSize), Long.valueOf(maxObjectSizeLimit)));
+				objectSize, maxObjectSizeLimit));
 	}
 }

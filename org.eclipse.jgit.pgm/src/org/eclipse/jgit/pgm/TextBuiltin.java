@@ -49,10 +49,7 @@ import static org.eclipse.jgit.lib.Constants.R_REMOTES;
 import static org.eclipse.jgit.lib.Constants.R_TAGS;
 
 import java.io.BufferedWriter;
-import java.io.FileDescriptor;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.text.MessageFormat;
@@ -60,10 +57,8 @@ import java.util.ResourceBundle;
 
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.pgm.opt.CmdLineParser;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.util.io.ThrowingPrintWriter;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.Option;
 
@@ -84,25 +79,7 @@ public abstract class TextBuiltin {
 	@Option(name = "--help", usage = "usage_displayThisHelpText", aliases = { "-h" })
 	private boolean help;
 
-	/**
-	 * Writer to output to, typically this is standard output.
-	 *
-	 * @since 2.2
-	 */
-	protected ThrowingPrintWriter outw;
-
-	/**
-	 * Stream to output to, typically this is standard output.
-	 *
-	 * @since 2.2
-	 */
-	protected OutputStream outs;
-
-	/**
-	 * Stream to output to, typically this is standard output.
-	 *
-	 * @deprecated Use outw instead
-	 */
+	/** Stream to output to, typically this is standard output. */
 	protected PrintWriter out;
 
 	/** Git repository the command was invoked within. */
@@ -135,17 +112,14 @@ public abstract class TextBuiltin {
 	protected void init(final Repository repository, final String gitDir) {
 		try {
 			final String outputEncoding = repository != null ? repository
-					.getConfig().getString("i18n", null, "logOutputEncoding") : null; //$NON-NLS-1$ //$NON-NLS-2$
-			if (outs == null)
-				outs = new FileOutputStream(FileDescriptor.out);
-			BufferedWriter bufw;
+					.getConfig()
+					.getString("i18n", null, "logOutputEncoding") : null;
 			if (outputEncoding != null)
-				bufw = new BufferedWriter(new OutputStreamWriter(outs,
-						outputEncoding));
+				out = new PrintWriter(new BufferedWriter(
+						new OutputStreamWriter(System.out, outputEncoding)));
 			else
-				bufw = new BufferedWriter(new OutputStreamWriter(outs));
-			out = new PrintWriter(bufw);
-			outw = new ThrowingPrintWriter(bufw);
+				out = new PrintWriter(new BufferedWriter(
+						new OutputStreamWriter(System.out)));
 		} catch (IOException e) {
 			throw die(CLIText.get().cannotCreateOutputStream);
 		}
@@ -208,7 +182,7 @@ public abstract class TextBuiltin {
 	 * @param clp
 	 */
 	public void printUsageAndExit(final CmdLineParser clp) {
-		printUsageAndExit("", clp); //$NON-NLS-1$
+		printUsageAndExit("", clp);
 	}
 
 	/**
@@ -220,7 +194,7 @@ public abstract class TextBuiltin {
 	public void printUsageAndExit(final String message, final CmdLineParser clp) {
 		PrintWriter writer = new PrintWriter(System.err);
 		writer.println(message);
-		writer.print("jgit "); //$NON-NLS-1$
+		writer.print("jgit ");
 		writer.print(commandName);
 		clp.printSingleLineUsage(writer, getResourceBundle());
 		writer.println();

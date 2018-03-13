@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2013 Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2011, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,11 +43,9 @@
 package org.eclipse.jgit.api;
 
 import java.util.Collections;
-import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.jgit.lib.IndexDiff;
-import org.eclipse.jgit.lib.IndexDiff.StageState;
 
 /**
  * A class telling where the working-tree, the index and the current HEAD differ
@@ -140,32 +138,10 @@ public class Status {
 	}
 
 	/**
-	 * @return set of directories that are not ignored, and not in the index.
-	 */
-	public Set<String> getUntrackedFolders() {
-		return Collections.unmodifiableSet(diff.getUntrackedFolders());
-	}
-
-	/**
 	 * @return list of files that are in conflict. (e.g what you get if you
 	 *         modify file that was modified by someone else in the meantime)
 	 */
 	public Set<String> getConflicting() {
 		return Collections.unmodifiableSet(diff.getConflicting());
-	}
-
-	/**
-	 * @return a map from conflicting path to its {@link StageState}.
-	 * @since 3.0
-	 */
-	public Map<String, StageState> getConflictingStageState() {
-		return Collections.unmodifiableMap(diff.getConflictingStageStates());
-	}
-
-	/**
-	 * @return set of files and folders that are ignored and not in the index.
-	 */
-	public Set<String> getIgnoredNotInIndex() {
-		return Collections.unmodifiableSet(diff.getIgnoredNotInIndex());
 	}
 }

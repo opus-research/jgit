@@ -48,10 +48,8 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.io.IOException;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -64,8 +62,7 @@ public class InitCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testInitRepository() throws IOException, JGitInternalException,
-			GitAPIException {
+	public void testInitRepository() throws IOException {
 		File directory = createTempDirectory("testInitRepository");
 		InitCommand command = new InitCommand();
 		command.setDirectory(directory);
@@ -75,8 +72,7 @@ public class InitCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testInitNonEmptyRepository() throws IOException,
-			JGitInternalException, GitAPIException {
+	public void testInitNonEmptyRepository() throws IOException {
 		File directory = createTempDirectory("testInitRepository2");
 		File someFile = new File(directory, "someFile");
 		someFile.createNewFile();
@@ -90,8 +86,7 @@ public class InitCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testInitBareRepository() throws IOException,
-			JGitInternalException, GitAPIException {
+	public void testInitBareRepository() throws IOException {
 		File directory = createTempDirectory("testInitBareRepository");
 		InitCommand command = new InitCommand();
 		command.setDirectory(directory);
