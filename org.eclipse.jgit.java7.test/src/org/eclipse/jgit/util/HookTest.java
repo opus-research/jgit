@@ -73,6 +73,48 @@ public class HookTest extends RepositoryTestCase {
 	}
 
 	@Test
+	public void testFailedCommitMsgHookBlocksCommit() throws Exception {
+		assumeSupportedPlatform();
+
+		Hook h = Hook.COMMIT_MSG;
+		writeHookFile(h.getName(),
+				"#!/bin/sh\necho \"test\"\n\necho 1>&2 \"stderr\"\nexit 1");
+		Git git = Git.wrap(db);
+		String path = "a.txt";
+		writeTrashFile(path, "content");
+		git.add().addFilepattern(path).call();
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		try {
+			git.commit().setMessage("commit")
+					.setHookOutputStream(new PrintStream(out)).call();
+			fail("expected commit-msg hook to abort commit");
+		} catch (RejectCommitException e) {
+			assertEquals("unexpected error message from commit-msg hook",
+					"Commit rejected by \"commit-msg\" hook.\nstderr\n",
+					e.getMessage());
+			assertEquals("unexpected output from commit-msg hook", "test\n",
+					out.toString());
+		}
+	}
+
+	@Test
+	public void testCommitMsgHook() throws Exception {
+		assumeSupportedPlatform();
+
+		Hook h = Hook.COMMIT_MSG;
+		writeHookFile(h.getName(),
+				"#!/bin/sh\necho \"test\"\n\necho 1>&2 \"stderr\"\nexit 0");
+		Git git = Git.wrap(db);
+		String path = "a.txt";
+		writeTrashFile(path, "content");
+		git.add().addFilepattern(path).call();
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		git.commit().setMessage("commit")
+				.setHookOutputStream(new PrintStream(out)).call();
+		assertEquals("test\n", out.toString("UTF-8"));
+	}
+
+	@Test
 	public void testRunHook() throws Exception {
 		assumeSupportedPlatform();
 
@@ -119,68 +161,6 @@ public class HookTest extends RepositoryTestCase {
 		} catch (Throwable e) {
 			fail("unexpected exception thrown by pre-commit hook: " + e);
 		}
-	}
-
-	@Test
-	public void testPostCommitHook() throws Exception {
-		assumeSupportedPlatform();
-
-		Hook h = Hook.POST_COMMIT;
-		writeHookFile(h.getName(),
-				"#!/bin/sh\necho \"test\"\n\necho 1>&2 \"stderr\"\nexit 1");
-		Git git = Git.wrap(db);
-		String path = "a.txt";
-		writeTrashFile(path, "content");
-		git.add().addFilepattern(path).call();
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		git.commit().setMessage("commit")
-				.setHookOutputStream(new PrintStream(out)).call();
-		assertEquals("test\n", out.toString("UTF-8"));
-	}
-
-	@Test
-	public void testPostCommitHookErrorHandlerIsCalledOnFailure()
-			throws Exception {
-		assumeSupportedPlatform();
-
-		final Hook h = Hook.POST_COMMIT;
-		writeHookFile(h.getName(),
-				"#!/bin/sh\necho \"test\"\n\necho 1>&2 \"stderr\"\nexit 1");
-		Git git = Git.wrap(db);
-		String path = "a.txt";
-		writeTrashFile(path, "content");
-		git.add().addFilepattern(path).call();
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-
-		TestHookErrorHandler handler = new TestHookErrorHandler();
-		git.commit().setMessage("commit")
-				.setHookOutputStream(new PrintStream(out))
-				.setHookErrorHandler(handler).call();
-		assertEquals(1, handler.invocationCount);
-		assertEquals(1, handler.processResult.getExitCode());
-		assertEquals("stderr\n", handler.errorStreamContent);
-		assertEquals(h, handler.hook);
-	}
-
-	@Test
-	public void testPostCommitHookErrorHandlerIsIgnoredOnSuccess()
-			throws Exception {
-		assumeSupportedPlatform();
-
-		final Hook h = Hook.POST_COMMIT;
-		writeHookFile(h.getName(),
-				"#!/bin/sh\necho \"test\"\n\necho 1>&2 \"stderr\"\nexit 0");
-		Git git = Git.wrap(db);
-		String path = "a.txt";
-		writeTrashFile(path, "content");
-		git.add().addFilepattern(path).call();
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-
-		TestHookErrorHandler handler = new TestHookErrorHandler();
-		git.commit().setMessage("commit")
-				.setHookOutputStream(new PrintStream(out))
-				.setHookErrorHandler(handler).call();
-		assertEquals(0, handler.invocationCount);
 	}
 
 	private File writeHookFile(final String name, final String data)
