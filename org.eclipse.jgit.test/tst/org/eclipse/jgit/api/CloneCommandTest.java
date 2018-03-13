@@ -55,7 +55,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.eclipse.jgit.api.ListBranchCommand.ListMode;
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.ConfigConstants;
@@ -104,8 +103,7 @@ public class CloneCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testCloneRepository() throws IOException,
-			JGitInternalException, GitAPIException {
+	public void testCloneRepository() throws IOException {
 		File directory = createTempDirectory("testCloneRepository");
 		CloneCommand command = Git.cloneRepository();
 		command.setDirectory(directory);
@@ -133,8 +131,7 @@ public class CloneCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testCloneRepositoryWithBranch() throws IOException,
-			JGitInternalException, GitAPIException {
+	public void testCloneRepositoryWithBranch() throws IOException {
 		File directory = createTempDirectory("testCloneRepositoryWithBranch");
 		CloneCommand command = Git.cloneRepository();
 		command.setBranch("refs/heads/master");
@@ -181,8 +178,7 @@ public class CloneCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testCloneRepositoryOnlyOneBranch() throws IOException,
-			JGitInternalException, GitAPIException {
+	public void testCloneRepositoryOnlyOneBranch() throws IOException {
 		File directory = createTempDirectory("testCloneRepositoryWithBranch");
 		CloneCommand command = Git.cloneRepository();
 		command.setBranch("refs/heads/master");
@@ -226,7 +222,7 @@ public class CloneCommandTest extends RepositoryTestCase {
 
 	@Test
 	public void testCloneRepositoryWhenDestinationDirectoryExistsAndIsNotEmpty()
-			throws IOException, JGitInternalException, GitAPIException {
+			throws IOException {
 		String dirName = "testCloneTargetDirectoryNotEmpty";
 		File directory = createTempDirectory(dirName);
 		CloneCommand command = Git.cloneRepository();
