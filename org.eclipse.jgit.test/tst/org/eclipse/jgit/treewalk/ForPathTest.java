@@ -49,6 +49,7 @@ import static org.junit.Assert.assertEquals;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEntry;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
@@ -64,6 +65,15 @@ public class ForPathTest extends RepositoryTestCase {
 
 	private static final FileMode EXECUTABLE_FILE = FileMode.EXECUTABLE_FILE;
 
+	private DirCacheEntry makeEntry(final String path, final FileMode mode)
+			throws Exception {
+		final DirCacheEntry ent = new DirCacheEntry(path);
+		ent.setFileMode(mode);
+		ent.setObjectId(new ObjectInserter.Formatter().idFor(
+				Constants.OBJ_BLOB, Constants.encode(path)));
+		return ent;
+	}
+
 	@Test
 	public void testFindObjects() throws Exception {
 		final DirCache tree0 = DirCache.newInCore();
@@ -71,13 +81,13 @@ public class ForPathTest extends RepositoryTestCase {
 		ObjectReader or = db.newObjectReader();
 		ObjectInserter oi = db.newObjectInserter();
 
-		DirCacheEntry aDotB = createEntry("a.b", EXECUTABLE_FILE);
+		DirCacheEntry aDotB = makeEntry("a.b", EXECUTABLE_FILE);
 		b0.add(aDotB);
-		DirCacheEntry aSlashB = createEntry("a/b", REGULAR_FILE);
+		DirCacheEntry aSlashB = makeEntry("a/b", REGULAR_FILE);
 		b0.add(aSlashB);
-		DirCacheEntry aSlashCSlashD = createEntry("a/c/d", REGULAR_FILE);
+		DirCacheEntry aSlashCSlashD = makeEntry("a/c/d", REGULAR_FILE);
 		b0.add(aSlashCSlashD);
-		DirCacheEntry aZeroB = createEntry("a0b", SYMLINK);
+		DirCacheEntry aZeroB = makeEntry("a0b", SYMLINK);
 		b0.add(aZeroB);
 		b0.finish();
 		assertEquals(4, tree0.getEntryCount());

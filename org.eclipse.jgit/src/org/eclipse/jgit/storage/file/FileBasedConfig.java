@@ -49,15 +49,14 @@
 
 package org.eclipse.jgit.storage.file;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.MessageFormat;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.LockFailedException;
 import org.eclipse.jgit.errors.ConfigInvalidException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -71,13 +70,8 @@ import org.eclipse.jgit.util.RawParseUtils;
  */
 public class FileBasedConfig extends StoredConfig {
 	private final File configFile;
-
 	private final FS fs;
-
-	private boolean utf8Bom;
-
 	private volatile FileSnapshot snapshot;
-
 	private volatile ObjectId hash;
 
 	/**
@@ -147,16 +141,7 @@ public class FileBasedConfig extends StoredConfig {
 				else
 					snapshot = newSnapshot;
 			} else {
-				final String decoded;
-				if (in.length >= 3 && in[0] == (byte) 0xEF
-						&& in[1] == (byte) 0xBB && in[2] == (byte) 0xBF) {
-					decoded = RawParseUtils.decode(RawParseUtils.UTF8_CHARSET,
-							in, 3, in.length);
-					utf8Bom = true;
-				} else {
-					decoded = RawParseUtils.decode(in);
-				}
-				fromText(decoded);
+				fromText(RawParseUtils.decode(in));
 				snapshot = newSnapshot;
 				hash = newHash;
 			}
@@ -185,19 +170,7 @@ public class FileBasedConfig extends StoredConfig {
 	 *             the file could not be written.
 	 */
 	public void save() throws IOException {
-		final byte[] out;
-		final String text = toText();
-		if (utf8Bom) {
-			final ByteArrayOutputStream bos = new ByteArrayOutputStream();
-			bos.write(0xEF);
-			bos.write(0xBB);
-			bos.write(0xBF);
-			bos.write(text.getBytes(RawParseUtils.UTF8_CHARSET.name()));
-			out = bos.toByteArray();
-		} else {
-			out = Constants.encode(text);
-		}
-
+		final byte[] out = Constants.encode(toText());
 		final LockFile lf = new LockFile(getFile(), fs);
 		if (!lf.lock())
 			throw new LockFailedException(getFile());

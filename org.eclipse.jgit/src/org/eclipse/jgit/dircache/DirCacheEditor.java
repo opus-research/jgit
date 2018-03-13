@@ -51,7 +51,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.Constants;
 
 /**
@@ -146,21 +146,18 @@ public class DirCacheEditor extends BaseDirCacheEditor {
 				continue;
 			}
 
+			final DirCacheEntry ent;
 			if (missing) {
-				final DirCacheEntry ent = new DirCacheEntry(e.path);
+				ent = new DirCacheEntry(e.path);
 				e.apply(ent);
 				if (ent.getRawMode() == 0)
 					throw new IllegalArgumentException(MessageFormat.format(JGitText.get().fileModeNotSetForPath
 							, ent.getPathString()));
-				fastAdd(ent);
 			} else {
-				// Apply to all entries of the current path (different stages)
-				for (int i = eIdx; i < lastIdx; i++) {
-					final DirCacheEntry ent = cache.getEntry(i);
-					e.apply(ent);
-					fastAdd(ent);
-				}
+				ent = cache.getEntry(eIdx);
+				e.apply(ent);
 			}
+			fastAdd(ent);
 		}
 
 		final int cnt = maxIdx - lastIdx;

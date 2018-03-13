@@ -49,7 +49,10 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.fail;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -68,6 +71,7 @@ import org.eclipse.jgit.storage.file.WindowCache;
 import org.eclipse.jgit.storage.file.WindowCacheConfig;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
+import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.SystemReader;
 import org.junit.After;
 import org.junit.Before;
@@ -431,11 +435,28 @@ public abstract class LocalDiskRepositoryTestCase {
 	 *             the file could not be written.
 	 */
 	protected void write(final File f, final String body) throws IOException {
-		JGitTestUtil.write(f, body);
+		FileUtils.mkdirs(f.getParentFile(), true);
+		Writer w = new OutputStreamWriter(new FileOutputStream(f), "UTF-8");
+		try {
+			w.write(body);
+		} finally {
+			w.close();
+		}
 	}
 
+	/**
+	 * Fully read a UTF-8 file and return as a string.
+	 *
+	 * @param f
+	 *            file to read the content of.
+	 * @return UTF-8 decoded content of the file, empty string if the file
+	 *         exists but has no content.
+	 * @throws IOException
+	 *             the file does not exist, or could not be read.
+	 */
 	protected String read(final File f) throws IOException {
-		return JGitTestUtil.read(f);
+		final byte[] body = IO.readFully(f);
+		return new String(body, 0, body.length, "UTF-8");
 	}
 
 	private static String[] toEnvArray(final Map<String, String> env) {
