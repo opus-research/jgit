@@ -54,7 +54,6 @@ import static org.eclipse.jgit.lib.Constants.PACKED_REFS;
 import static org.eclipse.jgit.lib.Constants.R_HEADS;
 import static org.eclipse.jgit.lib.Constants.R_REFS;
 import static org.eclipse.jgit.lib.Constants.R_REMOTES;
-import static org.eclipse.jgit.lib.Constants.R_STASH;
 import static org.eclipse.jgit.lib.Constants.R_TAGS;
 import static org.eclipse.jgit.lib.Constants.encode;
 import static org.eclipse.jgit.lib.Ref.Storage.LOOSE;
@@ -78,11 +77,10 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.eclipse.jgit.errors.LockFailedException;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.ObjectWritingException;
 import org.eclipse.jgit.events.RefsChangedEvent;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig;
 import org.eclipse.jgit.lib.ObjectId;
@@ -564,7 +562,8 @@ public class RefDirectory extends RefDatabase {
 			LockFile lck = new LockFile(packedRefsFile,
 					update.getRepository().getFS());
 			if (!lck.lock())
-				throw new LockFailedException(packedRefsFile);
+				throw new IOException(MessageFormat.format(
+					JGitText.get().cannotLockFile, packedRefsFile));
 			try {
 				PackedRefList cur = readPackedRefs();
 				int idx = cur.find(name);
@@ -672,8 +671,7 @@ public class RefDirectory extends RefDatabase {
 	private boolean shouldAutoCreateLog(final String refName) {
 		return refName.equals(HEAD) //
 				|| refName.startsWith(R_HEADS) //
-				|| refName.startsWith(R_REMOTES) //
-				|| refName.equals(R_STASH);
+				|| refName.startsWith(R_REMOTES);
 	}
 
 	private Ref resolve(final Ref ref, int depth, String prefix,
