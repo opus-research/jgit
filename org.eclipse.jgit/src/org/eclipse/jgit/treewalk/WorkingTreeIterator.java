@@ -195,6 +195,13 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	}
 
 	@Override
+	public boolean hasId() {
+		if (contentIdFromPtr == ptr)
+			return true;
+		return (mode & FileMode.TYPE_MASK) == FileMode.TYPE_FILE;
+	}
+
+	@Override
 	public byte[] idBuffer() {
 		if (contentIdFromPtr == ptr)
 			return contentId;
@@ -292,7 +299,15 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	}
 
 	private boolean mightNeedCleaning(Entry entry) {
-		return options.isAutoCRLF();
+		switch (options.getAutoCRLF()) {
+		case FALSE:
+		default:
+			return false;
+
+		case TRUE:
+		case INPUT:
+			return true;
+		}
 	}
 
 	private boolean isBinary(Entry entry, byte[] content, int sz) {
@@ -330,6 +345,15 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	@Override
 	public int idOffset() {
 		return 0;
+	}
+
+	@Override
+	public void reset() {
+		if (!first()) {
+			ptr = 0;
+			if (!eof())
+				parseEntry();
+		}
 	}
 
 	@Override

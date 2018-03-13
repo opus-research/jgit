@@ -46,6 +46,8 @@
 package org.eclipse.jgit.lib;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 
 import org.eclipse.jgit.dircache.DirCache;
@@ -58,6 +60,7 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.filter.AndTreeFilter;
 import org.eclipse.jgit.treewalk.filter.NotIgnoredFilter;
+import org.eclipse.jgit.treewalk.filter.SkipWorkTreeFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 
 /**
@@ -82,6 +85,8 @@ public class IndexDiff {
 	private final Repository repository;
 
 	private final RevTree tree;
+
+	private TreeFilter filter = null;
 
 	private final WorkingTreeIterator initialWorkingTreeIterator;
 
@@ -139,6 +144,15 @@ public class IndexDiff {
 		this.initialWorkingTreeIterator = workingTreeIterator;
 	}
 
+	/**
+	 * Sets a filter. Can be used e.g. for restricting the tree walk to a set of
+	 * files.
+	 *
+	 * @param filter
+	 */
+	public void setFilter(TreeFilter filter) {
+		this.filter = filter;
+	}
 
 	/**
 	 * Run the diff operation. Until this is called, all lists will be empty
@@ -159,9 +173,14 @@ public class IndexDiff {
 			treeWalk.addTree(new EmptyTreeIterator());
 		treeWalk.addTree(new DirCacheIterator(dirCache));
 		treeWalk.addTree(initialWorkingTreeIterator);
-		treeWalk.setFilter(TreeFilter.ANY_DIFF);
-		treeWalk.setFilter(AndTreeFilter.create(TreeFilter.ANY_DIFF,
-				new NotIgnoredFilter(WORKDIR)));
+		Collection<TreeFilter> filters = new ArrayList<TreeFilter>(
+				filter == null ? 3 : 4);
+		if (filter != null)
+			filters.add(filter);
+		filters.add(new NotIgnoredFilter(WORKDIR));
+		filters.add(new SkipWorkTreeFilter(INDEX));
+		filters.add(TreeFilter.ANY_DIFF);
+		treeWalk.setFilter(AndTreeFilter.create(filters));
 		while (treeWalk.next()) {
 			AbstractTreeIterator treeIterator = treeWalk.getTree(TREE,
 					AbstractTreeIterator.class);
@@ -184,6 +203,9 @@ public class IndexDiff {
 					if (!fileModeTree.equals(FileMode.TYPE_TREE)) {
 						removed.add(treeIterator.getEntryPathString());
 						changesExist = true;
+						if (workingTreeIterator != null)
+							untracked.add(workingTreeIterator
+									.getEntryPathString());
 					}
 				}
 			} else {

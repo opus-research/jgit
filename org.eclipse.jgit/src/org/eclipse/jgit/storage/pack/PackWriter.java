@@ -48,7 +48,6 @@ import static org.eclipse.jgit.storage.pack.StoredObjectRepresentation.PACK_DELT
 import static org.eclipse.jgit.storage.pack.StoredObjectRepresentation.PACK_WHOLE;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.security.MessageDigest;
 import java.util.ArrayList;
@@ -60,7 +59,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -88,13 +86,11 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.ThreadSafeProgressMonitor;
 import org.eclipse.jgit.revwalk.AsyncRevObjectQueue;
-import org.eclipse.jgit.revwalk.DepthWalk;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.storage.file.PackIndexWriter;
-import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.TemporaryBuffer;
 
 /**
@@ -382,40 +378,6 @@ public class PackWriter {
 			countingMonitor = NullProgressMonitor.INSTANCE;
 		ObjectWalk walker = setUpWalker(interestingObjects,
 				uninterestingObjects);
-		findObjectsToPack(countingMonitor, walker);
-	}
-
-	/**
-	 * Prepare the list of objects to be written to the pack stream.
-	 * <p>
-	 * Acts the same as the previous version of this function, but also
-	 * takes in the information necessary to perform a shallow clone.
-	 * @param countingMonitor
-	 *            progress during object enumeration.
-	 * @param interestingObjects
-	 *            collection of objects to be marked as interesting (start
-	 *            points of graph traversal).
-	 * @param uninterestingObjects
-	 *            collection of objects to be marked as uninteresting (end
-	 *            points of graph traversal).
-	 * @param unshallowObjects
-	 * 			  objects which used to be shallow on the client, but
-	 * 			  are being extended as part of this fetch
-	 * @param depth
-	 * 			  maximum depth to traverse the commit graph
-	 * @throws IOException
-	 *             when some I/O problem occur during reading objects.
-	 */
-	public void preparePack(ProgressMonitor countingMonitor,
-			final Collection<? extends ObjectId> interestingObjects,
-			final Collection<? extends ObjectId> uninterestingObjects,
-			final Collection<? extends ObjectId> unshallowObjects,
-			int depth)
-			throws IOException {
-		if (countingMonitor == null)
-			countingMonitor = NullProgressMonitor.INSTANCE;
-		ObjectWalk walker = setUpWalker(interestingObjects,
-				uninterestingObjects, unshallowObjects, depth);
 		findObjectsToPack(countingMonitor, walker);
 	}
 
@@ -712,7 +674,7 @@ public class PackWriter {
 		}
 
 		final DeltaCache dc = new ThreadSafeDeltaCache(config);
-		final ProgressMonitor pm = new ThreadSafeProgressMonitor(monitor);
+		final ThreadSafeProgressMonitor pm = new ThreadSafeProgressMonitor(monitor);
 
 		// Guess at the size of batch we want. Because we don't really
 		// have a way for a thread to steal work from another thread if
@@ -750,6 +712,7 @@ public class PackWriter {
 			i += batchSize;
 			myTasks.add(new DeltaTask(config, reader, dc, pm, batchSize, start, list));
 		}
+		pm.startWorkers(myTasks.size());
 
 		final Executor executor = config.getExecutor();
 		final List<Throwable> errors = Collections
@@ -757,7 +720,7 @@ public class PackWriter {
 		if (executor instanceof ExecutorService) {
 			// Caller supplied us a service, use it directly.
 			//
-			runTasks((ExecutorService) executor, myTasks, errors);
+			runTasks((ExecutorService) executor, pm, myTasks, errors);
 
 		} else if (executor == null) {
 			// Caller didn't give us a way to run the tasks, spawn up a
@@ -765,7 +728,7 @@ public class PackWriter {
 			//
 			ExecutorService pool = Executors.newFixedThreadPool(threads);
 			try {
-				runTasks(pool, myTasks, errors);
+				runTasks(pool, pm, myTasks, errors);
 			} finally {
 				pool.shutdown();
 				for (;;) {
@@ -783,7 +746,6 @@ public class PackWriter {
 			// asynchronous execution.  Wrap everything and hope it
 			// can schedule these for us.
 			//
-			final CountDownLatch done = new CountDownLatch(myTasks.size());
 			for (final DeltaTask task : myTasks) {
 				executor.execute(new Runnable() {
 					public void run() {
@@ -791,14 +753,12 @@ public class PackWriter {
 							task.call();
 						} catch (Throwable failure) {
 							errors.add(failure);
-						} finally {
-							done.countDown();
 						}
 					}
 				});
 			}
 			try {
-				done.await();
+				pm.waitForCompletion();
 			} catch (InterruptedException ie) {
 				// We can't abort the other tasks as we have no handle.
 				// Cross our fingers and just break out anyway.
@@ -826,13 +786,14 @@ public class PackWriter {
 		}
 	}
 
-	private void runTasks(ExecutorService pool, List<DeltaTask> tasks,
-			List<Throwable> errors) throws IOException {
+	private void runTasks(ExecutorService pool, ThreadSafeProgressMonitor pm,
+			List<DeltaTask> tasks, List<Throwable> errors) throws IOException {
 		List<Future<?>> futures = new ArrayList<Future<?>>(tasks.size());
 		for (DeltaTask task : tasks)
 			futures.add(pool.submit(task));
 
 		try {
+			pm.waitForCompletion();
 			for (Future<?> f : futures) {
 				try {
 					f.get();
@@ -992,41 +953,12 @@ public class PackWriter {
 
 	static byte[] buffer(PackConfig config, ObjectReader or, AnyObjectId objId)
 			throws IOException {
-		ObjectLoader ldr = or.open(objId);
-		if (!ldr.isLarge())
-			return ldr.getCachedBytes();
-
 		// PackWriter should have already pruned objects that
 		// are above the big file threshold, so our chances of
 		// the object being below it are very good. We really
 		// shouldn't be here, unless the implementation is odd.
 
-		// If it really is too big to work with, abort out now.
-		//
-		long sz = ldr.getSize();
-		if (config.getBigFileThreshold() <= sz || Integer.MAX_VALUE < sz)
-			throw new LargeObjectException(objId.copy());
-
-		// Its considered to be large by the loader, but we really
-		// want it in byte array format. Try to make it happen.
-		//
-		byte[] buf;
-		try {
-			buf = new byte[(int) sz];
-		} catch (OutOfMemoryError noMemory) {
-			LargeObjectException e;
-
-			e = new LargeObjectException(objId.copy());
-			e.initCause(noMemory);
-			throw e;
-		}
-		InputStream in = ldr.openStream();
-		try {
-			IO.readFully(in, buf, 0, buf.length);
-		} finally {
-			in.close();
-		}
-		return buf;
+		return or.open(objId).getCachedBytes(config.getBigFileThreshold());
 	}
 
 	private Deflater deflater() {
@@ -1038,53 +970,6 @@ public class PackWriter {
 	private void writeChecksum(PackOutputStream out) throws IOException {
 		packcsum = out.getDigest();
 		out.write(packcsum);
-	}
-
-	private ObjectWalk setUpWalker(
-			final Collection<? extends ObjectId> interestingObjects,
-			final Collection<? extends ObjectId> uninterestingObjects,
-			final Collection<? extends ObjectId> unshallowObjects,
-			int depth)
-			throws MissingObjectException, IOException,
-			IncorrectObjectTypeException {
-		final ObjectWalk walker;
-		walker = new DepthWalk.ObjectWalk(reader, depth);
-		walker.setRetainBody(false);
-		walker.sort(RevSort.COMMIT_TIME_DESC);
-		if (thin)
-			walker.sort(RevSort.BOUNDARY, true);
-
-		for (ObjectId id : interestingObjects) {
-			RevObject o = walker.parseAny(id);
-			walker.markStart(o);
-		}
-		if (uninterestingObjects != null) {
-			for (ObjectId id : uninterestingObjects) {
-				final RevObject o;
-				try {
-					o = walker.parseAny(id);
-				} catch (MissingObjectException x) {
-					if (ignoreMissingUninteresting)
-						continue;
-					throw x;
-				}
-				walker.markUninteresting(o);
-			}
-		}
-		if (unshallowObjects != null) {
-			for (ObjectId id : unshallowObjects) {
-				final RevObject o;
-				try {
-					o = walker.parseAny(id);
-				} catch (MissingObjectException x) {
-					if (ignoreMissingUninteresting)
-						continue;
-					throw x;
-				}
-				((DepthWalk.ObjectWalk)walker).markUnshallow(o);
-			}
-		}
-		return walker;
 	}
 
 	private ObjectWalk setUpWalker(
@@ -1107,7 +992,7 @@ public class PackWriter {
 
 		final ObjectWalk walker = new ObjectWalk(reader);
 		walker.setRetainBody(false);
-		walker.sort(RevSort.COMMIT_TIME_DESC);
+		walker.sort(RevSort.TOPO);
 		if (thin && !not.isEmpty())
 			walker.sort(RevSort.BOUNDARY, true);
 

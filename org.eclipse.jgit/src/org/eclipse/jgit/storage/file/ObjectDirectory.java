@@ -63,16 +63,12 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.PackMismatchException;
-import org.eclipse.jgit.events.ConfigChangedEvent;
-import org.eclipse.jgit.events.ConfigChangedListener;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.CoreConfig;
 import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.RepositoryCache;
 import org.eclipse.jgit.lib.RepositoryCache.FileKey;
@@ -98,8 +94,7 @@ import org.eclipse.jgit.util.FS;
  * searched (recursively through all alternates) before the slow half is
  * considered.
  */
-public class ObjectDirectory extends FileObjectDatabase implements
-		ConfigChangedListener {
+public class ObjectDirectory extends FileObjectDatabase {
 	private static final PackList NO_PACKS = new PackList(-1, -1, new PackFile[0]);
 
 	/** Maximum number of candidates offered as resolutions of abbreviation. */
@@ -121,7 +116,7 @@ public class ObjectDirectory extends FileObjectDatabase implements
 
 	private final AtomicReference<AlternateHandle[]> alternates;
 
-	private int streamFileThreshold;
+	private final UnpackedObjectCache unpackedObjectCache;
 
 	/**
 	 * Initialize a reference to an on-disk object directory.
@@ -146,6 +141,7 @@ public class ObjectDirectory extends FileObjectDatabase implements
 		packDirectory = new File(objects, "pack");
 		alternatesFile = new File(infoDirectory, "alternates");
 		packList = new AtomicReference<PackList>(NO_PACKS);
+		unpackedObjectCache = new UnpackedObjectCache();
 		this.fs = fs;
 
 		alternates = new AtomicReference<AlternateHandle[]>();
@@ -157,13 +153,6 @@ public class ObjectDirectory extends FileObjectDatabase implements
 				alt[i] = openAlternate(alternatePaths[i]);
 			alternates.set(alt);
 		}
-
-		onConfigChanged(new ConfigChangedEvent());
-	}
-
-	public void onConfigChanged(ConfigChangedEvent event) {
-		CoreConfig core = config.get(CoreConfig.KEY);
-		streamFileThreshold = core.getStreamFileThreshold();
 	}
 
 	/**
@@ -186,12 +175,14 @@ public class ObjectDirectory extends FileObjectDatabase implements
 	}
 
 	@Override
-	public ObjectInserter newInserter() {
+	public ObjectDirectoryInserter newInserter() {
 		return new ObjectDirectoryInserter(this, config);
 	}
 
 	@Override
 	public void close() {
+		unpackedObjectCache.clear();
+
 		final PackList packs = packList.get();
 		packList.set(NO_PACKS);
 		for (final PackFile p : packs.packs)
@@ -213,14 +204,9 @@ public class ObjectDirectory extends FileObjectDatabase implements
 	 *            identity of the loose object to map to the directory.
 	 * @return location of the object, if it were to exist as a loose object.
 	 */
+	@Override
 	public File fileFor(final AnyObjectId objectId) {
-		return fileFor(objectId.name());
-	}
-
-	private File fileFor(final String objectName) {
-		final String d = objectName.substring(0, 2);
-		final String f = objectName.substring(2);
-		return new File(new File(objects, d), f);
+		return super.fileFor(objectId);
 	}
 
 	/**
@@ -231,7 +217,10 @@ public class ObjectDirectory extends FileObjectDatabase implements
 	 *         history of the repository.
 	 */
 	public Collection<PackFile> getPacks() {
-		final PackFile[] packs = packList.get().packs;
+		PackList list = packList.get();
+		if (list == NO_PACKS)
+			list = scanPacks(list);
+		PackFile[] packs = list.packs;
 		return Collections.unmodifiableCollection(Arrays.asList(packs));
 	}
 
@@ -268,6 +257,8 @@ public class ObjectDirectory extends FileObjectDatabase implements
 	}
 
 	boolean hasObject1(final AnyObjectId objectId) {
+		if (unpackedObjectCache.isUnpacked(objectId))
+			return true;
 		for (final PackFile p : packList.get().packs) {
 			try {
 				if (p.hasObject(objectId)) {
@@ -341,6 +332,14 @@ public class ObjectDirectory extends FileObjectDatabase implements
 
 	ObjectLoader openObject1(final WindowCursor curs,
 			final AnyObjectId objectId) throws IOException {
+		if (unpackedObjectCache.isUnpacked(objectId)) {
+			ObjectLoader ldr = openObject2(curs, objectId.name(), objectId);
+			if (ldr != null)
+				return ldr;
+			else
+				unpackedObjectCache.remove(objectId);
+		}
+
 		PackList pList = packList.get();
 		SEARCH: for (;;) {
 			for (final PackFile p : pList.packs) {
@@ -442,13 +441,69 @@ public class ObjectDirectory extends FileObjectDatabase implements
 			File path = fileFor(objectName);
 			FileInputStream in = new FileInputStream(path);
 			try {
+				unpackedObjectCache.add(objectId);
 				return UnpackedObject.open(in, path, objectId, curs);
 			} finally {
 				in.close();
 			}
 		} catch (FileNotFoundException noFile) {
+			unpackedObjectCache.remove(objectId);
 			return null;
 		}
+	}
+
+	@Override
+	InsertLooseObjectResult insertUnpackedObject(File tmp, ObjectId id,
+			boolean createDuplicate) {
+		// If the object is already in the repository, remove temporary file.
+		//
+		if (unpackedObjectCache.isUnpacked(id)) {
+			tmp.delete();
+			return InsertLooseObjectResult.EXISTS_LOOSE;
+		}
+		if (!createDuplicate && has(id)) {
+			tmp.delete();
+			return InsertLooseObjectResult.EXISTS_PACKED;
+		}
+
+		tmp.setReadOnly();
+
+		final File dst = fileFor(id);
+		if (dst.exists()) {
+			// We want to be extra careful and avoid replacing an object
+			// that already exists. We can't be sure renameTo() would
+			// fail on all platforms if dst exists, so we check first.
+			//
+			tmp.delete();
+			return InsertLooseObjectResult.EXISTS_LOOSE;
+		}
+		if (tmp.renameTo(dst)) {
+			unpackedObjectCache.add(id);
+			return InsertLooseObjectResult.INSERTED;
+		}
+
+		// Maybe the directory doesn't exist yet as the object
+		// directories are always lazily created. Note that we
+		// try the rename first as the directory likely does exist.
+		//
+		dst.getParentFile().mkdir();
+		if (tmp.renameTo(dst)) {
+			unpackedObjectCache.add(id);
+			return InsertLooseObjectResult.INSERTED;
+		}
+
+		if (!createDuplicate && has(id)) {
+			tmp.delete();
+			return InsertLooseObjectResult.EXISTS_PACKED;
+		}
+
+		// The object failed to be renamed into its proper
+		// location and it doesn't exist in the repository
+		// either. We really don't know what went wrong, so
+		// fail.
+		//
+		tmp.delete();
+		return InsertLooseObjectResult.FAILURE;
 	}
 
 	boolean tryAgain1() {
@@ -456,6 +511,10 @@ public class ObjectDirectory extends FileObjectDatabase implements
 		if (old.tryAgain(packDirectory.lastModified()))
 			return old != scanPacks(old);
 		return false;
+	}
+
+	Config getConfig() {
+		return config;
 	}
 
 	private void insertPack(final PackFile pf) {
@@ -743,10 +802,5 @@ public class ObjectDirectory extends FileObjectDatabase implements
 
 	FileObjectDatabase newCachedFileObjectDatabase() {
 		return new CachedObjectDirectory(this);
-	}
-
-	@Override
-	int getStreamFileThreshold() {
-		return streamFileThreshold;
 	}
 }

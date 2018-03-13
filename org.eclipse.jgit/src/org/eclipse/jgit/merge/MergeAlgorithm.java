@@ -51,6 +51,7 @@ import org.eclipse.jgit.diff.Edit;
 import org.eclipse.jgit.diff.EditList;
 import org.eclipse.jgit.diff.MyersDiff;
 import org.eclipse.jgit.diff.Sequence;
+import org.eclipse.jgit.diff.SequenceComparator;
 import org.eclipse.jgit.merge.MergeChunk.ConflictState;
 
 /**
@@ -74,21 +75,24 @@ public final class MergeAlgorithm {
 	/**
 	 * Does the three way merge between a common base and two sequences.
 	 *
+	 * @param <S>
+	 *            type of sequence.
+	 * @param cmp comparison method for this execution.
 	 * @param base the common base sequence
 	 * @param ours the first sequence to be merged
 	 * @param theirs the second sequence to be merged
 	 * @return the resulting content
 	 */
-	public static MergeResult merge(Sequence base, Sequence ours,
-			Sequence theirs) {
-		List<Sequence> sequences = new ArrayList<Sequence>(3);
+	public static <S extends Sequence> MergeResult<S> merge(
+			SequenceComparator<S> cmp, S base, S ours, S theirs) {
+		List<S> sequences = new ArrayList<S>(3);
 		sequences.add(base);
 		sequences.add(ours);
 		sequences.add(theirs);
-		MergeResult result = new MergeResult(sequences);
-		EditList oursEdits = new MyersDiff(base, ours).getEdits();
+		MergeResult result = new MergeResult<S>(sequences);
+		EditList oursEdits = MyersDiff.INSTANCE.diff(cmp, base, ours);
 		Iterator<Edit> baseToOurs = oursEdits.iterator();
-		EditList theirsEdits = new MyersDiff(base, theirs).getEdits();
+		EditList theirsEdits = MyersDiff.INSTANCE.diff(cmp, base, theirs);
 		Iterator<Edit> baseToTheirs = theirsEdits.iterator();
 		int current = 0; // points to the next line (first line is 0) of base
 		                 // which was not handled yet
@@ -99,7 +103,7 @@ public final class MergeAlgorithm {
 		// leave the loop when there are no edits more for ours or for theirs
 		// (or both)
 		while (theirsEdit != END_EDIT || oursEdit != END_EDIT) {
-			if (oursEdit.getEndA() <= theirsEdit.getBeginA()) {
+			if (oursEdit.getEndA() < theirsEdit.getBeginA()) {
 				// something was changed in ours not overlapping with any change
 				// from theirs. First add the common part in front of the edit
 				// then the edit.
@@ -111,7 +115,7 @@ public final class MergeAlgorithm {
 						ConflictState.NO_CONFLICT);
 				current = oursEdit.getEndA();
 				oursEdit = nextEdit(baseToOurs);
-			} else if (theirsEdit.getEndA() <= oursEdit.getBeginA()) {
+			} else if (theirsEdit.getEndA() < oursEdit.getBeginA()) {
 				// something was changed in theirs not overlapping with any
 				// from ours. First add the common part in front of the edit
 				// then the edit.
@@ -175,10 +179,10 @@ public final class MergeAlgorithm {
 				Edit nextOursEdit = nextEdit(baseToOurs);
 				Edit nextTheirsEdit = nextEdit(baseToTheirs);
 				for (;;) {
-					if (oursEdit.getEndA() > nextTheirsEdit.getBeginA()) {
+					if (oursEdit.getEndA() >= nextTheirsEdit.getBeginA()) {
 						theirsEdit = nextTheirsEdit;
 						nextTheirsEdit = nextEdit(baseToTheirs);
-					} else if (theirsEdit.getEndA() > nextOursEdit.getBeginA()) {
+					} else if (theirsEdit.getEndA() >= nextOursEdit.getBeginA()) {
 						oursEdit = nextOursEdit;
 						nextOursEdit = nextEdit(baseToOurs);
 					} else {
@@ -195,11 +199,53 @@ public final class MergeAlgorithm {
 					theirsEndB += oursEdit.getEndA() - theirsEdit.getEndA();
 				}
 
-				// Add the conflict
-				result.add(1, oursBeginB, oursEndB,
-						ConflictState.FIRST_CONFLICTING_RANGE);
-				result.add(2, theirsBeginB, theirsEndB,
-						ConflictState.NEXT_CONFLICTING_RANGE);
+				// A conflicting region is found. Strip off common lines in
+				// in the beginning and the end of the conflicting region
+
+				// Determine the minimum length of the conflicting areas in OURS
+				// and THEIRS. Also determine how much bigger the conflicting
+				// area in THEIRS is compared to OURS. All that is needed to
+				// limit the search for common areas at the beginning or end
+				// (the common areas cannot be bigger then the smaller
+				// conflicting area. The delta is needed to know whether the
+				// complete conflicting area is common in OURS and THEIRS.
+				int minBSize = oursEndB - oursBeginB;
+				int BSizeDelta = minBSize - (theirsEndB - theirsBeginB);
+				if (BSizeDelta > 0)
+					minBSize -= BSizeDelta;
+
+				int commonPrefix = 0;
+				while (commonPrefix < minBSize
+						&& cmp.equals(ours, oursBeginB + commonPrefix, theirs,
+								theirsBeginB + commonPrefix))
+					commonPrefix++;
+				minBSize -= commonPrefix;
+				int commonSuffix = 0;
+				while (commonSuffix < minBSize
+						&& cmp.equals(ours, oursEndB - commonSuffix - 1, theirs,
+								theirsEndB - commonSuffix - 1))
+					commonSuffix++;
+				minBSize -= commonSuffix;
+
+				// Add the common lines at start of conflict
+				if (commonPrefix > 0)
+					result.add(1, oursBeginB, oursBeginB + commonPrefix,
+							ConflictState.NO_CONFLICT);
+
+				// Add the conflict (Only if there is a conflict left to report)
+				if (minBSize > 0 || BSizeDelta != 0) {
+					result.add(1, oursBeginB + commonPrefix, oursEndB
+							- commonSuffix,
+							ConflictState.FIRST_CONFLICTING_RANGE);
+					result.add(2, theirsBeginB + commonPrefix, theirsEndB
+							- commonSuffix,
+							ConflictState.NEXT_CONFLICTING_RANGE);
+				}
+
+				// Add the common lines at end of conflict
+				if (commonSuffix > 0)
+					result.add(1, oursEndB - commonSuffix, oursEndB,
+							ConflictState.NO_CONFLICT);
 
 				current = Math.max(oursEdit.getEndA(), theirsEdit.getEndA());
 				oursEdit = nextOursEdit;

@@ -45,14 +45,39 @@ package org.eclipse.jgit.diff;
 
 import java.util.AbstractList;
 import java.util.ArrayList;
+import java.util.Collection;
 
 /** Specialized list of {@link Edit}s in a document. */
 public class EditList extends AbstractList<Edit> {
+	/**
+	 * Construct an edit list containing a single edit.
+	 *
+	 * @param edit
+	 *            the edit to return in the list.
+	 * @return list containing only {@code edit}.
+	 */
+	public static EditList singleton(Edit edit) {
+		EditList res = new EditList(1);
+		res.add(edit);
+		return res;
+	}
+
 	private final ArrayList<Edit> container;
 
 	/** Create a new, empty edit list. */
 	public EditList() {
 		container = new ArrayList<Edit>();
+	}
+
+	/**
+	 * Create an empty edit list with the specified capacity.
+	 *
+	 * @param capacity
+	 *            the initial capacity of the edit list. If additional edits are
+	 *            added to the list, it will be grown to support them.
+	 */
+	public EditList(int capacity) {
+		container = new ArrayList<Edit>(capacity);
 	}
 
 	@Override
@@ -73,6 +98,11 @@ public class EditList extends AbstractList<Edit> {
 	@Override
 	public void add(final int index, final Edit element) {
 		container.add(index, element);
+	}
+
+	@Override
+	public boolean addAll(Collection<? extends Edit> c) {
+		return container.addAll(c);
 	}
 
 	@Override

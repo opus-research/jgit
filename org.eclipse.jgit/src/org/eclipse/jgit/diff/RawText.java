@@ -65,26 +65,7 @@ import org.eclipse.jgit.util.RawParseUtils;
  * line number 1. Callers may need to subtract 1 prior to invoking methods if
  * they are converting from "line number" to "element index".
  */
-public class RawText implements Sequence {
-	/** Creates a RawText instance. */
-	public static interface Factory {
-		/**
-		 * Construct a RawText instance for the content.
-		 *
-		 * @param input
-		 *            the content array.
-		 * @return a RawText instance wrapping this content.
-		 */
-		RawText create(byte[] input);
-	}
-
-	/** Creates RawText that does not treat whitespace specially. */
-	public static final Factory FACTORY = new Factory() {
-		public RawText create(byte[] input) {
-			return new RawText(input);
-		}
-	};
-
+public class RawText extends Sequence {
 	/** Number of bytes to check for heuristics in {@link #isBinary(byte[])} */
 	private static final int FIRST_FEW_BYTES = 8000;
 
@@ -93,9 +74,6 @@ public class RawText implements Sequence {
 
 	/** Map of line number to starting position within {@link #content}. */
 	protected final IntList lines;
-
-	/** Hash code for each line, for fast equality elimination. */
-	protected final IntList hashes;
 
 	/**
 	 * Create a new sequence from an existing content byte array.
@@ -109,7 +87,6 @@ public class RawText implements Sequence {
 	public RawText(final byte[] input) {
 		content = input;
 		lines = RawParseUtils.lineMap(content, 0, content.length);
-		hashes = computeHashes();
 	}
 
 	/**
@@ -126,36 +103,13 @@ public class RawText implements Sequence {
 		this(IO.readFully(file));
 	}
 
+	/** @return total number of items in the sequence. */
 	public int size() {
 		// The line map is always 2 entries larger than the number of lines in
 		// the file. Index 0 is padded out/unused. The last index is the total
 		// length of the buffer, and acts as a sentinel.
 		//
 		return lines.size() - 2;
-	}
-
-	public boolean equals(final int i, final Sequence other, final int j) {
-		return equals(this, i + 1, (RawText) other, j + 1);
-	}
-
-	private static boolean equals(final RawText a, final int ai,
-			final RawText b, final int bi) {
-		if (a.hashes.get(ai) != b.hashes.get(bi))
-			return false;
-
-		int as = a.lines.get(ai);
-		int bs = b.lines.get(bi);
-		final int ae = a.lines.get(ai + 1);
-		final int be = b.lines.get(bi + 1);
-
-		if (ae - as != be - bs)
-			return false;
-
-		while (as < ae) {
-			if (a.content[as++] != b.content[bs++])
-				return false;
-		}
-		return true;
 	}
 
 	/**
@@ -178,8 +132,8 @@ public class RawText implements Sequence {
 	 */
 	public void writeLine(final OutputStream out, final int i)
 			throws IOException {
-		final int start = lines.get(i + 1);
-		int end = lines.get(i + 2);
+		int start = getStart(i);
+		int end = getEnd(i);
 		if (content[end - 1] == '\n')
 			end--;
 		out.write(content, start, end - start);
@@ -197,34 +151,65 @@ public class RawText implements Sequence {
 		return content[end - 1] != '\n';
 	}
 
-	private IntList computeHashes() {
-		final IntList r = new IntList(lines.size());
-		r.add(0);
-		for (int lno = 1; lno < lines.size() - 1; lno++) {
-			final int ptr = lines.get(lno);
-			final int end = lines.get(lno + 1);
-			r.add(hashLine(content, ptr, end));
-		}
-		r.add(0);
-		return r;
+	/**
+	 * Get the text for a single line.
+	 *
+	 * @param i
+	 *            index of the line to extract. Note this is 0-based, so line
+	 *            number 1 is actually index 0.
+	 * @return the text for the line, without a trailing LF.
+	 */
+	public String getString(int i) {
+		return getString(i, i + 1, true);
 	}
 
 	/**
-	 * Compute a hash code for a single line.
+	 * Get the text for a region of lines.
 	 *
-	 * @param raw
-	 *            the raw file content.
-	 * @param ptr
-	 *            first byte of the content line to hash.
+	 * @param begin
+	 *            index of the first line to extract. Note this is 0-based, so
+	 *            line number 1 is actually index 0.
 	 * @param end
-	 *            1 past the last byte of the content line.
-	 * @return hash code for the region <code>[ptr, end)</code> of raw.
+	 *            index of one past the last line to extract.
+	 * @param dropLF
+	 *            if true the trailing LF ('\n') of the last returned line is
+	 *            dropped, if present.
+	 * @return the text for lines {@code [begin, end)}.
 	 */
-	protected int hashLine(final byte[] raw, int ptr, final int end) {
-		int hash = 5381;
-		for (; ptr < end; ptr++)
-			hash = (hash << 5) ^ (raw[ptr] & 0xff);
-		return hash;
+	public String getString(int begin, int end, boolean dropLF) {
+		if (begin == end)
+			return "";
+
+		int s = getStart(begin);
+		int e = getEnd(end - 1);
+		if (dropLF && content[e - 1] == '\n')
+			e--;
+		return decode(s, e);
+	}
+
+	/**
+	 * Decode a region of the text into a String.
+	 *
+	 * The default implementation of this method tries to guess the character
+	 * set by considering UTF-8, the platform default, and falling back on
+	 * ISO-8859-1 if neither of those can correctly decode the region given.
+	 *
+	 * @param start
+	 *            first byte of the content to decode.
+	 * @param end
+	 *            one past the last byte of the content to decode.
+	 * @return the region {@code [start, end)} decoded as a String.
+	 */
+	protected String decode(int start, int end) {
+		return RawParseUtils.decode(content, start, end);
+	}
+
+	private int getStart(final int i) {
+		return lines.get(i + 1);
+	}
+
+	private int getEnd(final int i) {
+		return lines.get(i + 2);
 	}
 
 	/**

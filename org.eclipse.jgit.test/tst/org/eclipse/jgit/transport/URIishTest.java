@@ -45,6 +45,8 @@
 
 package org.eclipse.jgit.transport;
 
+import java.io.File;
+import java.io.IOException;
 import java.net.URISyntaxException;
 
 import junit.framework.TestCase;
@@ -80,6 +82,16 @@ public class URIishTest extends TestCase {
 		assertFalse(u.isRemote());
 		assertEquals("D:/m y", u.getPath());
 		assertEquals("D:/m y", u.toString());
+		assertEquals(u, new URIish(str));
+	}
+
+	public void testRelativePath() throws Exception {
+		final String str = "../../foo/bar";
+		URIish u = new URIish(str);
+		assertNull(u.getScheme());
+		assertFalse(u.isRemote());
+		assertEquals(str, u.getPath());
+		assertEquals(str, u.toString());
 		assertEquals(u, new URIish(str));
 	}
 
@@ -160,12 +172,24 @@ public class URIishTest extends TestCase {
 		assertEquals(u, new URIish(str));
 	}
 
-	public void testScpStyleWithoutUser() throws Exception {
+	public void testScpStyleWithoutUserRelativePath() throws Exception {
 		final String str = "example.com:some/p ath";
 		URIish u = new URIish(str);
 		assertNull(u.getScheme());
 		assertTrue(u.isRemote());
 		assertEquals("some/p ath", u.getPath());
+		assertEquals("example.com", u.getHost());
+		assertEquals(-1, u.getPort());
+		assertEquals(str, u.toString());
+		assertEquals(u, new URIish(str));
+	}
+
+	public void testScpStyleWithoutUserAbsolutePath() throws Exception {
+		final String str = "example.com:/some/p ath";
+		URIish u = new URIish(str);
+		assertNull(u.getScheme());
+		assertTrue(u.isRemote());
+		assertEquals("/some/p ath", u.getPath());
 		assertEquals("example.com", u.getHost());
 		assertEquals(-1, u.getPort());
 		assertEquals(str, u.toString());
@@ -346,7 +370,8 @@ public class URIishTest extends TestCase {
 
 	public void testGetValidSlashHumanishName()
 			throws IllegalArgumentException, URISyntaxException {
-		String humanishName = new URIish(GIT_SCHEME + "abc/").getHumanishName();
+		String humanishName = new URIish(GIT_SCHEME + "host/abc/")
+				.getHumanishName();
 		assertEquals("abc", humanishName);
 	}
 
@@ -384,7 +409,7 @@ public class URIishTest extends TestCase {
 
 	public void testGetValidDotGitSlashHumanishName()
 			throws IllegalArgumentException, URISyntaxException {
-		String humanishName = new URIish(GIT_SCHEME + "abc.git/")
+		String humanishName = new URIish(GIT_SCHEME + "host.xy/abc.git/")
 				.getHumanishName();
 		assertEquals("abc", humanishName);
 	}
@@ -413,4 +438,68 @@ public class URIishTest extends TestCase {
 		assertEquals("c", humanishName);
 	}
 
+	public void testUserPasswordAndPort() throws URISyntaxException {
+		String str = "http://user:secret@host.xy:80/some/path";
+		URIish u = new URIish(str);
+		assertEquals("http", u.getScheme());
+		assertTrue(u.isRemote());
+		assertEquals("/some/path", u.getPath());
+		assertEquals("host.xy", u.getHost());
+		assertEquals(80, u.getPort());
+		assertEquals("user", u.getUser());
+		assertEquals("secret", u.getPass());
+		assertEquals(u, new URIish(str));
+
+		str = "http://user:secret@pass@host.xy:80/some/path";
+		u = new URIish(str);
+		assertEquals("http", u.getScheme());
+		assertTrue(u.isRemote());
+		assertEquals("/some/path", u.getPath());
+		assertEquals("host.xy", u.getHost());
+		assertEquals(80, u.getPort());
+		assertEquals("user", u.getUser());
+		assertEquals("secret@pass", u.getPass());
+		assertEquals(u, new URIish(str));
+	}
+
+	public void testFileProtocol() throws IllegalArgumentException,
+			URISyntaxException, IOException {
+		// as defined by git docu
+		URIish u = new URIish("file:///a/b.txt");
+		assertEquals("file", u.getScheme());
+		assertFalse(u.isRemote());
+		assertNull(u.getHost());
+		assertNull(u.getPass());
+		assertEquals("/a/b.txt", u.getPath());
+		assertEquals(-1, u.getPort());
+		assertNull(u.getUser());
+		assertEquals("b.txt", u.getHumanishName());
+
+		File tmp = File.createTempFile("jgitUnitTest", ".tmp");
+		u = new URIish(tmp.toURI().toString());
+		assertEquals("file", u.getScheme());
+		assertFalse(u.isRemote());
+		assertNull(u.getHost());
+		assertNull(u.getPass());
+		assertTrue(u.getPath().contains("jgitUnitTest"));
+		assertEquals(-1, u.getPort());
+		assertNull(u.getUser());
+		assertTrue(u.getHumanishName().startsWith("jgitUnitTest"));
+
+		u = new URIish("file:/a/b.txt");
+		assertEquals("file", u.getScheme());
+		assertFalse(u.isRemote());
+		assertNull(u.getHost());
+		assertNull(u.getPass());
+		assertEquals("/a/b.txt", u.getPath());
+		assertEquals(-1, u.getPort());
+		assertNull(u.getUser());
+		assertEquals("b.txt", u.getHumanishName());
+	}
+
+	public void testMissingPort() throws URISyntaxException {
+		final String incorrectSshUrl = "ssh://some-host:/path/to/repository.git";
+		URIish u = new URIish(incorrectSshUrl);
+		assertFalse(TransportGitSsh.canHandle(u));
+	}
 }

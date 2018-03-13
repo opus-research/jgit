@@ -95,6 +95,8 @@ import org.eclipse.jgit.treewalk.filter.TreeFilter;
  * {@link #next()} does not.
  */
 public class RevWalk implements Iterable<RevCommit> {
+	private static final int MB = 1 << 20;
+
 	/**
 	 * Set on objects whose important header data has been loaded.
 	 * <p>
@@ -813,13 +815,14 @@ public class RevWalk implements Iterable<RevCommit> {
 	}
 
 	private RevObject parseNew(AnyObjectId id, ObjectLoader ldr)
-			throws CorruptObjectException, LargeObjectException {
+			throws LargeObjectException, CorruptObjectException,
+			MissingObjectException, IOException {
 		RevObject r;
 		int type = ldr.getType();
 		switch (type) {
 		case Constants.OBJ_COMMIT: {
 			final RevCommit c = createCommit(id);
-			c.parseCanonical(this, ldr.getCachedBytes());
+			c.parseCanonical(this, getCachedBytes(c, ldr));
 			r = c;
 			break;
 		}
@@ -835,7 +838,7 @@ public class RevWalk implements Iterable<RevCommit> {
 		}
 		case Constants.OBJ_TAG: {
 			final RevTag t = new RevTag(id);
-			t.parseCanonical(this, ldr.getCachedBytes());
+			t.parseCanonical(this, getCachedBytes(t, ldr));
 			r = t;
 			break;
 		}
@@ -845,6 +848,21 @@ public class RevWalk implements Iterable<RevCommit> {
 		}
 		objects.add(r);
 		return r;
+	}
+
+	byte[] getCachedBytes(RevObject obj) throws LargeObjectException,
+			MissingObjectException, IncorrectObjectTypeException, IOException {
+		return getCachedBytes(obj, reader.open(obj, obj.getType()));
+	}
+
+	byte[] getCachedBytes(RevObject obj, ObjectLoader ldr)
+			throws LargeObjectException, MissingObjectException, IOException {
+		try {
+			return ldr.getCachedBytes(5 * MB);
+		} catch (LargeObjectException tooBig) {
+			tooBig.setObjectId(obj);
+			throw tooBig;
+		}
 	}
 
 	/**

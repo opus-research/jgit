@@ -84,12 +84,6 @@ import org.eclipse.jgit.util.NB;
 
 /** Indexes Git pack files for local use. */
 public class IndexPack {
-	/** Progress message when reading raw data from the pack. */
-	public static final String PROGRESS_DOWNLOAD = JGitText.get().receivingObjects;
-
-	/** Progress message when computing names of delta compressed objects. */
-	public static final String PROGRESS_RESOLVE_DELTA = JGitText.get().resolvingDeltas;
-
 	/**
 	 * Size of the internal stream buffer.
 	 * <p>
@@ -404,7 +398,8 @@ public class IndexPack {
 				baseById = new ObjectIdSubclassMap<DeltaChain>();
 				baseByPos = new LongMap<UnresolvedDelta>();
 
-				progress.beginTask(PROGRESS_DOWNLOAD, (int) objectCount);
+				progress.beginTask(JGitText.get().receivingObjects,
+						(int) objectCount);
 				for (int done = 0; done < objectCount; done++) {
 					indexOneObject();
 					progress.update(1);
@@ -473,7 +468,7 @@ public class IndexPack {
 
 	private void resolveDeltas(final ProgressMonitor progress)
 			throws IOException {
-		progress.beginTask(PROGRESS_RESOLVE_DELTA, deltaCount);
+		progress.beginTask(JGitText.get().resolvingDeltas, deltaCount);
 		final int last = entryCount;
 		for (int i = 0; i < last; i++) {
 			final int before = entryCount;
@@ -613,7 +608,7 @@ public class IndexPack {
 				missing.add(baseId);
 				continue;
 			}
-			final byte[] data = ldr.getCachedBytes();
+			final byte[] data = ldr.getCachedBytes(Integer.MAX_VALUE);
 			final int typeCode = ldr.getType();
 			final PackedObjectInfo oe;
 
@@ -870,7 +865,7 @@ public class IndexPack {
 
 		try {
 			final ObjectLoader ldr = readCurs.open(id, type);
-			final byte[] existingData = ldr.getCachedBytes();
+			final byte[] existingData = ldr.getCachedBytes(Integer.MAX_VALUE);
 			if (!Arrays.equals(data, existingData)) {
 				throw new IOException(MessageFormat.format(JGitText.get().collisionOn, id.name()));
 			}

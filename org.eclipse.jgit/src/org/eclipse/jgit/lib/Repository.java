@@ -63,6 +63,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.dircache.DirCache;
+import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -73,8 +74,10 @@ import org.eclipse.jgit.events.RepositoryEvent;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
+import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.ReflogReader;
+import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
@@ -371,32 +374,54 @@ public abstract class Repository {
 	/**
 	 * Parse a git revision string and return an object id.
 	 *
-	 * Currently supported is combinations of these.
+	 * Combinations of these operators are supported:
 	 * <ul>
-	 * <li>SHA-1 - a SHA-1</li>
-	 * <li>SHA-1 abbreviation - a leading prefix of a SHA-1. At least the first
-	 * two bytes must be supplied.</li>
-	 * <li>refs/... - a ref name</li>
-	 * <li>ref^n - nth parent reference</li>
-	 * <li>ref~n - distance via parent reference</li>
-	 * <li>ref@{n} - nth version of ref</li>
-	 * <li>ref^{tree} - tree references by ref</li>
-	 * <li>ref^{commit} - commit references by ref</li>
+	 * <li><b>HEAD</b>, <b>MERGE_HEAD</b>, <b>FETCH_HEAD</b></li>
+	 * <li><b>SHA-1</b>: a complete or abbreviated SHA-1</li>
+	 * <li><b>refs/...</b>: a complete reference name</li>
+	 * <li><b>short-name</b>: a short reference name under {@code refs/heads},
+	 * {@code refs/tags}, or {@code refs/remotes} namespace</li>
+	 * <li><b>tag-NN-gABBREV</b>: output from describe, parsed by treating
+	 * {@code ABBREV} as an abbreviated SHA-1.</li>
+	 * <li><i>id</i><b>^</b>: first parent of commit <i>id</i>, this is the same
+	 * as {@code id^1}</li>
+	 * <li><i>id</i><b>^0</b>: ensure <i>id</i> is a commit</li>
+	 * <li><i>id</i><b>^n</b>: n-th parent of commit <i>id</i></li>
+	 * <li><i>id</i><b>~n</b>: n-th historical ancestor of <i>id</i>, by first
+	 * parent. {@code id~3} is equivalent to {@code id^1^1^1} or {@code id^^^}.</li>
+	 * <li><i>id</i><b>:path</b>: Lookup path under tree named by <i>id</i></li>
+	 * <li><i>id</i><b>^{commit}</b>: ensure <i>id</i> is a commit</li>
+	 * <li><i>id</i><b>^{tree}</b>: ensure <i>id</i> is a tree</li>
+	 * <li><i>id</i><b>^{tag}</b>: ensure <i>id</i> is a tag</li>
+	 * <li><i>id</i><b>^{blob}</b>: ensure <i>id</i> is a blob</li>
 	 * </ul>
 	 *
-	 * Not supported is:
+	 * <p>
+	 * The following operators are specified by Git conventions, but are not
+	 * supported by this method:
 	 * <ul>
-	 * <li>tag-NNN-gcommit - a non tagged revision from git describe</li>
-	 * <li>timestamps in reflogs, ref@{full or relative timestamp}</li>
+	 * <li><b>ref@{n}</b>: n-th version of ref as given by its reflog</li>
+	 * <li><b>ref@{time}</b>: value of ref at the designated time</li>
 	 * </ul>
 	 *
 	 * @param revstr
 	 *            A git object references expression
 	 * @return an ObjectId or null if revstr can't be resolved to any ObjectId
+	 * @throws AmbiguousObjectException
+	 *             {@code revstr} contains an abbreviated ObjectId and this
+	 *             repository contains more than one object which match to the
+	 *             input abbreviation.
+	 * @throws IncorrectObjectTypeException
+	 *             the id parsed does not meet the type required to finish
+	 *             applying the operators in the expression.
+	 * @throws RevisionSyntaxException
+	 *             the expression is not supported by this implementation, or
+	 *             does not meet the standard syntax.
 	 * @throws IOException
 	 *             on serious errors
 	 */
-	public ObjectId resolve(final String revstr) throws IOException {
+	public ObjectId resolve(final String revstr)
+			throws AmbiguousObjectException, IOException {
 		RevWalk rw = new RevWalk(this);
 		try {
 			return resolve(rw, revstr);
@@ -556,12 +581,64 @@ public abstract class Repository {
 							revstr);
 				i = m - 1;
 				break;
+			case '-':
+				if (i + 4 < rev.length && rev[i + 1] == 'g'
+						&& isHex(rev[i + 2]) && isHex(rev[i + 3])) {
+					// Possibly output from git describe?
+					// Resolve longest valid abbreviation.
+					int cnt = 2;
+					while (i + 2 + cnt < rev.length && isHex(rev[i + 2 + cnt]))
+						cnt++;
+					String s = new String(rev, i + 2, cnt);
+					if (AbbreviatedObjectId.isId(s)) {
+						ObjectId id = resolveAbbreviation(s);
+						if (id != null) {
+							ref = rw.parseAny(id);
+							i += 1 + s.length();
+						}
+					}
+				}
+				break;
+			case ':': {
+				RevTree tree;
+				if (ref == null) {
+					// We might not yet have parsed the left hand side.
+					ObjectId id;
+					try {
+						if (i == 0)
+							id = resolve(rw, Constants.HEAD);
+						else
+							id = resolve(rw, new String(rev, 0, i));
+					} catch (RevisionSyntaxException badSyntax) {
+						throw new RevisionSyntaxException(revstr);
+					}
+					if (id == null)
+						return null;
+					tree = rw.parseTree(id);
+				} else {
+					tree = rw.parseTree(ref);
+				}
+
+				if (i == rev.length - i)
+					return tree.copy();
+
+				TreeWalk tw = TreeWalk.forPath(rw.getObjectReader(),
+						new String(rev, i + 1, rev.length - i - 1), tree);
+				return tw != null ? tw.getObjectId(0) : null;
+			}
+
 			default:
 				if (ref != null)
 					throw new RevisionSyntaxException(revstr);
 			}
 		}
 		return ref != null ? ref.copy() : resolveSimple(revstr);
+	}
+
+	private static boolean isHex(char c) {
+		return ('0' <= c && c <= '9') //
+				|| ('a' <= c && c <= 'f') //
+				|| ('A' <= c && c <= 'F');
 	}
 
 	private RevObject parseSimple(RevWalk rw, String revstr) throws IOException {
@@ -577,19 +654,27 @@ public abstract class Repository {
 		if (r != null)
 			return r.getObjectId();
 
-		if (AbbreviatedObjectId.isId(revstr)) {
-			AbbreviatedObjectId id = AbbreviatedObjectId.fromString(revstr);
-			ObjectReader reader = newObjectReader();
-			try {
-				Collection<ObjectId> matches = reader.resolve(id);
-				if (matches.size() == 1)
-					return matches.iterator().next();
-			} finally {
-				reader.release();
-			}
-		}
+		if (AbbreviatedObjectId.isId(revstr))
+			return resolveAbbreviation(revstr);
 
 		return null;
+	}
+
+	private ObjectId resolveAbbreviation(final String revstr) throws IOException,
+			AmbiguousObjectException {
+		AbbreviatedObjectId id = AbbreviatedObjectId.fromString(revstr);
+		ObjectReader reader = newObjectReader();
+		try {
+			Collection<ObjectId> matches = reader.resolve(id);
+			if (matches.size() == 0)
+				return null;
+			else if (matches.size() == 1)
+				return matches.iterator().next();
+			else
+				throw new AmbiguousObjectException(id, matches);
+		} finally {
+			reader.release();
+		}
 	}
 
 	/** Increment the use counter by one, requiring a matched {@link #close()}. */
@@ -1034,7 +1119,7 @@ public abstract class Repository {
 	 *
 	 * @return a more user friendly ref name
 	 */
-	public String shortenRefName(String refName) {
+	public static String shortenRefName(String refName) {
 		if (refName.startsWith(Constants.R_HEADS))
 			return refName.substring(Constants.R_HEADS.length());
 		if (refName.startsWith(Constants.R_TAGS))
