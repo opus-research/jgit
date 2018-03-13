@@ -60,8 +60,6 @@ import java.util.zip.CRC32;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
-import javaewah.EWAHCompressedBitmap;
-
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
