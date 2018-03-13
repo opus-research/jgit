@@ -56,6 +56,7 @@ import org.eclipse.jgit.api.errors.NoMessageException;
 import org.eclipse.jgit.api.errors.UnmergedPathsException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
+import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
@@ -82,9 +83,15 @@ import org.eclipse.jgit.treewalk.FileTreeIterator;
  *      >Git documentation about cherry-pick</a>
  */
 public class CherryPickCommand extends GitCommand<CherryPickResult> {
+	private String reflogPrefix = "cherry-pick:"; //$NON-NLS-1$
+
 	private List<Ref> commits = new LinkedList<Ref>();
 
 	private String ourCommitName = null;
+
+	private MergeStrategy strategy = MergeStrategy.RECURSIVE;
+
+	private Integer mainlineParentNumber;
 
 	/**
 	 * @param repo
@@ -122,9 +129,8 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 			if (headRef == null)
 				throw new NoHeadException(
 						JGitText.get().commitOnRepoWithoutHEADCurrentlyNotSupported);
-			RevCommit headCommit = revWalk.parseCommit(headRef.getObjectId());
 
-			newHead = headCommit;
+			newHead = revWalk.parseCommit(headRef.getObjectId());
 
 			// loop through all refs to be cherry-picked
 			for (Ref src : commits) {
@@ -136,40 +142,30 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 				RevCommit srcCommit = revWalk.parseCommit(srcObjectId);
 
 				// get the parent of the commit to cherry-pick
-				if (srcCommit.getParentCount() != 1)
-					throw new MultipleParentsNotAllowedException(
-							MessageFormat.format(
-									JGitText.get().canOnlyCherryPickCommitsWithOneParent,
-									srcCommit.name(),
-									Integer.valueOf(srcCommit.getParentCount())));
-
-				RevCommit srcParent = srcCommit.getParent(0);
-				revWalk.parseHeaders(srcParent);
+				final RevCommit srcParent = getParentCommit(srcCommit, revWalk);
 
 				String ourName = calculateOurName(headRef);
 				String cherryPickName = srcCommit.getId().abbreviate(7).name()
 						+ " " + srcCommit.getShortMessage(); //$NON-NLS-1$
 
-				ResolveMerger merger = (ResolveMerger) MergeStrategy.RECURSIVE
-						.newMerger(repo);
+				ResolveMerger merger = (ResolveMerger) strategy.newMerger(repo);
 				merger.setWorkingTreeIterator(new FileTreeIterator(repo));
 				merger.setBase(srcParent.getTree());
 				merger.setCommitNames(new String[] { "BASE", ourName,
 						cherryPickName });
-				if (merger.merge(headCommit, srcCommit)) {
-					if (AnyObjectId.equals(headCommit.getTree().getId(), merger
+				if (merger.merge(newHead, srcCommit)) {
+					if (AnyObjectId.equals(newHead.getTree().getId(), merger
 							.getResultTreeId()))
 						continue;
 					DirCacheCheckout dco = new DirCacheCheckout(repo,
-							headCommit.getTree(), repo.lockDirCache(),
+							newHead.getTree(), repo.lockDirCache(),
 							merger.getResultTreeId());
 					dco.setFailOnConflict(true);
 					dco.checkout();
 					newHead = new Git(getRepository()).commit()
 							.setMessage(srcCommit.getFullMessage())
-							.setReflogComment(
-									"cherry-pick: " //$NON-NLS-1$
-											+ srcCommit.getShortMessage())
+							.setReflogComment(reflogPrefix + " " //$NON-NLS-1$
+									+ srcCommit.getShortMessage())
 							.setAuthor(srcCommit.getAuthorIdent()).call();
 					cherryPickedRefs.add(src);
 				} else {
@@ -197,6 +193,31 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 			revWalk.release();
 		}
 		return new CherryPickResult(newHead, cherryPickedRefs);
+	}
+
+	private RevCommit getParentCommit(RevCommit srcCommit, RevWalk revWalk)
+			throws MultipleParentsNotAllowedException, MissingObjectException,
+			IOException {
+		final RevCommit srcParent;
+		if (mainlineParentNumber == null) {
+			if (srcCommit.getParentCount() != 1)
+				throw new MultipleParentsNotAllowedException(
+						MessageFormat.format(
+								JGitText.get().canOnlyCherryPickCommitsWithOneParent,
+								srcCommit.name(),
+								Integer.valueOf(srcCommit.getParentCount())));
+			srcParent = srcCommit.getParent(0);
+		} else {
+			if (mainlineParentNumber.intValue() > srcCommit.getParentCount())
+				throw new JGitInternalException(MessageFormat.format(
+						JGitText.get().commitDoesNotHaveGivenParent, srcCommit,
+						mainlineParentNumber));
+			srcParent = srcCommit
+					.getParent(mainlineParentNumber.intValue() - 1);
+		}
+
+		revWalk.parseHeaders(srcParent);
+		return srcParent;
 	}
 
 	/**
@@ -240,6 +261,45 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 	 */
 	public CherryPickCommand setOurCommitName(String ourCommitName) {
 		this.ourCommitName = ourCommitName;
+		return this;
+	}
+
+	/**
+	 * Set the prefix to use in the reflog.
+	 * <p>
+	 * This is primarily needed for implementing rebase in terms of
+	 * cherry-picking
+	 *
+	 * @param prefix
+	 *            including ":"
+	 * @return {@code this}
+	 * @since 3.1
+	 */
+	public CherryPickCommand setReflogPrefix(final String prefix) {
+		this.reflogPrefix = prefix;
+		return this;
+	}
+
+	/**
+	 * @param strategy
+	 *            The merge strategy to use during this Cherry-pick.
+	 * @return {@code this}
+	 * @since 3.4
+	 */
+	public CherryPickCommand setStrategy(MergeStrategy strategy) {
+		this.strategy = strategy;
+		return this;
+	}
+
+	/**
+	 * @param mainlineParentNumber
+	 *            the (1-based) parent number to diff against. This allows
+	 *            cherry-picking of merges.
+	 * @return {@code this}
+	 * @since 3.4
+	 */
+	public CherryPickCommand setMainlineParentNumber(int mainlineParentNumber) {
+		this.mainlineParentNumber = Integer.valueOf(mainlineParentNumber);
 		return this;
 	}
 

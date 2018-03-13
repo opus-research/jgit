@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2009, Google Inc.
+ * Copyright (C) 2008-2013, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -54,8 +54,8 @@ import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTree;
@@ -63,7 +63,6 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.revwalk.filter.RevFilter;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
-import org.eclipse.jgit.treewalk.EmptyTreeIterator;
 
 /**
  * Instance of a specific {@link MergeStrategy} for a single {@link Repository}.
@@ -73,10 +72,10 @@ public abstract class Merger {
 	protected final Repository db;
 
 	/** Reader to support {@link #walk} and other object loading. */
-	protected ObjectReader reader;
+	protected final ObjectReader reader;
 
 	/** A RevWalk for computing merge bases, or listing incoming commits. */
-	protected RevWalk walk;
+	protected final RevWalk walk;
 
 	private ObjectInserter inserter;
 
@@ -97,8 +96,7 @@ public abstract class Merger {
 	 */
 	protected Merger(final Repository local) {
 		db = local;
-		inserter = db.newObjectInserter();
-		reader = inserter.newReader(local);
+		reader = db.newObjectReader();
 		walk = new RevWalk(reader);
 	}
 
@@ -109,8 +107,14 @@ public abstract class Merger {
 		return db;
 	}
 
-	/** @return an object writer to create objects in {@link #getRepository()}. */
+	/**
+	 * @return an object writer to create objects in {@link #getRepository()}.
+	 *         If no inserter has been set on this instance, one will be created
+	 *         and returned by all future calls.
+	 */
 	public ObjectInserter getObjectInserter() {
+		if (inserter == null)
+			inserter = getRepository().newObjectInserter();
 		return inserter;
 	}
 
@@ -118,20 +122,17 @@ public abstract class Merger {
 	 * Set the inserter this merger will use to create objects.
 	 * <p>
 	 * If an inserter was already set on this instance (such as by a prior set,
-	 * or a prior call to {@link #getObjectInserter()}), the prior inserter as
-	 * well as the in-progress walk will be released.
+	 * or a prior call to {@link #getObjectInserter()}), the prior inserter will
+	 * be released first.
 	 *
 	 * @param oi
 	 *            the inserter instance to use. Must be associated with the
 	 *            repository instance returned by {@link #getRepository()}.
 	 */
 	public void setObjectInserter(ObjectInserter oi) {
-		walk.release();
-		reader.release();
-		inserter.release();
+		if (inserter != null)
+			inserter.release();
 		inserter = oi;
-		reader = oi.newReader(db);
-		walk = new RevWalk(reader);
 	}
 
 	/**
@@ -173,34 +174,22 @@ public abstract class Merger {
 
 		try {
 			boolean ok = mergeImpl();
-			if (ok)
+			if (ok && inserter != null)
 				inserter.flush();
 			return ok;
 		} finally {
-			inserter.release();
+			if (inserter != null)
+				inserter.release();
 			reader.release();
 		}
 	}
 
 	/**
-	 * Create an iterator to walk the merge base of two commits.
-	 *
-	 * @param a
-	 *            the first commit in {@link #sourceObjects}.
-	 * @param b
-	 *            the second commit in {@link #sourceObjects}.
-	 * @return the new iterator
-	 * @throws IncorrectObjectTypeException
-	 *             one of the input objects is not a commit.
-	 * @throws IOException
-	 *             objects are missing or multiple merge bases were found.
-	 * @since 3.0
+	 * @return the ID of the commit that was used as merge base for merging, or
+	 *         null if no merge base was used or it was set manually
+	 * @since 3.2
 	 */
-	protected AbstractTreeIterator mergeBase(RevCommit a, RevCommit b)
-			throws IOException {
-		RevCommit base = getBaseCommit(a, b);
-		return (base == null) ? new EmptyTreeIterator() : openTree(base.getTree());
-	}
+	public abstract ObjectId getBaseCommitId();
 
 	/**
 	 * Return the merge base of two commits.
@@ -214,7 +203,10 @@ public abstract class Merger {
 	 *             one of the input objects is not a commit.
 	 * @throws IOException
 	 *             objects are missing or multiple merge bases were found.
+	 * @deprecated use {@link #getBaseCommitId()} instead, as that does not
+	 *             require walking the commits again
 	 */
+	@Deprecated
 	public RevCommit getBaseCommit(final int aIdx, final int bIdx)
 			throws IncorrectObjectTypeException,
 			IOException {
@@ -224,15 +216,7 @@ public abstract class Merger {
 		if (sourceCommits[bIdx] == null)
 			throw new IncorrectObjectTypeException(sourceObjects[bIdx],
 					Constants.TYPE_COMMIT);
-		try {
-			return getBaseCommit(sourceCommits[aIdx], sourceCommits[bIdx]);
-		} finally {
-			// Ensure any virtual bases are flushed before returning. In practice,
-			// since the merge already happened, implementations *shouldn't* create
-			// new virtual merges at this point, but the interface of
-			// getBaseCommit(RevCommit, RevCommit) doesn't guarantee this.
-			inserter.flush();
-		}
+		return getBaseCommit(sourceCommits[aIdx], sourceCommits[bIdx]);
 	}
 
 	/**
