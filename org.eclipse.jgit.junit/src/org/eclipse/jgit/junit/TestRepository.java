@@ -138,7 +138,7 @@ public class TestRepository<R extends Repository> {
 
 	private final ObjectInserter inserter;
 
-	private final MockSystemReader mockSystemReader;
+	private long now;
 
 	/**
 	 * Wrap a repository with test building tools.
@@ -148,7 +148,7 @@ public class TestRepository<R extends Repository> {
 	 * @throws IOException
 	 */
 	public TestRepository(R db) throws IOException {
-		this(db, new RevWalk(db), new MockSystemReader());
+		this(db, new RevWalk(db));
 	}
 
 	/**
@@ -161,29 +161,11 @@ public class TestRepository<R extends Repository> {
 	 * @throws IOException
 	 */
 	public TestRepository(R db, RevWalk rw) throws IOException {
-		this(db, rw, new MockSystemReader());
-	}
-
-	/**
-	 * Wrap a repository with test building tools.
-	 *
-	 * @param db
-	 *            the test repository to write into.
-	 * @param rw
-	 *            the RevObject pool to use for object lookup.
-	 * @param reader
-	 *            the MockSystemReader to use for clock and other system
-	 *            operations.
-	 * @throws IOException
-	 * @since 4.2
-	 */
-	public TestRepository(R db, RevWalk rw, MockSystemReader reader)
-			throws IOException {
 		this.db = db;
 		this.git = Git.wrap(db);
 		this.pool = rw;
 		this.inserter = db.newObjectInserter();
-		this.mockSystemReader = reader;
+		this.now = 1236977987000L;
 	}
 
 	/** @return the repository this helper class operates against. */
@@ -204,28 +186,14 @@ public class TestRepository<R extends Repository> {
 		return git;
 	}
 
-	/**
-	 * @return current date.
-	 * @since 4.2
-	 */
-	public Date getDate() {
-		return new Date(mockSystemReader.getCurrentTime());
-	}
-
-	/**
-	 * @return current date.
-	 *
-	 * @deprecated Use {@link #getDate()} instead.
-	 */
-	@Deprecated
+	/** @return current time adjusted by {@link #tick(int)}. */
 	public Date getClock() {
-		// Remove once Gitiles and Gerrit are using the updated JGit.
-		return getDate();
+		return new Date(now);
 	}
 
 	/** @return timezone used for default identities. */
 	public TimeZone getTimeZone() {
-		return mockSystemReader.getTimeZone();
+		return defaultCommitter.getTimeZone();
 	}
 
 	/**
@@ -235,18 +203,18 @@ public class TestRepository<R extends Repository> {
 	 *            number of seconds to add to the current time.
 	 */
 	public void tick(final int secDelta) {
-		mockSystemReader.tick(secDelta);
+		now += secDelta * 1000L;
 	}
 
 	/**
-	 * Set the author and committer using {@link #getDate()}.
+	 * Set the author and committer using {@link #getClock()}.
 	 *
 	 * @param c
 	 *            the commit builder to store.
 	 */
 	public void setAuthorAndCommitter(org.eclipse.jgit.lib.CommitBuilder c) {
-		c.setAuthor(new PersonIdent(defaultAuthor, getDate()));
-		c.setCommitter(new PersonIdent(defaultCommitter, getDate()));
+		c.setAuthor(new PersonIdent(defaultAuthor, new Date(now)));
+		c.setCommitter(new PersonIdent(defaultCommitter, new Date(now)));
 	}
 
 	/**
@@ -424,8 +392,8 @@ public class TestRepository<R extends Repository> {
 		c = new org.eclipse.jgit.lib.CommitBuilder();
 		c.setTreeId(tree);
 		c.setParentIds(parents);
-		c.setAuthor(new PersonIdent(defaultAuthor, getDate()));
-		c.setCommitter(new PersonIdent(defaultCommitter, getDate()));
+		c.setAuthor(new PersonIdent(defaultAuthor, new Date(now)));
+		c.setCommitter(new PersonIdent(defaultCommitter, new Date(now)));
 		c.setMessage("");
 		ObjectId id;
 		try (ObjectInserter ins = inserter) {
@@ -460,7 +428,7 @@ public class TestRepository<R extends Repository> {
 		final TagBuilder t = new TagBuilder();
 		t.setObjectId(dst);
 		t.setTag(name);
-		t.setTagger(new PersonIdent(defaultCommitter, getDate()));
+		t.setTagger(new PersonIdent(defaultCommitter, new Date(now)));
 		t.setMessage("");
 		ObjectId id;
 		try (ObjectInserter ins = inserter) {
@@ -695,7 +663,7 @@ public class TestRepository<R extends Repository> {
 			b.setParentId(head);
 			b.setTreeId(merger.getResultTreeId());
 			b.setAuthor(commit.getAuthorIdent());
-			b.setCommitter(new PersonIdent(defaultCommitter, getDate()));
+			b.setCommitter(new PersonIdent(defaultCommitter, new Date(now)));
 			b.setMessage(commit.getFullMessage());
 			ObjectId result;
 			try (ObjectInserter ins = inserter) {
@@ -1132,7 +1100,7 @@ public class TestRepository<R extends Repository> {
 					c.setAuthor(author);
 				if (committer != null) {
 					if (updateCommitterTime)
-						committer = new PersonIdent(committer, getDate());
+						committer = new PersonIdent(committer, new Date(now));
 					c.setCommitter(committer);
 				}
 

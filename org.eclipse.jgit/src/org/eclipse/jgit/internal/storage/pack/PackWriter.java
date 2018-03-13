@@ -218,7 +218,7 @@ public class PackWriter implements AutoCloseable {
 	}
 
 	@SuppressWarnings("unchecked")
-	BlockList<ObjectToPack> objectsLists[] = new BlockList[OBJ_TAG + 1];
+	private BlockList<ObjectToPack> objectsLists[] = new BlockList[OBJ_TAG + 1];
 	{
 		objectsLists[OBJ_COMMIT] = new BlockList<ObjectToPack>();
 		objectsLists[OBJ_TREE] = new BlockList<ObjectToPack>();
@@ -249,7 +249,7 @@ public class PackWriter implements AutoCloseable {
 	/** {@link #reader} recast to the reuse interface, if it supports it. */
 	private final ObjectReuseAsIs reuseSupport;
 
-	final PackConfig config;
+	private final PackConfig config;
 
 	private final PackStatistics.Accumulator stats;
 
@@ -1306,7 +1306,8 @@ public class PackWriter implements AutoCloseable {
 		long totalWeight = 0;
 		for (int i = 0; i < cnt; i++) {
 			ObjectToPack o = list[i];
-			totalWeight += DeltaTask.getAdjustedWeight(o);
+			if (!o.isEdge() && !o.doNotAttemptDelta())
+				totalWeight += o.getWeight();
 		}
 
 		long bytesPerUnit = 1;
@@ -2014,10 +2015,13 @@ public class PackWriter implements AutoCloseable {
 		byName = null;
 
 		PackWriterBitmapPreparer bitmapPreparer = new PackWriterBitmapPreparer(
-				reader, writeBitmaps, pm, stats.interestingObjects, config);
+				reader, writeBitmaps, pm, stats.interestingObjects);
 
+		int commitRange = config.getBitmapCommitRange();
+		if (commitRange < 0)
+			commitRange = numCommits; // select from all commits
 		Collection<PackWriterBitmapPreparer.BitmapCommit> selectedCommits =
-				bitmapPreparer.selectCommits(numCommits);
+				bitmapPreparer.doCommitSelection(commitRange);
 
 		beginPhase(PackingPhase.BUILDING_BITMAPS, pm, selectedCommits.size());
 

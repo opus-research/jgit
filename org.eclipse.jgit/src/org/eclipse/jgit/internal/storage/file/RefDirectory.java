@@ -138,7 +138,7 @@ public class RefDirectory extends RefDatabase {
 
 	private final File gitDir;
 
-	final File refsDir;
+	private final File refsDir;
 
 	private final ReflogWriter logWriter;
 
@@ -155,7 +155,7 @@ public class RefDirectory extends RefDatabase {
 	private final AtomicReference<RefList<LooseRef>> looseRefs = new AtomicReference<RefList<LooseRef>>();
 
 	/** Immutable sorted list of packed references. */
-	final AtomicReference<PackedRefList> packedRefs = new AtomicReference<PackedRefList>();
+	private final AtomicReference<PackedRefList> packedRefs = new AtomicReference<PackedRefList>();
 
 	/**
 	 * Number of modifications made to this database.
@@ -262,30 +262,6 @@ public class RefDirectory extends RefDatabase {
 	}
 
 	@Override
-	public Ref exactRef(String name) throws IOException {
-		RefList<Ref> packed = getPackedRefs();
-		Ref ref;
-		try {
-			ref = readRef(name, packed);
-			if (ref != null) {
-				ref = resolve(ref, 0, null, null, packed);
-			}
-		} catch (IOException e) {
-			if (name.contains("/") //$NON-NLS-1$
-					|| !(e.getCause() instanceof InvalidObjectIdException)) {
-				throw e;
-			}
-
-			// While looking for a ref outside of refs/ (e.g., 'config'), we
-			// found a non-ref file (e.g., a config file) instead.  Treat this
-			// as a ref-not-found condition.
-			ref = null;
-		}
-		fireRefsChanged();
-		return ref;
-	}
-
-	@Override
 	public Ref getRef(final String needle) throws IOException {
 		final RefList<Ref> packed = getPackedRefs();
 		Ref ref = null;
@@ -294,8 +270,6 @@ public class RefDirectory extends RefDatabase {
 				ref = readRef(prefix + needle, packed);
 				if (ref != null) {
 					ref = resolve(ref, 0, null, null, packed);
-				}
-				if (ref != null) {
 					break;
 				}
 			} catch (IOException e) {
@@ -788,9 +762,6 @@ public class RefDirectory extends RefDatabase {
 						new DigestInputStream(new FileInputStream(packedRefsFile),
 								digest), CHARSET));
 			} catch (FileNotFoundException noPackedRefs) {
-				if (packedRefsFile.exists()) {
-					throw noPackedRefs;
-				}
 				// Ignore it and leave the new list empty.
 				return PackedRefList.NO_PACKED_REFS;
 			}
@@ -930,7 +901,7 @@ public class RefDirectory extends RefDatabase {
 		return n;
 	}
 
-	LooseRef scanRef(LooseRef ref, String name) throws IOException {
+	private LooseRef scanRef(LooseRef ref, String name) throws IOException {
 		final File path = fileFor(name);
 		FileSnapshot currentSnapshot = null;
 
@@ -947,10 +918,7 @@ public class RefDirectory extends RefDatabase {
 		try {
 			buf = IO.readSome(path, limit);
 		} catch (FileNotFoundException noFile) {
-			if (path.exists() && path.isFile()) {
-				throw noFile;
-			}
-			return null; // doesn't exist or no file; not a reference.
+			return null; // doesn't exist; not a reference.
 		}
 
 		int n = buf.length;

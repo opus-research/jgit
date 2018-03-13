@@ -43,20 +43,6 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.UTF_8;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.cryptoCipherListPBE;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.cryptoCipherListTrans;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.folderDelete;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.permitLongTests;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.policySetup;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.product;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.proxySetup;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.publicAddress;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.reportPolicy;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.securityProviderName;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.textWrite;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.transferStream;
-import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.verifyFileContent;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -73,10 +59,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.net.SocketTimeoutException;
 import java.net.URL;
-import java.net.URLConnection;
-import java.net.UnknownHostException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.security.GeneralSecurityException;
@@ -93,6 +76,7 @@ import java.util.UUID;
 import javax.crypto.Cipher;
 import javax.crypto.SecretKeyFactory;
 
+import org.apache.log4j.Logger;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.test.resources.SampleDataRepositoryTestCase;
@@ -108,8 +92,8 @@ import org.junit.runners.MethodSorters;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 import org.junit.runners.Suite;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import static org.eclipse.jgit.transport.WalkEncryptionTest.Util.*;
 
 /**
  * Amazon S3 encryption pipeline test.
@@ -135,7 +119,7 @@ public class WalkEncryptionTest {
 	/**
 	 * Logger setup: ${project_loc}/tst-rsrc/log4j.properties
 	 */
-	static final Logger logger = LoggerFactory.getLogger(WalkEncryptionTest.class);
+	static final Logger logger = Logger.getLogger(WalkEncryptionTest.class);
 
 	/**
 	 * Property names used in test session.
@@ -416,22 +400,14 @@ public class WalkEncryptionTest {
 		 * @throws Exception
 		 */
 		static String publicAddress() throws Exception {
+			String service = "http://checkip.amazonaws.com";
+			URL url = new URL(service);
+			BufferedReader reader = new BufferedReader(
+					new InputStreamReader(url.openStream()));
 			try {
-				String service = "http://checkip.amazonaws.com";
-				URL url = new URL(service);
-				URLConnection c = url.openConnection();
-				c.setConnectTimeout(500);
-				c.setReadTimeout(500);
-				BufferedReader reader = new BufferedReader(
-						new InputStreamReader(c.getInputStream()));
-				try {
-					return reader.readLine();
-				} finally {
-					reader.close();
-				}
-			} catch (UnknownHostException | SocketTimeoutException e) {
-				return "Can't reach http://checkip.amazonaws.com to"
-						+ " determine public address";
+				return reader.readLine();
+			} finally {
+				reader.close();
 			}
 		}
 
