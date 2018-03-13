@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012 Google Inc. and others.
+ * Copyright (C) 2013, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,59 +41,47 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.dfs;
+package org.eclipse.jgit.storage.pack;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.ByteBuffer;
+/** A pack file extension. */
+public class PackExt {
 
-import org.eclipse.jgit.storage.pack.PackExt;
+	/** A pack file extension. */
+	public static final PackExt PACK = new PackExt("pack"); //$NON-NLS-1$
 
-/**
- * Output stream to create a file on the DFS.
- *
- * @see DfsObjDatabase#writeFile(DfsPackDescription, PackExt)
- */
-public abstract class DfsOutputStream extends OutputStream {
+	/** A pack index file extension. */
+	public static final PackExt INDEX = new PackExt("idx"); //$NON-NLS-1$
+
+	private final String ext;
+
 	/**
-	 * Get the recommended alignment for writing.
-	 * <p>
-	 * Starting a write at multiples of the blockSize is more efficient than
-	 * starting a write at any other position. If 0 or -1 the channel does not
-	 * have any specific block size recommendation.
-	 * <p>
-	 * Channels should not recommend large block sizes. Sizes up to 1-4 MiB may
-	 * be reasonable, but sizes above that may be horribly inefficient.
-	 *
-	 * @return recommended alignment size for randomly positioned reads. Does
-	 *         not need to be a power of 2.
+	 * @param ext
+	 *            the file extension.
 	 */
-	public int blockSize() {
-		return 0;
+	public PackExt(String ext) {
+		this.ext = ext;
+	}
+
+	/** @return the file extension. */
+	public String getExtension() {
+		return ext;
 	}
 
 	@Override
-	public void write(int b) throws IOException {
-		write(new byte[] { (byte) b });
+	public boolean equals(Object obj) {
+		if (obj instanceof PackExt) {
+			return ((PackExt) obj).getExtension().equals(getExtension());
+		}
+		return false;
 	}
 
 	@Override
-	public abstract void write(byte[] buf, int off, int len) throws IOException;
+	public int hashCode() {
+		return getExtension().hashCode();
+	}
 
-	/**
-	 * Read back a portion of already written data.
-	 * <p>
-	 * The writing position of the output stream is not affected by a read.
-	 *
-	 * @param position
-	 *            offset to read from.
-	 * @param buf
-	 *            buffer to populate. Up to {@code buf.remaining()} bytes will
-	 *            be read from {@code position}.
-	 * @return number of bytes actually read.
-	 * @throws IOException
-	 *             reading is not supported, or the read cannot be performed due
-	 *             to DFS errors.
-	 */
-	public abstract int read(long position, ByteBuffer buf) throws IOException;
+	@Override
+	public String toString() {
+		return String.format("PackExt[%s]", getExtension()); //$NON-NLS-1$
+	}
 }

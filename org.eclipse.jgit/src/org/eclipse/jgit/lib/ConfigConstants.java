@@ -121,9 +121,6 @@ public class ConfigConstants {
 	/** The "deltaBaseCacheLimit" key */
 	public static final String CONFIG_KEY_DELTA_BASE_CACHE_LIMIT = "deltaBaseCacheLimit";
 
-	/** The "symlinks key */
-	public static final String CONFIG_KEY_SYMLINKS = "symlinks";
-
 	/** The "streamFileThreshold" key */
 	public static final String CONFIG_KEY_STREAM_FILE_TRESHOLD = "streamFileThreshold";
 
@@ -194,4 +191,7 @@ public class ConfigConstants {
 
 	/** The "mergeoptions" key */
 	public static final String CONFIG_KEY_MERGEOPTIONS = "mergeoptions";
+
+	/** The "ff" key */
+	public static final String CONFIG_KEY_FF = "ff";
 }
