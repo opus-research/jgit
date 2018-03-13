@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, IBM Corporation and others.
+ * Copyright (C) 2012, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,20 +42,29 @@
  */
 package org.eclipse.jgit.pgm;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertArrayEquals;
 
-
+import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.junit.Before;
 import org.junit.Test;
 
-public class CommitAllTest extends CLIRepositoryTestCase {
-
+public class ConfigTest extends CLIRepositoryTestCase {
+	@Override
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		new Git(db).commit().setMessage("initial commit").call();
+	}
 
 	@Test
-	public void testCommitAll() throws Exception {
-		assertEquals(
-				"[master 6fd41be26b7ee41584dd997f665deb92b6c4c004] initial commit",
-				execute("git commit --all -m 'initial commit'")[0]);
-
+	public void testListConfig() throws Exception {
+		String[] output = execute("git config --list");
+		assertArrayEquals("expected default configuration", //
+				new String[] { "core.autocrlf=false", //
+						"core.filemode=true", //
+						"core.logallrefupdates=true", //
+						"core.repositoryformatversion=0", //
+						"" /* ends with LF (last line empty) */}, output);
 	}
 }
