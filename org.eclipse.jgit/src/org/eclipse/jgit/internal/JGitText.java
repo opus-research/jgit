@@ -146,6 +146,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String commitAlreadyExists;
 	/***/ public String commitMessageNotSpecified;
 	/***/ public String commitOnRepoWithoutHEADCurrentlyNotSupported;
+	/***/ public String commitAmendOnInitialNotPossible;
 	/***/ public String compressingObjects;
 	/***/ public String connectionFailed;
 	/***/ public String connectionTimeOut;
@@ -437,6 +438,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String receivePackObjectTooLarge2;
 	/***/ public String receivingObjects;
 	/***/ public String refAlreadyExists;
+	/***/ public String refAlreadyExists1;
 	/***/ public String reflogEntryNotFound;
 	/***/ public String refNotResolved;
 	/***/ public String refUpdateReturnCodeWas;
