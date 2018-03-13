@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, David Pursehouse <david.pursehouse@gmail.com>
+ * Copyright (C) 2017 Thomas Wolf <thomas.wolf@paranor.ch>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,53 +41,56 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.transport;
 
-import org.eclipse.jgit.util.StringUtils;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import java.net.InetSocketAddress;
+
+import org.junit.Test;
 
 /**
- * Submodule section of a Git configuration file.
- *
- * @since 4.7
+ * Daemon tests.
  */
-public class SubmoduleConfig {
+public class DaemonTest {
 
-	/**
-	 * Config values for submodule.[name].fetchRecurseSubmodules.
-	 */
-	public enum FetchRecurseSubmodulesMode implements Config.ConfigEnum {
-		/** Unconditionally recurse into all populated submodules. */
-		YES("true"), //$NON-NLS-1$
+	@Test
+	public void testDaemonStop() throws Exception {
+		Daemon d = new Daemon();
+		d.start();
+		InetSocketAddress address = d.getAddress();
+		assertTrue("Port should be allocated", address.getPort() > 0);
+		assertTrue("Daemon should be running", d.isRunning());
+		Thread.sleep(1000); // Give it time to enter accept()
+		d.stopAndWait();
+		// Try to start a new Daemon again on the same port
+		d = new Daemon(address);
+		d.start();
+		InetSocketAddress newAddress = d.getAddress();
+		assertEquals("New daemon should run on the same port", address,
+				newAddress);
+		assertTrue("Daemon should be running", d.isRunning());
+		Thread.sleep(1000);
+		d.stopAndWait();
+	}
 
-		/**
-		 * Only recurse into a populated submodule when the superproject
-		 * retrieves a commit that updates the submodule's reference to a commit
-		 * that isn't already in the local submodule clone.
-		 */
-		ON_DEMAND("on-demand"), //$NON-NLS-1$
-
-		/** Completely disable recursion. */
-		NO("false"); //$NON-NLS-1$
-
-		private final String configValue;
-
-		private FetchRecurseSubmodulesMode(String configValue) {
-			this.configValue = configValue;
-		}
-
-		@Override
-		public String toConfigValue() {
-			return configValue;
-		}
-
-		@Override
-		public boolean matchConfigValue(String s) {
-			if (StringUtils.isEmptyOrNull(s)) {
-				return false;
-			}
-			s = s.replace('-', '_');
-			return name().equalsIgnoreCase(s)
-					|| configValue.equalsIgnoreCase(s);
-		}
+	@Test
+	public void testDaemonRestart() throws Exception {
+		Daemon d = new Daemon();
+		d.start();
+		InetSocketAddress address = d.getAddress();
+		assertTrue("Port should be allocated", address.getPort() > 0);
+		assertTrue("Daemon should be running", d.isRunning());
+		Thread.sleep(1000);
+		d.stopAndWait();
+		// Re-start the same daemon
+		d.start();
+		InetSocketAddress newAddress = d.getAddress();
+		assertEquals("Daemon should again run on the same port", address,
+				newAddress);
+		assertTrue("Daemon should be running", d.isRunning());
+		Thread.sleep(1000);
+		d.stopAndWait();
 	}
 }

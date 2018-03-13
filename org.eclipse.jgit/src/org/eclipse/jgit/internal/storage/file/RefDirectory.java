@@ -48,7 +48,6 @@ package org.eclipse.jgit.internal.storage.file;
 
 import static org.eclipse.jgit.lib.Constants.CHARSET;
 import static org.eclipse.jgit.lib.Constants.HEAD;
-import static org.eclipse.jgit.lib.Constants.LOGS;
 import static org.eclipse.jgit.lib.Constants.OBJECT_ID_STRING_LENGTH;
 import static org.eclipse.jgit.lib.Constants.PACKED_REFS;
 import static org.eclipse.jgit.lib.Constants.R_HEADS;
@@ -155,10 +154,6 @@ public class RefDirectory extends RefDatabase {
 
 	final File packedRefsFile;
 
-	final File logsDir;
-
-	final File logsRefsDir;
-
 	/**
 	 * Immutable sorted list of loose references.
 	 * <p>
@@ -210,10 +205,8 @@ public class RefDirectory extends RefDatabase {
 		final FS fs = db.getFS();
 		parent = db;
 		gitDir = db.getDirectory();
-		logWriter = new ReflogWriter(this);
+		logWriter = new ReflogWriter(db);
 		refsDir = fs.resolve(gitDir, R_REFS);
-		logsDir = fs.resolve(gitDir, LOGS);
-		logsRefsDir = fs.resolve(gitDir, LOGS + '/' + R_REFS);
 		packedRefsFile = fs.resolve(gitDir, PACKED_REFS);
 
 		looseRefs.set(RefList.<LooseRef> emptyList());
@@ -226,22 +219,6 @@ public class RefDirectory extends RefDatabase {
 
 	ReflogWriter getLogWriter() {
 		return logWriter;
-	}
-
-	/**
-	 * Locate the log file on disk for a single reference name.
-	 *
-	 * @param name
-	 *            name of the ref, relative to the Git repository top level
-	 *            directory (so typically starts with refs/).
-	 * @return the log file location.
-	 */
-	public File logFor(String name) {
-		if (name.startsWith(R_REFS)) {
-			name = name.substring(R_REFS.length());
-			return new File(logsRefsDir, name);
-		}
-		return new File(logsDir, name);
 	}
 
 	@Override
@@ -656,8 +633,9 @@ public class RefDirectory extends RefDatabase {
 				try {
 					PackedRefList cur = readPackedRefs();
 					int idx = cur.find(name);
-					if (0 <= idx)
-						commitPackedRefs(lck, cur.remove(idx), packed);
+					if (0 <= idx) {
+						commitPackedRefs(lck, cur.remove(idx), packed, true);
+					}
 				} finally {
 					lck.unlock();
 				}
@@ -676,7 +654,7 @@ public class RefDirectory extends RefDatabase {
 		} while (!looseRefs.compareAndSet(curLoose, newLoose));
 
 		int levels = levelsIn(name) - 2;
-		delete(logFor(name), levels);
+		delete(logWriter.logFor(name), levels);
 		if (dst.getStorage().isLoose()) {
 			update.unlock();
 			delete(fileFor(name), levels);
@@ -756,7 +734,8 @@ public class RefDirectory extends RefDatabase {
 				}
 
 				// The new content for packed-refs is collected. Persist it.
-				PackedRefList result = commitPackedRefs(lck, cur, packed);
+				PackedRefList result = commitPackedRefs(lck, cur, packed,
+						false);
 
 				// Now delete the loose refs which are now packed
 				for (String refName : refs) {
@@ -1011,7 +990,8 @@ public class RefDirectory extends RefDatabase {
 	}
 
 	PackedRefList commitPackedRefs(final LockFile lck, final RefList<Ref> refs,
-			final PackedRefList oldPackedList) throws IOException {
+			final PackedRefList oldPackedList, boolean changed)
+			throws IOException {
 		// Can't just return packedRefs.get() from this method; it might have been
 		// updated again after writePackedRefs() returns.
 		AtomicReference<PackedRefList> result = new AtomicReference<>();
@@ -1053,6 +1033,9 @@ public class RefDirectory extends RefDatabase {
 				if (!afterUpdate.id.equals(newPackedList.id)) {
 					throw new ObjectWritingException(
 							MessageFormat.format(JGitText.get().unableToWrite, name));
+				}
+				if (changed) {
+					modCnt.incrementAndGet();
 				}
 				result.set(newPackedList);
 			}

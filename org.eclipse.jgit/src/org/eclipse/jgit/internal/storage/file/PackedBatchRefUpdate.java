@@ -194,7 +194,8 @@ class PackedBatchRefUpdate extends BatchRefUpdate {
 				return;
 			}
 			// commitPackedRefs removes lock file (by renaming over real file).
-			refdb.commitPackedRefs(packedRefsLock, newRefs, oldPackedList);
+			refdb.commitPackedRefs(packedRefsLock, newRefs, oldPackedList,
+					true);
 		} finally {
 			try {
 				unlockAll(locks);
@@ -415,7 +416,7 @@ class PackedBatchRefUpdate extends BatchRefUpdate {
 
 			if (cmd.getType() == ReceiveCommand.Type.DELETE) {
 				try {
-					RefDirectory.delete(refdb.logFor(name), RefDirectory.levelsIn(name));
+					RefDirectory.delete(w.logFor(name), RefDirectory.levelsIn(name));
 				} catch (IOException e) {
 					// Ignore failures, see below.
 				}
