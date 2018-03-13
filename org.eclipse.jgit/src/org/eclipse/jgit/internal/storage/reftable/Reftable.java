@@ -61,8 +61,14 @@ public abstract class Reftable implements AutoCloseable {
 	 */
 	public static Reftable from(Collection<Ref> refs) {
 		try {
+			ReftableConfig cfg = new ReftableConfig();
+			cfg.setIndexObjects(false);
 			ByteArrayOutputStream buf = new ByteArrayOutputStream();
-			new ReftableWriter().begin(buf).sortAndWriteRefs(refs).finish();
+			new ReftableWriter()
+				.setConfig(cfg)
+				.begin(buf)
+				.sortAndWriteRefs(refs)
+				.finish();
 			return new ReftableReader(BlockSource.from(buf.toByteArray()));
 		} catch (IOException e) {
 			throw new RuntimeException(e);
