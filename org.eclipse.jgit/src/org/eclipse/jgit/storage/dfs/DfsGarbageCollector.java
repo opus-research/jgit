@@ -403,6 +403,9 @@ public class DfsGarbageCollector {
 
 		PackWriter.Statistics stats = pw.getStatistics();
 		pack.setPackStats(stats);
+		pack.setFileSize(PACK, stats.getTotalBytes());
+		pack.setObjectCount(stats.getTotalObjects());
+		pack.setDeltaCount(stats.getTotalDeltas());
 		objectsPacked += stats.getTotalObjects();
 		newPackStats.add(stats);
 

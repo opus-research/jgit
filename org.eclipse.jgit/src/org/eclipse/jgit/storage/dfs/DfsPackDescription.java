@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.storage.dfs;
 
-import static org.eclipse.jgit.storage.pack.PackExt.PACK;
-
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -250,9 +248,6 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 
 	DfsPackDescription setPackStats(PackWriter.Statistics stats) {
 		this.stats = stats;
-		setFileSize(PACK, stats.getTotalBytes());
-		setObjectCount(stats.getTotalObjects());
-		setDeltaCount(stats.getTotalDeltas());
 		return this;
 	}
 
