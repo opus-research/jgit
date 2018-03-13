@@ -77,11 +77,6 @@ public class FileUtils {
 	public static final int SKIP_MISSING = 4;
 
 	/**
-	 * Option to skip creation if file already exists
-	 */
-	public static final int SKIP_EXISTING = 4;
-
-	/**
 	 * Delete file or empty folder
 	 *
 	 * @param f
@@ -172,12 +167,12 @@ public class FileUtils {
 	 */
 	public static void mkdir(final File d, boolean skipExisting)
 			throws IOException {
-		if (skipExisting && d.exists() && d.isDirectory())
-			return;
-
-		if (!d.mkdir())
+		if (!d.mkdir()) {
+			if (skipExisting && d.isDirectory())
+				return;
 			throw new IOException(MessageFormat.format(
 					JGitText.get().mkDirFailed, d.getAbsolutePath()));
+		}
 	}
 
 	/**
@@ -217,31 +212,11 @@ public class FileUtils {
 	 */
 	public static void mkdirs(final File d, boolean skipExisting)
 			throws IOException {
-		if (skipExisting && d.exists() && d.isDirectory())
-			return;
-
-		if (!d.mkdirs())
+		if (!d.mkdirs()) {
+			if (skipExisting && d.isDirectory())
+				return;
 			throw new IOException(MessageFormat.format(
 					JGitText.get().mkDirsFailed, d.getAbsolutePath()));
-	}
-
-	/**
-	 * Atomically creates a new, empty file named by this abstract pathname if
-	 * and only if a file with this name does not yet exist. The check for the
-	 * existence of the file and the creation of the file if it does not exist
-	 * are a single operation that is atomic with respect to all other
-	 * filesystem activities that might affect the file. Note: this method
-	 * should not be used for file-locking, as the resulting protocol cannot be
-	 * made to work reliably. The FileLock facility should be used instead.
-	 *
-	 * @param f
-	 *            the file to be created
-	 * @throws IOException
-	 *             if the named file already exists or if an I/O error occurred
-	 */
-	public static void createNewFile(File f) throws IOException {
-		if (!f.createNewFile())
-			throw new IOException(MessageFormat.format(
-					JGitText.get().createNewFileFailed, f));
+		}
 	}
 }
