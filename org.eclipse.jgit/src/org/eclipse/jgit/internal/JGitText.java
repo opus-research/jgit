@@ -344,7 +344,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String expectedPktLineWithService;
 	/***/ public String expectedReceivedContentType;
 	/***/ public String expectedReportForRefNotReceived;
-	/***/ public String expectedShallowUnshallowGot;
 	/***/ public String failedToDetermineFilterDefinition;
 	/***/ public String failedUpdatingRefs;
 	/***/ public String failureDueToOneOfTheFollowing;
