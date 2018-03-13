@@ -45,7 +45,6 @@ package org.eclipse.jgit.transport;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
@@ -53,10 +52,8 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.List;
 
 import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
 import org.junit.After;
 import org.junit.Before;
@@ -210,20 +207,6 @@ public class TransportTest extends SampleDataRepositoryTestCase {
 		assertEquals("refs/remotes/test/a", tru.getLocalName());
 		assertEquals("refs/heads/a", tru.getRemoteName());
 		assertEquals(db.resolve("refs/heads/a"), tru.getNewObjectId());
-		assertEquals(ObjectId.zeroId(), tru.getOldObjectId());
-	}
-
-	@Test
-	public void testSpi() {
-		List<TransportProtocol> protocols = Transport.getTransportProtocols();
-		assertNotNull(protocols);
-		assertFalse(protocols.isEmpty());
-		TransportProtocol found = null;
-		for (TransportProtocol protocol : protocols)
-			if (protocol.getSchemes().contains(SpiTransport.SCHEME)) {
-				found = protocol;
-				break;
-			}
-		assertEquals(SpiTransport.PROTO, found);
+		assertNull(tru.getOldObjectId());
 	}
 }

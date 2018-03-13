@@ -43,9 +43,9 @@
 
 package org.eclipse.jgit.junit;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -61,10 +61,10 @@ import java.util.Set;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEditor;
+import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheEditor.DeletePath;
 import org.eclipse.jgit.dircache.DirCacheEditor.DeleteTree;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
-import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.ObjectWritingException;
@@ -97,7 +97,6 @@ import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 import org.eclipse.jgit.util.FileUtils;
-import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
  * Wrapper to make creating test data easier.
@@ -459,13 +458,9 @@ public class TestRepository<R extends Repository> {
 	 */
 	public <T extends AnyObjectId> T update(String ref, T obj) throws Exception {
 		if (Constants.HEAD.equals(ref)) {
-			// nothing
 		} else if ("FETCH_HEAD".equals(ref)) {
-			// nothing
 		} else if ("MERGE_HEAD".equals(ref)) {
-			// nothing
 		} else if (ref.startsWith(Constants.R_REFS)) {
-			// nothing
 		} else
 			ref = Constants.R_HEADS + ref;
 
@@ -541,9 +536,7 @@ public class TestRepository<R extends Repository> {
 	 */
 	public BranchBuilder branch(String ref) {
 		if (Constants.HEAD.equals(ref)) {
-			// nothing
 		} else if (ref.startsWith(Constants.R_REFS)) {
-			// nothing
 		} else
 			ref = Constants.R_HEADS + ref;
 		return new BranchBuilder(ref);
@@ -630,7 +623,7 @@ public class TestRepository<R extends Repository> {
 				OutputStream out;
 
 				pack = nameFor(odb, name, ".pack");
-				out = new SafeBufferedOutputStream(new FileOutputStream(pack));
+				out = new BufferedOutputStream(new FileOutputStream(pack));
 				try {
 					pw.writePack(m, m, out);
 				} finally {
@@ -639,7 +632,7 @@ public class TestRepository<R extends Repository> {
 				pack.setReadOnly();
 
 				idx = nameFor(odb, name, ".idx");
-				out = new SafeBufferedOutputStream(new FileOutputStream(idx));
+				out = new BufferedOutputStream(new FileOutputStream(idx));
 				try {
 					pw.writeIndex(out);
 				} finally {
@@ -793,18 +786,14 @@ public class TestRepository<R extends Repository> {
 
 		public CommitBuilder add(String path, final RevBlob id)
 				throws Exception {
-			return edit(new PathEdit(path) {
+			DirCacheEditor e = tree.editor();
+			e.add(new PathEdit(path) {
 				@Override
 				public void apply(DirCacheEntry ent) {
 					ent.setFileMode(FileMode.REGULAR_FILE);
 					ent.setObjectId(id);
 				}
 			});
-		}
-
-		public CommitBuilder edit(PathEdit edit) {
-			DirCacheEditor e = tree.editor();
-			e.add(edit);
 			e.finish();
 			return this;
 		}

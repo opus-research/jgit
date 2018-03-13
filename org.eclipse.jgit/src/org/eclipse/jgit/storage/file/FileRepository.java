@@ -52,11 +52,11 @@ import java.text.MessageFormat;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.events.ConfigChangedEvent;
 import org.eclipse.jgit.events.ConfigChangedListener;
 import org.eclipse.jgit.events.IndexChangedEvent;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.BaseRepositoryBuilder;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
@@ -160,8 +160,8 @@ public class FileRepository extends Repository {
 		systemConfig = SystemReader.getInstance().openSystemConfig(null, getFS());
 		userConfig = SystemReader.getInstance().openUserConfig(systemConfig,
 				getFS());
-		repoConfig = new FileBasedConfig(userConfig, getFS().resolve(
-				getDirectory(), Constants.CONFIG),
+		repoConfig = new FileBasedConfig(userConfig, //
+				getFS().resolve(getDirectory(), "config"), //
 				getFS());
 
 		loadSystemConfig();
@@ -181,13 +181,14 @@ public class FileRepository extends Repository {
 				getFS());
 
 		if (objectDatabase.exists()) {
-			final long repositoryFormatVersion = getConfig().getLong(
+			final String repositoryFormatVersion = getConfig().getString(
 					ConfigConstants.CONFIG_CORE_SECTION, null,
-					ConfigConstants.CONFIG_KEY_REPO_FORMAT_VERSION, 0);
-			if (repositoryFormatVersion > 0)
+					ConfigConstants.CONFIG_KEY_REPO_FORMAT_VERSION);
+			if (!"0".equals(repositoryFormatVersion)) {
 				throw new IOException(MessageFormat.format(
 						JGitText.get().unknownRepositoryFormat2,
-						Long.valueOf(repositoryFormatVersion)));
+						repositoryFormatVersion));
+			}
 		}
 
 		if (!isBare())
@@ -280,6 +281,8 @@ public class FileRepository extends Repository {
 					ConfigConstants.CONFIG_KEY_BARE, true);
 		cfg.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
 				ConfigConstants.CONFIG_KEY_LOGALLREFUPDATES, !bare);
+		cfg.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
+				ConfigConstants.CONFIG_KEY_AUTOCRLF, false);
 		cfg.save();
 	}
 
