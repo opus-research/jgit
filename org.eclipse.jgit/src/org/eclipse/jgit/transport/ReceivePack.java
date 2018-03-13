@@ -193,9 +193,6 @@ public class ReceivePack {
 
 	private boolean checkReferencedIsReachable;
 
-	/** Git object size limit */
-	private long maxObjectSizeLimit;
-
 	/**
 	 * Create a new pack receive for an open repository.
 	 *
@@ -494,19 +491,6 @@ public class ReceivePack {
 	 */
 	public void setTimeout(final int seconds) {
 		timeout = seconds;
-	}
-
-	/**
-	 * Set the maximum allowed Git object size.
-	 * <p>
-	 * If an object is larger than the given size the pack-parsing will throw an
-	 * exception aborting the receive-pack operation.
-	 *
-	 * @param limit
-	 *            the Git object size limit. If zero then there is not limit.
-	 */
-	public void setMaxObjectSizeLimit(final long limit) {
-		maxObjectSizeLimit = limit;
 	}
 
 	/** @return all of the command received by the current request. */
@@ -845,7 +829,6 @@ public class ReceivePack {
 			parser.setCheckEofAfterPackFooter(!biDirectionalPipe);
 			parser.setObjectChecking(isCheckReceivedObjects());
 			parser.setLockMessage(lockMsg);
-			parser.setMaxObjectSizeLimit(maxObjectSizeLimit);
 			packLock = parser.parse(receiving, resolving);
 			ins.flush();
 		} finally {

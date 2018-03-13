@@ -46,6 +46,7 @@ package org.eclipse.jgit.lib;
 
 import java.io.IOException;
 
+import org.eclipse.jgit.lib.GitIndex.Entry;
 import org.eclipse.jgit.util.RawParseUtils;
 
 /**
@@ -233,6 +234,19 @@ public abstract class TreeEntry implements Comparable {
 			return '\0';
 		else
 			return '/';
+	}
+
+	/**
+	 * Helper for accessing tree/blob/index methods.
+	 *
+	 * @param i
+	 * @return '/' for Tree entries and NUL for non-treeish objects
+	 */
+	final public static int lastChar(Entry i) {
+		// FIXME, gitlink etc. Currently Trees cannot appear in the
+		// index so '\0' is always returned, except maybe for submodules
+		// which we do not support yet.
+		return FileMode.TREE.equals(i.getModeBits()) ? '/' : '\0';
 	}
 
 	/**

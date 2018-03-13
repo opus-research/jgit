@@ -115,54 +115,39 @@ public class BlameCommandTest extends RepositoryTestCase {
 
 	@Test
 	public void testRename() throws Exception {
-		testRename("file1.txt", "file2.txt");
-	}
-
-	@Test
-	public void testRenameInSubDir() throws Exception {
-		testRename("subdir/file1.txt", "subdir/file2.txt");
-	}
-
-	@Test
-	public void testMoveToOtherDir() throws Exception {
-		testRename("subdir/file1.txt", "otherdir/file1.txt");
-	}
-
-	private void testRename(final String sourcePath, final String destPath)
-			throws Exception {
 		Git git = new Git(db);
 
 		String[] content1 = new String[] { "a", "b", "c" };
-		writeTrashFile(sourcePath, join(content1));
-		git.add().addFilepattern(sourcePath).call();
+		writeTrashFile("file.txt", join(content1));
+		git.add().addFilepattern("file.txt").call();
 		RevCommit commit1 = git.commit().setMessage("create file").call();
 
-		writeTrashFile(destPath, join(content1));
-		git.add().addFilepattern(destPath).call();
-		git.rm().addFilepattern(sourcePath).call();
+		writeTrashFile("file1.txt", join(content1));
+		git.add().addFilepattern("file1.txt").call();
+		git.rm().addFilepattern("file.txt").call();
 		git.commit().setMessage("moving file").call();
 
 		String[] content2 = new String[] { "a", "b", "c2" };
-		writeTrashFile(destPath, join(content2));
-		git.add().addFilepattern(destPath).call();
+		writeTrashFile("file1.txt", join(content2));
+		git.add().addFilepattern("file1.txt").call();
 		RevCommit commit3 = git.commit().setMessage("editing file").call();
 
 		BlameCommand command = new BlameCommand(db);
 		command.setFollowFileRenames(true);
-		command.setFilePath(destPath);
+		command.setFilePath("file1.txt");
 		BlameResult lines = command.call();
 
 		assertEquals(commit1, lines.getSourceCommit(0));
 		assertEquals(0, lines.getSourceLine(0));
-		assertEquals(sourcePath, lines.getSourcePath(0));
+		assertEquals("file.txt", lines.getSourcePath(0));
 
 		assertEquals(commit1, lines.getSourceCommit(1));
 		assertEquals(1, lines.getSourceLine(1));
-		assertEquals(sourcePath, lines.getSourcePath(1));
+		assertEquals("file.txt", lines.getSourcePath(1));
 
 		assertEquals(commit3, lines.getSourceCommit(2));
 		assertEquals(2, lines.getSourceLine(2));
-		assertEquals(destPath, lines.getSourcePath(2));
+		assertEquals("file1.txt", lines.getSourcePath(2));
 	}
 
 	@Test

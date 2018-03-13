@@ -368,7 +368,8 @@ public class HttpClientTests extends HttpTestCase {
 				t.openFetch();
 				fail("connection opened even though service disabled");
 			} catch (TransportException err) {
-				String exp = smartAuthNoneURI + ": Git access forbidden";
+				String exp = smartAuthNoneURI
+						+ ": git-upload-pack not permitted";
 				assertEquals(exp, err.getMessage());
 			}
 		} finally {
