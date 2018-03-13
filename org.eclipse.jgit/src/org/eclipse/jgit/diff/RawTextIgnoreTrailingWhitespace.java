@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2010, Jens Baumgart <jens.baumgart@sap.com>
+ * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2008-2009, Johannes E. Schindelin <johannes.schindelin@gmx.de>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,51 +41,71 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.treewalk.filter;
 
-import java.io.IOException;
+package org.eclipse.jgit.diff;
 
-import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.treewalk.WorkingTreeIterator;
+import static org.eclipse.jgit.util.RawCharUtil.trimTrailingWhitespace;
 
 /**
- * Skip {@link WorkingTreeIterator} entries that appear in gitignore files.
+ * A version of {@link RawText} that ignores trailing whitespace.
  */
-public class NotIgnoredFilter extends TreeFilter {
-	private final int index;
+public class RawTextIgnoreTrailingWhitespace extends RawText {
+	/** Creates RawText that ignores only trailing whitespace. */
+	@SuppressWarnings("hiding")
+	public static final Factory FACTORY = new Factory() {
+		public RawText create(byte[] input) {
+			return new RawTextIgnoreTrailingWhitespace(input);
+		}
+	};
 
 	/**
-	 * Construct a filter to ignore paths known to a particular iterator.
+	 * Create a new sequence from an existing content byte array.
+	 * <p>
+	 * The entire array (indexes 0 through length-1) is used as the content.
 	 *
-	 * @param workdirTreeIndex
-	 *            index of the workdir tree in the tree walk
+	 * @param input
+	 *            the content array. The array is never modified, so passing
+	 *            through cached arrays is safe.
 	 */
-	public NotIgnoredFilter(final int workdirTreeIndex) {
-		this.index = workdirTreeIndex;
+	public RawTextIgnoreTrailingWhitespace(byte[] input) {
+		super(input);
 	}
 
 	@Override
-	public boolean include(TreeWalk tw) throws MissingObjectException,
-			IncorrectObjectTypeException, IOException {
-		WorkingTreeIterator i = tw.getTree(index, WorkingTreeIterator.class);
-		return i == null || !i.isEntryIgnored();
+	public boolean equals(final int i, final Sequence other, final int j) {
+		return equals(this, i + 1, (RawText) other, j + 1);
+	}
+
+	private static boolean equals(final RawText a, final int ai,
+			final RawText b, final int bi) {
+		if (a.hashes[ai] != b.hashes[bi])
+			return false;
+
+		int as = a.lines.get(ai);
+		int bs = b.lines.get(bi);
+		int ae = a.lines.get(ai + 1);
+		int be = b.lines.get(bi + 1);
+
+		ae = trimTrailingWhitespace(a.content, as, ae);
+		be = trimTrailingWhitespace(b.content, bs, be);
+
+		if (ae - as != be - bs)
+			return false;
+
+		while (as < ae) {
+			if (a.content[as++] != b.content[bs++])
+				return false;
+		}
+		return true;
 	}
 
 	@Override
-	public boolean shouldBeRecursive() {
-		return false;
-	}
-
-	@Override
-	public TreeFilter clone() {
-		// immutable
-		return this;
-	}
-
-	@Override
-	public String toString() {
-		return "NotIgnored(" + index + ")";
+	protected int hashLine(final byte[] raw, int ptr, int end) {
+		int hash = 5381;
+		end = trimTrailingWhitespace(raw, ptr, end);
+		for (; ptr < end; ptr++) {
+			hash = (hash << 5) ^ (raw[ptr] & 0xff);
+		}
+		return hash;
 	}
 }
