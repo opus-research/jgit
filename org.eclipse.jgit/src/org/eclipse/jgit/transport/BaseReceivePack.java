@@ -48,7 +48,6 @@ import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_DELETE_
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_OFS_DELTA;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_REPORT_STATUS;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_SIDE_BAND_64K;
-import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_AGENT;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_DATA;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_PROGRESS;
 import static org.eclipse.jgit.transport.SideBandOutputStream.MAX_BUF;
@@ -71,7 +70,6 @@ import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.TooLargePackException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.PackLock;
-import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.BatchRefUpdate;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Config.SectionParser;
@@ -226,7 +224,6 @@ public abstract class BaseReceivePack {
 
 	/** Capabilities requested by the client. */
 	private Set<String> enabledCapabilities;
-	String userAgent;
 	private Set<ObjectId> clientShallowCommits;
 	private List<ReceiveCommand> commands;
 
@@ -292,7 +289,6 @@ public abstract class BaseReceivePack {
 
 		final boolean checkReceivedObjects;
 		final boolean allowLeadingZeroFileMode;
-		final boolean allowInvalidPersonIdent;
 		final boolean safeForWindows;
 		final boolean safeForMacOS;
 
@@ -310,8 +306,6 @@ public abstract class BaseReceivePack {
 					config.getBoolean("transfer", "fsckobjects", false)); //$NON-NLS-1$ //$NON-NLS-2$
 			allowLeadingZeroFileMode = checkReceivedObjects
 					&& config.getBoolean("fsck", "allowLeadingZeroFileMode", false); //$NON-NLS-1$ //$NON-NLS-2$
-			allowInvalidPersonIdent = checkReceivedObjects
-					&& config.getBoolean("fsck", "allowInvalidPersonIdent", false); //$NON-NLS-1$ //$NON-NLS-2$
 			safeForWindows = checkReceivedObjects
 					&& config.getBoolean("fsck", "safeForWindows", false); //$NON-NLS-1$ //$NON-NLS-2$
 			safeForMacOS = checkReceivedObjects
@@ -332,7 +326,6 @@ public abstract class BaseReceivePack {
 				return null;
 			return new ObjectChecker()
 				.setAllowLeadingZeroFileMode(allowLeadingZeroFileMode)
-				.setAllowInvalidPersonIdent(allowInvalidPersonIdent)
 				.setSafeForWindows(safeForWindows)
 				.setSafeForMacOS(safeForMacOS);
 		}
@@ -741,25 +734,6 @@ public abstract class BaseReceivePack {
 		return enabledCapabilities.contains(CAPABILITY_SIDE_BAND_64K);
 	}
 
-	/**
-	 * Get the user agent of the client.
-	 * <p>
-	 * If the client is new enough to use {@code agent=} capability that value
-	 * will be returned. Older HTTP clients may also supply their version using
-	 * the HTTP {@code User-Agent} header. The capability overrides the HTTP
-	 * header if both are available.
-	 * <p>
-	 * When an HTTP request has been received this method returns the HTTP
-	 * {@code User-Agent} header value until capabilities have been parsed.
-	 *
-	 * @return user agent supplied by the client. Available only if the client
-	 *         is new enough to advertise its user agent.
-	 * @since 4.0
-	 */
-	public String getPeerUserAgent() {
-		return UserAgent.getAgent(enabledCapabilities, userAgent);
-	}
-
 	/** @return all of the command received by the current request. */
 	public List<ReceiveCommand> getAllCommands() {
 		return Collections.unmodifiableList(commands);
@@ -977,7 +951,6 @@ public abstract class BaseReceivePack {
 			adv.advertiseCapability(CAPABILITY_ATOMIC);
 		if (allowOfsDelta)
 			adv.advertiseCapability(CAPABILITY_OFS_DELTA);
-		adv.advertiseCapability(OPTION_AGENT, UserAgent.get());
 		adv.send(getAdvertisedOrDefaultRefs());
 		for (ObjectId obj : advertisedHaves)
 			adv.advertiseHave(obj);
@@ -1127,30 +1100,6 @@ public abstract class BaseReceivePack {
 				|| !getClientShallowCommits().isEmpty();
 	}
 
-	private void checkObjectIsReachable(final RevObject obj, final ObjectWalk walk) throws IOException {
-
-		if (!db.hasObject(obj))
-			throw new MissingObjectException(obj, obj.getType());
-
-		if (walk.lookupOrNull(obj) != null)
-			return;
-
-		for (;;) {
-			RevObject o;
-			while ((o = walk.nextObject()) != null) {
-				if (AnyObjectId.equals(o, obj))
-					return;
-			}
-			RevCommit c = walk.next();
-			if (c == null)
-				break;
-			if (AnyObjectId.equals(c, obj))
-				return;
-		}
-
-		throw new MissingObjectException(obj, obj.getType());
-	}
-
 	private void checkConnectivity() throws IOException {
 		ObjectIdSubclassMap<ObjectId> baseObjects = null;
 		ObjectIdSubclassMap<ObjectId> providedObjects = null;
@@ -1182,16 +1131,9 @@ public abstract class BaseReceivePack {
 					continue;
 				ow.markStart(ow.parseAny(cmd.getNewId()));
 			}
-
-			final ObjectWalk have_w = new ObjectWalk(db);
-			have_w.setRetainBody(false);
-
 			for (final ObjectId have : advertisedHaves) {
 				RevObject o = ow.parseAny(have);
 				ow.markUninteresting(o);
-
-				RevObject w = have_w.parseAny(have);
-				have_w.markStart(have_w.peel(w));
 
 				if (baseObjects != null && !baseObjects.isEmpty()) {
 					o = ow.peel(o);
@@ -1223,7 +1165,7 @@ public abstract class BaseReceivePack {
 					if (providedObjects.contains(o))
 						continue;
 					else
-						checkObjectIsReachable(o, have_w);
+						throw new MissingObjectException(o, o.getType());
 				}
 
 				if (o instanceof RevBlob && !db.hasObject(o))
