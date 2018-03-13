@@ -565,13 +565,8 @@ public class ObjectDirectory extends FileObjectDatabase {
 			removePack(p);
 		}
 		if (warnTmpl != null) {
-			if (LOG.isDebugEnabled()) {
-				LOG.debug(MessageFormat.format(warnTmpl,
-						p.getPackFile().getAbsolutePath()), e);
-			} else {
-				LOG.warn(MessageFormat.format(warnTmpl,
-						p.getPackFile().getAbsolutePath()));
-			}
+			LOG.warn(MessageFormat.format(warnTmpl, p.getPackFile()
+					.getAbsolutePath()));
 		} else {
 			// Don't remove the pack from the list, as the error may be
 			// transient.
