@@ -273,7 +273,7 @@ public class RefTree {
 	/**
 	 * Attempt a batch of commands against this RefTree.
 	 * <p>
-	 * The batch is applied atomically. Either all commands apply at once, or
+	 * The batch is applied atomically, either all commands apply at once, or
 	 * they all reject and the RefTree is left unmodified.
 	 * <p>
 	 * On success (when this method returns {@code true}) the command results
