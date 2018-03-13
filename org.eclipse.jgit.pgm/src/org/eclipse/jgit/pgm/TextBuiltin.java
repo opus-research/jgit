@@ -49,7 +49,6 @@ import static org.eclipse.jgit.lib.Constants.R_REMOTES;
 import static org.eclipse.jgit.lib.Constants.R_TAGS;
 
 import java.io.BufferedWriter;
-import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -176,13 +175,12 @@ public abstract class TextBuiltin {
 			throw die(CLIText.get().cannotCreateOutputStream);
 		}
 
-		db = repository;
-		gitdir = gitDir;
-		if (repository != null) {
-			File directory = repository.getDirectory();
-			if (directory != null) {
-				gitdir = directory.getAbsolutePath();
-			}
+		if (repository != null && repository.getDirectory() != null) {
+			db = repository;
+			gitdir = repository.getDirectory().getAbsolutePath();
+		} else {
+			db = repository;
+			gitdir = gitDir;
 		}
 	}
 

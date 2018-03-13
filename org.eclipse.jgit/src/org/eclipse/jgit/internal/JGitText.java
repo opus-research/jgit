@@ -569,7 +569,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String renamesRejoiningModifies;
 	/***/ public String repositoryAlreadyExists;
 	/***/ public String repositoryConfigFileInvalid;
-	/***/ public String repositoryIsNotLocal;
 	/***/ public String repositoryIsRequired;
 	/***/ public String repositoryNotFound;
 	/***/ public String repositoryState_applyMailbox;
