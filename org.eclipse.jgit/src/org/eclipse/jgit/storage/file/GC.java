@@ -104,7 +104,7 @@ public class GC {
 
 	private long expireAgeMillis = -1;
 
-	private Date expire = null;
+	private Date expire;
 
 	/**
 	 * the refs which existed during the last call to {@link #repack()}. This is
