@@ -137,7 +137,6 @@ public class GC {
 	 * @throws IOException
 	 */
 	public Collection<PackFile> gc() throws IOException {
-		pm.start(6 /* tasks */);
 		packRefs();
 		// TODO: implement reflog_expire(pm, repo);
 		Collection<PackFile> newPacks = repack();
@@ -263,38 +262,34 @@ public class GC {
 		if (fanout != null && fanout.length > 0) {
 			pm.beginTask(JGitText.get().pruneLooseUnreferencedObjects,
 					fanout.length);
-			try {
-				for (String d : fanout) {
-					pm.update(1);
-					if (d.length() != 2)
+			for (String d : fanout) {
+				pm.update(1);
+				if (d.length() != 2)
+					continue;
+				File[] entries = new File(objects, d).listFiles();
+				if (entries == null)
+					continue;
+				for (File f : entries) {
+					String fName = f.getName();
+					if (fName.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
 						continue;
-					File[] entries = new File(objects, d).listFiles();
-					if (entries == null)
+					if (f.lastModified() >= expireDate)
 						continue;
-					for (File f : entries) {
-						String fName = f.getName();
-						if (fName.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
+					try {
+						ObjectId id = ObjectId.fromString(d + fName);
+						if (objectsToKeep.contains(id))
 							continue;
-						if (f.lastModified() >= expireDate)
+						if (indexObjects == null)
+							indexObjects = listNonHEADIndexObjects();
+						if (indexObjects.contains(id))
 							continue;
-						try {
-							ObjectId id = ObjectId.fromString(d + fName);
-							if (objectsToKeep.contains(id))
-								continue;
-							if (indexObjects == null)
-								indexObjects = listNonHEADIndexObjects();
-							if (indexObjects.contains(id))
-								continue;
-							deletionCandidates.put(id, f);
-						} catch (IllegalArgumentException notAnObject) {
-							// ignoring the file that does not represent loose
-							// object
-							continue;
-						}
+						deletionCandidates.put(id, f);
+					} catch (IllegalArgumentException notAnObject) {
+						// ignoring the file that does not represent loose
+						// object
+						continue;
 					}
 				}
-			} finally {
-				pm.endTask();
 			}
 		}
 		if (deletionCandidates.isEmpty())
