@@ -265,6 +265,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String flagNotFromThis;
 	/***/ public String flagsAlreadyCreated;
 	/***/ public String funnyRefname;
+	/***/ public String headRequiredToStash;
 	/***/ public String hoursAgo;
 	/***/ public String hugeIndexesAreNotSupportedByJgitYet;
 	/***/ public String hunkBelongsToAnotherFile;
@@ -482,6 +483,11 @@ public class JGitText extends TranslationBundle {
 	/***/ public String sourceRefNotSpecifiedForRefspec;
 	/***/ public String staleRevFlagsOn;
 	/***/ public String startingReadStageWithoutWrittenRequestDataPendingIsNotSupported;
+	/***/ public String stashApplyFailed;
+	/***/ public String stashApplyOnUnsafeRepository;
+	/***/ public String stashCommitMissingTwoParents;
+	/***/ public String stashFailed;
+	/***/ public String stashResolveFailed;
 	/***/ public String statelessRPCRequiresOptionToBeEnabled;
 	/***/ public String submoduleExists;
 	/***/ public String submodulesNotSupported;

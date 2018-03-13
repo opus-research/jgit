@@ -484,7 +484,7 @@ public class ReceivePack {
 		this.refFilter = refFilter != null ? refFilter : RefFilter.DEFAULT;
 	}
 
-	/** @return the hook invoked before updates occur. */
+	/** @return get the hook invoked before updates occur. */
 	public PreReceiveHook getPreReceiveHook() {
 		return preReceive;
 	}
@@ -507,7 +507,7 @@ public class ReceivePack {
 		preReceive = h != null ? h : PreReceiveHook.NULL;
 	}
 
-	/** @return the hook invoked after updates occur. */
+	/** @return get the hook invoked after updates occur. */
 	public PostReceiveHook getPostReceiveHook() {
 		return postReceive;
 	}
