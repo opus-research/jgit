@@ -58,7 +58,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.dfs.DfsObjDatabase.PackSource;
 import org.eclipse.jgit.internal.storage.file.PackIndex;
 import org.eclipse.jgit.internal.storage.pack.PackExt;
@@ -189,8 +188,7 @@ public class DfsGarbageCollector {
 		if (pm == null)
 			pm = NullProgressMonitor.INSTANCE;
 		if (packConfig.getIndexVersion() != 2)
-			throw new IllegalStateException(
-					JGitText.get().supportOnlyPackIndexVersion2);
+			throw new IllegalStateException("Only index version 2");
 
 		ctx = (DfsReader) objdb.newReader();
 		try {
@@ -274,11 +272,14 @@ public class DfsGarbageCollector {
 		if (allHeads.isEmpty())
 			return;
 
-		try (PackWriter pw = newPackWriter()) {
+		PackWriter pw = newPackWriter();
+		try {
 			pw.setTagTargets(tagTargets);
 			pw.preparePack(pm, allHeads, Collections.<ObjectId> emptySet());
 			if (0 < pw.getObjectCount())
 				writePack(GC, pw, pm);
+		} finally {
+			pw.release();
 		}
 	}
 
@@ -286,12 +287,15 @@ public class DfsGarbageCollector {
 		if (nonHeads.isEmpty())
 			return;
 
-		try (PackWriter pw = newPackWriter()) {
+		PackWriter pw = newPackWriter();
+		try {
 			for (PackWriter.ObjectIdSet packedObjs : newPackObj)
 				pw.excludeObjects(packedObjs);
 			pw.preparePack(pm, nonHeads, allHeads);
 			if (0 < pw.getObjectCount())
 				writePack(GC, pw, pm);
+		} finally {
+			pw.release();
 		}
 	}
 
@@ -303,11 +307,12 @@ public class DfsGarbageCollector {
 		cfg.setDeltaCompress(false);
 		cfg.setBuildBitmaps(false);
 
-		try (PackWriter pw = new PackWriter(cfg, ctx);
-				RevWalk pool = new RevWalk(ctx)) {
-			pw.setDeltaBaseAsOffset(true);
-			pw.setReuseDeltaCommits(true);
-			pm.beginTask(JGitText.get().findingGarbage, objectsBefore());
+		PackWriter pw = new PackWriter(cfg, ctx);
+		pw.setDeltaBaseAsOffset(true);
+		pw.setReuseDeltaCommits(true);
+		try {
+			RevWalk pool = new RevWalk(ctx);
+			pm.beginTask("Finding garbage", objectsBefore());
 			for (DfsPackFile oldPack : packsBefore) {
 				PackIndex oldIdx = oldPack.getPackIndex(ctx);
 				for (PackIndex.MutableEntry ent : oldIdx) {
@@ -323,6 +328,8 @@ public class DfsGarbageCollector {
 			pm.endTask();
 			if (0 < pw.getObjectCount())
 				writePack(UNREACHABLE_GARBAGE, pw, pm);
+		} finally {
+			pw.release();
 		}
 	}
 
