@@ -74,6 +74,7 @@ public class CLIText extends TranslationBundle {
 	}
 
 	// @formatter:off
+	/***/ public String IPZillaPasswordPrompt;
 	/***/ public String alreadyOnBranch;
 	/***/ public String alreadyUpToDate;
 	/***/ public String archiveEntryModeIgnored;

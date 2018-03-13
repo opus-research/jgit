@@ -43,8 +43,6 @@
 
 package org.eclipse.jgit.storage.dfs;
 
-import static org.eclipse.jgit.storage.pack.PackConstants.PACK_EXT;
-
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -148,7 +146,7 @@ public class DfsPackParser extends PackParser {
 			out = null;
 			currBuf = null;
 			readBlock = null;
-			packDsc.setFileSize(PACK_EXT, packEnd);
+			packDsc.setPackSize(packEnd);
 
 			writePackIndex();
 			objdb.commitPack(Collections.singletonList(packDsc), null);
@@ -207,7 +205,7 @@ public class DfsPackParser extends PackParser {
 		packDsc = objdb.newPack(DfsObjDatabase.PackSource.RECEIVE);
 		packKey = new DfsPackKey();
 
-		out = objdb.writeFile(packDsc, PACK_EXT);
+		out = objdb.writePackFile(packDsc);
 		int size = out.blockSize();
 		if (size <= 0)
 			size = blockCache.getBlockSize();

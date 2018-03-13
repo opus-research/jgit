@@ -387,13 +387,7 @@ public class Config {
 		if (value == null)
 			return defaultValue;
 
-		String n = value.replace(' ', '_');
-
-		// Because of c98abc9c0586c73ef7df4172644b7dd21c979e9d being used in
-		// the real world before its breakage was fully understood, we must
-		// also accept '-' as though it were ' '.
-		n = n.replace('-', '_');
-
+		String n = value.replace('-', '_');
 		T trueState = null;
 		T falseState = null;
 		for (T e : all) {
@@ -728,7 +722,7 @@ public class Config {
 	 */
 	public <T extends Enum<?>> void setEnum(final String section,
 			final String subsection, final String name, final T value) {
-		String n = value.name().toLowerCase().replace('_', ' ');
+		String n = value.name().toLowerCase().replace('_', '-');
 		setString(section, subsection, name, n);
 	}
 

@@ -710,7 +710,7 @@ public class GC {
 				if (delete && tmpIdx.exists())
 					tmpIdx.delete();
 			}
-			return repo.getObjectDatabase().openPack(realPack);
+			return repo.getObjectDatabase().openPack(realPack, realIdx);
 		} finally {
 			pw.release();
 			if (tmpPack != null && tmpPack.exists())
