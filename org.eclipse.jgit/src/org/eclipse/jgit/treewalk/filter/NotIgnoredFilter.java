@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.om>
+ * Copyright (C) 2010, Jens Baumgart <jens.baumgart@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,39 +40,53 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.treewalk.filter;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
+
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 
 /**
- * Test cases for ReadTree operations as implemented in WorkDirCheckout
+ * This filter includes workdir entries that are not ignored. This class is
+ * immutable.
  */
-public class WorkDirCheckout_ReadTreeTest extends ReadTreeTest {
-	private WorkDirCheckout wdc;
-	public void prescanTwoTrees(Tree head, Tree merge) throws IllegalStateException, IOException {
-		wdc = new WorkDirCheckout(db, db.getWorkTree(), head, db.getIndex(), merge);
-		wdc.prescanTwoTrees();
+public class NotIgnoredFilter extends TreeFilter {
+
+	private final int workdirTreeIndex;
+
+	/**
+	 * constructor
+	 *
+	 * @param workdirTreeIndex
+	 *            index of the workdir tree in the tree walk
+	 */
+	public NotIgnoredFilter(final int workdirTreeIndex) {
+		this.workdirTreeIndex = workdirTreeIndex;
 	}
 
-	public void checkout() throws IOException {
-		GitIndex index = db.getIndex();
-		wdc = new WorkDirCheckout(db, db.getWorkTree(), theHead, index, theMerge);
-		wdc.checkout();
-		index.write();
+	@Override
+	public boolean include(TreeWalk walker) throws MissingObjectException,
+			IncorrectObjectTypeException, IOException {
+		WorkingTreeIterator workingTreeIterator = walker.getTree(
+				workdirTreeIndex, WorkingTreeIterator.class);
+		if (workingTreeIterator != null)
+			// do not include ignored entries
+			return !workingTreeIterator.isEntryIgnored();
+		return true;
 	}
 
-	public ArrayList<String> getRemoved() {
-		return wdc.getRemoved();
+	@Override
+	public boolean shouldBeRecursive() {
+		return false;
 	}
 
-	public HashMap<String, ObjectId> getUpdated() {
-		return wdc.updated;
+	@Override
+	public TreeFilter clone() {
+		// immutable
+		return this;
 	}
 
-	public ArrayList<String> getConflicts() {
-		return wdc.getConflicts();
-	}
 }
-

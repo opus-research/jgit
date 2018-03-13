@@ -2,6 +2,7 @@
  * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -52,6 +53,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
 import java.security.MessageDigest;
 import java.text.MessageFormat;
 
@@ -303,10 +305,7 @@ public abstract class ObjectInserter {
 	 */
 	public final byte[] format(Commit commit)
 			throws UnsupportedEncodingException {
-		String encoding = commit.getEncoding();
-		if (encoding == null)
-			encoding = Constants.CHARACTER_ENCODING;
-
+		Charset encoding = commit.getEncoding();
 		ByteArrayOutputStream os = new ByteArrayOutputStream();
 		OutputStreamWriter w = new OutputStreamWriter(os, encoding);
 		try {
@@ -315,11 +314,10 @@ public abstract class ObjectInserter {
 			commit.getTreeId().copyTo(os);
 			os.write('\n');
 
-			ObjectId[] ps = commit.getParentIds();
-			for (int i = 0; i < ps.length; ++i) {
+			for (ObjectId p : commit.getParentIds()) {
 				os.write(hparent);
 				os.write(' ');
-				ps[i].copyTo(os);
+				p.copyTo(os);
 				os.write('\n');
 			}
 
@@ -335,16 +333,19 @@ public abstract class ObjectInserter {
 			w.flush();
 			os.write('\n');
 
-			if (!encoding.equals(Constants.CHARACTER_ENCODING)) {
+			if (encoding != Constants.CHARSET) {
 				os.write(hencoding);
 				os.write(' ');
-				os.write(Constants.encodeASCII(encoding));
+				os.write(Constants.encodeASCII(encoding.name()));
 				os.write('\n');
 			}
 
 			os.write('\n');
-			w.write(commit.getMessage());
-			w.flush();
+
+			if (commit.getMessage() != null) {
+				w.write(commit.getMessage());
+				w.flush();
+			}
 		} catch (IOException err) {
 			// This should never occur, the only way to get it above is
 			// for the ByteArrayOutputStream to throw, but it doesn't.
@@ -366,23 +367,26 @@ public abstract class ObjectInserter {
 		OutputStreamWriter w = new OutputStreamWriter(os, Constants.CHARSET);
 		try {
 			w.write("object ");
-			tag.getObjId().copyTo(w);
+			tag.getObjectId().copyTo(w);
 			w.write('\n');
 
 			w.write("type ");
-			w.write(tag.getType());
+			w.write(Constants.typeString(tag.getObjectType()));
 			w.write("\n");
 
 			w.write("tag ");
 			w.write(tag.getTag());
 			w.write("\n");
 
-			w.write("tagger ");
-			w.write(tag.getAuthor().toExternalString());
-			w.write('\n');
+			if (tag.getTagger() != null) {
+				w.write("tagger ");
+				w.write(tag.getTagger().toExternalString());
+				w.write('\n');
+			}
 
 			w.write('\n');
-			w.write(tag.getMessage());
+			if (tag.getMessage() != null)
+				w.write(tag.getMessage());
 			w.close();
 		} catch (IOException err) {
 			// This should never occur, the only way to get it above is
