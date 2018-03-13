@@ -170,6 +170,7 @@ public abstract class FS {
 	 * Constructs a file system abstraction.
 	 */
 	protected FS() {
+		// Do nothing by default.
 	}
 
 	/**
@@ -179,7 +180,6 @@ public abstract class FS {
 	 *            the source FS to copy from.
 	 */
 	protected FS(FS src) {
-		this();
 		userHome = src.userHome;
 		gitPrefix = src.gitPrefix;
 	}
@@ -240,9 +240,9 @@ public abstract class FS {
 	public abstract boolean setExecute(File f, boolean canExec);
 
 	/**
-	 * Get the last modified time of an file system object. If the OS/JRE
-	 * support symbolic links, the modification time of the link is returned,
-	 * rather than that of the link target.
+	 * Get the last modified time of a file system object. If the OS/JRE support
+	 * symbolic links, the modification time of the link is returned, rather
+	 * than that of the link target.
 	 *
 	 * @param f
 	 * @return last modified time of f
@@ -253,8 +253,8 @@ public abstract class FS {
 	}
 
 	/**
-	 * Get the last modified time of an file system object. If the OS/JRE
-	 * support symbolic links, the link is modified, not the target,
+	 * Get the last modified time of a file system object. If the OS/JRE support
+	 * symbolic links, the link is modified, not the target,
 	 *
 	 * @param f
 	 * @param time
