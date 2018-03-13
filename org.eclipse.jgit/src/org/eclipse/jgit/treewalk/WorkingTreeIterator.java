@@ -61,6 +61,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
@@ -69,7 +70,6 @@ import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.ignore.IgnoreNode;
 import org.eclipse.jgit.ignore.IgnoreRule;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig;
 import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
@@ -402,7 +402,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	}
 
 	private InputStream filterClean(InputStream in) throws IOException {
-		return new EolCanonicalizingInputStream(in, true);
+		return new EolCanonicalizingInputStream(in);
 	}
 
 	/**
@@ -500,7 +500,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		InputStream rawis = current().openInputStream();
 		InputStream is;
 		if (getOptions().getAutoCRLF() != AutoCRLF.FALSE)
-			is = new EolCanonicalizingInputStream(rawis, true);
+			is = new EolCanonicalizingInputStream(rawis);
 		else
 			is = rawis;
 		return is;
