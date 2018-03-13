@@ -34,15 +34,6 @@ import org.eclipse.jgit.util.RefList;
  * is garbage collected. Closing the repository has no impact on its memory.
  */
 public class InMemoryRepository extends DfsRepository {
-	/** Builder for in-memory repositories. */
-	public static class Builder
-			extends DfsRepositoryBuilder<Builder, InMemoryRepository> {
-		@Override
-		public InMemoryRepository build() throws IOException {
-			return new InMemoryRepository(this);
-		}
-	}
-
 	private static final AtomicInteger packId = new AtomicInteger();
 
 	private final DfsObjDatabase objdb;
@@ -57,11 +48,13 @@ public class InMemoryRepository extends DfsRepository {
 	 * @since 2.0
 	 */
 	public InMemoryRepository(DfsRepositoryDescription repoDesc) {
-		this(new Builder().setRepositoryDescription(repoDesc));
-	}
+		super(new DfsRepositoryBuilder<DfsRepositoryBuilder, InMemoryRepository>() {
+			@Override
+			public InMemoryRepository build() throws IOException {
+				throw new UnsupportedOperationException();
+			}
+		}.setRepositoryDescription(repoDesc));
 
-	private InMemoryRepository(Builder builder) {
-		super(builder);
 		objdb = new MemObjDatabase(this);
 		refdb = new MemRefDatabase();
 	}
@@ -226,10 +219,6 @@ public class InMemoryRepository extends DfsRepository {
 
 		public int blockSize() {
 			return 0;
-		}
-
-		public void setReadAheadBytes(int b) {
-			// Unnecessary on a byte array.
 		}
 	}
 

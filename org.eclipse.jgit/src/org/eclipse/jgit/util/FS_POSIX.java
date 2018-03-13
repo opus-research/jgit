@@ -42,22 +42,15 @@
  */
 package org.eclipse.jgit.util;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
 
 import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
 
 /**
@@ -65,12 +58,38 @@ import org.eclipse.jgit.lib.Repository;
  *
  * @since 3.0
  */
-public class FS_POSIX extends FS {
-	private static final int DEFAULT_UMASK = 0022;
-	private volatile int umask = -1;
+public abstract class FS_POSIX extends FS {
+	@Override
+	protected File discoverGitPrefix() {
+		String path = SystemReader.getInstance().getenv("PATH"); //$NON-NLS-1$
+		File gitExe = searchPath(path, "git"); //$NON-NLS-1$
+		if (gitExe != null)
+			return gitExe.getParentFile().getParentFile();
 
-	/** Default constructor. */
+		if (SystemReader.getInstance().isMacOS()) {
+			// On MacOSX, PATH is shorter when Eclipse is launched from the
+			// Finder than from a terminal. Therefore try to launch bash as a
+			// login shell and search using that.
+			//
+			String w = readPipe(userHome(), //
+					new String[] { "bash", "--login", "-c", "which git" }, // //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
+					Charset.defaultCharset().name());
+			if (w == null || w.length() == 0)
+				return null;
+			File parentFile = new File(w).getParentFile();
+			if (parentFile == null)
+				return null;
+			return parentFile.getParentFile();
+		}
+
+		return null;
+	}
+
+	/**
+	 * Default constructor
+	 */
 	protected FS_POSIX() {
+		super();
 	}
 
 	/**
@@ -81,79 +100,6 @@ public class FS_POSIX extends FS {
 	 */
 	protected FS_POSIX(FS src) {
 		super(src);
-		if (src instanceof FS_POSIX) {
-			umask = ((FS_POSIX) src).umask;
-		}
-	}
-
-	@Override
-	public FS newInstance() {
-		return new FS_POSIX(this);
-	}
-
-	/**
-	 * Set the umask, overriding any value observed from the shell.
-	 *
-	 * @param umask
-	 *            mask to apply when creating files.
-	 * @since 4.0
-	 */
-	public void setUmask(int umask) {
-		this.umask = umask;
-	}
-
-	private int umask() {
-		int u = umask;
-		if (u == -1) {
-			u = readUmask();
-			umask = u;
-		}
-		return u;
-	}
-
-	/** @return mask returned from running {@code umask} command in shell. */
-	private static int readUmask() {
-		try {
-			Process p = Runtime.getRuntime().exec(
-					new String[] { "sh", "-c", "umask" }, //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
-					null, null);
-			try (BufferedReader lineRead = new BufferedReader(
-					new InputStreamReader(p.getInputStream(), Charset
-							.defaultCharset().name()))) {
-				if (p.waitFor() == 0) {
-					String s = lineRead.readLine();
-					if (s.matches("0?\\d{3}")) { //$NON-NLS-1$
-						return Integer.parseInt(s, 8);
-					}
-				}
-				return DEFAULT_UMASK;
-			}
-		} catch (Exception e) {
-			return DEFAULT_UMASK;
-		}
-	}
-
-	@Override
-	protected File discoverGitExe() {
-		String path = SystemReader.getInstance().getenv("PATH"); //$NON-NLS-1$
-		File gitExe = searchPath(path, "git"); //$NON-NLS-1$
-
-		if (gitExe == null) {
-			if (SystemReader.getInstance().isMacOS()) {
-				if (searchPath(path, "bash") != null) { //$NON-NLS-1$
-					// On MacOSX, PATH is shorter when Eclipse is launched from the
-					// Finder than from a terminal. Therefore try to launch bash as a
-					// login shell and search using that.
-					String w = readPipe(userHome(),
-							new String[]{"bash", "--login", "-c", "which git"}, // //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
-							Charset.defaultCharset().name());
-					if (!StringUtils.isEmptyOrNull(w))
-						gitExe = new File(w);
-				}
-			}
-		}
-
-		return gitExe;
 	}
 
 	@Override
@@ -162,53 +108,8 @@ public class FS_POSIX extends FS {
 	}
 
 	@Override
-	public boolean supportsExecute() {
-		return true;
-	}
-
-	@Override
-	public boolean canExecute(File f) {
-		return FileUtil.canExecute(f);
-	}
-
-	@Override
-	public boolean setExecute(File f, boolean canExecute) {
-		if (!isFile(f))
-			return false;
-		if (!canExecute)
-			return f.setExecutable(false);
-
-		try {
-			Path path = f.toPath();
-			Set<PosixFilePermission> pset = Files.getPosixFilePermissions(path);
-
-			// owner (user) is always allowed to execute.
-			pset.add(PosixFilePermission.OWNER_EXECUTE);
-
-			int mask = umask();
-			apply(pset, mask, PosixFilePermission.GROUP_EXECUTE, 1 << 3);
-			apply(pset, mask, PosixFilePermission.OTHERS_EXECUTE, 1);
-			Files.setPosixFilePermissions(path, pset);
-			return true;
-		} catch (IOException e) {
-			// The interface doesn't allow to throw IOException
-			final boolean debug = Boolean.parseBoolean(SystemReader
-					.getInstance().getProperty("jgit.fs.debug")); //$NON-NLS-1$
-			if (debug)
-				System.err.println(e);
-			return false;
-		}
-	}
-
-	private static void apply(Set<PosixFilePermission> set,
-			int umask, PosixFilePermission perm, int test) {
-		if ((umask & test) == 0) {
-			// If bit is clear in umask, permission is allowed.
-			set.add(perm);
-		} else {
-			// If bit is set in umask, permission is denied.
-			set.remove(perm);
-		}
+	public void setHidden(File path, boolean hidden) throws IOException {
+		// Do nothing
 	}
 
 	@Override
@@ -233,112 +134,5 @@ public class FS_POSIX extends FS {
 			String stdinArgs) throws JGitInternalException {
 		return internalRunHookIfPresent(repository, hookName, args, outRedirect,
 				errRedirect, stdinArgs);
-	}
-
-	@Override
-	public boolean retryFailedLockFileCommit() {
-		return false;
-	}
-
-	@Override
-	public boolean supportsSymlinks() {
-		return true;
-	}
-
-	@Override
-	public boolean isSymLink(File path) throws IOException {
-		return FileUtil.isSymlink(path);
-	}
-
-	@Override
-	public long lastModified(File path) throws IOException {
-		return FileUtil.lastModified(path);
-	}
-
-	@Override
-	public void setLastModified(File path, long time) throws IOException {
-		FileUtil.setLastModified(path, time);
-	}
-
-	@Override
-	public void delete(File path) throws IOException {
-		FileUtil.delete(path);
-	}
-
-	@Override
-	public long length(File f) throws IOException {
-		return FileUtil.getLength(f);
-	}
-
-	@Override
-	public boolean exists(File path) {
-		return FileUtil.exists(path);
-	}
-
-	@Override
-	public boolean isDirectory(File path) {
-		return FileUtil.isDirectory(path);
-	}
-
-	@Override
-	public boolean isFile(File path) {
-		return FileUtil.isFile(path);
-	}
-
-	@Override
-	public boolean isHidden(File path) throws IOException {
-		return FileUtil.isHidden(path);
-	}
-
-	@Override
-	public void setHidden(File path, boolean hidden) throws IOException {
-		// no action on POSIX
-	}
-
-	@Override
-	public String readSymLink(File path) throws IOException {
-		return FileUtil.readSymlink(path);
-	}
-
-	@Override
-	public void createSymLink(File path, String target) throws IOException {
-		FileUtil.createSymLink(path, target);
-	}
-
-	/**
-	 * @since 3.3
-	 */
-	@Override
-	public Attributes getAttributes(File path) {
-		return FileUtil.getFileAttributesPosix(this, path);
-	}
-
-	/**
-	 * @since 3.3
-	 */
-	@Override
-	public File normalize(File file) {
-		return FileUtil.normalize(file);
-	}
-
-	/**
-	 * @since 3.3
-	 */
-	@Override
-	public String normalize(String name) {
-		return FileUtil.normalize(name);
-	}
-
-	/**
-	 * @since 3.7
-	 */
-	@Override
-	public File findHook(Repository repository, String hookName) {
-		final File gitdir = repository.getDirectory();
-		final Path hookPath = gitdir.toPath().resolve(Constants.HOOKS)
-				.resolve(hookName);
-		if (Files.isExecutable(hookPath))
-			return hookPath.toFile();
-		return null;
 	}
 }

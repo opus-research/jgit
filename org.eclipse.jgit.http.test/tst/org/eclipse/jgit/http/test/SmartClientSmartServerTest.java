@@ -59,11 +59,9 @@ import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 
-import javax.servlet.DispatcherType;
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
@@ -74,6 +72,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jetty.servlet.FilterHolder;
+import org.eclipse.jetty.servlet.FilterMapping;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jgit.errors.RemoteRepositoryException;
@@ -186,8 +185,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 			public void destroy() {
 				//
 			}
-		}), "/" + srcName + "/git-upload-pack",
-				EnumSet.of(DispatcherType.REQUEST));
+		}), "/" + srcName + "/git-upload-pack", FilterMapping.DEFAULT);
 		broken.addServlet(new ServletHolder(gs), "/*");
 
 		server.setUp();
@@ -482,7 +480,7 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 			} catch (TransportException err) {
 				String exp = brokenURI + ": expected"
 						+ " Content-Type application/x-git-upload-pack-result;"
-						+ " received Content-Type text/plain; charset=UTF-8";
+						+ " received Content-Type text/plain;charset=UTF-8";
 				assertEquals(exp, err.getMessage());
 			}
 		} finally {
@@ -506,8 +504,8 @@ public class SmartClientSmartServerTest extends HttpTestCase {
 		assertEquals(join(brokenURI, "git-upload-pack"), service.getPath());
 		assertEquals(0, service.getParameters().size());
 		assertEquals(200, service.getStatus());
-		assertEquals("text/plain; charset=UTF-8",
-				service.getResponseHeader(HDR_CONTENT_TYPE));
+		assertEquals("text/plain;charset=UTF-8", service
+				.getResponseHeader(HDR_CONTENT_TYPE));
 	}
 
 	@Test

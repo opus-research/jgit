@@ -46,10 +46,8 @@ package org.eclipse.jgit.transport;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_ATOMIC;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_DELETE_REFS;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_OFS_DELTA;
-import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_QUIET;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_REPORT_STATUS;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_SIDE_BAND_64K;
-import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_AGENT;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_DATA;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_PROGRESS;
 import static org.eclipse.jgit.transport.SideBandOutputStream.MAX_BUF;
@@ -177,7 +175,6 @@ public abstract class BaseReceivePack {
 	private boolean allowNonFastForwards;
 
 	private boolean allowOfsDelta;
-	private boolean allowQuiet = true;
 
 	/** Identity to record action as within the reflog. */
 	private PersonIdent refLogIdent;
@@ -227,7 +224,6 @@ public abstract class BaseReceivePack {
 
 	/** Capabilities requested by the client. */
 	private Set<String> enabledCapabilities;
-	String userAgent;
 	private Set<ObjectId> clientShallowCommits;
 	private List<ReceiveCommand> commands;
 
@@ -235,8 +231,6 @@ public abstract class BaseReceivePack {
 
 	/** If {@link BasePackPushConnection#CAPABILITY_SIDE_BAND_64K} is enabled. */
 	private boolean sideBand;
-
-	private boolean quiet;
 
 	/** Lock around the received pack file, while updating refs. */
 	private PackLock packLock;
@@ -295,7 +289,6 @@ public abstract class BaseReceivePack {
 
 		final boolean checkReceivedObjects;
 		final boolean allowLeadingZeroFileMode;
-		final boolean allowInvalidPersonIdent;
 		final boolean safeForWindows;
 		final boolean safeForMacOS;
 
@@ -313,8 +306,6 @@ public abstract class BaseReceivePack {
 					config.getBoolean("transfer", "fsckobjects", false)); //$NON-NLS-1$ //$NON-NLS-2$
 			allowLeadingZeroFileMode = checkReceivedObjects
 					&& config.getBoolean("fsck", "allowLeadingZeroFileMode", false); //$NON-NLS-1$ //$NON-NLS-2$
-			allowInvalidPersonIdent = checkReceivedObjects
-					&& config.getBoolean("fsck", "allowInvalidPersonIdent", false); //$NON-NLS-1$ //$NON-NLS-2$
 			safeForWindows = checkReceivedObjects
 					&& config.getBoolean("fsck", "safeForWindows", false); //$NON-NLS-1$ //$NON-NLS-2$
 			safeForMacOS = checkReceivedObjects
@@ -326,7 +317,7 @@ public abstract class BaseReceivePack {
 					"denynonfastforwards", false); //$NON-NLS-1$
 			allowOfsDelta = config.getBoolean("repack", "usedeltabaseoffset", //$NON-NLS-1$ //$NON-NLS-2$
 					true);
-			certNonceSeed = config.getString("receive", null, "certnonceseed"); //$NON-NLS-1$ //$NON-NLS-2$
+			certNonceSeed = config.getString("receive", null, "certnonceseed"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
 			certNonceSlopLimit = config.getInt("receive", "certnonceslop", 0); //$NON-NLS-1$ //$NON-NLS-2$
 		}
 
@@ -335,7 +326,6 @@ public abstract class BaseReceivePack {
 				return null;
 			return new ObjectChecker()
 				.setAllowLeadingZeroFileMode(allowLeadingZeroFileMode)
-				.setAllowInvalidPersonIdent(allowInvalidPersonIdent)
 				.setSafeForWindows(safeForWindows)
 				.setSafeForMacOS(safeForMacOS);
 		}
@@ -744,64 +734,6 @@ public abstract class BaseReceivePack {
 		return enabledCapabilities.contains(CAPABILITY_SIDE_BAND_64K);
 	}
 
-	/**
-	 * @return true if clients may request avoiding noisy progress messages.
-	 * @since 4.0
-	 */
-	public boolean isAllowQuiet() {
-		return allowQuiet;
-	}
-
-	/**
-	 * Configure if clients may request the server skip noisy messages.
-	 *
-	 * @param allow
-	 *            true to allow clients to request quiet behavior; false to
-	 *            refuse quiet behavior and send messages anyway. This may be
-	 *            necessary if processing is slow and the client-server network
-	 *            connection can timeout.
-	 * @since 4.0
-	 */
-	public void setAllowQuiet(boolean allow) {
-		allowQuiet = allow;
-	}
-
-	/**
-	 * True if the client wants less verbose output.
-	 *
-	 * @return true if the client has requested the server to be less verbose.
-	 * @throws RequestNotYetReadException
-	 *             if the client's request has not yet been read from the wire,
-	 *             so we do not know if they expect side-band. Note that the
-	 *             client may have already written the request, it just has not
-	 *             been read.
-	 * @since 4.0
-	 */
-	public boolean isQuiet() throws RequestNotYetReadException {
-		if (enabledCapabilities == null)
-			throw new RequestNotYetReadException();
-		return quiet;
-	}
-
-	/**
-	 * Get the user agent of the client.
-	 * <p>
-	 * If the client is new enough to use {@code agent=} capability that value
-	 * will be returned. Older HTTP clients may also supply their version using
-	 * the HTTP {@code User-Agent} header. The capability overrides the HTTP
-	 * header if both are available.
-	 * <p>
-	 * When an HTTP request has been received this method returns the HTTP
-	 * {@code User-Agent} header value until capabilities have been parsed.
-	 *
-	 * @return user agent supplied by the client. Available only if the client
-	 *         is new enough to advertise its user agent.
-	 * @since 4.0
-	 */
-	public String getPeerUserAgent() {
-		return UserAgent.getAgent(enabledCapabilities, userAgent);
-	}
-
 	/** @return all of the command received by the current request. */
 	public List<ReceiveCommand> getAllCommands() {
 		return Collections.unmodifiableList(commands);
@@ -1012,8 +944,6 @@ public abstract class BaseReceivePack {
 		adv.advertiseCapability(CAPABILITY_SIDE_BAND_64K);
 		adv.advertiseCapability(CAPABILITY_DELETE_REFS);
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
-		if (allowQuiet)
-			adv.advertiseCapability(CAPABILITY_QUIET);
 		if (pushCertificateParser.enabled())
 			adv.advertiseCapability(
 				pushCertificateParser.getAdvertiseNonce());
@@ -1021,7 +951,6 @@ public abstract class BaseReceivePack {
 			adv.advertiseCapability(CAPABILITY_ATOMIC);
 		if (allowOfsDelta)
 			adv.advertiseCapability(CAPABILITY_OFS_DELTA);
-		adv.advertiseCapability(OPTION_AGENT, UserAgent.get());
 		adv.send(getAdvertisedOrDefaultRefs());
 		for (ObjectId obj : advertisedHaves)
 			adv.advertiseHave(obj);
@@ -1091,7 +1020,6 @@ public abstract class BaseReceivePack {
 	/** Enable capabilities based on a previously read capabilities line. */
 	protected void enableCapabilities() {
 		sideBand = isCapabilityEnabled(CAPABILITY_SIDE_BAND_64K);
-		quiet = allowQuiet && isCapabilityEnabled(CAPABILITY_QUIET);
 		if (sideBand) {
 			OutputStream out = rawOut;
 
@@ -1139,10 +1067,11 @@ public abstract class BaseReceivePack {
 
 		ProgressMonitor receiving = NullProgressMonitor.INSTANCE;
 		ProgressMonitor resolving = NullProgressMonitor.INSTANCE;
-		if (sideBand && !quiet)
+		if (sideBand)
 			resolving = new SideBandProgressMonitor(msgOut);
 
-		try (ObjectInserter ins = db.newObjectInserter()) {
+		ObjectInserter ins = db.newObjectInserter();
+		try {
 			String lockMsg = "jgit receive-pack"; //$NON-NLS-1$
 			if (getRefLogIdent() != null)
 				lockMsg += " from " + getRefLogIdent().toExternalString(); //$NON-NLS-1$
@@ -1160,6 +1089,8 @@ public abstract class BaseReceivePack {
 			packLock = parser.parse(receiving, resolving);
 			packSize = Long.valueOf(parser.getPackSize());
 			ins.flush();
+		} finally {
+			ins.release();
 		}
 
 		if (timeoutIn != null)
@@ -1176,7 +1107,7 @@ public abstract class BaseReceivePack {
 		ObjectIdSubclassMap<ObjectId> baseObjects = null;
 		ObjectIdSubclassMap<ObjectId> providedObjects = null;
 		ProgressMonitor checking = NullProgressMonitor.INSTANCE;
-		if (sideBand && !quiet) {
+		if (sideBand) {
 			SideBandProgressMonitor m = new SideBandProgressMonitor(msgOut);
 			m.setDelayStart(750, TimeUnit.MILLISECONDS);
 			checking = m;
@@ -1188,68 +1119,67 @@ public abstract class BaseReceivePack {
 		}
 		parser = null;
 
-		try (final ObjectWalk ow = new ObjectWalk(db)) {
-			if (baseObjects != null) {
-				ow.sort(RevSort.TOPO);
-				if (!baseObjects.isEmpty())
-					ow.sort(RevSort.BOUNDARY, true);
-			}
+		final ObjectWalk ow = new ObjectWalk(db);
+		ow.setRetainBody(false);
+		if (baseObjects != null) {
+			ow.sort(RevSort.TOPO);
+			if (!baseObjects.isEmpty())
+				ow.sort(RevSort.BOUNDARY, true);
+		}
 
-			for (final ReceiveCommand cmd : commands) {
-				if (cmd.getResult() != Result.NOT_ATTEMPTED)
+		for (final ReceiveCommand cmd : commands) {
+			if (cmd.getResult() != Result.NOT_ATTEMPTED)
+				continue;
+			if (cmd.getType() == ReceiveCommand.Type.DELETE)
+				continue;
+			ow.markStart(ow.parseAny(cmd.getNewId()));
+		}
+		for (final ObjectId have : advertisedHaves) {
+			RevObject o = ow.parseAny(have);
+			ow.markUninteresting(o);
+
+			if (baseObjects != null && !baseObjects.isEmpty()) {
+				o = ow.peel(o);
+				if (o instanceof RevCommit)
+					o = ((RevCommit) o).getTree();
+				if (o instanceof RevTree)
+					ow.markUninteresting(o);
+			}
+		}
+
+		checking.beginTask(JGitText.get().countingObjects, ProgressMonitor.UNKNOWN);
+		RevCommit c;
+		while ((c = ow.next()) != null) {
+			checking.update(1);
+			if (providedObjects != null //
+					&& !c.has(RevFlag.UNINTERESTING) //
+					&& !providedObjects.contains(c))
+				throw new MissingObjectException(c, Constants.TYPE_COMMIT);
+		}
+
+		RevObject o;
+		while ((o = ow.nextObject()) != null) {
+			checking.update(1);
+			if (o.has(RevFlag.UNINTERESTING))
+				continue;
+
+			if (providedObjects != null) {
+				if (providedObjects.contains(o))
 					continue;
-				if (cmd.getType() == ReceiveCommand.Type.DELETE)
-					continue;
-				ow.markStart(ow.parseAny(cmd.getNewId()));
-			}
-			for (final ObjectId have : advertisedHaves) {
-				RevObject o = ow.parseAny(have);
-				ow.markUninteresting(o);
-
-				if (baseObjects != null && !baseObjects.isEmpty()) {
-					o = ow.peel(o);
-					if (o instanceof RevCommit)
-						o = ((RevCommit) o).getTree();
-					if (o instanceof RevTree)
-						ow.markUninteresting(o);
-				}
+				else
+					throw new MissingObjectException(o, o.getType());
 			}
 
-			checking.beginTask(JGitText.get().countingObjects,
-					ProgressMonitor.UNKNOWN);
-			RevCommit c;
-			while ((c = ow.next()) != null) {
-				checking.update(1);
-				if (providedObjects != null //
-						&& !c.has(RevFlag.UNINTERESTING) //
-						&& !providedObjects.contains(c))
-					throw new MissingObjectException(c, Constants.TYPE_COMMIT);
-			}
+			if (o instanceof RevBlob && !db.hasObject(o))
+				throw new MissingObjectException(o, Constants.TYPE_BLOB);
+		}
+		checking.endTask();
 
-			RevObject o;
-			while ((o = ow.nextObject()) != null) {
-				checking.update(1);
-				if (o.has(RevFlag.UNINTERESTING))
-					continue;
-
-				if (providedObjects != null) {
-					if (providedObjects.contains(o))
-						continue;
-					else
-						throw new MissingObjectException(o, o.getType());
-				}
-
-				if (o instanceof RevBlob && !db.hasObject(o))
-					throw new MissingObjectException(o, Constants.TYPE_BLOB);
-			}
-			checking.endTask();
-
-			if (baseObjects != null) {
-				for (ObjectId id : baseObjects) {
-					o = ow.parseAny(id);
-					if (!o.has(RevFlag.UNINTERESTING))
-						throw new MissingObjectException(o, o.getType());
-				}
+		if (baseObjects != null) {
+			for (ObjectId id : baseObjects) {
+				o = ow.parseAny(id);
+				if (!o.has(RevFlag.UNINTERESTING))
+					throw new MissingObjectException(o, o.getType());
 			}
 		}
 	}
@@ -1506,11 +1436,9 @@ public abstract class BaseReceivePack {
 			case REJECTED_MISSING_OBJECT:
 				if (cmd.getMessage() == null)
 					r.append("missing object(s)"); //$NON-NLS-1$
-				else if (cmd.getMessage().length() == Constants.OBJECT_ID_STRING_LENGTH) {
-					r.append("object "); //$NON-NLS-1$
-					r.append(cmd.getMessage());
-					r.append(" missing"); //$NON-NLS-1$
-				} else
+				else if (cmd.getMessage().length() == Constants.OBJECT_ID_STRING_LENGTH)
+					r.append("object " + cmd.getMessage() + " missing"); //$NON-NLS-1$ //$NON-NLS-2$
+				else
 					r.append(cmd.getMessage());
 				break;
 
@@ -1574,7 +1502,7 @@ public abstract class BaseReceivePack {
 	 *             the pack could not be unlocked.
 	 */
 	protected void release() throws IOException {
-		walk.close();
+		walk.release();
 		unlockPack();
 		timeoutIn = null;
 		rawIn = null;

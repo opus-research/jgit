@@ -529,7 +529,7 @@ public abstract class PackParser {
 		} finally {
 			try {
 				if (readCurs != null)
-					readCurs.close();
+					readCurs.release();
 			} finally {
 				readCurs = null;
 			}
@@ -812,7 +812,7 @@ public abstract class PackParser {
 
 		for (final DeltaChain base : missing) {
 			if (base.head != null)
-				throw new MissingObjectException(base, "delta base"); //$NON-NLS-1$
+				throw new MissingObjectException(base, "delta base");
 		}
 
 		onEndThinPack();
