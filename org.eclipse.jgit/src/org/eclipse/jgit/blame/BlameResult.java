@@ -167,10 +167,14 @@ public class BlameResult {
 
 	/**
 	 * Get the commit that provided the specified line of the result.
+	 * <p>
+	 * The source commit may be null if the line was blamed to an uncommitted
+	 * revision, such as the working tree copy, or during a reverse blame if the
+	 * line survives to the end revision (e.g. the branch tip).
 	 *
 	 * @param idx
 	 *            line to read data of, 0 based.
-	 * @return commit that provided line {@code idx}.
+	 * @return commit that provided line {@code idx}. May be null.
 	 */
 	public RevCommit getSourceCommit(int idx) {
 		return sourceCommits[idx];
@@ -181,7 +185,7 @@ public class BlameResult {
 	 *
 	 * @param idx
 	 *            line to read data of, 0 based.
-	 * @return author that provided line {@code idx}.
+	 * @return author that provided line {@code idx}. May be null.
 	 */
 	public PersonIdent getSourceAuthor(int idx) {
 		return sourceAuthors[idx];
@@ -192,7 +196,7 @@ public class BlameResult {
 	 *
 	 * @param idx
 	 *            line to read data of, 0 based.
-	 * @return committer that provided line {@code idx}.
+	 * @return committer that provided line {@code idx}. May be null.
 	 */
 	public PersonIdent getSourceCommitter(int idx) {
 		return sourceCommitters[idx];

@@ -274,7 +274,11 @@ class Blame extends TextBuiltin {
 
 	private int findLine(int b, String regex) {
 		String re = regex.substring(1, regex.length() - 1);
-		Pattern p = Pattern.compile(".*" + re + ".*");
+		if (!re.startsWith("^"))
+			re = ".*" + re;
+		if (!re.endsWith("$"))
+			re = re + ".*";
+		Pattern p = Pattern.compile(re);
 		RawText text = blame.getResultContents();
 		for (int line = b; line < text.size(); line++) {
 			if (p.matcher(text.getString(line)).matches())
@@ -298,6 +302,9 @@ class Blame extends TextBuiltin {
 	}
 
 	private String date(int line) {
+		if (blame.getSourceCommit(line) == null)
+			return "";
+
 		PersonIdent author = blame.getSourceAuthor(line);
 		if (author == null)
 			return "";
