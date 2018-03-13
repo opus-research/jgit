@@ -383,7 +383,7 @@ public class RenameDetector {
 				} else {
 					left.addAll(adds);
 				}
-			} else if (o != null) {
+			} else {
 				// We have many adds to many deletes: score all the adds against
 				// all the deletes by path name, take the best matches, pair
 				// them as renames, then call the rest copies
@@ -432,8 +432,6 @@ public class RenameDetector {
 					adds.set(addIdx, null); // Claim the destination was matched.
 					pm.update(1);
 				}
-			} else {
-				left.addAll(adds);
 			}
 		}
 		added = left;
