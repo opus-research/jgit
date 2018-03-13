@@ -980,7 +980,7 @@ public abstract class Repository implements AutoCloseable {
 	 *            the name of the ref to lookup. Must not be a short-hand
 	 *            form; e.g., "master" is not automatically expanded to
 	 *            "refs/heads/master".
-	 * @return the Ref with the given name, or null if it does not exist
+	 * @return the Ref with the given name, or {@code null} if it does not exist
 	 * @throws IOException
 	 * @since 4.2
 	 */
@@ -996,7 +996,7 @@ public abstract class Repository implements AutoCloseable {
 	 *            the name of the ref to lookup. May be a short-hand form, e.g.
 	 *            "master" which is is automatically expanded to
 	 *            "refs/heads/master" if "refs/heads/master" already exists.
-	 * @return the Ref with the given name, or null if it does not exist
+	 * @return the Ref with the given name, or {@code null} if it does not exist
 	 * @throws IOException
 	 * @since 4.2
 	 */
