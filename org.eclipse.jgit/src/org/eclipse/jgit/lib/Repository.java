@@ -47,27 +47,31 @@
 package org.eclipse.jgit.lib;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Vector;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
-import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.RevisionSyntaxException;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
-import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.util.FS;
+import org.eclipse.jgit.util.IO;
+import org.eclipse.jgit.util.RawParseUtils;
 
 /**
  * Represents a Git repository.
@@ -78,7 +82,24 @@ import org.eclipse.jgit.util.FS;
  * This class is thread-safe.
  */
 public abstract class Repository {
+	private final AtomicInteger useCnt = new AtomicInteger(1);
+
+	/** Metadata directory holding the repository's critical files. */
+	protected File gitDir;
+
+	/** File abstraction used to resolve paths. */
+	protected FS fs;
+
+	private GitIndex index;
+
+	private final List<RepositoryListener> listeners = new Vector<RepositoryListener>(); // thread safe
 	static private final List<RepositoryListener> allListeners = new Vector<RepositoryListener>(); // thread safe
+
+	/** If not bare, the top level directory of the working files. */
+	protected File workDir;
+
+	/** If not bare, the index file caching the working file states. */
+	protected File indexFile;
 
 	/** Initialize a new repository instance. */
 	protected Repository() {
@@ -113,7 +134,9 @@ public abstract class Repository {
 	/**
 	 * @return GIT_DIR
 	 */
-	public abstract File getDirectory();
+	public File getDirectory() {
+		return gitDir;
+	}
 
 	/**
 	 * @return the directory containing the objects owned by this repository.
@@ -136,12 +159,14 @@ public abstract class Repository {
 	/**
 	 * @return the configuration of this repository
 	 */
-	public abstract RepositoryConfig getConfig();
+	public abstract Config getConfig();
 
 	/**
 	 * @return the used file system abstraction
 	 */
-	public abstract FS getFS();
+	public FS getFS() {
+		return fs;
+	}
 
 	/**
 	 * Construct a filename where the loose object having a specified SHA-1
@@ -374,7 +399,7 @@ public abstract class Repository {
 	 * @return a Tag or null
 	 * @throws IOException on I/O error or unexpected type
 	 */
-	public  Tag mapTag(String revstr) throws IOException {
+	public Tag mapTag(String revstr) throws IOException {
 		final ObjectId id = resolve(revstr);
 		return id != null ? mapTag(revstr, id) : null;
 	}
@@ -536,14 +561,12 @@ public abstract class Repository {
 							} else if (item.equals("commit")) {
 								ref = rw.parseCommit(ref);
 							} else if (item.equals("blob")) {
-								ref = rw.parseAny(ref);
-								ref = peelTag(rw, ref);
+								ref = rw.peel(ref);
 								if (!(ref instanceof RevBlob))
 									throw new IncorrectObjectTypeException(ref,
 											Constants.TYPE_BLOB);
 							} else if (item.equals("")) {
-								ref = rw.parseAny(ref);
-								ref = peelTag(rw, ref);
+								ref = rw.peel(ref);
 							} else
 								throw new RevisionSyntaxException(revstr);
 						else
@@ -563,8 +586,7 @@ public abstract class Repository {
 
 					}
 				} else {
-					ref = rw.parseAny(ref);
-					ref = peelTag(rw, ref);
+					ref = rw.peel(ref);
 					if (ref instanceof RevCommit) {
 						RevCommit commit = ((RevCommit) ref);
 						if (commit.getParentCount() == 0)
@@ -582,7 +604,7 @@ public abstract class Repository {
 					if (ref == null)
 						return null;
 				}
-				ref = peelTag(rw, ref);
+				ref = rw.peel(ref);
 				if (!(ref instanceof RevCommit))
 					throw new IncorrectObjectTypeException(ref,
 							Constants.TYPE_COMMIT);
@@ -647,20 +669,27 @@ public abstract class Repository {
 		return r != null ? r.getObjectId() : null;
 	}
 
-	private RevObject peelTag(RevWalk rw, RevObject ref)
-			throws MissingObjectException, IOException {
-		while (ref instanceof RevTag)
-			ref = rw.parseAny(((RevTag) ref).getObject());
-		return ref;
+	/** Increment the use counter by one, requiring a matched {@link #close()}. */
+	public void incrementOpen() {
+		useCnt.incrementAndGet();
 	}
 
-	/** Increment the use counter by one, requiring a matched {@link #close()}. */
-	public abstract void incrementOpen();
+	/** Decrement the use count, and maybe close resources. */
+	public void close() {
+		if (useCnt.decrementAndGet() == 0) {
+			doClose();
+		}
+	}
 
 	/**
-	 * Close all resources used by this repository
+	 * Invoked when the use count drops to zero during {@link #close()}.
+	 * <p>
+	 * The default implementation closes the object and ref databases.
 	 */
-	public abstract void close();
+	protected void doClose() {
+		getObjectDatabase().close();
+		getRefDatabase().close();
+	}
 
 	/**
 	 * Add a single existing pack to the list of available pack files.
@@ -674,6 +703,10 @@ public abstract class Repository {
 	 *             a Git pack file index.
 	 */
 	public abstract void openPack(File pack, File idx) throws IOException;
+
+	public String toString() {
+		return "Repository[" + getDirectory() + "]";
+	}
 
 	/**
 	 * Get the name of the reference that {@code HEAD} points to.
@@ -718,6 +751,20 @@ public abstract class Repository {
 		if (name != null)
 			return shortenRefName(name);
 		return name;
+	}
+
+	/**
+	 * Objects known to exist but not expressed by {@link #getAllRefs()}.
+	 * <p>
+	 * When a repository borrows objects from another repository, it can
+	 * advertise that it safely has that other repository's references, without
+	 * exposing any other details about the other repository.  This may help
+	 * a client trying to push changes avoid pushing more than it needs to.
+	 *
+	 * @return unmodifiable collection of other known objects.
+	 */
+	public Set<ObjectId> getAdditionalHaves() {
+		return Collections.emptySet();
 	}
 
 	/**
@@ -816,15 +863,30 @@ public abstract class Repository {
 	 * @throws IllegalStateException
 	 *             if this is bare (see {@link #isBare()})
 	 */
-	public abstract GitIndex getIndex() throws IOException,
-			IllegalStateException;
+	public GitIndex getIndex() throws IOException, IllegalStateException {
+		if (isBare())
+			throw new IllegalStateException(
+					JGitText.get().bareRepositoryNoWorkdirAndIndex);
+		if (index == null) {
+			index = new GitIndex(this);
+			index.read();
+		} else {
+			index.rereadIfNecessary();
+		}
+		return index;
+	}
 
 	/**
 	 * @return the index file location
 	 * @throws IllegalStateException
 	 *             if this is bare (see {@link #isBare()})
 	 */
-	public abstract File getIndexFile() throws IllegalStateException;
+	public File getIndexFile() throws IllegalStateException {
+		if (isBare())
+			throw new IllegalStateException(
+					JGitText.get().bareRepositoryNoWorkdirAndIndex);
+		return indexFile;
+	}
 
 	static byte[] gitInternalSlash(byte[] bytes) {
 		if (File.separatorChar == '/')
@@ -838,7 +900,51 @@ public abstract class Repository {
 	/**
 	 * @return an important state
 	 */
-	public abstract RepositoryState getRepositoryState();
+	public RepositoryState getRepositoryState() {
+		if (isBare())
+			return RepositoryState.BARE;
+
+		// Pre Git-1.6 logic
+		if (new File(getWorkDir(), ".dotest").exists())
+			return RepositoryState.REBASING;
+		if (new File(getDirectory(), ".dotest-merge").exists())
+			return RepositoryState.REBASING_INTERACTIVE;
+
+		// From 1.6 onwards
+		if (new File(getDirectory(),"rebase-apply/rebasing").exists())
+			return RepositoryState.REBASING_REBASING;
+		if (new File(getDirectory(),"rebase-apply/applying").exists())
+			return RepositoryState.APPLY;
+		if (new File(getDirectory(),"rebase-apply").exists())
+			return RepositoryState.REBASING;
+
+		if (new File(getDirectory(),"rebase-merge/interactive").exists())
+			return RepositoryState.REBASING_INTERACTIVE;
+		if (new File(getDirectory(),"rebase-merge").exists())
+			return RepositoryState.REBASING_MERGE;
+
+		// Both versions
+		if (new File(getDirectory(), "MERGE_HEAD").exists()) {
+			// we are merging - now check whether we have unmerged paths
+			try {
+				if (!DirCache.read(this).hasUnmergedPaths()) {
+					// no unmerged paths -> return the MERGING_RESOLVED state
+					return RepositoryState.MERGING_RESOLVED;
+				}
+			} catch (IOException e) {
+				// Can't decide whether unmerged paths exists. Return
+				// MERGING state to be on the safe side (in state MERGING
+				// you are not allow to do anything)
+				e.printStackTrace();
+			}
+			return RepositoryState.MERGING;
+		}
+
+		if (new File(getDirectory(), "BISECT_LOG").exists())
+			return RepositoryState.BISECTING;
+
+		return RepositoryState.SAFE;
+	}
 
 	/**
 	 * Check validity of a ref name. It must not contain character that has
@@ -923,14 +1029,21 @@ public abstract class Repository {
 	/**
 	 * @return the "bare"-ness of this Repository
 	 */
-	public abstract boolean isBare();
+	public boolean isBare() {
+		return workDir == null;
+	}
 
 	/**
 	 * @return the workdir file, i.e. where the files are checked out
 	 * @throws IllegalStateException
 	 *             if the repository is "bare"
 	 */
-	public abstract File getWorkDir() throws IllegalStateException;
+	public File getWorkDir() throws IllegalStateException {
+		if (isBare())
+			throw new IllegalStateException(
+					JGitText.get().bareRepositoryNoWorkdirAndIndex);
+		return workDir;
+	}
 
 	/**
 	 * Override default workdir
@@ -938,7 +1051,9 @@ public abstract class Repository {
 	 * @param workTree
 	 *            the work tree directory
 	 */
-	public abstract void setWorkDir(File workTree);
+	public void setWorkDir(File workTree) {
+		this.workDir = workTree;
+	}
 
 	/**
 	 * Register a {@link RepositoryListener} which will be notified
@@ -946,13 +1061,17 @@ public abstract class Repository {
 	 *
 	 * @param l
 	 */
-	public abstract void addRepositoryChangedListener(RepositoryListener l);
+	public void addRepositoryChangedListener(final RepositoryListener l) {
+		listeners.add(l);
+	}
 
 	/**
 	 * Remove a registered {@link RepositoryListener}
 	 * @param l
 	 */
-	public abstract void removeRepositoryChangedListener(RepositoryListener l);
+	public void removeRepositoryChangedListener(final RepositoryListener l) {
+		listeners.remove(l);
+	}
 
 	/**
 	 * Register a global {@link RepositoryListener} which will be notified
@@ -972,14 +1091,33 @@ public abstract class Repository {
 		allListeners.remove(l);
 	}
 
-	/** @return a mutable copy of the known global listeners. */
-	protected List<RepositoryListener> getAnyRepositoryChangedListeners() {
+	void fireRefsChanged() {
+		final RefsChangedEvent event = new RefsChangedEvent(this);
+		List<RepositoryListener> all;
+		synchronized (listeners) {
+			all = new ArrayList<RepositoryListener>(listeners);
+		}
 		synchronized (allListeners) {
-			return new ArrayList<RepositoryListener>(allListeners);
+			all.addAll(allListeners);
+		}
+		for (final RepositoryListener l : all) {
+			l.refsChanged(event);
 		}
 	}
 
-	abstract void fireIndexChanged();
+	void fireIndexChanged() {
+		final IndexChangedEvent event = new IndexChangedEvent(this);
+		List<RepositoryListener> all;
+		synchronized (listeners) {
+			all = new ArrayList<RepositoryListener>(listeners);
+		}
+		synchronized (allListeners) {
+			all.addAll(allListeners);
+		}
+		for (final RepositoryListener l : all) {
+			l.indexChanged(event);
+		}
+	}
 
 	/**
 	 * Force a scan for changed refs.
@@ -1007,8 +1145,7 @@ public abstract class Repository {
 	 * @param refName
 	 * @return a {@link ReflogReader} for the supplied refname, or null if the
 	 *         named ref does not exist.
-	 * @throws IOException
-	 *             the ref could not be accessed.
+	 * @throws IOException the ref could not be accessed.
 	 */
 	public abstract ReflogReader getReflogReader(String refName)
 			throws IOException;
@@ -1021,8 +1158,23 @@ public abstract class Repository {
 	 * @return a String containing the content of the MERGE_MSG file or
 	 *         {@code null} if this file doesn't exist
 	 * @throws IOException
+	 * @throws IllegalStateException
+	 *             if the repository is "bare"
 	 */
-	public abstract String readMergeCommitMsg() throws IOException;
+	public String readMergeCommitMsg() throws IOException {
+		if (isBare())
+			throw new IllegalStateException(
+					JGitText.get().bareRepositoryNoWorkdirAndIndex);
+
+		File mergeMsgFile = new File(getDirectory(), Constants.MERGE_MSG);
+		try {
+			return new String(IO.readFully(mergeMsgFile));
+		} catch (FileNotFoundException e) {
+			// MERGE_MSG file has disappeared in the meantime
+			// ignore it
+			return null;
+		}
+	}
 
 	/**
 	 * Return the information stored in the file $GIT_DIR/MERGE_HEAD. In this
@@ -1033,6 +1185,31 @@ public abstract class Repository {
 	 *         file or {@code null} if this file doesn't exist. Also if the file
 	 *         exists but is empty {@code null} will be returned
 	 * @throws IOException
+	 * @throws IllegalStateException
+	 *             if the repository is "bare"
 	 */
-	public abstract List<ObjectId> readMergeHeads() throws IOException;
+	public List<ObjectId> readMergeHeads() throws IOException {
+		if (isBare())
+			throw new IllegalStateException(
+					JGitText.get().bareRepositoryNoWorkdirAndIndex);
+
+		File mergeHeadFile = new File(getDirectory(), Constants.MERGE_HEAD);
+		byte[] raw;
+		try {
+			raw = IO.readFully(mergeHeadFile);
+		} catch (FileNotFoundException notFound) {
+			return new LinkedList<ObjectId>();
+		}
+
+		if (raw.length == 0)
+			throw new IOException("MERGE_HEAD file empty: " + mergeHeadFile);
+
+		LinkedList<ObjectId> heads = new LinkedList<ObjectId>();
+		for (int p = 0; p < raw.length;) {
+			heads.add(ObjectId.fromString(raw, p));
+			p = RawParseUtils
+					.nextLF(raw, p + Constants.OBJECT_ID_STRING_LENGTH);
+		}
+		return heads;
+	}
 }

@@ -48,9 +48,9 @@ package org.eclipse.jgit.pgm;
 import java.io.File;
 import java.text.MessageFormat;
 
+import org.kohsuke.args4j.Option;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileRepository;
-import org.kohsuke.args4j.Option;
 
 @Command(common = true, usage = "usage_CreateAnEmptyGitRepository")
 class Init extends TextBuiltin {

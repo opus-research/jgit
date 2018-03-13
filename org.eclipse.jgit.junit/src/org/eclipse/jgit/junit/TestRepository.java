@@ -73,13 +73,13 @@ import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Commit;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
+import org.eclipse.jgit.lib.FileRepository;
 import org.eclipse.jgit.lib.LockFile;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectChecker;
-import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.lib.ObjectDirectory;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.ObjectWriter;
 import org.eclipse.jgit.lib.PackFile;
 import org.eclipse.jgit.lib.PackWriter;
 import org.eclipse.jgit.lib.PersonIdent;
@@ -99,8 +99,13 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 
-/** Wrapper to make creating test data easier. */
-public class TestRepository {
+/**
+ * Wrapper to make creating test data easier.
+ *
+ * @param <R>
+ *            type of Repository the test data is stored on.
+ */
+public class TestRepository<R extends Repository> {
 	private static final PersonIdent author;
 
 	private static final PersonIdent committer;
@@ -119,11 +124,11 @@ public class TestRepository {
 		committer = new PersonIdent(cn, ce, now, tz);
 	}
 
-	private final Repository db;
+	private final R db;
 
 	private final RevWalk pool;
 
-	private final ObjectInserter inserter;
+	private final ObjectWriter writer;
 
 	private long now;
 
@@ -132,9 +137,9 @@ public class TestRepository {
 	 *
 	 * @param db
 	 *            the test repository to write into.
-	 * @throws Exception
+	 * @throws IOException
 	 */
-	public TestRepository(Repository db) throws Exception {
+	public TestRepository(R db) throws IOException {
 		this(db, new RevWalk(db));
 	}
 
@@ -145,17 +150,17 @@ public class TestRepository {
 	 *            the test repository to write into.
 	 * @param rw
 	 *            the RevObject pool to use for object lookup.
-	 * @throws Exception
+	 * @throws IOException
 	 */
-	public TestRepository(Repository db, RevWalk rw) throws Exception {
+	public TestRepository(R db, RevWalk rw) throws IOException {
 		this.db = db;
 		this.pool = rw;
-		this.inserter = db.newObjectInserter();
+		this.writer = new ObjectWriter(db);
 		this.now = 1236977987000L;
 	}
 
 	/** @return the repository this helper class operates against. */
-	public Repository getRepository() {
+	public R getRepository() {
 		return db;
 	}
 
@@ -200,14 +205,7 @@ public class TestRepository {
 	 * @throws Exception
 	 */
 	public RevBlob blob(final byte[] content) throws Exception {
-		ObjectId id;
-		try {
-			id = inserter.insert(Constants.OBJ_BLOB, content);
-			inserter.flush();
-		} finally {
-			inserter.release();
-		}
-		return pool.lookupBlob(id);
+		return pool.lookupBlob(writer.writeBlob(content));
 	}
 
 	/**
@@ -243,14 +241,7 @@ public class TestRepository {
 		for (final DirCacheEntry e : entries)
 			b.add(e);
 		b.finish();
-		ObjectId root;
-		try {
-			root = dc.writeTree(inserter);
-			inserter.flush();
-		} finally {
-			inserter.release();
-		}
-		return pool.lookupTree(root);
+		return pool.lookupTree(dc.writeTree(writer));
 	}
 
 	/**
@@ -360,14 +351,7 @@ public class TestRepository {
 		c.setAuthor(new PersonIdent(author, new Date(now)));
 		c.setCommitter(new PersonIdent(committer, new Date(now)));
 		c.setMessage("");
-		ObjectId id;
-		try {
-			id = inserter.insert(Constants.OBJ_COMMIT, inserter.format(c));
-			inserter.flush();
-		} finally {
-			inserter.release();
-		}
-		return pool.lookupCommit(id);
+		return pool.lookupCommit(writer.writeCommit(c));
 	}
 
 	/** @return a new commit builder. */
@@ -398,14 +382,7 @@ public class TestRepository {
 		t.setTag(name);
 		t.setTagger(new PersonIdent(committer, new Date(now)));
 		t.setMessage("");
-		ObjectId id;
-		try {
-			id = inserter.insert(Constants.OBJ_TAG, inserter.format(t));
-			inserter.flush();
-		} finally {
-			inserter.release();
-		}
-		return (RevTag) pool.lookupAny(id, Constants.OBJ_TAG);
+		return (RevTag) pool.lookupAny(writer.writeTag(t), Constants.OBJ_TAG);
 	}
 
 	/**
@@ -471,25 +448,27 @@ public class TestRepository {
 	 * @throws Exception
 	 */
 	public void updateServerInfo() throws Exception {
-		final ObjectDatabase odb = db.getObjectDatabase();
-		if (odb instanceof ObjectDirectory) {
-			RefWriter rw = new RefWriter(db.getAllRefs().values()) {
+		if (db instanceof FileRepository) {
+			final FileRepository fr = (FileRepository) db;
+			RefWriter rw = new RefWriter(fr.getAllRefs().values()) {
 				@Override
 				protected void writeFile(final String name, final byte[] bin)
 						throws IOException {
-					TestRepository.this.writeFile(name, bin);
+					File path = new File(fr.getDirectory(), name);
+					TestRepository.this.writeFile(path, bin);
 				}
 			};
 			rw.writePackedRefs();
 			rw.writeInfoRefs();
 
 			final StringBuilder w = new StringBuilder();
-			for (PackFile p : ((ObjectDirectory) odb).getPacks()) {
+			for (PackFile p : fr.getObjectDatabase().getPacks()) {
 				w.append("P ");
 				w.append(p.getPackFile().getName());
 				w.append('\n');
 			}
-			writeFile("objects/info/packs", Constants.encodeASCII(w.toString()));
+			writeFile(new File(new File(fr.getObjectDatabase().getDirectory(),
+					"info"), "packs"), Constants.encodeASCII(w.toString()));
 		}
 	}
 
@@ -591,38 +570,40 @@ public class TestRepository {
 	 * @throws Exception
 	 */
 	public void packAndPrune() throws Exception {
-		final ObjectDirectory odb = (ObjectDirectory) db.getObjectDatabase();
-		final PackWriter pw = new PackWriter(db, NullProgressMonitor.INSTANCE);
+		if (db.getObjectDatabase() instanceof ObjectDirectory) {
+			ObjectDirectory odb = (ObjectDirectory) db.getObjectDatabase();
+			PackWriter pw = new PackWriter(db, NullProgressMonitor.INSTANCE);
 
-		Set<ObjectId> all = new HashSet<ObjectId>();
-		for (Ref r : db.getAllRefs().values())
-			all.add(r.getObjectId());
-		pw.preparePack(all, Collections.<ObjectId> emptySet());
+			Set<ObjectId> all = new HashSet<ObjectId>();
+			for (Ref r : db.getAllRefs().values())
+				all.add(r.getObjectId());
+			pw.preparePack(all, Collections.<ObjectId> emptySet());
 
-		final ObjectId name = pw.computeName();
-		OutputStream out;
+			final ObjectId name = pw.computeName();
+			OutputStream out;
 
-		final File pack = nameFor(odb, name, ".pack");
-		out = new BufferedOutputStream(new FileOutputStream(pack));
-		try {
-			pw.writePack(out);
-		} finally {
-			out.close();
+			final File pack = nameFor(odb, name, ".pack");
+			out = new BufferedOutputStream(new FileOutputStream(pack));
+			try {
+				pw.writePack(out);
+			} finally {
+				out.close();
+			}
+			pack.setReadOnly();
+
+			final File idx = nameFor(odb, name, ".idx");
+			out = new BufferedOutputStream(new FileOutputStream(idx));
+			try {
+				pw.writeIndex(out);
+			} finally {
+				out.close();
+			}
+			idx.setReadOnly();
+
+			odb.openPack(pack, idx);
+			updateServerInfo();
+			prunePacked(odb);
 		}
-		pack.setReadOnly();
-
-		final File idx = nameFor(odb, name, ".idx");
-		out = new BufferedOutputStream(new FileOutputStream(idx));
-		try {
-			pw.writeIndex(out);
-		} finally {
-			out.close();
-		}
-		idx.setReadOnly();
-
-		odb.openPack(pack, idx);
-		updateServerInfo();
-		prunePacked(odb);
 	}
 
 	private void prunePacked(ObjectDirectory odb) {
@@ -637,9 +618,8 @@ public class TestRepository {
 		return new File(packdir, "pack-" + name.name() + t);
 	}
 
-	private void writeFile(final String name, final byte[] bin)
-			throws IOException, ObjectWritingException {
-		final File p = new File(db.getDirectory(), name);
+	private void writeFile(final File p, final byte[] bin) throws IOException,
+			ObjectWritingException {
 		final LockFile lck = new LockFile(p);
 		if (!lck.lock())
 			throw new ObjectWritingException("Can't write " + p);
@@ -797,21 +777,13 @@ public class TestRepository {
 				TestRepository.this.tick(tick);
 
 				final Commit c = new Commit(db);
+				c.setTreeId(pool.lookupTree(tree.writeTree(writer)));
 				c.setParentIds(parents.toArray(new RevCommit[parents.size()]));
 				c.setAuthor(new PersonIdent(author, new Date(now)));
 				c.setCommitter(new PersonIdent(committer, new Date(now)));
 				c.setMessage(message);
 
-				ObjectId commitId;
-				try {
-					c.setTreeId(tree.writeTree(inserter));
-					commitId = inserter.insert(Constants.OBJ_COMMIT, inserter
-							.format(c));
-					inserter.flush();
-				} finally {
-					inserter.release();
-				}
-				self = pool.lookupCommit(commitId);
+				self = pool.lookupCommit(writer.writeCommit(c));
 
 				if (branch != null)
 					branch.update(self);

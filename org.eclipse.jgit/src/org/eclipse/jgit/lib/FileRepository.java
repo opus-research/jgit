@@ -47,21 +47,16 @@
 package org.eclipse.jgit.lib;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedList;
-import java.util.List;
-import java.util.Vector;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Set;
 
 import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.IO;
-import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.SystemReader;
 
 /**
@@ -90,27 +85,13 @@ import org.eclipse.jgit.util.SystemReader;
  *
  */
 public class FileRepository extends Repository {
-	private final AtomicInteger useCnt = new AtomicInteger(1);
-
-	private final File gitDir;
-
-	private final FS fs;
-
 	private final FileBasedConfig userConfig;
 
-	private final RepositoryConfig config;
+	private final FileBasedConfig repoConfig;
 
 	private final RefDatabase refs;
 
 	private final ObjectDirectory objectDatabase;
-
-	private GitIndex index;
-
-	private final List<RepositoryListener> listeners = new Vector<RepositoryListener>(); // thread safe
-
-	private File workDir;
-
-	private File indexFile;
 
 	/**
 	 * Construct a representation of a Git repository.
@@ -231,10 +212,10 @@ public class FileRepository extends Repository {
 		this.fs = fs;
 
 		userConfig = SystemReader.getInstance().openUserConfig(fs);
-		config = new RepositoryConfig(userConfig, fs.resolve(gitDir, "config"));
+		repoConfig = new FileBasedConfig(userConfig, fs.resolve(gitDir, "config"));
 
 		loadUserConfig();
-		loadConfig();
+		loadRepoConfig();
 
 		if (workDir == null) {
 			// if the working directory was not provided explicitly,
@@ -269,12 +250,12 @@ public class FileRepository extends Repository {
 
 		refs = new RefDirectory(this);
 		if (objectDir != null) {
-			objectDatabase = new ObjectDirectory(config, //
+			objectDatabase = new ObjectDirectory(repoConfig, //
 					fs.resolve(objectDir, ""), //
 					alternateObjectDir, //
 					fs);
 		} else {
-			objectDatabase = new ObjectDirectory(config, //
+			objectDatabase = new ObjectDirectory(repoConfig, //
 					fs.resolve(gitDir, "objects"), //
 					alternateObjectDir, //
 					fs);
@@ -309,9 +290,9 @@ public class FileRepository extends Repository {
 		}
 	}
 
-	private void loadConfig() throws IOException {
+	private void loadRepoConfig() throws IOException {
 		try {
-			config.load();
+			repoConfig.load();
 		} catch (ConfigInvalidException e1) {
 			IOException e2 = new IOException(JGitText.get().unknownRepositoryFormat);
 			e2.initCause(e1);
@@ -330,7 +311,7 @@ public class FileRepository extends Repository {
 	 *             in case of IO problem
 	 */
 	public void create(boolean bare) throws IOException {
-		final RepositoryConfig cfg = getConfig();
+		final FileBasedConfig cfg = getConfig();
 		if (cfg.getFile().exists()) {
 			throw new IllegalStateException(MessageFormat.format(
 					JGitText.get().repositoryAlreadyExists, gitDir));
@@ -360,13 +341,6 @@ public class FileRepository extends Repository {
 	}
 
 	/**
-	 * @return GIT_DIR
-	 */
-	public File getDirectory() {
-		return gitDir;
-	}
-
-	/**
 	 * @return the directory containing the objects owned by this repository.
 	 */
 	public File getObjectsDirectory() {
@@ -376,7 +350,7 @@ public class FileRepository extends Repository {
 	/**
 	 * @return the object database which stores this repository's data.
 	 */
-	public ObjectDatabase getObjectDatabase() {
+	public ObjectDirectory getObjectDatabase() {
 		return objectDatabase;
 	}
 
@@ -388,7 +362,7 @@ public class FileRepository extends Repository {
 	/**
 	 * @return the configuration of this repository
 	 */
-	public RepositoryConfig getConfig() {
+	public FileBasedConfig getConfig() {
 		if (userConfig.isOutdated()) {
 			try {
 				loadUserConfig();
@@ -396,21 +370,14 @@ public class FileRepository extends Repository {
 				throw new RuntimeException(e);
 			}
 		}
-		if (config.isOutdated()) {
+		if (repoConfig.isOutdated()) {
 				try {
-					loadConfig();
+					loadRepoConfig();
 				} catch (IOException e) {
 					throw new RuntimeException(e);
 				}
 		}
-		return config;
-	}
-
-	/**
-	 * @return the used file system abstraction
-	 */
-	public FS getFS() {
-		return fs;
+		return repoConfig;
 	}
 
 	/**
@@ -464,19 +431,29 @@ public class FileRepository extends Repository {
 		objectDatabase.openObjectInAllPacks(resultLoaders, curs, objectId);
 	}
 
-	/** Increment the use counter by one, requiring a matched {@link #close()}. */
-	public void incrementOpen() {
-		useCnt.incrementAndGet();
-	}
-
 	/**
-	 * Close all resources used by this repository
+	 * Objects known to exist but not expressed by {@link #getAllRefs()}.
+	 * <p>
+	 * When a repository borrows objects from another repository, it can
+	 * advertise that it safely has that other repository's references, without
+	 * exposing any other details about the other repository.  This may help
+	 * a client trying to push changes avoid pushing more than it needs to.
+	 *
+	 * @return unmodifiable collection of other known objects.
 	 */
-	public void close() {
-		if (useCnt.decrementAndGet() == 0) {
-			objectDatabase.close();
-			refs.close();
+	public Set<ObjectId> getAdditionalHaves() {
+		HashSet<ObjectId> r = new HashSet<ObjectId>();
+		for (ObjectDatabase d : getObjectDatabase().getAlternates()) {
+			if (d instanceof AlternateRepositoryDatabase) {
+				Repository repo;
+
+				repo = ((AlternateRepositoryDatabase) d).getRepository();
+				for (Ref ref : repo.getAllRefs().values())
+					r.add(ref.getObjectId());
+				r.addAll(repo.getAdditionalHaves());
+			}
 		}
+		return r;
 	}
 
 	/**
@@ -492,158 +469,6 @@ public class FileRepository extends Repository {
 	 */
 	public void openPack(final File pack, final File idx) throws IOException {
 		objectDatabase.openPack(pack, idx);
-	}
-
-	public String toString() {
-		return "Repository[" + getDirectory() + "]";
-	}
-
-	/**
-	 * @return a representation of the index associated with this
-	 *         {@link FileRepository}
-	 * @throws IOException
-	 *             if the index can not be read
-	 * @throws IllegalStateException
-	 *             if this is bare (see {@link #isBare()})
-	 */
-	public GitIndex getIndex() throws IOException, IllegalStateException {
-		if (isBare())
-			throw new IllegalStateException(
-					JGitText.get().bareRepositoryNoWorkdirAndIndex);
-		if (index == null) {
-			index = new GitIndex(this);
-			index.read();
-		} else {
-			index.rereadIfNecessary();
-		}
-		return index;
-	}
-
-	/**
-	 * @return the index file location
-	 * @throws IllegalStateException
-	 *             if this is bare (see {@link #isBare()})
-	 */
-	public File getIndexFile() throws IllegalStateException {
-		if (isBare())
-			throw new IllegalStateException(
-					JGitText.get().bareRepositoryNoWorkdirAndIndex);
-		return indexFile;
-	}
-
-	/**
-	 * @return an important state
-	 */
-	public RepositoryState getRepositoryState() {
-		// Pre Git-1.6 logic
-		if (new File(getWorkDir(), ".dotest").exists())
-			return RepositoryState.REBASING;
-		if (new File(gitDir,".dotest-merge").exists())
-			return RepositoryState.REBASING_INTERACTIVE;
-
-		// From 1.6 onwards
-		if (new File(getDirectory(),"rebase-apply/rebasing").exists())
-			return RepositoryState.REBASING_REBASING;
-		if (new File(getDirectory(),"rebase-apply/applying").exists())
-			return RepositoryState.APPLY;
-		if (new File(getDirectory(),"rebase-apply").exists())
-			return RepositoryState.REBASING;
-
-		if (new File(getDirectory(),"rebase-merge/interactive").exists())
-			return RepositoryState.REBASING_INTERACTIVE;
-		if (new File(getDirectory(),"rebase-merge").exists())
-			return RepositoryState.REBASING_MERGE;
-
-		// Both versions
-		if (new File(gitDir, "MERGE_HEAD").exists()) {
-			// we are merging - now check whether we have unmerged paths
-			try {
-				if (!DirCache.read(this).hasUnmergedPaths()) {
-					// no unmerged paths -> return the MERGING_RESOLVED state
-					return RepositoryState.MERGING_RESOLVED;
-				}
-			} catch (IOException e) {
-				// Can't decide whether unmerged paths exists. Return
-				// MERGING state to be on the safe side (in state MERGING
-				// you are not allow to do anything)
-				e.printStackTrace();
-			}
-			return RepositoryState.MERGING;
-		}
-
-		if (new File(gitDir,"BISECT_LOG").exists())
-			return RepositoryState.BISECTING;
-
-		return RepositoryState.SAFE;
-	}
-
-	/**
-	 * @return the "bare"-ness of this Repository
-	 */
-	public boolean isBare() {
-		return workDir == null;
-	}
-
-	/**
-	 * @return the workdir file, i.e. where the files are checked out
-	 * @throws IllegalStateException
-	 *             if the repository is "bare"
-	 */
-	public File getWorkDir() throws IllegalStateException {
-		if (isBare())
-			throw new IllegalStateException(
-					JGitText.get().bareRepositoryNoWorkdirAndIndex);
-		return workDir;
-	}
-
-	/**
-	 * Override default workdir
-	 *
-	 * @param workTree
-	 *            the work tree directory
-	 */
-	public void setWorkDir(File workTree) {
-		this.workDir = workTree;
-	}
-
-	/**
-	 * Register a {@link RepositoryListener} which will be notified
-	 * when ref changes are detected.
-	 *
-	 * @param l
-	 */
-	public void addRepositoryChangedListener(final RepositoryListener l) {
-		listeners.add(l);
-	}
-
-	/**
-	 * Remove a registered {@link RepositoryListener}
-	 * @param l
-	 */
-	public void removeRepositoryChangedListener(final RepositoryListener l) {
-		listeners.remove(l);
-	}
-
-	void fireRefsChanged() {
-		final RefsChangedEvent event = new RefsChangedEvent(this);
-		List<RepositoryListener> all = getAnyRepositoryChangedListeners();
-		synchronized (listeners) {
-			all.addAll(listeners);
-		}
-		for (final RepositoryListener l : all) {
-			l.refsChanged(event);
-		}
-	}
-
-	void fireIndexChanged() {
-		final IndexChangedEvent event = new IndexChangedEvent(this);
-		List<RepositoryListener> all = getAnyRepositoryChangedListeners();
-		synchronized (listeners) {
-			all.addAll(listeners);
-		}
-		for (final RepositoryListener l : all) {
-			l.indexChanged(event);
-		}
 	}
 
 	/**
@@ -668,56 +493,5 @@ public class FileRepository extends Repository {
 		if (ref != null)
 			return new ReflogReader(this, ref.getName());
 		return null;
-	}
-
-	/**
-	 * Return the information stored in the file $GIT_DIR/MERGE_MSG. In this
-	 * file operations triggering a merge will store a template for the commit
-	 * message of the merge commit.
-	 *
-	 * @return a String containing the content of the MERGE_MSG file or
-	 *         {@code null} if this file doesn't exist
-	 * @throws IOException
-	 */
-	public String readMergeCommitMsg() throws IOException {
-		File mergeMsgFile = new File(gitDir, Constants.MERGE_MSG);
-		try {
-			return new String(IO.readFully(mergeMsgFile));
-		} catch (FileNotFoundException e) {
-			// MERGE_MSG file has disappeared in the meantime
-			// ignore it
-			return null;
-		}
-	}
-
-	/**
-	 * Return the information stored in the file $GIT_DIR/MERGE_HEAD. In this
-	 * file operations triggering a merge will store the IDs of all heads which
-	 * should be merged together with HEAD.
-	 *
-	 * @return a list of {@link Commit}s which IDs are listed in the MERGE_HEAD
-	 *         file or {@code null} if this file doesn't exist. Also if the file
-	 *         exists but is empty {@code null} will be returned
-	 * @throws IOException
-	 */
-	public List<ObjectId> readMergeHeads() throws IOException {
-		File mergeHeadFile = new File(gitDir, Constants.MERGE_HEAD);
-		byte[] raw;
-		try {
-			raw = IO.readFully(mergeHeadFile);
-		} catch (FileNotFoundException notFound) {
-			return new LinkedList<ObjectId>();
-		}
-
-		if (raw.length == 0)
-			throw new IOException("MERGE_HEAD file empty: " + mergeHeadFile);
-
-		LinkedList<ObjectId> heads = new LinkedList<ObjectId>();
-		for (int p = 0; p < raw.length;) {
-			heads.add(ObjectId.fromString(raw, p));
-			p = RawParseUtils
-					.nextLF(raw, p + Constants.OBJECT_ID_STRING_LENGTH);
-		}
-		return heads;
 	}
 }
