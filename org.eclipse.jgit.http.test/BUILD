@@ -34,10 +34,10 @@ java_library(
     srcs = glob(["src/**/*.java"]),
     deps = [
         "//lib:junit",
+        "//lib:servlet-api",
         "//org.eclipse.jgit.http.server:jgit-servlet",
         "//org.eclipse.jgit:jgit",
         "//org.eclipse.jgit.junit.http:junit-http",
         "//org.eclipse.jgit.junit:junit",
-        "@servlet_api_3_1//jar",
     ],
 )
