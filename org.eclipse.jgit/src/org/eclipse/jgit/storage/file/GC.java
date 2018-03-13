@@ -741,9 +741,10 @@ public class GC {
 				delete = false;
 				for (Map.Entry<PackExt, File> tmpEntry : tmpExts.entrySet()) {
 					File tmpExt = tmpEntry.getValue();
+					tmpExt.setReadOnly();
+
 					File realExt = nameFor(
 							id, "." + tmpEntry.getKey().getExtension()); //$NON-NLS-1$
-					realExt.setReadOnly();
 					if (!tmpExt.renameTo(realExt)) {
 						File newExt = new File(realExt.getParentFile(),
 								realExt.getName() + ".new"); //$NON-NLS-1$
