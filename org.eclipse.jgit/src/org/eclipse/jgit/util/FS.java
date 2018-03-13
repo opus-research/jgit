@@ -138,14 +138,14 @@ public abstract class FS {
 				factory = (FSFactory) activatorClass.newInstance();
 			} catch (ClassNotFoundException e) {
 				// Java7 module not found
+				factory = new FS.FSFactory();
 				// Silently ignore failure to find Java7 FS factory
-				factory = new FS.FSFactory();
 			} catch (UnsupportedClassVersionError e) {
+				// Java7 module not accessible
 				factory = new FS.FSFactory();
-			} catch (InstantiationException e) {
+			} catch (Exception e) {
 				factory = new FS.FSFactory();
-			} catch (IllegalAccessException e) {
-				factory = new FS.FSFactory();
+				throw new Error(e);
 			}
 		}
 		return factory.detect(cygwinUsed);
