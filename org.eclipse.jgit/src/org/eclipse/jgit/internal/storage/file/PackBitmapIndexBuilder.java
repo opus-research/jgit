@@ -171,7 +171,7 @@ public class PackBitmapIndexBuilder extends BasePackBitmapIndex {
 
 		EWAHCompressedBitmap compressed;
 		if (bitmap instanceof CompressedBitmap)
-			compressed = ((CompressedBitmap) bitmap).bitmap;
+			compressed = ((CompressedBitmap) bitmap).getEwahCompressedBitmap();
 		else
 			throw new IllegalArgumentException(bitmap.getClass().toString());
 
@@ -312,7 +312,7 @@ public class PackBitmapIndexBuilder extends BasePackBitmapIndex {
 						if (entry == null)
 							throw new IllegalStateException();
 						return new StoredEntry(entry.namePosition, bestBitmap,
-								bestXorOffset, item.flags);
+								bestXorOffset, item.getFlags());
 					}
 
 					public void remove() {
@@ -324,26 +324,47 @@ public class PackBitmapIndexBuilder extends BasePackBitmapIndex {
 	}
 
 	/** Data object for the on disk representation of a bitmap entry. */
-	static final class StoredEntry {
-		final long objectId;
-		final EWAHCompressedBitmap bitmap;
-		final int xorOffset;
-		final int flags;
+	public static final class StoredEntry {
+		private final long objectId;
+		private final EWAHCompressedBitmap bitmap;
+		private final int xorOffset;
+		private final int flags;
 
-		StoredEntry(long objectId, EWAHCompressedBitmap bitmap,
+		private StoredEntry(long objectId, EWAHCompressedBitmap bitmap,
 				int xorOffset, int flags) {
 			this.objectId = objectId;
 			this.bitmap = bitmap;
 			this.xorOffset = xorOffset;
 			this.flags = flags;
 		}
+
+		/** @return the bitmap */
+		public EWAHCompressedBitmap getBitmap() {
+			return bitmap;
+		}
+
+		/** @return the xorOffset */
+		public int getXorOffset() {
+			return xorOffset;
+		}
+
+		/** @return the flags */
+		public int getFlags() {
+			return flags;
+		}
+
+		/** @return the ObjectId */
+		public long getObjectId() {
+			return objectId;
+		}
 	}
 
 	private static final class PositionEntry extends ObjectIdOwnerMap.Entry {
-		final int namePosition;
-		int offsetPosition;
+		private final int namePosition;
 
-		PositionEntry(AnyObjectId objectId, int namePosition) {
+		private int offsetPosition;
+
+		private PositionEntry(AnyObjectId objectId, int namePosition) {
 			super(objectId);
 			this.namePosition = namePosition;
 		}
