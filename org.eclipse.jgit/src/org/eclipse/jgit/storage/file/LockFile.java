@@ -52,7 +52,6 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
@@ -62,6 +61,7 @@ import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.util.FS;
+import org.eclipse.jgit.util.io.ChannelOutputStream;
 
 /**
  * Git style file locking and replacement.
@@ -305,7 +305,7 @@ public class LockFile {
 
 		final OutputStream out;
 		if (fsync)
-			out = Channels.newOutputStream(os.getChannel());
+			out = new ChannelOutputStream(os.getChannel());
 		else
 			out = os;
 
