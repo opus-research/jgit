@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2016, David Pursehouse <david.pursehouse@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,17 +41,21 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.lfs.errors;
 
-import java.util.HashSet;
-import java.util.Set;
+/**
+ * Thrown when there is a validation error with one or more of the objects in
+ * the request.
+ *
+ * @since 4.5
+ */
+public class LfsValidationError extends LfsException {
+	private static final long serialVersionUID = 1L;
 
-public class Sets {
-	@SafeVarargs
-	public static <T> Set<T> of(T... elements) {
-		Set<T> ret = new HashSet<T>();
-		for (T element : elements)
-			ret.add(element);
-		return ret;
+	/**
+	 * @param message
+	 */
+	public LfsValidationError(String message) {
+		super(message);
 	}
 }

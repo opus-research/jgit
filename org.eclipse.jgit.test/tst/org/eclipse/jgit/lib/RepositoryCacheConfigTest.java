@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2016 Ericsson
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,15 +43,65 @@
 
 package org.eclipse.jgit.lib;
 
-import java.util.HashSet;
-import java.util.Set;
+import static org.eclipse.jgit.lib.RepositoryCacheConfig.AUTO_CLEANUP_DELAY;
+import static org.eclipse.jgit.lib.RepositoryCacheConfig.NO_CLEANUP;
+import static org.junit.Assert.assertEquals;
 
-public class Sets {
-	@SafeVarargs
-	public static <T> Set<T> of(T... elements) {
-		Set<T> ret = new HashSet<T>();
-		for (T element : elements)
-			ret.add(element);
-		return ret;
+import java.util.concurrent.TimeUnit;
+
+import org.eclipse.jgit.errors.ConfigInvalidException;
+import org.junit.Before;
+import org.junit.Test;
+
+public class RepositoryCacheConfigTest {
+
+	private RepositoryCacheConfig config;
+
+	@Before
+	public void setUp() {
+		config = new RepositoryCacheConfig();
+	}
+
+	@Test
+	public void testDefaultValues() {
+		assertEquals(TimeUnit.HOURS.toMillis(1), config.getExpireAfter());
+		assertEquals(config.getExpireAfter() / 10, config.getCleanupDelay());
+	}
+
+	@Test
+	public void testCleanupDelay() {
+		config.setCleanupDelay(TimeUnit.HOURS.toMillis(1));
+		assertEquals(TimeUnit.HOURS.toMillis(1), config.getCleanupDelay());
+	}
+
+	@Test
+	public void testAutoCleanupDelay() {
+		config.setExpireAfter(TimeUnit.MINUTES.toMillis(20));
+		config.setCleanupDelay(AUTO_CLEANUP_DELAY);
+		assertEquals(TimeUnit.MINUTES.toMillis(20), config.getExpireAfter());
+		assertEquals(config.getExpireAfter() / 10, config.getCleanupDelay());
+	}
+
+	@Test
+	public void testAutoCleanupDelayShouldBeMax10minutes() {
+		config.setExpireAfter(TimeUnit.HOURS.toMillis(10));
+		assertEquals(TimeUnit.HOURS.toMillis(10), config.getExpireAfter());
+		assertEquals(TimeUnit.MINUTES.toMillis(10), config.getCleanupDelay());
+	}
+
+	@Test
+	public void testDisabledCleanupDelay() {
+		config.setCleanupDelay(NO_CLEANUP);
+		assertEquals(NO_CLEANUP, config.getCleanupDelay());
+	}
+
+	@Test
+	public void testFromConfig() throws ConfigInvalidException {
+		Config otherConfig = new Config();
+		otherConfig.fromText("[core]\nrepositoryCacheExpireAfter=1000\n"
+				+ "repositoryCacheCleanupDelay=500");
+		config.fromConfig(otherConfig);
+		assertEquals(1000, config.getExpireAfter());
+		assertEquals(500, config.getCleanupDelay());
 	}
 }
