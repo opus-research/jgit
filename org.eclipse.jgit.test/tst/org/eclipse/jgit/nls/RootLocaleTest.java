@@ -43,7 +43,6 @@
 
 package org.eclipse.jgit.nls;
 
-import org.eclipse.jgit.archive.ArchiveText;
 import org.eclipse.jgit.awtui.UIText;
 import org.eclipse.jgit.console.ConsoleText;
 import org.eclipse.jgit.internal.JGitText;
@@ -60,11 +59,6 @@ public class RootLocaleTest {
 	@Test
 	public void testJGitText() {
 		NLS.getBundleFor(JGitText.class);
-	}
-
-	@Test
-	public void testArchiveText() {
-		NLS.getBundleFor(ArchiveText.class);
 	}
 
 	@Test
