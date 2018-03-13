@@ -177,36 +177,25 @@ public class BatchRefUpdate {
 	 * @return message the caller wants to include in the reflog; null if the
 	 *         update should not be logged.
 	 */
-	@Nullable
 	public String getRefLogMessage() {
 		return refLogMessage;
 	}
 
-	/**
-	 * Check whether the reflog message should include the result of the update,
-	 * such as fast-forward or force-update.
-	 * <p>
-	 * Describes the default for commands in this batch that do not override it
-	 * with {@link ReceiveCommand#setRefLogMessage(String, boolean)}.
-	 *
-	 * @return true if the message should include the result.
-	 */
+	/** @return {@code true} if the ref log message should show the result. */
 	public boolean isRefLogIncludingResult() {
 		return refLogIncludeResult;
 	}
 
 	/**
 	 * Set the message to include in the reflog.
-	 * <p>
-	 * Describes the default for commands in this batch that do not override it
-	 * with {@link ReceiveCommand#setRefLogMessage(String, boolean)}.
 	 *
 	 * @param msg
-	 *            the message to describe this change. If null and appendStatus is
-	 *            false, the reflog will not be updated.
+	 *            the message to describe this change. It may be null if
+	 *            appendStatus is null in order not to append to the reflog
 	 * @param appendStatus
 	 *            true if the status of the ref change (fast-forward or
-	 *            forced-update) should be appended to the user supplied message.
+	 *            forced-update) should be appended to the user supplied
+	 *            message.
 	 * @return {@code this}.
 	 */
 	public BatchRefUpdate setRefLogMessage(String msg, boolean appendStatus) {
@@ -224,8 +213,6 @@ public class BatchRefUpdate {
 
 	/**
 	 * Don't record this update in the ref's associated reflog.
-	 * <p>
-	 * Equivalent to {@code setRefLogMessage(null, false)}.
 	 *
 	 * @return {@code this}.
 	 */
@@ -235,11 +222,7 @@ public class BatchRefUpdate {
 		return this;
 	}
 
-	/**
-	 * Check whether log has been disabled by {@link #disableRefLog()}.
-	 *
-	 * @return true if disabled.
-	 */
+	/** @return true if log has been disabled by {@link #disableRefLog()}. */
 	public boolean isRefLogDisabled() {
 		return refLogMessage == null;
 	}
@@ -443,8 +426,15 @@ public class BatchRefUpdate {
 		for (ReceiveCommand cmd : commands) {
 			try {
 				if (cmd.getResult() == NOT_ATTEMPTED) {
-					if (isMissing(walk, cmd.getOldId())
-							|| isMissing(walk, cmd.getNewId())) {
+					try {
+						if (!cmd.getNewId().equals(ObjectId.zeroId())) {
+							walk.parseAny(cmd.getNewId());
+						}
+					} catch (MissingObjectException e) {
+						// ReceiveCommand#setResult(Result) converts REJECTED to
+						// REJECTED_NONFASTFORWARD, even though that result is also used for
+						// a missing object. Eagerly handle this case so we can set the
+						// right result.
 						cmd.setResult(ReceiveCommand.Result.REJECTED_MISSING_OBJECT);
 						continue;
 					}
@@ -517,19 +507,6 @@ public class BatchRefUpdate {
 			}
 		}
 		monitor.endTask();
-	}
-
-	private static boolean isMissing(RevWalk walk, ObjectId id)
-			throws IOException {
-		if (id.equals(ObjectId.zeroId())) {
-			return false; // Explicit add or delete is not missing.
-		}
-		try {
-			walk.parseAny(id);
-			return false;
-		} catch (MissingObjectException e) {
-			return true;
-		}
 	}
 
 	/**
@@ -630,11 +607,11 @@ public class BatchRefUpdate {
 	 */
 	protected RefUpdate newUpdate(ReceiveCommand cmd) throws IOException {
 		RefUpdate ru = refdb.newUpdate(cmd.getRefName(), false);
-		if (isRefLogDisabled(cmd)) {
+		if (isRefLogDisabled())
 			ru.disableRefLog();
-		} else {
+		else {
 			ru.setRefLogIdent(refLogIdent);
-			ru.setRefLogMessage(getRefLogMessage(cmd), isRefLogIncludingResult(cmd));
+			ru.setRefLogMessage(refLogMessage, refLogIncludeResult);
 		}
 		ru.setPushCertificate(pushCert);
 		switch (cmd.getType()) {
@@ -653,47 +630,6 @@ public class BatchRefUpdate {
 			ru.setNewObjectId(cmd.getNewId());
 			return ru;
 		}
-	}
-
-	/**
-	 * Check whether reflog is disabled for a command.
-	 *
-	 * @param cmd
-	 *            specific command.
-	 * @return whether the reflog is disabled, taking into account the state from
-	 *         this instance as well as overrides in the given command.
-	 * @since 4.9
-	 */
-	protected boolean isRefLogDisabled(ReceiveCommand cmd) {
-		return cmd.hasCustomRefLog() ? cmd.isRefLogDisabled() : isRefLogDisabled();
-	}
-
-	/**
-	 * Get reflog message for a command.
-	 *
-	 * @param cmd
-	 *            specific command.
-	 * @return reflog message, taking into account the state from this instance as
-	 *         well as overrides in the given command.
-	 * @since 4.9
-	 */
-	protected String getRefLogMessage(ReceiveCommand cmd) {
-		return cmd.hasCustomRefLog() ? cmd.getRefLogMessage() : getRefLogMessage();
-	}
-
-	/**
-	 * Check whether the reflog message for a command should include the result.
-	 *
-	 * @param cmd
-	 *            specific command.
-	 * @return whether the reflog message should show the result, taking into
-	 *         account the state from this instance as well as overrides in the
-	 *         given command.
-	 * @since 4.9
-	 */
-	protected boolean isRefLogIncludingResult(ReceiveCommand cmd) {
-		return cmd.hasCustomRefLog()
-				? cmd.isRefLogIncludingResult() : isRefLogIncludingResult();
 	}
 
 	@Override

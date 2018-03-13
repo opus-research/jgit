@@ -43,7 +43,7 @@
 
 package org.eclipse.jgit.util;
 
-import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
 import java.io.UnsupportedEncodingException;
@@ -55,51 +55,52 @@ public class RawParseUtils_LineMapTest {
 	public void testEmpty() {
 		final IntList map = RawParseUtils.lineMap(new byte[] {}, 0, 0);
 		assertNotNull(map);
-		assertArrayEquals(new int[]{Integer.MIN_VALUE, 0}, asInts(map));
+		assertEquals(2, map.size());
+		assertEquals(Integer.MIN_VALUE, map.get(0));
+		assertEquals(0, map.get(1));
 	}
 
 	@Test
 	public void testOneBlankLine() {
 		final IntList map = RawParseUtils.lineMap(new byte[] { '\n' }, 0, 1);
-		assertArrayEquals(new int[]{Integer.MIN_VALUE, 0, 1}, asInts(map));
+		assertEquals(3, map.size());
+		assertEquals(Integer.MIN_VALUE, map.get(0));
+		assertEquals(0, map.get(1));
+		assertEquals(1, map.get(2));
 	}
 
 	@Test
 	public void testTwoLineFooBar() throws UnsupportedEncodingException {
 		final byte[] buf = "foo\nbar\n".getBytes("ISO-8859-1");
 		final IntList map = RawParseUtils.lineMap(buf, 0, buf.length);
-		assertArrayEquals(new int[]{Integer.MIN_VALUE, 0, 4, buf.length}, asInts(map));
+		assertEquals(4, map.size());
+		assertEquals(Integer.MIN_VALUE, map.get(0));
+		assertEquals(0, map.get(1));
+		assertEquals(4, map.get(2));
+		assertEquals(buf.length, map.get(3));
 	}
 
 	@Test
 	public void testTwoLineNoLF() throws UnsupportedEncodingException {
 		final byte[] buf = "foo\nbar".getBytes("ISO-8859-1");
 		final IntList map = RawParseUtils.lineMap(buf, 0, buf.length);
-		assertArrayEquals(new int[]{Integer.MIN_VALUE, 0, 4, buf.length}, asInts(map));
-	}
-
-	@Test
-	public void testBinary() throws UnsupportedEncodingException {
-		final byte[] buf = "xxxfoo\nb\0ar".getBytes("ISO-8859-1");
-		final IntList map = RawParseUtils.lineMap(buf, 3, buf.length);
-		assertArrayEquals(new int[]{Integer.MIN_VALUE, 3, buf.length}, asInts(map));
+		assertEquals(4, map.size());
+		assertEquals(Integer.MIN_VALUE, map.get(0));
+		assertEquals(0, map.get(1));
+		assertEquals(4, map.get(2));
+		assertEquals(buf.length, map.get(3));
 	}
 
 	@Test
 	public void testFourLineBlanks() throws UnsupportedEncodingException {
 		final byte[] buf = "foo\n\n\nbar\n".getBytes("ISO-8859-1");
 		final IntList map = RawParseUtils.lineMap(buf, 0, buf.length);
-
-		assertArrayEquals(new int[]{
-				Integer.MIN_VALUE, 0, 4, 5, 6, buf.length
-		}, asInts(map));
-	}
-
-	private int[] asInts(IntList l) {
-		int[] result = new int[l.size()];
-		for (int i = 0; i < l.size(); i++) {
-			result[i] = l.get(i);
-		}
-		return result;
+		assertEquals(6, map.size());
+		assertEquals(Integer.MIN_VALUE, map.get(0));
+		assertEquals(0, map.get(1));
+		assertEquals(4, map.get(2));
+		assertEquals(5, map.get(3));
+		assertEquals(6, map.get(4));
+		assertEquals(buf.length, map.get(5));
 	}
 }
