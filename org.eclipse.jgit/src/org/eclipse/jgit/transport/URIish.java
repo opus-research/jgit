@@ -2,7 +2,6 @@
  * Copyright (C) 2009, Mykola Nikishov <mn@mn.com.ua>
  * Copyright (C) 2008, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
- * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -75,7 +74,7 @@ public class URIish implements Serializable {
 	 * capturing groups: the first containing the user and the second containing
 	 * the password
 	 */
-	private static final String OPT_USER_PWD_P = "(?:([^/:@]+)(?::([^/]+))?@)?";
+	private static final String OPT_USER_PWD_P = "(?:([^/]+?)(?::([^/]+?))?@)?";
 
 	/**
 	 * Part of a pattern which matches the optional host part of URIs. Defines
@@ -96,7 +95,7 @@ public class URIish implements Serializable {
 	private static final String OPT_DRIVE_LETTER_P = "(?:[A-Za-z]:)?";
 
 	/**
-	 * Part of a pattern which matches a relative path. Relative parts don't
+	 * Part of a pattern which matches a relative path. Relative paths don't
 	 * start with slash or drive letters. Defines no capturing group.
 	 */
 	private static final String OPT_RELATIVE_PATH_P = "(?:\\.\\.)?";
@@ -104,9 +103,8 @@ public class URIish implements Serializable {
 	private static final long serialVersionUID = 1L;
 
 	/**
-	 * A pattern matching standard URI: a scheme, an optional host and a path.
-	 * The host may contain the common options user/password, port and
-	 * ~username.
+	 * A pattern matching standard URI: </br>
+	 * <code>scheme "://" user_password? hostname? portnumber? path</code>
 	 */
 	private static final Pattern FULL_URI = Pattern.compile("^" //
 			+ "(?:" //
@@ -119,7 +117,7 @@ public class URIish implements Serializable {
 			+ ")$"); // /anything
 
 	/**
-	 * A pattern matching a SCP URI's of the form user@host:path/to/repo.git
+	 * A pattern matching SCP URI's of the form user@host:path/to/repo.git
 	 */
 	private static final Pattern SCP_URI = Pattern.compile("^" //
 			+ "(?:([^@]+?)@)?" //
