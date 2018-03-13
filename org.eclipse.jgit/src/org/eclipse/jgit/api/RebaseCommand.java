@@ -483,7 +483,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		DiffFormatter df = new DiffFormatter(bos);
 		df.setRepository(repo);
 		df.format(commitToPick.getParent(0), commitToPick);
-		createFile(rebaseDir, PATCH, RawParseUtils.decode(bos.toByteArray()));
+		createFile(rebaseDir, PATCH, new String(bos.toByteArray(),
+				Constants.CHARACTER_ENCODING));
 		createFile(rebaseDir, STOPPED_SHA, repo.newObjectReader().abbreviate(
 				commitToPick).name());
 		// Remove cherry pick state file created by CherryPickCommand, it's not
@@ -821,7 +822,11 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 					ProgressMonitor.UNKNOWN);
 
 			DirCacheCheckout dco;
-			RevCommit commit = walk.parseCommit(repo.resolve(commitId));
+			if (commitId == null)
+				throw new JGitInternalException(
+						JGitText.get().abortingRebaseFailedNoOrigHead);
+			ObjectId id = repo.resolve(commitId);
+			RevCommit commit = walk.parseCommit(id);
 			if (result.getStatus().equals(Status.FAILED)) {
 				RevCommit head = walk.parseCommit(repo.resolve(Constants.HEAD));
 				dco = new DirCacheCheckout(repo, head.getTree(),

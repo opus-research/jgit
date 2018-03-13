@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2012 Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2012 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,58 +40,76 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
+package org.eclipse.jgit.pgm;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertNotNull;
 
-import java.io.File;
-import java.io.IOException;
+import java.lang.Exception;
+import java.lang.String;
 
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.dircache.DirCache;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
-public class RmCommandTest extends RepositoryTestCase {
-
+public class AddTest extends CLIRepositoryTestCase {
 	private Git git;
-
-	private static final String FILE = "test.txt";
 
 	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
 		git = new Git(db);
-		// commit something
-		writeTrashFile(FILE, "Hello world");
-		git.add().addFilepattern(FILE).call();
-		git.commit().setMessage("Initial commit").call();
+	}
+
+	@Ignore("args4j exit()s on error instead of throwing, JVM goes down")
+	@Test
+	public void testAddNothing() throws Exception {
+		assertEquals("fatal: Argument \"filepattern\" is required", //
+				execute("git add")[0]);
+	}
+
+	@Ignore("args4j exit()s for --help, too")
+	@Test
+	public void testAddUsage() throws Exception {
+		execute("git add --help");
 	}
 
 	@Test
-	public void testRemove() throws JGitInternalException,
-			IllegalStateException, IOException, GitAPIException {
-		assertEquals("[test.txt, mode:100644, content:Hello world]",
-				indexState(CONTENT));
-		RmCommand command = git.rm();
-		command.addFilepattern(FILE);
-		command.call();
-		assertEquals("", indexState(CONTENT));
+	public void testAddAFile() throws Exception {
+		writeTrashFile("greeting", "Hello, world!");
+		assertArrayEquals(new String[] { "" }, //
+				execute("git add greeting"));
+
+		DirCache cache = db.readDirCache();
+		assertNotNull(cache.getEntry("greeting"));
+		assertEquals(1, cache.getEntryCount());
 	}
 
 	@Test
-	public void testRemoveCached() throws Exception {
-		File newFile = writeTrashFile("new.txt", "new");
-		git.add().addFilepattern(newFile.getName()).call();
-		assertEquals("[new.txt, mode:100644][test.txt, mode:100644]",
-				indexState(0));
+	public void testAddFileTwice() throws Exception {
+		writeTrashFile("greeting", "Hello, world!");
+		assertArrayEquals(new String[] { "" }, //
+				execute("git add greeting greeting"));
 
-		git.rm().setCached(true).addFilepattern(newFile.getName()).call();
+		DirCache cache = db.readDirCache();
+		assertNotNull(cache.getEntry("greeting"));
+		assertEquals(1, cache.getEntryCount());
+	}
 
-		assertEquals("[test.txt, mode:100644]", indexState(0));
-		assertTrue("File should not have been removed.", newFile.exists());
+	@Test
+	public void testAddAlreadyAdded() throws Exception {
+		writeTrashFile("greeting", "Hello, world!");
+		git.add().addFilepattern("greeting").call();
+		assertArrayEquals(new String[] { "" }, //
+				execute("git add greeting"));
+
+		DirCache cache = db.readDirCache();
+		assertNotNull(cache.getEntry("greeting"));
+		assertEquals(1, cache.getEntryCount());
 	}
 }
