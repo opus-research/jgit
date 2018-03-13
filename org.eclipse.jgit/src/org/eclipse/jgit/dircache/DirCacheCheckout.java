@@ -406,7 +406,7 @@ public class DirCacheCheckout {
 			// File/Directory conflict case #20
 			if (walk.isDirectoryFileConflict())
 				// TODO: check whether it is always correct to report a conflict here
-				conflict(name, null, null, null);
+				conflict(name, null, h, m);
 
 			// file only exists in working tree -> ignore it
 			return;
