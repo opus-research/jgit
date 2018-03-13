@@ -120,7 +120,7 @@ public class PushCertificateParser {
 	 * Differences from the {@link PacketLineIn} receiver methods:
 	 * <ul>
 	 * <li>Does not use pkt-line framing.</li>
-	 * <li>Reads an entire cert in one cell rather than depending on a loop in
+	 * <li>Reads an entire cert in one call rather than depending on a loop in
 	 *   the caller.</li>
 	 * <li>Does not assume a {@code "push-cert-end"} line.</li>
 	 * </ul>
