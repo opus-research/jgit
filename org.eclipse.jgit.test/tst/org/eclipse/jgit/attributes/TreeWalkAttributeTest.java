@@ -802,9 +802,8 @@ public class TreeWalkAttributeTest extends RepositoryTestCase {
 		assertEquals(type, walk.getFileMode(0));
 
 		assertEquals(checkinAttributes,
-				asSet(ci_walk.getAttributes().getAttributes()));
-		assertEquals(checkoutAttributes,
-				asSet(walk.getAttributes().getAttributes()));
+				asSet(ci_walk.getAttributes().values()));
+		assertEquals(checkoutAttributes, asSet(walk.getAttributes().values()));
 
 		if (D.equals(type)) {
 			walk.enterSubtree();
