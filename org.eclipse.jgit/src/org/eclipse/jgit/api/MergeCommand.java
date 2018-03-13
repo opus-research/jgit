@@ -176,7 +176,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 					ResolveMerger resolveMerger = (ResolveMerger) merger;
 					resolveMerger.setCommitNames(new String[] {
 							"BASE", "HEAD", ref.getName() });
-					resolveMerger.setWorkingTreeIterator(new FileTreeIterator(repo));
+					resolveMerger.setWorkingTreeIt(new FileTreeIterator(repo));
 					noProblems = merger.merge(headCommit, srcCommit);
 					lowLevelResults = resolveMerger
 							.getMergeResults();
