@@ -80,9 +80,9 @@ public class RefList<T extends Ref> implements Iterable<Ref> {
 		return (RefList<T>) EMPTY;
 	}
 
-	final Ref[] list;
+	private final Ref[] list;
 
-	final int cnt;
+	private final int cnt;
 
 	RefList(Ref[] list, int cnt) {
 		this.list = list;
