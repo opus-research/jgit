@@ -140,7 +140,7 @@ public abstract class PackBitmapIndex {
 	}
 
 	/** Footer checksum applied on the bottom of the pack file. */
-	protected byte[] packChecksum;
+	byte[] packChecksum;
 
 	/**
 	 * Finds the position in the bitmap of the object.
