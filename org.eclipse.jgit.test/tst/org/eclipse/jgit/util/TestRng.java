@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2008, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,45 +41,27 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.http.test;
+package org.eclipse.jgit.util;
 
-import java.net.HttpURLConnection;
-import java.net.URI;
+/** Toy RNG to ensure we get predictable numbers during unit tests. */
+public class TestRng {
+	private int next;
 
-import junit.framework.TestCase;
-
-import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHolder;
-import org.eclipse.jgit.http.server.glue.ErrorServlet;
-import org.eclipse.jgit.http.test.util.AppServer;
-
-public class ErrorServletTest extends TestCase {
-	private AppServer server;
-
-	protected void setUp() throws Exception {
-		super.setUp();
-
-		server = new AppServer();
-
-		ServletContextHandler ctx = server.addContext("/");
-		ctx.addServlet(new ServletHolder(new ErrorServlet(404)), "/404");
-		ctx.addServlet(new ServletHolder(new ErrorServlet(500)), "/500");
-
-		server.setUp();
+	public TestRng(final String seed) {
+		next = 0;
+		for (int i = 0; i < seed.length(); i++)
+			next = next * 11 + seed.charAt(i);
 	}
 
-	protected void tearDown() throws Exception {
-		if (server != null) {
-			server.tearDown();
-		}
-		super.tearDown();
+	public byte[] nextBytes(final int cnt) {
+		final byte[] r = new byte[cnt];
+		for (int i = 0; i < cnt; i++)
+			r[i] = (byte) nextInt();
+		return r;
 	}
 
-	public void testHandler() throws Exception {
-		final URI uri = server.getURI();
-		assertEquals(404, ((HttpURLConnection) uri.resolve("/404").toURL()
-				.openConnection()).getResponseCode());
-		assertEquals(500, ((HttpURLConnection) uri.resolve("/500").toURL()
-				.openConnection()).getResponseCode());
+	public int nextInt() {
+		next = next * 1103515245 + 12345;
+		return next;
 	}
 }

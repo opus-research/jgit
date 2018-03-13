@@ -64,11 +64,7 @@ class PacketLineIn {
 		/** ACK */
 		ACK,
 		/** ACK + continue */
-		ACK_CONTINUE,
-		/** ACK + common */
-		ACK_COMMON,
-		/** ACK + ready */
-		ACK_READY;
+		ACK_CONTINUE
 	}
 
 	private final InputStream in;
@@ -92,16 +88,9 @@ class PacketLineIn {
 			return AckNackResult.NAK;
 		if (line.startsWith("ACK ")) {
 			returnedId.fromString(line.substring(4, 44));
-			if (line.length() == 44)
-				return AckNackResult.ACK;
-
-			final String arg = line.substring(44);
-			if (arg.equals(" continue"))
+			if (line.indexOf("continue", 44) != -1)
 				return AckNackResult.ACK_CONTINUE;
-			else if (arg.equals(" common"))
-				return AckNackResult.ACK_COMMON;
-			else if (arg.equals(" ready"))
-				return AckNackResult.ACK_READY;
+			return AckNackResult.ACK;
 		}
 		throw new PackProtocolException("Expected ACK/NAK, got: " + line);
 	}

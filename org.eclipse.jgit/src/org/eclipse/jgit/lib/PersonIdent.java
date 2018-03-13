@@ -99,10 +99,7 @@ public class PersonIdent {
 	 * @param aEmailAddress
 	 */
 	public PersonIdent(final String aName, final String aEmailAddress) {
-		name = aName;
-		emailAddress = aEmailAddress;
-		when = SystemReader.getInstance().getCurrentTime();
-		tzOffset = SystemReader.getInstance().getTimezone(when);
+		this(aName, aEmailAddress, new Date(), TimeZone.getDefault());
 	}
 
 	/**
