@@ -63,7 +63,6 @@ import java.util.zip.DataFormatException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.PackInvalidException;
 import org.eclipse.jgit.errors.PackMismatchException;
-import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.RawParseUtils;
 
@@ -106,7 +105,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 	/**
 	 * Construct a reader for an existing, pre-indexed packfile.
-	 *
+	 * 
 	 * @param idxFile
 	 *            path of the <code>.idx</code> file listing the contents.
 	 * @param packFile
@@ -162,7 +161,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	 * For performance reasons only the index file is searched; the main pack
 	 * content is ignored entirely.
 	 * </p>
-	 *
+	 * 
 	 * @param id
 	 *            the object to look for. Must not be null.
 	 * @return true if the object is in this pack; false otherwise.
@@ -175,7 +174,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 	/**
 	 * Get an object from this pack.
-	 *
+	 * 
 	 * @param curs
 	 *            temporary working space associated with the calling thread.
 	 * @param id
@@ -210,9 +209,9 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	 * <p>
 	 * Iterator returns objects in SHA-1 lexicographical order.
 	 * </p>
-	 *
+	 * 
 	 * @return iterator over entries of associated pack index
-	 *
+	 * 
 	 * @see PackIndex#iterator()
 	 */
 	public Iterator<PackIndex.MutableEntry> iterator() {
@@ -226,7 +225,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	/**
 	 * Obtain the total number of objects available in this pack. This method
 	 * relies on pack index, giving number of effectively available objects.
-	 *
+	 * 
 	 * @return number of objects in index of this pack, likewise in this pack
 	 * @throws IOException
 	 *             the index file cannot be loaded into memory.
@@ -401,7 +400,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		if (length < pos + size)
 			size = (int) (length - pos);
 		final byte[] buf = new byte[size];
-		IO.readFully(fd.getChannel(), pos, buf, 0, size);
+		NB.readFully(fd.getChannel(), pos, buf, 0, size);
 		return new ByteArrayWindow(this, pos, buf);
 	}
 
@@ -431,7 +430,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		final PackIndex idx = idx();
 		final byte[] buf = new byte[20];
 
-		IO.readFully(fd.getChannel(), 0, buf, 0, 12);
+		NB.readFully(fd.getChannel(), 0, buf, 0, 12);
 		if (RawParseUtils.match(buf, 0, Constants.PACK_SIGNATURE) != 4)
 			throw new IOException("Not a PACK file.");
 		final long vers = NB.decodeUInt32(buf, 4);
@@ -445,7 +444,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 					+ " index " + idx.getObjectCount()
 					+ ": " + getPackFile());
 
-		IO.readFully(fd.getChannel(), length - 20, buf, 0, 20);
+		NB.readFully(fd.getChannel(), length - 20, buf, 0, 20);
 		if (!Arrays.equals(buf, packChecksum))
 			throw new PackMismatchException("Pack checksum mismatch:"
 					+ " pack " + ObjectId.fromRaw(buf).name()

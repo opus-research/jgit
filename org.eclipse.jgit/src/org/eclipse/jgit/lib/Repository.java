@@ -111,7 +111,7 @@ public class Repository {
 
 	/**
 	 * Construct a representation of a Git repository.
-	 *
+	 * 
 	 * @param d
 	 *            GIT_DIR (the location of the repository metadata).
 	 * @throws IOException
@@ -185,6 +185,7 @@ public class Repository {
 		objectDatabase.create();
 
 		new File(gitDir, "branches").mkdir();
+		new File(gitDir, "remotes").mkdir();
 		final String master = Constants.R_HEADS + Constants.MASTER;
 		refs.link(Constants.HEAD, master);
 
@@ -250,7 +251,7 @@ public class Repository {
 	/**
 	 * @param id
 	 *            SHA-1 of an object.
-	 *
+	 * 
 	 * @return a {@link ObjectLoader} for accessing the data of the named
 	 *         object, or null if the object does not exist.
 	 * @throws IOException
@@ -270,7 +271,7 @@ public class Repository {
 	 *            temporary working space associated with the calling thread.
 	 * @param id
 	 *            SHA-1 of an object.
-	 *
+	 * 
 	 * @return a {@link ObjectLoader} for accessing the data of the named
 	 *         object, or null if the object does not exist.
 	 * @throws IOException
@@ -487,7 +488,7 @@ public class Repository {
 
 	/**
 	 * Create a command to update, create or delete a ref in this repository.
-	 *
+	 * 
 	 * @param ref
 	 *            name of the ref the caller wants to modify.
 	 * @return an update command. The caller must finish populating this command
@@ -665,7 +666,7 @@ public class Repository {
 								refId = parents[0];
 						} else
 							throw new IncorrectObjectTypeException(refId,  Constants.TYPE_COMMIT);
-
+						
 					}
 				} else {
 					ref = mapObject(refId, null);
@@ -770,7 +771,7 @@ public class Repository {
 
 	/**
 	 * Add a single existing pack to the list of available pack files.
-	 *
+	 * 
 	 * @param pack
 	 *            path of the pack file to open.
 	 * @param idx
@@ -816,7 +817,7 @@ public class Repository {
 			ref = ref.substring(5);
 		return ref;
 	}
-
+	
 	/**
 	 * @return name of current branch.
 	 * @throws IOException
@@ -883,7 +884,7 @@ public class Repository {
 	 * <p>
 	 * If the ref cannot be peeled (as it does not refer to an annotated tag)
 	 * the peeled id stays null, but {@link Ref#isPeeled()} will be true.
-	 *
+	 * 
 	 * @param ref
 	 *            The ref to peel
 	 * @return <code>ref</code> if <code>ref.isPeeled()</code> is true; else a
