@@ -222,6 +222,12 @@ public class CheckoutCommand extends GitCommand<Ref> {
 			}
 
 			Ref headRef = repo.getRef(Constants.HEAD);
+			if (headRef == null) {
+				// TODO Git CLI supports checkout from unborn branch, we should
+				// also allow this
+				throw new UnsupportedOperationException(
+						JGitText.get().cannotCheckoutFromUnbornBranch);
+			}
 			String shortHeadRef = getShortBranchName(headRef);
 			String refLogMessage = "checkout: moving from " + shortHeadRef; //$NON-NLS-1$
 			ObjectId branch;
@@ -325,9 +331,16 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	}
 
 	private String getShortBranchName(Ref headRef) {
-		if (headRef.getTarget().getName().equals(headRef.getName()))
-			return headRef.getTarget().getObjectId().getName();
-		return Repository.shortenRefName(headRef.getTarget().getName());
+		if (headRef.isSymbolic()) {
+			return Repository.shortenRefName(headRef.getTarget().getName());
+		}
+		// Detached HEAD. Every non-symbolic ref in the ref database has an
+		// object id, so this cannot be null.
+		ObjectId id = headRef.getObjectId();
+		if (id == null) {
+			throw new NullPointerException();
+		}
+		return id.getName();
 	}
 
 	/**

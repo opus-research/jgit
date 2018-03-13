@@ -175,6 +175,7 @@ public class TestRepository<R extends Repository> {
 	 *            the MockSystemReader to use for clock and other system
 	 *            operations.
 	 * @throws IOException
+	 * @since 4.2
 	 */
 	public TestRepository(R db, RevWalk rw, MockSystemReader reader)
 			throws IOException {
@@ -203,7 +204,10 @@ public class TestRepository<R extends Repository> {
 		return git;
 	}
 
-	/** @return current date. */
+	/**
+	 * @return current date.
+	 * @since 4.2
+	 */
 	public Date getDate() {
 		return new Date(mockSystemReader.getCurrentTime());
 	}
@@ -818,7 +822,7 @@ public class TestRepository<R extends Repository> {
 					break;
 
 				final byte[] bin = db.open(o, o.getType()).getCachedBytes();
-				oc.checkCommit(bin);
+				oc.checkCommit(o, bin);
 				assertHash(o, bin);
 			}
 
@@ -828,7 +832,7 @@ public class TestRepository<R extends Repository> {
 					break;
 
 				final byte[] bin = db.open(o, o.getType()).getCachedBytes();
-				oc.check(o.getType(), bin);
+				oc.check(o, o.getType(), bin);
 				assertHash(o, bin);
 			}
 		}
@@ -862,7 +866,7 @@ public class TestRepository<R extends Repository> {
 				Set<ObjectId> all = new HashSet<ObjectId>();
 				for (Ref r : db.getAllRefs().values())
 					all.add(r.getObjectId());
-				pw.preparePack(m, all, Collections.<ObjectId> emptySet());
+				pw.preparePack(m, all, PackWriter.NONE);
 
 				final ObjectId name = pw.computeName();
 
@@ -1151,8 +1155,7 @@ public class TestRepository<R extends Repository> {
 			return self;
 		}
 
-		private void insertChangeId(org.eclipse.jgit.lib.CommitBuilder c)
-				throws IOException {
+		private void insertChangeId(org.eclipse.jgit.lib.CommitBuilder c) {
 			if (changeId == null)
 				return;
 			int idx = ChangeIdUtil.indexOfChangeId(message, "\n");
