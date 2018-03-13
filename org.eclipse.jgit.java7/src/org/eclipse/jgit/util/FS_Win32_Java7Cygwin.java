@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, Google Inc.
+ * Copyright (C) 2012, Robin Rosenberg <robin.rosenberg@dewire.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,46 +41,85 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.dfs;
+package org.eclipse.jgit.util;
 
-import java.io.ByteArrayOutputStream;
-import java.nio.ByteBuffer;
+import java.io.File;
+import java.io.IOException;
 
-class InMemoryOutputStream extends DfsOutputStream {
-	private final ByteArrayOutputStream dst = new ByteArrayOutputStream();
+/**
+ * FS for Java7 on Windows with Cygwin
+ */
+public class FS_Win32_Java7Cygwin extends FS_Win32_Cygwin {
 
-	private byte[] data;
+	FS_Win32_Java7Cygwin(FS src) {
+		super(src);
+	}
 
-	@Override
-	public void write(byte[] buf, int off, int len) {
-		data = null;
-		dst.write(buf, off, len);
+	FS_Win32_Java7Cygwin() {
 	}
 
 	@Override
-	public int read(long position, ByteBuffer buf) {
-		byte[] d = getData();
-		int n = Math.min(buf.remaining(), d.length - (int) position);
-		if (n <= 0)
-			return -1;
-		buf.put(d, (int) position, n);
-		return n;
-	}
-
-	byte[] getData() {
-		if (data == null)
-			data = dst.toByteArray();
-		return data;
+	public FS newInstance() {
+		return new FS_Win32_Java7Cygwin(this);
 	}
 
 	@Override
-	public void flush() {
-		// Default implementation does nothing;
+	public boolean supportsSymlinks() {
+		return true;
 	}
 
 	@Override
-	public void close() {
-		flush();
+	public boolean isSymLink(File path) throws IOException {
+		return FileUtil.isSymlink(path);
 	}
 
+	@Override
+	public long lastModified(File path) throws IOException {
+		return FileUtil.lastModified(path);
+	}
+
+	@Override
+	public void setLastModified(File path, long time) throws IOException {
+		FileUtil.setLastModified(path, time);
+	}
+
+	@Override
+	public long length(File f) throws IOException {
+		return FileUtil.getLength(f);
+	}
+
+	@Override
+	public boolean exists(File path) {
+		return FileUtil.exists(path);
+	}
+
+	@Override
+	public boolean isDirectory(File path) {
+		return FileUtil.isDirectory(path);
+	}
+
+	@Override
+	public boolean isFile(File path) {
+		return FileUtil.isFile(path);
+	}
+
+	@Override
+	public boolean isHidden(File path) throws IOException {
+		return FileUtil.isHidden(path);
+	}
+
+	@Override
+	public void setHidden(File path, boolean hidden) throws IOException {
+		FileUtil.setHidden(path, hidden);
+	}
+
+	@Override
+	public String readSymLink(File path) throws IOException {
+		return FileUtil.readSymlink(path);
+	}
+
+	@Override
+	public void createSymLink(File path, String target) throws IOException {
+		FileUtil.createSymLink(path, target);
+	}
 }
