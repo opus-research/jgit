@@ -45,7 +45,6 @@
 
 package org.eclipse.jgit.storage.file;
 
-import static org.eclipse.jgit.storage.pack.PackExt.BITMAP_INDEX;
 import static org.eclipse.jgit.storage.pack.PackExt.INDEX;
 
 import java.io.EOFException;
@@ -98,8 +97,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 	private final File packFile;
 
-	private final int extensions;
-
 	private File keepFile;
 
 	private volatile String packName;
@@ -127,8 +124,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 	private PackReverseIndex reverseIdx;
 
-	private PackBitmapIndex bitmapIdx;
-
 	/**
 	 * Objects we have tried to read, and discovered to be corrupt.
 	 * <p>
@@ -143,13 +138,10 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	 *
 	 * @param packFile
 	 *            path of the <code>.pack</code> file holding the data.
-	 * @param extensions
-	 *            additional pack file extensions with the same base as the pack
 	 */
-	public PackFile(final File packFile, int extensions) {
+	public PackFile(final File packFile) {
 		this.packFile = packFile;
 		this.packLastModified = (int) (packFile.lastModified() >> 10);
-		this.extensions = extensions;
 
 		// Multiply by 31 here so we can more directly combine with another
 		// value in WindowCache.hash(), without doing the multiply there.
@@ -1056,22 +1048,6 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		return getReverseIdx().findNextOffset(startOffset, maxOffset);
 	}
 
-	synchronized PackBitmapIndex getBitmapIndex() throws IOException {
-		if (bitmapIdx == null && hasExt(BITMAP_INDEX)) {
-			final PackBitmapIndex idx = PackBitmapIndex.open(
-					extFile(BITMAP_INDEX), idx(), getReverseIdx());
-
-			if (packChecksum == null)
-				packChecksum = idx.packChecksum;
-			else if (!Arrays.equals(packChecksum, idx.packChecksum))
-				throw new PackMismatchException(
-						JGitText.get().packChecksumMismatch);
-
-			bitmapIdx = idx;
-		}
-		return bitmapIdx;
-	}
-
 	private synchronized PackReverseIndex getReverseIdx() throws IOException {
 		if (reverseIdx == null)
 			reverseIdx = new PackReverseIndex(idx());
@@ -1108,9 +1084,5 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		int dot = p.lastIndexOf('.');
 		String b = (dot < 0) ? p : p.substring(0, dot);
 		return new File(packFile.getParentFile(), b + '.' + ext.getExtension());
-	}
-
-	private boolean hasExt(PackExt ext) {
-		return (extensions & ext.getBit()) != 0;
 	}
 }

@@ -94,7 +94,7 @@ class ShowPackDelta extends TextBuiltin {
 			throws IOException, MissingObjectException,
 			StoredObjectRepresentationNotAvailableException {
 		ObjectReuseAsIs asis = (ObjectReuseAsIs) reader;
-		ObjectToPack target = asis.newObjectToPack(obj, obj.getType());
+		ObjectToPack target = asis.newObjectToPack(obj);
 
 		PackWriter pw = new PackWriter(reader) {
 			@Override
