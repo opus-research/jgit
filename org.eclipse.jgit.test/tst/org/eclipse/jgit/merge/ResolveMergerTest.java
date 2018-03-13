@@ -115,7 +115,6 @@ public class ResolveMergerTest extends RepositoryTestCase {
 		merger.setWorkingTreeIterator(new FileTreeIterator(db));
 		boolean ok = merger.merge(head.getId(), other.getId());
 		assertTrue(ok);
-		assertTrue(file.exists());
 	}
 
 	/**
