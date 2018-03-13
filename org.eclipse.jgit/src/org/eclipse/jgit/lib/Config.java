@@ -510,7 +510,7 @@ public class Config {
 	 *            indication of the units.
 	 * @return the value, or {@code defaultValue} if not set, expressed in
 	 *         {@code units}.
-	 * @since 4.4
+	 * @since 4.5
 	 */
 	public long getTimeUnit(String section, String subsection, String name,
 			long defaultValue, TimeUnit wantUnit) {
