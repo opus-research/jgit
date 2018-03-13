@@ -107,7 +107,7 @@ class ShowPackDelta extends TextBuiltin {
 		asis.selectObjectRepresentation(pw, NullProgressMonitor.INSTANCE,
 				Collections.singleton(target));
 		asis.copyObjectAsIs(new PackOutputStream(NullProgressMonitor.INSTANCE,
-				buf, pw), target, true);
+				buf, pw), target);
 
 		// At this point the object header has no delta information,
 		// because it was output as though it were a whole object.

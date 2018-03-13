@@ -209,18 +209,4 @@ public class TransportTest extends SampleDataRepositoryTestCase {
 		assertEquals(db.resolve("refs/heads/a"), tru.getNewObjectId());
 		assertNull(tru.getOldObjectId());
 	}
-
-	/**
-	 * Test meaningful exception message when open transport to non-existing
-	 * local repository
-	 */
-	@Test
-	public void testNonExistingLocalRepositoryException() throws IOException {
-		String path = "/path/to/non-existing/repository.git";
-		try {
-			Transport.open(db, path);
-		} catch (Exception e) {
-			assertEquals("Cannot find repository at " + path, e.getMessage());
-		}
-	}
 }

@@ -202,7 +202,6 @@ public class BundleWriter {
 				exc.add(r.getId());
 			packWriter.setDeltaBaseAsOffset(true);
 			packWriter.setThin(exc.size() > 0);
-			packWriter.setReuseValidatingObjects(false);
 			if (exc.size() == 0)
 				packWriter.setTagTargets(tagTargets);
 			packWriter.preparePack(monitor, inc, exc);

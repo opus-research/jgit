@@ -692,10 +692,8 @@ public class UploadPack {
 		final PackWriter pw = new PackWriter(cfg, walk.getObjectReader());
 		try {
 			pw.setUseCachedPacks(true);
-			pw.setReuseDeltaCommits(true);
 			pw.setDeltaBaseAsOffset(options.contains(OPTION_OFS_DELTA));
 			pw.setThin(options.contains(OPTION_THIN_PACK));
-			pw.setReuseValidatingObjects(false);
 
 			if (commonBase.isEmpty()) {
 				Set<ObjectId> tagTargets = new HashSet<ObjectId>();
