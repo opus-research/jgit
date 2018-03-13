@@ -43,7 +43,6 @@
 
 package org.eclipse.jgit.storage.file;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -225,7 +224,7 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 		assertEquals(data3.length, ol.getSize());
 		assertFalse("is large", ol.isLarge());
 		assertNotNull(ol.getCachedBytes());
-		assertArrayEquals(data3, ol.getCachedBytes());
+		assertTrue(Arrays.equals(data3, ol.getCachedBytes()));
 
 		ObjectStream in = ol.openStream();
 		assertNotNull("have stream", in);
