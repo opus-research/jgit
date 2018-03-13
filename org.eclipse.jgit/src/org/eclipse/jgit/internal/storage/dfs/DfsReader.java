@@ -616,24 +616,19 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 			boolean headerOnly) throws IOException, DataFormatException {
 		prepareInflater();
 		pin(pack, position);
-		block.setInput(inf, position);
 		int dstoff = 0;
 		for (;;) {
-			int n = inf.inflate(dstbuf, dstoff, dstbuf.length - dstoff);
-			if (n == 0) {
-				if (headerOnly && dstoff == dstbuf.length)
-					return dstoff;
-				if (inf.needsInput()) {
-					position += block.remaining(position);
-					pin(pack, position);
-					block.setInput(inf, position);
-					continue;
-				}
-				if (inf.finished())
-					return dstoff;
+			dstoff = block.inflate(inf, position, dstbuf, dstoff);
+
+			if (headerOnly && dstoff == dstbuf.length)
+				return dstoff;
+			if (inf.needsInput()) {
+				position += block.remaining(position);
+				pin(pack, position);
+			} else if (inf.finished())
+				return dstoff;
+			else
 				throw new DataFormatException();
-			}
-			dstoff += n;
 		}
 	}
 
