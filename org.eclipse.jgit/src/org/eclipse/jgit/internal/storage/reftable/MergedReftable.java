@@ -181,8 +181,8 @@ public class MergedReftable extends Reftable {
 			if (!t.rc.next()) {
 				t.rc.close();
 			} else if (head == null) {
-				if (queue.isEmpty()
-						|| RefQueueEntry.compare(t, queue.peek()) < 0) {
+				RefQueueEntry p = queue.peek();
+				if (p == null || RefQueueEntry.compare(t, p) < 0) {
 					head = t;
 				} else {
 					head = queue.poll();
@@ -225,9 +225,9 @@ public class MergedReftable extends Reftable {
 
 		private void skipShadowedRefs(String name) throws IOException {
 			for (;;) {
-				RefQueueEntry t = queue.peek();
+				RefQueueEntry t = head != null ? head : queue.peek();
 				if (t != null && name.equals(t.name())) {
-					add(queue.remove());
+					add(poll());
 				} else {
 					break;
 				}
