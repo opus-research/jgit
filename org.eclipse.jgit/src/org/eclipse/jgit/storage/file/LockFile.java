@@ -52,6 +52,7 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.text.MessageFormat;
 
@@ -59,7 +60,6 @@ import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.io.ChannelOutputStream;
 
 /**
  * Git style file locking and replacement.
@@ -283,7 +283,7 @@ public class LockFile {
 
 		final OutputStream out;
 		if (fsync)
-			out = new ChannelOutputStream(os.getChannel());
+			out = Channels.newOutputStream(os.getChannel());
 		else
 			out = os;
 
@@ -305,8 +305,14 @@ public class LockFile {
 			}
 
 			@Override
+			public void flush() throws IOException {
+				out.flush();
+			}
+
+			@Override
 			public void close() throws IOException {
 				try {
+					out.flush();
 					if (fsync)
 						os.getChannel().force(true);
 					out.close();
