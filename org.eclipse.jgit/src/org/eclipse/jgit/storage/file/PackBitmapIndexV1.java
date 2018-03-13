@@ -67,6 +67,7 @@ import org.eclipse.jgit.util.NB;
  * @see PackBitmapIndex
  */
 class PackBitmapIndexV1 extends BasePackBitmapIndex {
+	static final byte[] MAGIC = { 'B', 'I', 'T', 'M' };
 	static final int OPT_FULL = 1;
 
 	private static final int MAX_XOR_OFFSET = 126;
@@ -87,29 +88,47 @@ class PackBitmapIndexV1 extends BasePackBitmapIndex {
 		this.reverseIndex = reverseIndex;
 		this.bitmaps = getBitmaps();
 
-		// Read the version
-		final byte[] hdr = new byte[25];
+		final byte[] hdr = new byte[32];
 		IO.readFully(fd, hdr, 0, hdr.length);
-		final int v = NB.decodeInt32(hdr, 0);
-		if (v != 1)
+
+		// Check the magic bytes
+		for (int i = 0; i < MAGIC.length; i++) {
+			if (hdr[i] != MAGIC[i]) {
+				byte[] actual = new byte[MAGIC.length];
+				System.arraycopy(hdr, 0, actual, 0, MAGIC.length);
+				throw new IOException(MessageFormat.format(
+						JGitText.get().expectedGot, Arrays.toString(MAGIC),
+						Arrays.toString(actual)));
+			}
+		}
+
+		// Read the version (2 bytes)
+		final int version = NB.decodeUInt16(hdr, 4);
+		if (version != 1)
 			throw new IOException(MessageFormat.format(
 					JGitText.get().unsupportedPackIndexVersion,
-					Integer.valueOf(v)));
+					Integer.valueOf(version)));
 
-		// Read the options (1 byte)
-		switch (hdr[4]) {
+		// Read the options (2 bytes)
+		final int opts = NB.decodeUInt16(hdr, 6);
+		switch (opts) {
 		case OPT_FULL:
 			// Bitmaps are self contained within this file.
 			break;
 		default:
 			throw new IOException(MessageFormat.format(
 					JGitText.get().expectedGot, Integer.valueOf(OPT_FULL),
-					Integer.valueOf(hdr[4])));
+					Integer.valueOf(opts)));
 		}
+
+		// Read the number of entries (1 int32)
+		long numEntries = NB.decodeUInt32(hdr, 8);
+		if (numEntries > Integer.MAX_VALUE)
+			throw new IOException(JGitText.get().indexFileIsTooLargeForJgit);
 
 		// Checksum applied on the bottom of the corresponding pack file.
 		this.packChecksum = new byte[20];
-		System.arraycopy(hdr, 5, packChecksum, 0, packChecksum.length);
+		System.arraycopy(hdr, 12, packChecksum, 0, packChecksum.length);
 
 		// Read the bitmaps for the Git types
 		SimpleDataInput dataInput = new SimpleDataInput(fd);
@@ -117,14 +136,6 @@ class PackBitmapIndexV1 extends BasePackBitmapIndex {
 		this.trees = readBitmap(dataInput);
 		this.blobs = readBitmap(dataInput);
 		this.tags = readBitmap(dataInput);
-
-		// TODO(cranger): should this go before builtin bitmap reading so it can
-		// be picked up in a single read?
-
-		// Read the number of entries (1 int32)
-		long numEntries = dataInput.readUnsignedInt();
-		if (numEntries > Integer.MAX_VALUE)
-			throw new IOException(JGitText.get().indexFileIsTooLargeForJgit);
 
 		// An entry is object id, xor offset, and a length encoded bitmap.
 		// the object id is an int32 of the nth position sorted by name.
