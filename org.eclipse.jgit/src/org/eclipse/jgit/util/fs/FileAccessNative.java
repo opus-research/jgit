@@ -59,20 +59,5 @@ public class FileAccessNative extends FileAccess {
 		return lstatImp(file.getPath());
 	}
 
-	public String readlink(File file) throws UnsupportedOperationException,
-			AccessDeniedException, NoSuchFileException, NotDirectoryException {
-		return readlinkImp(file.getPath());
-	}
-
-	public void symlink(File file, String target)
-			throws UnsupportedOperationException, AccessDeniedException,
-			NoSuchFileException, NotDirectoryException, FileExistsException {
-		symlinkImp(file.getPath(), target);
-	}
-
 	private static native FileInfo lstatImp(String path);
-
-	private static native String readlinkImp(String path);
-
-	private static native void symlinkImp(String path, String target);
 }

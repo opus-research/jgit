@@ -50,8 +50,4 @@ public class NativeException extends RuntimeException {
 	NativeException(String message) {
 		super(message);
 	}
-
-	NativeException(String message, Throwable cause) {
-		super(message, cause);
-	}
 }
