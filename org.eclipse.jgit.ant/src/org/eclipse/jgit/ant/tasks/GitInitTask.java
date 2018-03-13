@@ -50,20 +50,20 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.InitCommand;
 
 public class GitInitTask extends Task {
-	private File dest;
+	private File destination;
 	private boolean bare;
 
 	/**
 	 * @param dest
-	 *            the dest to set
+	 *            the directory to init to
 	 */
 	public void setDest(File dest) {
-		this.dest = dest;
+		this.destination = dest;
 	}
 
 	/**
 	 * @param bare
-	 *            the bare to set
+	 *            whether the repository is bare or not
 	 */
 	public void setBare(boolean bare) {
 		this.bare = bare;
@@ -72,12 +72,12 @@ public class GitInitTask extends Task {
 	@Override
 	public void execute() throws BuildException {
 		if (bare) {
-			log("Initializing bare repository at " + dest);
+			log("Initializing bare repository at " + destination);
 		} else {
-			log("Initializing repository at " + dest);
+			log("Initializing repository at " + destination);
 		}
 		InitCommand init = Git.init();
-		init.setBare(bare).setDirectory(dest);
+		init.setBare(bare).setDirectory(destination);
 		init.call();
 	}
 }

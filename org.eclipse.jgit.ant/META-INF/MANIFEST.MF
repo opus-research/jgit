@@ -7,3 +7,4 @@ Bundle-RequiredExecutionEnvironment: J2SE-1.5
 Import-Package: org.apache.tools.ant
 Bundle-Localization: plugin
 Bundle-Vendor: %Provider-Name
+Export-Package: org.eclipse.jgit.ant.tasks;version="0.12.0"
