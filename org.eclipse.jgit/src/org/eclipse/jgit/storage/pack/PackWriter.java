@@ -866,7 +866,7 @@ public class PackWriter {
 	 * Create a bitmap index file to match the pack file just written.
 	 * <p>
 	 * This method can only be invoked after
-	 * {@link #prepareBitmapIndex(ProgressMonitor)} has been invoked and
+	 * {@link #prepareBitmapIndex(ProgressMonitor, Set)} has been invoked and
 	 * completed successfully. Writing a corresponding bitmap index is an
 	 * optional feature that not all pack users may require.
 	 *
@@ -2051,11 +2051,16 @@ public class PackWriter {
 	 *
 	 * @param pm
 	 *            progress monitor to report bitmap building work.
+	 * @param want
+	 *            collection of objects to be marked as interesting (start
+	 *            points of graph traversal).
 	 * @return whether a bitmap index may be written.
 	 * @throws IOException
 	 *             when some I/O problem occur during reading objects.
 	 */
-	public boolean prepareBitmapIndex(ProgressMonitor pm) throws IOException {
+	public boolean prepareBitmapIndex(
+			ProgressMonitor pm, Set<? extends ObjectId> want)
+			throws IOException {
 		if (!canBuildBitmaps || getObjectCount() > Integer.MAX_VALUE
 				|| !cachedPacks.isEmpty())
 			return false;
@@ -2064,8 +2069,8 @@ public class PackWriter {
 			pm = NullProgressMonitor.INSTANCE;
 
 		writeBitmaps = new PackBitmapIndexBuilder(sortByName());
-		PackWriterBitmapPreparer bitmapPreparer = new PackWriterBitmapPreparer(
-				reader, writeBitmaps, pm, stats.interestingObjects);
+		PackWriterBitmapPreparer bitmapPreparer =
+				new PackWriterBitmapPreparer(reader, writeBitmaps, pm, want);
 
 		int numCommits = objectsLists[Constants.OBJ_COMMIT].size();
 		Collection<PackWriterBitmapPreparer.BitmapCommit> selectedCommits =
@@ -2082,14 +2087,14 @@ public class PackWriter {
 				walker = bitmapPreparer.newBitmapWalker();
 
 			BitmapBuilder bitmap = walker.findObjects(
-					Collections.singleton(cmit.getObjectId()), null);
+					Collections.singleton(cmit), null);
 
 			if (last != null && cmit.isReuseWalker() && !bitmap.contains(last))
 				throw new IllegalStateException(MessageFormat.format(
-						JGitText.get().bitmapMissingObject,
-						cmit.getObjectId().name(), last.name()));
-			last = cmit.getObjectId();
-			writeBitmaps.addBitmap(cmit.getObjectId(), bitmap.build());
+						JGitText.get().bitmapMissingObject, cmit.name(),
+						last.name()));
+			last = cmit;
+			writeBitmaps.addBitmap(cmit, bitmap.build(), cmit.getFlags());
 
 			pm.update(1);
 		}

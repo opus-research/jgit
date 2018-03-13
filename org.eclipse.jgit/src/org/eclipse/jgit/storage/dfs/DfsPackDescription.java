@@ -81,8 +81,6 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 
 	private int extensions;
 
-	private int indexVersion;
-
 	/**
 	 * Initialize a description by pack name and repository.
 	 * <p>
@@ -258,21 +256,6 @@ public class DfsPackDescription implements Comparable<DfsPackDescription> {
 	 */
 	public DfsPackDescription clearPackStats() {
 		stats = null;
-		return this;
-	}
-
-	/** @return the version of the index file written. */
-	public int getIndexVersion() {
-		return indexVersion;
-	}
-
-	/**
-	 * @param version
-	 *            the version of the index file written.
-	 * @return {@code this}
-	 */
-	public DfsPackDescription setIndexVersion(int version) {
-		indexVersion = version;
 		return this;
 	}
 
