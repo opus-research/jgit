@@ -359,7 +359,7 @@ public class Main {
 				continue;
 			}
 			String s = System.getenv(protocol + "_proxy"); //$NON-NLS-1$
-			if (s == null && protocol.equals("https")) { //$NON-NLS-1$
+			if (s == null && protocol.equals("https")) {
 				s = System.getenv("HTTPS_PROXY"); //$NON-NLS-1$
 			}
 			if (s == null || s.equals("")) { //$NON-NLS-1$

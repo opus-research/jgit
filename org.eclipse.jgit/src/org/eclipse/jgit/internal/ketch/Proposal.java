@@ -233,12 +233,14 @@ public class Proposal {
 	 *            method to run after the proposal is done. The callback may be
 	 *            run on a Ketch system thread and should be completed quickly.
 	 */
-	public synchronized void addListener(Runnable callback) {
+	public void addListener(Runnable callback) {
 		boolean runNow = false;
-		if (state.get().isDone()) {
-			runNow = true;
-		} else {
-			listeners.add(callback);
+		synchronized (state) {
+			if (state.get().isDone()) {
+				runNow = true;
+			} else {
+				listeners.add(callback);
+			}
 		}
 		if (runNow) {
 			callback.run();
@@ -282,9 +284,11 @@ public class Proposal {
 	 * @throws InterruptedException
 	 *             caller was interrupted before proposal executed.
 	 */
-	public synchronized void await() throws InterruptedException {
-		while (!state.get().isDone()) {
-			state.wait();
+	public void await() throws InterruptedException {
+		synchronized (state) {
+			while (!state.get().isDone()) {
+				state.wait();
+			}
 		}
 	}
 
@@ -299,13 +303,14 @@ public class Proposal {
 	 * @throws InterruptedException
 	 *             caller was interrupted before proposal executed.
 	 */
-	public synchronized boolean await(long wait, TimeUnit unit)
-			throws InterruptedException {
-		if (state.get().isDone()) {
-			return true;
+	public boolean await(long wait, TimeUnit unit) throws InterruptedException {
+		synchronized (state) {
+			if (state.get().isDone()) {
+				return true;
+			}
+			state.wait(unit.toMillis(wait));
+			return state.get().isDone();
 		}
-		state.wait(unit.toMillis(wait));
-		return state.get().isDone();
 	}
 
 	/**
@@ -321,19 +326,22 @@ public class Proposal {
 	 * @throws InterruptedException
 	 *             caller was interrupted before proposal executed.
 	 */
-	public synchronized boolean awaitStateChange(State notIn, long wait,
-			TimeUnit unit)
+	public boolean awaitStateChange(State notIn, long wait, TimeUnit unit)
 			throws InterruptedException {
-		if (state.get() != notIn) {
-			return true;
+		synchronized (state) {
+			if (state.get() != notIn) {
+				return true;
+			}
+			state.wait(unit.toMillis(wait));
+			return state.get() != notIn;
 		}
-		state.wait(unit.toMillis(wait));
-		return state.get() != notIn;
 	}
 
-	synchronized void notifyState(State s) {
-		state.set(s);
-		state.notifyAll();
+	void notifyState(State s) {
+		synchronized (state) {
+			state.set(s);
+			state.notifyAll();
+		}
 		if (s.isDone()) {
 			for (Runnable callback : listeners) {
 				callback.run();
