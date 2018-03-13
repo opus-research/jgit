@@ -126,9 +126,6 @@ public class ReceivePack {
 	/** Identity to record action as within the reflog. */
 	private PersonIdent refLogIdent;
 
-	/** Hook to check the commands before validation. */
-	private ValidationHook validator;
-
 	/** Hook to validate the update commands before execution. */
 	private PreReceiveHook preReceive;
 
@@ -189,7 +186,6 @@ public class ReceivePack {
 		allowOfsDelta = cfg.allowOfsDelta;
 		preReceive = PreReceiveHook.NULL;
 		postReceive = PostReceiveHook.NULL;
-		validator = ValidationHook.NULL;
 	}
 
 	private static class ReceiveConfig {
@@ -337,25 +333,6 @@ public class ReceivePack {
 	 */
 	public void setRefLogIdent(final PersonIdent pi) {
 		refLogIdent = pi;
-	}
-
-	/**
-	 * @return the hook invoked before validation occurs.
-	 */
-	public ValidationHook getValidationHook() {
-		return validator;
-	}
-
-	/**
-	 * Set the hook which is invoked prior to commands being validated.
-	 * <p>
-	 * The hook may be called with an empty command collection.
-	 *
-	 * @param v
-	 * 			the hook instance; may be null to disable the hook.
-	 */
-	public void setValidationHook(final ValidationHook v) {
-		validator = v != null ? v : ValidationHook.NULL;
 	}
 
 	/** @return get the hook invoked before updates occur. */
@@ -713,7 +690,6 @@ public class ReceivePack {
 	}
 
 	private void validateCommands() {
-		validator.validate(this, commands);
 		for (final ReceiveCommand cmd : commands) {
 			final Ref ref = cmd.getRef();
 			if (cmd.getResult() != Result.NOT_ATTEMPTED)
