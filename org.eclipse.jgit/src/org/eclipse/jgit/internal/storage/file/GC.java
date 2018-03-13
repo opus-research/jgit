@@ -53,7 +53,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
-import java.nio.file.StandardCopyOption;
 import java.text.MessageFormat;
 import java.text.ParseException;
 import java.util.ArrayList;
@@ -787,32 +786,39 @@ public class GC {
 						break;
 					}
 			tmpPack.setReadOnly();
+			boolean delete = true;
+			try {
+				FileUtils.rename(tmpPack, realPack);
+				delete = false;
+				for (Map.Entry<PackExt, File> tmpEntry : tmpExts.entrySet()) {
+					File tmpExt = tmpEntry.getValue();
+					tmpExt.setReadOnly();
 
-			FileUtils.rename(tmpPack, realPack, StandardCopyOption.ATOMIC_MOVE);
-			for (Map.Entry<PackExt, File> tmpEntry : tmpExts.entrySet()) {
-				File tmpExt = tmpEntry.getValue();
-				tmpExt.setReadOnly();
-
-				File realExt = nameFor(id,
-						"." + tmpEntry.getKey().getExtension()); //$NON-NLS-1$
-				try {
-					FileUtils.rename(tmpExt, realExt,
-							StandardCopyOption.ATOMIC_MOVE);
-				} catch (IOException e) {
-					File newExt = new File(realExt.getParentFile(),
-							realExt.getName() + ".new"); //$NON-NLS-1$
+					File realExt = nameFor(
+							id, "." + tmpEntry.getKey().getExtension()); //$NON-NLS-1$
 					try {
-						FileUtils.rename(tmpExt, newExt,
-								StandardCopyOption.ATOMIC_MOVE);
-					} catch (IOException e2) {
-						newExt = tmpExt;
+						FileUtils.rename(tmpExt, realExt);
+					} catch (IOException e) {
+						File newExt = new File(realExt.getParentFile(),
+								realExt.getName() + ".new"); //$NON-NLS-1$
+						if (!tmpExt.renameTo(newExt))
+							newExt = tmpExt;
 						throw new IOException(MessageFormat.format(
 								JGitText.get().panicCantRenameIndexFile, newExt,
-								realExt), e2);
+								realExt));
+					}
+				}
+
+			} finally {
+				if (delete) {
+					if (tmpPack.exists())
+						tmpPack.delete();
+					for (File tmpExt : tmpExts.values()) {
+						if (tmpExt.exists())
+							tmpExt.delete();
 					}
 				}
 			}
-
 			return repo.getObjectDatabase().openPack(realPack);
 		} finally {
 			if (tmpPack != null && tmpPack.exists())
@@ -871,6 +877,11 @@ public class GC {
 		 */
 		public long numberOfPackedRefs;
 
+		/**
+		 * The number of bitmaps in the bitmap indices.
+		 */
+		public long numberOfBitmaps;
+
 		public String toString() {
 			final StringBuilder b = new StringBuilder();
 			b.append("numberOfPackedObjects=").append(numberOfPackedObjects); //$NON-NLS-1$
@@ -880,15 +891,15 @@ public class GC {
 			b.append(", numberOfPackedRefs=").append(numberOfPackedRefs); //$NON-NLS-1$
 			b.append(", sizeOfLooseObjects=").append(sizeOfLooseObjects); //$NON-NLS-1$
 			b.append(", sizeOfPackedObjects=").append(sizeOfPackedObjects); //$NON-NLS-1$
+			b.append(", numberOfBitmaps=").append(numberOfBitmaps); //$NON-NLS-1$
 			return b.toString();
 		}
 	}
 
 	/**
-	 * Returns the number of objects stored in pack files. If an object is
-	 * contained in multiple pack files it is counted as often as it occurs.
+	 * Returns information about objects and pack files for a FileRepository.
 	 *
-	 * @return the number of objects stored in pack files
+	 * @return information about objects and pack files for a FileRepository
 	 * @throws IOException
 	 */
 	public RepoStatistics getStatistics() throws IOException {
@@ -898,6 +909,8 @@ public class GC {
 			ret.numberOfPackedObjects += f.getIndex().getObjectCount();
 			ret.numberOfPackFiles++;
 			ret.sizeOfPackedObjects += f.getPackFile().length();
+			if (f.getBitmapIndex() != null)
+				ret.numberOfBitmaps += f.getBitmapIndex().getBitmapCount();
 		}
 		File objDir = repo.getObjectsDirectory();
 		String[] fanout = objDir.list();
