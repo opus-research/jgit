@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Robin Rosenberg
+ * Copyright (C) 2011, Robin Stocker <robin@nibor.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,23 +41,63 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.dircache;
+package org.eclipse.jgit.revwalk;
 
-import java.text.MessageFormat;
+import static org.junit.Assert.assertEquals;
 
-import org.eclipse.jgit.JGitText;
+import org.junit.Test;
 
-/**
- * Thrown when JGit detects and refuses to use an invalid path
- */
-public class InvalidPathException extends IllegalArgumentException {
+public class RevWalkUtilsCountTest extends RevWalkTestCase {
 
-	private static final long serialVersionUID = 1L;
+	@Test
+	public void shouldWorkForNormalCase() throws Exception {
+		final RevCommit a = commit();
+		final RevCommit b = commit(a);
 
-	/**
-	 * @param path
-	 */
-	public InvalidPathException(String path) {
-		super(MessageFormat.format(JGitText.get().invalidPath, path));
+		assertEquals(1, count(b, a));
+	}
+
+	@Test
+	public void shouldReturnZeroOnSameCommit() throws Exception {
+		final RevCommit c1 = commit(commit(commit()));
+		assertEquals(0, count(c1, c1));
+	}
+
+	@Test
+	public void shouldReturnZeroWhenMergedInto() throws Exception {
+		final RevCommit a = commit();
+		final RevCommit b = commit(a);
+
+		assertEquals(0, count(a, b));
+	}
+
+	@Test
+	public void shouldWorkWithMerges() throws Exception {
+		final RevCommit a = commit();
+		final RevCommit b1 = commit(a);
+		final RevCommit b2 = commit(a);
+		final RevCommit c = commit(b1, b2);
+
+		assertEquals(3, count(c, a));
+	}
+
+	@Test
+	public void shouldWorkWithoutCommonAncestor() throws Exception {
+		final RevCommit a1 = commit();
+		final RevCommit a2 = commit();
+		final RevCommit b = commit(a1);
+
+		assertEquals(2, count(b, a2));
+	}
+
+	@Test
+	public void shouldWorkWithZeroAsEnd() throws Exception {
+		final RevCommit c = commit(commit());
+
+		assertEquals(2, count(c, null));
+	}
+
+	private int count(RevCommit start, RevCommit end) throws Exception {
+		return RevWalkUtils.count(rw, start, end);
 	}
 }

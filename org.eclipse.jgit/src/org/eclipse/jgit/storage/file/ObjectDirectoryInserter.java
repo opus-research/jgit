@@ -95,10 +95,10 @@ class ObjectDirectoryInserter extends ObjectInserter {
 	@Override
 	public ObjectId insert(final int type, long len, final InputStream is)
 			throws IOException {
-		if (len <= buffer().length) {
-			byte[] buf = buffer();
-			IO.readFully(is, buf, 0, (int) len);
-			return insert(type, buf, 0, (int) len);
+		byte[] buf = buffer(len);
+		if (len <= buf.length) {
+			int actLen = IO.readFully(is, buf, 0);
+			return insert(type, buf, 0, actLen);
 
 		} else {
 			MessageDigest md = digest();
