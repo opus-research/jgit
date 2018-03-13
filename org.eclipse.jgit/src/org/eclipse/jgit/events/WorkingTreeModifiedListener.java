@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, Google Inc.
+ * Copyright (C) 2017, Thomas Wolf <thomas.wolf@paranor.ch>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,22 +41,21 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.reftable;
+package org.eclipse.jgit.events;
 
-import java.io.IOException;
+/**
+ * Receives {@link WorkingTreeModifiedEvent}s, which are fired whenever a
+ * {@link org.eclipse.jgit.dircache.DirCacheCheckout} modifies
+ * (adds/deletes/updates) files in the working tree.
+ *
+ * @since 4.9
+ */
+public interface WorkingTreeModifiedListener extends RepositoryListener {
 
-/** Thrown if {@link ReftableWriter} cannot fit a reference. */
-public class BlockSizeTooSmallException extends IOException {
-	private static final long serialVersionUID = 1L;
-
-	private final int minBlockSize;
-
-	BlockSizeTooSmallException(int b) {
-		minBlockSize = b;
-	}
-
-	/** @return minimum block size in bytes reftable requires to write a ref. */
-	public int getMinimumBlockSize() {
-		return minBlockSize;
-	}
+	/**
+	 * Respond to working tree modifications.
+	 *
+	 * @param event
+	 */
+	void onWorkingTreeModified(WorkingTreeModifiedEvent event);
 }

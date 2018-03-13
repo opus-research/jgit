@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, Google Inc.
+ * Copyright (C) 2016, 2017 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,46 +40,46 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.http.test;
 
-package org.eclipse.jgit.internal.storage.reftable;
+import javax.servlet.http.HttpServletRequest;
 
-class ReftableConstants {
-	static final byte[] FILE_HEADER_MAGIC = { 'R', 'E', 'F', 'T' };
-	static final byte VERSION_1 = (byte) 1;
+import org.eclipse.jgit.errors.RepositoryNotFoundException;
+import org.eclipse.jgit.junit.TestRepository;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.resolver.RepositoryResolver;
+import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
-	static final int FILE_HEADER_LEN = 24;
-	static final int FILE_FOOTER_LEN = 68;
+/** A simple repository resolver for tests. */
+public final class TestRepositoryResolver
+		implements RepositoryResolver<HttpServletRequest> {
 
-	static final byte FILE_BLOCK_TYPE = 'R';
-	static final byte REF_BLOCK_TYPE = 'r';
-	static final byte OBJ_BLOCK_TYPE = 'o';
-	static final byte LOG_BLOCK_TYPE = 'g';
-	static final byte INDEX_BLOCK_TYPE = 'i';
+	private final TestRepository<Repository> repo;
 
-	static final int VALUE_NONE = 0x0;
-	static final int VALUE_1ID = 0x1;
-	static final int VALUE_2ID = 0x2;
-	static final int VALUE_SYMREF = 0x3;
-	static final int VALUE_TYPE_MASK = 0x7;
+	private final String repoName;
 
-	static final int LOG_NONE = 0x0;
-	static final int LOG_DATA = 0x1;
-
-	static final int MAX_BLOCK_SIZE = (1 << 24) - 1;
-	static final int MAX_RESTARTS = 65535;
-
-	static boolean isFileHeaderMagic(byte[] buf, int o, int n) {
-		return (n - o) >= FILE_HEADER_MAGIC.length
-				&& buf[o + 0] == FILE_HEADER_MAGIC[0]
-				&& buf[o + 1] == FILE_HEADER_MAGIC[1]
-				&& buf[o + 2] == FILE_HEADER_MAGIC[2]
-				&& buf[o + 3] == FILE_HEADER_MAGIC[3];
+	/**
+	 * Creates a new {@link TestRepositoryResolver} that resolves the given name to
+	 * the given repository.
+	 *
+	 * @param repo
+	 *            to resolve to
+	 * @param repoName
+	 *            to match
+	 */
+	public TestRepositoryResolver(TestRepository<Repository> repo, String repoName) {
+		this.repo = repo;
+		this.repoName = repoName;
 	}
 
-	static long reverseUpdateIndex(long time) {
-		return 0xffffffffffffffffL - time;
-	}
-
-	private ReftableConstants() {
+	@Override
+	public Repository open(HttpServletRequest req, String name)
+			throws RepositoryNotFoundException, ServiceNotEnabledException {
+		if (!name.equals(repoName)) {
+			throw new RepositoryNotFoundException(name);
+		}
+		Repository db = repo.getRepository();
+		db.incrementOpen();
+		return db;
 	}
 }
