@@ -624,15 +624,15 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 	}
 
 	class HttpObjectDB extends WalkRemoteObjectDatabase {
-		private final URL httpObjectsUrl;
+		private final URL objectsUrl;
 
 		HttpObjectDB(final URL b) {
-			httpObjectsUrl = b;
+			objectsUrl = b;
 		}
 
 		@Override
 		URIish getURI() {
-			return new URIish(httpObjectsUrl);
+			return new URIish(objectsUrl);
 		}
 
 		@Override
@@ -655,7 +655,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		@Override
 		WalkRemoteObjectDatabase openAlternate(final String location)
 				throws IOException {
-			return new HttpObjectDB(new URL(httpObjectsUrl, location));
+			return new HttpObjectDB(new URL(objectsUrl, location));
 		}
 
 		@Override
@@ -683,7 +683,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		@Override
 		FileStream open(final String path) throws IOException {
-			final URL base = httpObjectsUrl;
+			final URL base = objectsUrl;
 			final URL u = new URL(base, path);
 			final HttpConnection c = httpOpen(u);
 			switch (HttpSupport.response(c)) {

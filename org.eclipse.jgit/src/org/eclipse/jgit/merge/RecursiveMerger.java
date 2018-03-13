@@ -196,22 +196,25 @@ public class RecursiveMerger extends ResolveMerger {
 				if (mergeTrees(
 						openTree(getBaseCommit(currentBase, nextBase,
 								callDepth + 1).getTree()),
-						currentBase.getTree(),
-						nextBase.getTree()))
+						currentBase.getTree(), nextBase.getTree(), true))
 					currentBase = createCommitForTree(resultTree, parents);
 				else
 					throw new NoMergeBaseException(
 							NoMergeBaseException.MergeBaseFailureReason.CONFLICTS_DURING_MERGE_BASE_CALCULATION,
 							MessageFormat.format(
-									JGitText.get().mergeRecursiveTooManyMergeBasesFor,
-									Integer.valueOf(MAX_BASES), a.name(),
-									b.name(),
-									Integer.valueOf(baseCommits.size())));
+									JGitText.get().mergeRecursiveConflictsWhenMergingCommonAncestors,
+									currentBase.getName(), nextBase.getName()));
 			}
 		} finally {
 			inCore = oldIncore;
 			dircache = oldDircache;
 			workingTreeIterator = oldWTreeIt;
+			toBeCheckedOut.clear();
+			toBeDeleted.clear();
+			modifiedFiles.clear();
+			unmergedPaths.clear();
+			mergeResults.clear();
+			failingPaths.clear();
 		}
 		return currentBase;
 	}
@@ -254,17 +257,17 @@ public class RecursiveMerger extends ResolveMerger {
 	 */
 	private DirCache dircacheFromTree(ObjectId treeId) throws IOException {
 		DirCache ret = DirCache.newInCore();
-		DirCacheBuilder aBuilder = ret.builder();
-		TreeWalk atw = new TreeWalk(db);
-		atw.addTree(treeId);
-		atw.setRecursive(true);
-		while (atw.next()) {
-			DirCacheEntry e = new DirCacheEntry(atw.getRawPath());
-			e.setFileMode(atw.getFileMode(0));
-			e.setObjectId(atw.getObjectId(0));
-			aBuilder.add(e);
+		DirCacheBuilder builder = ret.builder();
+		TreeWalk tw = new TreeWalk(db);
+		tw.addTree(treeId);
+		tw.setRecursive(true);
+		while (tw.next()) {
+			DirCacheEntry e = new DirCacheEntry(tw.getRawPath());
+			e.setFileMode(tw.getFileMode(0));
+			e.setObjectId(tw.getObjectId(0));
+			builder.add(e);
 		}
-		aBuilder.finish();
+		builder.finish();
 		return ret;
 	}
 }

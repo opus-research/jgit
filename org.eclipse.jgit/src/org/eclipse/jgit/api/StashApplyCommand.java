@@ -122,12 +122,12 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 	}
 
 	/**
-	 * @param willIgnoreRepositoryState
+	 * @param ignoreRepositoryState
 	 * @return {@code this}
 	 * @since 3.2
 	 */
-	public StashApplyCommand ignoreRepositoryState(boolean willIgnoreRepositoryState) {
-		this.ignoreRepositoryState = willIgnoreRepositoryState;
+	public StashApplyCommand ignoreRepositoryState(boolean ignoreRepositoryState) {
+		this.ignoreRepositoryState = ignoreRepositoryState;
 		return this;
 	}
 
