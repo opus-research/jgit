@@ -58,7 +58,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.TextProgressMonitor;
-import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteRefUpdate;
@@ -195,7 +194,7 @@ class Push extends TextBuiltin {
 					final char flag = fastForward ? ' ' : '+';
 					final String summary = safeAbbreviate(reader, oldRef
 							.getObjectId())
-							+ (fastForward ? ".." : "...") //$NON-NLS-1$ //$NON-NLS-2$
+							+ (fastForward ? ".." : "...")
 							+ safeAbbreviate(reader, rru.getNewObjectId());
 					final String message = fastForward ? null : CLIText.get().forcedUpdate;
 					printUpdateLine(flag, summary, srcRef, remoteName, message);
@@ -242,7 +241,7 @@ class Push extends TextBuiltin {
 		}
 	}
 
-	private static String safeAbbreviate(ObjectReader reader, ObjectId id) {
+	private String safeAbbreviate(ObjectReader reader, ObjectId id) {
 		try {
 			return reader.abbreviate(id).name();
 		} catch (IOException cannotAbbreviate) {
@@ -253,14 +252,14 @@ class Push extends TextBuiltin {
 	private void printUpdateLine(final char flag, final String summary,
 			final String srcRef, final String destRef, final String message)
 			throws IOException {
-		outw.format(" %c %-17s", valueOf(flag), summary); //$NON-NLS-1$
+		outw.format(" %c %-17s", valueOf(flag), summary);
 
 		if (srcRef != null)
-			outw.format(" %s ->", abbreviateRef(srcRef, true)); //$NON-NLS-1$
-		outw.format(" %s", abbreviateRef(destRef, true)); //$NON-NLS-1$
+			outw.format(" %s ->", abbreviateRef(srcRef, true));
+		outw.format(" %s", abbreviateRef(destRef, true));
 
 		if (message != null)
-			outw.format(" (%s)", message); //$NON-NLS-1$
+			outw.format(" (%s)", message);
 
 		outw.println();
 	}

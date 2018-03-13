@@ -97,7 +97,7 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 	public void setUp() throws Exception {
 		super.setUp();
 
-		final TestRepository<Repository> src = createTestRepository();
+		final TestRepository src = createTestRepository();
 		final String srcName = src.getRepository().getDirectory().getName();
 
 		ServletContextHandler app = server.addContext("/git");
@@ -217,7 +217,7 @@ public class DumbClientSmartServerTest extends HttpTestCase {
 
 	@Test
 	public void testInitialClone_Packed() throws Exception {
-		new TestRepository<Repository>(remoteRepository).packAndPrune();
+		new TestRepository(remoteRepository).packAndPrune();
 
 		Repository dst = createBareRepository();
 		assertFalse(dst.hasObject(A_txt));

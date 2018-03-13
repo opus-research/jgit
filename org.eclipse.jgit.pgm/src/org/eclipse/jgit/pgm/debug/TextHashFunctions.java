@@ -64,9 +64,8 @@ import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryBuilder;
 import org.eclipse.jgit.lib.RepositoryCache;
-import org.eclipse.jgit.pgm.Command;
+import org.eclipse.jgit.pgm.CLIText;
 import org.eclipse.jgit.pgm.TextBuiltin;
-import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.util.FS;
@@ -91,7 +90,6 @@ import org.kohsuke.args4j.Option;
  * type {@link Fold} and implement the logic. The test suite will automatically
  * pick up the new function through reflection.
  */
-@Command(usage = "usage_TextHashFunctions")
 class TextHashFunctions extends TextBuiltin {
 
 	/** Standard SHA-1 on the line, using the first 4 bytes as the hash code. */
@@ -349,19 +347,19 @@ class TextHashFunctions extends TextBuiltin {
 			File parent = db.getDirectory().getParentFile();
 			if (name.equals(Constants.DOT_GIT) && parent != null)
 				name = parent.getName();
-			outw.println(name + ":"); //$NON-NLS-1$
+			outw.println(name + ":");
 		}
 		outw.format("  %6d files; %5d avg. unique lines/file\n", //
 				valueOf(fileCnt), //
 				valueOf(lineCnt / fileCnt));
 		outw.format("%-20s %-15s %9s\n", "Hash", "Fold", "Max Len");
-		outw.println("-----------------------------------------------"); //$NON-NLS-1$
+		outw.println("-----------------------------------------------");
 		String lastHashName = null;
 		for (Function fun : all) {
 			String hashName = fun.hash.name;
 			if (hashName.equals(lastHashName))
-				hashName = ""; //$NON-NLS-1$
-			outw.format("%-20s %-15s %9d\n", // //$NON-NLS-1$
+				hashName = "";
+			outw.format("%-20s %-15s %9d\n", //
 					hashName, //
 					fun.fold.name, //
 					valueOf(fun.maxChainLength));
@@ -371,8 +369,7 @@ class TextHashFunctions extends TextBuiltin {
 		outw.flush();
 	}
 
-	private static void testOne(Function fun, RawText txt, int[] elements,
-			int cnt) {
+	private void testOne(Function fun, RawText txt, int[] elements, int cnt) {
 		final Hash cmp = fun.hash;
 		final Fold fold = fun.fold;
 

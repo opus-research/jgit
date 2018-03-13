@@ -59,7 +59,6 @@ import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.util.RawParseUtils;
-import org.eclipse.jgit.util.StringUtils;
 
 /** A commit reference to a commit in the DAG. */
 public class RevCommit extends RevObject {
@@ -392,7 +391,7 @@ public class RevCommit extends RevObject {
 		final byte[] raw = buffer;
 		final int msgB = RawParseUtils.commitMessage(raw, 0);
 		if (msgB < 0)
-			return ""; //$NON-NLS-1$
+			return "";
 		final Charset enc = RawParseUtils.parseEncoding(raw);
 		return RawParseUtils.decode(enc, raw, msgB, raw.length);
 	}
@@ -416,13 +415,13 @@ public class RevCommit extends RevObject {
 		final byte[] raw = buffer;
 		final int msgB = RawParseUtils.commitMessage(raw, 0);
 		if (msgB < 0)
-			return ""; //$NON-NLS-1$
+			return "";
 
 		final Charset enc = RawParseUtils.parseEncoding(raw);
 		final int msgE = RawParseUtils.endOfParagraph(raw, msgB);
 		String str = RawParseUtils.decode(enc, raw, msgB, msgE);
 		if (hasLF(raw, msgB, msgE))
-			str = StringUtils.replaceLineBreaksWithSpace(str);
+			str = str.replace('\n', ' ');
 		return str;
 	}
 

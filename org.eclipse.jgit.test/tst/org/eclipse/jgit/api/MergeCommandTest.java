@@ -52,16 +52,12 @@ import static org.junit.Assert.fail;
 import java.io.File;
 import java.util.Iterator;
 
-import org.eclipse.jgit.api.MergeCommand.FastForwardMode;
 import org.eclipse.jgit.api.MergeResult.MergeStatus;
 import org.eclipse.jgit.api.errors.InvalidMergeHeadsException;
-import org.eclipse.jgit.junit.RepositoryTestCase;
-import org.eclipse.jgit.junit.TestRepository;
-import org.eclipse.jgit.junit.TestRepository.BranchBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryState;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
 import org.eclipse.jgit.revwalk.RevCommit;
@@ -99,10 +95,10 @@ public class MergeCommandTest extends RepositoryTestCase {
 		MergeResult result = git.merge().include(db.getRef(Constants.HEAD)).call();
 		assertEquals(MergeResult.MergeStatus.ALREADY_UP_TO_DATE, result.getMergeStatus());
 		// no reflog entry written by merge
-		assertEquals("commit (initial): initial commit",
+		assertEquals("commit: initial commit",
 				db
 				.getReflogReader(Constants.HEAD).getLastEntry().getComment());
-		assertEquals("commit (initial): initial commit",
+		assertEquals("commit: initial commit",
 				db
 				.getReflogReader(db.getBranch()).getLastEntry().getComment());
 	}
@@ -142,28 +138,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 				db.getReflogReader(Constants.HEAD).getLastEntry().getComment());
 		assertEquals("merge refs/heads/master: Fast-forward",
 				db.getReflogReader(db.getBranch()).getLastEntry().getComment());
-	}
-
-	@Test
-	public void testFastForwardNoCommit() throws Exception {
-		Git git = new Git(db);
-		RevCommit first = git.commit().setMessage("initial commit").call();
-		createBranch(first, "refs/heads/branch1");
-
-		RevCommit second = git.commit().setMessage("second commit").call();
-
-		checkoutBranch("refs/heads/branch1");
-
-		MergeResult result = git.merge().include(db.getRef(Constants.MASTER))
-				.setCommit(false).call();
-
-		assertEquals(MergeResult.MergeStatus.FAST_FORWARD,
-				result.getMergeStatus());
-		assertEquals(second, result.getNewHead());
-		assertEquals("merge refs/heads/master: Fast-forward", db
-				.getReflogReader(Constants.HEAD).getLastEntry().getComment());
-		assertEquals("merge refs/heads/master: Fast-forward", db
-				.getReflogReader(db.getBranch()).getLastEntry().getComment());
 	}
 
 	@Test
@@ -259,31 +233,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 				db.getReflogReader(db.getBranch()).getLastEntry().getComment());
 	}
 
-	@Theory
-	public void testMergeSuccessAllStrategiesNoCommit(
-			MergeStrategy mergeStrategy) throws Exception {
-		Git git = new Git(db);
-
-		RevCommit first = git.commit().setMessage("first").call();
-		createBranch(first, "refs/heads/side");
-
-		writeTrashFile("a", "a");
-		git.add().addFilepattern("a").call();
-		git.commit().setMessage("second").call();
-
-		checkoutBranch("refs/heads/side");
-		writeTrashFile("b", "b");
-		git.add().addFilepattern("b").call();
-		RevCommit thirdCommit = git.commit().setMessage("third").call();
-
-		MergeResult result = git.merge().setStrategy(mergeStrategy)
-				.setCommit(false)
-				.include(db.getRef(Constants.MASTER)).call();
-		assertEquals(MergeStatus.MERGED_NOT_COMMITTED, result.getMergeStatus());
-		assertEquals(db.getRef(Constants.HEAD).getTarget().getObjectId(),
-				thirdCommit.getId());
-	}
-
 	@Test
 	public void testContentMerge() throws Exception {
 		Git git = new Git(db);
@@ -327,33 +276,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertEquals(3, result.getConflicts().get("a")[0].length);
 
 		assertEquals(RepositoryState.MERGING, db.getRepositoryState());
-	}
-
-	@Test
-	public void testMergeTag() throws Exception {
-		Git git = new Git(db);
-
-		writeTrashFile("a", "a");
-		git.add().addFilepattern("a").call();
-		RevCommit initialCommit = git.commit().setMessage("initial").call();
-
-		createBranch(initialCommit, "refs/heads/side");
-		checkoutBranch("refs/heads/side");
-
-		writeTrashFile("b", "b");
-		git.add().addFilepattern("b").call();
-		RevCommit secondCommit = git.commit().setMessage("side").call();
-		Ref tag = git.tag().setAnnotated(true).setMessage("my tag 01")
-				.setName("tag01").setObjectId(secondCommit).call();
-
-		checkoutBranch("refs/heads/master");
-
-		writeTrashFile("a", "a2");
-		git.add().addFilepattern("a").call();
-		git.commit().setMessage("main").call();
-
-		MergeResult result = git.merge().include(tag).setStrategy(MergeStrategy.RESOLVE).call();
-		assertEquals(MergeStatus.MERGED, result.getMergeStatus());
 	}
 
 	@Test
@@ -555,56 +477,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 		// @TODO fix me
 		assertEquals(RepositoryState.SAFE, db.getRepositoryState());
 		// test index state
-	}
-
-	@Test
-	public void testSuccessfulContentMergeNoCommit() throws Exception {
-		Git git = new Git(db);
-
-		writeTrashFile("a", "1\na\n3\n");
-		writeTrashFile("b", "1\nb\n3\n");
-		writeTrashFile("c/c/c", "1\nc\n3\n");
-		git.add().addFilepattern("a").addFilepattern("b")
-				.addFilepattern("c/c/c").call();
-		RevCommit initialCommit = git.commit().setMessage("initial").call();
-
-		createBranch(initialCommit, "refs/heads/side");
-		checkoutBranch("refs/heads/side");
-
-		writeTrashFile("a", "1(side)\na\n3\n");
-		writeTrashFile("b", "1\nb(side)\n3\n");
-		git.add().addFilepattern("a").addFilepattern("b").call();
-		RevCommit secondCommit = git.commit().setMessage("side").call();
-
-		assertEquals("1\nb(side)\n3\n", read(new File(db.getWorkTree(), "b")));
-		checkoutBranch("refs/heads/master");
-		assertEquals("1\nb\n3\n", read(new File(db.getWorkTree(), "b")));
-
-		writeTrashFile("a", "1\na\n3(main)\n");
-		writeTrashFile("c/c/c", "1\nc(main)\n3\n");
-		git.add().addFilepattern("a").addFilepattern("c/c/c").call();
-		RevCommit thirdCommit = git.commit().setMessage("main").call();
-
-		MergeResult result = git.merge().include(secondCommit.getId())
-				.setCommit(false)
-				.setStrategy(MergeStrategy.RESOLVE).call();
-		assertEquals(MergeStatus.MERGED_NOT_COMMITTED, result.getMergeStatus());
-		assertEquals(db.getRef(Constants.HEAD).getTarget().getObjectId(),
-				thirdCommit.getId());
-
-		assertEquals("1(side)\na\n3(main)\n", read(new File(db.getWorkTree(),
-				"a")));
-		assertEquals("1\nb(side)\n3\n", read(new File(db.getWorkTree(), "b")));
-		assertEquals("1\nc(main)\n3\n",
-				read(new File(db.getWorkTree(), "c/c/c")));
-
-		assertEquals(null, result.getConflicts());
-
-		assertEquals(2, result.getMergedCommits().length);
-		assertEquals(thirdCommit, result.getMergedCommits()[0]);
-		assertEquals(secondCommit, result.getMergedCommits()[1]);
-		assertNull(result.getNewHead());
-		assertEquals(RepositoryState.MERGING_RESOLVED, db.getRepositoryState());
 	}
 
 	@Test
@@ -1343,7 +1215,7 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertNull(db.readMergeCommitMsg());
 
 		Status stat = git.status().call();
-		assertEquals(Sets.of("file2", "file3"), stat.getAdded());
+		assertEquals(StatusCommandTest.set("file2", "file3"), stat.getAdded());
 	}
 
 	@Test
@@ -1399,7 +1271,7 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertNull(db.readMergeCommitMsg());
 
 		Status stat = git.status().call();
-		assertEquals(Sets.of("file3"), stat.getAdded());
+		assertEquals(StatusCommandTest.set("file3"), stat.getAdded());
 	}
 
 	@Test
@@ -1453,130 +1325,20 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertEquals("\nConflicts:\n\tfile2\n", db.readMergeCommitMsg());
 
 		Status stat = git.status().call();
-		assertEquals(Sets.of("file2"), stat.getConflicting());
+		assertEquals(StatusCommandTest.set("file2"), stat.getConflicting());
 	}
 
-	@Test
-	public void testFastForwardOnly() throws Exception {
-		Git git = new Git(db);
-		RevCommit initialCommit = git.commit().setMessage("initial commit")
-				.call();
-		createBranch(initialCommit, "refs/heads/branch1");
-		git.commit().setMessage("second commit").call();
-		checkoutBranch("refs/heads/branch1");
-
-		MergeCommand merge = git.merge();
-		merge.setFastForward(FastForwardMode.FF_ONLY);
-		merge.include(db.getRef(Constants.MASTER));
-		MergeResult result = merge.call();
-
-		assertEquals(MergeStatus.FAST_FORWARD, result.getMergeStatus());
-	}
-
-	@Test
-	public void testNoFastForward() throws Exception {
-		Git git = new Git(db);
-		RevCommit initialCommit = git.commit().setMessage("initial commit")
-				.call();
-		createBranch(initialCommit, "refs/heads/branch1");
-		git.commit().setMessage("second commit").call();
-		checkoutBranch("refs/heads/branch1");
-
-		MergeCommand merge = git.merge();
-		merge.setFastForward(FastForwardMode.NO_FF);
-		merge.include(db.getRef(Constants.MASTER));
-		MergeResult result = merge.call();
-
-		assertEquals(MergeStatus.MERGED, result.getMergeStatus());
-	}
-
-	@Test
-	public void testNoFastForwardNoCommit() throws Exception {
-		// given
-		Git git = new Git(db);
-		RevCommit initialCommit = git.commit().setMessage("initial commit")
-				.call();
-		createBranch(initialCommit, "refs/heads/branch1");
-		RevCommit secondCommit = git.commit().setMessage("second commit")
-				.call();
-		checkoutBranch("refs/heads/branch1");
-
-		// when
-		MergeCommand merge = git.merge();
-		merge.setFastForward(FastForwardMode.NO_FF);
-		merge.include(db.getRef(Constants.MASTER));
-		merge.setCommit(false);
-		MergeResult result = merge.call();
-
-		// then
-		assertEquals(MergeStatus.MERGED_NOT_COMMITTED, result.getMergeStatus());
-		assertEquals(2, result.getMergedCommits().length);
-		assertEquals(initialCommit, result.getMergedCommits()[0]);
-		assertEquals(secondCommit, result.getMergedCommits()[1]);
-		assertNull(result.getNewHead());
-		assertEquals(RepositoryState.MERGING_RESOLVED, db.getRepositoryState());
-	}
-
-	@Test
-	public void testFastForwardOnlyNotPossible() throws Exception {
-		Git git = new Git(db);
-		RevCommit initialCommit = git.commit().setMessage("initial commit")
-				.call();
-		createBranch(initialCommit, "refs/heads/branch1");
-		git.commit().setMessage("second commit").call();
-		checkoutBranch("refs/heads/branch1");
-		writeTrashFile("file1", "branch1");
-		git.add().addFilepattern("file").call();
-		git.commit().setMessage("second commit on branch1").call();
-		MergeCommand merge = git.merge();
-		merge.setFastForward(FastForwardMode.FF_ONLY);
-		merge.include(db.getRef(Constants.MASTER));
-		MergeResult result = merge.call();
-
-		assertEquals(MergeStatus.ABORTED, result.getMergeStatus());
-	}
-
-	@Test
-	public void testRecursiveMergeWithConflict() throws Exception {
-		TestRepository<Repository> db_t = new TestRepository<Repository>(db);
-		BranchBuilder master = db_t.branch("master");
-		RevCommit m0 = master.commit().add("f", "1\n2\n3\n4\n5\n6\n7\n8\n9\n")
-				.message("m0").create();
-		RevCommit m1 = master.commit()
-				.add("f", "1-master\n2\n3\n4\n5\n6\n7\n8\n9\n").message("m1")
-				.create();
-		db_t.getRevWalk().parseCommit(m1);
-
-		BranchBuilder side = db_t.branch("side");
-		RevCommit s1 = side.commit().parent(m0)
-				.add("f", "1\n2\n3\n4\n5\n6\n7\n8\n9-side\n").message("s1")
-				.create();
-		RevCommit s2 = side.commit().parent(m1)
-				.add("f", "1-master\n2\n3\n4\n5\n6\n7-res(side)\n8\n9-side\n")
-				.message("s2(merge)").create();
-		master.commit().parent(s1)
-				.add("f", "1-master\n2\n3\n4\n5\n6\n7-conflict\n8\n9-side\n")
-				.message("m2(merge)").create();
-
-		Git git = Git.wrap(db);
-		git.checkout().setName("master").call();
-
-		MergeResult result = git.merge().setStrategy(MergeStrategy.RECURSIVE)
-				.include("side", s2).call();
-		assertEquals(MergeStatus.CONFLICTING, result.getMergeStatus());
-	}
-
-	private static void setExecutable(Git git, String path, boolean executable) {
+	private void setExecutable(Git git, String path, boolean executable) {
 		FS.DETECTED.setExecute(
 				new File(git.getRepository().getWorkTree(), path), executable);
 	}
 
-	private static boolean canExecute(Git git, String path) {
+	private boolean canExecute(Git git, String path) {
 		return FS.DETECTED.canExecute(new File(git.getRepository()
 				.getWorkTree(), path));
 	}
 
-	private static RevCommit addAllAndCommit(final Git git) throws Exception {
+	private RevCommit addAllAndCommit(final Git git) throws Exception {
 		git.add().addFilepattern(".").call();
 		return git.commit().setMessage("message").call();
 	}

@@ -46,11 +46,11 @@ package org.eclipse.jgit.pgm.debug;
 import java.net.URL;
 
 import org.kohsuke.args4j.Option;
+import org.eclipse.jgit.pgm.CLIText;
 import org.eclipse.jgit.pgm.Command;
 import org.eclipse.jgit.pgm.CommandCatalog;
 import org.eclipse.jgit.pgm.CommandRef;
 import org.eclipse.jgit.pgm.TextBuiltin;
-import org.eclipse.jgit.pgm.internal.CLIText;
 
 @Command(usage = "usage_displayAListOfAllRegisteredJgitCommands")
 class ShowCommands extends TextBuiltin {
@@ -103,7 +103,7 @@ class ShowCommands extends TextBuiltin {
 				final ClassLoader ldr = c.getImplementationClassLoader();
 
 				String cn = c.getImplementationClassName();
-				cn = cn.replace('.', '/') + ".class"; //$NON-NLS-1$
+				cn = cn.replace('.', '/') + ".class";
 
 				final URL url = ldr.getResource(cn);
 				if (url == null) {

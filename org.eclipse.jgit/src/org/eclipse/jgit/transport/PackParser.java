@@ -62,8 +62,6 @@ import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.TooLargeObjectInPackException;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.file.PackLock;
-import org.eclipse.jgit.internal.storage.pack.BinaryDelta;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.BatchingProgressMonitor;
 import org.eclipse.jgit.lib.Constants;
@@ -80,6 +78,8 @@ import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ObjectStream;
 import org.eclipse.jgit.lib.ProgressMonitor;
+import org.eclipse.jgit.storage.file.PackLock;
+import org.eclipse.jgit.storage.pack.BinaryDelta;
 import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.NB;
@@ -428,7 +428,6 @@ public abstract class PackParser {
 	 *         {@link #setLockMessage(String)}.
 	 * @throws IOException
 	 *             the stream is malformed, or contains corrupt objects.
-	 * @since 3.0
 	 */
 	public final PackLock parse(ProgressMonitor progress) throws IOException {
 		return parse(progress, progress);
@@ -447,7 +446,6 @@ public abstract class PackParser {
 	 *         {@link #setLockMessage(String)}.
 	 * @throws IOException
 	 *             the stream is malformed, or contains corrupt objects.
-	 * @since 3.0
 	 */
 	public PackLock parse(ProgressMonitor receiving, ProgressMonitor resolving)
 			throws IOException {
@@ -848,13 +846,13 @@ public abstract class PackParser {
 		if (bAvail != 0 && !expectDataAfterPackFooter)
 			throw new CorruptObjectException(MessageFormat.format(
 					JGitText.get().expectedEOFReceived,
-					"\\x" + Integer.toHexString(buf[bOffset] & 0xff))); //$NON-NLS-1$
+					"\\x" + Integer.toHexString(buf[bOffset] & 0xff)));
 		if (isCheckEofAfterPackFooter()) {
 			int eof = in.read();
 			if (0 <= eof)
 				throw new CorruptObjectException(MessageFormat.format(
 						JGitText.get().expectedEOFReceived,
-						"\\x" + Integer.toHexString(eof))); //$NON-NLS-1$
+						"\\x" + Integer.toHexString(eof)));
 		} else if (bAvail > 0 && expectDataAfterPackFooter) {
 			in.reset();
 			IO.skipFully(in, bOffset);

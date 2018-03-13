@@ -47,25 +47,24 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.StringUtils;
 import org.eclipse.jgit.util.SystemReader;
 import org.kohsuke.args4j.Option;
 
 @Command(common = true, usage = "usage_getAndSetOptions")
 class Config extends TextBuiltin {
-	@Option(name = "--system", usage = "usage_configSystem")
+	@Option(name = "--system")
 	private boolean system;
 
-	@Option(name = "--global", usage = "usage_configGlobal")
+	@Option(name = "--global")
 	private boolean global;
 
-	@Option(name = "--local", usage = "usage_configLocal")
+	@Option(name = "--local")
 	private boolean local;
 
-	@Option(name = "--list", aliases = { "-l" }, usage = "usage_configList")
+	@Option(name = "--list", aliases = { "-l" })
 	private boolean list;
 
-	@Option(name = "--file", aliases = { "-f" }, metaVar = "metaVar_file", usage = "usage_configFile")
+	@Option(name = "--file", aliases = { "-f" })
 	private File configFile;
 
 	@Override
@@ -83,10 +82,7 @@ class Config extends TextBuiltin {
 			list(new FileBasedConfig(configFile, fs));
 			return;
 		}
-		if (system
-				|| (isListAll() && StringUtils.isEmptyOrNull(SystemReader
-						.getInstance()
-						.getenv(Constants.GIT_CONFIG_NOSYSTEM_KEY))))
+		if (system || isListAll())
 			list(SystemReader.getInstance().openSystemConfig(null, fs));
 		if (global || isListAll())
 			list(SystemReader.getInstance().openUserConfig(null, fs));
@@ -107,7 +103,7 @@ class Config extends TextBuiltin {
 			Set<String> names = config.getNames(section);
 			for (String name : names) {
 				for (String value : config.getStringList(section, null, name))
-					outw.println(section + "." + name + "=" + value); //$NON-NLS-1$ //$NON-NLS-2$
+					outw.println(section + "." + name + "=" + value);
 			}
 			if (names.isEmpty()) {
 				for (String subsection : config.getSubsections(section)) {
@@ -115,8 +111,8 @@ class Config extends TextBuiltin {
 					for (String name : names) {
 						for (String value : config.getStringList(section,
 								subsection, name))
-							outw.println(section + "." + subsection + "." //$NON-NLS-1$ //$NON-NLS-2$
-									+ name + "=" + value); //$NON-NLS-1$
+							outw.println(section + "." + subsection + "."
+									+ name + "=" + value);
 					}
 				}
 			}

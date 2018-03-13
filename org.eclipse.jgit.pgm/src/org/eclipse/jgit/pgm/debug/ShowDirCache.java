@@ -54,37 +54,26 @@ import java.util.Date;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.lib.FileMode;
-import org.eclipse.jgit.pgm.Command;
 import org.eclipse.jgit.pgm.TextBuiltin;
-import org.kohsuke.args4j.Option;
 
-@Command(usage = "usage_ShowDirCache")
 class ShowDirCache extends TextBuiltin {
-
-	@Option(name = "--millis", aliases = { "-m" }, usage = "usage_showTimeInMilliseconds")
-	private boolean millis = false;
-
 	@Override
 	protected void run() throws Exception {
 		final SimpleDateFormat fmt;
-		fmt = new SimpleDateFormat("yyyy-MM-dd,HH:mm:ss.SSS"); //$NON-NLS-1$
+		fmt = new SimpleDateFormat("yyyy-MM-dd,HH:mm:ss.SSS");
 
 		final DirCache cache = db.readDirCache();
 		for (int i = 0; i < cache.getEntryCount(); i++) {
 			final DirCacheEntry ent = cache.getEntry(i);
 			final FileMode mode = FileMode.fromBits(ent.getRawMode());
 			final int len = ent.getLength();
-			long lastModified = ent.getLastModified();
-			final Date mtime = new Date(lastModified);
+			final Date mtime = new Date(ent.getLastModified());
 			final int stage = ent.getStage();
 
 			outw.print(mode);
-			outw.format(" %6d", valueOf(len)); //$NON-NLS-1$
+			outw.format(" %6d", valueOf(len));
 			outw.print(' ');
-			if (millis)
-				outw.print(lastModified);
-			else
-				outw.print(fmt.format(mtime));
+			outw.print(fmt.format(mtime));
 			outw.print(' ');
 			outw.print(ent.getObjectId().name());
 			outw.print(' ');

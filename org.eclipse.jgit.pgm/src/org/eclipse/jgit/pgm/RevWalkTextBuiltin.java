@@ -47,17 +47,13 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
 
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
-import org.eclipse.jgit.diff.DiffConfig;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.RefDatabase;
-import org.eclipse.jgit.pgm.internal.CLIText;
 import org.eclipse.jgit.pgm.opt.PathTreeFilterHandler;
 import org.eclipse.jgit.revwalk.FollowFilter;
 import org.eclipse.jgit.revwalk.ObjectWalk;
@@ -121,7 +117,9 @@ abstract class RevWalkTextBuiltin extends TextBuiltin {
 	}
 
 	@Option(name = "--follow", metaVar = "metaVar_path")
-	private String followPath;
+	void follow(final String path) {
+		pathFilter = FollowFilter.create(path);
+	}
 
 	@Argument(index = 0, metaVar = "metaVar_commitish")
 	private final List<RevCommit> commits = new ArrayList<RevCommit>();
@@ -152,24 +150,19 @@ abstract class RevWalkTextBuiltin extends TextBuiltin {
 		for (final RevSort s : sorting)
 			walk.sort(s, true);
 
-		if (pathFilter == TreeFilter.ALL) {
-			if (followPath != null)
-				walk.setTreeFilter(FollowFilter.create(followPath,
-						db.getConfig().get(DiffConfig.KEY)));
-		} else if (pathFilter != TreeFilter.ALL) {
+		if (pathFilter instanceof FollowFilter)
+			walk.setTreeFilter(pathFilter);
+		else if (pathFilter != TreeFilter.ALL)
 			walk.setTreeFilter(AndTreeFilter.create(pathFilter,
 					TreeFilter.ANY_DIFF));
-		}
 
 		if (revLimiter.size() == 1)
 			walk.setRevFilter(revLimiter.get(0));
 		else if (revLimiter.size() > 1)
 			walk.setRevFilter(AndRevFilter.create(revLimiter));
 
-		if (all) {
-			Map<String, Ref> refs =
-				db.getRefDatabase().getRefs(RefDatabase.ALL);
-			for (Ref a : refs.values()) {
+		if (all)
+			for (Ref a : db.getAllRefs().values()) {
 				ObjectId oid = a.getPeeledObjectId();
 				if (oid == null)
 					oid = a.getObjectId();
@@ -179,7 +172,6 @@ abstract class RevWalkTextBuiltin extends TextBuiltin {
 					// Ignore all refs which are not commits
 				}
 			}
-		}
 
 		if (commits.isEmpty()) {
 			final ObjectId head = db.resolve(Constants.HEAD);
