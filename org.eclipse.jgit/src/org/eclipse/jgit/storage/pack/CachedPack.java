@@ -41,35 +41,47 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.dht;
+package org.eclipse.jgit.storage.pack;
 
-/**
- * Key for any row that the DHT will be asked to store.
- * <p>
- * Implementations of this interface know how to encode and decode themselves
- * from a byte array format, expecting the DHT to use the byte array as the row
- * key within the database.
- * <p>
- * It is strongly encouraged to use only row keys that are valid UTF-8 strings,
- * as most DHT systems have client tools that can interact with rows using the
- * UTF-8 encoding.
- */
-public interface RowKey {
-	/** @return key formatted as byte array for storage in the DHT. */
-	public byte[] toBytes();
+import java.io.IOException;
+import java.util.Set;
 
-	/** @return relatively unique hash code value for in-memory compares. */
-	public int hashCode();
+import org.eclipse.jgit.lib.ObjectId;
+
+/** Describes a pack file {@link ObjectReuseAsIs} can append onto a stream. */
+public abstract class CachedPack {
+	/**
+	 * Objects that start this pack.
+	 * <p>
+	 * All objects reachable from the tips are contained within this pack. If
+	 * {@link PackWriter} is going to include everything reachable from all of
+	 * these objects, this cached pack is eligible to be appended directly onto
+	 * the output pack stream.
+	 *
+	 * @return the tip objects that describe this pack.
+	 */
+	public abstract Set<ObjectId> getTips();
 
 	/**
-	 * Compare this key to another key for equality.
+	 * Get the number of objects in this pack.
 	 *
-	 * @param other
-	 *            the other key instance, may be null.
-	 * @return true if these keys reference the same row.
+	 * @return the total object count for the pack.
+	 * @throws IOException
+	 *             if the object count cannot be read.
 	 */
-	public boolean equals(Object other);
+	public abstract long getObjectCount() throws IOException;
 
-	/** @return pretty printable string for debugging/reporting only. */
-	public String toString();
+	/**
+	 * Determine if the pack contains the requested objects.
+	 *
+	 * @param <T>
+	 *            any type of ObjectId to search for.
+	 * @param toFind
+	 *            the objects to search for.
+	 * @return the objects contained in the pack.
+	 * @throws IOException
+	 *             the pack cannot be accessed
+	 */
+	public abstract <T extends ObjectId> Set<ObjectId> hasObject(
+			Iterable<T> toFind) throws IOException;
 }

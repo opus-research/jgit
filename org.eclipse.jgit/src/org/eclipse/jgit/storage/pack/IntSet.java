@@ -41,21 +41,47 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.dht;
+package org.eclipse.jgit.storage.pack;
 
-import java.io.IOException;
+class IntSet {
+	private int[] set;
 
-import org.eclipse.jgit.errors.ConfigInvalidException;
-import org.eclipse.jgit.lib.StoredConfig;
+	private int cnt;
 
-final class DhtConfig extends StoredConfig {
-	@Override
-	public void load() throws IOException, ConfigInvalidException {
-		clear();
+	IntSet() {
+		set = new int[64];
 	}
 
-	@Override
-	public void save() throws IOException {
-		// TODO actually store this configuration.
+	boolean add(int key) {
+		int high = cnt;
+		int low = 0;
+
+		if (high == 0) {
+			set[0] = key;
+			cnt = 1;
+			return true;
+		}
+
+		do {
+			int p = (low + high) >>> 1;
+			if (key < set[p])
+				high = p;
+			else if (key == set[p])
+				return false;
+			else
+				low = p + 1;
+		} while (low < high);
+
+		if (cnt == set.length) {
+			int[] n = new int[set.length * 2];
+			System.arraycopy(set, 0, n, 0, cnt);
+			set = n;
+		}
+
+		if (low < cnt)
+			System.arraycopy(set, low, set, low + 1, cnt - low);
+		set[low] = key;
+		cnt++;
+		return true;
 	}
 }

@@ -406,10 +406,33 @@ public abstract class PackParser {
 	 * @throws IOException
 	 *             the stream is malformed, or contains corrupt objects.
 	 */
-	public PackLock parse(ProgressMonitor progress) throws IOException {
-		if (progress == null)
-			progress = NullProgressMonitor.INSTANCE;
-		progress.start(2 /* tasks */);
+	public final PackLock parse(ProgressMonitor progress) throws IOException {
+		return parse(progress, progress);
+	}
+
+	/**
+	 * Parse the pack stream.
+	 *
+	 * @param receiving
+	 *            receives progress feedback during the initial receiving
+	 *            objects phase. If null, {@link NullProgressMonitor} will be
+	 *            used.
+	 * @param resolving
+	 *            receives progress feedback during the resolving objects phase.
+	 * @return the pack lock, if one was requested by setting
+	 *         {@link #setLockMessage(String)}.
+	 * @throws IOException
+	 *             the stream is malformed, or contains corrupt objects.
+	 */
+	public PackLock parse(ProgressMonitor receiving, ProgressMonitor resolving)
+			throws IOException {
+		if (receiving == null)
+			receiving = NullProgressMonitor.INSTANCE;
+		if (resolving == null)
+			resolving = NullProgressMonitor.INSTANCE;
+
+		if (receiving == resolving)
+			receiving.start(2 /* tasks */);
 		try {
 			readPackHeader();
 
@@ -418,21 +441,25 @@ public abstract class PackParser {
 			baseByPos = new LongMap<UnresolvedDelta>();
 			deferredCheckBlobs = new ArrayList<PackedObjectInfo>();
 
-			progress.beginTask(JGitText.get().receivingObjects,
+			receiving.beginTask(JGitText.get().receivingObjects,
 					(int) objectCount);
-			for (int done = 0; done < objectCount; done++) {
-				indexOneObject();
-				progress.update(1);
-				if (progress.isCancelled())
-					throw new IOException(JGitText.get().downloadCancelled);
+			try {
+				for (int done = 0; done < objectCount; done++) {
+					indexOneObject();
+					receiving.update(1);
+					if (receiving.isCancelled())
+						throw new IOException(JGitText.get().downloadCancelled);
+				}
+				readPackFooter();
+				endInput();
+			} finally {
+				receiving.endTask();
 			}
-			readPackFooter();
-			endInput();
+
 			if (!deferredCheckBlobs.isEmpty())
 				doDeferredCheckBlobs();
-			progress.endTask();
 			if (deltaCount > 0) {
-				resolveDeltas(progress);
+				resolveDeltas(resolving);
 				if (entryCount < objectCount) {
 					if (!isAllowThin()) {
 						throw new IOException(MessageFormat.format(JGitText
@@ -440,7 +467,7 @@ public abstract class PackParser {
 								(objectCount - entryCount)));
 					}
 
-					resolveDeltasWithExternalBases(progress);
+					resolveDeltasWithExternalBases(resolving);
 
 					if (entryCount < objectCount) {
 						throw new IOException(MessageFormat.format(JGitText
@@ -467,8 +494,6 @@ public abstract class PackParser {
 				inflater = null;
 				objectDatabase.close();
 			}
-
-			progress.endTask();
 		}
 		return null; // By default there is no locking.
 	}
@@ -553,7 +578,6 @@ public abstract class PackParser {
 			PackedObjectInfo oe;
 			oe = newInfo(tempObjectId, visit.delta, visit.parent.id);
 			oe.setOffset(visit.delta.position);
-			onInflatedObjectData(oe, type, visit.data);
 			addObjectAndTrack(oe);
 			visit.id = oe;
 
@@ -742,8 +766,6 @@ public abstract class PackParser {
 					JGitText.get().unsupportedPackVersion, vers));
 		objectCount = NB.decodeUInt32(buf, p + 8);
 		use(hdrln);
-
-		onPackHeader(objectCount);
 	}
 
 	private void readPackFooter() throws IOException {
@@ -851,7 +873,6 @@ public abstract class PackParser {
 		objectDigest.update(Constants.encodeASCII(sz));
 		objectDigest.update((byte) 0);
 
-		final byte[] data;
 		boolean checkContentLater = false;
 		if (type == Constants.OBJ_BLOB) {
 			byte[] readBuffer = buffer();
@@ -868,10 +889,9 @@ public abstract class PackParser {
 			tempObjectId.fromRaw(objectDigest.digest(), 0);
 			checkContentLater = isCheckObjectCollisions()
 					&& readCurs.has(tempObjectId);
-			data = null;
 
 		} else {
-			data = inflateAndReturn(Source.INPUT, sz);
+			final byte[] data = inflateAndReturn(Source.INPUT, sz);
 			objectDigest.update(data);
 			tempObjectId.fromRaw(objectDigest.digest(), 0);
 			verifySafeObject(tempObjectId, type, data);
@@ -880,8 +900,6 @@ public abstract class PackParser {
 		PackedObjectInfo obj = newInfo(tempObjectId, null, null);
 		obj.setOffset(pos);
 		onEndWholeObject(obj);
-		if (data != null)
-			onInflatedObjectData(obj, type, data);
 		addObjectAndTrack(obj);
 		if (checkContentLater)
 			deferredCheckBlobs.add(obj);
@@ -1122,31 +1140,6 @@ public abstract class PackParser {
 	 */
 	protected abstract void onObjectData(Source src, byte[] raw, int pos,
 			int len) throws IOException;
-
-	/**
-	 * Invoked for commits, trees, tags, and small blobs.
-	 *
-	 * @param obj
-	 *            the object info, populated.
-	 * @param typeCode
-	 *            the type of the object.
-	 * @param data
-	 *            inflated data for the object.
-	 * @throws IOException
-	 *             the object cannot be archived.
-	 */
-	protected abstract void onInflatedObjectData(PackedObjectInfo obj,
-			int typeCode, byte[] data) throws IOException;
-
-	/**
-	 * Provide the implementation with the original stream's pack header.
-	 *
-	 * @param objCnt
-	 *            number of objects expected in the stream.
-	 * @throws IOException
-	 *             the implementation refuses to work with this many objects.
-	 */
-	protected abstract void onPackHeader(long objCnt) throws IOException;
 
 	/**
 	 * Provide the implementation with the original stream's pack footer.

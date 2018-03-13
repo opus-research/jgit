@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2011, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,50 +42,69 @@
  */
 package org.eclipse.jgit.api;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
 
-import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RepositoryTestCase;
-import org.eclipse.jgit.util.FileUtils;
-import org.junit.Before;
 import org.junit.Test;
 
-public class InitCommandTest extends RepositoryTestCase {
+public class CloneCommandTest extends RepositoryTestCase {
 
-	@Override
-	@Before
+	private Git git;
+
 	public void setUp() throws Exception {
 		super.setUp();
+		git = new Git(db);
+		// commit something
+		writeTrashFile("Test.txt", "Hello world");
+		git.add().addFilepattern("Test.txt").call();
+		git.commit().setMessage("Initial commit").call();
+
+		// create a master branch and switch to it
+		git.branchCreate().setName("test").call();
+		RefUpdate rup = db.updateRef(Constants.HEAD);
+		rup.link("refs/heads/test");
+
+		// commit something on the test branch
+		writeTrashFile("Test.txt", "Some change");
+		git.add().addFilepattern("Test.txt").call();
+		git.commit().setMessage("Second commit").call();
 	}
 
 	@Test
-	public void testInitRepository() {
+	public void testCloneRepository() {
 		try {
-			File directory = createTempDirectory("testInitRepository");
-			InitCommand command = new InitCommand();
+			File directory = createTempDirectory("testCloneRepository");
+			CloneCommand command = Git.cloneRepository();
 			command.setDirectory(directory);
-			Repository repository = command.call().getRepository();
-			assertNotNull(repository);
+			command.setURI("file://"
+					+ git.getRepository().getWorkTree().getPath());
+			Git git2 = command.call();
+			assertNotNull(git2);
 		} catch (Exception e) {
 			fail(e.getMessage());
 		}
 	}
 
 	@Test
-	public void testInitBareRepository() {
+	public void testCloneRepositoryWithBranch() {
 		try {
-			File directory = createTempDirectory("testInitBareRepository");
-			InitCommand command = new InitCommand();
+			File directory = createTempDirectory("testCloneRepositoryWithBranch");
+			CloneCommand command = Git.cloneRepository();
+			command.setBranch("refs/heads/test");
 			command.setDirectory(directory);
-			command.setBare(true);
-			Repository repository = command.call().getRepository();
-			assertNotNull(repository);
-			assertTrue(repository.isBare());
+			command.setURI("file://"
+					+ git.getRepository().getWorkTree().getPath());
+			Git git2 = command.call();
+			assertNotNull(git2);
+			assertEquals(git2.getRepository().getFullBranch(),
+					"refs/heads/test");
 		} catch (Exception e) {
 			fail(e.getMessage());
 		}
@@ -94,8 +113,16 @@ public class InitCommandTest extends RepositoryTestCase {
 	public static File createTempDirectory(String name) throws IOException {
 		final File temp;
 		temp = File.createTempFile(name, Long.toString(System.nanoTime()));
-		FileUtils.delete(temp);
-		FileUtils.mkdir(temp);
+
+		if (!(temp.delete())) {
+			throw new IOException("Could not delete temp file: "
+					+ temp.getAbsolutePath());
+		}
+
+		if (!(temp.mkdir())) {
+			throw new IOException("Could not create temp directory: "
+					+ temp.getAbsolutePath());
+		}
 		return temp;
 	}
 

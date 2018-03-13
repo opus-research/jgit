@@ -41,53 +41,34 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.storage.dht.spi.tools;
+package org.eclipse.jgit.storage.pack;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.atomic.AtomicInteger;
+import static org.junit.Assert.*;
 
-/** Optional executor support for implementors to build on top of. */
-public class ExecutorTools {
-	/**
-	 * Get the default executor service for this JVM.
-	 * <p>
-	 * The default executor service is created the first time it is requested,
-	 * and is shared with all future requests. It uses a fixed sized thread pool
-	 * that is allocated 2 threads per CPU. Each thread is configured to be a
-	 * daemon thread, permitting the JVM to do a clean shutdown when the
-	 * application thread stop, even if work is still pending in the service.
-	 *
-	 * @return the default executor service.
-	 */
-	public static ExecutorService getDefaultExecutorService() {
-		return DefaultExecutors.service;
-	}
+import org.junit.Test;
 
-	private static class DefaultExecutors {
-		static final ExecutorService service;
-		static {
-			int ncpu = Runtime.getRuntime().availableProcessors();
-			ThreadFactory threadFactory = new ThreadFactory() {
-				private final AtomicInteger cnt = new AtomicInteger();
+public class IntSetTest {
+	@Test
+	public void testAdd() {
+		IntSet s = new IntSet();
 
-				public Thread newThread(Runnable taskBody) {
-					int id = cnt.incrementAndGet();
-					ClassLoader myCL = getClass().getClassLoader();
+		assertTrue(s.add(1));
+		assertFalse(s.add(1));
 
-					Thread t = new Thread(taskBody);
-					t.setDaemon(true);
-					t.setName("JGit-DHT-Worker-" + id);
-					t.setContextClassLoader(myCL);
-					return t;
-				}
-			};
-			service = java.util.concurrent.Executors.newFixedThreadPool(
-					2 * ncpu, threadFactory);
-		}
-	}
+		for (int i = 2; i < 64; i++)
+			assertTrue(s.add(i));
+		for (int i = 2; i < 64; i++)
+			assertFalse(s.add(i));
 
-	private ExecutorTools() {
-		// Static helper class, do not make instances.
+		assertTrue(s.add(-1));
+		assertFalse(s.add(-1));
+
+		assertTrue(s.add(-2));
+		assertFalse(s.add(-2));
+
+		assertTrue(s.add(128));
+		assertFalse(s.add(128));
+
+		assertFalse(s.add(1));
 	}
 }

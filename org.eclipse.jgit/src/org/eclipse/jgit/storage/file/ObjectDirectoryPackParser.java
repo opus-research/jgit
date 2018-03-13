@@ -168,13 +168,14 @@ public class ObjectDirectoryPackParser extends PackParser {
 	}
 
 	@Override
-	public PackLock parse(ProgressMonitor progress) throws IOException {
+	public PackLock parse(ProgressMonitor receiving, ProgressMonitor resolving)
+			throws IOException {
 		tmpPack = File.createTempFile("incoming_", ".pack", db.getDirectory());
 		tmpIdx = new File(db.getDirectory(), baseName(tmpPack) + ".idx");
 		try {
 			out = new RandomAccessFile(tmpPack, "rw");
 
-			super.parse(progress);
+			super.parse(receiving, resolving);
 
 			out.seek(packEnd);
 			out.write(packHash);
@@ -198,11 +199,6 @@ public class ObjectDirectoryPackParser extends PackParser {
 			}
 			cleanupTemporaryFiles();
 		}
-	}
-
-	@Override
-	protected void onPackHeader(long objectCount) throws IOException {
-		// Ignored, the count is not required.
 	}
 
 	@Override
@@ -233,12 +229,6 @@ public class ObjectDirectoryPackParser extends PackParser {
 		UnresolvedDelta delta = new UnresolvedDelta();
 		delta.setCRC((int) crc.getValue());
 		return delta;
-	}
-
-	@Override
-	protected void onInflatedObjectData(PackedObjectInfo obj, int typeCode,
-			byte[] data) throws IOException {
-		// ObjectDirectory ignores this event.
 	}
 
 	@Override
