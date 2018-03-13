@@ -71,6 +71,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -1260,7 +1261,7 @@ public class UploadPack {
 		@Override
 		public void checkWants(UploadPack up, List<ObjectId> wants)
 				throws PackProtocolException, IOException {
-			checkNotAdvertisedWants(up, wants,
+			checkNotAdvertisedWants(up.getRevWalk(), wants,
 					refIdSet(up.getAdvertisedRefs().values()));
 		}
 	}
@@ -1297,7 +1298,7 @@ public class UploadPack {
 		@Override
 		public void checkWants(UploadPack up, List<ObjectId> wants)
 				throws PackProtocolException, IOException {
-			checkNotAdvertisedWants(up, wants,
+			checkNotAdvertisedWants(up.getRevWalk(), wants,
 					refIdSet(up.getRepository().getRefDatabase().getRefs(ALL).values()));
 		}
 	}
@@ -1315,7 +1316,7 @@ public class UploadPack {
 		}
 	}
 
-	private static void checkNotAdvertisedWants(UploadPack up,
+	private static void checkNotAdvertisedWants(RevWalk walk,
 			List<ObjectId> notAdvertisedWants, Set<ObjectId> reachableFrom)
 			throws MissingObjectException, IncorrectObjectTypeException, IOException {
 		// Walk the requested commits back to the provided set of commits. If any
@@ -1324,34 +1325,32 @@ public class UploadPack {
 		// into an advertised branch it will be marked UNINTERESTING and no commits
 		// return.
 
-		try (RevWalk walk = new RevWalk(up.getRevWalk().getObjectReader())) {
-			AsyncRevObjectQueue q = walk.parseAny(notAdvertisedWants, true);
+		AsyncRevObjectQueue q = walk.parseAny(notAdvertisedWants, true);
+		try {
+			RevObject obj;
+			while ((obj = q.next()) != null) {
+				if (!(obj instanceof RevCommit))
+					throw new WantNotValidException(obj);
+				walk.markStart((RevCommit) obj);
+			}
+		} catch (MissingObjectException notFound) {
+			throw new WantNotValidException(notFound.getObjectId(), notFound);
+		} finally {
+			q.release();
+		}
+		for (ObjectId id : reachableFrom) {
 			try {
-				RevObject obj;
-				while ((obj = q.next()) != null) {
-					if (!(obj instanceof RevCommit))
-						throw new WantNotValidException(obj);
-					walk.markStart((RevCommit) obj);
-				}
-			} catch (MissingObjectException notFound) {
-				throw new WantNotValidException(notFound.getObjectId(),
-						notFound);
-			} finally {
-				q.release();
-			}
-			for (ObjectId id : reachableFrom) {
-				try {
-					walk.markUninteresting(walk.parseCommit(id));
-				} catch (IncorrectObjectTypeException notCommit) {
-					continue;
-				}
-			}
-
-			RevCommit bad = walk.next();
-			if (bad != null) {
-				throw new WantNotValidException(bad);
+				walk.markUninteresting(walk.parseCommit(id));
+			} catch (IncorrectObjectTypeException notCommit) {
+				continue;
 			}
 		}
+
+		RevCommit bad = walk.next();
+		if (bad != null) {
+			throw new WantNotValidException(bad);
+		}
+		walk.reset();
 	}
 
 	private void addCommonBase(final RevObject o) {
