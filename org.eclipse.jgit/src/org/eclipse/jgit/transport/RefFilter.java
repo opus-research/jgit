@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2012, Google Inc.
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,35 +43,34 @@
 
 package org.eclipse.jgit.transport;
 
-import java.io.IOException;
+import java.util.Map;
 
-/** Indicates a transport service may not continue execution. */
-public class ServiceMayNotContinueException extends IOException {
-	private static final long serialVersionUID = 1L;
+import org.eclipse.jgit.lib.Ref;
 
-	private boolean output;
-
-	/** Initialize with no message. */
-	public ServiceMayNotContinueException() {
-		// Do not set a message.
-	}
+/**
+ * Filters the list of refs that are advertised to the client.
+ * <p>
+ * The filter is called by {@link ReceivePack} and {@link UploadPack} to ensure
+ * that the refs are filtered before they are advertised to the client.
+ * <p>
+ * This can be used by applications to control visibility of certain refs based
+ * on a custom set of rules.
+ */
+public interface RefFilter {
+	/** The default filter, allows all refs to be shown. */
+	public static final RefFilter DEFAULT = new RefFilter() {
+		public Map<String, Ref> filter (final Map<String, Ref> refs) {
+			return refs;
+		}
+	};
 
 	/**
-	 * @param msg
-	 *            a message explaining why it cannot continue. This message may
-	 *            be shown to an end-user.
+	 * Filters a {@code Map} of refs before it is advertised to the client.
+	 *
+	 * @param refs
+	 *            the refs which this method need to consider.
+	 * @return
+	 *            the filtered map of refs.
 	 */
-	public ServiceMayNotContinueException(String msg) {
-		super(msg);
-	}
-
-	/** @return true if the message was already output to the client. */
-	public boolean isOutput() {
-		return output;
-	}
-
-	/** Mark this message has being sent to the client. */
-	public void setOutput() {
-		output = true;
-	}
+	public Map<String, Ref> filter(Map<String, Ref> refs);
 }
