@@ -159,7 +159,6 @@ public class RepositoryCache {
 			openLocks[i] = new Lock();
 	}
 
-	@SuppressWarnings("resource")
 	private Repository openRepository(final Key location,
 			final boolean mustExist) throws IOException {
 		Reference<Repository> ref = cacheMap.get(location);
