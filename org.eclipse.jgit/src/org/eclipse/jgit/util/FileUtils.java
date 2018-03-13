@@ -416,7 +416,7 @@ public class FileUtils {
 	 *            The path that will be made relative to <code>base</code>.
 	 * @return A relative path that, when resolved against <code>base</code>,
 	 *         will yield the original <code>other</code>.
-	 * @since 3.4
+	 * @since 3.6
 	 */
 	public static String relativize(String base, String other) {
 		if (base.equals(other))

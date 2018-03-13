@@ -3,6 +3,8 @@ package org.eclipse.jgit.util;
 /**
  * An enum describing the different hooks a user can implement to customize his
  * repositories.
+ * 
+ * @since 3.6
  */
 public enum Hook {
 	/**

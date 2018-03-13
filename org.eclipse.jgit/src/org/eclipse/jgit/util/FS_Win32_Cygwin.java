@@ -143,6 +143,9 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 		return proc;
 	}
 
+	/**
+	 * @since 3.6
+	 */
 	@Override
 	public int runIfPresent(Repository repository, Hook hook, String[] args,
 			PrintStream outRedirect, PrintStream errRedirect, String stdinArgs)
