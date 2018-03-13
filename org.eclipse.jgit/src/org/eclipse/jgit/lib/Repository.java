@@ -553,7 +553,6 @@ public class Repository {
 	 *
 	 * @see #resolve(String)
 	 */
-	@Deprecated
 	public Commit mapCommit(final String revstr) throws IOException {
 		final ObjectId id = resolve(revstr);
 		return id != null ? mapCommit(id) : null;
@@ -568,7 +567,6 @@ public class Repository {
 	 * @return The Git object if found or null
 	 * @throws IOException
 	 */
-	@Deprecated
 	public Object mapObject(final ObjectId id, final String refName) throws IOException {
 		final ObjectLoader or = openObject(id);
 		if (or == null)
@@ -599,7 +597,6 @@ public class Repository {
 	 * @return Commit or null
 	 * @throws IOException for I/O error or unexpected object type.
 	 */
-	@Deprecated
 	public Commit mapCommit(final ObjectId id) throws IOException {
 		final ObjectLoader or = openObject(id);
 		if (or == null)
@@ -626,7 +623,6 @@ public class Repository {
 	 *
 	 * @see #resolve(String)
 	 */
-	@Deprecated
 	public Tree mapTree(final String revstr) throws IOException {
 		final ObjectId id = resolve(revstr);
 		return id != null ? mapTree(id) : null;
@@ -638,7 +634,6 @@ public class Repository {
 	 * @return Tree or null
 	 * @throws IOException for I/O error or unexpected object type.
 	 */
-	@Deprecated
 	public Tree mapTree(final ObjectId id) throws IOException {
 		final ObjectLoader or = openObject(id);
 		if (or == null)
@@ -673,7 +668,6 @@ public class Repository {
 	 * @return a Tag or null
 	 * @throws IOException on I/O error or unexpected type
 	 */
-	@Deprecated
 	public Tag mapTag(String revstr) throws IOException {
 		final ObjectId id = resolve(revstr);
 		return id != null ? mapTag(revstr, id) : null;
@@ -686,7 +680,6 @@ public class Repository {
 	 * @return Commit or null
 	 * @throws IOException for I/O error or unexpected object type.
 	 */
-	@Deprecated
 	public Tag mapTag(final String refName, final ObjectId id) throws IOException {
 		final ObjectLoader or = openObject(id);
 		if (or == null)
