@@ -116,9 +116,9 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotGet;
 	/***/ public String cannotListRefs;
 	/***/ public String cannotLock;
+	/***/ public String cannotLockFile;
 	/***/ public String cannotLockPackIn;
 	/***/ public String cannotMatchOnEmptyString;
-	/***/ public String maxCountMustBeNonNegative;
 	/***/ public String cannotMoveIndexTo;
 	/***/ public String cannotMovePackTo;
 	/***/ public String cannotOpenService;
@@ -310,7 +310,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidPacketLineHeader;
 	/***/ public String invalidPath;
 	/***/ public String invalidRemote;
-	/***/ public String invalidReflogRevision;
 	/***/ public String invalidRefName;
 	/***/ public String invalidStageForPath;
 	/***/ public String invalidTagOption;
@@ -407,7 +406,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String packingCancelledDuringObjectsWriting;
 	/***/ public String packWriterStatistics;
 	/***/ public String pathIsNotInWorkingDir;
-	/***/ public String pathNotConfigured;
 	/***/ public String peeledLineBeforeRef;
 	/***/ public String peerDidNotSupplyACompleteObjectGraph;
 	/***/ public String prefixRemote;
@@ -428,7 +426,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String refAlreadyExists;
 	/***/ public String refNotResolved;
 	/***/ public String refUpdateReturnCodeWas;
-	/***/ public String reflogEntryNotFound;
+	/***/ public String reflogsNotYetSupportedByRevisionParser;
 	/***/ public String remoteConfigHasNoURIAssociated;
 	/***/ public String remoteDoesNotHaveSpec;
 	/***/ public String remoteDoesNotSupportSmartHTTPPush;
@@ -482,7 +480,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String staleRevFlagsOn;
 	/***/ public String startingReadStageWithoutWrittenRequestDataPendingIsNotSupported;
 	/***/ public String statelessRPCRequiresOptionToBeEnabled;
-	/***/ public String submoduleExists;
 	/***/ public String submodulesNotSupported;
 	/***/ public String symlinkCannotBeWrittenAsTheLinkTarget;
 	/***/ public String systemConfigFileInvalid;
@@ -542,7 +539,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unsupportedPackVersion;
 	/***/ public String updatingReferences;
 	/***/ public String updatingRefFailed;
-	/***/ public String uriNotConfigured;
 	/***/ public String uriNotFound;
 	/***/ public String userConfigFileInvalid;
 	/***/ public String walkFailure;

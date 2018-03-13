@@ -101,11 +101,8 @@ class SmartOutputStream extends TemporaryBuffer {
 				TemporaryBuffer gzbuf = new TemporaryBuffer.Heap(LIMIT);
 				try {
 					GZIPOutputStream gzip = new GZIPOutputStream(gzbuf);
-					try {
-						out.writeTo(gzip, null);
-					} finally {
-						gzip.close();
-					}
+					out.writeTo(gzip, null);
+					gzip.close();
 					if (gzbuf.length() < out.length()) {
 						out = gzbuf;
 						rsp.setHeader(HDR_CONTENT_ENCODING, ENCODING_GZIP);
