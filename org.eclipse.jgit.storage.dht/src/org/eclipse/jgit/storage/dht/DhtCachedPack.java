@@ -125,18 +125,9 @@ public class DhtCachedPack extends CachedPack {
 			throws IOException {
 		if (keyList == null)
 			init();
-
-		// Clear the recent chunks because all of the reader's
-		// chunk limit should be made available for prefetch.
-		int cacheLimit = ctx.getOptions().getChunkLimit();
-		ctx.getRecentChunks().setMaxBytes(0);
-		try {
-			Prefetcher p = new Prefetcher(ctx, 0, cacheLimit);
-			p.push(Arrays.asList(keyList));
-			copyPack(out, p, validate);
-		} finally {
-			ctx.getRecentChunks().setMaxBytes(cacheLimit);
-		}
+		Prefetcher p = new Prefetcher(ctx, 0);
+		p.push(Arrays.asList(keyList));
+		copyPack(out, p, validate);
 	}
 
 	private void copyPack(PackOutputStream out, Prefetcher prefetcher,
