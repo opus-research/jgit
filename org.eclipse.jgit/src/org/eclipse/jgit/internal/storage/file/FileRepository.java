@@ -485,7 +485,7 @@ public class FileRepository extends Repository {
 	}
 
 	@Override
-	public AttributesNodeProvider newAttributesNodeProvider() {
+	public AttributesNodeProvider createAttributesNodeProvider() {
 		return new AttributesNodeProviderImpl(this);
 	}
 

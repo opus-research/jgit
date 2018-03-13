@@ -217,7 +217,7 @@ public abstract class Repository implements AutoCloseable {
 	 *         instance for each use.
 	 * @since 4.2
 	 */
-	public abstract AttributesNodeProvider newAttributesNodeProvider();
+	public abstract AttributesNodeProvider createAttributesNodeProvider();
 
 
 	/**

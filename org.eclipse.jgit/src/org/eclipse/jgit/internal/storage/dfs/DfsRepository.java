@@ -133,7 +133,7 @@ public abstract class DfsRepository extends Repository {
 	}
 
 	@Override
-	public AttributesNodeProvider newAttributesNodeProvider() {
+	public AttributesNodeProvider createAttributesNodeProvider() {
 		// TODO Check if the implementation used in FileRepository can be used
 		// for this kind of repository
 		return new EmptyAttributesNodeProvider();
