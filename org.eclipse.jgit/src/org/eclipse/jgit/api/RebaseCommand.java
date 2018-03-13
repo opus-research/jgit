@@ -672,15 +672,15 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		FileUtils.delete(currentCommitFile);
 	}
 
-	private RebaseResult finishRebase(RevCommit finalHead,
-			boolean lastStepIsForward) throws IOException, GitAPIException {
+	private RebaseResult finishRebase(RevCommit newHead,
+			boolean lastStepWasForward) throws IOException, GitAPIException {
 		String headName = rebaseState.readFile(HEAD_NAME);
-		updateHead(headName, finalHead, upstreamCommit);
+		updateHead(headName, newHead, upstreamCommit);
 		boolean stashConflicts = autoStashApply();
 		FileUtils.delete(rebaseState.getDir(), FileUtils.RECURSIVE);
 		if (stashConflicts)
 			return RebaseResult.STASH_APPLY_CONFLICTS_RESULT;
-		if (lastStepIsForward || finalHead == null)
+		if (lastStepWasForward || newHead == null)
 			return RebaseResult.FAST_FORWARD_RESULT;
 		return RebaseResult.OK_RESULT;
 	}
@@ -753,7 +753,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	private RevCommit squashIntoPrevious(boolean sequenceContainsSquash,
 			RebaseTodoLine nextStep)
 			throws IOException, GitAPIException {
-		RevCommit retNewHead;
+		RevCommit newHead;
 		String commitMessage = rebaseState
 				.readFile(MESSAGE_SQUASH);
 
@@ -765,7 +765,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				commitMessage = interactiveHandler
 						.modifyCommitMessage(commitMessage);
 			}
-			retNewHead = new Git(repo).commit()
+			newHead = new Git(repo).commit()
 					.setMessage(stripCommentLines(commitMessage))
 					.setAmend(true).call();
 			rebaseState.getFile(MESSAGE_SQUASH).delete();
@@ -773,11 +773,11 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 		} else {
 			// Next step is either Squash or Fixup
-			retNewHead = new Git(repo).commit()
+			newHead = new Git(repo).commit()
 					.setMessage(commitMessage).setAmend(true)
 					.call();
 		}
-		return retNewHead;
+		return newHead;
 	}
 
 	private static String stripCommentLines(String commitMessage) {
@@ -862,13 +862,13 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		return ourCommitName;
 	}
 
-	private void updateHead(String headName, RevCommit aNewHead, RevCommit onto)
+	private void updateHead(String headName, RevCommit newHead, RevCommit onto)
 			throws IOException {
 		// point the previous head (if any) to the new commit
 
 		if (headName.startsWith(Constants.R_REFS)) {
 			RefUpdate rup = repo.updateRef(headName);
-			rup.setNewObjectId(aNewHead);
+			rup.setNewObjectId(newHead);
 			rup.setRefLogMessage("rebase finished: " + headName + " onto " //$NON-NLS-1$ //$NON-NLS-2$
 					+ onto.getName(), false);
 			Result res = rup.forceUpdate();
