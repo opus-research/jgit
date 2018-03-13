@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
- * Copyright (C) 2012-2013, Robin Rosenberg
+ * Copyright (C) 2013, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,53 +40,24 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.treewalk;
 
-import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.ConfigConstants;
-import org.eclipse.jgit.lib.Config.SectionParser;
-import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
-import org.eclipse.jgit.lib.CoreConfig.CheckStat;
+package org.eclipse.jgit.archive.internal;
 
-/** Options used by the {@link WorkingTreeIterator}. */
-public class WorkingTreeOptions {
-	/** Key for {@link Config#get(SectionParser)}. */
-	public static final Config.SectionParser<WorkingTreeOptions> KEY = new SectionParser<WorkingTreeOptions>() {
-		public WorkingTreeOptions parse(final Config cfg) {
-			return new WorkingTreeOptions(cfg);
-		}
-	};
+import org.eclipse.jgit.nls.NLS;
+import org.eclipse.jgit.nls.TranslationBundle;
 
-	private final boolean fileMode;
-
-	private final AutoCRLF autoCRLF;
-
-	private final CheckStat checkStat;
-
-	private WorkingTreeOptions(final Config rc) {
-		fileMode = rc.getBoolean(ConfigConstants.CONFIG_CORE_SECTION,
-				ConfigConstants.CONFIG_KEY_FILEMODE, true);
-		autoCRLF = rc.getEnum(ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_AUTOCRLF, AutoCRLF.FALSE);
-		checkStat = rc.getEnum(ConfigConstants.CONFIG_CORE_SECTION, null,
-				ConfigConstants.CONFIG_KEY_CHECKSTAT, CheckStat.DEFAULT);
-	}
-
-	/** @return true if the execute bit on working files should be trusted. */
-	public boolean isFileMode() {
-		return fileMode;
-	}
-
-	/** @return how automatic CRLF conversion has been configured. */
-	public AutoCRLF getAutoCRLF() {
-		return autoCRLF;
-	}
-
+/**
+ * Translation bundle for archivers
+ */
+public class ArchiveText extends TranslationBundle {
 	/**
-	 * @return how stat data is compared
-	 * @since 3.0
+	 * @return an instance of this translation bundle
 	 */
-	public CheckStat getCheckStat() {
-		return checkStat;
+	public static ArchiveText get() {
+		return NLS.getBundleFor(ArchiveText.class);
 	}
+
+	// @formatter:off
+	/***/ public String pathDoesNotMatchMode;
+	/***/ public String unsupportedMode;
 }
