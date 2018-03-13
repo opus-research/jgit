@@ -1041,7 +1041,7 @@ public class UploadPack {
 					notAdvertisedWants = new ArrayList<ObjectId>();
 				notAdvertisedWants.add(obj);
 			}
-	    }
+		}
 		if (notAdvertisedWants != null)
 			requestValidator.checkWants(this, notAdvertisedWants);
 
@@ -1165,12 +1165,20 @@ public class UploadPack {
 		// return.
 
 		AsyncRevObjectQueue q = walk.parseAny(notAdvertisedWants, true);
-		RevObject obj;
-		while ((obj = q.next()) != null) {
-			if (!(obj instanceof RevCommit))
-				throw new PackProtocolException(MessageFormat.format(
-					JGitText.get().wantNotValid, obj.name()));
-			walk.markStart((RevCommit) obj);
+		try {
+			RevObject obj;
+			while ((obj = q.next()) != null) {
+				if (!(obj instanceof RevCommit))
+					throw new PackProtocolException(MessageFormat.format(
+						JGitText.get().wantNotValid, obj.name()));
+				walk.markStart((RevCommit) obj);
+			}
+		} catch (MissingObjectException notFound) {
+			ObjectId id = notFound.getObjectId();
+			throw new PackProtocolException(MessageFormat.format(
+					JGitText.get().wantNotValid, id.name()), notFound);
+		} finally {
+			q.release();
 		}
 		for (ObjectId id : reachableFrom) {
 			try {
