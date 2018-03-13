@@ -43,6 +43,7 @@
 
 package org.eclipse.jgit.storage.dht;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -54,7 +55,6 @@ import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.eclipse.jgit.generated.storage.dht.proto.GitStore.ChunkMeta;
 import org.eclipse.jgit.storage.dht.spi.Context;
 import org.eclipse.jgit.util.BlockList;
 
@@ -136,7 +136,7 @@ final class ObjectWriter {
 					ChunkMeta meta = allMeta.remove(key);
 					if (meta != null) {
 						for (int i = 1; i < meta.getFragmentCount(); i++)
-							keys.add(ChunkKey.fromString(meta.getFragment(i)));
+							keys.add(meta.getFragmentKey(i));
 					}
 				}
 				order = keys;
@@ -221,7 +221,7 @@ final class ObjectWriter {
 			throw metaError.get();
 	}
 
-	private class MetaLoader implements AsyncCallback<Map<ChunkKey, ChunkMeta>> {
+	private class MetaLoader implements AsyncCallback<Collection<ChunkMeta>> {
 		private final Context context;
 
 		private final Set<ChunkKey> keys;
@@ -231,11 +231,13 @@ final class ObjectWriter {
 			this.keys = keys;
 		}
 
-		public void onSuccess(Map<ChunkKey, ChunkMeta> result) {
+		public void onSuccess(Collection<ChunkMeta> result) {
 			try {
 				synchronized (allMeta) {
-					allMeta.putAll(result);
-					keys.removeAll(result.keySet());
+					for (ChunkMeta meta : result) {
+						allMeta.put(meta.getChunkKey(), meta);
+						keys.remove(meta.getChunkKey());
+					}
 				}
 				if (context == Context.FAST_MISSING_OK && !keys.isEmpty()) {
 					synchronized (metaMissing) {

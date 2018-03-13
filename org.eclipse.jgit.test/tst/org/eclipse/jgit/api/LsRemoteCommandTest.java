@@ -89,8 +89,6 @@ public class LsRemoteCommandTest extends RepositoryTestCase {
 					+ git.getRepository().getWorkTree().getPath());
 			command.setCloneAllBranches(true);
 			Git git2 = command.call();
-			addRepoToClose(git2.getRepository());
-
 
 			LsRemoteCommand lsRemoteCommand = git2.lsRemote();
 			Collection<Ref> refs = lsRemoteCommand.call();
@@ -111,7 +109,6 @@ public class LsRemoteCommandTest extends RepositoryTestCase {
 					+ git.getRepository().getWorkTree().getPath());
 			command.setCloneAllBranches(true);
 			Git git2 = command.call();
-			addRepoToClose(git2.getRepository());
 
 			LsRemoteCommand lsRemoteCommand = git2.lsRemote();
 			lsRemoteCommand.setTags(true);
@@ -133,7 +130,6 @@ public class LsRemoteCommandTest extends RepositoryTestCase {
 					+ git.getRepository().getWorkTree().getPath());
 			command.setCloneAllBranches(true);
 			Git git2 = command.call();
-			addRepoToClose(git2.getRepository());
 
 			LsRemoteCommand lsRemoteCommand = git2.lsRemote();
 			lsRemoteCommand.setHeads(true);
