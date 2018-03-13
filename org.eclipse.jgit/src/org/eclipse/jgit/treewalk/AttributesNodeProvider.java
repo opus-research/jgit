@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2009, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2014, Arthur Daussy <arthur.daussy@obeo.fr>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,48 +40,47 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.treewalk;
 
-package org.eclipse.jgit.errors;
+import java.io.IOException;
 
-import static java.nio.charset.StandardCharsets.US_ASCII;
-
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.attributes.AttributesNode;
+import org.eclipse.jgit.lib.CoreConfig;
 
 /**
- * Thrown when an invalid object id is passed in as an argument.
+ * An internal interface use to retrieve {@link AttributesNode}s.
+ * <p>
+ * Implementor of this interface should be able to retrieve the global
+ * {@link AttributesNode} and the info {@link AttributesNode}
+ * </p>
+ * 
+ * @since 4.1
+ *
  */
-public class InvalidObjectIdException extends IllegalArgumentException {
-	private static final long serialVersionUID = 1L;
+public interface AttributesNodeProvider {
 
 	/**
-	 * Create exception with bytes of the invalid object id.
+	 * Retrieves the {@link AttributesNode} that holds the information located
+	 * in $GIT_DIR/info/attributes file.
 	 *
-	 * @param bytes containing the invalid id.
-	 * @param offset in the byte array where the error occurred.
-	 * @param length of the sequence of invalid bytes.
+	 * @return the {@link AttributesNode} that holds the information located in
+	 *         $GIT_DIR/info/attributes file.
+	 * @throws IOException
+	 *             if an error is raised while parsing the attributes file
 	 */
-	public InvalidObjectIdException(byte[] bytes, int offset, int length) {
-		super(msg(bytes, offset, length));
-	}
+	public AttributesNode getInfoAttributesNode() throws IOException;
 
 	/**
-	 * @param id the invalid id.
+	 * Retrieves the {@link AttributesNode} that holds the information located
+	 * in system-wide file.
 	 *
-	 * @since 4.1
+	 * @return the {@link AttributesNode} that holds the information located in
+	 *         system-wide file.
+	 * @throws IOException
+	 *             IOException if an error is raised while parsing the
+	 *             attributes file
+	 * @see CoreConfig#getAttributesFile()
 	 */
-	public InvalidObjectIdException(String id) {
-		super(MessageFormat.format(JGitText.get().invalidId, id));
-	}
+	public AttributesNode getGlobalAttributesNode() throws IOException;
 
-	private static String msg(byte[] bytes, int offset, int length) {
-		try {
-			return MessageFormat.format(
-					JGitText.get().invalidId,
-					new String(bytes, offset, length, US_ASCII));
-		} catch (StringIndexOutOfBoundsException e) {
-			return JGitText.get().invalidId0;
-		}
-	}
 }

@@ -1,7 +1,6 @@
 /*
- * Copyright (C) 2009, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2014, Arthur Daussy <arthur.daussy@obeo.fr>
+ * Copyright (C) 2015, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,48 +41,46 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.internal.storage.file;
 
-package org.eclipse.jgit.errors;
+import java.io.File;
+import java.io.IOException;
 
-import static java.nio.charset.StandardCharsets.US_ASCII;
+import org.eclipse.jgit.attributes.AttributesNode;
+import org.eclipse.jgit.lib.CoreConfig;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.util.FS;
 
-import java.text.MessageFormat;
-
-import org.eclipse.jgit.internal.JGitText;
-
-/**
- * Thrown when an invalid object id is passed in as an argument.
- */
-public class InvalidObjectIdException extends IllegalArgumentException {
-	private static final long serialVersionUID = 1L;
+/** Attribute node loaded from global system-wide file. */
+public class GlobalAttributesNode extends AttributesNode {
+	final Repository repository;
 
 	/**
-	 * Create exception with bytes of the invalid object id.
-	 *
-	 * @param bytes containing the invalid id.
-	 * @param offset in the byte array where the error occurred.
-	 * @param length of the sequence of invalid bytes.
+	 * @param repository
 	 */
-	public InvalidObjectIdException(byte[] bytes, int offset, int length) {
-		super(msg(bytes, offset, length));
+	public GlobalAttributesNode(Repository repository) {
+		this.repository = repository;
 	}
 
 	/**
-	 * @param id the invalid id.
-	 *
-	 * @since 4.1
+	 * @return the attributes node
+	 * @throws IOException
 	 */
-	public InvalidObjectIdException(String id) {
-		super(MessageFormat.format(JGitText.get().invalidId, id));
-	}
+	public AttributesNode load() throws IOException {
+		AttributesNode r = new AttributesNode();
 
-	private static String msg(byte[] bytes, int offset, int length) {
-		try {
-			return MessageFormat.format(
-					JGitText.get().invalidId,
-					new String(bytes, offset, length, US_ASCII));
-		} catch (StringIndexOutOfBoundsException e) {
-			return JGitText.get().invalidId0;
+		FS fs = repository.getFS();
+		String path = repository.getConfig().get(CoreConfig.KEY)
+				.getAttributesFile();
+		if (path != null) {
+			File attributesFile;
+			if (path.startsWith("~/")) //$NON-NLS-1$
+				attributesFile = fs.resolve(fs.userHome(),
+						path.substring(2));
+			else
+				attributesFile = fs.resolve(null, path);
+			FileRepository.AttributesNodeProviderImpl.loadRulesFromFile(r, attributesFile);
 		}
+		return r.getRules().isEmpty() ? null : r;
 	}
 }

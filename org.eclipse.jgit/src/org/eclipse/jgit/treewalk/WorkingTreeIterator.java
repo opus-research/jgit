@@ -74,6 +74,8 @@ import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.ignore.FastIgnoreRule;
 import org.eclipse.jgit.ignore.IgnoreNode;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.internal.storage.file.GlobalAttributesNode;
+import org.eclipse.jgit.internal.storage.file.InfoAttributesNode;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig;
 import org.eclipse.jgit.lib.CoreConfig.CheckStat;
@@ -150,14 +152,14 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 * Holds the {@link AttributesNode} that is stored in
 	 * $GIT_DIR/info/attributes file.
 	 */
-	private AttributesNode infoAttributeNode;
+	private AttributesNode infoAttributesNode;
 
 	/**
 	 * Holds the {@link AttributesNode} that is stored in global attribute file.
 	 *
 	 * @see CoreConfig#getAttributesFile()
 	 */
-	private AttributesNode globalAttributeNode;
+	private AttributesNode globalAttributesNode;
 
 	/**
 	 * Create a new iterator with no parent.
@@ -202,8 +204,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	protected WorkingTreeIterator(final WorkingTreeIterator p) {
 		super(p);
 		state = p.state;
-		infoAttributeNode = p.infoAttributeNode;
-		globalAttributeNode = p.globalAttributeNode;
+		infoAttributesNode = p.infoAttributesNode;
+		globalAttributesNode = p.globalAttributesNode;
 	}
 
 	/**
@@ -224,9 +226,9 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			entry = null;
 		ignoreNode = new RootIgnoreNode(entry, repo);
 
-		infoAttributeNode = new InfoAttributesNode(repo);
+		infoAttributesNode = new InfoAttributesNode(repo);
 
-		globalAttributeNode = new GlobalAttributesNode(repo);
+		globalAttributesNode = new GlobalAttributesNode(repo);
 	}
 
 	/**
@@ -596,7 +598,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *             a relevant ignore rule file exists but cannot be read.
 	 */
 	protected boolean isEntryIgnored(final int pLen) throws IOException {
-		return isEntryIgnored(pLen, false);
+		return isEntryIgnored(pLen, mode, false);
 	}
 
 	/**
@@ -605,13 +607,16 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *
 	 * @param pLen
 	 *            the length of the path in the path buffer.
+	 * @param fileMode
+	 *            the original iterator file mode
 	 * @param negatePrevious
 	 *            true if the previous matching iterator rule was negation
 	 * @return true if the entry is ignored by an ignore rule.
 	 * @throws IOException
 	 *             a relevant ignore rule file exists but cannot be read.
 	 */
-	private boolean isEntryIgnored(final int pLen, boolean negatePrevious)
+	private boolean isEntryIgnored(final int pLen, int fileMode,
+			boolean negatePrevious)
 			throws IOException {
 		IgnoreNode rules = getIgnoreNode();
 		if (rules != null) {
@@ -623,7 +628,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			if (0 < pOff)
 				pOff--;
 			String p = TreeWalk.pathOf(path, pOff, pLen);
-			switch (rules.isIgnored(p, FileMode.TREE.equals(mode),
+			switch (rules.isIgnored(p, FileMode.TREE.equals(fileMode),
 					negatePrevious)) {
 			case IGNORED:
 				return true;
@@ -638,7 +643,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			}
 		}
 		if (parent instanceof WorkingTreeIterator)
-			return ((WorkingTreeIterator) parent).isEntryIgnored(pLen,
+			return ((WorkingTreeIterator) parent).isEntryIgnored(pLen, fileMode,
 					negatePrevious);
 		return false;
 	}
@@ -675,9 +680,9 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 * @since 3.7
 	 */
 	public AttributesNode getInfoAttributesNode() throws IOException {
-		if (infoAttributeNode instanceof InfoAttributesNode)
-			infoAttributeNode = ((InfoAttributesNode) infoAttributeNode).load();
-		return infoAttributeNode;
+		if (infoAttributesNode instanceof InfoAttributesNode)
+			infoAttributesNode = ((InfoAttributesNode) infoAttributesNode).load();
+		return infoAttributesNode;
 	}
 
 	/**
@@ -693,10 +698,10 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 * @since 3.7
 	 */
 	public AttributesNode getGlobalAttributesNode() throws IOException {
-		if (globalAttributeNode instanceof GlobalAttributesNode)
-			globalAttributeNode = ((GlobalAttributesNode) globalAttributeNode)
+		if (globalAttributesNode instanceof GlobalAttributesNode)
+			globalAttributesNode = ((GlobalAttributesNode) globalAttributesNode)
 					.load();
-		return globalAttributeNode;
+		return globalAttributesNode;
 	}
 
 	private static final Comparator<Entry> ENTRY_CMP = new Comparator<Entry>() {
@@ -1293,68 +1298,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	/**
-	 * Attributes node loaded from global system-wide file.
-	 */
-	private static class GlobalAttributesNode extends AttributesNode {
-		final Repository repository;
-
-		GlobalAttributesNode(Repository repository) {
-			this.repository = repository;
-		}
-
-		AttributesNode load() throws IOException {
-			AttributesNode r = new AttributesNode();
-
-			FS fs = repository.getFS();
-			String path = repository.getConfig().get(CoreConfig.KEY)
-					.getAttributesFile();
-			if (path != null) {
-				File attributesFile;
-				if (path.startsWith("~/")) //$NON-NLS-1$
-					attributesFile = fs.resolve(fs.userHome(),
-							path.substring(2));
-				else
-					attributesFile = fs.resolve(null, path);
-				loadRulesFromFile(r, attributesFile);
-			}
-			return r.getRules().isEmpty() ? null : r;
-		}
-	}
-
-	/** Magic type indicating there may be rules for the top level. */
-	private static class InfoAttributesNode extends AttributesNode {
-		final Repository repository;
-
-		InfoAttributesNode(Repository repository) {
-			this.repository = repository;
-		}
-
-		AttributesNode load() throws IOException {
-			AttributesNode r = new AttributesNode();
-
-			FS fs = repository.getFS();
-
-			File attributes = fs.resolve(repository.getDirectory(),
-					"info/attributes"); //$NON-NLS-1$
-			loadRulesFromFile(r, attributes);
-
-			return r.getRules().isEmpty() ? null : r;
-		}
-
-	}
-
-	private static void loadRulesFromFile(AttributesNode r, File attrs)
-			throws FileNotFoundException, IOException {
-		if (attrs.exists()) {
-			FileInputStream in = new FileInputStream(attrs);
-			try {
-				r.parse(in);
-			} finally {
-				in.close();
-			}
-		}
-	}
 
 	private static final class IteratorState {
 		/** Options used to process the working tree. */
