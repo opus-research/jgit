@@ -157,7 +157,6 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 	 * @throws NoHeadException
 	 * @throws StashApplyFailureException
 	 */
-	@Override
 	public ObjectId call() throws GitAPIException,
 			WrongRepositoryStateException, NoHeadException,
 			StashApplyFailureException {
@@ -233,19 +232,19 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 					untrackedMerger.setBase(null);
 					boolean ok = untrackedMerger.merge(headCommit,
 							untrackedCommit);
-					if (ok) {
+					if (ok)
 						try {
 							RevTree untrackedTree = revWalk
-									.parseTree(untrackedCommit);
+									.parseTree(untrackedMerger
+											.getResultTreeId());
 							resetUntracked(untrackedTree);
 						} catch (CheckoutConflictException e) {
 							throw new StashApplyFailureException(
-									JGitText.get().stashApplyConflict, e);
+									JGitText.get().stashApplyConflict);
 						}
-					} else {
+					else
 						throw new StashApplyFailureException(
 								JGitText.get().stashApplyConflict);
-					}
 				}
 			} else {
 				throw new StashApplyFailureException(
