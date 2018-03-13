@@ -65,7 +65,6 @@ import java.util.List;
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
-import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.LargeObjectException;
@@ -81,8 +80,8 @@ import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.patch.FileHeader;
-import org.eclipse.jgit.patch.HunkHeader;
 import org.eclipse.jgit.patch.FileHeader.PatchType;
+import org.eclipse.jgit.patch.HunkHeader;
 import org.eclipse.jgit.revwalk.FollowFilter;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -92,9 +91,7 @@ import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.filter.AndTreeFilter;
-import org.eclipse.jgit.treewalk.filter.IndexDiffFilter;
 import org.eclipse.jgit.treewalk.filter.NotIgnoredFilter;
-import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.QuotedString;
 import org.eclipse.jgit.util.io.DisabledOutputStream;
@@ -438,16 +435,15 @@ public class DiffFormatter {
 		walk.addTree(b);
 		walk.setRecursive(true);
 
-		TreeFilter filter = getDiffTreeFilterFor(a, b);
-		if (pathFilter instanceof FollowFilter) {
-			walk.setFilter(AndTreeFilter.create(
-					PathFilter.create(((FollowFilter) pathFilter).getPath()),
-					filter));
-		} else if (pathFilter != null) {
-			walk.setFilter(AndTreeFilter.create(pathFilter, filter));
-		} else {
-			walk.setFilter(filter);
-		}
+		TreeFilter filter = pathFilter;
+
+		if (a instanceof WorkingTreeIterator)
+			filter = AndTreeFilter.create(filter, new NotIgnoredFilter(0));
+		if (b instanceof WorkingTreeIterator)
+			filter = AndTreeFilter.create(filter, new NotIgnoredFilter(1));
+		if (!(pathFilter instanceof FollowFilter))
+			filter = AndTreeFilter.create(filter, TreeFilter.ANY_DIFF);
+		walk.setFilter(filter);
 
 		source = new ContentSource.Pair(source(a), source(b));
 
@@ -462,6 +458,12 @@ public class DiffFormatter {
 			walk.reset();
 			walk.addTree(a);
 			walk.addTree(b);
+
+			filter = TreeFilter.ANY_DIFF;
+			if (a instanceof WorkingTreeIterator)
+				filter = AndTreeFilter.create(new NotIgnoredFilter(0), filter);
+			if (b instanceof WorkingTreeIterator)
+				filter = AndTreeFilter.create(new NotIgnoredFilter(1), filter);
 			walk.setFilter(filter);
 
 			if (renameDetector == null)
@@ -472,22 +474,6 @@ public class DiffFormatter {
 			files = detectRenames(files);
 
 		return files;
-	}
-
-	private static TreeFilter getDiffTreeFilterFor(AbstractTreeIterator a,
-			AbstractTreeIterator b) {
-		if (a instanceof DirCacheIterator && b instanceof WorkingTreeIterator)
-			return new IndexDiffFilter(0, 1);
-
-		if (a instanceof WorkingTreeIterator && b instanceof DirCacheIterator)
-			return new IndexDiffFilter(1, 0);
-
-		TreeFilter filter = TreeFilter.ANY_DIFF;
-		if (a instanceof WorkingTreeIterator)
-			filter = AndTreeFilter.create(new NotIgnoredFilter(0), filter);
-		if (b instanceof WorkingTreeIterator)
-			filter = AndTreeFilter.create(new NotIgnoredFilter(1), filter);
-		return filter;
 	}
 
 	private ContentSource source(AbstractTreeIterator iterator) {
