@@ -43,73 +43,66 @@
 
 package org.eclipse.jgit.util;
 
-/**
- * Utility class for character functions on raw bytes
- * <p>
- * Characters are assumed to be 8-bit US-ASCII.
- */
-public class RawCharUtil {
-	private static final boolean[] WHITESPACE = new boolean[256];
+import java.io.UnsupportedEncodingException;
 
-	static {
-		WHITESPACE['\r'] = true;
-		WHITESPACE['\n'] = true;
-		WHITESPACE['\t'] = true;
-		WHITESPACE[' '] = true;
+import junit.framework.TestCase;
+import static org.eclipse.jgit.util.RawCharUtil.isWhitespace;
+import static org.eclipse.jgit.util.RawCharUtil.trimTrailingWhitespace;
+import static org.eclipse.jgit.util.RawCharUtil.trimLeadingWhitespace;
+
+public class RawCharUtilTest extends TestCase {
+
+	/**
+	 * Test method for {@link RawCharUtil#isWhitespace(byte)}.
+	 */
+	public void testIsWhitespace() {
+		for (byte c = -128; c < 127; c++) {
+			switch (c) {
+			case (byte) '\r':
+			case (byte) '\n':
+			case (byte) '\t':
+			case (byte) ' ':
+				assertTrue(isWhitespace(c));
+				break;
+			default:
+				assertFalse(isWhitespace(c));
+			}
+		}
 	}
 
 	/**
-	 * Determine if an 8-bit US-ASCII encoded character is represents whitespace
+	 * Test method for
+	 * {@link RawCharUtil#trimTrailingWhitespace(byte[], int, int)}.
 	 *
-	 * @param c
-	 *            the 8-bit US-ASCII encoded character
-	 * @return true if c represents a whitespace character in 8-bit US-ASCII
+	 * @throws UnsupportedEncodingException
 	 */
-	public static boolean isWhitespace(byte c) {
-		return WHITESPACE[c & 0xff];
+	public void testTrimTrailingWhitespace()
+			throws UnsupportedEncodingException {
+		assertEquals(0, trimTrailingWhitespace("".getBytes("US-ASCII"), 0, 0));
+		assertEquals(0, trimTrailingWhitespace(" ".getBytes("US-ASCII"), 0, 1));
+		assertEquals(1, trimTrailingWhitespace("a ".getBytes("US-ASCII"), 0, 2));
+		assertEquals(2,
+				trimTrailingWhitespace(" a ".getBytes("US-ASCII"), 0, 3));
+		assertEquals(3,
+				trimTrailingWhitespace("  a".getBytes("US-ASCII"), 0, 3));
+		assertEquals(6, trimTrailingWhitespace(
+				"  test   ".getBytes("US-ASCII"), 2, 9));
 	}
 
 	/**
-	 * Returns the new end point for the byte array passed in after trimming any
-	 * trailing whitespace characters, as determined by the isWhitespace()
-	 * function. start and end are assumed to be within the bounds of raw.
+	 * Test method for
+	 * {@link RawCharUtil#trimLeadingWhitespace(byte[], int, int)}.
 	 *
-	 * @param raw
-	 *            the byte array containing the portion to trim whitespace for
-	 * @param start
-	 *            the start of the section of bytes
-	 * @param end
-	 *            the end of the section of bytes
-	 * @return the new end point
+	 * @throws UnsupportedEncodingException
 	 */
-	public static int trimTrailingWhitespace(byte[] raw, int start, int end) {
-		while (end > start && isWhitespace(raw[end - 1]))
-			end--;
-
-		return end;
+	public void testTrimLeadingWhitespace() throws UnsupportedEncodingException {
+		assertEquals(0, trimLeadingWhitespace("".getBytes("US-ASCII"), 0, 0));
+		assertEquals(1, trimLeadingWhitespace(" ".getBytes("US-ASCII"), 0, 1));
+		assertEquals(0, trimLeadingWhitespace("a ".getBytes("US-ASCII"), 0, 2));
+		assertEquals(1, trimLeadingWhitespace(" a ".getBytes("US-ASCII"), 0, 3));
+		assertEquals(2, trimLeadingWhitespace("  a".getBytes("US-ASCII"), 0, 3));
+		assertEquals(2, trimLeadingWhitespace("  test   ".getBytes("US-ASCII"),
+				2, 9));
 	}
 
-	/**
-	 * Returns the new start point for the byte array passed in after trimming
-	 * any leading whitespace characters, as determined by the isWhitespace()
-	 * function. start and end are assumed to be within the bounds of raw.
-	 *
-	 * @param raw
-	 *            the byte array containing the portion to trim whitespace for
-	 * @param start
-	 *            the start of the section of bytes
-	 * @param end
-	 *            the end of the section of bytes
-	 * @return the new start point
-	 */
-	public static int trimLeadingWhitespace(byte[] raw, int start, int end) {
-		while (start < end && isWhitespace(raw[start]))
-			start++;
-
-		return start;
-	}
-
-	private RawCharUtil() {
-		// This will never be called
-	}
 }

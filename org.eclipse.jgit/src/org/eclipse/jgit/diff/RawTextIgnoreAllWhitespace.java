@@ -45,7 +45,6 @@
 package org.eclipse.jgit.diff;
 
 import static org.eclipse.jgit.util.RawCharUtil.isWhitespace;
-import static org.eclipse.jgit.util.RawCharUtil.trimLeadingWhitespace;
 import static org.eclipse.jgit.util.RawCharUtil.trimTrailingWhitespace;
 
 /**
@@ -81,8 +80,6 @@ public class RawTextIgnoreAllWhitespace extends RawText {
 		int ae = a.lines.get(ai + 1);
 		int be = b.lines.get(bi + 1);
 
-		as = trimLeadingWhitespace(a.content, as, ae);
-		bs = trimLeadingWhitespace(b.content, bs, be);
 		ae = trimTrailingWhitespace(a.content, as, ae);
 		be = trimTrailingWhitespace(b.content, bs, be);
 
@@ -107,7 +104,7 @@ public class RawTextIgnoreAllWhitespace extends RawText {
 			bs++;
 		}
 
-		return ae - as == be - bs;
+		return as == ae && bs == be;
 	}
 
 	@Override
