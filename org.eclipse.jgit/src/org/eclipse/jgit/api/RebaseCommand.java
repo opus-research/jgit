@@ -186,8 +186,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 
 	private InteractiveHandler interactiveHandler;
 
-	private boolean stopAfterInitialization = false;
-
 	/**
 	 * @param repo
 	 */
@@ -239,8 +237,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				break;
 			case BEGIN:
 				RebaseResult res = initFilesAndRewind();
-				if (stopAfterInitialization)
-					return RebaseResult.INTERACTIVE_PREPARED_RESULT;
 				if (res != null)
 					return res;
 			}
@@ -1039,33 +1035,12 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	}
 
 	/**
-	 * Enables interactive rebase<br>
-	 * <br>
-	 * Does not stop after initialization of rebase interactive. This is equals
-	 * to runInteractively(InteractiveHandler handler, false);
+	 * Enables interactive rebase
 	 *
 	 * @param handler
 	 * @return this
 	 */
 	public RebaseCommand runInteractively(InteractiveHandler handler) {
-		return runInteractively(handler, false);
-	}
-
-	/**
-	 * Enables interactive rebase<br>
-	 * <br>
-	 * If stopAfterRebaseInteractiveInitialization is true the rebase stops
-	 * after initialization of rebase interactive returning
-	 * {@link RebaseResult#INTERACTIVE_PREPARED_RESULT}
-	 * 
-	 * @param handler
-	 * @param stopAfterRebaseInteractiveInitialization
-	 *            if true the rebase stops after initialization
-	 * @return this instance
-	 */
-	public RebaseCommand runInteractively(InteractiveHandler handler,
-			final boolean stopAfterRebaseInteractiveInitialization) {
-		this.stopAfterInitialization = stopAfterRebaseInteractiveInitialization;
 		this.interactiveHandler = handler;
 		return this;
 	}
