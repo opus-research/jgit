@@ -485,11 +485,7 @@ public class GC {
 		} else {
 			if (r2.isSymbolic())
 				return false;
-			ObjectId objectId = r1.getObjectId();
-			if (objectId != null) {
-				return objectId.equals(r2.getObjectId());
-			}
-			return false;
+			return r1.getObjectId().equals(r2.getObjectId());
 		}
 	}
 

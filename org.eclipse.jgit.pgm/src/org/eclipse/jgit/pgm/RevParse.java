@@ -74,8 +74,7 @@ class RevParse extends TextBuiltin {
 		if (all) {
 			Map<String, Ref> allRefs = db.getRefDatabase().getRefs(ALL);
 			for (final Ref r : allRefs.values()) {
-				ObjectId objectId = r.getObjectId();
-				outw.println(objectId != null ? objectId.name() : r.getName());
+				outw.println(r.getObjectId().name());
 			}
 		} else {
 			if (verify && commits.size() > 1) {
