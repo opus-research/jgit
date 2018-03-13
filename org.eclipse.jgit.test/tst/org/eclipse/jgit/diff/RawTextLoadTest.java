@@ -54,8 +54,6 @@ import org.junit.Test;
 
 import java.io.IOException;
 
-import static org.junit.Assert.assertNotNull;
-
 public class RawTextLoadTest extends RepositoryTestCase {
 	private static byte[] generate(int size, int nullAt) {
 		byte[] data = new byte[size];

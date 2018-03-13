@@ -311,6 +311,7 @@ public class RawText extends Sequence {
 	 * @since 4.10
 	 * @return the RawText representing the blob.
 	 * @throws BinaryBlobException if the blob contains binary data.
+	 * @throws IOException if the input could not be read.
 	 */
 	public static RawText load(ObjectLoader ldr, int threshold) throws IOException, BinaryBlobException {
 		long sz = ldr.getSize();
