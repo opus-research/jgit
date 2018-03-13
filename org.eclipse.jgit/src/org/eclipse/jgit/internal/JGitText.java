@@ -425,7 +425,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidTimeout;
 	/***/ public String invalidTimeUnitValue2;
 	/***/ public String invalidTimeUnitValue3;
-	/***/ public String invalidTreeZeroLengthName;
 	/***/ public String invalidURL;
 	/***/ public String invalidWildcards;
 	/***/ public String invalidRefSpec;
