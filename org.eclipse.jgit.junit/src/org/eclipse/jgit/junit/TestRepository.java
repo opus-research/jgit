@@ -575,8 +575,8 @@ public class TestRepository<R extends Repository> {
 	/**
 	 * Soft-reset HEAD to a different commit.
 	 * <p>
-	 * This is equivalent to {@code git reset --soft} in that it modifies HEAD but not the index or
-	 * the working tree of a non-bare repository.
+	 * This is equivalent to {@code git reset --soft} in that it modifies HEAD but
+	 * not the index or the working tree of a non-bare repository.
 	 *
 	 * @param name
 	 *            revision string; either an existing ref name, or something that
@@ -585,17 +585,12 @@ public class TestRepository<R extends Repository> {
 	 */
 	public void reset(String name) throws Exception {
 		RefUpdate.Result result;
-		Ref ref = db.getRef(name);
-		if (ref != null)
-			result = db.updateRef(Constants.HEAD).link(ref.getName());
-		else {
-			ObjectId id = db.resolve(name);
-			if (id == null)
-				throw new IOException("Not a revision: " + name);
-			RefUpdate ru = db.updateRef(Constants.HEAD, true);
-			ru.setNewObjectId(id);
-			result = ru.forceUpdate();
-		}
+		ObjectId id = db.resolve(name);
+		if (id == null)
+			throw new IOException("Not a revision: " + name);
+		RefUpdate ru = db.updateRef(Constants.HEAD, false);
+		ru.setNewObjectId(id);
+		result = ru.forceUpdate();
 		switch (result) {
 			case FAST_FORWARD:
 			case FORCED:
@@ -892,8 +887,9 @@ public class TestRepository<R extends Repository> {
 			branch = b;
 
 			Ref ref = db.getRef(branch.ref);
-			if (ref != null && ref.getObjectId() != null)
+			if (ref != null) {
 				parent(pool.parseCommit(ref.getObjectId()));
+			}
 		}
 
 		CommitBuilder(CommitBuilder prior) throws Exception {
