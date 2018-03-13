@@ -53,8 +53,6 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.Set;
 
-import org.eclipse.jgit.lib.Repository;
-
 /**
  * FS implementation for Java7 on unix like systems
  */
@@ -345,18 +343,5 @@ public class FS_POSIX_Java7 extends FS_POSIX {
 	@Override
 	public String normalize(String name) {
 		return FileUtil.normalize(name);
-	}
-
-	/**
-	 * @since 3.6
-	 */
-	@Override
-	public File tryFindHook(Repository repository, Hook hook) {
-		final File gitdir = repository.getDirectory();
-		final Path hookPath = gitdir.toPath().resolve("hooks") //$NON-NLS-1$
-				.resolve(hook.getName());
-		if (Files.isExecutable(hookPath))
-			return hookPath.toFile();
-		return null;
 	}
 }
