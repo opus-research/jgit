@@ -220,7 +220,7 @@ public class PushOptionsTest extends RepositoryTestCase {
 				one.getStatus());
 		assertSame(RemoteRefUpdate.Status.REJECTED_REMOTE_CHANGED,
 				two.getStatus());
-		assertNull(baseReceivePack.getPushOptions());
+		assertEquals(new ArrayList<String>(), baseReceivePack.getPushOptions());
 	}
 
 	@Test
