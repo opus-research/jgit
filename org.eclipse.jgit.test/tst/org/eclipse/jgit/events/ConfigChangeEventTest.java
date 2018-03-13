@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.om>
+ * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,39 +40,42 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.events;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
+import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.storage.file.FileBasedConfig;
 
-/**
- * Test cases for ReadTree operations as implemented in WorkDirCheckout
- */
-public class WorkDirCheckout_ReadTreeTest extends ReadTreeTest {
-	private WorkDirCheckout wdc;
-	public void prescanTwoTrees(Tree head, Tree merge) throws IllegalStateException, IOException {
-		wdc = new WorkDirCheckout(db, db.getWorkTree(), head, db.getIndex(), merge);
-		wdc.prescanTwoTrees();
-	}
+public class ConfigChangeEventTest extends RepositoryTestCase {
+	public void testFileRepository_ChangeEventsOnlyOnSave() throws Exception {
+		final ConfigChangedEvent[] events = new ConfigChangedEvent[1];
+		db.getListenerList().addConfigChangedListener(
+				new ConfigChangedListener() {
+					public void onConfigChanged(ConfigChangedEvent event) {
+						events[0] = event;
+					}
+				});
+		FileBasedConfig config = db.getConfig();
+		assertNull(events[0]);
 
-	public void checkout() throws IOException {
-		GitIndex index = db.getIndex();
-		wdc = new WorkDirCheckout(db, db.getWorkTree(), theHead, index, theMerge);
-		wdc.checkout();
-		index.write();
-	}
+		// set a value to some arbitrary key
+		config.setString("test", "section", "event", "value");
+		// no changes until we save
+		assertNull(events[0]);
+		config.save();
+		assertNotNull(events[0]);
+		// correct repository?
+		assertEquals(events[0].getRepository(), db);
 
-	public ArrayList<String> getRemoved() {
-		return wdc.getRemoved();
-	}
+		// reset for the next test
+		events[0] = null;
 
-	public HashMap<String, ObjectId> getUpdated() {
-		return wdc.updated;
-	}
-
-	public ArrayList<String> getConflicts() {
-		return wdc.getConflicts();
+		// unset the value we have just set above
+		config.unset("test", "section", "event");
+		// no changes until we save
+		assertNull(events[0]);
+		config.save();
+		assertNotNull(events[0]);
+		// correct repository?
+		assertEquals(events[0].getRepository(), db);
 	}
 }
-
