@@ -471,15 +471,12 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 					if (authMethod == HttpAuthMethod.NONE)
 						throw new TransportException(uri, MessageFormat.format(
 								JGitText.get().authenticationNotSupported, uri));
-					CredentialsProvider credentialsProvider = getCredentialsProvider();
-					if (4 < authAttempts
-							|| !authMethod.authorize(uri, credentialsProvider)) {
-						credentialsProvider.reset(uri);
+					if (1 < authAttempts
+							|| !authMethod.authorize(uri,
+									getCredentialsProvider())) {
 						throw new TransportException(uri,
 								JGitText.get().notAuthorized);
 					}
-					if (authAttempts > 1)
-						credentialsProvider.reset(uri);
 					authAttempts++;
 					continue;
 
@@ -507,7 +504,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 	/**
 	 * Open an HTTP connection.
-	 *
+	 * 
 	 * @param method
 	 * @param u
 	 * @return the connection
