@@ -60,7 +60,6 @@ import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.slf4j.Logger;
@@ -306,11 +305,9 @@ public class RepositoryCache {
 	private void unregisterAndCloseRepository(final Key location,
 			Repository db) {
 		synchronized (lockFor(location)) {
-			if (isExpired(db)) {
-				Repository oldDb = unregisterRepository(location);
-				if (oldDb != null) {
-					oldDb.close();
-				}
+			Repository oldDb = unregisterRepository(location);
+			if (oldDb != null) {
+				oldDb.doClose();
 			}
 		}
 	}
@@ -488,21 +485,9 @@ public class RepositoryCache {
 		 *         Git directory.
 		 */
 		public static boolean isGitRepository(final File dir, FS fs) {
-			try {
-				// check if GIT_COMMON_DIR available and fallback to GIT_DIR if
-				// not
-				File commonDir = FileUtils.getCommonDir(dir);
-				if (commonDir == null) {
-					commonDir = dir;
-				}
-				return fs.resolve(commonDir, Constants.OBJECTS).exists()
-						&& fs.resolve(commonDir, Constants.REFS).exists()
-						&& isValidHead(
-								new File(dir,
-										Constants.HEAD));
-			} catch (IOException e) {
-				return false;
-			}
+			return fs.resolve(dir, "objects").exists() //$NON-NLS-1$
+					&& fs.resolve(dir, "refs").exists() //$NON-NLS-1$
+					&& isValidHead(new File(dir, Constants.HEAD));
 		}
 
 		private static boolean isValidHead(final File head) {
@@ -545,28 +530,15 @@ public class RepositoryCache {
 		 *         null if there is no suitable match.
 		 */
 		public static File resolve(final File directory, FS fs) {
-			// the folder itself
 			if (isGitRepository(directory, fs))
 				return directory;
-			// the .git subfolder or file (reference)
-			final File dotDir = new File(directory, Constants.DOT_GIT);
-			if (dotDir.isFile()) {
-				try {
-					File refDir = FileUtils.getSymRef(directory, dotDir, fs);
-					if (refDir != null && isGitRepository(refDir, fs)) {
-						return refDir;
-					}
-				} catch (IOException ignored) {
-					// Continue searching if gitdir ref isn't found
-				}
-			} else if (isGitRepository(dotDir, fs)) {
-				return dotDir;
-			}
-			// the folder extended with .git (bare)
-			final File bareDir = new File(directory.getParentFile(),
-					directory.getName() + Constants.DOT_GIT_EXT);
-			if (isGitRepository(bareDir, fs))
-				return bareDir;
+			if (isGitRepository(new File(directory, Constants.DOT_GIT), fs))
+				return new File(directory, Constants.DOT_GIT);
+
+			final String name = directory.getName();
+			final File parent = directory.getParentFile();
+			if (isGitRepository(new File(parent, name + Constants.DOT_GIT_EXT), fs))
+				return new File(parent, name + Constants.DOT_GIT_EXT);
 			return null;
 		}
 	}
