@@ -274,11 +274,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 			// which should not be wrapped by a JGitInternalException we
 			// have to catch and re-throw it here
 			throw e;
-		} catch (JGitInternalException e) {
-			throw e;
 		} catch (CannotLockDirCache e) {
-			throw new JGitInternalException(e.getMessage(), e);
-		} catch (IOException e) {
 			throw new JGitInternalException(e.getMessage(), e);
 		} catch (Exception e) {
 			throw new JGitInternalException(
