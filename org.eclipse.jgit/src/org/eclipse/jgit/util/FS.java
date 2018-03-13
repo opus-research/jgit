@@ -50,7 +50,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
-import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -96,20 +95,6 @@ public abstract class FS {
 	public static final FS DETECTED = detect();
 
 	private static FSFactory factory;
-
-	/**
-	 * Set the factory class to use
-	 *
-	 * @param factory
-	 */
-	@SuppressWarnings("nls")
-	public static void setFactory(FSFactory factory) {
-		if (FS.factory != null)
-			throw new IllegalStateException("FSFactory alread set to "
-					+ FS.factory.getClass() + ", cannot change to "
-					+ factory.getClass());
-		FS.factory = factory;
-	}
 
 	/**
 	 * Auto-detect the appropriate file system abstraction.
@@ -258,7 +243,7 @@ public abstract class FS {
 	}
 
 	/**
-	 * Get the last modified time of a file system object. If the OS/JRE support
+	 * Set the last modified time of a file system object. If the OS/JRE support
 	 * symbolic links, the link is modified, not the target,
 	 *
 	 * @param f
@@ -279,19 +264,6 @@ public abstract class FS {
 	 */
 	public long length(File path) throws IOException {
 		return path.length();
-	}
-
-	/**
-	 * Delete a file. Throws an exception if delete fails.
-	 *
-	 * @param f
-	 * @throws IOException
-	 *             , this may be a Java7 subclass with detailed information
-	 */
-	public void delete(File f) throws IOException {
-		if (!f.delete())
-			throw new IOException(MessageFormat.format(
-					JGitText.get().deleteFileFailed, f.getAbsolutePath()));
 	}
 
 	/**
@@ -557,7 +529,7 @@ public abstract class FS {
 	/**
 	 * Check if path is a directory. If the OS/JRE supports symbolic links and
 	 * path is a symbolic link to a directory, this method returns false.
-	 * 
+	 *
 	 * @param path
 	 * @return true if file is a directory,
 	 */
