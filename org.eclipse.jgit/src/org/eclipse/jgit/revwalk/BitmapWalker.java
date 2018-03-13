@@ -48,14 +48,14 @@ import java.util.Arrays;
 
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
-import org.eclipse.jgit.lib.BitmapIndex;
+import org.eclipse.jgit.internal.revwalk.AddToBitmapFilter;
+import org.eclipse.jgit.internal.revwalk.AddUnseenToBitmapFilter;
 import org.eclipse.jgit.lib.BitmapIndex.Bitmap;
 import org.eclipse.jgit.lib.BitmapIndex.BitmapBuilder;
-import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.BitmapIndex;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
-import org.eclipse.jgit.revwalk.filter.RevFilter;
 
 /**
  * Helper class to do ObjectWalks with pack index bitmaps.
@@ -199,118 +199,5 @@ public final class BitmapWalker {
 		}
 
 		return bitmapResult;
-	}
-
-	/**
-	 * A RevFilter that adds the visited commits to {@code bitmap} as a side
-	 * effect.
-	 * <p>
-	 * When the walk hits a commit that is part of {@code bitmap}'s
-	 * BitmapIndex, that entire bitmap is ORed into {@code bitmap} and the
-	 * commit and its parents are marked as SEEN so that the walk does not
-	 * have to visit its ancestors.  This ensures the walk is very short if
-	 * there is good bitmap coverage.
-	 *
-	 * @since 4.10
-	 */
-	public static class AddToBitmapFilter extends RevFilter {
-		private final BitmapBuilder bitmap;
-
-		/**
-		 * Create a filter that adds visited commits to the given bitmap.
-		 */
-		public AddToBitmapFilter(BitmapBuilder bitmap) {
-			this.bitmap = bitmap;
-		}
-
-		@Override
-		public final boolean include(RevWalk walker, RevCommit cmit) {
-			Bitmap visitedBitmap;
-
-			if (bitmap.contains(cmit)) {
-				// already included
-			} else if ((visitedBitmap = bitmap.getBitmapIndex()
-					.getBitmap(cmit)) != null) {
-				bitmap.or(visitedBitmap);
-			} else {
-				bitmap.addObject(cmit, Constants.OBJ_COMMIT);
-				return true;
-			}
-
-			for (RevCommit p : cmit.getParents()) {
-				p.add(RevFlag.SEEN);
-			}
-			return false;
-		}
-
-		@Override
-		public final RevFilter clone() {
-			throw new UnsupportedOperationException();
-		}
-
-		@Override
-		public final boolean requiresCommitBody() {
-			return false;
-		}
-	}
-
-	/**
-	 * A RevFilter that adds the visited commits to {@code bitmap} as a side
-	 * effect.
-	 * <p>
-	 * When the walk hits a commit that is part of {@code bitmap}'s
-	 * BitmapIndex, that entire bitmap is ORed into {@code bitmap} and the
-	 * commit and its parents are marked as SEEN so that the walk does not
-	 * have to visit its ancestors.  This ensures the walk is very short if
-	 * there is good bitmap coverage.
-	 * <p>
-	 * Commits named in {@code seen} are considered already seen.  If one is
-	 * encountered, that commit and its parents will be marked with the SEEN
-	 * flag to prevent the walk from visiting its ancestors.
-	 *
-	 * @since 4.10
-	 */
-	public static class AddUnseenToBitmapFilter extends RevFilter {
-		private final BitmapBuilder seen;
-		private final BitmapBuilder bitmap;
-
-		/**
-		 * Create a filter that adds visited commits to the given bitmap, but does not walk
-		 * through the objects in {@code seen}.
-		 */
-		public AddUnseenToBitmapFilter(BitmapBuilder seen, BitmapBuilder bitmapResult) {
-			this.seen = seen;
-			this.bitmap = bitmapResult;
-		}
-
-		@Override
-		public final boolean include(RevWalk walker, RevCommit cmit) {
-			Bitmap visitedBitmap;
-
-			if (seen.contains(cmit) || bitmap.contains(cmit)) {
-				// already seen or included
-			} else if ((visitedBitmap = bitmap.getBitmapIndex()
-					.getBitmap(cmit)) != null) {
-				bitmap.or(visitedBitmap);
-			} else {
-				bitmap.addObject(cmit, Constants.OBJ_COMMIT);
-				return true;
-			}
-
-			for (RevCommit p : cmit.getParents()) {
-				p.add(RevFlag.SEEN);
-			}
-			return false;
-		}
-
-		@Override
-		public final RevFilter clone() {
-			throw new UnsupportedOperationException();
-		}
-
-		@Override
-		public final boolean requiresCommitBody() {
-			return false;
-		}
 	}
 }
