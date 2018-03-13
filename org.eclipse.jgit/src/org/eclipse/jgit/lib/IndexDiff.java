@@ -169,7 +169,6 @@ public class IndexDiff {
 		boolean changesExist = false;
 		DirCache dirCache = repository.readDirCache();
 		TreeWalk treeWalk = new TreeWalk(repository);
-		treeWalk.reset();
 		treeWalk.setRecursive(true);
 		// add the trees (tree, dirchache, workdir)
 		if (tree != null)
@@ -281,7 +280,7 @@ public class IndexDiff {
 	}
 
 	/**
-	 * @return list of files that are not ignored, and not in the index.
+	 * @return list of files on modified on disk relative to the index
 	 */
 	public Set<String> getUntracked() {
 		return untracked;
