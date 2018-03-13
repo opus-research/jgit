@@ -1,9 +1,5 @@
 /*
- * Copyright (C) 2009, Constantine Plotnikov <constantine.plotnikov@gmail.com>
- * Copyright (C) 2008, Google Inc.
- * Copyright (C) 2010, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
- * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -45,33 +41,19 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.pgm;
+package org.eclipse.jgit.storage.file;
 
-import java.text.MessageFormat;
+import java.io.File;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.InitCommand;
-import org.eclipse.jgit.lib.Repository;
-import org.kohsuke.args4j.Option;
+import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 
-@Command(common = true, usage = "usage_CreateAnEmptyGitRepository")
-class Init extends TextBuiltin {
-	@Option(name = "--bare", usage = "usage_CreateABareRepository")
-	private boolean bare;
+public class FileRepositoryBuilderTest extends LocalDiskRepositoryTestCase {
+	public void testShouldAutomagicallyDetectGitDirectory() throws Exception {
+		FileRepository r = createWorkRepository();
+		File d = new File(r.getDirectory(), "sub-dir");
+		d.mkdir();
 
-	@Override
-	protected final boolean requiresRepository() {
-		return false;
-	}
-
-	@Override
-	protected void run() throws Exception {
-		InitCommand command = Git.init();
-		command.setBare(bare);
-		command.setDirectory(gitdir);
-		Repository repository = command.call().getRepository();
-		out.println(MessageFormat.format(
-				CLIText.get().initializedEmptyGitRepositoryIn, repository
-						.getDirectory().getAbsolutePath()));
+		assertEquals(r.getDirectory(), new FileRepositoryBuilder()
+				.findGitDir(d).getGitDir());
 	}
 }

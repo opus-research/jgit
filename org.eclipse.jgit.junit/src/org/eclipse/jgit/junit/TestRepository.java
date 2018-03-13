@@ -98,8 +98,6 @@ import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 
-import static org.eclipse.jgit.lib.Constants.OBJ_COMMIT;
-
 /**
  * Wrapper to make creating test data easier.
  *
@@ -577,7 +575,7 @@ public class TestRepository<R extends Repository> {
 				break;
 
 			final byte[] bin = db.open(o, o.getType()).getCachedBytes();
-			oc.check(OBJ_COMMIT, bin);
+			oc.checkCommit(bin);
 			assertHash(o, bin);
 		}
 
