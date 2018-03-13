@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014, Arthur Daussy <arthur.daussy@obeo.fr>
+ * Copyright (C) 2015, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,47 +40,28 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.treewalk;
 
-import java.io.IOException;
+package org.eclipse.jgit.annotations;
 
-import org.eclipse.jgit.attributes.AttributesNode;
-import org.eclipse.jgit.lib.CoreConfig;
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.LOCAL_VARIABLE;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
- * An internal interface use to retrieve {@link AttributesNode}s.
+ * JGit's replacement for the {@code javax.annotations.Nullable}.
  * <p>
- * Implementor of this interface should be able to retrieve the global
- * {@link AttributesNode} and the info {@link AttributesNode}
- * </p>
- *
- * @since 4.2
- *
+ * Denotes that a local variable, parameter, field, method return value can be
+ * {@code null}.
  */
-public interface AttributesNodeProvider {
-
-	/**
-	 * Retrieves the {@link AttributesNode} that holds the information located
-	 * in $GIT_DIR/info/attributes file.
-	 *
-	 * @return the {@link AttributesNode} that holds the information located in
-	 *         $GIT_DIR/info/attributes file.
-	 * @throws IOException
-	 *             if an error is raised while parsing the attributes file
-	 */
-	public AttributesNode getInfoAttributesNode() throws IOException;
-
-	/**
-	 * Retrieves the {@link AttributesNode} that holds the information located
-	 * in system-wide file.
-	 *
-	 * @return the {@link AttributesNode} that holds the information located in
-	 *         system-wide file.
-	 * @throws IOException
-	 *             IOException if an error is raised while parsing the
-	 *             attributes file
-	 * @see CoreConfig#getAttributesFile()
-	 */
-	public AttributesNode getGlobalAttributesNode() throws IOException;
-
+@Documented
+@Retention(RetentionPolicy.CLASS)
+@Target({ FIELD, METHOD, PARAMETER, LOCAL_VARIABLE })
+public @interface Nullable {
+	// marker annotation with no members
 }

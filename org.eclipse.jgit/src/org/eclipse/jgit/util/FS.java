@@ -65,7 +65,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.eclipse.jdt.annotation.Nullable;
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
@@ -110,54 +110,7 @@ public abstract class FS {
 		}
 	}
 
-	/**
-	 * Result of an executed process. The caller is responsible to close the
-	 * contained {@link TemporaryBuffer}s
-	 *
-	 * @since 4.2
-	 */
-	public static class ExecutionResult {
-		private TemporaryBuffer stdout;
-
-		private TemporaryBuffer stderr;
-
-		private int rc;
-
-		/**
-		 * @param stdout
-		 * @param stderr
-		 * @param rc
-		 */
-		public ExecutionResult(TemporaryBuffer stdout, TemporaryBuffer stderr,
-				int rc) {
-			this.stdout = stdout;
-			this.stderr = stderr;
-			this.rc = rc;
-		}
-
-		/**
-		 * @return buffered standard output stream
-		 */
-		public TemporaryBuffer getStdout() {
-			return stdout;
-		}
-
-		/**
-		 * @return buffered standard error stream
-		 */
-		public TemporaryBuffer getStderr() {
-			return stderr;
-		}
-
-		/**
-		 * @return the return code of the process
-		 */
-		public int getRc() {
-			return rc;
-		}
-	}
-
-	private final static Logger LOG = LoggerFactory.getLogger(FS.class);
+	final static Logger LOG = LoggerFactory.getLogger(FS.class);
 
 	/** The auto-detected implementation selected for this operating system and JRE. */
 	public static final FS DETECTED = detect();
@@ -451,7 +404,8 @@ public abstract class FS {
 	 *            as component array
 	 * @param encoding
 	 *            to be used to parse the command's output
-	 * @return the one-line output of the command
+	 * @return the one-line output of the command or {@code null} if there is
+	 *         none
 	 */
 	@Nullable
 	protected static String readPipe(File dir, String[] command, String encoding) {
@@ -470,7 +424,8 @@ public abstract class FS {
 	 * @param env
 	 *            Map of environment variables to be merged with those of the
 	 *            current process
-	 * @return the one-line output of the command
+	 * @return the one-line output of the command or {@code null} if there is
+	 *         none
 	 * @since 4.0
 	 */
 	@Nullable
@@ -1078,32 +1033,6 @@ public abstract class FS {
 	 *         populating directory, environment, and then start the process.
 	 */
 	public abstract ProcessBuilder runInShell(String cmd, String[] args);
-
-	/**
-	 * Execute a command defined by a {@link ProcessBuilder}.
-	 *
-	 * @param pb
-	 *            The command to be executed
-	 * @param in
-	 *            The standard input stream passed to the process
-	 * @return The result of the executed command
-	 * @throws InterruptedException
-	 * @throws IOException
-	 * @since 4.2
-	 */
-	public ExecutionResult execute(ProcessBuilder pb, InputStream in)
-			throws IOException, InterruptedException {
-		TemporaryBuffer stdout = new TemporaryBuffer.LocalFile(null);
-		TemporaryBuffer stderr = new TemporaryBuffer.Heap(1024, 1024 * 1024);
-		try {
-			int rc = runProcess(pb, stdout, stderr, in);
-			return new ExecutionResult(stdout, stderr, rc);
-		} catch (Exception e) {
-			stdout.close();
-			stderr.close();
-			throw e;
-		}
-	}
 
 	private static class Holder<V> {
 		final V value;

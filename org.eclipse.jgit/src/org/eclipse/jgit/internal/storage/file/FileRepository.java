@@ -57,6 +57,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.eclipse.jgit.attributes.AttributesNode;
+import org.eclipse.jgit.attributes.AttributesNodeProvider;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.events.ConfigChangedEvent;
 import org.eclipse.jgit.events.ConfigChangedListener;
@@ -77,7 +78,6 @@ import org.eclipse.jgit.lib.ReflogReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
-import org.eclipse.jgit.treewalk.AttributesNodeProvider;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.StringUtils;
