@@ -48,6 +48,7 @@ package org.eclipse.jgit.internal.storage.file;
 
 import static org.eclipse.jgit.lib.Constants.CHARSET;
 import static org.eclipse.jgit.lib.Constants.HEAD;
+import static org.eclipse.jgit.lib.Constants.LOGS;
 import static org.eclipse.jgit.lib.Constants.OBJECT_ID_STRING_LENGTH;
 import static org.eclipse.jgit.lib.Constants.PACKED_REFS;
 import static org.eclipse.jgit.lib.Constants.R_HEADS;
@@ -63,17 +64,22 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.InterruptedIOException;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.text.MessageFormat;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.eclipse.jgit.annotations.NonNull;
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.InvalidObjectIdException;
 import org.eclipse.jgit.errors.LockFailedException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -135,15 +141,21 @@ public class RefDirectory extends RefDatabase {
 			Constants.MERGE_HEAD, Constants.FETCH_HEAD, Constants.ORIG_HEAD,
 			Constants.CHERRY_PICK_HEAD };
 
+	@SuppressWarnings("boxing")
+	private static final List<Integer> RETRY_SLEEP_MS =
+			Collections.unmodifiableList(Arrays.asList(0, 100, 200, 400, 800, 1600));
+
 	private final FileRepository parent;
 
 	private final File gitDir;
 
 	final File refsDir;
 
-	private final ReflogWriter logWriter;
+	final File packedRefsFile;
 
-	private final File packedRefsFile;
+	final File logsDir;
+
+	final File logsRefsDir;
 
 	/**
 	 * Immutable sorted list of loose references.
@@ -157,6 +169,22 @@ public class RefDirectory extends RefDatabase {
 
 	/** Immutable sorted list of packed references. */
 	final AtomicReference<PackedRefList> packedRefs = new AtomicReference<>();
+
+	/**
+	 * Lock for coordinating operations within a single process that may contend
+	 * on the {@code packed-refs} file.
+	 * <p>
+	 * All operations that write {@code packed-refs} must still acquire a
+	 * {@link LockFile} on {@link #packedRefsFile}, even after they have acquired
+	 * this lock, since there may be multiple {@link RefDirectory} instances or
+	 * other processes operating on the same repo on disk.
+	 * <p>
+	 * This lock exists so multiple threads in the same process can wait in a fair
+	 * queue without trying, failing, and retrying to acquire the on-disk lock. If
+	 * {@code RepositoryCache} is used, this lock instance will be used by all
+	 * threads.
+	 */
+	final ReentrantLock inProcessPackedRefsLock = new ReentrantLock(true);
 
 	/**
 	 * Number of modifications made to this database.
@@ -174,24 +202,43 @@ public class RefDirectory extends RefDatabase {
 	 */
 	private final AtomicInteger lastNotifiedModCnt = new AtomicInteger();
 
+	private List<Integer> retrySleepMs = RETRY_SLEEP_MS;
+
 	RefDirectory(final FileRepository db) {
 		final FS fs = db.getFS();
 		parent = db;
 		gitDir = db.getDirectory();
-		logWriter = new ReflogWriter(db);
 		refsDir = fs.resolve(gitDir, R_REFS);
+		logsDir = fs.resolve(gitDir, LOGS);
+		logsRefsDir = fs.resolve(gitDir, LOGS + '/' + R_REFS);
 		packedRefsFile = fs.resolve(gitDir, PACKED_REFS);
 
 		looseRefs.set(RefList.<LooseRef> emptyList());
-		packedRefs.set(PackedRefList.NO_PACKED_REFS);
+		packedRefs.set(NO_PACKED_REFS);
 	}
 
 	Repository getRepository() {
 		return parent;
 	}
 
-	ReflogWriter getLogWriter() {
-		return logWriter;
+	ReflogWriter newLogWriter(boolean force) {
+		return new ReflogWriter(this, force);
+	}
+
+	/**
+	 * Locate the log file on disk for a single reference name.
+	 *
+	 * @param name
+	 *            name of the ref, relative to the Git repository top level
+	 *            directory (so typically starts with refs/).
+	 * @return the log file location.
+	 */
+	public File logFor(String name) {
+		if (name.startsWith(R_REFS)) {
+			name = name.substring(R_REFS.length());
+			return new File(logsRefsDir, name);
+		}
+		return new File(logsDir, name);
 	}
 
 	@Override
@@ -199,7 +246,7 @@ public class RefDirectory extends RefDatabase {
 		FileUtils.mkdir(refsDir);
 		FileUtils.mkdir(new File(refsDir, R_HEADS.substring(R_REFS.length())));
 		FileUtils.mkdir(new File(refsDir, R_TAGS.substring(R_REFS.length())));
-		logWriter.create();
+		newLogWriter(false).create();
 	}
 
 	@Override
@@ -209,7 +256,7 @@ public class RefDirectory extends RefDatabase {
 
 	private void clearReferences() {
 		looseRefs.set(RefList.<LooseRef> emptyList());
-		packedRefs.set(PackedRefList.NO_PACKED_REFS);
+		packedRefs.set(NO_PACKED_REFS);
 	}
 
 	@Override
@@ -562,6 +609,16 @@ public class RefDirectory extends RefDatabase {
 		return new RefDirectoryRename(from, to);
 	}
 
+	@Override
+	public PackedBatchRefUpdate newBatchUpdate() {
+		return new PackedBatchRefUpdate(this);
+	}
+
+	@Override
+	public boolean performsAtomicTransactions() {
+		return true;
+	}
+
 	void stored(RefDirectoryUpdate update, FileSnapshot snapshot) {
 		final ObjectId target = update.getNewObjectId().copy();
 		final Ref leaf = update.getRef().getLeaf();
@@ -590,16 +647,20 @@ public class RefDirectory extends RefDatabase {
 		// we don't miss an edit made externally.
 		final PackedRefList packed = getPackedRefs();
 		if (packed.contains(name)) {
-			LockFile lck = new LockFile(packedRefsFile);
-			if (!lck.lock())
-				throw new LockFailedException(packedRefsFile);
+			inProcessPackedRefsLock.lock();
 			try {
-				PackedRefList cur = readPackedRefs();
-				int idx = cur.find(name);
-				if (0 <= idx)
-					commitPackedRefs(lck, cur.remove(idx), packed);
+				LockFile lck = lockPackedRefsOrThrow();
+				try {
+					PackedRefList cur = readPackedRefs();
+					int idx = cur.find(name);
+					if (0 <= idx) {
+						commitPackedRefs(lck, cur.remove(idx), packed, true);
+					}
+				} finally {
+					lck.unlock();
+				}
 			} finally {
-				lck.unlock();
+				inProcessPackedRefsLock.unlock();
 			}
 		}
 
@@ -613,7 +674,7 @@ public class RefDirectory extends RefDatabase {
 		} while (!looseRefs.compareAndSet(curLoose, newLoose));
 
 		int levels = levelsIn(name) - 2;
-		delete(logWriter.logFor(name), levels);
+		delete(logFor(name), levels);
 		if (dst.getStorage().isLoose()) {
 			update.unlock();
 			delete(fileFor(name), levels);
@@ -635,89 +696,143 @@ public class RefDirectory extends RefDatabase {
 	 * @throws IOException
 	 */
 	public void pack(List<String> refs) throws IOException {
-		if (refs.size() == 0)
-			return;
+		pack(refs, Collections.emptyMap());
+	}
+
+	PackedRefList pack(Map<String, LockFile> heldLocks) throws IOException {
+		return pack(heldLocks.keySet(), heldLocks);
+	}
+
+	private PackedRefList pack(Collection<String> refs,
+			Map<String, LockFile> heldLocks) throws IOException {
+		for (LockFile ol : heldLocks.values()) {
+			ol.requireLock();
+		}
+		if (refs.size() == 0) {
+			return null;
+		}
 		FS fs = parent.getFS();
 
 		// Lock the packed refs file and read the content
-		LockFile lck = new LockFile(packedRefsFile);
-		if (!lck.lock())
-			throw new IOException(MessageFormat.format(
-					JGitText.get().cannotLock, packedRefsFile));
-
+		inProcessPackedRefsLock.lock();
 		try {
-			final PackedRefList packed = getPackedRefs();
-			RefList<Ref> cur = readPackedRefs();
+			LockFile lck = lockPackedRefsOrThrow();
+			try {
+				final PackedRefList packed = getPackedRefs();
+				RefList<Ref> cur = readPackedRefs();
 
-			// Iterate over all refs to be packed
-			boolean dirty = false;
-			for (String refName : refs) {
-				Ref oldRef = readRef(refName, cur);
-				if (oldRef.isSymbolic()) {
-					continue; // can't pack symbolic refs
-				}
-				// Add/Update it to packed-refs
-				Ref newRef = peeledPackedRef(oldRef);
-				if (newRef == oldRef) {
-					// No-op; peeledPackedRef returns the input ref only if it's already
-					// packed, and readRef returns a packed ref only if there is no loose
-					// ref.
-					continue;
-				}
-
-				dirty = true;
-				int idx = cur.find(refName);
-				if (idx >= 0) {
-					cur = cur.set(idx, newRef);
-				} else {
-					cur = cur.add(idx, newRef);
-				}
-			}
-			if (!dirty) {
-				// All requested refs were already packed accurately
-				return;
-			}
-
-			// The new content for packed-refs is collected. Persist it.
-			commitPackedRefs(lck, cur, packed);
-
-			// Now delete the loose refs which are now packed
-			for (String refName : refs) {
-				// Lock the loose ref
-				File refFile = fileFor(refName);
-				if (!fs.exists(refFile))
-					continue;
-				LockFile rLck = new LockFile(refFile);
-				if (!rLck.lock())
-					continue;
-				try {
-					LooseRef currentLooseRef = scanRef(null, refName);
-					if (currentLooseRef == null || currentLooseRef.isSymbolic())
-						continue;
-					Ref packedRef = cur.get(refName);
-					ObjectId clr_oid = currentLooseRef.getObjectId();
-					if (clr_oid != null
-							&& clr_oid.equals(packedRef.getObjectId())) {
-						RefList<LooseRef> curLoose, newLoose;
-						do {
-							curLoose = looseRefs.get();
-							int idx = curLoose.find(refName);
-							if (idx < 0)
-								break;
-							newLoose = curLoose.remove(idx);
-						} while (!looseRefs.compareAndSet(curLoose, newLoose));
-						int levels = levelsIn(refName) - 2;
-						delete(refFile, levels, rLck);
+				// Iterate over all refs to be packed
+				boolean dirty = false;
+				for (String refName : refs) {
+					Ref oldRef = readRef(refName, cur);
+					if (oldRef == null) {
+						continue; // A non-existent ref is already correctly packed.
 					}
-				} finally {
-					rLck.unlock();
+					if (oldRef.isSymbolic()) {
+						continue; // can't pack symbolic refs
+					}
+					// Add/Update it to packed-refs
+					Ref newRef = peeledPackedRef(oldRef);
+					if (newRef == oldRef) {
+						// No-op; peeledPackedRef returns the input ref only if it's already
+						// packed, and readRef returns a packed ref only if there is no
+						// loose ref.
+						continue;
+					}
+
+					dirty = true;
+					int idx = cur.find(refName);
+					if (idx >= 0) {
+						cur = cur.set(idx, newRef);
+					} else {
+						cur = cur.add(idx, newRef);
+					}
 				}
+				if (!dirty) {
+					// All requested refs were already packed accurately
+					return packed;
+				}
+
+				// The new content for packed-refs is collected. Persist it.
+				PackedRefList result = commitPackedRefs(lck, cur, packed,
+						false);
+
+				// Now delete the loose refs which are now packed
+				for (String refName : refs) {
+					// Lock the loose ref
+					File refFile = fileFor(refName);
+					if (!fs.exists(refFile)) {
+						continue;
+					}
+
+					LockFile rLck = heldLocks.get(refName);
+					boolean shouldUnlock;
+					if (rLck == null) {
+						rLck = new LockFile(refFile);
+						if (!rLck.lock()) {
+							continue;
+						}
+						shouldUnlock = true;
+					} else {
+						shouldUnlock = false;
+					}
+
+					try {
+						LooseRef currentLooseRef = scanRef(null, refName);
+						if (currentLooseRef == null || currentLooseRef.isSymbolic()) {
+							continue;
+						}
+						Ref packedRef = cur.get(refName);
+						ObjectId clr_oid = currentLooseRef.getObjectId();
+						if (clr_oid != null
+								&& clr_oid.equals(packedRef.getObjectId())) {
+							RefList<LooseRef> curLoose, newLoose;
+							do {
+								curLoose = looseRefs.get();
+								int idx = curLoose.find(refName);
+								if (idx < 0) {
+									break;
+								}
+								newLoose = curLoose.remove(idx);
+							} while (!looseRefs.compareAndSet(curLoose, newLoose));
+							int levels = levelsIn(refName) - 2;
+							delete(refFile, levels, rLck);
+						}
+					} finally {
+						if (shouldUnlock) {
+							rLck.unlock();
+						}
+					}
+				}
+				// Don't fire refsChanged. The refs have not change, only their
+				// storage.
+				return result;
+			} finally {
+				lck.unlock();
 			}
-			// Don't fire refsChanged. The refs have not change, only their
-			// storage.
 		} finally {
-			lck.unlock();
+			inProcessPackedRefsLock.unlock();
 		}
+	}
+
+	@Nullable
+	LockFile lockPackedRefs() throws IOException {
+		LockFile lck = new LockFile(packedRefsFile);
+		for (int ms : getRetrySleepMs()) {
+			sleep(ms);
+			if (lck.lock()) {
+				return lck;
+			}
+		}
+		return null;
+	}
+
+	private LockFile lockPackedRefsOrThrow() throws IOException {
+		LockFile lck = lockPackedRefs();
+		if (lck == null) {
+			throw new LockFailedException(packedRefsFile);
+		}
+		return lck;
 	}
 
 	/**
@@ -748,9 +863,9 @@ public class RefDirectory extends RefDatabase {
 		}
 	}
 
-	void log(final RefUpdate update, final String msg, final boolean deref)
+	void log(boolean force, RefUpdate update, String msg, boolean deref)
 			throws IOException {
-		logWriter.log(update, msg, deref);
+		newLogWriter(force).log(update, msg, deref);
 	}
 
 	private Ref resolve(final Ref ref, int depth, String prefix,
@@ -813,7 +928,7 @@ public class RefDirectory extends RefDatabase {
 					throw noPackedRefs;
 				}
 				// Ignore it and leave the new list empty.
-				return PackedRefList.NO_PACKED_REFS;
+				return NO_PACKED_REFS;
 			}
 			try {
 				return new PackedRefList(parsePackedRefs(br), snapshot,
@@ -894,8 +1009,12 @@ public class RefDirectory extends RefDatabase {
 		return new StringBuilder(end - off).append(src, off, end).toString();
 	}
 
-	private void commitPackedRefs(final LockFile lck, final RefList<Ref> refs,
-			final PackedRefList oldPackedList) throws IOException {
+	PackedRefList commitPackedRefs(final LockFile lck, final RefList<Ref> refs,
+			final PackedRefList oldPackedList, boolean changed)
+			throws IOException {
+		// Can't just return packedRefs.get() from this method; it might have been
+		// updated again after writePackedRefs() returns.
+		AtomicReference<PackedRefList> result = new AtomicReference<>();
 		new RefWriter(refs) {
 			@Override
 			protected void writeFile(String name, byte[] content)
@@ -935,8 +1054,13 @@ public class RefDirectory extends RefDatabase {
 					throw new ObjectWritingException(
 							MessageFormat.format(JGitText.get().unableToWrite, name));
 				}
+				if (changed) {
+					modCnt.incrementAndGet();
+				}
+				result.set(newPackedList);
 			}
 		}.writePackedRefs();
+		return result.get();
 	}
 
 	private Ref readRef(String name, RefList<Ref> packed) throws IOException {
@@ -1058,7 +1182,7 @@ public class RefDirectory extends RefDatabase {
 	}
 
 	/** If the parent should fire listeners, fires them. */
-	private void fireRefsChanged() {
+	void fireRefsChanged() {
 		final int last = lastNotifiedModCnt.get();
 		final int curr = modCnt.get();
 		if (last != curr && lastNotifiedModCnt.compareAndSet(last, curr) && last != 0)
@@ -1125,21 +1249,79 @@ public class RefDirectory extends RefDatabase {
 		}
 	}
 
-	private static class PackedRefList extends RefList<Ref> {
-		static final PackedRefList NO_PACKED_REFS = new PackedRefList(
-				RefList.emptyList(), FileSnapshot.MISSING_FILE,
-				ObjectId.zeroId());
+	/**
+	 * Get times to sleep while retrying a possibly contentious operation.
+	 * <p>
+	 * For retrying an operation that might have high contention, such as locking
+	 * the {@code packed-refs} file, the caller may implement a retry loop using
+	 * the returned values:
+	 *
+	 * <pre>
+	 * for (int toSleepMs : getRetrySleepMs()) {
+	 *   sleep(toSleepMs);
+	 *   if (isSuccessful(doSomething())) {
+	 *     return success;
+	 *   }
+	 * }
+	 * return failure;
+	 * </pre>
+	 *
+	 * The first value in the returned iterable is 0, and the caller should treat
+	 * a fully-consumed iterator as a timeout.
+	 *
+	 * @return iterable of times, in milliseconds, that the caller should sleep
+	 *         before attempting an operation.
+	 */
+	Iterable<Integer> getRetrySleepMs() {
+		return retrySleepMs;
+	}
 
-		final FileSnapshot snapshot;
+	void setRetrySleepMs(List<Integer> retrySleepMs) {
+		if (retrySleepMs == null || retrySleepMs.isEmpty()
+				|| retrySleepMs.get(0).intValue() != 0) {
+			throw new IllegalArgumentException();
+		}
+		this.retrySleepMs = retrySleepMs;
+	}
 
-		final ObjectId id;
+	/**
+	 * Sleep with {@link Thread#sleep(long)}, converting {@link
+	 * InterruptedException} to {@link InterruptedIOException}.
+	 *
+	 * @param ms
+	 *            time to sleep, in milliseconds; zero or negative is a no-op.
+	 * @throws InterruptedIOException
+	 *             if sleeping was interrupted.
+	 */
+	static void sleep(long ms) throws InterruptedIOException {
+		if (ms <= 0) {
+			return;
+		}
+		try {
+			Thread.sleep(ms);
+		} catch (InterruptedException e) {
+			InterruptedIOException ie = new InterruptedIOException();
+			ie.initCause(e);
+			throw ie;
+		}
+	}
 
-		PackedRefList(RefList<Ref> src, FileSnapshot s, ObjectId i) {
+	static class PackedRefList extends RefList<Ref> {
+
+		private final FileSnapshot snapshot;
+
+		private final ObjectId id;
+
+		private PackedRefList(RefList<Ref> src, FileSnapshot s, ObjectId i) {
 			super(src);
 			snapshot = s;
 			id = i;
 		}
 	}
+
+	private static final PackedRefList NO_PACKED_REFS = new PackedRefList(
+			RefList.emptyList(), FileSnapshot.MISSING_FILE,
+			ObjectId.zeroId());
 
 	private static LooseSymbolicRef newSymbolicRef(FileSnapshot snapshot,
 			String name, String target) {

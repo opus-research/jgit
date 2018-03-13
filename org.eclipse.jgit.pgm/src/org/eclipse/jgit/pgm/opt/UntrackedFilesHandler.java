@@ -42,6 +42,7 @@
  */
 package org.eclipse.jgit.pgm.opt;
 
+import org.eclipse.jgit.pgm.internal.CLIText;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.OptionDef;
@@ -102,8 +103,9 @@ public class UntrackedFilesHandler extends StringOptionHandler {
 			if ("no".equals(mode) || "all".equals(mode)) { //$NON-NLS-1$ //$NON-NLS-2$
 				setter.addValue(mode);
 			} else {
-				throw new CmdLineException(owner, String.format(
-						"Invalid untracked files mode '%s'", mode)); //$NON-NLS-1$
+				throw new CmdLineException(owner,
+						CLIText.format(CLIText.get().invalidUntrackedFilesMode),
+						mode);
 			}
 			return 1;
 		} else {

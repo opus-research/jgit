@@ -59,6 +59,7 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 
 import org.eclipse.jgit.annotations.Nullable;
+import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -81,8 +82,10 @@ public class BatchRefUpdate {
 	 * clock skew between machines on the same LAN using an NTP server also on
 	 * the same LAN should be under 5 seconds. 5 seconds is also not that long
 	 * for a large `git push` operation to complete.
+	 *
+	 * @since 4.9
 	 */
-	private static final Duration MAX_WAIT = Duration.ofSeconds(5);
+	protected static final Duration MAX_WAIT = Duration.ofSeconds(5);
 
 	private final RefDatabase refdb;
 
@@ -100,6 +103,12 @@ public class BatchRefUpdate {
 
 	/** Should the result value be appended to {@link #refLogMessage}. */
 	private boolean refLogIncludeResult;
+
+	/**
+	 * Should reflogs be written even if the configured default for this ref is
+	 * not to write it.
+	 */
+	private boolean forceRefLog;
 
 	/** Push certificate associated with this update. */
 	private PushCertificate pushCert;
@@ -174,25 +183,42 @@ public class BatchRefUpdate {
 	 * @return message the caller wants to include in the reflog; null if the
 	 *         update should not be logged.
 	 */
+	@Nullable
 	public String getRefLogMessage() {
 		return refLogMessage;
 	}
 
-	/** @return {@code true} if the ref log message should show the result. */
+	/**
+	 * Check whether the reflog message should include the result of the update,
+	 * such as fast-forward or force-update.
+	 * <p>
+	 * Describes the default for commands in this batch that do not override it
+	 * with {@link ReceiveCommand#setRefLogMessage(String, boolean)}.
+	 *
+	 * @return true if the message should include the result.
+	 */
 	public boolean isRefLogIncludingResult() {
 		return refLogIncludeResult;
 	}
 
 	/**
 	 * Set the message to include in the reflog.
+	 * <p>
+	 * Repository implementations may limit which reflogs are written by default,
+	 * based on the project configuration. If a repo is not configured to write
+	 * logs for this ref by default, setting the message alone may have no effect.
+	 * To indicate that the repo should write logs for this update in spite of
+	 * configured defaults, use {@link #setForceRefLog(boolean)}.
+	 * <p>
+	 * Describes the default for commands in this batch that do not override it
+	 * with {@link ReceiveCommand#setRefLogMessage(String, boolean)}.
 	 *
 	 * @param msg
-	 *            the message to describe this change. It may be null if
-	 *            appendStatus is null in order not to append to the reflog
+	 *            the message to describe this change. If null and appendStatus is
+	 *            false, the reflog will not be updated.
 	 * @param appendStatus
 	 *            true if the status of the ref change (fast-forward or
-	 *            forced-update) should be appended to the user supplied
-	 *            message.
+	 *            forced-update) should be appended to the user supplied message.
 	 * @return {@code this}.
 	 */
 	public BatchRefUpdate setRefLogMessage(String msg, boolean appendStatus) {
@@ -210,6 +236,8 @@ public class BatchRefUpdate {
 
 	/**
 	 * Don't record this update in the ref's associated reflog.
+	 * <p>
+	 * Equivalent to {@code setRefLogMessage(null, false)}.
 	 *
 	 * @return {@code this}.
 	 */
@@ -219,9 +247,35 @@ public class BatchRefUpdate {
 		return this;
 	}
 
-	/** @return true if log has been disabled by {@link #disableRefLog()}. */
+	/**
+	 * Force writing a reflog for the updated ref.
+	 *
+	 * @param force whether to force.
+	 * @return {@code this}
+	 * @since 4.9
+	 */
+	public BatchRefUpdate setForceRefLog(boolean force) {
+		forceRefLog = force;
+		return this;
+	}
+
+	/**
+	 * Check whether log has been disabled by {@link #disableRefLog()}.
+	 *
+	 * @return true if disabled.
+	 */
 	public boolean isRefLogDisabled() {
 		return refLogMessage == null;
+	}
+
+	/**
+	 * Check whether the reflog should be written regardless of repo defaults.
+	 *
+	 * @return whether force writing is enabled.
+	 * @since 4.9
+	 */
+	protected boolean isForceRefLog() {
+		return forceRefLog;
 	}
 
 	/**
@@ -334,6 +388,19 @@ public class BatchRefUpdate {
 	}
 
 	/**
+	 * Set push options associated with this update.
+	 * <p>
+	 * Implementations must call this at the top of {@link #execute(RevWalk,
+	 * ProgressMonitor, List)}.
+	 *
+	 * @param options options passed to {@code execute}.
+	 * @since 4.9
+	 */
+	protected void setPushOptions(List<String> options) {
+		pushOptions = options;
+	}
+
+	/**
 	 * @return list of timestamps the batch must wait for.
 	 * @since 4.6
 	 */
@@ -399,7 +466,7 @@ public class BatchRefUpdate {
 		}
 
 		if (options != null) {
-			pushOptions = options;
+			setPushOptions(options);
 		}
 
 		monitor.beginTask(JGitText.get().updatingReferences, commands.size());
@@ -410,6 +477,11 @@ public class BatchRefUpdate {
 		for (ReceiveCommand cmd : commands) {
 			try {
 				if (cmd.getResult() == NOT_ATTEMPTED) {
+					if (isMissing(walk, cmd.getOldId())
+							|| isMissing(walk, cmd.getNewId())) {
+						cmd.setResult(ReceiveCommand.Result.REJECTED_MISSING_OBJECT);
+						continue;
+					}
 					cmd.updateType(walk);
 					switch (cmd.getType()) {
 					case CREATE:
@@ -481,6 +553,19 @@ public class BatchRefUpdate {
 		monitor.endTask();
 	}
 
+	private static boolean isMissing(RevWalk walk, ObjectId id)
+			throws IOException {
+		if (id.equals(ObjectId.zeroId())) {
+			return false; // Explicit add or delete is not missing.
+		}
+		try {
+			walk.parseAny(id);
+			return false;
+		} catch (MissingObjectException e) {
+			return true;
+		}
+	}
+
 	/**
 	 * Wait for timestamps to be in the past, aborting commands on timeout.
 	 *
@@ -534,17 +619,36 @@ public class BatchRefUpdate {
 		return ref;
 	}
 
-	static Collection<String> getPrefixes(String s) {
+	/**
+	 * Get all path prefixes of a ref name.
+	 *
+	 * @param name
+	 *            ref name.
+	 * @return path prefixes of the ref name. For {@code refs/heads/foo}, returns
+	 *         {@code refs} and {@code refs/heads}.
+	 * @since 4.9
+	 */
+	protected static Collection<String> getPrefixes(String name) {
 		Collection<String> ret = new HashSet<>();
-		addPrefixesTo(s, ret);
+		addPrefixesTo(name, ret);
 		return ret;
 	}
 
-	static void addPrefixesTo(String s, Collection<String> out) {
-		int p1 = s.indexOf('/');
+	/**
+	 * Add prefixes of a ref name to an existing collection.
+	 *
+	 * @param name
+	 *            ref name.
+	 * @param out
+	 *            path prefixes of the ref name. For {@code refs/heads/foo},
+	 *            returns {@code refs} and {@code refs/heads}.
+	 * @since 4.9
+	 */
+	protected static void addPrefixesTo(String name, Collection<String> out) {
+		int p1 = name.indexOf('/');
 		while (p1 > 0) {
-			out.add(s.substring(0, p1));
-			p1 = s.indexOf('/', p1 + 1);
+			out.add(name.substring(0, p1));
+			p1 = name.indexOf('/', p1 + 1);
 		}
 	}
 
@@ -560,11 +664,12 @@ public class BatchRefUpdate {
 	 */
 	protected RefUpdate newUpdate(ReceiveCommand cmd) throws IOException {
 		RefUpdate ru = refdb.newUpdate(cmd.getRefName(), false);
-		if (isRefLogDisabled())
+		if (isRefLogDisabled(cmd)) {
 			ru.disableRefLog();
-		else {
+		} else {
 			ru.setRefLogIdent(refLogIdent);
-			ru.setRefLogMessage(refLogMessage, refLogIncludeResult);
+			ru.setRefLogMessage(getRefLogMessage(cmd), isRefLogIncludingResult(cmd));
+			ru.setForceRefLog(isForceRefLog(cmd));
 		}
 		ru.setPushCertificate(pushCert);
 		switch (cmd.getType()) {
@@ -583,6 +688,62 @@ public class BatchRefUpdate {
 			ru.setNewObjectId(cmd.getNewId());
 			return ru;
 		}
+	}
+
+	/**
+	 * Check whether reflog is disabled for a command.
+	 *
+	 * @param cmd
+	 *            specific command.
+	 * @return whether the reflog is disabled, taking into account the state from
+	 *         this instance as well as overrides in the given command.
+	 * @since 4.9
+	 */
+	protected boolean isRefLogDisabled(ReceiveCommand cmd) {
+		return cmd.hasCustomRefLog() ? cmd.isRefLogDisabled() : isRefLogDisabled();
+	}
+
+	/**
+	 * Get reflog message for a command.
+	 *
+	 * @param cmd
+	 *            specific command.
+	 * @return reflog message, taking into account the state from this instance as
+	 *         well as overrides in the given command.
+	 * @since 4.9
+	 */
+	protected String getRefLogMessage(ReceiveCommand cmd) {
+		return cmd.hasCustomRefLog() ? cmd.getRefLogMessage() : getRefLogMessage();
+	}
+
+	/**
+	 * Check whether the reflog message for a command should include the result.
+	 *
+	 * @param cmd
+	 *            specific command.
+	 * @return whether the reflog message should show the result, taking into
+	 *         account the state from this instance as well as overrides in the
+	 *         given command.
+	 * @since 4.9
+	 */
+	protected boolean isRefLogIncludingResult(ReceiveCommand cmd) {
+		return cmd.hasCustomRefLog()
+				? cmd.isRefLogIncludingResult() : isRefLogIncludingResult();
+	}
+
+	/**
+	 * Check whether the reflog for a command should be written regardless of repo
+	 * defaults.
+	 *
+	 * @param cmd
+	 *            specific command.
+	 * @return whether force writing is enabled.
+	 * @since 4.9
+	 */
+	protected boolean isForceRefLog(ReceiveCommand cmd) {
+		Boolean isForceRefLog = cmd.isForceRefLog();
+		return isForceRefLog != null ? isForceRefLog.booleanValue()
+				: isForceRefLog();
 	}
 
 	@Override

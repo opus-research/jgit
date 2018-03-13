@@ -50,6 +50,7 @@ import java.io.IOException;
 
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
+import org.eclipse.jgit.lib.ReflogEntry;
 import org.eclipse.jgit.lib.Repository;
 
 /** Updates any reference stored by {@link RefDirectory}. */
@@ -119,7 +120,7 @@ class RefDirectoryUpdate extends RefUpdate {
 						msg = strResult;
 				}
 			}
-			database.log(this, msg, shouldDeref);
+			database.log(isForceRefLog(), this, msg, shouldDeref);
 		}
 		if (!lock.commit())
 			return Result.LOCK_FAILURE;
@@ -127,14 +128,14 @@ class RefDirectoryUpdate extends RefUpdate {
 		return status;
 	}
 
-	private String toResultString(final Result status) {
+	private String toResultString(Result status) {
 		switch (status) {
 		case FORCED:
-			return "forced-update"; //$NON-NLS-1$
+			return ReflogEntry.PREFIX_FORCED_UPDATE;
 		case FAST_FORWARD:
-			return "fast forward"; //$NON-NLS-1$
+			return ReflogEntry.PREFIX_FAST_FORWARD;
 		case NEW:
-			return "created"; //$NON-NLS-1$
+			return ReflogEntry.PREFIX_CREATED;
 		default:
 			return null;
 		}
@@ -158,7 +159,7 @@ class RefDirectoryUpdate extends RefUpdate {
 
 		String msg = getRefLogMessage();
 		if (msg != null)
-			database.log(this, msg, false);
+			database.log(isForceRefLog(), this, msg, false);
 		if (!lock.commit())
 			return Result.LOCK_FAILURE;
 		database.storedSymbolicRef(this, lock.getCommitSnapshot(), target);
