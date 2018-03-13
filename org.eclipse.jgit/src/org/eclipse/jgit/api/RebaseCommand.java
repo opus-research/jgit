@@ -273,6 +273,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			}
 			for (RebaseTodoLine step : steps) {
 				popSteps(1);
+				if (Action.COMMENT.equals(step.getAction()))
+					continue;
 				Collection<ObjectId> ids = or.resolve(step.getCommit());
 				if (ids.size() != 1)
 					throw new JGitInternalException(
@@ -605,8 +607,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		rebaseState.createFile(INTERACTIVE, ""); //$NON-NLS-1$
 
 		ArrayList<RebaseTodoLine> toDoSteps = new ArrayList<RebaseTodoLine>();
-		toDoSteps.add(new RebaseTodoLine("# Created by EGit: rebasing " + upstreamCommit.name() //$NON-NLS-1$
-						+ " onto " + headId.name())); //$NON-NLS-1$
+		toDoSteps.add(new RebaseTodoLine("# Created by EGit: rebasing " + headId.name() //$NON-NLS-1$
+						+ " onto " + upstreamCommit.name())); //$NON-NLS-1$
 		ObjectReader reader = walk.getObjectReader();
 		for (RevCommit commit : cherryPickList)
 			toDoSteps.add(new RebaseTodoLine(Action.PICK, reader

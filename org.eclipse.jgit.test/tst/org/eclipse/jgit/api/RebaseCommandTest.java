@@ -63,13 +63,11 @@ import org.eclipse.jgit.api.MergeResult.MergeStatus;
 import org.eclipse.jgit.api.RebaseCommand.InteractiveHandler;
 import org.eclipse.jgit.api.RebaseCommand.Operation;
 import org.eclipse.jgit.api.RebaseResult.Status;
-import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.api.errors.UnmergedPathsException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.junit.RepositoryTestCase;
-import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
@@ -1639,6 +1637,57 @@ public class RebaseCommandTest extends RepositoryTestCase {
 	}
 
 	@Test
+	public void testRebaseShouldNotFailIfUserAddCommentLinesInPrepareSteps()
+			throws Exception {
+		commitFile(FILE1, FILE1, "master");
+		RevCommit c2 = commitFile("file2", "file2", "master");
+
+		// update files on master
+		commitFile(FILE1, "blah", "master");
+		RevCommit c4 = commitFile("file2", "more change", "master");
+
+		RebaseResult res = git.rebase().setUpstream("HEAD~2")
+				.runInteractively(new InteractiveHandler() {
+					public void prepareSteps(List<RebaseTodoLine> steps) {
+						steps.add(0, new RebaseTodoLine(
+								"# Comment that should not be processed"));
+					}
+
+					public String modifyCommitMessage(String commit) {
+						fail("modifyCommitMessage() was not expected to be called");
+						return commit;
+					}
+				}).call();
+
+		assertEquals(RebaseResult.Status.FAST_FORWARD, res.getStatus());
+
+		RebaseResult res2 = git.rebase().setUpstream("HEAD~2")
+				.runInteractively(new InteractiveHandler() {
+					public void prepareSteps(List<RebaseTodoLine> steps) {
+						steps.get(0).setAction(Action.COMMENT); // delete
+																// RevCommit c4
+					}
+
+					public String modifyCommitMessage(String commit) {
+						fail("modifyCommitMessage() was not expected to be called");
+						return commit;
+					}
+				}).call();
+
+		assertEquals(RebaseResult.Status.OK, res2.getStatus());
+
+		ObjectId headId = db.resolve(Constants.HEAD);
+		RevWalk rw = new RevWalk(db);
+		RevCommit rc = rw.parseCommit(headId);
+
+		ObjectId head1Id = db.resolve(Constants.HEAD + "~1");
+		RevCommit rc1 = rw.parseCommit(head1Id);
+
+		assertEquals(rc.getFullMessage(), c4.getFullMessage());
+		assertEquals(rc1.getFullMessage(), c2.getFullMessage());
+	}
+
+	@Test
 	public void testParseRewordCommand() throws Exception {
 		String todo = "pick 1111111 Commit 1\n"
 				+ "reword 2222222 Commit 2\n";
@@ -1694,123 +1743,6 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		assertEquals("1111111", steps.get(0).getCommit().name());
 		assertEquals("2222222", steps.get(1).getCommit().name());
 		assertEquals(Action.REWORD, steps.get(1).getAction());
-	}
-
-	@Test
-	public void testRebaseShouldTryToParseValidLineMarkedAsComment()
-			throws IOException {
-		String todo = "# pick 1111111 Valid line commented out with space\n"
-				+ "#edit 2222222 Valid line commented out without space\n"
-				+ "# pick invalidLine Comment line at end\n";
-		write(getTodoFile(), todo);
-
-		List<RebaseTodoLine> steps = db.readRebaseTodo(GIT_REBASE_TODO, true);
-		assertEquals(3, steps.size());
-
-		RebaseTodoLine firstLine = steps.get(0);
-
-		assertEquals("1111111", firstLine.getCommit().name());
-		assertEquals("Valid line commented out with space",
-				firstLine.getShortMessage());
-		assertEquals("comment", firstLine.getAction().toToken());
-
-		try {
-			firstLine.setAction(Action.PICK);
-			assertEquals("1111111", firstLine.getCommit().name());
-			assertEquals("pick", firstLine.getAction().toToken());
-		} catch (Exception e) {
-			fail("Valid parsable RebaseTodoLine that has been commented out should allow to change the action, but failed");
-		}
-
-		assertEquals("2222222", steps.get(1).getCommit().name());
-		assertEquals("comment", steps.get(1).getAction().toToken());
-
-		assertEquals(null, steps.get(2).getCommit());
-		assertEquals(null, steps.get(2).getShortMessage());
-		assertEquals("comment", steps.get(2).getAction().toToken());
-		assertEquals("# pick invalidLine Comment line at end", steps.get(2)
-				.getComment());
-		try {
-			steps.get(2).setAction(Action.PICK);
-			fail("A comment RebaseTodoLine that doesn't contain a valid parsable line should fail, but doesn't");
-		} catch (Exception e) {
-			// expected
-		}
-
-	}
-
-	@SuppressWarnings("unused")
-	@Test
-	public void testRebaseTodoLineSetComment() throws Exception {
-		try {
-			new RebaseTodoLine("This is a invalid comment");
-			fail("Constructing a comment line with invalid comment string should fail, but doesn't");
-		} catch (JGitInternalException e) {
-			// expected
-		}
-		RebaseTodoLine validCommentLine = new RebaseTodoLine(
-				"# This is a comment");
-		assertEquals(Action.COMMENT, validCommentLine.getAction());
-		assertEquals("# This is a comment", validCommentLine.getComment());
-
-		RebaseTodoLine actionLineToBeChanged = new RebaseTodoLine(Action.EDIT,
-				AbbreviatedObjectId.fromString("1111111"), "short Message");
-		assertEquals(null, actionLineToBeChanged.getComment());
-
-		try {
-			actionLineToBeChanged.setComment("invalid comment");
-			fail("Setting a invalid comment string should fail but doesn't");
-		} catch (JGitInternalException e) {
-			assertEquals(null, actionLineToBeChanged.getComment());
-		}
-
-		actionLineToBeChanged.setComment("# valid comment");
-		assertEquals("# valid comment", actionLineToBeChanged.getComment());
-		try {
-			actionLineToBeChanged.setComment("invalid comment");
-			fail("Setting a invalid comment string should fail but doesn't");
-		} catch (JGitInternalException e) {
-			// expected
-			// setting comment failed, but was successfully set before,
-			// therefore it may not be altered since then
-			assertEquals("# valid comment", actionLineToBeChanged.getComment());
-		}
-		try {
-			actionLineToBeChanged.setComment("# line1 \n line2");
-			actionLineToBeChanged.setComment("line1 \n line2");
-			actionLineToBeChanged.setComment("\n");
-			actionLineToBeChanged.setComment("# line1 \r line2");
-			actionLineToBeChanged.setComment("line1 \r line2");
-			actionLineToBeChanged.setComment("\r");
-			actionLineToBeChanged.setComment("# line1 \n\r line2");
-			actionLineToBeChanged.setComment("line1 \n\r line2");
-			actionLineToBeChanged.setComment("\n\r");
-			fail("Setting a multiline comment string should fail but doesn't");
-		} catch (JGitInternalException e) {
-			// expected
-		}
-		// Try setting valid comments
-		actionLineToBeChanged.setComment("# valid comment");
-		assertEquals("# valid comment", actionLineToBeChanged.getComment());
-
-		actionLineToBeChanged.setComment("# \t \t valid comment");
-		assertEquals("# \t \t valid comment",
-				actionLineToBeChanged.getComment());
-
-		actionLineToBeChanged.setComment("#       ");
-		assertEquals("#       ", actionLineToBeChanged.getComment());
-
-		actionLineToBeChanged.setComment("");
-		assertEquals("", actionLineToBeChanged.getComment());
-
-		actionLineToBeChanged.setComment("  ");
-		assertEquals("  ", actionLineToBeChanged.getComment());
-
-		actionLineToBeChanged.setComment("\t\t");
-		assertEquals("\t\t", actionLineToBeChanged.getComment());
-
-		actionLineToBeChanged.setComment(null);
-		assertEquals(null, actionLineToBeChanged.getComment());
 	}
 
 	@Test
