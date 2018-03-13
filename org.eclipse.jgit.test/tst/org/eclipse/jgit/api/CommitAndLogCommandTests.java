@@ -256,8 +256,6 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 
 	@Test
 	public void testModeChange() throws IOException, GitAPIException {
-		if (System.getProperty("os.name").startsWith("Windows"))
-			return; // SKIP
 		Git git = new Git(db);
 
 		// create file
