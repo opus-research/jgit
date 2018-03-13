@@ -155,32 +155,27 @@ public class SubmoduleWalk {
 	 */
 	public static Repository getSubmoduleRepository(final Repository parent,
 			final String path) throws IOException {
-		return getSubmoduleRepository(parent.getWorkTree(), path);
-	}
-
-	/**
-	 * Get submodule repository at path
-	 *
-	 * @param parent
-	 * @param path
-	 * @return repository or null if repository doesn't exist
-	 * @throws IOException
-	 */
-	public static Repository getSubmoduleRepository(final File parent,
-			final String path) throws IOException {
-		File subWorkTree = new File(parent, path);
-		if (!subWorkTree.isDirectory())
+		File directory = getSubmoduleGitDirectory(parent, path);
+		if (!directory.isDirectory())
 			return null;
-		File workTree = new File(parent, path);
 		try {
-			return new RepositoryBuilder() //
-					.setMustExist(true) //
-					.setFS(FS.DETECTED) //
-					.setWorkTree(workTree) //
-					.build();
+			return new RepositoryBuilder().setMustExist(true)
+					.setFS(FS.DETECTED).setGitDir(directory).build();
 		} catch (RepositoryNotFoundException e) {
 			return null;
 		}
+	}
+
+	/**
+	 * Get the .git directory for a repository submodule path
+	 *
+	 * @param parent
+	 * @param path
+	 * @return .git for submodule repository
+	 */
+	public static File getSubmoduleGitDirectory(final Repository parent,
+			final String path) {
+		return new File(getSubmoduleDirectory(parent, path), Constants.DOT_GIT);
 	}
 
 	/**
@@ -354,6 +349,15 @@ public class SubmoduleWalk {
 	}
 
 	/**
+	 * Get the .git directory for the current submodule entry
+	 *
+	 * @return .git for submodule repository
+	 */
+	public File getGitDirectory() {
+		return getSubmoduleGitDirectory(repository, path);
+	}
+
+	/**
 	 * Advance to next submodule in the index tree.
 	 *
 	 * The object id and path of the next entry can be obtained by calling
@@ -463,8 +467,19 @@ public class SubmoduleWalk {
 	}
 
 	/**
+	 * Does the current submodule entry have a .git directory in the parent
+	 * repository's working tree?
+	 *
+	 * @return true if .git directory exists, false otherwise
+	 */
+	public boolean hasGitDirectory() {
+		return getGitDirectory().isDirectory();
+	}
+
+	/**
 	 * Get repository for current submodule entry
 	 *
+	 * @see #hasGitDirectory()
 	 * @return repository or null if non-existent
 	 * @throws IOException
 	 */
