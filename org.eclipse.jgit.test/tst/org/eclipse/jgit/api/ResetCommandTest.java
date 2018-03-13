@@ -42,7 +42,6 @@
  */
 package org.eclipse.jgit.api;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -117,7 +116,6 @@ public class ResetCommandTest extends RepositoryTestCase {
 			NoHeadException, NoMessageException, ConcurrentRefUpdateException,
 			WrongRepositoryStateException {
 		setupRepository();
-		ObjectId prevHead = db.resolve(Constants.HEAD);
 		git.reset().setMode(ResetType.HARD).setRef(initialCommit.getName())
 				.call();
 		// check if HEAD points to initial commit now
@@ -130,7 +128,6 @@ public class ResetCommandTest extends RepositoryTestCase {
 		String fileInIndexPath = indexFile.getAbsolutePath();
 		assertFalse(inHead(fileInIndexPath));
 		assertFalse(inIndex(indexFile.getName()));
-		asseetReflog(prevHead, head);
 	}
 
 	@Test
@@ -139,7 +136,6 @@ public class ResetCommandTest extends RepositoryTestCase {
 			NoHeadException, NoMessageException, ConcurrentRefUpdateException,
 			WrongRepositoryStateException {
 		setupRepository();
-		ObjectId prevHead = db.resolve(Constants.HEAD);
 		git.reset().setMode(ResetType.SOFT).setRef(initialCommit.getName())
 				.call();
 		// check if HEAD points to initial commit now
@@ -152,7 +148,6 @@ public class ResetCommandTest extends RepositoryTestCase {
 		String fileInIndexPath = indexFile.getAbsolutePath();
 		assertFalse(inHead(fileInIndexPath));
 		assertTrue(inIndex(indexFile.getName()));
-		asseetReflog(prevHead, head);
 	}
 
 	@Test
@@ -161,7 +156,6 @@ public class ResetCommandTest extends RepositoryTestCase {
 			NoHeadException, NoMessageException, ConcurrentRefUpdateException,
 			WrongRepositoryStateException {
 		setupRepository();
-		ObjectId prevHead = db.resolve(Constants.HEAD);
 		git.reset().setMode(ResetType.MIXED).setRef(initialCommit.getName())
 				.call();
 		// check if HEAD points to initial commit now
@@ -174,33 +168,6 @@ public class ResetCommandTest extends RepositoryTestCase {
 		String fileInIndexPath = indexFile.getAbsolutePath();
 		assertFalse(inHead(fileInIndexPath));
 		assertFalse(inIndex(indexFile.getName()));
-
-		asseetReflog(prevHead, head);
-	}
-
-	private void asseetReflog(ObjectId prevHead, ObjectId head)
-			throws IOException {
-		// Check the reflog for HEAD
-		String actualHeadMessage = db.getReflogReader(Constants.HEAD)
-				.getLastEntry().getComment();
-		String expectedHeadMessage = head.getName() + ": updating HEAD";
-		assertEquals(expectedHeadMessage, actualHeadMessage);
-		assertEquals(head.getName(), db.getReflogReader(Constants.HEAD)
-				.getLastEntry().getNewId().getName());
-		assertEquals(prevHead.getName(), db
-				.getReflogReader(Constants.HEAD).getLastEntry().getOldId()
-				.getName());
-
-		// The reflog for master contains the same as the one for HEAD
-		String actualMasterMessage = db.getReflogReader("refs/heads/master")
-				.getLastEntry().getComment();
-		String expectedMasterMessage = head.getName() + ": updating HEAD"; // yes!
-		assertEquals(expectedMasterMessage, actualMasterMessage);
-		assertEquals(head.getName(), db.getReflogReader(Constants.HEAD)
-				.getLastEntry().getNewId().getName());
-		assertEquals(prevHead.getName(),
-				db.getReflogReader("refs/heads/master").getLastEntry()
-						.getOldId().getName());
 	}
 
 	/**
