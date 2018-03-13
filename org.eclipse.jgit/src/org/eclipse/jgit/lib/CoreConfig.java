@@ -83,12 +83,9 @@ public class CoreConfig {
 	private final String excludesfile;
 
 	private CoreConfig(final Config rc) {
-		compression = rc.getInt(ConfigConstants.CONFIG_CORE_SECTION,
-				ConfigConstants.CONFIG_KEY_COMPRESSION, DEFAULT_COMPRESSION);
-		packIndexVersion = rc.getInt(ConfigConstants.CONFIG_PACK_SECTION,
-				ConfigConstants.CONFIG_KEY_INDEXVERSION, 2);
-		logAllRefUpdates = rc.getBoolean(ConfigConstants.CONFIG_CORE_SECTION,
-				ConfigConstants.CONFIG_KEY_LOGALLREFUPDATES, true);
+		compression = rc.getInt("core", "compression", DEFAULT_COMPRESSION);
+		packIndexVersion = rc.getInt("pack", "indexversion", 2);
+		logAllRefUpdates = rc.getBoolean("core", "logallrefupdates", true);
 		excludesfile = rc.getString(ConfigConstants.CONFIG_CORE_SECTION, null,
 				ConfigConstants.CONFIG_KEY_EXCLUDESFILE);
 	}

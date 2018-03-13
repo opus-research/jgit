@@ -67,9 +67,9 @@ import java.util.Map;
 import java.util.Vector;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ProgressMonitor;
@@ -552,10 +552,10 @@ public abstract class Transport {
 	/**
 	 * Convert push remote refs update specification from {@link RefSpec} form
 	 * to {@link RemoteRefUpdate}. Conversion expands wildcards by matching
-	 * source part to local refs. <code>expectedOldObjectId</code> in
-	 * <code>RemoteRefUpdate</code> is always set as null. Tracking branch is
-	 * configured if RefSpec destination matches source of any fetch ref spec
-	 * for this transport remote configuration.
+	 * source part to local refs. expectedOldObjectId in RemoteRefUpdate is
+	 * always set as null. Tracking branch is configured if RefSpec destination
+	 * matches source of any fetch ref spec for this transport remote
+	 * configuration.
 	 *
 	 * @param db
 	 *            local database.
@@ -1091,8 +1091,7 @@ public abstract class Transport {
 	 *            collection to use the specifications from the RemoteConfig
 	 *            converted by {@link #findRemoteRefUpdatesFor(Collection)}. No
 	 *            more than 1 RemoteRefUpdate with the same remoteName is
-	 *            allowed. These objects are modified during this call. TODO:
-	 *            update
+	 *            allowed. These objects are modified during this call.
 	 * @return information about results of remote refs updates, tracking refs
 	 *         updates and refs advertised by remote repository.
 	 * @throws NotSupportedException
@@ -1114,10 +1113,8 @@ public abstract class Transport {
 				throw new TransportException(MessageFormat.format(
 						JGitText.get().problemWithResolvingPushRefSpecsLocally, e.getMessage()), e);
 			}
-			// if no refspec has been provided defer creating RemoteRefUpdate
-			// until connected
-			// if (toPush.isEmpty())
-			// throw new TransportException(JGitText.get().nothingToPush);
+			if (toPush.isEmpty())
+				throw new TransportException(JGitText.get().nothingToPush);
 		}
 		final PushProcess pushProcess = new PushProcess(this, toPush);
 		return pushProcess.execute(monitor);

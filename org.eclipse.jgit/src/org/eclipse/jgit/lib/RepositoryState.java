@@ -46,7 +46,7 @@
 
 package org.eclipse.jgit.lib;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 /**
  * Important state of the repository that affects what can and cannot bed
  * done. This is things like unhandled conflicted merges and unfinished rebase.
@@ -60,7 +60,6 @@ public enum RepositoryState {
 		public boolean canCheckout() { return false; }
 		public boolean canResetHead() { return false; }
 		public boolean canCommit() { return false; }
-		public boolean canAmend() { return false; }
 		public String getDescription() { return "Bare"; }
 	},
 
@@ -71,7 +70,6 @@ public enum RepositoryState {
 		public boolean canCheckout() { return true; }
 		public boolean canResetHead() { return true; }
 		public boolean canCommit() { return true; }
-		public boolean canAmend() { return true; }
 		public String getDescription() { return JGitText.get().repositoryState_normal; }
 	},
 
@@ -81,7 +79,6 @@ public enum RepositoryState {
 		public boolean canCheckout() { return false; }
 		public boolean canResetHead() { return true; }
 		public boolean canCommit() { return false; }
-		public boolean canAmend() { return false; }
 		public String getDescription() { return JGitText.get().repositoryState_conflicts; }
 	},
 
@@ -93,7 +90,6 @@ public enum RepositoryState {
 		public boolean canCheckout() { return true; }
 		public boolean canResetHead() { return true; }
 		public boolean canCommit() { return true; }
-		public boolean canAmend() { return false; }
 		public String getDescription() { return JGitText.get().repositoryState_merged; }
 	},
 
@@ -103,7 +99,6 @@ public enum RepositoryState {
 		public boolean canCheckout() { return false; }
 		public boolean canResetHead() { return true; }
 		public boolean canCommit() { return false; }
-		public boolean canAmend() { return false; }
 		public String getDescription() { return JGitText.get().repositoryState_conflicts; }
 	},
 
@@ -115,7 +110,6 @@ public enum RepositoryState {
 		public boolean canCheckout() { return true; }
 		public boolean canResetHead() { return true; }
 		public boolean canCommit() { return true; }
-		public boolean canAmend() { return false; }
 		public String getDescription() { return JGitText.get().repositoryState_merged; }
 	},
 
@@ -126,7 +120,6 @@ public enum RepositoryState {
 		public boolean canCheckout() { return false; }
 		public boolean canResetHead() { return false; }
 		public boolean canCommit() { return true; }
-		public boolean canAmend() { return true; }
 		public String getDescription() { return JGitText.get().repositoryState_rebaseOrApplyMailbox; }
 	},
 
@@ -137,7 +130,6 @@ public enum RepositoryState {
 		public boolean canCheckout() { return false; }
 		public boolean canResetHead() { return false; }
 		public boolean canCommit() { return true; }
-		public boolean canAmend() { return true; }
 		public String getDescription() { return JGitText.get().repositoryState_rebase; }
 	},
 
@@ -148,7 +140,6 @@ public enum RepositoryState {
 		public boolean canCheckout() { return false; }
 		public boolean canResetHead() { return false; }
 		public boolean canCommit() { return true; }
-		public boolean canAmend() { return true; }
 		public String getDescription() { return JGitText.get().repositoryState_applyMailbox; }
 	},
 
@@ -159,7 +150,6 @@ public enum RepositoryState {
 		public boolean canCheckout() { return false; }
 		public boolean canResetHead() { return false; }
 		public boolean canCommit() { return true; }
-		public boolean canAmend() { return true; }
 		public String getDescription() { return JGitText.get().repositoryState_rebaseWithMerge; }
 	},
 
@@ -170,7 +160,6 @@ public enum RepositoryState {
 		public boolean canCheckout() { return false; }
 		public boolean canResetHead() { return false; }
 		public boolean canCommit() { return true; }
-		public boolean canAmend() { return true; }
 		public String getDescription() { return JGitText.get().repositoryState_rebaseInteractive; }
 	},
 
@@ -186,8 +175,6 @@ public enum RepositoryState {
 
 		/* Commit during bisect is useful */
 		public boolean canCommit() { return true; }
-
-		public boolean canAmend() { return false; }
 
 		public String getDescription() { return JGitText.get().repositoryState_bisecting; }
 	};
@@ -206,11 +193,6 @@ public enum RepositoryState {
 	 * @return true if reset to another HEAD is considered SAFE
 	 */
 	public abstract boolean canResetHead();
-
-	/**
-	 * @return true if amending is considered SAFE
-	 */
-	public abstract boolean canAmend();
 
 	/**
 	 * @return a human readable description of the state.

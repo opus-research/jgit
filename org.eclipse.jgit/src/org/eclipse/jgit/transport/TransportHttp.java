@@ -88,11 +88,11 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.Constants;
@@ -687,8 +687,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 	}
 
 	class SmartHttpFetchConnection extends BasePackFetchConnection {
-		private Service svc;
-
 		SmartHttpFetchConnection(final InputStream advertisement)
 				throws TransportException {
 			super(TransportHttp.this);
@@ -703,18 +701,9 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		protected void doFetch(final ProgressMonitor monitor,
 				final Collection<Ref> want, final Set<ObjectId> have)
 				throws TransportException {
-			try {
-				svc = new Service(SVC_UPLOAD_PACK);
-				init(svc.in, svc.out);
-				super.doFetch(monitor, want, have);
-			} finally {
-				svc = null;
-			}
-		}
-
-		@Override
-		protected void onReceivePack() {
-			svc.finalRequest = true;
+			final Service svc = new Service(SVC_UPLOAD_PACK);
+			init(svc.in, svc.out);
+			super.doFetch(monitor, want, have);
 		}
 	}
 
@@ -767,8 +756,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 		private final HttpExecuteStream execute;
 
-		boolean finalRequest;
-
 		final UnionInputStream in;
 
 		final HttpOutputStream out;
@@ -797,14 +784,10 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			out.close();
 
 			if (conn == null) {
+				// Output hasn't started yet, because everything fit into
+				// our request buffer. Send with a Content-Length header.
+				//
 				if (out.length() == 0) {
-					// Request output hasn't started yet, but more data is being
-					// requested. If there is no request data buffered and the
-					// final request was already sent, do nothing to ensure the
-					// caller is shown EOF on the InputStream; otherwise an
-					// programming error has occurred within this module.
-					if (finalRequest)
-						return;
 					throw new TransportException(uri,
 							JGitText.get().startingReadStageWithoutWrittenRequestDataPendingIsNotSupported);
 				}
@@ -850,8 +833,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			}
 
 			in.add(openInputStream(conn));
-			if (!finalRequest)
-				in.add(execute);
+			in.add(execute);
 			conn = null;
 		}
 
@@ -869,6 +851,11 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 
 		class HttpExecuteStream extends InputStream {
+			public int available() throws IOException {
+				execute();
+				return 0;
+			}
+
 			public int read() throws IOException {
 				execute();
 				return -1;

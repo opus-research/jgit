@@ -48,21 +48,19 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.InvalidRemoteException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
@@ -77,8 +75,7 @@ import org.eclipse.jgit.transport.Transport;
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-push.html"
  *      >Git documentation about Push</a>
  */
-public class PushCommand extends
-		TransportCommand<PushCommand, Iterable<PushResult>> {
+public class PushCommand extends GitCommand<Iterable<PushResult>> {
 
 	private String remote = Constants.DEFAULT_REMOTE_NAME;
 
@@ -93,6 +90,10 @@ public class PushCommand extends
 	private boolean force;
 
 	private boolean thin = Transport.DEFAULT_PUSH_THIN;
+
+	private int timeout;
+
+	private CredentialsProvider credentialsProvider;
 
 	/**
 	 * @param repo
@@ -132,22 +133,6 @@ public class PushCommand extends
 				Ref head = repo.getRef(Constants.HEAD);
 				if (head != null && head.isSymbolic())
 					refSpecs.add(new RefSpec(head.getLeaf().getName()));
-				// TODO: checking if a local branch has a remote counterpart
-				Map<String, Ref> headsRefList = repo.getRefDatabase().getRefs(
-						Constants.R_HEADS);
-				Map<String, Ref> remotesRefList = repo.getRefDatabase()
-						.getRefs(Constants.R_REMOTES);
-				for (Iterator<Entry<String, Ref>> iterator = headsRefList
-						.entrySet().iterator(); iterator
-						.hasNext();) {
-					Entry<String, Ref> entry = iterator
-							.next();
-					for (String remoteKey : remotesRefList.keySet()) {
-						if (remoteKey.endsWith(entry.getKey()))
-							refSpecs.add(new RefSpec(entry.getValue().getLeaf()
-								.getName()));
-					}
-				}
 			}
 
 			if (force) {
@@ -158,11 +143,14 @@ public class PushCommand extends
 			final List<Transport> transports;
 			transports = Transport.openAll(repo, remote, Transport.Operation.PUSH);
 			for (final Transport transport : transports) {
+				if (0 <= timeout)
+					transport.setTimeout(timeout);
 				transport.setPushThin(thin);
 				if (receivePack != null)
 					transport.setOptionReceivePack(receivePack);
 				transport.setDryRun(dryRun);
-				configure(transport);
+				if (credentialsProvider != null)
+					transport.setCredentialsProvider(credentialsProvider);
 
 				final Collection<RemoteRefUpdate> toPush = transport
 						.findRemoteRefUpdatesFor(refSpecs);
@@ -239,6 +227,17 @@ public class PushCommand extends
 	 */
 	public String getReceivePack() {
 		return receivePack;
+	}
+
+	/**
+	 * @param timeout
+	 *            the timeout used for the push operation
+	 * @return {@code this}
+	 */
+	public PushCommand setTimeout(int timeout) {
+		checkCallable();
+		this.timeout = timeout;
+		return this;
 	}
 
 	/**
@@ -418,6 +417,18 @@ public class PushCommand extends
 	public PushCommand setForce(boolean force) {
 		checkCallable();
 		this.force = force;
+		return this;
+	}
+
+	/**
+	 * @param credentialsProvider
+	 *            the {@link CredentialsProvider} to use
+	 * @return {@code this}
+	 */
+	public PushCommand setCredentialsProvider(
+			CredentialsProvider credentialsProvider) {
+		checkCallable();
+		this.credentialsProvider = credentialsProvider;
 		return this;
 	}
 }

@@ -54,8 +54,7 @@ import org.eclipse.jgit.util.FS;
 /**
  * Offers a "GitPorcelain"-like API to interact with a git repository.
  * <p>
- * The GitPorcelain commands are described in the <a href=
- * "http://www.kernel.org/pub/software/scm/git/docs/git.html#_high_level_commands_porcelain"
+ * The GitPorcelain commands are described in the <a href="http://www.kernel.org/pub/software/scm/git/docs/git.html#_high_level_commands_porcelain"
  * >Git Documentation</a>.
  * <p>
  * This class only offers methods to construct so-called command classes. Each
@@ -110,7 +109,9 @@ public class Git {
 		RepositoryCache.FileKey key;
 
 		key = RepositoryCache.FileKey.lenient(dir, fs);
-		return wrap(new RepositoryBuilder().setFS(fs).setGitDir(key.getFile())
+		return wrap(new RepositoryBuilder()
+				.setFS(fs)
+				.setGitDir(key.getFile())
 				.setMustExist(true).build());
 	}
 
@@ -241,16 +242,6 @@ public class Git {
 	}
 
 	/**
-	 *
-	 * Returns a command object used to list tags
-	 *
-	 * @return a {@link ListTagCommand}
-	 */
-	public ListTagCommand tagList() {
-		return new ListTagCommand(repo);
-	}
-
-	/**
 	 * Returns a command object used to rename branches
 	 *
 	 * @return a {@link RenameBranchCommand}
@@ -265,8 +256,8 @@ public class Git {
 	 * @see <a
 	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-add.html"
 	 *      >Git documentation about Add</a>
-	 * @return a {@link AddCommand} used to collect all optional parameters and
-	 *         to finally execute the {@code Add} command
+	 * @return a {@link AddCommand} used to collect all optional parameters
+	 *         and to finally execute the {@code Add} command
 	 */
 	public AddCommand add() {
 		return new AddCommand(repo);
@@ -278,8 +269,8 @@ public class Git {
 	 * @see <a
 	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-tag.html"
 	 *      >Git documentation about Tag</a>
-	 * @return a {@link TagCommand} used to collect all optional parameters and
-	 *         to finally execute the {@code Tag} command
+	 * @return a {@link TagCommand} used to collect all optional parameters
+	 *         and to finally execute the {@code Tag} command
 	 */
 	public TagCommand tag() {
 		return new TagCommand(repo);
@@ -330,8 +321,8 @@ public class Git {
 	 * @see <a
 	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-revert.html"
 	 *      >Git documentation about reverting changes</a>
-	 * @return a {@link RevertCommand} used to collect all optional parameters
-	 *         and to finally execute the {@code cherry-pick} command
+	 * @return a {@link RevertCommand} used to collect all optional
+	 *         parameters and to finally execute the {@code cherry-pick} command
 	 */
 	public RevertCommand revert() {
 		return new RevertCommand(repo);
@@ -501,107 +492,6 @@ public class Git {
 	 */
 	public DiffCommand diff() {
 		return new DiffCommand(repo);
-	}
-
-	/**
-	 * Returns a command object used to delete tags
-	 *
-	 * @return a {@link DeleteTagCommand}
-	 */
-	public DeleteTagCommand tagDelete() {
-		return new DeleteTagCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code submodule add} command
-	 *
-	 * @return a {@link SubmoduleAddCommand} used to add a new submodule to a
-	 *         parent repository
-	 */
-	public SubmoduleAddCommand submoduleAdd() {
-		return new SubmoduleAddCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code submodule init} command
-	 *
-	 * @return a {@link SubmoduleInitCommand} used to initialize the
-	 *         repository's config with settings from the .gitmodules file in
-	 *         the working tree
-	 */
-	public SubmoduleInitCommand submoduleInit() {
-		return new SubmoduleInitCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code submodule status} command
-	 *
-	 * @return a {@link SubmoduleStatusCommand} used to report the status of a
-	 *         repository's configured submodules
-	 */
-	public SubmoduleStatusCommand submoduleStatus() {
-		return new SubmoduleStatusCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code submodule sync} command
-	 *
-	 * @return a {@link SubmoduleSyncCommand} used to update the URL of a
-	 *         submodule from the parent repository's .gitmodules file
-	 */
-	public SubmoduleSyncCommand submoduleSync() {
-		return new SubmoduleSyncCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code submodule update} command
-	 *
-	 * @return a {@link SubmoduleUpdateCommand} used to update the submodules in
-	 *         a repository to the configured revision
-	 */
-	public SubmoduleUpdateCommand submoduleUpdate() {
-		return new SubmoduleUpdateCommand(repo);
-	}
-
-	/**
-	 * Returns a command object used to list stashed commits
-	 *
-	 * @return a {@link StashListCommand}
-	 */
-	public StashListCommand stashList() {
-		return new StashListCommand(repo);
-	}
-
-	/**
-	 * Returns a command object used to create a stashed commit
-	 *
-	 * @return a {@link StashCreateCommand}
-	 */
-	public StashCreateCommand stashCreate() {
-		return new StashCreateCommand(repo);
-	}
-
-	/**
-	 * Returns a command object used to apply a stashed commit
-	 *
-	 * @return a {@link StashApplyCommand}
-	 */
-	public StashApplyCommand stashApply() {
-		return new StashApplyCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code apply} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-apply.html"
-	 *      >Git documentation about apply</a>
-	 *
-	 * @return a {@link ApplyCommand} used to collect all optional parameters
-	 *         and to finally execute the {@code apply} command
-	 */
-	public ApplyCommand apply() {
-		return new ApplyCommand(repo);
 	}
 
 	/**

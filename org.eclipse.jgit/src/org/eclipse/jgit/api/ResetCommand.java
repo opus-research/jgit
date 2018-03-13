@@ -47,6 +47,7 @@ import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.LinkedList;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
@@ -54,7 +55,6 @@ import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
@@ -151,12 +151,6 @@ public class ResetCommand extends GitCommand<Ref> {
 			final ObjectId commitId;
 			try {
 				commitId = repo.resolve(ref);
-				if (commitId == null) {
-					// @TODO throw an InvalidRefNameException. We can't do that
-					// now because this would break the API
-					throw new JGitInternalException("Invalid ref " + ref
-							+ " specified");
-				}
 			} catch (IOException e) {
 				throw new JGitInternalException(
 						MessageFormat.format(JGitText.get().cannotRead, ref),
