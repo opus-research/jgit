@@ -59,9 +59,7 @@ import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
 import org.eclipse.jgit.events.ListenerHandle;
 import org.eclipse.jgit.events.RefsChangedEvent;
@@ -98,7 +96,7 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		diskRepo = createBareRepository();
 		refdir = (RefDirectory) diskRepo.getRefDatabase();
 
-		repo = new TestRepository(diskRepo);
+		repo = new TestRepository<Repository>(diskRepo);
 		A = repo.commit().create();
 		B = repo.commit(repo.getRevWalk().parseCommit(A));
 		v1_0 = repo.tag("v1_0", B);
@@ -926,11 +924,8 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertEquals(Storage.LOOSE, all.get("refs/tags/v0.1").getStorage());
 		assertEquals(v0_1.getId(), all.get("refs/tags/v0.1").getObjectId());
 
-		Set<RefDirectoryUpdate> updates = new HashSet<RefDirectoryUpdate>();
 		all = refdir.getRefs(RefDatabase.ALL);
-		for(Ref f: all.values())
-			updates.add(new RefDirectoryUpdate(refdir, f));
-		refdir.pack(updates);
+		refdir.pack(all.keySet().toArray(new String[all.size()]));
 
 		all = refdir.getRefs(RefDatabase.ALL);
 		assertEquals(5, all.size());

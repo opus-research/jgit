@@ -72,12 +72,9 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.text.MessageFormat;
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -602,18 +599,18 @@ public class RefDirectory extends RefDatabase {
 	 * Adds a set of refs to the set of packed-refs. Only non-symbolic refs are
 	 * added. If a ref with the given name already existed in packed-refs it is
 	 * updated with the new value. Each loose ref which was added to the
-	 * packed-ref file is deleted.
+	 * packed-ref file is deleted. If a given ref can't be locked it will not be
+	 * added to the pack file.
 	 *
-	 * @param refUpdates
-	 *            the refs to be added
+	 * @param refs
+	 *            the refs to be added. Must be fully qualified.
 	 * @throws IOException
 	 */
-	public void pack(Collection<RefDirectoryUpdate> refUpdates) throws IOException {
-		if (refUpdates.isEmpty())
+	public void pack(String[] refs) throws IOException {
+		if (refs.length == 0)
 			return;
-		FS fs = refUpdates.iterator().next().getRepository().getFS();
-
-		Set<RefDirectoryUpdate> lockedLooseRefs = new HashSet<RefDirectoryUpdate>();
+		FS fs = parent.getFS();
+		LockFile[] locks = new LockFile[refs.length];
 
 		// Lock the packed refs file and read the content
 		LockFile lck = new LockFile(packedRefsFile, fs);
@@ -621,60 +618,64 @@ public class RefDirectory extends RefDatabase {
 			throw new IOException(MessageFormat.format(
 					JGitText.get().cannotLock, packedRefsFile));
 
-		RevWalk rw = null;
 		try {
-			rw = new RevWalk(getRepository());
+			String refName;
+			LockFile rLck;
 			final PackedRefList packed = getPackedRefs();
 			RefList<Ref> cur = readPackedRefs();
 
 			// Iterate over all refs to be packed
-			for (RefDirectoryUpdate ru : refUpdates) {
-				Ref ref = ru.getRef();
-				if (!ref.isSymbolic()) {
-					if (ref.getStorage().isLoose()) {
-						// Lock the loose ref
-						if (!ru.tryLock(false))
-							continue;
-						lockedLooseRefs.add(ru);
-					}
-					// Add/Update it to packed-refs
-					int idx = cur.find(ref.getName());
-					if (idx >= 0) {
-						// TODO: don't we have to update the storage of the ref?
-						cur = cur.set(idx, peeledPackedRef(ref, rw));
-					} else
-						cur = cur.add(idx, peeledPackedRef(ref, rw));
+			for (int i = 0; i < refs.length; i++) {
+				refName = refs[i];
+				Ref ref = readRef(refName, cur);
+				if (ref.isSymbolic())
+					continue; // can't pack symbolic refs
+				if (ref.getStorage().isLoose()) {
+					// Lock the loose ref
+					rLck = new LockFile(fileFor(refName),
+							parent.getFS());
+					if (!rLck.lock())
+						continue;
+					locks[i] = rLck;
 				}
+				// Add/Update it to packed-refs
+				int idx = cur.find(refName);
+				if (idx >= 0) {
+					cur = cur.set(idx, peeledPackedRef(ref));
+				} else
+					cur = cur.add(idx, peeledPackedRef(ref));
+
 			}
 
 			// The new content for packed-refs is collected. Persist it.
 			commitPackedRefs(lck, cur, packed);
 
 			// Now delete the loose refs which are locked and now packed
-			for (RefDirectoryUpdate ru : lockedLooseRefs) {
-				String name = ru.getName();
+			for (int i = 0; i < refs.length; i++) {
+				rLck = locks[i];
+				if (rLck == null)
+					continue;
+				refName = refs[i];
 				RefList<LooseRef> curLoose, newLoose;
 				do {
 					curLoose = looseRefs.get();
-					int idx = curLoose.find(name);
+					int idx = curLoose.find(refName);
 					if (idx < 0)
 						break;
 					newLoose = curLoose.remove(idx);
 				} while (!looseRefs.compareAndSet(curLoose, newLoose));
-				int levels = levelsIn(name) - 2;
-				if (ru.getRef().getStorage().isLoose()) {
-					ru.unlock();
-					delete(fileFor(name), levels);
-				}
+				int levels = levelsIn(refName) - 2;
+				delete(fileFor(refName), levels);
+				locks[i] = null;
+				rLck.unlock();
 			}
-			lockedLooseRefs.clear();
 			// Don't fire refsChanged. The refs have not change, only their
 			// storage.
 		} finally {
-			rw.release();
 			lck.unlock();
-			for (RefDirectoryUpdate ru : lockedLooseRefs)
-				ru.unlock();
+			for (LockFile l : locks)
+				if (l != null)
+					l.unlock();
 		}
 	}
 
@@ -684,23 +685,19 @@ public class RefDirectory extends RefDatabase {
 	 * {@link ObjectIdRef} where Storage is set to PACKED.
 	 *
 	 * @param f
-	 * @param rw
-	 *            a refwalk used to determine the type of the ref
 	 * @return a ref for Storage PACKED having the same name, id, peeledId as f
 	 * @throws MissingObjectException
 	 * @throws IOException
 	 */
-	private Ref peeledPackedRef(Ref f, RevWalk rw)
+	private Ref peeledPackedRef(Ref f)
 			throws MissingObjectException, IOException {
-
 		if (f.getStorage().isPacked() && f.isPeeled())
 			return f;
-
-		RevObject obj = rw.parseAny(f.getObjectId());
-		if (obj instanceof RevTag)
+		if (!f.isPeeled())
+			f = peel(f);
+		if (f.getPeeledObjectId() != null)
 			return new ObjectIdRef.PeeledTag(PACKED, f.getName(),
-					f.getObjectId(), (f.isPeeled() ? f.getPeeledObjectId() : rw
-							.peel(obj).copy()));
+					f.getObjectId(), f.getPeeledObjectId());
 		else
 			return new ObjectIdRef.PeeledNonTag(PACKED, f.getName(),
 					f.getObjectId());

@@ -43,25 +43,29 @@
  */
 package org.eclipse.jgit.storage.file;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.channels.Channels;
+import java.nio.channels.FileChannel;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
 import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -69,7 +73,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.revwalk.ObjectWalk;
-import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.pack.PackWriter;
@@ -83,31 +86,45 @@ import org.eclipse.jgit.util.FileUtils;
  * Additionally the index is taken into account and reflogs are handled.
  */
 public class GC {
-	private FileRepository repo;
+	private final FileRepository repo;
 
 	private ProgressMonitor pm;
 
 	private long expireAgeMillis;
 
 	/**
-	 * Creates a new garbage collector
+	 * the refs which existed during the last call to {@link #repack()}. This is
+	 * needed during {@link #prune(Set)} where we can optimize by looking at the
+	 * difference between the current refs and the refs which existed during
+	 * last {@link #repack()}.
 	 *
-	 * @param pm
-	 *            a progress monitor
+	 * TODO: this field makes this class non thread-safe. Decide whether we
+	 * accept this and document it or introduce a complex return type for
+	 * repack() which captures the pack files and the refs together. Then
+	 * callers to prune() could explicitly give the refs used during last
+	 * repack()
+	 */
+	private Map<String, Ref> lastPackedRefs;
+
+	/**
+	 * Holds the starting time of the last repack() execution. This is needed in
+	 * prune() to inspect only those reflog entries which have been added since
+	 * last repack().
+	 */
+	private long lastRepackTime;
+
+	/**
+	 * Creates a new garbage collector with default values. An expirationTime of
+	 * two weeks and <code>null</code> as progress monitor will be used.
+	 *
 	 * @param repo
 	 *            the repo to work on
-	 * @param expireAgeMillis
-	 *            During gc() or prune() each unreferenced, loose object which
-	 *            has been created or modified in the last <expireAgeMillis>
-	 *            milliseconds will not be pruned. Only older objects may be
-	 *            pruned. If set to 0 then every object is a candidate for
-	 *            pruning.
 	 */
-
-	public GC(FileRepository repo, ProgressMonitor pm, long expireAgeMillis) {
+	public GC(FileRepository repo) {
+		ProgressMonitor pm = NullProgressMonitor.INSTANCE;
 		this.repo = repo;
 		this.pm = (pm == null) ? NullProgressMonitor.INSTANCE : pm;
-		this.expireAgeMillis = expireAgeMillis;
+		this.expireAgeMillis = 14 * 24 * 60 * 60 * 1000l;
 	}
 
 	/**
@@ -160,9 +177,15 @@ public class GC {
 			for (PackFile newPack : newPacks)
 				if (oldName.equals(newPack.getPackName()))
 					continue oldPackLoop;
-			FileUtils.delete(nameFor(oldName, ".pack"), deleteOptions);
-			FileUtils.delete(nameFor(oldName, ".idx"), deleteOptions);
+			if (!nameFor(oldName, ".pack.keep").exists()) {
+				oldPack.close();
+				FileUtils.delete(nameFor(oldName, ".pack"), deleteOptions);
+				FileUtils.delete(nameFor(oldName, ".idx"), deleteOptions);
+			}
 		}
+		// close the complete object database. Thats my only chance to force
+		// rescanning and to detect that certain pack files are now deleted.
+		repo.getObjectDatabase().close();
 	}
 
 	/**
@@ -225,117 +248,196 @@ public class GC {
 	 *
 	 * @param objectsToKeep
 	 *            a set of objects which should explicitly not be pruned
+	 *
 	 * @throws IOException
 	 */
 	public void prune(Set<ObjectId> objectsToKeep)
 			throws IOException {
-		ObjectDirectory objdb = repo.getObjectDatabase();
-		File objects = repo.getObjectsDirectory();
-		String[] fanout = objects.list();
 		long expireDate = System.currentTimeMillis() - expireAgeMillis;
 
+		// Collect all loose objects which are old enough, not referenced from
+		// the index and not in objectsToKeep
+		Map<ObjectId, File> deletionCandidates = new HashMap<ObjectId, File>();
+		Set<ObjectId> indexObjects = null;
+		File objects = repo.getObjectsDirectory();
+		String[] fanout = objects.list();
 		if (fanout != null && fanout.length > 0) {
 			pm.beginTask(JGitText.get().pruneLooseUnreferencedObjects,
 					fanout.length);
-			ObjectWalk w = null;
-			try {
-				// Expensive: create a Objectwalk which walks over all
-				// referenced objects.
-				w = new ObjectWalk(repo);
-				for (Ref f : repo.getAllRefs().values())
-					w.markStart(w.parseAny(f.getObjectId()));
-				for (Ref f : repo.getRefDatabase().getAdditionalRefs())
-					w.markStart(w.parseAny(f.getObjectId()));
-				for (ObjectId oid : listNonHEADIndexObjects())
-					w.markStart(w.parseAny(oid));
-				for (;;) {
-					final RevCommit c = w.next();
-					if (c == null)
-						break;
-				}
-				for (;;) {
-					final RevObject o = w.nextObject();
-					if (o == null)
-						break;
-				}
-				for (String d : fanout) {
-					pm.update(1);
-					if (d.length() != 2)
+			for (String d : fanout) {
+				pm.update(1);
+				if (d.length() != 2)
+					continue;
+				File[] entries = new File(objects, d).listFiles();
+				if (entries == null)
+					continue;
+				for (File f : entries) {
+					String fName = f.getName();
+					if (fName.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
 						continue;
-					String[] entries = new File(objects, d).list();
-					if (entries == null)
+					if (f.lastModified() >= expireDate)
 						continue;
-					for (String e : entries) {
-						if (e.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
+					try {
+						ObjectId id = ObjectId.fromString(d + fName);
+						if (objectsToKeep.contains(id))
 							continue;
-						ObjectId id;
-						try {
-							id = ObjectId.fromString(d + e);
-						} catch (IllegalArgumentException notAnObject) {
-							// ignoring the file that does not represent loose
-							// object
+						if (indexObjects == null)
+							indexObjects = listNonHEADIndexObjects();
+						if (indexObjects.contains(id))
 							continue;
-						}
-
-						if (w.lookupOrNull(id) == null
-								&& !objectsToKeep.contains(id)) {
-							File f = objdb.fileFor(id);
-							if (f.lastModified() < expireDate)
-								FileUtils.delete(f, FileUtils.RETRY
-										| FileUtils.SKIP_MISSING
-										| FileUtils.IGNORE_ERRORS);
-						}
+						deletionCandidates.put(id, f);
+					} catch (IllegalArgumentException notAnObject) {
+						// ignoring the file that does not represent loose
+						// object
+						continue;
 					}
 				}
-
-			} finally {
-				pm.endTask();
-				if (w != null)
-					w.dispose();
 			}
+		}
+		if (deletionCandidates.isEmpty())
+			return;
+
+		// From the set of current refs remove all those which have been handled
+		// during last repack(). Only those refs will survive which have been
+		// added or modified since the last repack. Only these can save existing
+		// loose refs from being pruned.
+		Map<String, Ref> newRefs;
+		if (lastPackedRefs == null || lastPackedRefs.isEmpty())
+			newRefs = getAllRefs();
+		else {
+			newRefs = new HashMap<String, Ref>();
+			for (Iterator<Map.Entry<String, Ref>> i = getAllRefs().entrySet()
+					.iterator(); i.hasNext();) {
+				Entry<String, Ref> newEntry = i.next();
+				Ref old = lastPackedRefs.get(newEntry.getKey());
+				if (!compare(newEntry.getValue(), old))
+					newRefs.put(newEntry.getKey(), newEntry.getValue());
+			}
+		}
+
+		if (!newRefs.isEmpty()) {
+			// There are new/modified refs! Check which loose objects are now
+			// referenced by these modified refs (or their reflogentries).
+			// Remove these loose objects
+			// from the deletionCandidates. When the last candidate is removed
+			// leave this method.
+			ObjectWalk w = new ObjectWalk(repo);
+			try {
+				for (Ref cr : newRefs.values())
+					w.markStart(w.parseAny(cr.getObjectId()));
+				if (lastPackedRefs != null)
+					for (Ref lpr : lastPackedRefs.values())
+						w.markUninteresting(w.parseAny(lpr.getObjectId()));
+				removeReferenced(deletionCandidates, w);
+			} finally {
+				w.dispose();
+			}
+		}
+
+		if (deletionCandidates.isEmpty())
+			return;
+
+		// Since we have not left the method yet there are still
+		// deletionCandidates. Last chance for these objects not to be pruned is
+		// that they are referenced by reflog entries. Even refs which currently
+		// point to the same object as during last repack() may have
+		// additional reflog entries not handled during last repack()
+		ObjectWalk w = new ObjectWalk(repo);
+		try {
+			for (Ref ar : getAllRefs().values())
+				for (ObjectId id : listRefLogObjects(ar, lastRepackTime))
+					w.markStart(w.parseAny(id));
+			if (lastPackedRefs != null)
+				for (Ref lpr : lastPackedRefs.values())
+					w.markUninteresting(w.parseAny(lpr.getObjectId()));
+			removeReferenced(deletionCandidates, w);
+		} finally {
+			w.dispose();
+		}
+
+		if (deletionCandidates.isEmpty())
+			return;
+
+		// delete all candidates which have survived: these are unreferenced
+		// loose objects
+		for (File f : deletionCandidates.values())
+			f.delete();
+	}
+
+	/**
+	 * Remove all entries from a map which key is the id of an object referenced
+	 * by the given ObjectWalk
+	 *
+	 * @param id2File
+	 * @param w
+	 * @throws MissingObjectException
+	 * @throws IncorrectObjectTypeException
+	 * @throws IOException
+	 */
+	private void removeReferenced(Map<ObjectId, File> id2File,
+			ObjectWalk w) throws MissingObjectException,
+			IncorrectObjectTypeException, IOException {
+		RevObject ro = w.next();
+		while (ro != null) {
+			if (id2File.remove(ro.getId()) != null)
+				if (id2File.isEmpty())
+					return;
+			ro = w.next();
+		}
+		ro = w.nextObject();
+		while (ro != null) {
+			if (id2File.remove(ro.getId()) != null)
+				if (id2File.isEmpty())
+					return;
+			ro = w.nextObject();
+		}
+	}
+
+	private boolean compare(Ref r1, Ref r2) {
+		if (r1 == null || r2 == null)
+			return false;
+		if (r1.isSymbolic()) {
+			if (!r2.isSymbolic())
+				return false;
+			return r1.getTarget().getName().equals(r2.getTarget().getName());
+		} else {
+			if (r2.isSymbolic())
+				return false;
+			return r1.getObjectId().equals(r2.getObjectId());
 		}
 	}
 
 	/**
-<<<<<<< HEAD
-	 * Packs all objects which are reachable from any of the heads into one pack
-	 * file. Additionally all objects which are not reachable from any head but
-	 * which are reachable from any of the other refs (e.g. tags), special refs
-	 * (e.g. FETCH_HEAD) or index are packed into a separate pack file. All old
-	 * pack files which existed before are deleted.
-=======
-	 * packs all non-symbolic, loose refs into the packed-refs.
+	 * Packs all non-symbolic, loose refs into packed-refs.
 	 *
 	 * @throws IOException
 	 */
 	public void packRefs() throws IOException {
-		Set<Entry<String, Ref>> refEntries = repo.getAllRefs().entrySet();
-		if (pm == null)
-			pm = NullProgressMonitor.INSTANCE;
-		pm.beginTask("pack refs", refEntries.size());
+		Collection<Ref> refs = repo.getAllRefs().values();
+		ArrayList<String> refsToBePacked = new ArrayList<String>(refs.size());
+		int packRefsCnt = 0;
+		pm.beginTask(JGitText.get().packRefs, refs.size());
 		try {
-			Collection<RefDirectoryUpdate> updates = new LinkedList<RefDirectoryUpdate>();
-			for (Map.Entry<String, Ref> entry : refEntries) {
-				Ref ref = entry.getValue();
+			for (Ref ref : refs) {
 				if (!ref.isSymbolic() && ref.getStorage().isLoose()) {
-					updates.add(new RefDirectoryUpdate((RefDirectory) repo
-							.getRefDatabase(), ref));
+					refsToBePacked.add(ref.getName());
+					packRefsCnt++;
 				}
 				pm.update(1);
 			}
-			((RefDirectory) repo.getRefDatabase()).pack(updates);
+			((RefDirectory) repo.getRefDatabase()).pack(refsToBePacked
+					.toArray(new String[packRefsCnt]));
 		} finally {
 			pm.endTask();
 		}
 	}
 
 	/**
-	 * Packs all objects which reachable from any of the heads into one
-	 * packfile. Additionally all objects which are not reachable from any head
-	 * but which are reachable from any of the other refs (e.g. tags), special
-	 * refs (e.g. FETCH_HEAD) or index are packed into a separate packfile. All
-	 * old packfiles which existed before are deleted.
->>>>>>> Allow to pack a set of loose and packed refs into a new packed-ref file
+	 * Packs all objects which reachable from any of the heads into one pack
+	 * file. Additionally all objects which are not reachable from any head but
+	 * which are reachable from any of the other refs (e.g. tags), special refs
+	 * (e.g. FETCH_HEAD) or index are packed into a separate pack file. All old
+	 * pack files which existed before are deleted.
 	 *
 	 * @return a collection of the newly created pack files
 	 * @throws IOException
@@ -346,9 +448,8 @@ public class GC {
 	public Collection<PackFile> repack() throws IOException {
 		Collection<PackFile> toBeDeleted = repo.getObjectDatabase().getPacks();
 
-		Map<String, Ref> refsBefore = repo.getAllRefs();
-		for (Ref ref : repo.getRefDatabase().getAdditionalRefs())
-			refsBefore.put(ref.getName(), ref);
+		long time = System.currentTimeMillis();
+		Map<String, Ref> refsBefore = getAllRefs();
 
 		Set<ObjectId> allHeads = new HashSet<ObjectId>();
 		Set<ObjectId> nonHeads = new HashSet<ObjectId>();
@@ -356,6 +457,7 @@ public class GC {
 		Set<ObjectId> indexObjects = listNonHEADIndexObjects();
 
 		for (Ref ref : refsBefore.values()) {
+			nonHeads.addAll(listRefLogObjects(ref, 0));
 			if (ref.isSymbolic() || ref.getObjectId() == null)
 				continue;
 			if (ref.getName().startsWith(Constants.R_HEADS))
@@ -364,36 +466,72 @@ public class GC {
 				nonHeads.add(ref.getObjectId());
 			if (ref.getPeeledObjectId() != null)
 				tagTargets.add(ref.getPeeledObjectId());
-			List<ReflogEntry> rlEntries = repo.getReflogReader(ref.getName())
-					.getReverseEntries();
-			if (rlEntries != null)
-				for (ReflogEntry e : rlEntries)
-					nonHeads.add(e.getNewId());
 		}
+
 		tagTargets.addAll(allHeads);
 		nonHeads.addAll(indexObjects);
 
 		List<PackFile> ret = new ArrayList<PackFile>(2);
+		PackFile heads = null;
 		if (!allHeads.isEmpty()) {
-			PackFile heads = writePack(allHeads,
-					Collections.<ObjectId> emptySet(), tagTargets);
+			heads = writePack(allHeads, Collections.<ObjectId> emptySet(),
+					tagTargets, null);
 			if (heads != null)
 				ret.add(heads);
 		}
 		if (!nonHeads.isEmpty()) {
-			// DfsGarbageCollector calls here pw.excludeObjects(idx).
-			// Is there the need to explicitly exclude the objects
-			// in the newly created pack file? We are already telling the
-			// packwriter that we have already allHeads and that he should
-			// stop traversing when he finds a head?
-			// My problem: I don't have the PackIndex anymore and PackFile
-			// doesn't expose it.
-			PackFile rest = writePack(nonHeads, allHeads, tagTargets);
+			PackFile rest = writePack(
+					nonHeads,
+					allHeads,
+					tagTargets,
+					(heads == null) ? null : Collections.singleton(heads
+							.getIndex()));
 			if (rest != null)
 				ret.add(rest);
 		}
 		deleteOldPacks(toBeDeleted, ret, true);
 		prunePacked();
+
+		lastPackedRefs = refsBefore;
+		lastRepackTime = time;
+		return ret;
+	}
+
+	/**
+	 * @param ref
+	 *            the ref which log should be inspected
+	 * @param minTime only reflog entries not older then this time are processed
+	 * @return the {@link ObjectId}s contained in the reflog
+	 * @throws IOException
+	 */
+	private Set<ObjectId> listRefLogObjects(Ref ref, long minTime) throws IOException {
+		List<ReflogEntry> rlEntries = repo.getReflogReader(ref.getName())
+				.getReverseEntries();
+		if (rlEntries == null || rlEntries.isEmpty())
+			return Collections.<ObjectId> emptySet();
+		Set<ObjectId> ret = new HashSet<ObjectId>();
+		for (ReflogEntry e : rlEntries) {
+			if (e.getWho().getWhen().getTime() < minTime)
+				break;
+			ret.add(e.getNewId());
+			ObjectId oldId = e.getOldId();
+			if (oldId != null && !ObjectId.zeroId().equals(oldId))
+				ret.add(oldId);
+		}
+		return ret;
+	}
+
+	/**
+	 * Returns a map of all refs and additional refs (e.g. FETCH_HEAD,
+	 * MERGE_HEAD, ...)
+	 *
+	 * @return a map where names of refs point to ref objects
+	 * @throws IOException
+	 */
+	private Map<String, Ref> getAllRefs() throws IOException {
+		Map<String, Ref> ret = repo.getAllRefs();
+		for (Ref ref : repo.getRefDatabase().getAdditionalRefs())
+			ret.put(ref.getName(), ref);
 		return ret;
 	}
 
@@ -409,7 +547,6 @@ public class GC {
 	private Set<ObjectId> listNonHEADIndexObjects()
 			throws CorruptObjectException, IOException {
 		RevWalk revWalk = null;
-		DirCache dc = null;
 		try {
 			// Even bare repos may have an index check for the existence of an
 			// index file. Only checking for isBare() is wrong.
@@ -420,8 +557,7 @@ public class GC {
 		}
 		TreeWalk treeWalk = new TreeWalk(repo);
 		try {
-			dc = repo.readDirCache();
-			treeWalk.addTree(new DirCacheIterator(dc));
+			treeWalk.addTree(new DirCacheIterator(repo.readDirCache()));
 			ObjectId headID = repo.resolve(Constants.HEAD);
 			if (headID != null) {
 				revWalk = new RevWalk(repo);
@@ -446,55 +582,74 @@ public class GC {
 	}
 
 	private PackFile writePack(Set<? extends ObjectId> want,
-			Set<? extends ObjectId> have, Set<ObjectId> tagTargets)
-			throws IOException {
-
+			Set<? extends ObjectId> have, Set<ObjectId> tagTargets,
+			Set<PackIndex> excludeObjects) throws IOException {
+		File tmpPack = null;
+		File tmpIdx = null;
 		PackWriter pw = new PackWriter(repo);
-		pw.setDeltaBaseAsOffset(true);
-		pw.setReuseDeltaCommits(false);
-		if (tagTargets != null)
-			pw.setTagTargets(tagTargets);
 		try {
+			// prepare the PackWriter
+			pw.setDeltaBaseAsOffset(true);
+			pw.setReuseDeltaCommits(false);
+			if (tagTargets != null)
+				pw.setTagTargets(tagTargets);
+			if (excludeObjects != null)
+				for (PackIndex idx : excludeObjects)
+					pw.excludeObjects(idx);
 			pw.preparePack(pm, want, have);
-			if (0 < pw.getObjectCount()) {
-				String id = pw.computeName().getName();
-				File pack = nameFor(id, ".pack");
-				File idx = nameFor(id, ".idx");
-				if (!pack.createNewFile()) {
-					for (PackFile f : repo.getObjectDatabase().getPacks())
-						if (f.getPackName().equals(id))
-							return f;
-					throw new IOException(
-							MessageFormat.format(
-									JGitText.get().cannotCreatePackfile,
-									pack.getPath()));
-				}
-				if (!idx.createNewFile())
-					throw new IOException(
-							MessageFormat.format(
-									JGitText.get().cannotCreateIndexfile,
-									idx.getPath()));
-				BufferedOutputStream out = new BufferedOutputStream(
-						new FileOutputStream(pack));
-				try {
-					pw.writePack(pm, pm, out);
-				} finally {
-					out.close();
-				}
-				pack.setReadOnly();
-
-				out = new BufferedOutputStream(new FileOutputStream(idx));
-				try {
-					pw.writeIndex(out);
-				} finally {
-					out.close();
-				}
-				idx.setReadOnly();
-				return repo.getObjectDatabase().openPack(pack, idx);
-			} else
+			if (pw.getObjectCount() == 0)
 				return null;
+
+			// create temporary files
+			String id = pw.computeName().getName();
+			tmpPack = nameFor(id, ".pack.tmp");
+			tmpIdx = nameFor(id, ".idx.tmp");
+			if (!tmpPack.createNewFile())
+				throw new IOException(MessageFormat.format(
+						JGitText.get().cannotCreatePackfile, tmpPack.getPath()));
+			if (!tmpIdx.createNewFile())
+				throw new IOException(MessageFormat.format(
+						JGitText.get().cannotCreateIndexfile, tmpIdx.getPath()));
+
+			// write the packfile
+			FileChannel channel = new FileOutputStream(tmpPack).getChannel();
+			OutputStream channelStream = Channels.newOutputStream(channel);
+			try {
+				pw.writePack(pm, pm, channelStream);
+			} finally {
+				channel.force(true);
+				channelStream.close();
+				channel.close();
+			}
+
+			// write the packindex
+			FileChannel idxChannel = new FileOutputStream(tmpIdx).getChannel();
+			OutputStream idxChannelStream = Channels
+					.newOutputStream(idxChannel);
+			try {
+				pw.writeIndex(idxChannelStream);
+			} finally {
+				idxChannel.force(true);
+				idxChannelStream.close();
+				idxChannel.close();
+			}
+
+			// rename the temporary files to real files
+			File realPack = nameFor(id, ".pack");
+			if (!tmpPack.renameTo(realPack))
+				return null;
+			realPack.setReadOnly();
+			File realIdx = nameFor(id, ".idx");
+			// If the following rename fails we cannot revert back anymore.
+			tmpIdx.renameTo(realIdx);
+			realIdx.setReadOnly();
+			return repo.getObjectDatabase().openPack(realPack, realIdx);
 		} finally {
 			pw.release();
+			if (tmpPack != null && tmpPack.exists())
+				tmpPack.delete();
+			if (tmpIdx != null && tmpIdx.exists())
+				tmpIdx.delete();
 		}
 	}
 
@@ -513,17 +668,17 @@ public class GC {
 		 * stored in multiple pack files then it is counted as often as it
 		 * occurs in pack files.
 		 */
-		public long nrOfPackedObjects;
+		public long numberOfPackedObjects;
 
 		/**
 		 * The number of pack files
 		 */
-		public long nrOfPackFiles;
+		public long numberOfPackFiles;
 
 		/**
 		 * The number of objects stored as loose objects.
 		 */
-		public long nrOfLooseObjects;
+		public long numberOfLooseObjects;
 	}
 
 	/**
@@ -535,11 +690,11 @@ public class GC {
 	 */
 	public RepoStatistics getStatistics() throws IOException {
 		RepoStatistics ret = new RepoStatistics();
-		ret.nrOfPackedObjects = 0;
+		ret.numberOfPackedObjects = 0;
 		for (PackFile f : repo.getObjectDatabase().getPacks())
-			ret.nrOfPackedObjects += f.getObjectCount();
-		ret.nrOfPackFiles = repo.getObjectDatabase().getPacks().size();
-		ret.nrOfLooseObjects = 0;
+			ret.numberOfPackedObjects += f.getObjectCount();
+		ret.numberOfPackFiles = repo.getObjectDatabase().getPacks().size();
+		ret.numberOfLooseObjects = 0;
 		File objDir = repo.getObjectsDirectory();
 		String[] fanout = objDir.list();
 		if (fanout != null && fanout.length > 0) {
@@ -552,7 +707,7 @@ public class GC {
 				for (String e : entries) {
 					if (e.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
 						continue;
-					ret.nrOfLooseObjects++;
+					ret.numberOfLooseObjects++;
 				}
 			}
 		}
@@ -560,7 +715,7 @@ public class GC {
 	}
 
 	/**
-	 * Set's the progress monitor used for garbage collection methods.
+	 * Set the progress monitor used for garbage collection methods.
 	 *
 	 * @param pm
 	 */

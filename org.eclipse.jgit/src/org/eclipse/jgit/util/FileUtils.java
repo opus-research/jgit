@@ -91,8 +91,7 @@ public class FileUtils {
 	 *             if deletion of {@code f} fails. This may occur if {@code f}
 	 *             didn't exist when the method was called. This can therefore
 	 *             cause IOExceptions during race conditions when multiple
-	 *             concurrent threads all try to delete the same file. This
-	 *             exception is not thrown when IGNORE_ERRORS is set.
+	 *             concurrent threads all try to delete the same file.
 	 */
 	public static void delete(final File f) throws IOException {
 		delete(f, NONE);
