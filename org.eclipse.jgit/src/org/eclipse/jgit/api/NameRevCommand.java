@@ -110,7 +110,6 @@ public class NameRevCommand extends GitCommand<Map<ObjectId, String>> {
 
 	private final RevWalk walk;
 	private final List<String> prefixes;
-	private final List<Ref> refs;
 	private final List<ObjectId> revs;
 
 	/**
@@ -121,7 +120,6 @@ public class NameRevCommand extends GitCommand<Map<ObjectId, String>> {
 	protected NameRevCommand(Repository repo) {
 		super(repo);
 		prefixes = new ArrayList<String>(2);
-		refs = new ArrayList<Ref>();
 		revs = new ArrayList<ObjectId>(2);
 		walk = new RevWalk(repo) {
 			@Override
@@ -136,9 +134,6 @@ public class NameRevCommand extends GitCommand<Map<ObjectId, String>> {
 		try {
 			Map<ObjectId, String> nonCommits = new HashMap<ObjectId, String>();
 			FIFORevQueue pending = new FIFORevQueue();
-			for (Ref ref : refs) {
-				addRef(ref, nonCommits, pending);
-			}
 			addPrefixes(nonCommits, pending);
 			int cutoff = minCommitTime() - COMMIT_TIME_SLOP;
 
@@ -240,11 +235,10 @@ public class NameRevCommand extends GitCommand<Map<ObjectId, String>> {
 	}
 
 	/**
-	 * Add a ref prefix to the set that results must match.
+	 * Add a ref prefix that all results must match.
 	 * <p>
-	 * If an object matches multiple refs equally well, the first matching ref
-	 * added with {@link #addRef(Ref)} is preferred, or else the first matching
-	 * prefix added by {@link #addPrefix(String)}.
+	 * If an object matches refs under multiple prefixes equally well, the first
+	 * prefix added to this command is preferred.
 	 *
 	 * @param prefix
 	 *            prefix to add; see {@link RefDatabase#getRefs(String)}
@@ -253,50 +247,6 @@ public class NameRevCommand extends GitCommand<Map<ObjectId, String>> {
 	public NameRevCommand addPrefix(String prefix) {
 		checkCallable();
 		prefixes.add(prefix);
-		return this;
-	}
-
-	/**
-	 * Add all annotated tags under {@code refs/tags/} to the set that all results
-	 * must match.
-	 * <p>
-	 * Calls {@link #addRef(Ref)}; see that method for a note on matching
-	 * priority.
-	 *
-	 * @return {@code this}
-	 * @throws JGitInternalException
-	 *             a low-level exception of JGit has occurred. The original
-	 *             exception can be retrieved by calling
-	 *             {@link Exception#getCause()}.
-	 */
-	public NameRevCommand addAnnotatedTags() {
-		checkCallable();
-		try {
-			for (Ref ref : repo.getRefDatabase().getRefs(Constants.R_TAGS).values()) {
-				ObjectId id = ref.getObjectId();
-				if (id != null && (walk.parseAny(id) instanceof RevTag))
-					addRef(ref);
-			}
-		} catch (IOException e) {
-			throw new JGitInternalException(e.getMessage(), e);
-		}
-		return this;
-	}
-
-	/**
-	 * Add a ref to the set that all results must match.
-	 * <p>
-	 * If an object matches multiple refs equally well, the first matching ref
-	 * added with {@link #addRef(Ref)} is preferred, or else the first matching
-	 * prefix added by {@link #addPrefix(String)}.
-	 *
-	 * @param ref
-	 *            ref to add.
-	 * @return {@code this}
-	 */
-	public NameRevCommand addRef(Ref ref) {
-		checkCallable();
-		refs.add(ref);
 		return this;
 	}
 
@@ -311,28 +261,24 @@ public class NameRevCommand extends GitCommand<Map<ObjectId, String>> {
 
 	private void addPrefix(String prefix, Map<ObjectId, String> nonCommits,
 			FIFORevQueue pending) throws IOException {
-		for (Ref ref : repo.getRefDatabase().getRefs(prefix).values())
-			addRef(ref, nonCommits, pending);
-	}
-
-	private void addRef(Ref ref, Map<ObjectId, String> nonCommits,
-			FIFORevQueue pending) throws IOException {
-		if (ref.getObjectId() == null)
-			return;
-		RevObject o = walk.parseAny(ref.getObjectId());
-		while (o instanceof RevTag) {
-			RevTag t = (RevTag) o;
-			nonCommits.put(o, ref.getName());
-			o = t.getObject();
-			walk.parseHeaders(o);
+		for (Ref ref : repo.getRefDatabase().getRefs(prefix).values()) {
+			if (ref.getObjectId() == null)
+				continue;
+			RevObject o = walk.parseAny(ref.getObjectId());
+			while (o instanceof RevTag) {
+				RevTag t = (RevTag) o;
+				nonCommits.put(o, ref.getName());
+				o = t.getObject();
+				walk.parseHeaders(o);
+			}
+			if (o instanceof NameRevCommit) {
+				NameRevCommit c = (NameRevCommit) o;
+				if (c.tip == null)
+					c.tip = ref.getName();
+				pending.add(c);
+			} else if (!nonCommits.containsKey(o))
+				nonCommits.put(o, ref.getName());
 		}
-		if (o instanceof NameRevCommit) {
-			NameRevCommit c = (NameRevCommit) o;
-			if (c.tip == null)
-				c.tip = ref.getName();
-			pending.add(c);
-		} else if (!nonCommits.containsKey(o))
-			nonCommits.put(o, ref.getName());
 	}
 
 	private int minCommitTime() throws IOException {
