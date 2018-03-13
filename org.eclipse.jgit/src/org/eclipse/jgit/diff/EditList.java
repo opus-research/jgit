@@ -45,7 +45,6 @@ package org.eclipse.jgit.diff;
 
 import java.util.AbstractList;
 import java.util.ArrayList;
-import java.util.Collection;
 
 /** Specialized list of {@link Edit}s in a document. */
 public class EditList extends AbstractList<Edit> {
@@ -98,11 +97,6 @@ public class EditList extends AbstractList<Edit> {
 	@Override
 	public void add(final int index, final Edit element) {
 		container.add(index, element);
-	}
-
-	@Override
-	public boolean addAll(Collection<? extends Edit> c) {
-		return container.addAll(c);
 	}
 
 	@Override
