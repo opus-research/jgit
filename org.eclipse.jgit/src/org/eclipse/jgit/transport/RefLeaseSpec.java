@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Google Inc.
+ * Copyright (C) 2017 Two Sigma Open Source
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,46 +41,59 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.dfs;
+package org.eclipse.jgit.transport;
 
-import org.eclipse.jgit.internal.storage.pack.StoredObjectRepresentation;
-import org.eclipse.jgit.lib.ObjectId;
+import java.io.Serializable;
 
-class DfsObjectRepresentation extends StoredObjectRepresentation {
-	final DfsPackFile pack;
-	int format;
-	long offset;
-	long length;
-	ObjectId baseId;
+/**
+ * Describes the expected value for a ref being pushed.
+ * @since 4.7
+ */
+public class RefLeaseSpec implements Serializable {
+	private static final long serialVersionUID = 1L;
 
-	DfsObjectRepresentation(DfsPackFile pack) {
-		this.pack = pack;
+	/** Name of the ref whose value we want to check. */
+	private final String ref;
+
+	/** Local commitish to get expected value from. */
+	private final String expected;
+
+	/**
+	 *
+	 * @param ref
+	 *            ref being pushed
+	 * @param expected
+	 *            the expected value of the ref
+	 */
+	public RefLeaseSpec(String ref, String expected) {
+		this.ref = ref;
+		this.expected = expected;
 	}
 
-	@Override
-	public int getFormat() {
-		return format;
+	/**
+	 * Get the ref to protect.
+	 *
+	 * @return name of ref to check.
+	 */
+	public String getRef() {
+		return ref;
 	}
 
-	@Override
-	public int getWeight() {
-		return (int) Math.min(length, Integer.MAX_VALUE);
+	/**
+	 * Get the expected value of the ref, in the form
+	 * of a local committish
+	 *
+	 * @return expected ref value.
+	 */
+	public String getExpected() {
+		return expected;
 	}
 
-	@Override
-	public ObjectId getDeltaBase() {
-		return baseId;
-	}
-
-	@Override
-	public boolean wasDeltaAttempted() {
-		switch (pack.getPackDescription().getPackSource()) {
-		case GC:
-		case GC_REST:
-		case GC_TXN:
-			return true;
-		default:
-			return false;
-		}
+	public String toString() {
+		final StringBuilder r = new StringBuilder();
+		r.append(getRef());
+		r.append(':');
+		r.append(getExpected());
+		return r.toString();
 	}
 }
