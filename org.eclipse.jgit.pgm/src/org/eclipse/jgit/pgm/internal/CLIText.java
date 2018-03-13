@@ -108,6 +108,7 @@ public class CLIText extends TranslationBundle {
 	/***/ public String changesNotStagedForCommit;
 	/***/ public String changesToBeCommitted;
 	/***/ public String checkoutConflict;
+	/***/ public String checkoutConflictPathLine;
 	/***/ public String commitLabel;
 	/***/ public String conflictingUsageOf_git_dir_andArguments;
 	/***/ public String couldNotCreateBranch;

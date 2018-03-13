@@ -110,8 +110,10 @@ class Checkout extends TextBuiltin {
 			throw die(MessageFormat.format(CLIText.get().branchAlreadyExists,
 					name));
 		} catch (CheckoutConflictException e) {
-			outw.println(MessageFormat.format(CLIText.get().checkoutConflict,
-					name));
+			outw.println(CLIText.get().checkoutConflict);
+			for (String path : e.getConflictingPaths())
+				outw.println(MessageFormat.format(
+						CLIText.get().checkoutConflictPathLine, path));
 		}
 	}
 }
