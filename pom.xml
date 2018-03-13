@@ -461,22 +461,22 @@
   <profiles>
     <profile>
       <id>jgit.java6</id>
-	  <activation>
-	    <jdk>1.6</jdk>
-	  </activation>
+      <activation>
+        <jdk>1.6</jdk>
+      </activation>
       <modules>
         <module>org.eclipse.jgit.console</module>
       </modules>
     </profile>
     <profile>
       <id>jgit.java7</id>
-	  <activation>
-	    <jdk>1.7</jdk>
-	  </activation>
+      <activation>
+        <jdk>1.7</jdk>
+      </activation>
       <modules>
-	<module>org.eclipse.jgit.console</module>
-	<module>org.eclipse.jgit.java7</module>
-	<module>org.eclipse.jgit.java7.test</module>
+        <module>org.eclipse.jgit.console</module>
+        <module>org.eclipse.jgit.java7</module>
+        <module>org.eclipse.jgit.java7.test</module>
       </modules>
     </profile>
     <profile>

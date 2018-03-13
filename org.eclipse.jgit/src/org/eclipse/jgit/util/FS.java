@@ -61,6 +61,8 @@ public abstract class FS {
 	/**
 	 * This class creates FS instances. It will be overridden by a Java7 variant
 	 * if such can be detected in {@link #detect(Boolean)}.
+	 *
+	 * @since 3.0
 	 */
 	public static class FSFactory {
 		/**
@@ -136,7 +138,7 @@ public abstract class FS {
 			} catch (ClassNotFoundException e) {
 				System.out.println("Java7 module not found");
 				factory = new FS.FSFactory();
-				// Silently ignore failure find Java7 FS factory
+				// Silently ignore failure to find Java7 FS factory
 			} catch (UnsupportedClassVersionError e) {
 				System.out.println("Java7 module not accessible");
 				factory = new FS.FSFactory();
@@ -186,6 +188,7 @@ public abstract class FS {
 	 * capability to handle symbolic links is detected at runtime.
 	 *
 	 * @return true if symbolic links may be used
+	 * @since 3.0
 	 */
 	public boolean supportsSymlinks() {
 		return false;
@@ -237,6 +240,7 @@ public abstract class FS {
 	 * @param f
 	 * @return last modified time of f
 	 * @throws IOException
+	 * @since 3.0
 	 */
 	public long lastModified(File f) throws IOException {
 		return f.lastModified();
@@ -249,6 +253,7 @@ public abstract class FS {
 	 * @param f
 	 * @param time
 	 * @throws IOException
+	 * @since 3.0
 	 */
 	public void setLastModified(File f, long time) throws IOException {
 		f.setLastModified(time);
@@ -261,6 +266,7 @@ public abstract class FS {
 	 * @param path
 	 * @return length of a file
 	 * @throws IOException
+	 * @since 3.0
 	 */
 	public long length(File path) throws IOException {
 		return path.length();
@@ -357,6 +363,7 @@ public abstract class FS {
 	 * @param lookFor
 	 *            Files to search for in the given path
 	 * @return the first match found, or null
+	 * @since 3.0
 	 **/
 	protected static File searchPath(final String path, final String... lookFor) {
 		if (path == null)
@@ -500,6 +507,7 @@ public abstract class FS {
 	 * @param path
 	 * @return target of link or null
 	 * @throws IOException
+	 * @since 3.0
 	 */
 	public String readSymLink(File path) throws IOException {
 		throw new SymlinksNotSupportedException(
@@ -510,6 +518,7 @@ public abstract class FS {
 	 * @param path
 	 * @return true if the path is a symbolic link (and we support these)
 	 * @throws IOException
+	 * @since 3.0
 	 */
 	public boolean isSymLink(File path) throws IOException {
 		return false;
@@ -521,6 +530,7 @@ public abstract class FS {
 	 *
 	 * @param path
 	 * @return true if path exists
+	 * @since 3.0
 	 */
 	public boolean exists(File path) {
 		return path.exists();
@@ -532,6 +542,7 @@ public abstract class FS {
 	 *
 	 * @param path
 	 * @return true if file is a directory,
+	 * @since 3.0
 	 */
 	public boolean isDirectory(File path) {
 		return path.isDirectory();
@@ -543,6 +554,7 @@ public abstract class FS {
 	 *
 	 * @param path
 	 * @return true if path represents a regular file
+	 * @since 3.0
 	 */
 	public boolean isFile(File path) {
 		return path.isFile();
@@ -553,6 +565,7 @@ public abstract class FS {
 	 * @return true if path is hidden, either starts with . on unix or has the
 	 *         hidden attribute in windows
 	 * @throws IOException
+	 * @since 3.0
 	 */
 	public boolean isHidden(File path) throws IOException {
 		return path.isHidden();
@@ -564,6 +577,7 @@ public abstract class FS {
 	 * @param path
 	 * @param hidden
 	 * @throws IOException
+	 * @since 3.0
 	 */
 	public void setHidden(File path, boolean hidden) throws IOException {
 		if (!path.getName().startsWith(".")) //$NON-NLS-1$
@@ -577,6 +591,7 @@ public abstract class FS {
 	 * @param path
 	 * @param target
 	 * @throws IOException
+	 * @since 3.0
 	 */
 	public void createSymLink(File path, String target) throws IOException {
 		throw new SymlinksNotSupportedException(
