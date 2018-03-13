@@ -52,6 +52,12 @@ import java.util.List;
 public class CheckoutResult {
 
 	/**
+	 * The {@link Status#OK} result;
+	 */
+	public static final CheckoutResult OK_RESULT = new CheckoutResult(
+			Status.OK, null);
+
+	/**
 	 * The {@link Status#ERROR} result;
 	 */
 	public static final CheckoutResult ERROR_RESULT = new CheckoutResult(
@@ -95,8 +101,6 @@ public class CheckoutResult {
 
 	private final List<String> undeletedList;
 
-	private final List<String> modifiedList;
-
 	CheckoutResult(Status status, List<String> fileList) {
 		myStatus = status;
 		if (status == Status.CONFLICTS)
@@ -107,10 +111,7 @@ public class CheckoutResult {
 			this.undeletedList = fileList;
 		else
 			this.undeletedList = new ArrayList<String>(0);
-		if (status == Status.OK)
-			this.modifiedList = fileList;
-		else
-			this.modifiedList = new ArrayList<String>(0);
+
 	}
 
 	/**
@@ -135,14 +136,6 @@ public class CheckoutResult {
 	 */
 	public List<String> getUndeletedList() {
 		return undeletedList;
-	}
-
-	/**
-	 * @return the list of files that where modified during checkout, or an
-	 *         empty list if {@link #getStatus()} is not {@link Status#OK}
-	 */
-	public List<String> getModifiedList() {
-		return modifiedList;
 	}
 
 }
