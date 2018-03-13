@@ -53,6 +53,7 @@ import static org.eclipse.jgit.internal.storage.pack.PackExt.PACK;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -277,7 +278,7 @@ public class DfsGarbageCollector {
 
 		try (PackWriter pw = newPackWriter()) {
 			pw.setTagTargets(tagTargets);
-			pw.preparePack(pm, allHeads, PackWriter.NONE);
+			pw.preparePack(pm, allHeads, none());
 			if (0 < pw.getObjectCount())
 				writePack(GC, pw, pm);
 		}
@@ -302,10 +303,14 @@ public class DfsGarbageCollector {
 		try (PackWriter pw = newPackWriter()) {
 			for (ObjectIdSet packedObjs : newPackObj)
 				pw.excludeObjects(packedObjs);
-			pw.preparePack(pm, txnHeads, PackWriter.NONE);
+			pw.preparePack(pm, txnHeads, none());
 			if (0 < pw.getObjectCount())
 				writePack(GC_TXN, pw, pm);
 		}
+	}
+
+	private static Set<ObjectId> none() {
+		return Collections.<ObjectId> emptySet();
 	}
 
 	private void packGarbage(ProgressMonitor pm) throws IOException {
