@@ -106,7 +106,7 @@ class Clone extends AbstractFetchCommand {
 			}
 		}
 		if (gitdir == null)
-			gitdir = new File(localName, Constants.DOT_GIT).getAbsolutePath();
+			gitdir = new File(localName, Constants.DOT_GIT);
 
 		dst = new FileRepository(gitdir);
 		dst.create();
@@ -116,7 +116,8 @@ class Clone extends AbstractFetchCommand {
 		db = dst;
 
 		out.print(MessageFormat.format(
-				CLIText.get().initializedEmptyGitRepositoryIn, gitdir));
+				CLIText.get().initializedEmptyGitRepositoryIn, gitdir
+						.getAbsolutePath()));
 		out.println();
 		out.flush();
 

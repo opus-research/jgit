@@ -41,33 +41,22 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.transport.resolver;
+package org.eclipse.jgit.http.server.resolver;
+
+import javax.servlet.http.HttpServletRequest;
 
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.lib.Repository;
 
-/**
- * Locate a Git {@link Repository} by name from the URL.
- *
- * @param <C>
- *            type of connection.
- */
-public interface RepositoryResolver<C> {
-	/** Resolver configured to open nothing. */
-	public static final RepositoryResolver<?> NONE = new RepositoryResolver<Object>() {
-		public Repository open(Object req, String name)
-				throws RepositoryNotFoundException {
-			throw new RepositoryNotFoundException(name);
-		}
-	};
-
+/** Locate a Git {@link Repository} by name from the URL. */
+public interface RepositoryResolver {
 	/**
 	 * Locate and open a reference to a {@link Repository}.
 	 * <p>
 	 * The caller is responsible for closing the returned Repository.
 	 *
 	 * @param req
-	 *            the current request, may be used to inspect session state
+	 *            the current HTTP request, may be used to inspect session state
 	 *            including cookies or user authentication.
 	 * @param name
 	 *            name of the repository, as parsed out of the URL.
@@ -82,6 +71,7 @@ public interface RepositoryResolver<C> {
 	 *             the repository exists, but HTTP access is not allowed on the
 	 *             target repository, by any user.
 	 */
-	Repository open(C req, String name) throws RepositoryNotFoundException,
-			ServiceNotAuthorizedException, ServiceNotEnabledException;
+	Repository open(HttpServletRequest req, String name)
+			throws RepositoryNotFoundException, ServiceNotAuthorizedException,
+			ServiceNotEnabledException;
 }
