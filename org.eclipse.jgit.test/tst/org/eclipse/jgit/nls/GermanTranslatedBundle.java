@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Google Inc.
+ * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,93 +41,12 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.iplog;
+package org.eclipse.jgit.nls;
 
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Set;
-import java.util.TreeSet;
-
-import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdSubclassMap;
-
-/** Description of a project. */
-class Project {
-	/** Sorts projects by unique identities. */
-	static final Comparator<Project> COMPARATOR = new Comparator<Project>() {
-		public int compare(Project a, Project b) {
-			return a.getID().compareTo(b.getID());
-		}
-	};
-
-	private final String id;
-
-	private final String name;
-
-	private String comments;
-
-	private final Set<String> licenses = new TreeSet<String>();
-
-	private final ObjectIdSubclassMap<ObjectId> skipCommits = new ObjectIdSubclassMap<ObjectId>();
-
-	private String version;
-
-	/**
-	 * @param id
-	 * @param name
-	 */
-	Project(String id, String name) {
-		this.id = id;
-		this.name = name;
+public class GermanTranslatedBundle extends TranslationBundle {
+	public static GermanTranslatedBundle get() {
+		return NLS.getBundleFor(GermanTranslatedBundle.class);
 	}
 
-	/** @return unique identity of this project. */
-	String getID() {
-		return id;
-	}
-
-	/** @return name of this project. */
-	String getName() {
-		return name;
-	}
-
-	/** @return any additional comments about this project. */
-	String getComments() {
-		return comments;
-	}
-
-	void setComments(String comments) {
-		this.comments = comments;
-	}
-
-	/** @return the licenses this project is released under. */
-	Set<String> getLicenses() {
-		return Collections.unmodifiableSet(licenses);
-	}
-
-	void addLicense(String licenseName) {
-		licenses.add(licenseName);
-	}
-
-	void addSkipCommit(AnyObjectId commit) {
-		skipCommits.add(commit.copy());
-	}
-
-	boolean isSkippedCommit(AnyObjectId commit) {
-		return skipCommits.contains(commit);
-	}
-
-	String getVersion() {
-		return version;
-	}
-
-	void setVersion(String v) {
-		version = v;
-	}
-
-	@Override
-	public String toString() {
-		return "Project " + getID() + " (" + getName() + ")";
-	}
+	public String goodMorning;
 }
