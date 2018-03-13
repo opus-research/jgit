@@ -56,7 +56,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 
@@ -131,10 +130,10 @@ public class RepositoryCache {
 	}
 
 	/**
-	 * Remove a repository from the cache.
+	 * Close and remove a repository from the cache.
 	 * <p>
-	 * Removes a repository from the cache, if it is still registered here,
-	 * permitting it to close.
+	 * Removes a repository from the cache, if it is still registered here, and
+	 * close it.
 	 *
 	 * @param db
 	 *            repository to unregister.
@@ -142,15 +141,35 @@ public class RepositoryCache {
 	public static void close(final Repository db) {
 		if (db.getDirectory() != null) {
 			FileKey key = FileKey.exact(db.getDirectory(), db.getFS());
-			cache.unregisterRepository(key);
+			cache.unregisterAndCloseRepository(key);
 		}
 	}
 
 	/**
 	 * Remove a repository from the cache.
 	 * <p>
-	 * Removes a repository from the cache, if it is still registered here,
-	 * permitting it to close.
+	 * Removes a repository from the cache, if it is still registered here. This
+	 * method will not close the repository, only remove it from the cache. See
+	 * {@link RepositoryCache#close(Repository)} to remove and close the
+	 * repository.
+	 *
+	 * @param db
+	 *            repository to unregister.
+	 * @since 4.3
+	 */
+	public static void unregister(final Repository db) {
+		if (db.getDirectory() != null) {
+			unregister(FileKey.exact(db.getDirectory(), db.getFS()));
+		}
+	}
+
+	/**
+	 * Remove a repository from the cache.
+	 * <p>
+	 * Removes a repository from the cache, if it is still registered here. This
+	 * method will not close the repository, only remove it from the cache. See
+	 * {@link RepositoryCache#close(Repository)} to remove and close the
+	 * repository.
 	 *
 	 * @param location
 	 *            location of the repository to remove.
@@ -197,15 +216,17 @@ public class RepositoryCache {
 					db = location.open(mustExist);
 					ref = new SoftReference<Repository>(db);
 					cacheMap.put(location, ref);
+				} else {
+					db.incrementOpen();
 				}
 			}
+		} else {
+			db.incrementOpen();
 		}
-		db.incrementOpen();
 		return db;
 	}
 
 	private void registerRepository(final Key location, final Repository db) {
-		db.incrementOpen();
 		SoftReference<Repository> newRef = new SoftReference<Repository>(db);
 		Reference<Repository> oldRef = cacheMap.put(location, newRef);
 		Repository oldDb = oldRef != null ? oldRef.get() : null;
@@ -213,11 +234,16 @@ public class RepositoryCache {
 			oldDb.close();
 	}
 
-	private void unregisterRepository(final Key location) {
+	private Repository unregisterRepository(final Key location) {
 		Reference<Repository> oldRef = cacheMap.remove(location);
-		Repository oldDb = oldRef != null ? oldRef.get() : null;
-		if (oldDb != null)
+		return oldRef != null ? oldRef.get() : null;
+	}
+
+	private void unregisterAndCloseRepository(final Key location) {
+		Repository oldDb = unregisterRepository(location);
+		if (oldDb != null) {
 			oldDb.close();
+		}
 	}
 
 	private Collection<Key> getKeys() {
@@ -384,21 +410,9 @@ public class RepositoryCache {
 		 *         Git directory.
 		 */
 		public static boolean isGitRepository(final File dir, FS fs) {
-			try {
-				// check if GIT_COMMON_DIR available and fallback to GIT_DIR if
-				// not
-				File commonDir = FileUtils.getCommonDir(dir);
-				if (commonDir == null) {
-					commonDir = dir;
-				}
-				return fs.resolve(commonDir, Constants.OBJECTS).exists()
-						&& fs.resolve(commonDir, Constants.REFS).exists()
-						&& isValidHead(
-								new File(dir,
-										Constants.HEAD));
-			} catch (IOException e) {
-				return false;
-			}
+			return fs.resolve(dir, "objects").exists() //$NON-NLS-1$
+					&& fs.resolve(dir, "refs").exists() //$NON-NLS-1$
+					&& isValidHead(new File(dir, Constants.HEAD));
 		}
 
 		private static boolean isValidHead(final File head) {
@@ -441,28 +455,15 @@ public class RepositoryCache {
 		 *         null if there is no suitable match.
 		 */
 		public static File resolve(final File directory, FS fs) {
-			// the folder itself
 			if (isGitRepository(directory, fs))
 				return directory;
-			// the .git subfolder or file (reference)
-			final File dotDir = new File(directory, Constants.DOT_GIT);
-			if (dotDir.isFile()) {
-				try {
-					File refDir = FileUtils.getSymRef(directory, dotDir, fs);
-					if (refDir != null && isGitRepository(refDir, fs)) {
-						return refDir;
-					}
-				} catch (IOException ignored) {
-					// Continue searching if gitdir ref isn't found
-				}
-			} else if (isGitRepository(dotDir, fs)) {
-				return dotDir;
-			}
-			// the folder extended with .git (bare)
-			final File bareDir = new File(directory.getParentFile(),
-					directory.getName() + Constants.DOT_GIT_EXT);
-			if (isGitRepository(bareDir, fs))
-				return bareDir;
+			if (isGitRepository(new File(directory, Constants.DOT_GIT), fs))
+				return new File(directory, Constants.DOT_GIT);
+
+			final String name = directory.getName();
+			final File parent = directory.getParentFile();
+			if (isGitRepository(new File(parent, name + Constants.DOT_GIT_EXT), fs))
+				return new File(parent, name + Constants.DOT_GIT_EXT);
 			return null;
 		}
 	}
