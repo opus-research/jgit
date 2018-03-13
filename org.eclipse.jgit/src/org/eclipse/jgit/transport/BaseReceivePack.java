@@ -1583,9 +1583,7 @@ public abstract class BaseReceivePack {
 		pckIn = null;
 		pckOut = null;
 		refs = null;
-		// Keep the capabilities. If responses are sent after this release
-		// we need to remember at least whether sideband communication has to be
-		// used
+		enabledCapabilities = null;
 		commands = null;
 		if (timer != null) {
 			try {
