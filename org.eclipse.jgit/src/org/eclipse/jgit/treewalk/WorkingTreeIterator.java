@@ -56,7 +56,6 @@ import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CharsetEncoder;
-import java.security.MessageDigest;
 import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Collections;
@@ -65,6 +64,8 @@ import java.util.Comparator;
 import org.eclipse.jgit.api.errors.FilterFailedException;
 import org.eclipse.jgit.attributes.AttributesNode;
 import org.eclipse.jgit.attributes.AttributesRule;
+import org.eclipse.jgit.attributes.FilterCommand;
+import org.eclipse.jgit.attributes.FilterCommandRegistry;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
@@ -93,8 +94,11 @@ import org.eclipse.jgit.util.Holder;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.Paths;
 import org.eclipse.jgit.util.RawParseUtils;
+import org.eclipse.jgit.util.TemporaryBuffer;
+import org.eclipse.jgit.util.TemporaryBuffer.LocalFile;
 import org.eclipse.jgit.util.io.AutoLFInputStream;
 import org.eclipse.jgit.util.io.EolStreamTypeUtil;
+import org.eclipse.jgit.util.sha1.SHA1;
 
 /**
  * Walks a working directory tree as part of a {@link TreeWalk}.
@@ -263,7 +267,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			// If there is a matching DirCacheIterator, we can reuse
 			// its idBuffer, but only if we appear to be clean against
 			// the cached index information for the path.
-			//
 			DirCacheIterator i = state.walk.getTree(state.dirCacheTree,
 							DirCacheIterator.class);
 			if (i != null) {
@@ -361,7 +364,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			if (is == null)
 				return zeroid;
 			try {
-				state.initializeDigestAndReadBuffer();
+				state.initializeReadBuffer();
 
 				final long len = e.getLength();
 				InputStream filteredIs = possiblyFilteredInputStream(e, is, len,
@@ -393,15 +396,9 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 		if (len <= MAXIMUM_FILE_SIZE_TO_READ_FULLY) {
 			ByteBuffer rawbuf = IO.readWholeStream(is, (int) len);
-			byte[] raw = rawbuf.array();
-			int n = rawbuf.limit();
-			if (!isBinary(raw, n)) {
-				rawbuf = filterClean(raw, n, opType);
-				raw = rawbuf.array();
-				n = rawbuf.limit();
-			}
-			canonLen = n;
-			return new ByteArrayInputStream(raw, 0, n);
+			rawbuf = filterClean(rawbuf.array(), rawbuf.limit(), opType);
+			canonLen = rawbuf.limit();
+			return new ByteArrayInputStream(rawbuf.array(), 0, (int) canonLen);
 		}
 
 		if (getCleanFilterCommand() == null && isBinary(e)) {
@@ -427,10 +424,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			// stream. We don't care, we should not have any
 			// outstanding data to flush or anything like that.
 		}
-	}
-
-	private static boolean isBinary(byte[] content, int sz) {
-		return RawText.isBinary(content, sz);
 	}
 
 	private static boolean isBinary(Entry entry) throws IOException {
@@ -461,6 +454,16 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		in = handleAutoCRLF(in, opType);
 		String filterCommand = getCleanFilterCommand();
 		if (filterCommand != null) {
+			if (FilterCommandRegistry.isRegistered(filterCommand)) {
+				LocalFile buffer = new TemporaryBuffer.LocalFile(null);
+				FilterCommand command = FilterCommandRegistry
+						.createFilterCommand(filterCommand, repository, in,
+								buffer);
+				while (command.run() != -1) {
+					// loop as long as command.run() tells there is work to do
+				}
+				return buffer.openInputStream();
+			}
 			FS fs = repository.getFS();
 			ProcessBuilder filterProcessBuilder = fs.runInShell(filterCommand,
 					new String[0]);
@@ -712,6 +715,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	}
 
 	private static final Comparator<Entry> ENTRY_CMP = new Comparator<Entry>() {
+		@Override
 		public int compare(Entry a, Entry b) {
 			return Paths.compare(
 					a.encodedName, 0, a.encodedNameLen, a.getMode().getBits(),
@@ -1005,10 +1009,10 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 
 			return false;
 		} else {
-			if (mode == FileMode.SYMLINK.getBits())
-				return !new File(readContentAsNormalizedString(current()))
-						.equals(new File((readContentAsNormalizedString(entry,
-								reader))));
+			if (mode == FileMode.SYMLINK.getBits()) {
+				return !new File(readSymlinkTarget(current())).equals(
+						new File(readContentAsNormalizedString(entry, reader)));
+			}
 			// Content differs: that's a real change, perhaps
 			if (reader == null) // deprecated use, do no further checks
 				return true;
@@ -1054,12 +1058,30 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		return FS.detect().normalize(RawParseUtils.decode(cachedBytes));
 	}
 
-	private static String readContentAsNormalizedString(Entry entry) throws IOException {
+	/**
+	 * Reads the target of a symlink as a string. This default implementation
+	 * fully reads the entry's input stream and converts it to a normalized
+	 * string. Subclasses may override to provide more specialized
+	 * implementations.
+	 *
+	 * @param entry
+	 *            to read
+	 * @return the entry's content as a normalized string
+	 * @throws IOException
+	 *             if the entry cannot be read or does not denote a symlink
+	 * @since 4.6
+	 */
+	protected String readSymlinkTarget(Entry entry) throws IOException {
+		if (!entry.getMode().equals(FileMode.SYMLINK)) {
+			throw new java.nio.file.NotLinkException(entry.getName());
+		}
 		long length = entry.getLength();
 		byte[] content = new byte[(int) length];
-		InputStream is = entry.openInputStream();
-		IO.readFully(is, content, 0, (int) length);
-		return FS.detect().normalize(RawParseUtils.decode(content));
+		try (InputStream is = entry.openInputStream()) {
+			int bytesRead = IO.readFully(is, content, 0);
+			return FS.detect()
+					.normalize(RawParseUtils.decode(content, 0, bytesRead));
+		}
 	}
 
 	private static long computeLength(InputStream in) throws IOException {
@@ -1077,10 +1099,9 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	}
 
 	private byte[] computeHash(InputStream in, long length) throws IOException {
-		final MessageDigest contentDigest = state.contentDigest;
+		SHA1 contentDigest = SHA1.newInstance();
 		final byte[] contentReadBuffer = state.contentReadBuffer;
 
-		contentDigest.reset();
 		contentDigest.update(hblob);
 		contentDigest.update((byte) ' ');
 
@@ -1133,6 +1154,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				b.get(encodedName = new byte[encodedNameLen]);
 		}
 
+		@Override
 		public String toString() {
 			return getMode().toString() + " " + getName(); //$NON-NLS-1$
 		}
@@ -1307,9 +1329,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		/** File name character encoder. */
 		final CharsetEncoder nameEncoder;
 
-		/** Digest computer for {@link #contentId} computations. */
-		MessageDigest contentDigest;
-
 		/** Buffer used to perform {@link #contentId} computations. */
 		byte[] contentReadBuffer;
 
@@ -1324,9 +1343,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			this.nameEncoder = Constants.CHARSET.newEncoder();
 		}
 
-		void initializeDigestAndReadBuffer() {
-			if (contentDigest == null) {
-				contentDigest = Constants.newMessageDigest();
+		void initializeReadBuffer() {
+			if (contentReadBuffer == null) {
 				contentReadBuffer = new byte[BUFFER_SIZE];
 			}
 		}
@@ -1345,7 +1363,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				cmd = state.walk
 						.getFilterCommand(Constants.ATTR_FILTER_TYPE_CLEAN);
 			}
-			cleanFilterCommandHolder = new Holder<String>(cmd);
+			cleanFilterCommandHolder = new Holder<>(cmd);
 		}
 		return cleanFilterCommandHolder.get();
 	}
@@ -1392,7 +1410,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 					break;
 				}
 			}
-			eolStreamTypeHolder = new Holder<EolStreamType>(type);
+			eolStreamTypeHolder = new Holder<>(type);
 		}
 		return eolStreamTypeHolder.get();
 	}
