@@ -53,6 +53,7 @@ public class BaseReceivePackTest {
 			"0000000000000000000000000000000000000000"
 			+ " deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
 			+ " refs/heads/master";
+
 	@Test
 	public void parseCommand() {
 		String input = CMD_STRING;
