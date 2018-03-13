@@ -153,12 +153,7 @@ public class SmartClientSmartServerSslTest extends HttpTestCase {
 
 		FileBasedConfig userConfig = SystemReader.getInstance()
 				.openUserConfig(null, FS.DETECTED);
-		userConfig.setBoolean("http",
-				"https://" + secureURI.getHost() + ':' + server.getSecurePort(),
-				"sslVerify", false);
-		userConfig.setBoolean("http",
-				"http://" + remoteURI.getHost() + ':' + server.getPort(),
-				"sslVerify", false);
+		userConfig.setBoolean("http", null, "sslVerify", false);
 		userConfig.save();
 	}
 
