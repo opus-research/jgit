@@ -438,15 +438,10 @@
   </dependencyManagement>
 
   <distributionManagement>
-    <repository>
-      <id>repo.eclipse.org</id>
-      <name>JGit Maven Repository - Releases</name>
-      <url>https://repo.eclipse.org/content/repositories/jgit-releases/</url>
-    </repository>
     <snapshotRepository>
-      <id>repo.eclipse.org</id>
-      <name>JGit Maven Repository - Snapshots</name>
-      <url>https://repo.eclipse.org/content/repositories/jgit-snapshots/</url>
+      <id>jgit-maven-snapshot</id>
+      <name>JGit Maven Repository</name>
+      <url>dav:https://egit.googlecode.com/svn/maven/</url>
       <uniqueVersion>true</uniqueVersion>
     </snapshotRepository>
   </distributionManagement>
