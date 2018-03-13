@@ -287,18 +287,16 @@ saves space.
 
 Index block format:
 
-    uint32( (1 << 31) | block_len )
+    'i'
+    uint24( block_len )
     index_record+
     uint24( restart_offset )+
     uint16( restart_count )
     padding?
 
-The index block header starts with the high bit set.  This identifies
-the block as an index block, and not as a ref block, log block or file
-footer.  The `block_len` field in an index block is 31-bits network
-byte order, and allowed to occupy space normally used by the block
-type in other blocks.  This supports single-level indexes
-significantly larger than the file's `block_size`, up to 1.9 GiB.
+The index blocks begin with `block_type = 'i'` and a 3-byte
+`block_len` which encodes the number of bytes in the block,
+up to but not including the optional `padding`.
 
 The `restart_offset` and `restart_count` fields are identical in
 format, meaning and usage as in ref blocks.
