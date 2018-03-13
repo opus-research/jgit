@@ -251,8 +251,6 @@ the following:
 - `0x1`: one 20-byte object id; value of the ref
 - `0x2`: two 20-byte object ids; value of the ref, peeled target
 - `0x3`: symref and text: `varint( text_len ) text`
-- `0x4`: index record (see below)
-- `0x5`: log record (see below)
 
 Symbolic references use `0x3` with a `text` string starting with `"ref: "`,
 followed by the complete name of the reference target.  No
@@ -260,18 +258,26 @@ compression is applied to the target name.  Other types of contents
 that are also reference like, such as `FETCH_HEAD` and `MERGE_HEAD`,
 may also be stored using type `0x3`.
 
-Types `0x6..0x7` are reserved for future use.
+Types `0x4..0x7` are reserved for future use.
 
 ### Ref index
 
 The ref index stores the name of the last reference from every ref
-block in the file, enabling constant O(1) disk seeks for all lookups.
-Any reference can be found by searching the index, identifying the
+block in the file, enabling reduced disk seeks for lookups.  Any
+reference can be found by searching the index, identifying the
 containing block, and searching within that block.
 
-If present the ref index block appears after the last ref block.  The
-prior ref block should be padded to ensure the ref index starts on a
-block alignment.
+The index may be organized into a multi-level index, where the 1st
+level index block points to additional ref index blocks (2nd level),
+which may in turn point to either index blocks (3rd level) or ref
+blocks (leaf level).  Disk reads required to access a ref go up with
+higher index levels.  To acheive constant O(1) disk seeks for lookups
+the index must be a single level, which is permitted to exceed the
+file's configured `block_size`.
+
+If present, the ref index block(s) appears after the last ref block.
+The prior ref block should be padded to ensure the ref index starts on
+a block alignment.
 
 If there are at least 4 ref blocks, a ref index block should be
 written to improve lookup times.  Cold reads using the index requires
@@ -281,7 +287,7 @@ saves space.
 
 Index block format:
 
-    uint32( (0x80 << 24) | block_len )
+    uint32( (1 << 31) | block_len )
     uint16( restart_count )
     uint24( restart_offset )+
     index_record+
@@ -289,19 +295,23 @@ Index block format:
 
 The index block header starts with the high bit set.  This identifies
 the block as an index block, and not as a ref block, log block or file
-footer.  The `block_len` field in an index block is 30-bits network
+footer.  The `block_len` field in an index block is 31-bits network
 byte order, and allowed to occupy space normally used by the block
-type in other blocks.  This supports indexes significantly larger than
-the file's `block_size`.
+type in other blocks.  This supports single-level indexes
+significantly larger than the file's `block_size`, up to 1.9 GiB.
 
 The `restart_offset` and `restart_count` fields are identical in
 format, meaning and usage as in ref blocks.
 
 To reduce the number of reads required for random access in very large
-files, the index block may be larger than the other blocks.  However,
+files the index block may be larger than the other blocks.  However,
 readers must hold the entire index in memory to benefit from this, so
 it's a time-space tradeoff in both file size and reader memory.
-Increasing the block size decreases the index size.
+
+Increasing the file's `block_size` decreases the index size.
+Alternatively a multi-level index may be used, keeping index blocks
+within the file's `block_size`, but increasing the number of blocks
+that need to be accessed.
 
 When object blocks are present the ref index block is padded with
 `padding` to maintain alignment for the next block. No padding is
@@ -313,7 +323,7 @@ An index record describes the last entry in another block.
 Index records are written as:
 
     varint( prefix_length )
-    varint( (suffix_length << 3) | 0x4 )
+    varint( (suffix_length << 3) | 0 )
     suffix
     varint( block_position )
 
@@ -324,17 +334,24 @@ absolute position in bytes (from the start of the file) of the block
 that ends with this reference. Readers can seek to `block_position` to
 begin reading the block header.
 
+Readers must examine the block header at `block_position` to determine
+if the next block is another level index block, or the leaf-level ref
+block.
+
 #### Reading the index
 
 Readers loading the ref index must first read the footer (below) to
 obtain `ref_index_position`. If not present, the position will be 0.
+The `ref_index_position` address is for the 1st level root of the ref
+index.
 
 ### Obj block format
 
 Object blocks use unique, abbreviated 2-20 byte SHA-1 keys, mapping
 to ref blocks containing references pointing to that object directly,
 or as the peeled value of an annotated tag.  Like ref blocks, object
-blocks use the file's standard `block_size`.
+blocks use the file's standard `block_size`. The abbrevation length is
+available in the footer as `obj_id_len`.
 
 To save space in small files, object blocks may be omitted if the ref
 index is not present, as brute force search will only need to read a
@@ -418,9 +435,9 @@ block sizes reduces the number of candidates this step must consider.
 ### Obj index
 
 The obj index stores the abbreviation from the last entry for every
-obj block in the file, enabling constant O(1) disk seeks for all
-lookups.  It is formatted exactly the same as the ref index, but
-refers to obj blocks.
+obj block in the file, enabling reduced disk seeks for all lookups.
+It is formatted exactly the same as the ref index, but refers to obj
+blocks.
 
 The obj index should be present if obj blocks are present, as
 obj blocks should only be written in larger files.
@@ -499,24 +516,53 @@ log record key described above.
 
 ```
     varint( prefix_length )
-    varint( (suffix_length << 3) | 0x5 )
+    varint( (suffix_length << 3) | log_type )
     suffix
+    ( log_data | log_chained )?
 
-    old_id
-    new_id
-    sint16( tz_offset )
-    varint( time_seconds )
-    varint( name_length    )  name
-    varint( email_length   )  email
-    varint( message_length )  message
+
+    log_data {
+      old_id
+      new_id
+      varint( time_seconds )
+      sint16( tz_offset )
+      varint( name_length    )  name
+      varint( email_length   )  email
+      varint( message_length )  message
+    }
+
+    log_chained {
+      old_id
+      varint( time_seconds )
+      not_same_committer {
+        sint16( tz_offset )
+        varint( name_length    )  name
+        varint( email_length   )  email
+      }?
+      not_same_message {
+        varint( message_length )  message
+      }?
+    }
 ```
 
-Log records follow [git update-ref][update-ref] logging, and include
-the following values:
+Log record entries use `log_type` to indicate what follows:
+
+- `0x0`: deletion; no log data.
+- `0x1`: standard git reflog data using `log_data` above.
+- `0x2..0x3`: reserved for future use.
+- `0x4..0x7`: `log_chained`, with conditional members.
+
+The `log_type = 0x0` is mostly useful for `git stash drop`, removing
+an entry from the reflog of `refs/stash` in a transaction file
+(below), without needing to rewrite larger files.  Readers reading a
+stack of reflogs must treat this as a deletion.
+
+For `log_type = 0x1`, the `log_data` section follows
+[git update-ref][update-ref] logging, and includes:
 
 - two 20-byte SHA-1s (old id, new id)
-- 2-byte timezone offset in minutes (signed)
 - varint time in seconds since epoch (Jan 1, 1970)
+- 2-byte timezone offset in minutes (signed)
 - varint string of committer's name
 - varint string of committer's email
 - varint string of message
@@ -530,6 +576,16 @@ normally found between the `<>` in a git commit object header.
 
 The `message_length` may be 0, in which case there was no message
 supplied for the update.
+
+For `log_type = 0x4..0x7` the `log_chained` section is used instead to
+compress information that already appeared in a prior log record.  The
+`log_chained` always includes `old_id` for this record, as `new_id` is
+implied by the prior (by file order, more recent) record's `old_id`.
+
+The `not_same_committer` block appears if `log_type & 0x1` is true,
+`not_same_message` block appears if `log_type & 0x2` is true.  When
+one of these blocks is missing, its values are implied by the prior
+(more recent) log record.
 
 [update-ref]: https://git-scm.com/docs/git-update-ref#_logging_updates
 
@@ -587,7 +643,7 @@ A 68-byte footer appears at the end:
     uint64( max_update_index )
 
     uint64( ref_index_position )
-    uint64( obj_position )
+    uint64( (obj_position << 5) | obj_id_len )
     uint64( obj_index_position )
 
     uint64( log_position )
@@ -600,6 +656,8 @@ If a section is missing (e.g. ref index) the corresponding position
 field (e.g. `ref_index_position`) will be 0.
 
 - `obj_position`: byte position for the first obj block.
+- `obj_id_len`: number of bytes used to abbreviate object identifiers
+  in obj blocks.
 - `log_position`: byte position for the first log block.
 - `ref_index_position`: byte position for the start of the ref index.
 - `obj_index_position`: byte position for the start of the obj index.
@@ -727,7 +785,7 @@ A repository must set its `$GIT_DIR/config` to configure reftable:
     [core]
         repositoryformatversion = 1
     [extensions]
-        reftable = true
+        refStorage = reftable
 
 ### Layout
 
@@ -841,6 +899,24 @@ locating the correct chunk.
 
 Given the compression achieved by reftable's encoding, it does not
 seem necessary to add the complexity of bzip/gzip/zlib.
+
+### Michael Haggerty's alternate format
+
+Michael Haggerty proposed [an alternate][mh-alt] format to reftable on
+the Git mailing list.  This format uses smaller chunks, without the
+restart table, and avoids block aligning with padding.  Reflog entries
+immediately follow each ref, and are thus interleaved between refs.
+
+Performance testing indicates reftable is faster for lookups (51%
+faster, 11.2 usec vs.  5.4 usec), although reftable produces a
+slightly larger file (+ ~3.2%, 28.3M vs 29.2M):
+
+format    |  size  | seek cold | seek hot  |
+---------:|-------:|----------:|----------:|
+mh-alt    | 28.3 M | 23.4 usec | 11.2 usec |
+reftable  | 29.2 M | 19.9 usec |  5.4 usec |
+
+[mh-alt]: https://public-inbox.org/git/CAMy9T_HCnyc1g8XWOOWhe7nN0aEFyyBskV2aOMb_fe+wGvEJ7A@mail.gmail.com/
 
 ### JGit Ketch RefTree
 
