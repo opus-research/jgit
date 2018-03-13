@@ -58,7 +58,7 @@ import java.util.Map;
 import org.eclipse.jgit.errors.ObjectWritingException;
 import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.IO;
+import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.RawParseUtils;
 
 class RefDatabase {
@@ -126,7 +126,7 @@ class RefDatabase {
 
 	/**
 	 * Create a command to update, create or delete a ref in this repository.
-	 *
+	 * 
 	 * @param name
 	 *            name of the ref the caller wants to modify.
 	 * @return an update command. The caller must finish populating this command
@@ -137,30 +137,10 @@ class RefDatabase {
 	 *             to the base ref, as the symbolic ref could not be read.
 	 */
 	RefUpdate newUpdate(final String name) throws IOException {
-		return newUpdate(name, false);
-	}
-
-	/**
-	 * Create a command to update, create or delete a ref in this repository.
-	 *
-	 * @param name
-	 *            name of the ref the caller wants to modify.
-	 * @param detach
-	 *            true to detach the ref, i.e. replace symref with object ref
-	 * @return an update command. The caller must finish populating this command
-	 *         and then invoke one of the update methods to actually make a
-	 *         change.
-	 * @throws IOException
-	 *             a symbolic ref was passed in and could not be resolved back
-	 *             to the base ref, as the symbolic ref could not be read.
-	 */
-	RefUpdate newUpdate(final String name, boolean detach) throws IOException {
 		refreshPackedRefs();
 		Ref r = readRefBasic(name, 0);
 		if (r == null)
 			r = new Ref(Ref.Storage.NEW, name, null);
-		else if (detach)
-			r = new Ref(Ref.Storage.NEW, name, r.getObjectId());
 		return new RefUpdate(this, r, fileForRef(r.getName()));
 	}
 
@@ -192,7 +172,7 @@ class RefDatabase {
 
 	/**
 	 * Writes a symref (e.g. HEAD) to disk
-	 *
+	 * 
 	 * @param name
 	 *            symref name
 	 * @param target
@@ -402,7 +382,7 @@ class RefDatabase {
 				return new Ref(Ref.Storage.LOOSE, origName, target, null);
 			if (!origName.equals(r.getName()))
 				r = new Ref(Ref.Storage.LOOSE_PACKED, origName, r.getName(), r.getObjectId(), r.getPeeledObjectId(), true);
-			return r;
+			return r; 
 		}
 
 		setModified();
@@ -522,7 +502,7 @@ class RefDatabase {
 
 	private static String readLine(final File file)
 			throws FileNotFoundException, IOException {
-		final byte[] buf = IO.readFully(file, 4096);
+		final byte[] buf = NB.readFully(file, 4096);
 		int n = buf.length;
 
 		// remove trailing whitespaces

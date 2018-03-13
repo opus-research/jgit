@@ -58,21 +58,8 @@ public final class Constants {
 	/** Hash function used natively by Git for all objects. */
 	private static final String HASH_FUNCTION = "SHA-1";
 
-	/**
-	 * A Git object hash is 160 bits, i.e. 20 bytes.
-	 * <p>
-	 * Changing this assumption is not going to be as easy as changing this
-	 * declaration.
-	 */
+	/** Length of an object hash. */
 	public static final int OBJECT_ID_LENGTH = 20;
-
-	/**
-	 * A Git object can be expressed as a 40 character string of hexadecimal
-	 * digits.
-	 *
-	 * @see #OBJECT_ID_LENGTH
-	 */
-	public static final int OBJECT_ID_STRING_LENGTH = OBJECT_ID_LENGTH * 2;
 
 	/** Special name for the "HEAD" symbolic-ref. */
 	public static final String HEAD = "HEAD";
@@ -136,7 +123,7 @@ public final class Constants {
 	 * Indicates the associated object is a commit.
 	 * <p>
 	 * <b>This constant is fixed and is defined by the Git packfile format.</b>
-	 *
+	 * 
 	 * @see #TYPE_COMMIT
 	 */
 	public static final int OBJ_COMMIT = 1;
@@ -147,7 +134,7 @@ public final class Constants {
 	 * Indicates the associated object is a tree.
 	 * <p>
 	 * <b>This constant is fixed and is defined by the Git packfile format.</b>
-	 *
+	 * 
 	 * @see #TYPE_BLOB
 	 */
 	public static final int OBJ_TREE = 2;
@@ -158,7 +145,7 @@ public final class Constants {
 	 * Indicates the associated object is a blob.
 	 * <p>
 	 * <b>This constant is fixed and is defined by the Git packfile format.</b>
-	 *
+	 * 
 	 * @see #TYPE_BLOB
 	 */
 	public static final int OBJ_BLOB = 3;
@@ -169,7 +156,7 @@ public final class Constants {
 	 * Indicates the associated object is an annotated tag.
 	 * <p>
 	 * <b>This constant is fixed and is defined by the Git packfile format.</b>
-	 *
+	 * 
 	 * @see #TYPE_TAG
 	 */
 	public static final int OBJ_TAG = 4;
@@ -216,7 +203,7 @@ public final class Constants {
 	 * <b>This constant is fixed and is defined by the Git packfile format.</b>
 	 */
 	public static final byte[] PACK_SIGNATURE = { 'P', 'A', 'C', 'K' };
-
+	
 	/** Native character encoding for commit messages, file names... */
 	public static final String CHARACTER_ENCODING = "UTF-8";
 
@@ -262,55 +249,15 @@ public final class Constants {
 	/** The environment variable that contains the commiter's email */
 	public static final String GIT_COMMITTER_EMAIL_KEY = "GIT_COMMITTER_EMAIL";
 
-	/**
-	 * The environment variable that limits how close to the root of the file
-	 * systems JGit will traverse when looking for a repository root.
-	 */
-	public static final String GIT_CEILING_DIRECTORIES_KEY = "GIT_CEILING_DIRECTORIES";
-
-	/**
-	 * The environment variable that tells us which directory is the ".git"
-	 * directory
-	 */
-	public static final String GIT_DIR_KEY = "GIT_DIR";
-
-	/**
-	 * The environment variable that tells us which directory is the working
-	 * directory.
-	 */
-	public static final String GIT_WORK_TREE_KEY = "GIT_WORK_TREE";
-
-	/**
-	 * The environment variable that tells us which file holds the Git index.
-	 */
-	public static final String GIT_INDEX_KEY = "GIT_INDEX";
-
-	/**
-	 * The environment variable that tells us where objects are stored
-	 */
-	public static final String GIT_OBJECT_DIRECTORY_KEY = "GIT_OBJECT_DIRECTORY";
-
-	/**
-	 * The environment variable that tells us where to look for objects, besides
-	 * the default objects directory.
-	 */
-	public static final String GIT_ALTERNATE_OBJECT_DIRECTORIES_KEY = "GIT_ALTERNATE_OBJECT_DIRECTORIES";
-
 	/** Default value for the user name if no other information is available */
 	public static final String UNKNOWN_USER_DEFAULT = "unknown-user";
 
 	/** Beginning of the common "Signed-off-by: " commit message line */
 	public static final String SIGNED_OFF_BY_TAG = "Signed-off-by: ";
 
-	/** A gitignore file name */
-	public static final String GITIGNORE_FILENAME = ".gitignore";
-
-	/** Default remote name used by clone, push and fetch operations */
-	public static final String DEFAULT_REMOTE_NAME = "origin";
-
 	/**
 	 * Create a new digest function for objects.
-	 *
+	 * 
 	 * @return a new digest object.
 	 * @throws RuntimeException
 	 *             this Java virtual machine does not support the required hash
@@ -373,7 +320,7 @@ public final class Constants {
 
 	/**
 	 * Parse an encoded type string into a type constant.
-	 *
+	 * 
 	 * @param id
 	 *            object id this type string came from; may be null if that is
 	 *            not known at the time the parse is occurring.
@@ -448,7 +395,7 @@ public final class Constants {
 
 	/**
 	 * Convert an integer into its decimal representation.
-	 *
+	 * 
 	 * @param s
 	 *            the integer to convert.
 	 * @return a decimal representation of the input integer. The returned array
@@ -460,7 +407,7 @@ public final class Constants {
 
 	/**
 	 * Convert a string to US-ASCII encoding.
-	 *
+	 * 
 	 * @param s
 	 *            the string to convert. Must not contain any characters over
 	 *            127 (outside of 7-bit ASCII).
