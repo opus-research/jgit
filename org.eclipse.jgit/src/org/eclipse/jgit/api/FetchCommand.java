@@ -47,7 +47,6 @@ import java.net.URISyntaxException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidConfigurationException;
@@ -58,21 +57,20 @@ import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.IndexDiff;
 import org.eclipse.jgit.lib.NullProgressMonitor;
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.lib.SubmoduleConfig.FetchRecurseSubmodulesMode;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.submodule.SubmoduleWalk;
 import org.eclipse.jgit.transport.FetchResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.TagOpt;
 import org.eclipse.jgit.transport.Transport;
-import org.eclipse.jgit.treewalk.FileTreeIterator;
 
 /**
  * A class used to execute a {@code Fetch} command. It has setters for all
@@ -109,18 +107,25 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 		refSpecs = new ArrayList<>(3);
 	}
 
-	private FetchRecurseSubmodulesMode getRecurseMode(String path,
-			Config config) {
+	private FetchRecurseSubmodulesMode getRecurseMode(String path) {
 		// Use the caller-specified mode, if set
 		if (submoduleRecurseMode != null) {
 			return submoduleRecurseMode;
 		}
 
-		// Fall back to submodule config, if set
-		FetchRecurseSubmodulesMode mode = config.getEnum(
+		// Fall back to submodule.name.fetchRecurseSubmodules, if set
+		FetchRecurseSubmodulesMode mode = repo.getConfig().getEnum(
 				FetchRecurseSubmodulesMode.values(),
 				ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
 				ConfigConstants.CONFIG_KEY_FETCH_RECURSE_SUBMODULES, null);
+		if (mode != null) {
+			return mode;
+		}
+
+		// Fall back to fetch.recurseSubmodules, if set
+		mode = repo.getConfig().getEnum(FetchRecurseSubmodulesMode.values(),
+				ConfigConstants.CONFIG_FETCH_SECTION, null,
+				ConfigConstants.CONFIG_KEY_RECURSE_SUBMODULES, null);
 		if (mode != null) {
 			return mode;
 		}
@@ -129,54 +134,43 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 		return FetchRecurseSubmodulesMode.ON_DEMAND;
 	}
 
-	private boolean isRecurseSubmodules() {
-		return submoduleRecurseMode != null
-				&& submoduleRecurseMode != FetchRecurseSubmodulesMode.NO;
-	}
-
 	private void fetchSubmodules(FetchResult results)
 			throws org.eclipse.jgit.api.errors.TransportException,
 			GitAPIException, InvalidConfigurationException {
-		Set<String> updated = null;
-		try (SubmoduleWalk walk = SubmoduleWalk.forIndex(repo)) {
+		try (SubmoduleWalk walk = new SubmoduleWalk(repo);
+				RevWalk revWalk = new RevWalk(repo)) {
+			// Walk over submodules in the parent repository's FETCH_HEAD.
+			ObjectId fetchHead = repo.resolve(Constants.FETCH_HEAD);
+			if (fetchHead == null) {
+				return;
+			}
+			walk.setTree(revWalk.parseTree(fetchHead));
 			while (walk.next()) {
 				Repository submoduleRepo = walk.getRepository();
 
 				// Skip submodules that don't exist locally (have not been
-				// cloned), are not registered in the .gitmodules file, or not
-				// registered in the parent repository's config.
+				// cloned), are not registered in the .gitmodules file, or
+				// not registered in the parent repository's config.
 				if (submoduleRepo == null || walk.getModulesPath() == null
 						|| walk.getConfigUrl() == null) {
 					continue;
 				}
 
 				FetchRecurseSubmodulesMode recurseMode = getRecurseMode(
-						walk.getPath(), submoduleRepo.getConfig());
+						walk.getPath());
 
-				// In on-demand mode, we need the list of changed paths in the
-				// parent repository, to determine whether or not the submodule
-				// has been updated. Lazy load the list on the first time it's
-				// needed.
-				if (recurseMode == FetchRecurseSubmodulesMode.ON_DEMAND
-						&& updated == null) {
-					IndexDiff indexDiff = new IndexDiff(repo,
-							Constants.FETCH_HEAD, new FileTreeIterator(repo));
-					indexDiff.diff();
-					updated = indexDiff.getChanged();
-					updated.addAll(indexDiff.getAdded());
-				}
-
-				if (recurseMode == FetchRecurseSubmodulesMode.YES
-						|| (recurseMode == FetchRecurseSubmodulesMode.ON_DEMAND
-								&& updated != null
-								&& updated.contains(walk.getPath()))) {
+				// When the fetch mode is "yes" we always fetch. When the mode
+				// is "on demand", we only fetch if the submodule's revision was
+				// updated to an object that is not currently present in the
+				// submodule.
+				if ((recurseMode == FetchRecurseSubmodulesMode.ON_DEMAND
+						&& !submoduleRepo.hasObject(walk.getObjectId()))
+						|| recurseMode == FetchRecurseSubmodulesMode.YES) {
 					FetchCommand f = new FetchCommand(submoduleRepo)
-							.setProgressMonitor(monitor)
-							.setTagOpt(tagOption)
+							.setProgressMonitor(monitor).setTagOpt(tagOption)
 							.setCheckFetchedObjects(checkFetchedObjects)
 							.setRemoveDeletedRefs(isRemoveDeletedRefs())
-							.setThin(thin)
-							.setRefSpecs(refSpecs)
+							.setThin(thin).setRefSpecs(refSpecs)
 							.setDryRun(dryRun)
 							.setRecurseSubmodules(recurseMode);
 					results.addSubmodule(walk.getPath(), f.call());
@@ -217,8 +211,7 @@ public class FetchCommand extends TransportCommand<FetchCommand, FetchResult> {
 			configure(transport);
 
 			FetchResult result = transport.fetch(monitor, refSpecs);
-			if (!repo.isBare() && (!result.getTrackingRefUpdates().isEmpty()
-					|| isRecurseSubmodules())) {
+			if (!repo.isBare()) {
 				fetchSubmodules(result);
 			}
 

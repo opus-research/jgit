@@ -1,8 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
- * Copyright (C) 2008, Marek Zawirski <marek.zawirski@gmail.com>
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2017, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -44,56 +41,30 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.transport;
+package org.eclipse.jgit.util.sha1;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.text.MessageFormat;
+
+import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.lib.ObjectId;
 
 /**
- * Final status after a successful fetch from a remote repository.
+ * Thrown by {@link SHA1} if it detects a likely hash collision.
  *
- * @see Transport#fetch(org.eclipse.jgit.lib.ProgressMonitor, Collection)
+ * @since 4.7
  */
-public class FetchResult extends OperationResult {
-	private final List<FetchHeadRecord> forMerge;
-
-	private final Map<String, FetchResult> submodules;
-
-	FetchResult() {
-		forMerge = new ArrayList<>();
-		submodules = new HashMap<>();
-	}
-
-	void add(final FetchHeadRecord r) {
-		if (!r.notForMerge)
-			forMerge.add(r);
-	}
+public class Sha1CollisionException extends RuntimeException {
+	private static final long serialVersionUID = 1L;
 
 	/**
-	 * Add fetch results for a submodule.
+	 * Initialize with default message.
 	 *
-	 * @param path
-	 *            the submodule path
-	 * @param result
-	 *            the fetch result
-	 * @since 4.7
+	 * @param id
+	 *            object whose contents are a hash collision.
 	 */
-	public void addSubmodule(String path, FetchResult result) {
-		submodules.put(path, result);
-	}
-
-	/**
-	 * Get fetch results for submodules.
-	 *
-	 * @return Fetch results for submodules as a map of submodule paths to fetch
-	 *         results.
-	 * @since 4.7
-	 */
-	public Map<String, FetchResult> submoduleResults() {
-		return Collections.unmodifiableMap(submodules);
+	public Sha1CollisionException(ObjectId id) {
+		super(MessageFormat.format(
+				JGitText.get().sha1CollisionDetected1,
+				id.name()));
 	}
 }
