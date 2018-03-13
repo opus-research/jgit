@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>,
- * Copyright (C) 2010, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,21 +40,49 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.merge;
 
-import org.eclipse.jgit.lib.Repository;
+package org.eclipse.jgit.errors;
 
-/**
- * A three-way merge strategy performing a content-merge if necessary
- */
-public class StrategyResolve extends ThreeWayMergeStrategy {
-	@Override
-	public ThreeWayMerger newMerger(Repository db) {
-		return new ResolveMerger(db);
+import java.io.IOException;
+import java.text.MessageFormat;
+import java.util.Collection;
+
+import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.lib.AbbreviatedObjectId;
+import org.eclipse.jgit.lib.ObjectId;
+
+/** An {@link AbbreviatedObjectId} cannot be extended. */
+public class AmbiguousObjectException extends IOException {
+	private static final long serialVersionUID = 1L;
+
+	private final AbbreviatedObjectId missing;
+
+	private final Collection<ObjectId> candidates;
+
+	/**
+	 * Construct a MissingObjectException for the specified object id. Expected
+	 * type is reported to simplify tracking down the problem.
+	 *
+	 * @param id
+	 *            SHA-1
+	 * @param candidates
+	 *            the candidate matches returned by the ObjectReader.
+	 */
+	public AmbiguousObjectException(final AbbreviatedObjectId id,
+			final Collection<ObjectId> candidates) {
+		super(MessageFormat.format(JGitText.get().ambiguousObjectAbbreviation,
+				id.name()));
+		this.missing = id;
+		this.candidates = candidates;
 	}
 
-	@Override
-	public String getName() {
-		return "resolve";
+	/** @return the AbbreviatedObjectId that has more than one result. */
+	public AbbreviatedObjectId getAbbreviatedObjectId() {
+		return missing;
+	}
+
+	/** @return the matching candidates (or at least a subset of them). */
+	public Collection<ObjectId> getCandidates() {
+		return candidates;
 	}
 }
