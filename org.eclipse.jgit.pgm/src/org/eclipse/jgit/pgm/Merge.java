@@ -182,7 +182,6 @@ class Merge extends TextBuiltin {
 		case FAST_FORWARD_SQUASHED:
 		case MERGED_SQUASHED_NOT_COMMITTED:
 			outw.println(CLIText.get().mergedSquashed);
-			outw.println(CLIText.get().mergeWentWellStoppedBeforeCommitting);
 			break;
 		case ABORTED:
 			throw die(CLIText.get().ffNotPossibleAborting);
