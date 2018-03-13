@@ -355,7 +355,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 		for (PackExt ext : PackExt.values()) {
 			if (ext != PACK && ext != INDEX) {
 				final String name = base + ext.getExtension();
-				if (new File(name).exists())
+				if (new File(pack.getParentFile(), name).exists())
 					extensions.add(ext);
 			}
 		}
