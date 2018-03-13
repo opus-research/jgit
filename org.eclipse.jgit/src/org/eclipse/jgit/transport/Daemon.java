@@ -45,16 +45,16 @@ package org.eclipse.jgit.transport;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketAddress;
-import java.net.SocketException;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.pack.PackConfig;
@@ -78,8 +78,6 @@ public class Daemon {
 	private final ThreadGroup processors;
 
 	private boolean run;
-
-	private ServerSocket listenSock;
 
 	private Thread acceptThread;
 
@@ -282,7 +280,7 @@ public class Daemon {
 		if (acceptThread != null)
 			throw new IllegalStateException(JGitText.get().daemonAlreadyRunning);
 
-		listenSock = new ServerSocket(
+		final ServerSocket listenSock = new ServerSocket(
 				myAddress != null ? myAddress.getPort() : 0, BACKLOG,
 				myAddress != null ? myAddress.getAddress() : null);
 		myAddress = (InetSocketAddress) listenSock.getLocalSocketAddress();
@@ -290,28 +288,23 @@ public class Daemon {
 		run = true;
 		acceptThread = new Thread(processors, "Git-Daemon-Accept") {
 			public void run() {
-				try {
-					while (isRunning()) {
-						try {
-							startClient(listenSock.accept());
-						} catch (SocketException e) {
-							// Test again to see if we should keep accepting.
-						} catch (IOException e) {
-							break;
-						}
+				while (isRunning()) {
+					try {
+						startClient(listenSock.accept());
+					} catch (InterruptedIOException e) {
+						// Test again to see if we should keep accepting.
+					} catch (IOException e) {
+						break;
 					}
+				}
+
+				try {
+					listenSock.close();
+				} catch (IOException err) {
+					//
 				} finally {
 					synchronized (Daemon.this) {
 						acceptThread = null;
-						// listenSock might already have been closed by stop()
-						if (!listenSock.isClosed()) {
-							try {
-								listenSock.close();
-							} catch (IOException err) {
-								//
-							}
-						}
-						listenSock = null;
 					}
 				}
 			}
@@ -325,26 +318,11 @@ public class Daemon {
 	}
 
 	/** Stop this daemon. */
-	public synchronized void stop() throws IOException {
+	public synchronized void stop() {
 		if (acceptThread != null) {
 			run = false;
-			listenSock.close();
+			acceptThread.interrupt();
 		}
-	}
-
-	/** Stop this daemon and block until the listening socket has been
-	 * closed and the accepting thread is dead. */
-	public void stopSync() throws IOException, InterruptedException {
-		Thread t;
-		synchronized (this) {
-			if (acceptThread == null)
-				return;
-			t = acceptThread;
-			stop();
-		}
-		// This thread must not be holding the lock on this Daemon
-		// instance, otherwise deadlock.
-		t.join();
 	}
 
 	private void startClient(final Socket s) {
@@ -388,7 +366,8 @@ public class Daemon {
 		return null;
 	}
 
-	Repository openRepository(DaemonClient client, String name) {
+	Repository openRepository(DaemonClient client, String name)
+			throws ServiceMayNotContinueException {
 		// Assume any attempt to use \ was by a Windows client
 		// and correct to the more typical / used in Git URIs.
 		//
