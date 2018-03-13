@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2016, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,53 +40,14 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.junit;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-/**
- * An abstraction for JGits builtin implementations for hooks and filters.
- * Instead of spawning an external processes to start a filter/hook and to pump
- * data from/to stdin/stdout these builtin coammnds may be used. They are
- * constructed by {@link FilterCommandFactory}.
- *
- * @since 4.5
- */
-public abstract class FilterCommand {
-	/**
-	 * The {@link InputStream} this command should read from
-	 */
-	protected InputStream in;
-
-	/**
-	 * The {@link OutputStream} this command should write to
-	 */
-	protected OutputStream out;
-
-	/**
-	 * @param in
-	 * @param out
-	 */
-	public FilterCommand(InputStream in, OutputStream out) {
-		this.in = in;
-		this.out = out;
-	}
-
-	/**
-	 * Execute the command. The command is supposed to read data from
-	 * {@link #in} and to write the result to {@link #out}. It returns the
-	 * number of bytes it read from {@link #in}. It should be called in a loop
-	 * until it returns -1 signaling that the {@link InputStream} is completely
-	 * processed.
-	 *
-	 * @return the number of bytes read from the {@link InputStream} or -1. -1
-	 *         means that the {@link InputStream} is completely processed.
-	 * @throws IOException
-	 *             when {@link IOException} occured while reading from
-	 *             {@link #in} or writing to {@link #out}
-	 *
-	 */
-	public abstract int run() throws IOException;
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ java.lang.annotation.ElementType.METHOD })
+public @interface Repeat {
+	public abstract int n();
 }

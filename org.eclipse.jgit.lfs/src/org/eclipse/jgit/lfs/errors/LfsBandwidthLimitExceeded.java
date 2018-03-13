@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2016, David Pursehouse <david.pursehouse@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,34 +40,23 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-
-import org.eclipse.jgit.lib.Repository;
+package org.eclipse.jgit.lfs.errors;
 
 /**
- * The factory responsible for creating instances of {@link FilterCommand}.
+ * Thrown when the bandwidth limit for the user or repository has been exceeded.
  *
  * @since 4.5
+ *
  */
-public interface FilterCommandFactory {
-	/**
-	 * Create a new {@link FilterCommand}.
-	 *
-	 * @param db
-	 *            the repository this command should work on
-	 * @param in
-	 *            the {@link InputStream} this command should read from
-	 * @param out
-	 *            the {@link OutputStream} this command should write to
-	 * @return the create {@link FilterCommand}
-	 * @throws IOException
-	 *             thrown when the command constructor throws a IOException
-	 */
-	public FilterCommand create(Repository db, InputStream in,
-			OutputStream out) throws IOException;
+public class LfsBandwidthLimitExceeded extends LfsException {
+	private static final long serialVersionUID = 1L;
 
+	/**
+	 * @param message
+	 *            error message, which may be shown to an end-user.
+	 */
+	public LfsBandwidthLimitExceeded(String message) {
+		super(message);
+	}
 }
