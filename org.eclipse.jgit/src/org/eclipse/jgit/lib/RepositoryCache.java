@@ -45,8 +45,12 @@ package org.eclipse.jgit.lib;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.ref.Reference;
+import java.lang.ref.SoftReference;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -146,7 +150,7 @@ public class RepositoryCache {
 	public static void close(@NonNull final Repository db) {
 		if (db.getDirectory() != null) {
 			FileKey key = FileKey.exact(db.getDirectory(), db.getFS());
-			cache.unregisterAndCloseRepository(key);
+			cache.unregisterAndCloseRepository(key, db);
 		}
 	}
 
@@ -198,7 +202,8 @@ public class RepositoryCache {
 			return false;
 		}
 		FileKey key = new FileKey(gitDir, repo.getFS());
-		return cache.cacheMap.get(key) == repo;
+		Reference<Repository> repoRef = cache.cacheMap.get(key);
+		return repoRef != null && repoRef.get() == repo;
 	}
 
 	/** Unregister all repositories from the cache. */
@@ -214,7 +219,7 @@ public class RepositoryCache {
 		cache.configureEviction(repositoryCacheConfig);
 	}
 
-	private final ConcurrentHashMap<Key, Repository> cacheMap;
+	private final ConcurrentHashMap<Key, Reference<Repository>> cacheMap;
 
 	private final Lock[] openLocks;
 
@@ -223,7 +228,7 @@ public class RepositoryCache {
 	private volatile long expireAfter;
 
 	private RepositoryCache() {
-		cacheMap = new ConcurrentHashMap<>();
+		cacheMap = new ConcurrentHashMap<Key, Reference<Repository>>();
 		openLocks = new Lock[4];
 		for (int i = 0; i < openLocks.length; i++) {
 			openLocks[i] = new Lock();
@@ -256,15 +261,19 @@ public class RepositoryCache {
 		}
 	}
 
+	@SuppressWarnings("resource")
 	private Repository openRepository(final Key location,
 			final boolean mustExist) throws IOException {
-		Repository db = cacheMap.get(location);
+		Reference<Repository> ref = cacheMap.get(location);
+		Repository db = ref != null ? ref.get() : null;
 		if (db == null) {
 			synchronized (lockFor(location)) {
-				db = cacheMap.get(location);
+				ref = cacheMap.get(location);
+				db = ref != null ? ref.get() : null;
 				if (db == null) {
 					db = location.open(mustExist);
-					cacheMap.put(location, db);
+					ref = new SoftReference<Repository>(db);
+					cacheMap.put(location, ref);
 				} else {
 					db.incrementOpen();
 				}
@@ -276,25 +285,31 @@ public class RepositoryCache {
 	}
 
 	private void registerRepository(final Key location, final Repository db) {
-		Repository oldDb = cacheMap.put(location, db);
+		SoftReference<Repository> newRef = new SoftReference<Repository>(db);
+		Reference<Repository> oldRef = cacheMap.put(location, newRef);
+		Repository oldDb = oldRef != null ? oldRef.get() : null;
 		if (oldDb != null)
 			oldDb.close();
 	}
 
 	private Repository unregisterRepository(final Key location) {
-		return cacheMap.remove(location);
+		Reference<Repository> oldRef = cacheMap.remove(location);
+		return oldRef != null ? oldRef.get() : null;
 	}
 
 	private boolean isExpired(Repository db) {
-		return db != null && db.useCnt.get() <= 0
+		return db != null && db.useCnt.get() == 0
 			&& (System.currentTimeMillis() - db.closedAt.get() > expireAfter);
 	}
 
-	private void unregisterAndCloseRepository(final Key location) {
+	private void unregisterAndCloseRepository(final Key location,
+			Repository db) {
 		synchronized (lockFor(location)) {
-			Repository oldDb = unregisterRepository(location);
-			if (oldDb != null) {
-				oldDb.doClose();
+			if (isExpired(db)) {
+				Repository oldDb = unregisterRepository(location);
+				if (oldDb != null) {
+					oldDb.close();
+				}
 			}
 		}
 	}
@@ -304,7 +319,8 @@ public class RepositoryCache {
 	}
 
 	private void clearAllExpired() {
-		for (Repository db : cacheMap.values()) {
+		for (Reference<Repository> ref : cacheMap.values()) {
+			Repository db = ref.get();
 			if (isExpired(db)) {
 				RepositoryCache.close(db);
 			}
@@ -312,8 +328,15 @@ public class RepositoryCache {
 	}
 
 	private void clearAll() {
-		for (Key k : cacheMap.keySet()) {
-			unregisterAndCloseRepository(k);
+		for (int stage = 0; stage < 2; stage++) {
+			for (Iterator<Map.Entry<Key, Reference<Repository>>> i = cacheMap
+					.entrySet().iterator(); i.hasNext();) {
+				final Map.Entry<Key, Reference<Repository>> e = i.next();
+				final Repository db = e.getValue().get();
+				if (db != null)
+					db.close();
+				i.remove();
+			}
 		}
 	}
 
@@ -427,7 +450,6 @@ public class RepositoryCache {
 			return path;
 		}
 
-		@Override
 		public Repository open(final boolean mustExist) throws IOException {
 			if (mustExist && !isGitRepository(path, fs))
 				throw new RepositoryNotFoundException(path);
