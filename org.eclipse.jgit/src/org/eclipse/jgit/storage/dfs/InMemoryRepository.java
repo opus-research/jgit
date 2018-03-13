@@ -26,8 +26,6 @@ import org.eclipse.jgit.util.RefList;
  * is garbage collected. Closing the repository has no impact on its memory.
  */
 public class InMemoryRepository extends DfsRepository {
-	private static final AtomicInteger packId = new AtomicInteger();
-
 	private final DfsObjDatabase objdb;
 
 	private final DfsRefDatabase refdb;
@@ -36,8 +34,7 @@ public class InMemoryRepository extends DfsRepository {
 	 * Initialize a new in-memory repository.
 	 *
 	 * @param repoDesc
-	 *            description of the repository.
-	 * @since 2.0
+	 *             description of the repository.
 	 */
 	public InMemoryRepository(DfsRepositoryDescription repoDesc) {
 		super(new DfsRepositoryBuilder<DfsRepositoryBuilder, InMemoryRepository>() {
@@ -62,6 +59,7 @@ public class InMemoryRepository extends DfsRepository {
 	}
 
 	private class MemObjDatabase extends DfsObjDatabase {
+		private final AtomicInteger packId = new AtomicInteger();
 		private List<DfsPackDescription> packs = new ArrayList<DfsPackDescription>();
 
 		MemObjDatabase(DfsRepository repo) {
@@ -76,10 +74,8 @@ public class InMemoryRepository extends DfsRepository {
 		@Override
 		protected DfsPackDescription newPack(PackSource source) {
 			int id = packId.incrementAndGet();
-			DfsPackDescription desc = new MemPack(
-					"pack-" + id + "-" + source.name(),
+			return new MemPack("pack-" + id + "-" + source.name(),
 					getRepository().getDescription());
-			return desc.setPackSource(source);
 		}
 
 		@Override

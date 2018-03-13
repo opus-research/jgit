@@ -46,13 +46,11 @@ package org.eclipse.jgit.api;
 import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
 import org.eclipse.jgit.api.CheckoutResult.Status;
 import org.eclipse.jgit.api.errors.CheckoutConflictException;
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
@@ -79,7 +77,6 @@ import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
-import org.eclipse.jgit.util.FileUtils;
 
 /**
  * Checkout a branch to the working tree
@@ -124,11 +121,9 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	 * @throws InvalidRefNameException
 	 *             if the provided name is <code>null</code> or otherwise
 	 *             invalid
-	 * @throws CheckoutConflictException
-	 *             if the checkout results in a conflict
 	 * @return the newly created branch
 	 */
-	public Ref call() throws GitAPIException, RefAlreadyExistsException,
+	public Ref call() throws JGitInternalException, RefAlreadyExistsException,
 			RefNotFoundException, InvalidRefNameException,
 			CheckoutConflictException {
 		checkCallable();
@@ -136,7 +131,7 @@ public class CheckoutCommand extends GitCommand<Ref> {
 		try {
 			if (checkoutAllPaths || !paths.isEmpty()) {
 				checkoutPaths();
-				status = new CheckoutResult(Status.OK, paths);
+				status = CheckoutResult.OK_RESULT;
 				setCallable(false);
 				return null;
 			}
@@ -216,14 +211,12 @@ public class CheckoutCommand extends GitCommand<Ref> {
 				throw new JGitInternalException(MessageFormat.format(JGitText
 						.get().checkoutUnexpectedResult, updateResult.name()));
 
-
 			if (!dco.getToBeDeleted().isEmpty()) {
-				status = new CheckoutResult(Status.NONDELETED,
-						dco.getToBeDeleted());
-			} else
-				status = new CheckoutResult(new ArrayList<String>(dco
-						.getUpdated().keySet()), dco.getRemoved());
-
+				status = new CheckoutResult(Status.NONDELETED, dco
+						.getToBeDeleted());
+			}
+			else
+				status = CheckoutResult.OK_RESULT;
 			return ref;
 		} catch (IOException ioe) {
 			throw new JGitInternalException(ioe.getMessage(), ioe);
@@ -260,7 +253,6 @@ public class CheckoutCommand extends GitCommand<Ref> {
 	 * @param all
 	 *            true to checkout all paths, false otherwise
 	 * @return {@code this}
-	 * @since 2.0
 	 */
 	public CheckoutCommand setAllPaths(boolean all) {
 		checkoutAllPaths = all;
@@ -301,11 +293,9 @@ public class CheckoutCommand extends GitCommand<Ref> {
 						public void apply(DirCacheEntry ent) {
 							ent.setObjectId(blobId);
 							ent.setFileMode(mode);
-							File file = new File(workTree, ent.getPathString());
-							File parentDir = file.getParentFile();
 							try {
-								FileUtils.mkdirs(parentDir, true);
-								DirCacheCheckout.checkoutEntry(repo, file, ent, r);
+								DirCacheCheckout.checkoutEntry(repo, new File(
+										workTree, ent.getPathString()), ent, r);
 							} catch (IOException e) {
 								throw new JGitInternalException(
 										MessageFormat.format(
