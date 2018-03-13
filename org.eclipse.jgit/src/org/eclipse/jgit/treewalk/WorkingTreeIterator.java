@@ -466,7 +466,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		if (filterCommand != null) {
 			if (Repository.isRegistered(filterCommand)) {
 				LocalFile buffer = new TemporaryBuffer.LocalFile(null);
-				FilterCommand command = Repository.getCommand(filterCommand,
+				FilterCommand command = Repository.getFilterCommand(filterCommand,
 						repository, in, buffer);
 				while (command.run() != -1) {
 					// loop as long as command.run() tells there is work to do
