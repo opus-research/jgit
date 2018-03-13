@@ -258,7 +258,7 @@ public class BasePackSubscribeConnection extends BasePackConnection implements
 	 * @param subscriber
 	 * @throws IOException
 	 */
-	public void doSubscribeAdvertisment(Subscriber subscriber)
+	public void doSubscribeAdvertisement(Subscriber subscriber)
 			throws IOException {
 		try {
 			pckOut.end();
