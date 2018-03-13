@@ -52,7 +52,7 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 
 /**
- * A command being processed by {@link ReceivePack}.
+ * A command being processed by {@link ReceiveSession}.
  * <p>
  * This command instance roughly translates to the server side representation of
  * the {@link RemoteRefUpdate} created by the client.
@@ -135,7 +135,7 @@ public class ReceiveCommand {
 	private String message;
 
 	/**
-	 * Create a new command for {@link ReceivePack}.
+	 * Create a new command for {@link ReceiveSession}.
 	 *
 	 * @param oldId
 	 *            the old object id; must not be null. Use
@@ -223,13 +223,13 @@ public class ReceiveCommand {
 	 * <p>
 	 * Sets the status of the command as a side effect.
 	 *
-	 * @param rp
+	 * @param rs
 	 *            receive-pack session.
 	 */
-	public void execute(final ReceivePack rp) {
+	public void execute(final ReceiveSession rs) {
 		try {
-			final RefUpdate ru = rp.getRepository().updateRef(getRefName());
-			ru.setRefLogIdent(rp.getRefLogIdent());
+			final RefUpdate ru = rs.getRepository().updateRef(getRefName());
+			ru.setRefLogIdent(rs.getRefLogIdent());
 			switch (getType()) {
 			case DELETE:
 				if (!ObjectId.zeroId().equals(getOldId())) {
@@ -240,17 +240,17 @@ public class ReceiveCommand {
 					ru.setExpectedOldObjectId(getOldId());
 				}
 				ru.setForceUpdate(true);
-				setResult(ru.delete(rp.getRevWalk()));
+				setResult(ru.delete(rs.getRevWalk()));
 				break;
 
 			case CREATE:
 			case UPDATE:
 			case UPDATE_NONFASTFORWARD:
-				ru.setForceUpdate(rp.isAllowNonFastForwards());
+				ru.setForceUpdate(rs.isAllowNonFastForwards());
 				ru.setExpectedOldObjectId(getOldId());
 				ru.setNewObjectId(getNewId());
 				ru.setRefLogMessage("push", true);
-				setResult(ru.update(rp.getRevWalk()));
+				setResult(ru.update(rs.getRevWalk()));
 				break;
 			}
 		} catch (IOException err) {
