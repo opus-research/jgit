@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2008, Charles O'Farrell <charleso@charleso.org>
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2009, Google Inc.
  * Copyright (C) 2009, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
@@ -83,9 +83,9 @@ public abstract class RefWriter {
 	 */
 	public void writeInfoRefs() throws IOException {
 		final StringWriter w = new StringWriter();
-		final char[] tmp = new char[Constants.OBJECT_ID_STRING_LENGTH];
+		final char[] tmp = new char[Constants.OBJECT_ID_LENGTH * 2];
 		for (final Ref r : refs) {
-			if (Constants.HEAD.equals(r.getOrigName())) {
+			if (Constants.HEAD.equals(r.getName())) {
 				// Historically HEAD has never been published through
 				// the INFO_REFS file. This is a mistake, but its the
 				// way things are.
@@ -137,7 +137,7 @@ public abstract class RefWriter {
 			w.write('\n');
 		}
 
-		final char[] tmp = new char[Constants.OBJECT_ID_STRING_LENGTH];
+		final char[] tmp = new char[Constants.OBJECT_ID_LENGTH * 2];
 		for (final Ref r : refs) {
 			if (r.getStorage() != Ref.Storage.PACKED)
 				continue;

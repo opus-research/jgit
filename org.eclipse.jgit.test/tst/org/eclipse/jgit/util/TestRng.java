@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2009, Johannes E. Schindelin
- * Copyright (C) 2009, Johannes Schindelin <johannes.schindelin@gmx.de>
+ * Copyright (C) 2008, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,68 +41,27 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.diff;
+package org.eclipse.jgit.util;
 
-import junit.framework.TestCase;
+/** Toy RNG to ensure we get predictable numbers during unit tests. */
+public class TestRng {
+	private int next;
 
-public class MyersDiffTest extends TestCase {
-	public void testAtEnd() {
-		assertDiff("HELLO", "HELL", " -4,1 +4,0");
+	public TestRng(final String seed) {
+		next = 0;
+		for (int i = 0; i < seed.length(); i++)
+			next = next * 11 + seed.charAt(i);
 	}
 
-	public void testAtStart() {
-		assertDiff("Git", "JGit", " -0,0 +0,1");
+	public byte[] nextBytes(final int cnt) {
+		final byte[] r = new byte[cnt];
+		for (int i = 0; i < cnt; i++)
+			r[i] = (byte) nextInt();
+		return r;
 	}
 
-	public void testSimple() {
-		assertDiff("HELLO WORLD", "LOW",
-			" -0,3 +0,0 -5,1 +2,0 -7,4 +3,0");
-		// is ambiguous, could be this, too:
-		// " -0,2 +0,0 -3,1 +1,0 -5,1 +2,0 -7,4 +3,0"
-	}
-
-	public void assertDiff(String a, String b, String edits) {
-		MyersDiff diff = new MyersDiff(toCharArray(a), toCharArray(b));
-		assertEquals(edits, toString(diff.getEdits()));
-	}
-
-	private static String toString(EditList list) {
-		StringBuilder builder = new StringBuilder();
-		for (Edit e : list)
-			builder.append(" -" + e.beginA
-					+ "," + (e.endA - e.beginA)
-				+ " +" + e.beginB + "," + (e.endB - e.beginB));
-		return builder.toString();
-	}
-
-	private static CharArray toCharArray(String s) {
-		return new CharArray(s);
-	}
-
-	protected static String toString(Sequence seq, int begin, int end) {
-		CharArray a = (CharArray)seq;
-		return new String(a.array, begin, end - begin);
-	}
-
-	protected static String toString(CharArray a, CharArray b,
-			int x, int k) {
-		return "(" + x + "," + (k + x)
-			+ (x < 0 ? '<' :
-					(x >= a.array.length ?
-					 '>' : a.array[x]))
-			+ (k + x < 0 ? '<' :
-					(k + x >= b.array.length ?
-					 '>' : b.array[k + x]))
-			+ ")";
-	}
-
-	private static class CharArray implements Sequence {
-		char[] array;
-		public CharArray(String s) { array = s.toCharArray(); }
-		public int size() { return array.length; }
-		public boolean equals(int i, Sequence other, int j) {
-			CharArray o = (CharArray)other;
-			return array[i] == o.array[j];
-		}
+	public int nextInt() {
+		next = next * 1103515245 + 12345;
+		return next;
 	}
 }

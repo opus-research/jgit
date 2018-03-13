@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2009, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,50 +41,53 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.diff;
+package org.eclipse.jgit.http.server;
 
-public class DiffTestDataGenerator {
-	/**
-	 * Generate sequence of characters in ascending order. The first character
-	 * is a space. All subsequent characters have an ASCII code one greater then
-	 * the ASCII code of the preceding character. On exception: the character
-	 * following which follows '~' is again a ' '.
-	 *
-	 * @param len
-	 *            length of the String to be returned
-	 * @return the sequence of characters as String
-	 */
-	public static String generateSequence(int len) {
-		return generateSequence(len, 0, 0);
+import static javax.servlet.http.HttpServletResponse.SC_FORBIDDEN;
+import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
+import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
+
+import java.io.IOException;
+
+import javax.servlet.Filter;
+import javax.servlet.FilterChain;
+import javax.servlet.FilterConfig;
+import javax.servlet.ServletException;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.eclipse.jgit.http.server.resolver.GetAnyFile;
+import org.eclipse.jgit.http.server.resolver.ServiceNotAuthorizedException;
+import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
+import org.eclipse.jgit.lib.Repository;
+
+class GetAnyFileFilter implements Filter {
+	private final GetAnyFile getAnyFile;
+
+	GetAnyFileFilter(final GetAnyFile getAnyFile) {
+		this.getAnyFile = getAnyFile;
 	}
 
-	/**
-	 * Generate sequence of characters similar to the one returned by
-	 * {@link #generateSequence(int)}. But this time in each chunk of
-	 * <skipPeriod> characters the last <skipLength> characters are left out. By
-	 * calling this method twice with two different prime skipPeriod values and
-	 * short skipLength values you create test data which is similar to what
-	 * programmers do to their source code - huge files with only few
-	 * insertions/deletions/changes.
-	 *
-	 * @param len
-	 *            length of the String to be returned
-	 * @param skipPeriod
-	 * @param skipLength
-	 * @return the sequence of characters as String
-	 */
-	public static String generateSequence(int len, int skipPeriod,
-			int skipLength) {
-		StringBuilder text = new StringBuilder(len);
-		int skipStart = skipPeriod - skipLength;
-		int skippedChars = 0;
-		for (int i = 0; i - skippedChars < len; ++i) {
-			if (skipPeriod == 0 || i % skipPeriod < skipStart) {
-				text.append((char) (32 + i % 95));
-			} else {
-				skippedChars++;
-			}
+	public void init(FilterConfig config) throws ServletException {
+		// Do nothing.
+	}
+
+	public void destroy() {
+		// Do nothing.
+	}
+
+	public void doFilter(ServletRequest request, ServletResponse response,
+			FilterChain chain) throws IOException, ServletException {
+		try {
+			final Repository db = getRepository(request);
+			getAnyFile.access((HttpServletRequest) request, db);
+			chain.doFilter(request, response);
+		} catch (ServiceNotAuthorizedException e) {
+			((HttpServletResponse) response).sendError(SC_UNAUTHORIZED);
+		} catch (ServiceNotEnabledException e) {
+			((HttpServletResponse) response).sendError(SC_FORBIDDEN);
 		}
-		return text.toString();
 	}
 }
