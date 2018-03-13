@@ -44,21 +44,28 @@
 package org.eclipse.jgit.util;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.text.MessageFormat;
 import java.util.Arrays;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.SymlinksNotSupportedException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Repository;
@@ -620,26 +627,12 @@ public abstract class FS {
 	}
 
 	/**
-	 * Determines whether this platform is capable of running hooks.
-	 * <p>
-	 * Hooks are command line scripts located in the repositories. Not all
-	 * platforms are capable of running them. Typically, hooks are disabled on
-	 * Windows machines, unless cygwin is detected on the path.
-	 * </p>
-	 *
-	 * @return <code>true</code> if this FS can run command line hooks,
-	 *         <code>false</code> otherwise.
-	 */
-	public boolean canRunHooks() {
-		return false;
-	}
-
-	/**
 	 * Checks whether the given hook is defined for the given repository, then
 	 * runs it with the given arguments.
 	 * <p>
 	 * By default, the hook's standard output and error will be redirected to
-	 * System.out and System.err respectively.
+	 * <code>System.out</code> and <code>System.err</code> respectively. The
+	 * hook will have no stdin.
 	 * </p>
 	 *
 	 * @param repository
@@ -648,15 +641,17 @@ public abstract class FS {
 	 *            The particular hook we wish to execute.
 	 * @param args
 	 *            Arguments to pass to this hook.
-	 * @return The exit value of the hook. <code>0</code> if the hook has no
-	 *         exit value.
-	 * @throws UnsupportedOperationException
-	 *             Thrown if this FS is not capable of executing hooks (i.e.
-	 *             {@link #canRunHooks()} returns <code>false</code>).
+	 * @return The exit value of the hook. Defaults to <code>0</code> if the
+	 *         hook has no exit value, does not exist or cannot be run on this
+	 *         {@link FS}.
+	 * @throws JGitInternalException
+	 *             if we fail to run the hook somehow. Causes may include an
+	 *             interrupted process or I/O errors.
 	 */
 	public int runIfPresent(Repository repository, final Hook hook,
-			String[] args) throws UnsupportedOperationException {
-		return runIfPresent(repository, hook, args, System.out, System.err);
+			String[] args) throws JGitInternalException {
+		return runIfPresent(repository, hook, args, System.out, System.err,
+				null);
 	}
 
 	/**
@@ -670,19 +665,27 @@ public abstract class FS {
 	 * @param args
 	 *            Arguments to pass to this hook.
 	 * @param outRedirect
-	 *            A print stream on which to redirect the hook's stdout.
+	 *            A print stream on which to redirect the hook's stdout. Can be
+	 *            <code>null</code>, in which case the hook's standard output
+	 *            will be lost.
 	 * @param errRedirect
-	 *            A print stream on which to redirect the hook's stderr.
-	 * @return The exit value of the hook. <code>0</code> if the hook has no
-	 *         exit value.
-	 * @throws UnsupportedOperationException
-	 *             Thrown if this FS is not capable of executing hooks (i.e.
-	 *             {@link #canRunHooks()} returns <code>false</code>).
+	 *            A print stream on which to redirect the hook's stderr. Can be
+	 *            <code>null</code>, in which case the hook's standard error
+	 *            will be lost.
+	 * @param stdinArgs
+	 *            A string to pass on to the standard input of the hook. May be
+	 *            <code>null</code>.
+	 * @return The exit value of the hook. Defaults to <code>0</code> if the
+	 *         hook has no exit value, does not exist or cannot be run on this
+	 *         {@link FS}.
+	 * @throws JGitInternalException
+	 *             if we fail to run the hook somehow. Causes may include an
+	 *             interrupted process or I/O errors.
 	 */
 	public int runIfPresent(Repository repository, final Hook hook,
-			String[] args, PrintStream outRedirect, PrintStream errRedirect)
-			throws UnsupportedOperationException {
-		throw new UnsupportedOperationException();
+			String[] args, PrintStream outRedirect, PrintStream errRedirect,
+			String stdinArgs) throws JGitInternalException {
+		return 0;
 	}
 
 	/**
@@ -725,29 +728,84 @@ public abstract class FS {
 	 * @param hookProcessBuilder
 	 *            The process builder configured for this hook.
 	 * @param outRedirect
-	 *            A print stream on which to redirect the hook's stdout.
+	 *            A print stream on which to redirect the hook's stdout. Can be
+	 *            <code>null</code>, in which case the hook's standard output
+	 *            will be lost.
 	 * @param errRedirect
-	 *            A print stream on which to redirect the hook's stderr.
+	 *            A print stream on which to redirect the hook's stderr. Can be
+	 *            <code>null</code>, in which case the hook's standard error
+	 *            will be lost.
+	 * @param stdinArgs
+	 *            A string to pass on to the standard input of the hook. Can be
+	 *            <code>null</code>.
 	 * @return the exit value of this hook.
+	 * @throws IOException
+	 *             if an I/O error occurs while executing this hook.
+	 * @throws InterruptedException
+	 *             if the current thread is interrupted while waiting for the
+	 *             process to end.
 	 */
-	protected int runHook(ProcessBuilder hookProcessBuilder,
-			PrintStream outRedirect, PrintStream errRedirect) {
+	protected int runHook(ProcessBuilder hookProcessBuilder, OutputStream outRedirect, OutputStream errRedirect, String stdinArgs) throws IOException, InterruptedException {
 		final ExecutorService executor = Executors.newFixedThreadPool(2);
+		Process process = null;
+		// We'll record the first I/O exception that occurs, but keep on trying
+		// to dispose of our open streams and file handles
+		IOException ioException = null;
 		try {
-			final Process process = hookProcessBuilder.start();
-			final Runnable errorGobbler = new StreamGobbler(
+			process = hookProcessBuilder.start();
+			final Callable<Void> errorGobbler = new StreamGobbler(
 					process.getErrorStream(), errRedirect);
-			final Runnable outputGobbler = new StreamGobbler(
+			final Callable<Void> outputGobbler = new StreamGobbler(
 					process.getInputStream(), outRedirect);
 			executor.submit(errorGobbler);
 			executor.submit(outputGobbler);
+			if (stdinArgs != null) {
+				final PrintWriter stdinWriter = new PrintWriter(
+						process.getOutputStream());
+				stdinWriter.print(stdinArgs);
+				stdinWriter.flush();
+				// We are done with this hook's input. Explicitly close its
+				// stdin now to kick off any blocking read the hook might have.
+				stdinWriter.close();
+			}
 			return process.waitFor();
 		} catch (IOException e) {
-			e.printStackTrace();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
+			ioException = e;
 		} finally {
 			shutdownAndAwaitTermination(executor);
+			if (process != null) {
+				try {
+					process.waitFor();
+				} catch (InterruptedException e) {
+					// Thrown by the outer try.
+					// Swallow this one to carry on our cleanup, and clear the
+					// interrupted flag (processes throw the exception without
+					// clearing the flag).
+					Thread.interrupted();
+				}
+				// A process doesn't clean its own resources even when destroyed
+				// Explicitly try and close all three streams, preserving the
+				// outer I/O exception if any.
+				try {
+					process.getErrorStream().close();
+				} catch (IOException e) {
+					ioException = ioException != null ? ioException : e;
+				}
+				try {
+					process.getInputStream().close();
+				} catch (IOException e) {
+					ioException = ioException != null ? ioException : e;
+				}
+				try {
+					process.getOutputStream().close();
+				} catch (IOException e) {
+					ioException = ioException != null ? ioException : e;
+				}
+				process.destroy();
+			}
+			if (ioException != null) {
+				throw ioException;
+			}
 		}
 		return -1;
 	}
@@ -765,7 +823,7 @@ public abstract class FS {
 	 * @return <code>true</code> if the pool has been properly shutdown,
 	 *         <code>false</code> otherwise.
 	 */
-	static boolean shutdownAndAwaitTermination(ExecutorService pool) {
+	private static boolean shutdownAndAwaitTermination(ExecutorService pool) {
 		boolean hasShutdown = true;
 		pool.shutdown(); // Disable new tasks from being submitted
 		try {
@@ -773,9 +831,8 @@ public abstract class FS {
 			if (!pool.awaitTermination(5, TimeUnit.SECONDS)) {
 				pool.shutdownNow(); // Cancel currently executing tasks
 				// Wait a while for tasks to respond to being canceled
-				if (!pool.awaitTermination(5, TimeUnit.SECONDS)) {
+				if (!pool.awaitTermination(5, TimeUnit.SECONDS))
 					hasShutdown = false;
-				}
 			}
 		} catch (InterruptedException ie) {
 			// (Re-)Cancel if current thread also interrupted
@@ -977,26 +1034,50 @@ public abstract class FS {
 		return name;
 	}
 
-	static class StreamGobbler implements Runnable {
-		private final InputStream stream;
+	/**
+	 * This runnable will consume an input stream's content into an output
+	 * stream as soon as it gets available.
+	 * <p>
+	 * Typically used to empty processes' standard output and error, preventing
+	 * them to choke.
+	 * </p>
+	 * <p>
+	 * <b>Note</b> that a {@link StreamGobbler} will never close either of its
+	 * streams.
+	 * </p>
+	 */
+	private static class StreamGobbler implements Callable<Void> {
+		private final BufferedReader reader;
 
-		private final PrintStream output;
+		private final BufferedWriter writer;
 
-		public StreamGobbler(InputStream stream, PrintStream output) {
-			this.stream = stream;
-			this.output = output;
+		public StreamGobbler(InputStream stream, OutputStream output) {
+			this.reader = new BufferedReader(new InputStreamReader(stream));
+			if (output == null)
+				this.writer = new BufferedWriter(new OutputStreamWriter(
+						new ByteArrayOutputStream()));
+			else
+				this.writer = new BufferedWriter(new OutputStreamWriter(output));
 		}
 
-		public void run() {
-			try {
-				final BufferedReader reader = new BufferedReader(new InputStreamReader(stream));
-				String line = null;
-				while ((line = reader.readLine()) != null) {
-					output.println(line);
+		public Void call() throws IOException {
+			boolean writeFailure = false;
+
+			String line = null;
+			while ((line = reader.readLine()) != null) {
+				// Do not try to write again after a failure, but keep reading
+				// as long as possible to prevent the input stream from choking.
+				if (!writeFailure) {
+					try {
+						writer.write(line);
+						writer.newLine();
+						writer.flush();
+					} catch (IOException e) {
+						writeFailure = true;
+					}
 				}
-			} catch (IOException e) {
-				e.printStackTrace();
 			}
+			return null;
 		}
 	}
 }

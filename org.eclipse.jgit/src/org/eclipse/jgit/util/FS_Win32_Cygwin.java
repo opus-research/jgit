@@ -44,13 +44,17 @@
 package org.eclipse.jgit.util;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Repository;
 
 
@@ -140,13 +144,8 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 	}
 
 	@Override
-	public boolean canRunHooks() {
-		return true;
-	}
-
-	@Override
 	public int runIfPresent(Repository repository, Hook hook, String[] args,
-			PrintStream outRedirect, PrintStream errRedirect)
+			PrintStream outRedirect, PrintStream errRedirect, String stdinArgs)
 			throws UnsupportedOperationException {
 		final File hookFile = tryFindHook(repository, hook);
 		if (hookFile == null)
@@ -163,6 +162,16 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 		cmd = cmd.replace(File.separatorChar, '/');
 		ProcessBuilder hookProcess = runInShell(cmd, args);
 		hookProcess.directory(runDirectory);
-		return runHook(hookProcess, outRedirect, errRedirect);
+		try {
+			return runHook(hookProcess, outRedirect, errRedirect, stdinArgs);
+		} catch (IOException e) {
+			throw new JGitInternalException(MessageFormat.format(
+					JGitText.get().exceptionCaughtDuringExecutionOfHook,
+					hook.getName()), e);
+		} catch (InterruptedException e) {
+			throw new JGitInternalException(MessageFormat.format(
+					JGitText.get().exceptionHookExecutionInterrupted,
+					hook.getName()), e);
+		}
 	}
 }

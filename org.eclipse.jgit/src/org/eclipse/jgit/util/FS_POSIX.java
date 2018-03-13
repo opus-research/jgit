@@ -46,10 +46,13 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.charset.Charset;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Repository;
 
 
@@ -126,14 +129,9 @@ public abstract class FS_POSIX extends FS {
 	}
 
 	@Override
-	public boolean canRunHooks() {
-		return true;
-	}
-
-	@Override
 	public int runIfPresent(Repository repository, Hook hook, String[] args,
-			PrintStream outRedirect, PrintStream errRedirect)
-			throws UnsupportedOperationException {
+			PrintStream outRedirect, PrintStream errRedirect, String stdinArgs)
+			throws JGitInternalException {
 		final File hookFile = tryFindHook(repository, hook);
 		if (hookFile == null)
 			return 0;
@@ -148,6 +146,16 @@ public abstract class FS_POSIX extends FS {
 				hookPath);
 		ProcessBuilder hookProcess = runInShell(cmd, args);
 		hookProcess.directory(runDirectory);
-		return runHook(hookProcess, outRedirect, errRedirect);
+		try {
+			return runHook(hookProcess, outRedirect, errRedirect, stdinArgs);
+		} catch (IOException e) {
+			throw new JGitInternalException(MessageFormat.format(
+					JGitText.get().exceptionCaughtDuringExecutionOfHook,
+					hook.getName()), e);
+		} catch (InterruptedException e) {
+			throw new JGitInternalException(MessageFormat.format(
+					JGitText.get().exceptionHookExecutionInterrupted,
+					hook.getName()), e);
+		}
 	}
 }
