@@ -639,7 +639,7 @@ public class RefDirectory extends RefDatabase {
 			for (String refName : refs) {
 				// Lock the loose ref
 				File refFile = fileFor(refName);
-				if (!fs.exists(refFile))
+				if (!refFile.exists())
 					continue;
 				LockFile rLck = new LockFile(refFile,
 						parent.getFS());
