@@ -74,9 +74,12 @@ public class TooLargePackException extends TransportException {
 	 *            URI used for transport
 	 * @param s
 	 *            message
+	 *
 	 * @since 4.0
 	 */
-	public TooLargePackException(URIish uri, String s) {
-		super(uri.setPass(null) + ": " + s); //$NON-NLS-1$
+	public TooLargePackException(final URIish uri, String s) {
+		super(uri.setPass(null)
+				+ ": " //$NON-NLS-1$
+				+ s);
 	}
 }

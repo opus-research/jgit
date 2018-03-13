@@ -108,7 +108,7 @@ public class CommitCommandTest extends RepositoryTestCase {
 				return this;
 			}
 
-			protected File discoverGitExe() {
+			protected File discoverGitPrefix() {
 				return null;
 			}
 
@@ -153,7 +153,7 @@ public class CommitCommandTest extends RepositoryTestCase {
 				return this;
 			}
 
-			protected File discoverGitExe() {
+			protected File discoverGitPrefix() {
 				return null;
 			}
 
@@ -509,20 +509,9 @@ public class CommitCommandTest extends RepositoryTestCase {
 				+ "[unmerged2, mode:100644, stage:3]",
 				indexState(0));
 
-		try (TreeWalk walk = TreeWalk.forPath(db, "unmerged1", commit.getTree())) {
-			assertEquals(FileMode.REGULAR_FILE, walk.getFileMode(0));
-		}
-	}
-
-	@Test
-	public void commitOnlyShouldHandleIgnored() throws Exception {
-		try (Git git = new Git(db)) {
-			writeTrashFile("subdir/foo", "Hello World");
-			writeTrashFile("subdir/bar", "Hello World");
-			writeTrashFile(".gitignore", "bar");
-			git.add().addFilepattern("subdir").call();
-			git.commit().setOnly("subdir").setMessage("first commit").call();
-		}
+		TreeWalk walk = TreeWalk.forPath(db, "unmerged1", commit.getTree());
+		assertEquals(FileMode.REGULAR_FILE, walk.getFileMode(0));
+		walk.release();
 	}
 
 	private static void addUnmergedEntry(String file, DirCacheBuilder builder) {

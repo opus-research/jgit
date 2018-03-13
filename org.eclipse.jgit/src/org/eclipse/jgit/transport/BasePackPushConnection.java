@@ -316,8 +316,7 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 			throw new PackProtocolException(uri, MessageFormat.format(JGitText.get().unexpectedReportLine, unpackLine));
 		final String unpackStatus = unpackLine.substring("unpack ".length()); //$NON-NLS-1$
 		if (unpackStatus.startsWith("error Pack exceeds the limit of")) //$NON-NLS-1$
-			throw new TooLargePackException(uri,
-					unpackStatus.substring("error ".length())); //$NON-NLS-1$
+			throw new TooLargePackException(uri, unpackStatus);
 		if (!unpackStatus.equals("ok")) //$NON-NLS-1$
 			throw new TransportException(uri, MessageFormat.format(
 					JGitText.get().errorOccurredDuringUnpackingOnTheRemoteEnd, unpackStatus));

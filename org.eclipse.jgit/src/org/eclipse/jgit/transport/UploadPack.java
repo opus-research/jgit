@@ -630,7 +630,7 @@ public class UploadPack {
 			service();
 		} finally {
 			msgOut = NullOutputStream.INSTANCE;
-			walk.close();
+			walk.release();
 			if (timer != null) {
 				try {
 					timer.terminate();
@@ -737,35 +737,35 @@ public class UploadPack {
 	}
 
 	private void processShallow() throws IOException {
-		try (DepthWalk.RevWalk depthWalk = new DepthWalk.RevWalk(
-				walk.getObjectReader(), depth)) {
+		DepthWalk.RevWalk depthWalk =
+			new DepthWalk.RevWalk(walk.getObjectReader(), depth);
 
-			// Find all the commits which will be shallow
-			for (ObjectId o : wantIds) {
-				try {
-					depthWalk.markRoot(depthWalk.parseCommit(o));
-				} catch (IncorrectObjectTypeException notCommit) {
-					// Ignore non-commits in this loop.
-				}
-			}
-
-			RevCommit o;
-			while ((o = depthWalk.next()) != null) {
-				DepthWalk.Commit c = (DepthWalk.Commit) o;
-
-				// Commits at the boundary which aren't already shallow in
-				// the client need to be marked as such
-				if (c.getDepth() == depth && !clientShallowCommits.contains(c))
-					pckOut.writeString("shallow " + o.name()); //$NON-NLS-1$
-
-				// Commits not on the boundary which are shallow in the client
-				// need to become unshallowed
-				if (c.getDepth() < depth && clientShallowCommits.remove(c)) {
-					unshallowCommits.add(c.copy());
-					pckOut.writeString("unshallow " + c.name()); //$NON-NLS-1$
-				}
+		// Find all the commits which will be shallow
+		for (ObjectId o : wantIds) {
+			try {
+				depthWalk.markRoot(depthWalk.parseCommit(o));
+			} catch (IncorrectObjectTypeException notCommit) {
+				// Ignore non-commits in this loop.
 			}
 		}
+
+		RevCommit o;
+		while ((o = depthWalk.next()) != null) {
+			DepthWalk.Commit c = (DepthWalk.Commit) o;
+
+			// Commits at the boundary which aren't already shallow in
+			// the client need to be marked as such
+			if (c.getDepth() == depth && !clientShallowCommits.contains(c))
+				pckOut.writeString("shallow " + o.name()); //$NON-NLS-1$
+
+			// Commits not on the boundary which are shallow in the client
+			// need to become unshallowed
+			if (c.getDepth() < depth && clientShallowCommits.remove(c)) {
+				unshallowCommits.add(c.copy());
+				pckOut.writeString("unshallow " + c.name()); //$NON-NLS-1$
+			}
+		}
+
 		pckOut.end();
 	}
 
@@ -810,9 +810,9 @@ public class UploadPack {
 			adv.advertiseCapability(OPTION_ALLOW_TIP_SHA1_IN_WANT);
 		adv.advertiseCapability(OPTION_AGENT, UserAgent.get());
 		adv.setDerefTags(true);
-		Map<String, Ref> advertisedOrDefaultRefs = getAdvertisedOrDefaultRefs();
-		findSymrefs(adv, advertisedOrDefaultRefs);
-		advertised = adv.send(advertisedOrDefaultRefs);
+		Map<String, Ref> refs = getAdvertisedOrDefaultRefs();
+		findSymrefs(adv, refs);
+		advertised = adv.send(refs);
 		if (adv.isEmpty())
 			adv.advertiseId(ObjectId.zeroId(), "capabilities^{}"); //$NON-NLS-1$
 		adv.end();
@@ -1460,14 +1460,14 @@ public class UploadPack {
 			statistics = pw.getStatistics();
 			if (statistics != null)
 				logger.onPackStatistics(statistics);
-			pw.close();
+			pw.release();
 		}
 
 		if (sideband)
 			pckOut.end();
 	}
 
-	private static void findSymrefs(
+	private void findSymrefs(
 			final RefAdvertiser adv, final Map<String, Ref> refs) {
 		Ref head = refs.get(Constants.HEAD);
 		if (head != null && head.isSymbolic()) {

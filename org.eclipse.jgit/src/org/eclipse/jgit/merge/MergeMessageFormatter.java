@@ -97,27 +97,27 @@ public class MergeMessageFormatter {
 		List<String> listings = new ArrayList<String>();
 
 		if (!branches.isEmpty())
-			listings.add(joinNames(branches, "branch", "branches")); //$NON-NLS-1$//$NON-NLS-2$
+			listings.add(joinNames(branches, "branch", "branches"));
 
 		if (!remoteBranches.isEmpty())
-			listings.add(joinNames(remoteBranches, "remote-tracking branch", //$NON-NLS-1$
-					"remote-tracking branches")); //$NON-NLS-1$
+			listings.add(joinNames(remoteBranches, "remote-tracking branch",
+					"remote-tracking branches"));
 
 		if (!tags.isEmpty())
-			listings.add(joinNames(tags, "tag", "tags")); //$NON-NLS-1$ //$NON-NLS-2$
+			listings.add(joinNames(tags, "tag", "tags"));
 
 		if (!commits.isEmpty())
-			listings.add(joinNames(commits, "commit", "commits")); //$NON-NLS-1$ //$NON-NLS-2$
+			listings.add(joinNames(commits, "commit", "commits"));
 
 		if (!others.isEmpty())
-			listings.add(StringUtils.join(others, ", ", " and ")); //$NON-NLS-1$ //$NON-NLS-2$
+			listings.add(StringUtils.join(others, ", ", " and ")); //$NON-NLS-1$
 
 		sb.append(StringUtils.join(listings, ", ")); //$NON-NLS-1$
 
 		String targetName = target.getLeaf().getName();
 		if (!targetName.equals(Constants.R_HEADS + Constants.MASTER)) {
 			String targetShortName = Repository.shortenRefName(targetName);
-			sb.append(" into " + targetShortName); //$NON-NLS-1$
+			sb.append(" into " + targetShortName);
 		}
 
 		return sb.toString();

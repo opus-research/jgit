@@ -73,9 +73,7 @@ public enum RepositoryState {
 		public boolean isRebasing() { return false; }
 
 		@Override
-		public String getDescription() {
-			return JGitText.get().repositoryState_bare;
-		}
+		public String getDescription() { return "Bare"; }
 	},
 
 	/**
