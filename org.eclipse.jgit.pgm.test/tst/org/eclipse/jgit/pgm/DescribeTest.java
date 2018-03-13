@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2013, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,36 +40,60 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.pgm;
 
-import java.io.IOException;
-import java.net.Proxy;
-import java.net.URL;
+import static org.junit.Assert.assertArrayEquals;
 
-/**
- * The interface of a factory returning {@link HttpConnection}
- */
-public interface HttpConnectionFactory {
-	/**
-	 * Creates a new connection to a destination defined by a {@link URL}
-	 *
-	 * @param url
-	 * @return a {@link HttpConnection}
-	 * @throws IOException
-	 */
-	public HttpConnection create(URL url) throws IOException;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.junit.Before;
+import org.junit.Test;
 
-	/**
-	 * Creates a new connection to a destination defined by a {@link URL} using
-	 * a proxy
-	 *
-	 * @param url
-	 * @param proxy
-	 *            the proxy to be used
-	 * @return a {@link HttpConnection}
-	 *
-	 * @throws IOException
-	 */
-	public HttpConnection create(URL url, Proxy proxy)
-			throws IOException;
+public class DescribeTest extends CLIRepositoryTestCase {
+
+	private Git git;
+
+	@Override
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		git = new Git(db);
+	}
+
+	private void initialCommitAndTag() throws Exception {
+		git.commit().setMessage("initial commit").call();
+		git.tag().setName("v1.0").call();
+	}
+
+	@Test
+	public void testNoHead() throws Exception {
+		assertArrayEquals(
+				new String[] { "fatal: No names found, cannot describe anything." },
+				execute("git describe"));
+	}
+
+	@Test
+	public void testHeadNoTag() throws Exception {
+		git.commit().setMessage("initial commit").call();
+		assertArrayEquals(
+				new String[] { "fatal: No names found, cannot describe anything." },
+				execute("git describe"));
+	}
+
+	@Test
+	public void testDescribeTag() throws Exception {
+		initialCommitAndTag();
+		assertArrayEquals(new String[] { "v1.0", "" },
+				execute("git describe HEAD"));
+	}
+
+	@Test
+	public void testDescribeCommit() throws Exception {
+		initialCommitAndTag();
+		writeTrashFile("greeting", "Hello, world!");
+		git.add().addFilepattern("greeting").call();
+		git.commit().setMessage("2nd commit").call();
+		assertArrayEquals(new String[] { "v1.0-1-g56f6ceb", "" },
+				execute("git describe"));
+	}
 }
