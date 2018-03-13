@@ -48,6 +48,7 @@ import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
 import java.io.IOException;
 
 import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.blame.Candidate.BlobCandidate;
 import org.eclipse.jgit.diff.DiffAlgorithm;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
@@ -57,9 +58,9 @@ import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.diff.RawTextComparator;
 import org.eclipse.jgit.diff.RenameDetector;
 import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
@@ -129,11 +130,6 @@ public class BlameGenerator {
 
 	private RenameDetector renameDetector;
 
-	private AnyObjectId start;
-
-	/** True if the generator has not yet started.  */
-	private boolean notStarted;
-
 	/** Potential candidates, sorted by commit time descending. */
 	private Candidate queue;
 
@@ -164,7 +160,6 @@ public class BlameGenerator {
 		setFollowFileRenames(true);
 
 		remaining = -1;
-		notStarted = true;
 	}
 
 	/** @return repository being scanned for revision history. */
@@ -175,17 +170,6 @@ public class BlameGenerator {
 	/** @return path file path being processed. */
 	public String getResultPath() {
 		return resultPath.getPath();
-	}
-
-	/**
-	 * Set starting commit id. If not set, HEAD is assumed.
-	 *
-	 * @param commitId
-	 * @return {@code this}
-	 */
-	public BlameGenerator setStartRevision(ObjectId commitId) {
-		start = commitId;
-		return this;
 	}
 
 	/**
@@ -241,6 +225,97 @@ public class BlameGenerator {
 	}
 
 	/**
+	 * Push a candidate blob onto the generator's traversal stack.
+	 * <p>
+	 * Candidates should be pushed in history order from oldest-to-newest.
+	 * Applications should push the starting commit first, then the index
+	 * revision (if the index is interesting), and finally the working tree
+	 * copy (if the working tree is interesting).
+	 *
+	 * @param description
+	 *            description of the blob revision, such as "Working Tree".
+	 * @param contents
+	 *            contents of the file.
+	 * @return {@code this}
+	 * @throws IOException
+	 *             the repository cannot be read.
+	 */
+	public BlameGenerator push(String description, byte[] contents)
+			throws IOException {
+		return push(description, new RawText(contents));
+	}
+
+	/**
+	 * Push a candidate blob onto the generator's traversal stack.
+	 * <p>
+	 * Candidates should be pushed in history order from oldest-to-newest.
+	 * Applications should push the starting commit first, then the index
+	 * revision (if the index is interesting), and finally the working tree copy
+	 * (if the working tree is interesting).
+	 *
+	 * @param description
+	 *            description of the blob revision, such as "Working Tree".
+	 * @param contents
+	 *            contents of the file.
+	 * @return {@code this}
+	 * @throws IOException
+	 *             the repository cannot be read.
+	 */
+	public BlameGenerator push(String description, RawText contents)
+			throws IOException {
+		BlobCandidate c = new BlobCandidate(description, resultPath);
+		c.sourceText = contents;
+		c.regionList = new Region(0, 0, contents.size());
+		remaining = contents.size();
+		push(c);
+		return this;
+	}
+
+	/**
+	 * Push a candidate object onto the generator's traversal stack.
+	 * <p>
+	 * Candidates should be pushed in history order from oldest-to-newest.
+	 * Applications should push the starting commit first, then the index
+	 * revision (if the index is interesting), and finally the working tree copy
+	 * (if the working tree is interesting).
+	 *
+	 * @param description
+	 *            description of the blob revision, such as "Working Tree".
+	 * @param id
+	 *            may be a commit or a blob.
+	 * @return {@code this}
+	 * @throws IOException
+	 *             the repository cannot be read.
+	 */
+	public BlameGenerator push(String description, AnyObjectId id)
+			throws IOException {
+		ObjectLoader ldr = reader.open(id);
+		if (ldr.getType() == OBJ_BLOB) {
+			if (description == null)
+				description = JGitText.get().blameNotCommittedYet;
+			BlobCandidate c = new BlobCandidate(description, resultPath);
+			c.sourceBlob = id.toObjectId();
+			c.sourceText = new RawText(ldr.getCachedBytes(Integer.MAX_VALUE));
+			c.regionList = new Region(0, 0, c.sourceText.size());
+			remaining = c.sourceText.size();
+			push(c);
+			return this;
+		}
+
+		RevCommit commit = revPool.parseCommit(id);
+		if (!find(commit, resultPath))
+			return this;
+
+		Candidate c = new Candidate(commit, resultPath);
+		c.sourceBlob = idBuf.toObjectId();
+		c.loadText(reader);
+		c.regionList = new Region(0, 0, c.sourceText.size());
+		remaining = c.sourceText.size();
+		push(c);
+		return this;
+	}
+
+	/**
 	 * Execute the generator in a blocking fashion until all data is ready.
 	 *
 	 * @return the complete result. Null if no file exists for the given path.
@@ -288,16 +363,10 @@ public class BlameGenerator {
 
 		for (;;) {
 			Candidate n = pop();
-			if (n == null) {
-				if (notStarted && start()) {
-					notStarted = false;
-					continue;
-				}
+			if (n == null)
 				return done();
-			}
 
-			RevCommit source = n.sourceCommit;
-			int pCnt = source.getParentCount();
+			int pCnt = n.getParentCount();
 			if (pCnt == 1) {
 				if (processOne(n))
 					return true;
@@ -320,7 +389,8 @@ public class BlameGenerator {
 	}
 
 	private boolean result(Candidate n) throws IOException {
-		revPool.parseBody(n.sourceCommit);
+		if (n.sourceCommit != null)
+			revPool.parseBody(n.sourceCommit);
 		currentSource = n;
 		return true;
 	}
@@ -332,16 +402,25 @@ public class BlameGenerator {
 		return n;
 	}
 
+	private void push(BlobCandidate toInsert) {
+		Candidate c = queue;
+		if (c != null) {
+			c.regionList = null;
+			toInsert.parent = c;
+		}
+		queue = toInsert;
+	}
+
 	private void push(Candidate toInsert) {
 		// Mark sources to ensure they get discarded (above) if
 		// another path to the same commit.
-		toInsert.sourceCommit.add(SEEN);
+		toInsert.add(SEEN);
 
 		// Insert into the queue using descending commit time, so
 		// the most recent commit will pop next.
-		int time = toInsert.sourceCommit.getCommitTime();
+		int time = toInsert.getTime();
 		Candidate n = queue;
-		if (n == null || time >= n.sourceCommit.getCommitTime()) {
+		if (n == null || time >= n.getTime()) {
 			toInsert.queueNext = n;
 			queue = toInsert;
 			return;
@@ -349,7 +428,7 @@ public class BlameGenerator {
 
 		for (Candidate p = n;; p = n) {
 			n = p.queueNext;
-			if (n == null || time >= n.sourceCommit.getCommitTime()) {
+			if (n == null || time >= n.getTime()) {
 				toInsert.queueNext = n;
 				p.queueNext = toInsert;
 				return;
@@ -358,8 +437,9 @@ public class BlameGenerator {
 	}
 
 	private boolean processOne(Candidate n) throws IOException {
-		RevCommit source = n.sourceCommit;
-		RevCommit parent = source.getParent(0);
+		RevCommit parent = n.getParent(0);
+		if (parent == null)
+			return split(n.getNextCandidate(0), n);
 		if (parent.has(SEEN))
 			return false;
 		revPool.parseHeaders(parent);
@@ -379,7 +459,10 @@ public class BlameGenerator {
 			return split(next, n);
 		}
 
-		DiffEntry r = findRename(parent, source, n.sourcePath);
+		if (n.sourceCommit == null)
+			return result(n);
+
+		DiffEntry r = findRename(parent, n.sourceCommit, n.sourcePath);
 		if (r == null)
 			return result(n);
 
@@ -542,12 +625,13 @@ public class BlameGenerator {
 
 	/** @return current author being blamed. */
 	public PersonIdent getSourceAuthor() {
-		return getSourceCommit().getAuthorIdent();
+		return currentSource.getAuthor();
 	}
 
 	/** @return current committer being blamed. */
 	public PersonIdent getSourceCommitter() {
-		return getSourceCommit().getCommitterIdent();
+		RevCommit c = getSourceCommit();
+		return c != null ? c.getCommitterIdent() : null;
 	}
 
 	/** @return path of the file being blamed. */
@@ -623,29 +707,6 @@ public class BlameGenerator {
 	}
 
 	/**
-	 * @return revision blame will produce results for. This value is accessible
-	 *         only after being configured and only immediately before the first
-	 *         call to {@link #next()}.
-	 * @throws IOException
-	 *             repository cannot be read.
-	 * @throws IllegalStateException
-	 *             {@link #next()} has already been invoked.
-	 */
-	public RevCommit getResultCommit() throws IOException {
-		if (notStarted) {
-			if (start())
-				notStarted = false;
-			else
-				return null;
-		}
-
-		Candidate c = queue;
-		if (c.queueNext != null || remaining != c.sourceText.size())
-			throw new IllegalStateException(JGitText.get().blameHasAlreadyBeenStarted);
-		return c.sourceCommit;
-	}
-
-	/**
 	 * @return complete file contents of the result file blame is annotating.
 	 *         This value is accessible only after being configured and only
 	 *         immediately before the first call to {@link #next()}. Returns
@@ -656,54 +717,14 @@ public class BlameGenerator {
 	 *             {@link #next()} has already been invoked.
 	 */
 	public RawText getResultContents() throws IOException {
-		if (notStarted) {
-			if (start())
-				notStarted = false;
-			else
-				return null;
-		}
-
-		Candidate c = queue;
-		if (c.queueNext != null || remaining != c.sourceText.size())
-			throw new IllegalStateException(JGitText.get().blameHasAlreadyBeenStarted);
-		return c.sourceText;
+		return queue != null ? queue.sourceText : null;
 	}
 
-	private boolean start() throws IOException {
-		RevCommit commit;
-		if (start != null) {
-			commit = revPool.parseCommit(start);
-		} else {
-			AnyObjectId head = repository.resolve(Constants.HEAD);
-			if (head == null)
-				return false;
-			commit = revPool.parseCommit(head);
-		}
-
-		if (!find(commit, resultPath))
-			return false;
-
-		Candidate toInsert = new Candidate(commit, resultPath);
-		toInsert.sourceBlob = idBuf.toObjectId();
-		toInsert.loadText(reader);
-		toInsert.regionList = new Region(0, 0, toInsert.sourceText.size());
-		remaining = toInsert.sourceText.size();
-		queue = toInsert;
-		currentSource = null;
-		commit.add(SEEN);
-		return true;
-	}
-
-	/**
-	 * Release the current blame session started from calling {@link #start()}
-	 *
-	 * @return this generator
-	 */
-	public BlameGenerator release() {
+	/** Release the current blame session. */
+	public void release() {
 		revPool.release();
 		queue = null;
 		currentSource = null;
-		return this;
 	}
 
 	private boolean find(RevCommit commit, PathFilter path) throws IOException {
