@@ -41,35 +41,52 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.reftable;
+package org.eclipse.jgit.lib;
 
-import java.io.IOException;
+import org.eclipse.jgit.errors.CorruptObjectException;
 
-import org.eclipse.jgit.lib.Ref;
+/**
+ * Verifies that a blob object is a valid object.
+ * <p>
+ * Unlike trees, commits and tags, there's no validity of blobs. Implementers
+ * can optionally implement this blob checker to reject certain blobs.
+ *
+ * @since 4.9
+ */
+public interface BlobObjectChecker {
+	/** No-op implementation of {@link BlobObjectChecker}. */
+	public static final BlobObjectChecker NULL_CHECKER =
+			new BlobObjectChecker() {
+				@Override
+				public void update(byte[] in, int p, int len) {
+					// Empty implementation.
+				}
 
-/** Iterator over references inside a {@link Reftable}. */
-public abstract class RefCursor implements AutoCloseable {
+				@Override
+				public void endBlob(AnyObjectId id) {
+					// Empty implementation.
+				}
+			};
+
 	/**
-	 * Check if another reference is available.
+	 * Check a new fragment of the blob.
 	 *
-	 * @return {@code true} if there is another result.
-	 * @throws IOException
-	 *             references cannot be read.
+	 * @param in
+	 *            input array of bytes.
+	 * @param offset
+	 *            offset to start at from {@code in}.
+	 * @param len
+	 *            length of the fragment to check.
 	 */
-	public abstract boolean next() throws IOException;
+	void update(byte[] in, int offset, int len);
 
-	/** @return reference at the current position. */
-	public abstract Ref getRef();
-
-	/** @return updateIndex that last modified the current reference, */
-	public abstract long getUpdateIndex();
-
-	/** @return {@code true} if the current reference was deleted. */
-	public boolean wasDeleted() {
-		Ref r = getRef();
-		return r.getStorage() == Ref.Storage.NEW && r.getObjectId() == null;
-	}
-
-	@Override
-	public abstract void close();
+	/**
+	 * Finalize the blob checking.
+	 *
+	 * @param id
+	 *            identity of the object being checked.
+	 * @throws CorruptObjectException
+	 *             if any error was detected.
+	 */
+	void endBlob(AnyObjectId id) throws CorruptObjectException;
 }
