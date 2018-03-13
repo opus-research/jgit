@@ -78,37 +78,32 @@ class Archive extends TextBuiltin {
 
 	@Override
 	protected void run() throws Exception {
+		final TreeWalk walk = new TreeWalk(db);
+		final ObjectReader reader = walk.getObjectReader();
 		final MutableObjectId idBuf = new MutableObjectId();
 		final Archiver fmt = formats.get(format);
+		final ArchiveOutputStream outa = fmt.createArchiveOutputStream(outs);
 
 		if (tree == null)
 			throw die(CLIText.get().treeIsRequired);
 
-		final ArchiveOutputStream outa = fmt.createArchiveOutputStream(outs);
-		final TreeWalk walk = new TreeWalk(db);
-		final ObjectReader reader = walk.getObjectReader();
+		walk.reset();
+		walk.addTree(tree);
+		walk.setRecursive(true);
+		while (walk.next()) {
+			final String name = walk.getPathString();
+			final FileMode mode = walk.getFileMode(0);
 
-		try {
-			walk.reset();
-			walk.addTree(tree);
-			walk.setRecursive(true);
-			while (walk.next()) {
-				final String name = walk.getPathString();
-				final FileMode mode = walk.getFileMode(0);
+			if (mode == FileMode.TREE)
+				// ZIP entries for directories are optional.
+				// Leave them out, mimicking "git archive".
+				continue;
 
-				if (mode == FileMode.TREE)
-					// ZIP entries for directories are optional.
-					// Leave them out, mimicking "git archive".
-					continue;
-
-				walk.getObjectId(idBuf, 0);
-				fmt.putEntry(name, mode, reader.open(idBuf), outa);
-			}
-		} finally {
-			reader.release();
-			walk.release();
-			outa.close();
+			walk.getObjectId(idBuf, 0);
+			fmt.putEntry(name, mode, reader.open(idBuf), outa);
 		}
+
+		outa.close();
 	}
 
 	static private void warnArchiveEntryModeIgnored(String name) {
