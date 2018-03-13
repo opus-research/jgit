@@ -76,8 +76,6 @@ import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.util.BlockList;
 import org.eclipse.jgit.util.SystemReader;
 
-import com.googlecode.javaewah.EWAHCompressedBitmap;
-
 /**
  * Helper class for the {@link PackWriter} to select commits for which to build
  * pack index bitmaps.
@@ -349,11 +347,11 @@ class PackWriterBitmapPreparer {
 			RevCommit rc = (RevCommit) ro;
 			reuseCommits.add(new BitmapCommit(rc, false, entry.getFlags()));
 			rw.markUninteresting(rc);
-			if (!reuse.contains(rc)) {
-				EWAHCompressedBitmap bitmap = bitmapRemapper.ofObjectType(
-						bitmapRemapper.getBitmap(rc), Constants.OBJ_COMMIT);
-				reuse.or(commitBitmapIndex.toBitmap(writeBitmaps, bitmap));
-			}
+			// PackBitmapIndexRemapper.ofObjectType() ties the underlying
+			// bitmap in the old pack into the new bitmap builder.
+			bitmapRemapper.ofObjectType(bitmapRemapper.getBitmap(rc),
+					Constants.OBJ_COMMIT).trim();
+			reuse.add(rc, Constants.OBJ_COMMIT);
 		}
 
 		// Add branch tips that are not represented in old bitmap indices. Set
