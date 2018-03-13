@@ -501,16 +501,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		return httpOpen(METHOD_GET, u);
 	}
 
-	/**
-	 * Open an http connection.
-	 *
-	 * @param method
-	 * @param u
-	 * @return the connection
-	 * @throws IOException
-	 */
-	protected HttpURLConnection httpOpen(String method, URL u)
-			throws IOException {
+	final HttpURLConnection httpOpen(String method, URL u) throws IOException {
 		final Proxy proxy = HttpSupport.proxyFor(proxySelector, u);
 		HttpURLConnection conn = (HttpURLConnection) u.openConnection(proxy);
 
