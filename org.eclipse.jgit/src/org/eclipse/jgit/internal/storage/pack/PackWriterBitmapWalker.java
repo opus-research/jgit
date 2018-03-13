@@ -110,12 +110,8 @@ final class PackWriterBitmapWalker {
 		}
 
 		if (marked) {
-			if (seen == null) {
-				walker.setRevFilter(new AddToBitmapFilter(bitmapResult));
-			} else {
-				walker.setRevFilter(
-						new AddUnseenToBitmapFilter(seen, bitmapResult));
-			}
+			RevFilter filter = newRevFilter(seen, bitmapResult);
+			walker.setRevFilter(filter);
 
 			while (walker.next() != null) {
 				// Iterate through all of the commits. The BitmapRevFilter does
@@ -145,6 +141,13 @@ final class PackWriterBitmapWalker {
 		walker.reset();
 	}
 
+	static RevFilter newRevFilter(BitmapBuilder seen, BitmapBuilder bitmapResult) {
+		if (seen != null) {
+			return new AddUnseenToBitmapFilter(seen, bitmapResult);
+		}
+		return new AddToBitmapFilter(bitmapResult);
+	}
+
 	/**
 	 * A RevFilter that adds the visited commits to {@code bitmap} as a side
 	 * effect.
@@ -155,7 +158,7 @@ final class PackWriterBitmapWalker {
 	 * have to visit its ancestors.  This ensures the walk is very short if
 	 * there is good bitmap coverage.
 	 */
-	static class AddToBitmapFilter extends RevFilter {
+	private static class AddToBitmapFilter extends RevFilter {
 		private final BitmapBuilder bitmap;
 
 		AddToBitmapFilter(BitmapBuilder bitmap) {
@@ -206,7 +209,7 @@ final class PackWriterBitmapWalker {
 	 * encountered, that commit and its parents will be marked with the SEEN
 	 * flag to prevent the walk from visiting its ancestors.
 	 */
-	static class AddUnseenToBitmapFilter extends RevFilter {
+	private static class AddUnseenToBitmapFilter extends RevFilter {
 		private final BitmapBuilder seen;
 		private final BitmapBuilder bitmap;
 
