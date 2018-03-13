@@ -75,10 +75,6 @@ import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdSet;
 import org.eclipse.jgit.lib.ObjectInserter;
-import org.eclipse.jgit.lib.Sets;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.revwalk.DepthWalk;
-import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
@@ -96,9 +92,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	private static final List<RevObject> EMPTY_LIST_REVS = Collections
 			.<RevObject> emptyList();
 
-	private static final Set<ObjectIdSet> EMPTY_ID_SET = Collections
-			.<ObjectIdSet> emptySet();
-
 	private PackConfig config;
 
 	private PackWriter writer;
@@ -110,26 +103,6 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	private ObjectInserter inserter;
 
 	private FileRepository dst;
-
-	private RevBlob contentA;
-
-	private RevBlob contentB;
-
-	private RevBlob contentC;
-
-	private RevBlob contentD;
-
-	private RevBlob contentE;
-
-	private RevCommit c1;
-
-	private RevCommit c2;
-
-	private RevCommit c3;
-
-	private RevCommit c4;
-
-	private RevCommit c5;
 
 	@Before
 	public void setUp() throws Exception {
@@ -229,7 +202,8 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		final ObjectId nonExisting = ObjectId
 				.fromString("0000000000000000000000000000000000000001");
 		try {
-			createVerifyOpenPack(NONE, haves(nonExisting), false, false);
+			createVerifyOpenPack(NONE, Collections.singleton(nonExisting),
+					false, false);
 			fail("Should have thrown MissingObjectException");
 		} catch (MissingObjectException x) {
 			// expected
@@ -245,7 +219,8 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	public void testIgnoreNonExistingObjects() throws IOException {
 		final ObjectId nonExisting = ObjectId
 				.fromString("0000000000000000000000000000000000000001");
-		createVerifyOpenPack(NONE, haves(nonExisting), false, true);
+		createVerifyOpenPack(NONE, Collections.singleton(nonExisting),
+				false, true);
 		// shouldn't throw anything
 	}
 
@@ -263,7 +238,8 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		final ObjectId nonExisting = ObjectId
 				.fromString("0000000000000000000000000000000000000001");
 		new GC(db).gc();
-		createVerifyOpenPack(NONE, haves(nonExisting), false, true, true);
+		createVerifyOpenPack(NONE, Collections.singleton(nonExisting), false,
+				true, true);
 		// shouldn't throw anything
 	}
 
@@ -537,18 +513,20 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		TestRepository<FileRepository> testRepo = new TestRepository<FileRepository>(
 				repo);
 		BranchBuilder bb = testRepo.branch("refs/heads/master");
-		contentA = testRepo.blob("A");
-		c1 = bb.commit().add("f", contentA).create();
+		RevBlob contentA = testRepo.blob("A");
+		RevCommit c1 = bb.commit().add("f", contentA).create();
 		testRepo.getRevWalk().parseHeaders(c1);
-		PackIndex pf1 = writePack(repo, wants(c1), EMPTY_ID_SET);
+		PackIndex pf1 = writePack(repo, Collections.singleton(c1),
+				Collections.<ObjectIdSet> emptySet());
 		assertContent(
 				pf1,
 				Arrays.asList(c1.getId(), c1.getTree().getId(),
 						contentA.getId()));
-		contentB = testRepo.blob("B");
-		c2 = bb.commit().add("f", contentB).create();
+		RevBlob contentB = testRepo.blob("B");
+		RevCommit c2 = bb.commit().add("f", contentB).create();
 		testRepo.getRevWalk().parseHeaders(c2);
-		PackIndex pf2 = writePack(repo, wants(c2), Sets.of((ObjectIdSet) pf1));
+		PackIndex pf2 = writePack(repo, Collections.singleton(c2),
+				Collections.<ObjectIdSet> singleton(pf1));
 		assertContent(
 				pf2,
 				Arrays.asList(c2.getId(), c2.getTree().getId(),
@@ -565,107 +543,15 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 					expected.contains(pi.getObjectId(i)));
 	}
 
-	@Test
-	public void testShallowIsMinimal() throws Exception {
-		FileRepository repo = setupRepoForShallowFetch();
-
-		PackIndex idx = writeShallowPack(repo, 1, wants(c2), NONE, NONE);
-		assertContent(idx,
-				Arrays.asList(c1.getId(), c2.getId(), c1.getTree().getId(),
-						c2.getTree().getId(), contentA.getId(),
-						contentB.getId()));
-
-		// Client already has blobs A and B, verify those are not packed.
-		idx = writeShallowPack(repo, 1, wants(c5), haves(c1, c2), shallows(c1));
-		assertContent(idx,
-				Arrays.asList(c4.getId(), c5.getId(), c4.getTree().getId(),
-						c5.getTree().getId(), contentC.getId(),
-						contentD.getId(), contentE.getId()));
-	}
-
-	@Test
-	public void testShallowFetchShallowParent() throws Exception {
-		FileRepository repo = setupRepoForShallowFetch();
-
-		PackIndex idx = writeShallowPack(repo, 1, wants(c5), NONE, NONE);
-		assertContent(idx,
-				Arrays.asList(c4.getId(), c5.getId(), c4.getTree().getId(),
-						c5.getTree().getId(), contentA.getId(),
-						contentB.getId(), contentC.getId(), contentD.getId(),
-						contentE.getId()));
-
-		idx = writeShallowPack(repo, 1, wants(c3), haves(c4, c5), shallows(c4));
-		assertContent(idx, Arrays.asList(c2.getId(), c3.getId(),
-				c2.getTree().getId(), c3.getTree().getId()));
-	}
-
-	@Test
-	public void testShallowFetchShallowAncestor() throws Exception {
-		FileRepository repo = setupRepoForShallowFetch();
-
-		PackIndex idx = writeShallowPack(repo, 1, wants(c5), NONE, NONE);
-		assertContent(idx,
-				Arrays.asList(c4.getId(), c5.getId(), c4.getTree().getId(),
-						c5.getTree().getId(), contentA.getId(),
-						contentB.getId(), contentC.getId(), contentD.getId(),
-						contentE.getId()));
-
-		idx = writeShallowPack(repo, 1, wants(c2), haves(c4, c5), shallows(c4));
-		assertContent(idx, Arrays.asList(c1.getId(), c2.getId(),
-				c1.getTree().getId(), c2.getTree().getId()));
-	}
-
-	private FileRepository setupRepoForShallowFetch() throws Exception {
-		FileRepository repo = createBareRepository();
-		TestRepository<Repository> r = new TestRepository<Repository>(repo);
-		BranchBuilder bb = r.branch("refs/heads/master");
-		contentA = r.blob("A");
-		contentB = r.blob("B");
-		contentC = r.blob("C");
-		contentD = r.blob("D");
-		contentE = r.blob("E");
-		c1 = bb.commit().add("a", contentA).create();
-		c2 = bb.commit().add("b", contentB).create();
-		c3 = bb.commit().add("c", contentC).create();
-		c4 = bb.commit().add("d", contentD).create();
-		c5 = bb.commit().add("e", contentE).create();
-		r.getRevWalk().parseHeaders(c5); // fully initialize the tip RevCommit
-		return repo;
-	}
-
 	private static PackIndex writePack(FileRepository repo,
 			Set<? extends ObjectId> want, Set<ObjectIdSet> excludeObjects)
-					throws IOException {
-		RevWalk walk = new RevWalk(repo);
-		return writePack(repo, walk, 0, want, NONE, excludeObjects);
-	}
-
-	private static PackIndex writeShallowPack(FileRepository repo, int depth,
-			Set<? extends ObjectId> want, Set<? extends ObjectId> have,
-			Set<? extends ObjectId> shallow) throws IOException {
-		// During negotiation, UploadPack would have set up a DepthWalk and
-		// marked the client's "shallow" commits. Emulate that here.
-		DepthWalk.RevWalk walk = new DepthWalk.RevWalk(repo, depth);
-		walk.assumeShallow(shallow);
-		return writePack(repo, walk, depth, want, have, EMPTY_ID_SET);
-	}
-
-	private static PackIndex writePack(FileRepository repo, RevWalk walk,
-			int depth, Set<? extends ObjectId> want,
-			Set<? extends ObjectId> have, Set<ObjectIdSet> excludeObjects)
-					throws IOException {
+			throws IOException {
 		try (PackWriter pw = new PackWriter(repo)) {
 			pw.setDeltaBaseAsOffset(true);
 			pw.setReuseDeltaCommits(false);
-			for (ObjectIdSet idx : excludeObjects) {
+			for (ObjectIdSet idx : excludeObjects)
 				pw.excludeObjects(idx);
-			}
-			if (depth > 0) {
-				pw.setShallowPack(depth, null);
-			}
-			ObjectWalk ow = walk.toObjectWalkWithSameObjects();
-
-			pw.preparePack(NullProgressMonitor.INSTANCE, ow, want, have);
+			pw.preparePack(NullProgressMonitor.INSTANCE, want, NONE);
 			String id = pw.computeName().getName();
 			File packdir = new File(repo.getObjectsDirectory(), "pack");
 			File packFile = new File(packdir, "pack-" + id + ".pack");
@@ -843,17 +729,5 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		for (MutableEntry me : entries) {
 			assertEquals(objectsOrder[i++].toObjectId(), me.toObjectId());
 		}
-	}
-
-	private static Set<ObjectId> haves(ObjectId... objects) {
-		return Sets.of(objects);
-	}
-
-	private static Set<ObjectId> wants(ObjectId... objects) {
-		return Sets.of(objects);
-	}
-
-	private static Set<ObjectId> shallows(ObjectId... objects) {
-		return Sets.of(objects);
 	}
 }
