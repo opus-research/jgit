@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,35 +41,36 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.stringext;
+package org.eclipse.jgit.lib;
 
-import junit.framework.TestCase;
+import static org.junit.Assert.assertEquals;
 
-import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.awtui.UIText;
-import org.eclipse.jgit.console.ConsoleText;
-import org.eclipse.jgit.http.server.HttpServerText;
-import org.eclipse.jgit.iplog.IpLogText;
-import org.eclipse.jgit.nls.NLS;
-import org.eclipse.jgit.pgm.CLIText;
+import java.util.Date;
+import java.util.TimeZone;
 
-public class TestStringExternalization extends TestCase {
+import org.junit.Test;
 
-	private static Class[] translationBundleClasses = new Class[] {
-		ConsoleText.class, HttpServerText.class, IpLogText.class, CLIText.class,
-		UIText.class, JGitText.class,
-	};
+public class T0001_PersonIdentTest {
 
-	/**
-	 * Verifies that all translation keys are defined in the root resource bundle.
-	 * <p>
-	 * This makes sure that all translation bundles will get all strings populated
-	 * since the string will be found at last in the root resource bundle.
-	 */
-	public void testAllTranslationKeysDefinedInRoot() {
-		NLS.setLocale(NLS.ROOT_LOCALE);
-		for (Class c : translationBundleClasses) {
-			NLS.getBundleFor(c);
-		}
+	@Test
+	public void test001_NewIdent() {
+		final PersonIdent p = new PersonIdent("A U Thor", "author@example.com",
+				new Date(1142878501000L), TimeZone.getTimeZone("EST"));
+		assertEquals("A U Thor", p.getName());
+		assertEquals("author@example.com", p.getEmailAddress());
+		assertEquals(1142878501000L, p.getWhen().getTime());
+		assertEquals("A U Thor <author@example.com> 1142878501 -0500",
+				p.toExternalString());
+	}
+
+	@Test
+	public void test002_NewIdent() {
+		final PersonIdent p = new PersonIdent("A U Thor", "author@example.com",
+				new Date(1142878501000L), TimeZone.getTimeZone("GMT+0230"));
+		assertEquals("A U Thor", p.getName());
+		assertEquals("author@example.com", p.getEmailAddress());
+		assertEquals(1142878501000L, p.getWhen().getTime());
+		assertEquals("A U Thor <author@example.com> 1142878501 +0230",
+				p.toExternalString());
 	}
 }
