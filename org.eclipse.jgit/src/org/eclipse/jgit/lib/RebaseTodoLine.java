@@ -55,22 +55,24 @@ public class RebaseTodoLine {
 	/**
 	 * Describes rebase actions
 	 */
+	@SuppressWarnings("nls")
 	public static enum Action {
 		/** Use commit */
-		PICK("pick", "p"), //$NON-NLS-1$ //$NON-NLS-2$
+		PICK("pick", "p"),
+
 		/** Use commit, but edit the commit message */
-		REWORD("reword", "r"), //$NON-NLS-1$ //$NON-NLS-2$
+		REWORD("reword", "r"),
+
 		/** Use commit, but stop for amending */
-		EDIT("edit", "e"), //$NON-NLS-1$ //$NON-NLS-2$
-		/** Use commit, but meld into previous commit */
-		SQUASH("squash", "s"), //$NON-NLS-1$ //$NON-NLS-2$
-		/** like "squash", but discard this commit's log message */
-		FIXUP("fixup", "f"), //$NON-NLS-1$ //$NON-NLS-2$
+		EDIT("edit", "e"),
+
+		// TODO: add SQUASH, FIXUP, etc.
+
 		/**
 		 * A comment in the file. Also blank lines (or lines containing only
 		 * whitespaces) are reported as comments
 		 */
-		COMMENT("comment", "#"); //$NON-NLS-1$ //$NON-NLS-2$
+		COMMENT("comment", "#");
 
 		private final String token;
 
@@ -88,7 +90,6 @@ public class RebaseTodoLine {
 			return this.token;
 		}
 
-		@SuppressWarnings("nls")
 		@Override
 		public String toString() {
 			return "Action[" + token + "]";
@@ -200,17 +201,24 @@ public class RebaseTodoLine {
 			this.comment = null;
 			return;
 		}
-		Exception iae = new IllegalArgumentException(
-				MessageFormat.format(
-				JGitText.get().argumentIsNotAValidCommentString, newComment));
-		if (newComment.contains("\n") || newComment.contains("\r")) { //$NON-NLS-1$ //$NON-NLS-2$
-			throw new JGitInternalException(iae.getMessage(), iae);
-		}
+
+		if (newComment.contains("\n") || newComment.contains("\r")) //$NON-NLS-1$ //$NON-NLS-2$
+			throw createInvalidCommentException(newComment);
+
 		if (newComment.trim().length() == 0 || newComment.startsWith("#")) { //$NON-NLS-1$
 			this.comment = newComment;
 			return;
 		}
-		throw new JGitInternalException(iae.getMessage(), iae);
+
+		throw createInvalidCommentException(newComment);
+	}
+
+	private static JGitInternalException createInvalidCommentException(
+			String newComment) {
+		IllegalArgumentException iae = new IllegalArgumentException(
+				MessageFormat.format(
+				JGitText.get().argumentIsNotAValidCommentString, newComment));
+		return new JGitInternalException(iae.getMessage(), iae);
 	}
 
 	/**
@@ -222,8 +230,8 @@ public class RebaseTodoLine {
 	}
 
 	/**
-	 * @return the first line of the commit message of the commit on that the
-	 *         action will be performed on.
+	 * @return the first line of the commit message of the commit the action
+	 *         will be performed on.
 	 */
 	public String getShortMessage() {
 		return shortMessage;

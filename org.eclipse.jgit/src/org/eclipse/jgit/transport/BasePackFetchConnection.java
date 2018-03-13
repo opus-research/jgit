@@ -45,6 +45,8 @@
 
 package org.eclipse.jgit.transport;
 
+import static org.eclipse.jgit.lib.RefDatabase.ALL;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -52,6 +54,7 @@ import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
+import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.jgit.errors.PackProtocolException;
@@ -63,6 +66,7 @@ import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
+import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ProgressMonitor;
@@ -221,6 +225,8 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 	private boolean noDone;
 
+	private boolean noProgress;
+
 	private String lockMessage;
 
 	private PackLock packLock;
@@ -320,7 +326,9 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	 * Execute common ancestor negotiation and fetch the objects.
 	 *
 	 * @param monitor
-	 *            progress monitor to receive status updates.
+	 *            progress monitor to receive status updates. If the monitor is
+	 *            the {@link NullProgressMonitor#INSTANCE}, then the no-progress
+	 *            option enabled.
 	 * @param want
 	 *            the advertised remote references the caller wants to fetch.
 	 * @param have
@@ -337,6 +345,8 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 			final Collection<Ref> want, final Set<ObjectId> have,
 			OutputStream outputStream) throws TransportException {
 		try {
+			noProgress = monitor == NullProgressMonitor.INSTANCE;
+
 			markRefsAdvertised();
 			markReachable(have, maxTimeWanted(want));
 
@@ -393,7 +403,8 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 	private void markReachable(final Set<ObjectId> have, final int maxTime)
 			throws IOException {
-		for (final Ref r : local.getAllRefs().values()) {
+		Map<String, Ref> refs = local.getRefDatabase().getRefs(ALL);
+		for (final Ref r : refs.values()) {
 			ObjectId id = r.getPeeledObjectId();
 			if (id == null)
 				id = r.getObjectId();
@@ -480,6 +491,8 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 	private String enableCapabilities() throws TransportException {
 		final StringBuilder line = new StringBuilder();
+		if (noProgress)
+			wantCapability(line, OPTION_NO_PROGRESS);
 		if (includeTags)
 			includeTags = wantCapability(line, OPTION_INCLUDE_TAG);
 		if (allowOfsDelta)
