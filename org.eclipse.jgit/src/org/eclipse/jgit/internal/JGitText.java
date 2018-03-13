@@ -146,6 +146,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotReadCommit;
 	/***/ public String cannotReadFile;
 	/***/ public String cannotReadHEAD;
+	/***/ public String cannotReadIndex;
 	/***/ public String cannotReadObject;
 	/***/ public String cannotReadObjectsPath;
 	/***/ public String cannotReadTree;
@@ -338,8 +339,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String fileIsTooBigForThisConvenienceMethod;
 	/***/ public String fileIsTooLarge;
 	/***/ public String fileModeNotSetForPath;
-	/***/ public String filterExecutionFailed;
-	/***/ public String filterExecutionFailedRc;
 	/***/ public String findingGarbage;
 	/***/ public String flagIsDisposed;
 	/***/ public String flagNotFromThis;

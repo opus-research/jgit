@@ -63,6 +63,7 @@ import java.util.Comparator;
 import java.util.List;
 
 import org.eclipse.jgit.errors.CorruptObjectException;
+import org.eclipse.jgit.errors.IndexReadException;
 import org.eclipse.jgit.errors.LockFailedException;
 import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.events.IndexChangedEvent;
@@ -418,6 +419,12 @@ public class DirCache {
 					}
 				}
 			} catch (FileNotFoundException fnfe) {
+				if (liveFile.exists()) {
+					// Panic: the index file exists but we can't read it
+					throw new IndexReadException(
+							MessageFormat.format(JGitText.get().cannotReadIndex,
+									liveFile.getAbsolutePath(), fnfe));
+				}
 				// Someone must have deleted it between our exists test
 				// and actually opening the path. That's fine, its empty.
 				//
@@ -976,7 +983,6 @@ public class DirCache {
 			FileTreeIterator fIter = new FileTreeIterator(repository);
 			walk.addTree(iIter);
 			walk.addTree(fIter);
-			fIter.setDirCacheIterator(walk, 0);
 			walk.setRecursive(true);
 			while (walk.next()) {
 				iIter = walk.getTree(0, DirCacheIterator.class);
