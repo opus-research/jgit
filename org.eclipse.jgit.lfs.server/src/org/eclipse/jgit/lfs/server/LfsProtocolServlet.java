@@ -63,7 +63,9 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.eclipse.jgit.lfs.errors.LfsBandwidthLimitExceeded;
 import org.eclipse.jgit.lfs.errors.LfsException;
+import org.eclipse.jgit.lfs.errors.LfsRateLimitExceeded;
 import org.eclipse.jgit.lfs.errors.LfsRepositoryNotFound;
 import org.eclipse.jgit.lfs.errors.LfsRepositoryReadOnly;
 import org.eclipse.jgit.lfs.errors.LfsValidationError;
@@ -83,7 +85,12 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 
 	private static final long serialVersionUID = 1L;
 
-	private static final String CONTENTTYPE_VND_GIT_LFS_JSON = "application/vnd.git-lfs+json"; //$NON-NLS-1$
+	private static final String CONTENTTYPE_VND_GIT_LFS_JSON =
+			"application/vnd.git-lfs+json; charset=utf-8"; //$NON-NLS-1$
+
+	private static final int SC_RATE_LIMIT_EXCEEDED = 429;
+
+	private static final int SC_BANDWIDTH_LIMIT_EXCEEDED = 509;
 
 	private Gson gson = createGson();
 
@@ -143,14 +150,15 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 		LfsRequest request = gson.fromJson(r, LfsRequest.class);
 		String path = req.getPathInfo();
 
+		res.setContentType(CONTENTTYPE_VND_GIT_LFS_JSON);
 		LargeFileRepository repo = null;
 		try {
 			repo = getLargeFileRepository(request, path);
 			if (repo == null) {
-				res.setStatus(SC_SERVICE_UNAVAILABLE);
+				sendError(res, w, SC_SERVICE_UNAVAILABLE,
+						"LFS is not available"); //$NON-NLS-1$
 			} else {
 				res.setStatus(SC_OK);
-				res.setContentType(CONTENTTYPE_VND_GIT_LFS_JSON);
 				TransferHandler handler = TransferHandler
 						.forOperation(request.operation, repo, request.objects);
 				gson.toJson(handler.process(), w);
@@ -161,6 +169,10 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 			sendError(res, w, SC_NOT_FOUND, e.getMessage());
 		} catch (LfsRepositoryReadOnly e) {
 			sendError(res, w, SC_FORBIDDEN, e.getMessage());
+		} catch (LfsRateLimitExceeded e) {
+			sendError(res, w, SC_RATE_LIMIT_EXCEEDED, e.getMessage());
+		} catch (LfsBandwidthLimitExceeded e) {
+			sendError(res, w, SC_BANDWIDTH_LIMIT_EXCEEDED, e.getMessage());
 		} catch (LfsException e) {
 			sendError(res, w, SC_SERVICE_UNAVAILABLE, e.getMessage());
 		} finally {
@@ -183,10 +195,9 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 	}
 
 	private Gson createGson() {
-		GsonBuilder gb = new GsonBuilder()
-				.setFieldNamingPolicy(
-						FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
-				.setPrettyPrinting().disableHtmlEscaping();
-		return gb.create();
+		return new GsonBuilder()
+				.setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
+				.disableHtmlEscaping()
+				.create();
 	}
 }
