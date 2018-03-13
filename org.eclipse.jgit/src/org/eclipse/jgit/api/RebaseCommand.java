@@ -191,7 +191,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	public RebaseResult call() throws NoHeadException, RefNotFoundException,
 			JGitInternalException, GitAPIException {
 		RevCommit newHead = null;
-		boolean lastStepWasForward = false;
 		checkCallable();
 		checkParameters();
 		try {
@@ -243,14 +242,11 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				// if the first parent of commitToPick is the current HEAD,
 				// we do a fast-forward instead of cherry-pick to avoid
 				// unnecessary object rewriting
-				newHead = tryFastForward(commitToPick);
-				lastStepWasForward = newHead != null;
-				if (!lastStepWasForward)
-					// TODO if the content of this commit is already merged here
-					// we should skip this step in order to avoid confusing
-					// pseudo-changed
-					newHead = new Git(repo).cherryPick().include(commitToPick)
-							.call();
+				RevCommit fastForward = tryFastForward(commitToPick);
+				if (fastForward != null)
+					return new RebaseResult(Status.FAST_FORWARD);
+				newHead = new Git(repo).cherryPick().include(commitToPick)
+						.call();
 				monitor.endTask();
 				if (newHead == null) {
 					return stop(commitToPick);
@@ -283,8 +279,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 					}
 				}
 				FileUtils.delete(rebaseDir, FileUtils.RECURSIVE);
-				if (lastStepWasForward)
-					return new RebaseResult(Status.FAST_FORWARD);
 				return new RebaseResult(Status.OK);
 			}
 			return new RebaseResult(Status.UP_TO_DATE);
