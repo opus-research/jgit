@@ -165,7 +165,7 @@ public class RepositorySetupWorkDirTest extends LocalDiskRepositoryTestCase {
 	public void testExceptionThrown_BareRepoGetIndex() throws Exception {
 		File gitDir = getFile("workdir");
 		try {
-			new FileRepository(gitDir).readDirCache();
+			new FileRepository(gitDir).getIndex();
 			fail("Expected NoWorkTreeException missing");
 		} catch (NoWorkTreeException e) {
 			// expected
