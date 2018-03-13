@@ -45,6 +45,7 @@ package org.eclipse.jgit.transport;
 import static org.junit.Assert.fail;
 
 import java.io.IOException;
+import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -52,7 +53,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.eclipse.jgit.util.JDKHttpConnection;
 import org.junit.Test;
 
 public class HttpAuthTest {
@@ -71,7 +71,7 @@ public class HttpAuthTest {
 	private static String DIGEST = "Digest";
 
 	@Test
-	public void testHttpAuthScanResponse() {
+	public void testHttpAuthScanResponse() throws MalformedURLException {
 		checkResponse(new String[] { basicHeader }, BASIC);
 		checkResponse(new String[] { digestHeader }, DIGEST);
 		checkResponse(new String[] { basicHeader, digestHeader }, DIGEST);
@@ -83,15 +83,10 @@ public class HttpAuthTest {
 	}
 
 	private static void checkResponse(String[] headers,
-			String expectedAuthMethod) {
+			String expectedAuthMethod) throws MalformedURLException {
 
-		AuthHeadersResponse response = null;
-		try {
-			response = new AuthHeadersResponse(headers);
-		} catch (IOException e) {
-			fail("Couldn't instantiate AuthHeadersResponse: " + e.toString());
-		}
-		HttpAuthMethod authMethod = HttpAuthMethod.scanResponse(response);
+		AuthHeadersResponse responce = new AuthHeadersResponse(headers);
+		HttpAuthMethod authMethod = HttpAuthMethod.scanResponse(responce);
 
 		if (!expectedAuthMethod.equals(getAuthMethodName(authMethod))) {
 			fail("Wrong authentication method: expected " + expectedAuthMethod
@@ -103,11 +98,11 @@ public class HttpAuthTest {
 		return authMethod.getClass().getSimpleName();
 	}
 
-	private static class AuthHeadersResponse extends JDKHttpConnection {
+	private static class AuthHeadersResponse extends HttpURLConnection {
 		Map<String, List<String>> headerFields = new HashMap<String, List<String>>();
 
 		public AuthHeadersResponse(String[] authHeaders)
-				throws MalformedURLException, IOException {
+				throws MalformedURLException {
 			super(new URL(URL_SAMPLE));
 			parseHeaders(authHeaders);
 		}
