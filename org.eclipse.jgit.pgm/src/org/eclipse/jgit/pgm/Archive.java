@@ -51,7 +51,6 @@ import java.util.EnumMap;
 import java.util.Map;
 import java.text.MessageFormat;
 
-import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
@@ -83,7 +82,7 @@ class Archive extends TextBuiltin {
 		final ObjectReader reader = walk.getObjectReader();
 		final MutableObjectId idBuf = new MutableObjectId();
 		final Archiver fmt = formats.get(format);
-		final ArchiveOutputStream out = fmt.createArchiveOutputStream(outs);
+		final ArchiveOutputStream outa = fmt.createArchiveOutputStream(outs);
 
 		if (tree == null)
 			throw die(CLIText.get().treeIsRequired);
@@ -101,10 +100,10 @@ class Archive extends TextBuiltin {
 				continue;
 
 			walk.getObjectId(idBuf, 0);
-			fmt.putEntry(name, mode, reader.open(idBuf), out);
+			fmt.putEntry(name, mode, reader.open(idBuf), outa);
 		}
 
-		out.close();
+		outa.close();
 	}
 
 	static private void warnArchiveEntryModeIgnored(String name) {
@@ -116,7 +115,7 @@ class Archive extends TextBuiltin {
 	public enum Format {
 		ZIP,
 		TAR
-	};
+	}
 
 	private static interface Archiver {
 		ArchiveOutputStream createArchiveOutputStream(OutputStream s);
@@ -129,24 +128,23 @@ class Archive extends TextBuiltin {
 	static {
 		Map<Format, Archiver> fmts = new EnumMap<Format, Archiver>(Format.class);
 		fmts.put(Format.ZIP, new Archiver() {
-			@Override
 			public ArchiveOutputStream createArchiveOutputStream(OutputStream s) {
 				return new ZipArchiveOutputStream(s);
 			}
 
-			@Override
 			public void putEntry(String path, FileMode mode, //
 					ObjectLoader loader, ArchiveOutputStream out) //
 					throws IOException {
 				final ZipArchiveEntry entry = new ZipArchiveEntry(path);
 
-				if (mode == FileMode.REGULAR_FILE)
-					; // ok
-				else if (mode == FileMode.EXECUTABLE_FILE ||
-					 mode == FileMode.SYMLINK)
+				if (mode == FileMode.REGULAR_FILE) {
+					// ok
+				} else if (mode == FileMode.EXECUTABLE_FILE
+						|| mode == FileMode.SYMLINK) {
 					entry.setUnixMode(mode.getBits());
-				else
+				} else {
 					warnArchiveEntryModeIgnored(path);
+				}
 				entry.setSize(loader.getSize());
 				out.putArchiveEntry(entry);
 				loader.copyTo(out);
@@ -154,12 +152,10 @@ class Archive extends TextBuiltin {
 			}
 		});
 		fmts.put(Format.TAR, new Archiver() {
-			@Override
 			public ArchiveOutputStream createArchiveOutputStream(OutputStream s) {
 				return new TarArchiveOutputStream(s);
 			}
 
-			@Override
 			public void putEntry(String path, FileMode mode, //
 					ObjectLoader loader, ArchiveOutputStream out) //
 					throws IOException {
@@ -167,7 +163,7 @@ class Archive extends TextBuiltin {
 					final TarArchiveEntry entry = new TarArchiveEntry( //
 							path, TarConstants.LF_SYMLINK);
 					entry.setLinkName(new String( //
-						loader.getCachedBytes(100), "UTF-8"));
+							loader.getCachedBytes(100), "UTF-8")); //$NON-NLS-1$
 					out.putArchiveEntry(entry);
 					out.closeArchiveEntry();
 					return;
