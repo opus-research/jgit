@@ -164,7 +164,6 @@ public class PublisherClient {
 		} catch (IOException e) {
 			System.err.println("Client disconnected");
 			clientState.rollbackUpdateStream();
-			throw e;
 		} catch (InterruptedException e) {
 			System.err.println("Interrupted while polling");
 			e.printStackTrace();

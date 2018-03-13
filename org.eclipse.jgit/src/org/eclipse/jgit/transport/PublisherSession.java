@@ -376,7 +376,7 @@ public class PublisherSession {
 	}
 
 	/** Disconnect the current PublisherClient. */
-	public void disconnect() {
+	public synchronized void disconnect() {
 		PublisherClient pc = client;
 		if (pc != null && !pc.isClosed()) {
 			pc.close();
