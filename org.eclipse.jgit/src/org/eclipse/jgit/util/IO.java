@@ -55,7 +55,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.JGitText;
 
 /**
  * Input/Output utilities
@@ -137,37 +137,17 @@ public class IO {
 			throws FileNotFoundException, IOException {
 		final FileInputStream in = new FileInputStream(path);
 		try {
-			long sz = Math.max(path.length(), 1);
+			final long sz = in.getChannel().size();
 			if (sz > max)
 				throw new IOException(MessageFormat.format(
 						JGitText.get().fileIsTooLarge, path));
+			final byte[] buf = new byte[(int) sz];
+			int actSz = IO.readFully(in, buf, 0);
 
-			byte[] buf = new byte[(int) sz];
-			int valid = 0;
-			for (;;) {
-				if (buf.length == valid) {
-					if (buf.length == max) {
-						int next = in.read();
-						if (next < 0)
-							break;
-
-						throw new IOException(MessageFormat.format(
-								JGitText.get().fileIsTooLarge, path));
-					}
-
-					byte[] nb = new byte[Math.min(buf.length * 2, max)];
-					System.arraycopy(buf, 0, nb, 0, valid);
-					buf = nb;
-				}
-				int n = in.read(buf, valid, buf.length - valid);
-				if (n < 0)
-					break;
-				valid += n;
-			}
-			if (valid < buf.length) {
-				byte[] nb = new byte[valid];
-				System.arraycopy(buf, 0, nb, 0, valid);
-				buf = nb;
+			if (actSz == sz) {
+				byte[] ret = new byte[actSz];
+				System.arraycopy(buf, 0, ret, 0, actSz);
+				return ret;
 			}
 			return buf;
 		} finally {
