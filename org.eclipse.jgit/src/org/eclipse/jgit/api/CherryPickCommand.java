@@ -122,8 +122,9 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 			if (headRef == null)
 				throw new NoHeadException(
 						JGitText.get().commitOnRepoWithoutHEADCurrentlyNotSupported);
+			RevCommit headCommit = revWalk.parseCommit(headRef.getObjectId());
 
-			newHead = revWalk.parseCommit(headRef.getObjectId());
+			newHead = headCommit;
 
 			// loop through all refs to be cherry-picked
 			for (Ref src : commits) {
@@ -155,12 +156,12 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 				merger.setBase(srcParent.getTree());
 				merger.setCommitNames(new String[] { "BASE", ourName,
 						cherryPickName });
-				if (merger.merge(newHead, srcCommit)) {
-					if (AnyObjectId.equals(newHead.getTree().getId(), merger
+				if (merger.merge(headCommit, srcCommit)) {
+					if (AnyObjectId.equals(headCommit.getTree().getId(), merger
 							.getResultTreeId()))
 						continue;
 					DirCacheCheckout dco = new DirCacheCheckout(repo,
-							newHead.getTree(), repo.lockDirCache(),
+							headCommit.getTree(), repo.lockDirCache(),
 							merger.getResultTreeId());
 					dco.setFailOnConflict(true);
 					dco.checkout();

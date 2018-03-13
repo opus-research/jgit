@@ -116,13 +116,8 @@ public class UploadPack {
 	public static enum RequestPolicy {
 		/** Client may only ask for objects the server advertised a reference for. */
 		ADVERTISED,
-
-		/**
-		 * Client may ask for any commit reachable from a reference advertised by
-		 * the server.
-		 */
+		/** Client may ask for any commit reachable from a reference. */
 		REACHABLE_COMMIT,
-
 		/**
 		 * Client may ask for objects that are the tip of any reference, even if not
 		 * advertised.
@@ -130,13 +125,6 @@ public class UploadPack {
 		 * This may happen, for example, when a custom {@link RefFilter} is set.
 		 */
 		TIP,
-
-		/**
-		 * Client may ask for any commit reachable from any reference, even if that
-		 * reference wasn't advertised.
-		 */
-		REACHABLE_COMMIT_TIP,
-
 		/** Client may ask for any SHA-1 in the repository. */
 		ANY;
 	}
@@ -385,12 +373,10 @@ public class UploadPack {
 	 */
 	public void setBiDirectionalPipe(final boolean twoWay) {
 		biDirectionalPipe = twoWay;
-		if (!biDirectionalPipe) {
-			if (requestPolicy == RequestPolicy.ADVERTISED)
-				requestPolicy = RequestPolicy.REACHABLE_COMMIT;
-			else if (requestPolicy == RequestPolicy.TIP)
-				requestPolicy = RequestPolicy.REACHABLE_COMMIT_TIP;
-		}
+		if (!biDirectionalPipe &&
+				(requestPolicy == RequestPolicy.ADVERTISED
+				|| requestPolicy == RequestPolicy.TIP))
+			requestPolicy = RequestPolicy.REACHABLE_COMMIT;
 	}
 
 	/** @return policy used by the service to validate client requests. */
@@ -404,9 +390,8 @@ public class UploadPack {
 	 *            By default the policy is {@link RequestPolicy#ADVERTISED},
 	 *            which is the Git default requiring clients to only ask for an
 	 *            object that a reference directly points to. This may be relaxed
-	 *            to {@link RequestPolicy#REACHABLE_COMMIT} or
-	 *            {@link RequestPolicy#REACHABLE_COMMIT_TIP} when callers have
-	 *            {@link #setBiDirectionalPipe(boolean)} set to false.
+	 *            to {@link RequestPolicy#REACHABLE_COMMIT} when callers
+	 *            have {@link #setBiDirectionalPipe(boolean)} set to false.
 	 */
 	public void setRequestPolicy(RequestPolicy policy) {
 		requestPolicy = policy != null ? policy : RequestPolicy.ADVERTISED;
@@ -724,8 +709,7 @@ public class UploadPack {
 		adv.advertiseCapability(OPTION_SHALLOW);
 		if (!biDirectionalPipe)
 			adv.advertiseCapability(OPTION_NO_DONE);
-		if (requestPolicy == RequestPolicy.TIP
-				|| requestPolicy == RequestPolicy.REACHABLE_COMMIT_TIP)
+		if (requestPolicy == RequestPolicy.TIP)
 			adv.advertiseCapability(OPTION_ALLOW_TIP_SHA1_IN_WANT);
 		adv.setDerefTags(true);
 		advertised = adv.send(getAdvertisedOrDefaultRefs());
@@ -853,10 +837,10 @@ public class UploadPack {
 	private ObjectId processHaveLines(List<ObjectId> peerHas, ObjectId last)
 			throws IOException {
 		preUploadHook.onBeginNegotiateRound(this, wantIds, peerHas.size());
-		if (wantAll.isEmpty() && !wantIds.isEmpty())
-			parseWants();
 		if (peerHas.isEmpty())
 			return last;
+		if (wantAll.isEmpty() && !wantIds.isEmpty())
+			parseWants();
 
 		sentReady = false;
 		int haveCnt = 0;
@@ -956,9 +940,8 @@ public class UploadPack {
 		AsyncRevObjectQueue q = walk.parseAny(wantIds, true);
 		try {
 			List<RevCommit> checkReachable = null;
-			Set<ObjectId> reachableFrom = null;
-			Set<ObjectId> tips = null;
 			RevObject obj;
+			Set<ObjectId> tips = null;
 			while ((obj = q.next()) != null) {
 				if (!advertised.contains(obj)) {
 					switch (requestPolicy) {
@@ -966,17 +949,6 @@ public class UploadPack {
 					default:
 						throw new PackProtocolException(MessageFormat.format(
 								JGitText.get().wantNotValid, obj));
-					case REACHABLE_COMMIT:
-						if (!(obj instanceof RevCommit)) {
-							throw new PackProtocolException(MessageFormat.format(
-								JGitText.get().wantNotValid, obj));
-						}
-						if (checkReachable == null) {
-							checkReachable = new ArrayList<RevCommit>();
-							reachableFrom = advertised;
-						}
-						checkReachable.add((RevCommit) obj);
-						break;
 					case TIP:
 						if (tips == null)
 							tips = refIdSet(db.getAllRefs().values());
@@ -984,15 +956,13 @@ public class UploadPack {
 							throw new PackProtocolException(MessageFormat.format(
 									JGitText.get().wantNotValid, obj));
 						break;
-					case REACHABLE_COMMIT_TIP:
+					case REACHABLE_COMMIT:
 						if (!(obj instanceof RevCommit)) {
 							throw new PackProtocolException(MessageFormat.format(
 								JGitText.get().wantNotValid, obj));
 						}
-						if (checkReachable == null) {
+						if (checkReachable == null)
 							checkReachable = new ArrayList<RevCommit>();
-							reachableFrom = refIdSet(db.getAllRefs().values());
-						}
 						checkReachable.add((RevCommit) obj);
 						break;
 					case ANY:
@@ -1010,7 +980,7 @@ public class UploadPack {
 				}
 			}
 			if (checkReachable != null)
-				checkNotAdvertisedWants(checkReachable, reachableFrom);
+				checkNotAdvertisedWants(checkReachable);
 			wantIds.clear();
 		} catch (MissingObjectException notFound) {
 			ObjectId id = notFound.getObjectId();
@@ -1028,18 +998,17 @@ public class UploadPack {
 		}
 	}
 
-	private void checkNotAdvertisedWants(List<RevCommit> notAdvertisedWants,
-			Set<ObjectId> reachableFrom)
+	private void checkNotAdvertisedWants(List<RevCommit> notAdvertisedWants)
 			throws MissingObjectException, IncorrectObjectTypeException, IOException {
-		// Walk the requested commits back to the provided set of commits. If any
-		// commit exists, a branch was deleted or rewound and the repository owner
-		// no longer exports that requested item. If the requested commit is merged
-		// into an advertised branch it will be marked UNINTERESTING and no commits
-		// return.
+		// Walk the requested commits back to the advertised commits.
+		// If any commit exists, a branch was deleted or rewound and
+		// the repository owner no longer exports that requested item.
+		// If the requested commit is merged into an advertised branch
+		// it will be marked UNINTERESTING and no commits return.
 
 		for (RevCommit c : notAdvertisedWants)
 			walk.markStart(c);
-		for (ObjectId id : reachableFrom) {
+		for (ObjectId id : advertised) {
 			try {
 				walk.markUninteresting(walk.parseCommit(id));
 			} catch (IncorrectObjectTypeException notCommit) {
