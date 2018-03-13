@@ -86,8 +86,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 
 	private File directory;
 
-	private File gitDir;
-
 	private boolean bare;
 
 	private String remote = Constants.DEFAULT_REMOTE_NAME;
@@ -139,19 +137,12 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	private Repository init(URIish u) throws GitAPIException {
 		InitCommand command = Git.init();
 		command.setBare(bare);
-		if (directory == null && gitDir == null)
+		if (directory == null)
 			directory = new File(u.getHumanishName(), Constants.DOT_GIT);
-		if (directory != null && directory.exists()
-				&& directory.listFiles().length != 0)
+		if (directory.exists() && directory.listFiles().length != 0)
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().cloneNonEmptyDirectory, directory.getName()));
-		if (gitDir != null && gitDir.exists() && gitDir.listFiles().length != 0)
-			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().cloneNonEmptyDirectory, gitDir.getName()));
-		if (directory != null)
-			command.setDirectory(directory);
-		if (gitDir != null)
-			command.setGitDir(gitDir);
+		command.setDirectory(directory);
 		return command.call().getRepository();
 	}
 
@@ -348,21 +339,6 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 	 */
 	public CloneCommand setDirectory(File directory) {
 		this.directory = directory;
-		return this;
-	}
-
-	/**
-	 * @param gitDir
-	 *            the repository meta directory
-	 * @return this instance
-	 * @throws IllegalStateException
-	 *             if the combination of directory, gitDir and bare is illegal.
-	 *             E.g. if for a non-bare repo directory and seperateGitDir is
-	 *             specified.
-	 * @since 3.6
-	 */
-	public CloneCommand setGitDir(File gitDir) {
-		this.gitDir = gitDir;
 		return this;
 	}
 
