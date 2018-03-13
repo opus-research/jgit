@@ -50,7 +50,7 @@ import org.eclipse.jgit.storage.file.WindowCacheConfig;
 class DeltaBaseCache {
 	private static final int CACHE_SZ = 1024;
 
-	static final SoftReference<Entry> DEAD;
+	private static final SoftReference<Entry> DEAD;
 
 	private static int hash(final long position) {
 		return (((int) position) << 22) >>> 22;
