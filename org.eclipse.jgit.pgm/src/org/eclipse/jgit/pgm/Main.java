@@ -137,14 +137,6 @@ public class Main {
 			err.printStackTrace();
 			System.exit(1);
 		}
-		if (System.out.checkError()) {
-			System.err.println("An unknown I/O error occurs on stdout");
-			System.exit(1);
-		}
-		if (System.err.checkError()) {
-			// No idea how to present an error here
-			System.exit(1);
-		}
 	}
 
 	private void execute(final String[] argv) throws Exception {
@@ -198,8 +190,8 @@ public class Main {
 		try {
 			cmd.execute(arguments.toArray(new String[arguments.size()]));
 		} finally {
-			if (cmd.outw != null)
-				cmd.outw.flush();
+			if (cmd.out != null)
+				cmd.out.flush();
 		}
 	}
 

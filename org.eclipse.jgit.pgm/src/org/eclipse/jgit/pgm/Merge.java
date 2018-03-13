@@ -88,13 +88,13 @@ class Merge extends TextBuiltin {
 		switch (result.getMergeStatus()) {
 		case ALREADY_UP_TO_DATE:
 		case FAST_FORWARD:
-			outw.println(result.getMergeStatus().toString());
+			out.println(result.getMergeStatus().toString());
 			break;
 		case CONFLICTING:
 			for (String collidingPath : result.getConflicts().keySet())
-				outw.println(MessageFormat.format(CLIText.get().mergeConflict,
+				out.println(MessageFormat.format(CLIText.get().mergeConflict,
 						collidingPath));
-			outw.println(CLIText.get().mergeFailed);
+			out.println(CLIText.get().mergeFailed);
 			break;
 		case FAILED:
 			for (Map.Entry<String, MergeFailureReason> entry : result
@@ -102,21 +102,21 @@ class Merge extends TextBuiltin {
 				switch (entry.getValue()) {
 				case DIRTY_WORKTREE:
 				case DIRTY_INDEX:
-					outw.println(CLIText.get().dontOverwriteLocalChanges);
-					outw.println("        " + entry.getKey());
+					out.println(CLIText.get().dontOverwriteLocalChanges);
+					out.println("        " + entry.getKey());
 					break;
 				case COULD_NOT_DELETE:
-					outw.println(CLIText.get().cannotDeleteFile);
-					outw.println("        " + entry.getKey());
+					out.println(CLIText.get().cannotDeleteFile);
+					out.println("        " + entry.getKey());
 					break;
 				}
 			break;
 		case MERGED:
-			outw.println(MessageFormat.format(CLIText.get().mergeMadeBy,
+			out.println(MessageFormat.format(CLIText.get().mergeMadeBy,
 					mergeStrategy.getName()));
 			break;
 		case NOT_SUPPORTED:
-			outw.println(MessageFormat.format(
+			out.println(MessageFormat.format(
 					CLIText.get().unsupportedOperation, result.toString()));
 		}
 	}
