@@ -121,6 +121,15 @@ public abstract class SystemReader {
 		public int getTimezone(long when) {
 			return getTimeZone().getOffset(when) / (60 * 1000);
 		}
+
+		public TimeZone getTimeZone() {
+			return TimeZone.getDefault();
+		}
+
+		@Override
+		public Locale getLocale() {
+			return Locale.getDefault();
+		}
 	};
 
 	/** @return the live instance to read system properties. */
@@ -191,17 +200,11 @@ public abstract class SystemReader {
 
 	/**
 	 * @return system time zone, possibly mocked for testing
-	 * @since 1.2
 	 */
-	public TimeZone getTimeZone() {
-		return TimeZone.getDefault();
-	}
+	public abstract TimeZone getTimeZone();
 
 	/**
 	 * @return the locale to use
-	 * @since 1.2
 	 */
-	public Locale getLocale() {
-		return Locale.getDefault();
-	}
+	public abstract Locale getLocale();
 }
