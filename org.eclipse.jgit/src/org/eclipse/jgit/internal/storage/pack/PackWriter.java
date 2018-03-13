@@ -1305,57 +1305,68 @@ public class PackWriter {
 			threads = Runtime.getRuntime().availableProcessors();
 
 		if (threads <= 1 || cnt <= 2 * config.getDeltaSearchWindowSize()) {
-			new DeltaWindow(config, new DeltaCache(config), reader, monitor,
-					list, 0, cnt).search();
+			DeltaCache dc = new DeltaCache(config);
+			DeltaWindow dw = new DeltaWindow(config, dc, reader);
+			dw.search(monitor, list, 0, cnt);
 			return;
 		}
 
 		final DeltaCache dc = new ThreadSafeDeltaCache(config);
 		final ThreadSafeProgressMonitor pm = new ThreadSafeProgressMonitor(monitor);
 
-		int estSize = cnt / threads;
-		if (estSize < config.getDeltaSearchWindowSize())
-			estSize = config.getDeltaSearchWindowSize();
+		// Guess at the size of batch we want. Because we don't really
+		// have a way for a thread to steal work from another thread if
+		// it ends early, we over partition slightly so the work units
+		// are a bit smaller.
+		//
+		int estSize = cnt / (threads * 2);
+		if (estSize < 2 * config.getDeltaSearchWindowSize())
+			estSize = 2 * config.getDeltaSearchWindowSize();
 
-		DeltaTask.Block taskBlock = new DeltaTask.Block(threads, config,
-				reader, dc, pm,
-				list, 0, cnt);
+		final List<DeltaTask> myTasks = new ArrayList<DeltaTask>(threads * 2);
 		for (int i = 0; i < cnt;) {
 			final int start = i;
-			int end;
+			final int batchSize;
 
 			if (cnt - i < estSize) {
 				// If we don't have enough to fill the remaining block,
 				// schedule what is left over as a single block.
-				end = cnt;
+				//
+				batchSize = cnt - i;
 			} else {
 				// Try to split the block at the end of a path.
-				end = start + estSize;
-				int h = list[end - 1].getPathHash();
+				//
+				int end = start + estSize;
 				while (end < cnt) {
-					if (h == list[end].getPathHash())
+					ObjectToPack a = list[end - 1];
+					ObjectToPack b = list[end];
+					if (a.getPathHash() == b.getPathHash())
 						end++;
 					else
 						break;
 				}
+				batchSize = end - start;
 			}
-			i = end;
-			taskBlock.tasks.add(new DeltaTask(taskBlock, start, end));
+			i += batchSize;
+			myTasks.add(new DeltaTask(config, reader, dc, pm, batchSize, start, list));
 		}
-		pm.startWorkers(taskBlock.tasks.size());
+		pm.startWorkers(myTasks.size());
 
 		final Executor executor = config.getExecutor();
 		final List<Throwable> errors = Collections
 				.synchronizedList(new ArrayList<Throwable>());
 		if (executor instanceof ExecutorService) {
 			// Caller supplied us a service, use it directly.
-			runTasks((ExecutorService) executor, pm, taskBlock, errors);
+			//
+			runTasks((ExecutorService) executor, pm, myTasks, errors);
+
 		} else if (executor == null) {
 			// Caller didn't give us a way to run the tasks, spawn up a
 			// temporary thread pool and make sure it tears down cleanly.
+			//
 			ExecutorService pool = Executors.newFixedThreadPool(threads);
 			try {
-				runTasks(pool, pm, taskBlock, errors);
+				runTasks(pool, pm, myTasks, errors);
 			} finally {
 				pool.shutdown();
 				for (;;) {
@@ -1372,7 +1383,8 @@ public class PackWriter {
 			// The caller gave us an executor, but it might not do
 			// asynchronous execution.  Wrap everything and hope it
 			// can schedule these for us.
-			for (final DeltaTask task : taskBlock.tasks) {
+			//
+			for (final DeltaTask task : myTasks) {
 				executor.execute(new Runnable() {
 					public void run() {
 						try {
@@ -1414,9 +1426,9 @@ public class PackWriter {
 
 	private static void runTasks(ExecutorService pool,
 			ThreadSafeProgressMonitor pm,
-			DeltaTask.Block tb, List<Throwable> errors) throws IOException {
-		List<Future<?>> futures = new ArrayList<Future<?>>(tb.tasks.size());
-		for (DeltaTask task : tb.tasks)
+			List<DeltaTask> tasks, List<Throwable> errors) throws IOException {
+		List<Future<?>> futures = new ArrayList<Future<?>>(tasks.size());
+		for (DeltaTask task : tasks)
 			futures.add(pool.submit(task));
 
 		try {
