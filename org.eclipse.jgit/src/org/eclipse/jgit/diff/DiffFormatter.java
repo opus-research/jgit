@@ -268,10 +268,6 @@ public class DiffFormatter {
 				o.write('\n');
 			}
 			break;
-		case MODIFY:
-			o.write(encodeASCII("dissimilarity index " + (100 - ent.getScore()) + "%"));
-			o.write('\n');
-			break;
 		}
 
 		switch (ent.getChangeType()) {
