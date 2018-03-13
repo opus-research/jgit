@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2017, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,85 +40,71 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs;
+package org.eclipse.jgit.diff;
+
+import org.eclipse.jgit.errors.BinaryBlobException;
+import org.eclipse.jgit.internal.storage.file.FileRepository;
+import org.eclipse.jgit.junit.RepositoryTestCase;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.ObjectLoader;
+import org.junit.Assert;
+import org.junit.Test;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 
-import org.eclipse.jgit.lfs.lib.AnyLongObjectId;
-
-/**
- * Class which represents the lfs folder hierarchy inside a .git folder
- *
- * @since 4.6
- */
-public class Lfs {
-	private Path root;
-
-	private Path objDir;
-
-	private Path tmpDir;
-
-	/**
-	 * @param root
-	 *            the path to the LFS media directory. Will be "<repo>/.git/lfs"
-	 */
-	public Lfs(Path root) {
-		this.root = root;
-	}
-
-	/**
-	 * @return the path to the LFS directory
-	 */
-	public Path getLfsRoot() {
-		return root;
-	}
-
-	/**
-	 * @return the path to the temp directory used by LFS. Will be
-	 *         "<repo>/.git/lfs/tmp"
-	 */
-	public Path getLfsTmpDir() {
-		if (tmpDir == null) {
-			tmpDir = root.resolve("tmp"); //$NON-NLS-1$
+public class RawTextLoadTest extends RepositoryTestCase {
+	private static byte[] generate(int size, int nullAt) {
+		byte[] data = new byte[size];
+		for (int i = 0; i < data.length; i++) {
+			data[i] = (byte) ((i % 72 == 0) ? '\n' : (i%10) + '0');
 		}
-		return tmpDir;
-	}
-
-	/**
-	 * @return the path to the object directory used by LFS. Will be
-	 *         "<repo>/.git/lfs/objects"
-	 */
-	public Path getLfsObjDir() {
-		if (objDir == null) {
-			objDir = root.resolve("objects"); //$NON-NLS-1$
+		if (nullAt >= 0) {
+			data[nullAt] = '\0';
 		}
-		return objDir;
+		return data;
 	}
 
-	/**
-	 * @param id
-	 *            the id of the mediafile
-	 * @return the file which stores the original content. This will be files
-	 *         underneath
-	 *         "<repo>/.git/lfs/objects/<firstTwoLettersOfID>/<remainingLettersOfID>"
-	 */
-	public Path getMediaFile(AnyLongObjectId id) {
-		String idStr = id.name();
-		return getLfsObjDir().resolve(idStr.substring(0, 2))
-				.resolve(idStr.substring(2));
+	private RawText textFor(byte[] data, int limit) throws IOException, BinaryBlobException {
+		FileRepository repo = createBareRepository();
+		ObjectId id;
+		try (ObjectInserter ins = repo.getObjectDatabase().newInserter()) {
+			id = ins.insert(Constants.OBJ_BLOB, data);
+		}
+		ObjectLoader ldr = repo.open(id);
+		return RawText.load(ldr, limit);
 	}
 
-	/**
-	 * Create a new temp file in the LFS directory
-	 *
-	 * @return a new temporary file in the LFS directory
-	 * @throws IOException
-	 *             when the temp file could not be created
-	 */
-	public Path createTmpFile() throws IOException {
-		return Files.createTempFile(getLfsTmpDir(), null, null);
+	@Test
+	public void testSmallOK() throws Exception {
+		byte[] data = generate(1000, -1);
+		RawText result = textFor(data, 1 << 20);
+		Assert.assertArrayEquals(result.content, data);
 	}
 
+	@Test(expected = BinaryBlobException.class)
+	public void testSmallNull() throws Exception {
+		byte[] data = generate(1000, 22);
+		textFor(data, 1 << 20);
+	}
+
+	@Test
+	public void testBigOK() throws Exception {
+		byte[] data = generate(10000, -1);
+		RawText result = textFor(data, 1 << 20);
+		Assert.assertArrayEquals(result.content, data);
+	}
+
+	@Test(expected = BinaryBlobException.class)
+	public void testBigWithNullAtStart() throws Exception {
+		byte[] data = generate(10000, 22);
+		textFor(data, 1 << 20);
+	}
+
+	@Test(expected = BinaryBlobException.class)
+	public void testBinaryThreshold() throws Exception {
+		byte[] data = generate(2 << 20, -1);
+		textFor(data, 1 << 20);
+	}
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Matthias Sohn <matthias.sohn@sap.com>
+ * Copyright (C) 2017 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,33 +40,19 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs.internal;
-
-import org.eclipse.jgit.nls.NLS;
-import org.eclipse.jgit.nls.TranslationBundle;
+package org.eclipse.jgit.errors;
 
 /**
- * Translation bundle for JGit LFS server
+ * BinaryBlobException is used to signal that binary data was found
+ * in a context that requires text (eg. for generating textual diffs).
+ *
+ * @since 4.10
  */
-public class LfsText extends TranslationBundle {
+public class BinaryBlobException extends Exception {
+	private static final long serialVersionUID = 1L;
 
 	/**
-	 * @return an instance of this translation bundle
+	 * Construct a BinaryBlobException.
 	 */
-	public static LfsText get() {
-		return NLS.getBundleFor(LfsText.class);
-	}
-
-	// @formatter:off
-	/***/ public String corruptLongObject;
-	/***/ public String inconsistentMediafileLength;
-	/***/ public String incorrectLONG_OBJECT_ID_LENGTH;
-	/***/ public String invalidLongId;
-	/***/ public String invalidLongIdLength;
-	/***/ public String requiredHashFunctionNotAvailable;
-	/***/ public String repositoryNotFound;
-	/***/ public String repositoryReadOnly;
-	/***/ public String lfsUnavailable;
-	/***/ public String lfsUnathorized;
-	/***/ public String lfsFailedToGetRepository;
+	public BinaryBlobException() {}
 }
