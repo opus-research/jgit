@@ -45,6 +45,7 @@ package org.eclipse.jgit.pgm;
 
 import java.io.IOException;
 import java.text.MessageFormat;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -69,14 +70,9 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.ExampleMode;
 import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.RestOfArgumentsHandler;
 
 @Command(common = true, usage = "usage_listCreateOrDeleteBranches")
 class Branch extends TextBuiltin {
-
-	private String otherBranch;
-	private boolean createForce;
-	private boolean rename;
 
 	@Option(name = "--remote", aliases = { "-r" }, usage = "usage_actOnRemoteTrackingBranches")
 	private boolean remote = false;
@@ -87,62 +83,23 @@ class Branch extends TextBuiltin {
 	@Option(name = "--contains", metaVar = "metaVar_commitish", usage = "usage_printOnlyBranchesThatContainTheCommit")
 	private String containsCommitish;
 
-	@Option(name = "--delete", aliases = { "-d" }, metaVar = "metaVar_branchName", usage = "usage_deleteFullyMergedBranch")
-	private List<String> delete;
+	@Option(name = "--delete", aliases = { "-d" }, usage = "usage_deleteFullyMergedBranch")
+	private boolean delete = false;
 
-	@Option(name = "--delete-force", aliases = { "-D" }, metaVar = "metaVar_branchName", usage = "usage_deleteBranchEvenIfNotMerged")
-	private List<String> deleteForce;
+	@Option(name = "--delete-force", aliases = { "-D" }, usage = "usage_deleteBranchEvenIfNotMerged")
+	private boolean deleteForce = false;
 
-	@Option(name = "--create-force", aliases = { "-f" }, metaVar = "metaVar_branchAndStartPoint", usage = "usage_forceCreateBranchEvenExists")
-	public void createForce(String args) {
-		createForce = true;
-		if (args != null && !args.isEmpty()) {
-			String[] branchAndStartPoint = args.split(" "); //$NON-NLS-1$
-			if (branchAndStartPoint.length > 2) {
-				throw die(
-						CLIText.get().tooManyRefsGiven + new CmdLineParser(this)
-								.printExample(ExampleMode.ALL));
-			}
-			if (branchAndStartPoint.length == 2) {
-				branch = branchAndStartPoint[0];
-				otherBranch = branchAndStartPoint[1];
-			} else {
-				branch = branchAndStartPoint[0];
-			}
-		}
-	}
+	@Option(name = "--create-force", aliases = { "-f" }, usage = "usage_forceCreateBranchEvenExists")
+	private boolean createForce = false;
 
-	@Option(name = "--move", aliases = { "-m" }, usage = "usage_moveRenameABranch", metaVar = "metaVar_oldNewBranchNames", handler = RestOfArgumentsHandler.class)
-	public void moveRename(String args) {
-		rename = true;
-		if (args == null) {
-			throw die(CLIText.get().branchNameRequired
-					+ new CmdLineParser(this).printExample(ExampleMode.ALL));
-		}
-		if (!args.trim().isEmpty()) {
-			String[] currentAndNew = args.trim().split(" "); //$NON-NLS-1$
-			if (currentAndNew.length > 2) {
-				throw die(CLIText.get().tooManyRefsGiven
-						+ new CmdLineParser(this).printExample(ExampleMode.ALL));
-			}
-			if (currentAndNew.length == 0) {
-				throw die(CLIText.get().branchNameRequired
-						+ new CmdLineParser(this).printExample(ExampleMode.ALL));
-			}
-			if (currentAndNew.length == 2) {
-				branch = currentAndNew[0];
-				otherBranch = currentAndNew[1];
-			} else {
-				branch = currentAndNew[0];
-			}
-		}
-	}
+	@Option(name = "-m", usage = "usage_moveRenameABranch")
+	private boolean rename = false;
 
 	@Option(name = "--verbose", aliases = { "-v" }, usage = "usage_beVerbose")
 	private boolean verbose = false;
 
-	@Argument(metaVar = "metaVar_name")
-	private String branch;
+	@Argument
+	private List<String> branches = new ArrayList<String>();
 
 	private final Map<String, Ref> printRefs = new LinkedHashMap<String, Ref>();
 
@@ -153,33 +110,30 @@ class Branch extends TextBuiltin {
 
 	@Override
 	protected void run() throws Exception {
-		if (delete != null || deleteForce != null) {
-			if (delete != null) {
-				delete(delete, false);
-			}
-			if (deleteForce != null) {
-				delete(deleteForce, true);
-			}
-		} else {
+		if (delete || deleteForce)
+			delete(deleteForce);
+		else {
+			if (branches.size() > 2)
+				throw die(CLIText.get().tooManyRefsGiven + new CmdLineParser(this).printExample(ExampleMode.ALL));
+
 			if (rename) {
 				String src, dst;
-				if (otherBranch == null) {
+				if (branches.size() == 1) {
 					final Ref head = db.getRef(Constants.HEAD);
-					if (head != null && head.isSymbolic()) {
+					if (head != null && head.isSymbolic())
 						src = head.getLeaf().getName();
-					} else {
+					else
 						throw die(CLIText.get().cannotRenameDetachedHEAD);
-					}
-					dst = branch;
+					dst = branches.get(0);
 				} else {
-					src = branch;
+					src = branches.get(0);
 					final Ref old = db.getRef(src);
 					if (old == null)
 						throw die(MessageFormat.format(CLIText.get().doesNotExist, src));
 					if (!old.getName().startsWith(Constants.R_HEADS))
 						throw die(MessageFormat.format(CLIText.get().notABranch, src));
 					src = old.getName();
-					dst = otherBranch;
+					dst = branches.get(1);
 				}
 
 				if (!dst.startsWith(Constants.R_HEADS))
@@ -191,14 +145,13 @@ class Branch extends TextBuiltin {
 				if (r.rename() != Result.RENAMED)
 					throw die(MessageFormat.format(CLIText.get().cannotBeRenamed, src));
 
-			} else if (createForce || branch != null) {
-				String newHead = branch;
+			} else if (branches.size() > 0) {
+				String newHead = branches.get(0);
 				String startBranch;
-				if (createForce) {
-					startBranch = otherBranch;
-				} else {
+				if (branches.size() == 2)
+					startBranch = branches.get(1);
+				else
 					startBranch = Constants.HEAD;
-				}
 				Ref startRef = db.getRef(startBranch);
 				ObjectId startAt = db.resolve(startBranch + "^0"); //$NON-NLS-1$
 				if (startRef != null) {
@@ -211,27 +164,22 @@ class Branch extends TextBuiltin {
 				}
 				startBranch = Repository.shortenRefName(startBranch);
 				String newRefName = newHead;
-				if (!newRefName.startsWith(Constants.R_HEADS)) {
+				if (!newRefName.startsWith(Constants.R_HEADS))
 					newRefName = Constants.R_HEADS + newRefName;
-				}
-				if (!Repository.isValidRefName(newRefName)) {
+				if (!Repository.isValidRefName(newRefName))
 					throw die(MessageFormat.format(CLIText.get().notAValidRefName, newRefName));
-				}
-				if (!createForce && db.resolve(newRefName) != null) {
+				if (!createForce && db.resolve(newRefName) != null)
 					throw die(MessageFormat.format(CLIText.get().branchAlreadyExists, newHead));
-				}
 				RefUpdate updateRef = db.updateRef(newRefName);
 				updateRef.setNewObjectId(startAt);
 				updateRef.setForceUpdate(createForce);
 				updateRef.setRefLogMessage(MessageFormat.format(CLIText.get().branchCreatedFrom, startBranch), false);
 				Result update = updateRef.update();
-				if (update == Result.REJECTED) {
+				if (update == Result.REJECTED)
 					throw die(MessageFormat.format(CLIText.get().couldNotCreateBranch, newHead, update.toString()));
-				}
 			} else {
-				if (verbose) {
+				if (verbose)
 					rw = new RevWalk(db);
-				}
 				list();
 			}
 		}
@@ -301,8 +249,7 @@ class Branch extends TextBuiltin {
 		outw.println();
 	}
 
-	private void delete(List<String> branches, boolean force)
-			throws IOException {
+	private void delete(boolean force) throws IOException {
 		String current = db.getBranch();
 		ObjectId head = db.resolve(Constants.HEAD);
 		for (String branch : branches) {
