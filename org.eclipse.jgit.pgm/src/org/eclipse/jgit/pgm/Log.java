@@ -67,6 +67,7 @@ import org.eclipse.jgit.diff.RenameDetector;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.notes.NoteMap;
@@ -87,6 +88,10 @@ class Log extends RevWalkTextBuiltin {
 	private Map<AnyObjectId, Set<Ref>> allRefsByPeeledObjectId;
 
 	private Map<String, NoteMap> noteMaps;
+
+	private ObjectReader reader;
+
+	private RevWalk revWalk;
 
 	@Option(name="--decorate", usage="usage_showRefNamesMatchingCommits")
 	private boolean decorate;
@@ -197,18 +202,20 @@ class Log extends RevWalkTextBuiltin {
 				rd.setRenameLimit(renameLimit.intValue());
 			}
 
-			if (!noStandardNotes || !additionalNoteRefs.isEmpty()) {
-				createWalk();
+			if (!noStandardNotes || additionalNoteRefs != null) {
+				reader = db.newObjectReader();
+				revWalk = new RevWalk(db);
 				noteMaps = new LinkedHashMap<String, NoteMap>();
 				if (!noStandardNotes) {
-					addNoteMap(Constants.R_NOTES_COMMITS);
+					noteMaps.put(Constants.R_NOTES_COMMITS,
+							getNoteMap(Constants.R_NOTES_COMMITS));
 				}
-				if (!additionalNoteRefs.isEmpty()) {
+				if (additionalNoteRefs != null) {
 					for (String notesRef : additionalNoteRefs) {
 						if (!notesRef.startsWith(Constants.R_NOTES)) {
 							notesRef = Constants.R_NOTES + notesRef;
 						}
-						addNoteMap(notesRef);
+						noteMaps.put(notesRef, getNoteMap(notesRef));
 					}
 				}
 			}
@@ -216,16 +223,19 @@ class Log extends RevWalkTextBuiltin {
 			super.run();
 		} finally {
 			diffFmt.release();
+			if (reader != null)
+				reader.release();
+			if (revWalk != null)
+				revWalk.release();
 		}
 	}
 
-	private void addNoteMap(String notesRef) throws IOException {
+	private NoteMap getNoteMap(String notesRef) throws IOException {
 		Ref notes = db.getRef(notesRef);
 		if (notes == null)
-			return;
-		RevCommit notesCommit = argWalk.parseCommit(notes.getObjectId());
-		noteMaps.put(notesRef,
-				NoteMap.read(argWalk.getObjectReader(), notesCommit));
+			return null;
+		RevCommit notesCommit = revWalk.parseCommit(notes.getObjectId());
+		return NoteMap.read(reader, notesCommit);
 	}
 
 	@Override
@@ -294,7 +304,7 @@ class Log extends RevWalkTextBuiltin {
 			}
 			boolean printedNote = showNotes(c, e.getValue(), label,
 					printEmptyLine);
-			atLeastOnePrinted |= printedNote;
+			atLeastOnePrinted = atLeastOnePrinted || printedNote;
 			printEmptyLine = printedNote;
 		}
 		return atLeastOnePrinted;
@@ -324,11 +334,12 @@ class Log extends RevWalkTextBuiltin {
 			out.print(")");
 		}
 		out.println(":");
-		RawText rawText = new RawText(argWalk.getObjectReader().open(blobId)
-				.getBytes());
-		for (int i = 0; i < rawText.size(); i++) {
+		RawText rawText = new RawText(reader.open(blobId).getBytes());
+		String s = rawText.getString(0, rawText.size(), false);
+		final String[] lines = s.split("\n");
+		for (final String l : lines) {
 			out.print("    ");
-			out.println(rawText.getString(i));
+			out.println(l);
 		}
 		return true;
 	}
