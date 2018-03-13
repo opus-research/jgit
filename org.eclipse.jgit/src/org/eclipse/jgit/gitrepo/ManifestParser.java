@@ -83,11 +83,12 @@ public class ManifestParser extends DefaultHandler {
 	private final Map<String, String> remotes;
 	private final Set<String> plusGroups;
 	private final Set<String> minusGroups;
-	private List<RepoProject> projects;
-	private List<RepoProject> filteredProjects;
+	private final List<RepoProject> projects;
+	private final List<RepoProject> filteredProjects;
+	private final IncludedFileReader includedReader;
+
 	private String defaultRemote;
 	private String defaultRevision;
-	private IncludedFileReader includedReader;
 	private int xmlInRead;
 	private RepoProject currentProject;
 
@@ -297,7 +298,7 @@ public class ManifestParser extends DefaultHandler {
 	/**
 	 * Getter for projects.
 	 *
-	 * @return the projects
+	 * @return projects list reference, never null
 	 */
 	public List<RepoProject> getProjects() {
 		return projects;
@@ -306,7 +307,7 @@ public class ManifestParser extends DefaultHandler {
 	/**
 	 * Getter for filterdProjects.
 	 *
-	 * @return the filtered projects
+	 * @return filtered projects list reference, never null
 	 */
 	public List<RepoProject> getFilteredProjects() {
 		return filteredProjects;
