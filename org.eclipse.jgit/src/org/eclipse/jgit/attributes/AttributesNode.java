@@ -50,6 +50,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Map;
 
 import org.eclipse.jgit.lib.Constants;
 
@@ -136,8 +137,8 @@ public class AttributesNode {
 	 *            it is not empty, this method will NOT override any
 	 *            existing entry.
 	 */
-	public void getAttributes(String entryPath,
-			boolean isDirectory, Attributes attributes) {
+	public void getAttributes(String entryPath, boolean isDirectory,
+			Map<String, Attribute> attributes) {
 		// Parse rules in the reverse order that they were read since the last
 		// entry should be used
 		ListIterator<AttributesRule> ruleIterator = rules.listIterator(rules
@@ -152,7 +153,7 @@ public class AttributesNode {
 				while (attributeIte.hasPrevious()) {
 					Attribute attr = attributeIte.previous();
 					if (!attributes.containsKey(attr.getKey()))
-						attributes.putAttribute(attr);
+						attributes.put(attr.getKey(), attr);
 				}
 			}
 		}

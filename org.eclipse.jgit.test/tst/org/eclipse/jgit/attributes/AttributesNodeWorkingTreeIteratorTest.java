@@ -53,7 +53,9 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.eclipse.jgit.attributes.Attribute.State;
 import org.eclipse.jgit.errors.CorruptObjectException;
@@ -225,14 +227,12 @@ public class AttributesNodeWorkingTreeIteratorTest extends RepositoryTestCase {
 			assertTrue(nodeAttrs == null || nodeAttrs.isEmpty());
 		else {
 
-			Attributes entryAttributes = new Attributes();
-			attributesNode.getAttributes(pathName,
-					false, entryAttributes);
+			Map<String, Attribute> entryAttributes = new LinkedHashMap<String, Attribute>();
+			attributesNode.getAttributes(pathName, false, entryAttributes);
 
 			if (nodeAttrs != null && !nodeAttrs.isEmpty()) {
 				for (Attribute attribute : nodeAttrs) {
-					assertThat(entryAttributes.getAttributes(),
-							hasItem(attribute));
+					assertThat(entryAttributes.values(), hasItem(attribute));
 				}
 			} else {
 				assertTrue(
