@@ -161,7 +161,7 @@ class Log extends RevWalkTextBuiltin {
 		out.print(" ");
 		c.getId().copyTo(outbuffer, out);
 		if (decorate) {
-			Collection<Ref> list = allRefsByPeeledObjectId.get(c);
+			Collection<Ref> list = allRefsByPeeledObjectId.get(c.copy());
 			if (list != null) {
 				out.print(" (");
 				for (Iterator<Ref> i = list.iterator(); i.hasNext(); ) {

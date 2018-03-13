@@ -97,7 +97,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String exporting;
 	/***/ public String failedToCommitIndex;
 	/***/ public String failedToLockIndex;
-	/***/ public String failedToLockTag;
 	/***/ public String fatalError;
 	/***/ public String fatalErrorTagExists;
 	/***/ public String fatalThisProgramWillDestroyTheRepository;

@@ -64,19 +64,11 @@ public class ObjectToPack extends PackedObjectInfo {
 
 	private static final int DO_NOT_DELTA = 1 << 2;
 
-	private static final int EDGE = 1 << 3;
-
 	private static final int TYPE_SHIFT = 5;
 
-	private static final int EXT_SHIFT = 8;
+	private static final int DELTA_SHIFT = 8;
 
-	private static final int EXT_MASK = 0xf;
-
-	private static final int DELTA_SHIFT = 12;
-
-	private static final int NON_EXT_MASK = ~(EXT_MASK << EXT_SHIFT);
-
-	private static final int NON_DELTA_MASK = 0xfff;
+	private static final int NON_DELTA_MASK = 0xff;
 
 	/** Other object being packed that this will delta against. */
 	private ObjectId deltaBase;
@@ -87,12 +79,10 @@ public class ObjectToPack extends PackedObjectInfo {
 	 * <li>1 bit: wantWrite</li>
 	 * <li>1 bit: canReuseAsIs</li>
 	 * <li>1 bit: doNotDelta</li>
-	 * <li>1 bit: edgeObject</li>
-	 * <li>1 bit: unused</li>
+	 * <li>2 bits: unused</li>
 	 * <li>3 bits: type</li>
-	 * <li>4 bits: subclass flags (if any)</li>
 	 * <li>--</li>
-	 * <li>20 bits: deltaDepth</li>
+	 * <li>24 bits: deltaDepth</li>
 	 * </ul>
 	 */
 	private int flags;
@@ -133,7 +123,7 @@ public class ObjectToPack extends PackedObjectInfo {
 	 *         representation; null otherwise - if going to be packed as a
 	 *         whole object.
 	 */
-	public ObjectId getDeltaBaseId() {
+	ObjectId getDeltaBaseId() {
 		return deltaBase;
 	}
 
@@ -143,7 +133,7 @@ public class ObjectToPack extends PackedObjectInfo {
 	 *         pack; null otherwise - if going to be packed as a whole
 	 *         object or delta base is specified only as id.
 	 */
-	public ObjectToPack getDeltaBase() {
+	ObjectToPack getDeltaBase() {
 		if (deltaBase instanceof ObjectToPack)
 			return (ObjectToPack) deltaBase;
 		return null;
@@ -188,7 +178,7 @@ public class ObjectToPack extends PackedObjectInfo {
 	 * @return true if object is going to be written as delta; false
 	 *         otherwise.
 	 */
-	public boolean isDeltaRepresentation() {
+	boolean isDeltaRepresentation() {
 		return deltaBase != null;
 	}
 
@@ -198,12 +188,11 @@ public class ObjectToPack extends PackedObjectInfo {
 	 *
 	 * @return true if object is already written; false otherwise.
 	 */
-	public boolean isWritten() {
+	boolean isWritten() {
 		return getOffset() != 0;
 	}
 
-	/** @return the type of this object. */
-	public int getType() {
+	int getType() {
 		return (flags >> TYPE_SHIFT) & 0x7;
 	}
 
@@ -223,11 +212,7 @@ public class ObjectToPack extends PackedObjectInfo {
 		flags |= WANT_WRITE;
 	}
 
-	/**
-	 * @return true if an existing representation was selected to be reused
-	 *         as-is into the pack stream.
-	 */
-	public boolean isReuseAsIs() {
+	boolean isReuseAsIs() {
 		return (flags & REUSE_AS_IS) != 0;
 	}
 
@@ -255,73 +240,6 @@ public class ObjectToPack extends PackedObjectInfo {
 			flags |= DO_NOT_DELTA;
 		else
 			flags &= ~DO_NOT_DELTA;
-	}
-
-	boolean isEdge() {
-		return (flags & EDGE) != 0;
-	}
-
-	void setEdge() {
-		flags |= EDGE;
-	}
-
-	/** @return the extended flags on this object, in the range [0x0, 0xf]. */
-	protected int getExtendedFlags() {
-		return (flags >>> EXT_SHIFT) & EXT_MASK;
-	}
-
-	/**
-	 * Determine if a particular extended flag bit has been set.
-	 *
-	 * This implementation may be faster than calling
-	 * {@link #getExtendedFlags()} and testing the result.
-	 *
-	 * @param flag
-	 *            the flag mask to test, must be between 0x0 and 0xf.
-	 * @return true if any of the bits matching the mask are non-zero.
-	 */
-	protected boolean isExtendedFlag(int flag) {
-		return (flags & (flag << EXT_SHIFT)) != 0;
-	}
-
-	/**
-	 * Set an extended flag bit.
-	 *
-	 * This implementation is more efficient than getting the extended flags,
-	 * adding the bit, and setting them all back.
-	 *
-	 * @param flag
-	 *            the bits to set, must be between 0x0 and 0xf.
-	 */
-	protected void setExtendedFlag(int flag) {
-		flags |= (flag & EXT_MASK) << EXT_SHIFT;
-	}
-
-	/**
-	 * Clear an extended flag bit.
-	 *
-	 * This implementation is more efficient than getting the extended flags,
-	 * removing the bit, and setting them all back.
-	 *
-	 * @param flag
-	 *            the bits to clear, must be between 0x0 and 0xf.
-	 */
-	protected void clearExtendedFlag(int flag) {
-		flags &= ~((flag & EXT_MASK) << EXT_SHIFT);
-	}
-
-	/**
-	 * Set the extended flags used by the subclass.
-	 *
-	 * Subclass implementations may store up to 4 bits of information inside of
-	 * the internal flags field already used by the base ObjectToPack instance.
-	 *
-	 * @param extFlags
-	 *            additional flag bits to store in the flags field. Due to space
-	 *            constraints only values [0x0, 0xf] are permitted.
-	 */
-	protected void setExtendedFlags(int extFlags) {
-		flags = ((extFlags & EXT_MASK) << EXT_SHIFT) | (flags & NON_EXT_MASK);
 	}
 
 	int getFormat() {
@@ -386,8 +304,6 @@ public class ObjectToPack extends PackedObjectInfo {
 			buf.append(" reuseAsIs");
 		if (isDoNotDelta())
 			buf.append(" doNotDelta");
-		if (isEdge())
-			buf.append(" edge");
 		if (getDeltaDepth() > 0)
 			buf.append(" depth=" + getDeltaDepth());
 		if (isDeltaRepresentation()) {
