@@ -52,10 +52,11 @@ import java.text.MessageFormat;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.events.ConfigChangedEvent;
 import org.eclipse.jgit.events.ConfigChangedListener;
+import org.eclipse.jgit.events.IndexChangedEvent;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.BaseRepositoryBuilder;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
@@ -104,6 +105,8 @@ public class FileRepository extends Repository {
 	private final RefDatabase refs;
 
 	private final ObjectDirectory objectDatabase;
+
+	private FileSnapshot snapshot;
 
 	/**
 	 * Construct a representation of a Git repository.
@@ -157,8 +160,8 @@ public class FileRepository extends Repository {
 		systemConfig = SystemReader.getInstance().openSystemConfig(null, getFS());
 		userConfig = SystemReader.getInstance().openUserConfig(systemConfig,
 				getFS());
-		repoConfig = new FileBasedConfig(userConfig, //
-				getFS().resolve(getDirectory(), "config"), //
+		repoConfig = new FileBasedConfig(userConfig, getFS().resolve(
+				getDirectory(), Constants.CONFIG),
 				getFS());
 
 		loadSystemConfig();
@@ -178,15 +181,17 @@ public class FileRepository extends Repository {
 				getFS());
 
 		if (objectDatabase.exists()) {
-			final String repositoryFormatVersion = getConfig().getString(
+			final long repositoryFormatVersion = getConfig().getLong(
 					ConfigConstants.CONFIG_CORE_SECTION, null,
-					ConfigConstants.CONFIG_KEY_REPO_FORMAT_VERSION);
-			if (!"0".equals(repositoryFormatVersion)) {
+					ConfigConstants.CONFIG_KEY_REPO_FORMAT_VERSION, 0);
+			if (repositoryFormatVersion > 0)
 				throw new IOException(MessageFormat.format(
 						JGitText.get().unknownRepositoryFormat2,
-						repositoryFormatVersion));
-			}
+						Long.valueOf(repositoryFormatVersion)));
 		}
+
+		if (!isBare())
+			snapshot = FileSnapshot.save(getIndexFile());
 	}
 
 	private void loadSystemConfig() throws IOException {
@@ -371,15 +376,30 @@ public class FileRepository extends Repository {
 		objectDatabase.openPack(pack, idx);
 	}
 
-	/**
-	 * Force a scan for changed refs.
-	 *
-	 * @throws IOException
-	 */
+	@Override
 	public void scanForRepoChanges() throws IOException {
 		getAllRefs(); // This will look for changes to refs
-		if (!isBare())
-			getIndex(); // This will detect changes in the index
+		detectIndexChanges();
+	}
+
+	/**
+	 * Detect index changes.
+	 */
+	private void detectIndexChanges() {
+		if (isBare())
+			return;
+
+		File indexFile = getIndexFile();
+		if (snapshot == null)
+			snapshot = FileSnapshot.save(indexFile);
+		else if (snapshot.isModified(indexFile))
+			notifyIndexChanged();
+	}
+
+	@Override
+	public void notifyIndexChanged() {
+		snapshot = FileSnapshot.save(getIndexFile());
+		fireEvent(new IndexChangedEvent());
 	}
 
 	/**

@@ -54,13 +54,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.errors.TooLargeObjectInPackException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.BatchingProgressMonitor;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.InflaterCache;
 import org.eclipse.jgit.lib.MutableObjectId;
@@ -177,6 +180,9 @@ public abstract class PackParser {
 
 	/** Message to protect the pack data from garbage collection. */
 	private String lockMessage;
+
+	/** Git object size limit */
+	private long maxObjectSizeLimit;
 
 	/**
 	 * Initialize a pack parser.
@@ -364,6 +370,19 @@ public abstract class PackParser {
 	}
 
 	/**
+	 * Set the maximum allowed Git object size.
+	 * <p>
+	 * If an object is larger than the given size the pack-parsing will throw an
+	 * exception aborting the parsing.
+	 *
+	 * @param limit
+	 *            the Git object size limit. If zero then there is not limit.
+	 */
+	public void setMaxObjectSizeLimit(long limit) {
+		maxObjectSizeLimit = limit;
+	}
+
+	/**
 	 * Get the number of objects in the stream.
 	 * <p>
 	 * The object count is only available after {@link #parse(ProgressMonitor)}
@@ -478,6 +497,12 @@ public abstract class PackParser {
 			if (!deferredCheckBlobs.isEmpty())
 				doDeferredCheckBlobs();
 			if (deltaCount > 0) {
+				if (resolving instanceof BatchingProgressMonitor) {
+					((BatchingProgressMonitor) resolving).setDelayStart(
+							1000,
+							TimeUnit.MILLISECONDS);
+				}
+				resolving.beginTask(JGitText.get().resolvingDeltas, deltaCount);
 				resolveDeltas(resolving);
 				if (entryCount < objectCount) {
 					if (!isAllowThin()) {
@@ -494,6 +519,7 @@ public abstract class PackParser {
 								(objectCount - entryCount)));
 					}
 				}
+				resolving.endTask();
 			}
 
 			packDigest = null;
@@ -511,7 +537,6 @@ public abstract class PackParser {
 				inflater.release();
 			} finally {
 				inflater = null;
-				objectDatabase.close();
 			}
 		}
 		return null; // By default there is no locking.
@@ -519,20 +544,17 @@ public abstract class PackParser {
 
 	private void resolveDeltas(final ProgressMonitor progress)
 			throws IOException {
-		progress.beginTask(JGitText.get().resolvingDeltas, deltaCount);
 		final int last = entryCount;
 		for (int i = 0; i < last; i++) {
-			final int before = entryCount;
-			resolveDeltas(entries[i]);
-			progress.update(entryCount - before);
+			resolveDeltas(entries[i], progress);
 			if (progress.isCancelled())
 				throw new IOException(
 						JGitText.get().downloadCancelledDuringIndexing);
 		}
-		progress.endTask();
 	}
 
-	private void resolveDeltas(final PackedObjectInfo oe) throws IOException {
+	private void resolveDeltas(final PackedObjectInfo oe,
+			ProgressMonitor progress) throws IOException {
 		UnresolvedDelta children = firstChildOf(oe);
 		if (children == null)
 			return;
@@ -560,12 +582,14 @@ public abstract class PackParser {
 							.getOffset()));
 		}
 
-		resolveDeltas(visit.next(), info.type, info);
+		resolveDeltas(visit.next(), info.type, info, progress);
 	}
 
 	private void resolveDeltas(DeltaVisit visit, final int type,
-			ObjectTypeAndSize info) throws IOException {
+			ObjectTypeAndSize info, ProgressMonitor progress)
+			throws IOException {
 		do {
+			progress.update(1);
 			info = openDatabase(visit.delta, info);
 			switch (info.type) {
 			case Constants.OBJ_OFS_DELTA:
@@ -577,8 +601,11 @@ public abstract class PackParser {
 						JGitText.get().unknownObjectType, info.type));
 			}
 
-			visit.data = BinaryDelta.apply(visit.parent.data, //
-					inflateAndReturn(Source.DATABASE, info.size));
+			byte[] delta = inflateAndReturn(Source.DATABASE, info.size);
+			checkIfTooLarge(type, BinaryDelta.getResultSize(delta));
+
+			visit.data = BinaryDelta.apply(visit.parent.data, delta);
+			delta = null;
 
 			if (!checkCRC(visit.delta.crc))
 				throw new IOException(MessageFormat.format(
@@ -604,6 +631,26 @@ public abstract class PackParser {
 			visit.nextChild = firstChildOf(oe);
 			visit = visit.next();
 		} while (visit != null);
+	}
+
+	private final void checkIfTooLarge(int typeCode, long size)
+			throws IOException {
+		if (0 < maxObjectSizeLimit && maxObjectSizeLimit < size)
+			switch (typeCode) {
+			case Constants.OBJ_COMMIT:
+			case Constants.OBJ_TREE:
+			case Constants.OBJ_BLOB:
+			case Constants.OBJ_TAG:
+				throw new TooLargeObjectInPackException(size, maxObjectSizeLimit);
+
+			case Constants.OBJ_OFS_DELTA:
+			case Constants.OBJ_REF_DELTA:
+				throw new TooLargeObjectInPackException(maxObjectSizeLimit);
+
+			default:
+				throw new IOException(MessageFormat.format(
+						JGitText.get().unknownObjectType, typeCode));
+			}
 	}
 
 	/**
@@ -634,7 +681,7 @@ public abstract class PackParser {
 		while ((c & 0x80) != 0) {
 			c = readFrom(Source.DATABASE);
 			hdrBuf[hdrPtr++] = (byte) c;
-			sz += (c & 0x7f) << shift;
+			sz += ((long) (c & 0x7f)) << shift;
 			shift += 7;
 		}
 		info.size = sz;
@@ -750,7 +797,8 @@ public abstract class PackParser {
 				entries[entryCount++] = oe;
 
 			visit.nextChild = firstChildOf(oe);
-			resolveDeltas(visit.next(), typeCode, new ObjectTypeAndSize());
+			resolveDeltas(visit.next(), typeCode,
+					new ObjectTypeAndSize(), progress);
 
 			if (progress.isCancelled())
 				throw new IOException(
@@ -844,9 +892,11 @@ public abstract class PackParser {
 		while ((c & 0x80) != 0) {
 			c = readFrom(Source.INPUT);
 			hdrBuf[hdrPtr++] = (byte) c;
-			sz += (c & 0x7f) << shift;
+			sz += ((long) (c & 0x7f)) << shift;
 			shift += 7;
 		}
+
+		checkIfTooLarge(typeCode, sz);
 
 		switch (typeCode) {
 		case Constants.OBJ_COMMIT:

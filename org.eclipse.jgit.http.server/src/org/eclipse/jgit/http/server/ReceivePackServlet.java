@@ -47,7 +47,12 @@ import static javax.servlet.http.HttpServletResponse.SC_FORBIDDEN;
 import static javax.servlet.http.HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
 import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
 import static javax.servlet.http.HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE;
+import static org.eclipse.jgit.http.server.GitSmartHttpTools.RECEIVE_PACK;
+import static org.eclipse.jgit.http.server.GitSmartHttpTools.RECEIVE_PACK_REQUEST_TYPE;
+import static org.eclipse.jgit.http.server.GitSmartHttpTools.RECEIVE_PACK_RESULT_TYPE;
+import static org.eclipse.jgit.http.server.GitSmartHttpTools.sendError;
 import static org.eclipse.jgit.http.server.ServletUtils.ATTRIBUTE_HANDLER;
+import static org.eclipse.jgit.http.server.ServletUtils.consumeRequestBody;
 import static org.eclipse.jgit.http.server.ServletUtils.getInputStream;
 import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
 
@@ -64,6 +69,7 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.eclipse.jgit.errors.UnpackException;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.transport.ReceivePack;
 import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
@@ -73,10 +79,6 @@ import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
 
 /** Server side implementation of smart push over HTTP. */
 class ReceivePackServlet extends HttpServlet {
-	private static final String REQ_TYPE = "application/x-git-receive-pack-request";
-
-	private static final String RSP_TYPE = "application/x-git-receive-pack-result";
-
 	private static final long serialVersionUID = 1L;
 
 	static class InfoRefs extends SmartServiceInfoRefs {
@@ -84,7 +86,7 @@ class ReceivePackServlet extends HttpServlet {
 
 		InfoRefs(ReceivePackFactory<HttpServletRequest> receivePackFactory,
 				List<Filter> filters) {
-			super("git-receive-pack", filters);
+			super(RECEIVE_PACK, filters);
 			this.receivePackFactory = receivePackFactory;
 		}
 
@@ -128,7 +130,7 @@ class ReceivePackServlet extends HttpServlet {
 				return;
 
 			} catch (ServiceNotEnabledException e) {
-				RepositoryFilter.sendError(SC_FORBIDDEN, req, rsp);
+				sendError(req, rsp, SC_FORBIDDEN);
 				return;
 			}
 
@@ -152,27 +154,39 @@ class ReceivePackServlet extends HttpServlet {
 	@Override
 	public void doPost(final HttpServletRequest req,
 			final HttpServletResponse rsp) throws IOException {
-		if (!REQ_TYPE.equals(req.getContentType())) {
+		if (!RECEIVE_PACK_REQUEST_TYPE.equals(req.getContentType())) {
 			rsp.sendError(SC_UNSUPPORTED_MEDIA_TYPE);
 			return;
 		}
 
+		SmartOutputStream out = new SmartOutputStream(req, rsp) {
+			@Override
+			public void flush() throws IOException {
+				doFlush();
+			}
+		};
+
 		ReceivePack rp = (ReceivePack) req.getAttribute(ATTRIBUTE_HANDLER);
 		try {
 			rp.setBiDirectionalPipe(false);
-			rsp.setContentType(RSP_TYPE);
+			rsp.setContentType(RECEIVE_PACK_RESULT_TYPE);
 
-			final SmartOutputStream out = new SmartOutputStream(req, rsp) {
-				@Override
-				public void flush() throws IOException {
-					doFlush();
-				}
-			};
 			rp.receive(getInputStream(req), out, null);
 			out.close();
-		} catch (IOException e) {
+		} catch (UnpackException e) {
+			// This should be already reported to the client.
+			getServletContext().log(
+					HttpServerText.get().internalErrorDuringReceivePack,
+					e.getCause());
+			consumeRequestBody(req);
+			out.close();
+
+		} catch (Throwable e) {
 			getServletContext().log(HttpServerText.get().internalErrorDuringReceivePack, e);
-			rsp.sendError(SC_INTERNAL_SERVER_ERROR);
+			if (!rsp.isCommitted()) {
+				rsp.reset();
+				sendError(req, rsp, SC_INTERNAL_SERVER_ERROR);
+			}
 			return;
 		}
 	}

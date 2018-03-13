@@ -47,12 +47,12 @@ import java.text.MessageFormat;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.MultipleParentsNotAllowedException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -122,10 +122,13 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 				RevCommit srcCommit = revWalk.parseCommit(srcObjectId);
 
 				// get the parent of the commit to cherry-pick
-				if (srcCommit.getParentCount() != 1) {
+				if (srcCommit.getParentCount() != 1)
 					throw new MultipleParentsNotAllowedException(
-							JGitText.get().canOnlyCherryPickCommitsWithOneParent);
-				}
+							MessageFormat.format(
+									JGitText.get().canOnlyCherryPickCommitsWithOneParent,
+									srcCommit.name(),
+									Integer.valueOf(srcCommit.getParentCount())));
+
 				RevCommit srcParent = srcCommit.getParent(0);
 				revWalk.parseHeaders(srcParent);
 
@@ -133,7 +136,6 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 						.newMerger(repo);
 				merger.setWorkingTreeIterator(new FileTreeIterator(repo));
 				merger.setBase(srcParent.getTree());
-
 				if (merger.merge(headCommit, srcCommit)) {
 					if (AnyObjectId.equals(headCommit.getTree().getId(), merger
 							.getResultTreeId()))
@@ -145,6 +147,9 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 					dco.checkout();
 					newHead = new Git(getRepository()).commit()
 							.setMessage(srcCommit.getFullMessage())
+							.setReflogComment(
+									"cherry-pick: "
+											+ srcCommit.getShortMessage())
 							.setAuthor(srcCommit.getAuthorIdent()).call();
 					cherryPickedRefs.add(src);
 				} else {
