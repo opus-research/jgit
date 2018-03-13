@@ -73,10 +73,10 @@ public abstract class Merger {
 	protected final Repository db;
 
 	/** Reader to support {@link #walk} and other object loading. */
-	protected ObjectReader reader;
+	protected final ObjectReader reader;
 
 	/** A RevWalk for computing merge bases, or listing incoming commits. */
-	protected RevWalk walk;
+	protected final RevWalk walk;
 
 	private ObjectInserter inserter;
 
@@ -115,7 +115,7 @@ public abstract class Merger {
 	 */
 	public ObjectInserter getObjectInserter() {
 		if (inserter == null)
-			setObjectInserter(getRepository().newObjectInserter());
+			inserter = getRepository().newObjectInserter();
 		return inserter;
 	}
 
@@ -123,8 +123,8 @@ public abstract class Merger {
 	 * Set the inserter this merger will use to create objects.
 	 * <p>
 	 * If an inserter was already set on this instance (such as by a prior set,
-	 * or a prior call to {@link #getObjectInserter()}), the prior inserter as
-	 * well as the in-progress walk will be released.
+	 * or a prior call to {@link #getObjectInserter()}), the prior inserter will
+	 * be released first.
 	 *
 	 * @param oi
 	 *            the inserter instance to use. Must be associated with the
@@ -133,10 +133,6 @@ public abstract class Merger {
 	public void setObjectInserter(ObjectInserter oi) {
 		if (inserter != null)
 			inserter.release();
-		reader.release();
-		walk.release();
-		reader = oi.newReader();
-		walk = new RevWalk(reader);
 		inserter = oi;
 	}
 
@@ -231,17 +227,7 @@ public abstract class Merger {
 		if (sourceCommits[bIdx] == null)
 			throw new IncorrectObjectTypeException(sourceObjects[bIdx],
 					Constants.TYPE_COMMIT);
-		try {
-			return getBaseCommit(sourceCommits[aIdx], sourceCommits[bIdx]);
-		} finally {
-			// Ensure any virtual bases are flushed before returning. In practice,
-			// since the merge already happened, implementations *shouldn't* create
-			// new virtual merges at this point, but the interface of
-			// getBaseCommit(RevCommit, RevCommit) doesn't guarantee this.
-			if (inserter != null) {
-				inserter.flush();
-			}
-		}
+		return getBaseCommit(sourceCommits[aIdx], sourceCommits[bIdx]);
 	}
 
 	/**
