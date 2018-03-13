@@ -47,16 +47,11 @@ import java.text.MessageFormat;
 
 import org.eclipse.jgit.lfs.errors.InvalidLongObjectIdException;
 import org.eclipse.jgit.lfs.internal.LfsText;
-import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.RawParseUtils;
 
 /**
  * A mutable SHA-256 abstraction.
- *
- * Ported to SHA-256 from {@link MutableObjectId}
- *
- * @since 4.3
  */
 public class MutableLongObjectId extends AnyLongObjectId {
 	/**

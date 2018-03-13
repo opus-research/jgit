@@ -52,8 +52,6 @@ import org.eclipse.jgit.lfs.internal.LfsText;
 
 /**
  * Thrown when an invalid long object id is passed in as an argument.
- *
- * @since 4.3
  */
 public class InvalidLongObjectIdException extends IllegalArgumentException {
 	private static final long serialVersionUID = 1L;

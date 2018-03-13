@@ -48,11 +48,7 @@ import java.text.MessageFormat;
 
 import org.eclipse.jgit.lfs.internal.LfsText;
 
-/**
- * Misc. constants used throughout JGit LFS extension.
- *
- * @since 4.3
- **/
+/** Misc. constants used throughout JGit LFS extension. */
 @SuppressWarnings("nls")
 public final class Constants {
 	/** Hash function used natively by Git LFS extension for large objects. */

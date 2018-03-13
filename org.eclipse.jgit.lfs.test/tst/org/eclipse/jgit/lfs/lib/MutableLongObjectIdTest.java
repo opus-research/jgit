@@ -46,9 +46,6 @@ import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
 
-/*
- * Ported to SHA-256 from org.eclipse.jgit.lib.MutableObjectIdTest
- */
 public class MutableLongObjectIdTest {
 
 	@Test

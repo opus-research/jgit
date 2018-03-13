@@ -50,23 +50,21 @@ import java.nio.ByteBuffer;
 
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
+//import org.eclipse.jgit.lib.AnyObjectId;
+//import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.util.NB;
 
 /**
- * A (possibly mutable) SHA-256 abstraction.
+ * A (possibly mutable) SHA-1 abstraction.
  * <p>
  * If this is an instance of {@link MutableLongObjectId} the concept of equality
  * with this instance can alter at any time, if this instance is modified to
  * represent a different object name.
- *
- * Ported to SHA-256 from {@link AnyObjectId}
- *
- * @since 4.3
  */
 public abstract class AnyLongObjectId implements Comparable<AnyLongObjectId> {
 
 	/**
-	 * Compare two object identifier byte sequences for equality.
+	 * Compare to object identifier byte sequences for equality.
 	 *
 	 * @param firstObjectId
 	 *            the first identifier to compare. Must not be null.
@@ -120,7 +118,7 @@ public abstract class AnyLongObjectId implements Comparable<AnyLongObjectId> {
 	 *         signed byte range of [-128, 127].
 	 */
 	public final int getSecondByte() {
-		return (int) ((w1 >>> 48) & 0xff);
+		return (int) ((w1 >>> 112) & 0xff);
 	}
 
 	/**
@@ -251,19 +249,18 @@ public abstract class AnyLongObjectId implements Comparable<AnyLongObjectId> {
 	}
 
 	/**
-	 * Tests if this LongObjectId starts with the given abbreviation.
+	 * Tests if this ObjectId starts with the given abbreviation.
 	 *
 	 * @param abbr
 	 *            the abbreviation.
-	 * @return true if this LongObjectId begins with the abbreviation; else
-	 *         false.
+	 * @return true if this ObjectId begins with the abbreviation; else false.
 	 */
 	public boolean startsWith(final AbbreviatedLongObjectId abbr) {
 		return abbr.prefixCompare(this) == 0;
 	}
 
 	public final int hashCode() {
-		return (int) (w1 >> 32);
+		return (int) (w2 >>> 32);
 	}
 
 	/**
@@ -523,7 +520,7 @@ public abstract class AnyLongObjectId implements Comparable<AnyLongObjectId> {
 	}
 
 	/**
-	 * Obtain an immutable copy of this current object.
+	 * Obtain an immutable copy of this current object name value.
 	 * <p>
 	 * Only returns <code>this</code> if this instance is an unsubclassed
 	 * instance of {@link LongObjectId}; otherwise a new instance is returned
@@ -542,14 +539,14 @@ public abstract class AnyLongObjectId implements Comparable<AnyLongObjectId> {
 	}
 
 	/**
-	 * Obtain an immutable copy of this current object.
+	 * Obtain an immutable copy of this current object name value.
 	 * <p>
 	 * See {@link #copy()} if <code>this</code> is a possibly subclassed (but
 	 * immutable) identity and the application needs a lightweight identity
 	 * <i>only</i> reference.
 	 *
-	 * @return an immutable copy. May be <code>this</code> if this is already an
-	 *         immutable instance.
+	 * @return an immutable copy. May be <code>this</code> if this is already
+	 *         an immutable instance.
 	 */
 	public abstract LongObjectId toObjectId();
 }
