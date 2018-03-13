@@ -63,7 +63,7 @@ import org.eclipse.jgit.revwalk.RevWalk;
  * Readers that can support efficient reuse of pack encoded objects should also
  * implement the companion interface {@link ObjectReuseAsIs}.
  */
-public abstract class ObjectReader implements AutoCloseable {
+public abstract class ObjectReader {
 	/** Type hint indicating the caller doesn't know the type. */
 	public static final int OBJ_ANY = -1;
 
@@ -466,23 +466,9 @@ public abstract class ObjectReader implements AutoCloseable {
 	 * Release any resources used by this reader.
 	 * <p>
 	 * A reader that has been released can be used again, but may need to be
-	 * released after the subsequent usage. Use {@link #close()} instead.
-	 */
-	@Deprecated
-	public void release() {
-		close();
-	}
-
-	/**
-	 * Release any resources used by this reader.
-	 * <p>
-	 * A reader that has been released can be used again, but may need to be
 	 * released after the subsequent usage.
-	 *
-	 * @since 4.0
 	 */
-	@Override
-	public void close() {
+	public void release() {
 		// Do nothing.
 	}
 }
