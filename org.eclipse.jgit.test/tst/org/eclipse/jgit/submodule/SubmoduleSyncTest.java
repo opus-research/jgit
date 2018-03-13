@@ -53,7 +53,6 @@ import java.util.Map.Entry;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.SubmoduleSyncCommand;
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
@@ -74,7 +73,7 @@ import org.junit.Test;
 public class SubmoduleSyncTest extends RepositoryTestCase {
 
 	@Test
-	public void repositoryWithNoSubmodules() throws GitAPIException {
+	public void repositoryWithNoSubmodules() {
 		SubmoduleSyncCommand command = new SubmoduleSyncCommand(db);
 		Map<String, String> modules = command.call();
 		assertNotNull(modules);
@@ -115,7 +114,6 @@ public class SubmoduleSyncTest extends RepositoryTestCase {
 				.setURI(db.getDirectory().toURI().toString())
 				.setDirectory(new File(db.getWorkTree(), path)).call()
 				.getRepository();
-		addRepoToClose(subRepo);
 		assertNotNull(subRepo);
 
 		SubmoduleWalk generator = SubmoduleWalk.forIndex(db);
@@ -134,82 +132,8 @@ public class SubmoduleSyncTest extends RepositoryTestCase {
 		generator = SubmoduleWalk.forIndex(db);
 		assertTrue(generator.next());
 		assertEquals(url, generator.getConfigUrl());
-		Repository subModRepository = generator.getRepository();
-		addRepoToClose(subModRepository);
-		StoredConfig submoduleConfig = subModRepository.getConfig();
+		StoredConfig submoduleConfig = generator.getRepository().getConfig();
 		assertEquals(url, submoduleConfig.getString(
-				ConfigConstants.CONFIG_REMOTE_SECTION,
-				Constants.DEFAULT_REMOTE_NAME, ConfigConstants.CONFIG_KEY_URL));
-	}
-
-	@Test
-	public void repositoryWithRelativeUriSubmodule() throws Exception {
-		writeTrashFile("file.txt", "content");
-		Git git = Git.wrap(db);
-		git.add().addFilepattern("file.txt").call();
-		git.commit().setMessage("create file").call();
-
-		final ObjectId id = ObjectId
-				.fromString("abcd1234abcd1234abcd1234abcd1234abcd1234");
-		final String path = "sub";
-		DirCache cache = db.lockDirCache();
-		DirCacheEditor editor = cache.editor();
-		editor.add(new PathEdit(path) {
-
-			public void apply(DirCacheEntry ent) {
-				ent.setFileMode(FileMode.GITLINK);
-				ent.setObjectId(id);
-			}
-		});
-		editor.commit();
-
-		String base = "git://server/repo.git";
-		FileBasedConfig config = db.getConfig();
-		config.setString(ConfigConstants.CONFIG_REMOTE_SECTION,
-				Constants.DEFAULT_REMOTE_NAME, ConfigConstants.CONFIG_KEY_URL,
-				base);
-		config.save();
-
-		FileBasedConfig modulesConfig = new FileBasedConfig(new File(
-				db.getWorkTree(), Constants.DOT_GIT_MODULES), db.getFS());
-		modulesConfig.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
-				ConfigConstants.CONFIG_KEY_PATH, path);
-		String current = "git://server/repo.git";
-		modulesConfig.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
-				ConfigConstants.CONFIG_KEY_URL, current);
-		modulesConfig.save();
-
-		Repository subRepo = Git.cloneRepository()
-				.setURI(db.getDirectory().toURI().toString())
-				.setDirectory(new File(db.getWorkTree(), path)).call()
-				.getRepository();
-		assertNotNull(subRepo);
-		addRepoToClose(subRepo);
-
-		SubmoduleWalk generator = SubmoduleWalk.forIndex(db);
-		assertTrue(generator.next());
-		assertNull(generator.getConfigUrl());
-		assertEquals(current, generator.getModulesUrl());
-
-		modulesConfig.setString(ConfigConstants.CONFIG_SUBMODULE_SECTION, path,
-				ConfigConstants.CONFIG_KEY_URL, "../sub.git");
-		modulesConfig.save();
-
-		SubmoduleSyncCommand command = new SubmoduleSyncCommand(db);
-		Map<String, String> synced = command.call();
-		assertNotNull(synced);
-		assertEquals(1, synced.size());
-		Entry<String, String> module = synced.entrySet().iterator().next();
-		assertEquals(path, module.getKey());
-		assertEquals("git://server/sub.git", module.getValue());
-
-		generator = SubmoduleWalk.forIndex(db);
-		assertTrue(generator.next());
-		assertEquals("git://server/sub.git", generator.getConfigUrl());
-		Repository subModRepository1 = generator.getRepository();
-		addRepoToClose(subModRepository1);
-		StoredConfig submoduleConfig = subModRepository1.getConfig();
-		assertEquals("git://server/sub.git", submoduleConfig.getString(
 				ConfigConstants.CONFIG_REMOTE_SECTION,
 				Constants.DEFAULT_REMOTE_NAME, ConfigConstants.CONFIG_KEY_URL));
 	}

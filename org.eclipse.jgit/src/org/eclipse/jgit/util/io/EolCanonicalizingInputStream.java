@@ -46,15 +46,10 @@ package org.eclipse.jgit.util.io;
 import java.io.IOException;
 import java.io.InputStream;
 
-import org.eclipse.jgit.diff.RawText;
-import org.eclipse.jgit.errors.UnsafeCRLFConversionException;
-
 /**
  * An input stream which canonicalizes EOLs bytes on the fly to '\n'.
  *
- * Optionally, a binary check on the first 8000 bytes is performed
- * and in case of binary files, canonicalization is turned off
- * (for the complete file).
+ * Note: Make sure to apply this InputStream only to text files!
  */
 public class EolCanonicalizingInputStream extends InputStream {
 	private final byte[] single = new byte[1];
@@ -67,38 +62,14 @@ public class EolCanonicalizingInputStream extends InputStream {
 
 	private int ptr;
 
-	private boolean isBinary;
-
-	private boolean detectBinary;
-
-	private long srcBytes = 0;
-
-	private long dstBytes = 0;
-
-	private final boolean safe;
-
-	private boolean lfOnlyFound;
-
-	private boolean crlfFound;
-
 	/**
 	 * Creates a new InputStream, wrapping the specified stream
 	 *
 	 * @param in
 	 *            raw input stream
-	 * @param detectBinary
-	 *            whether binaries should be detected
-	 * @param safe
-	 *            if true, reading will fail in lone LF's appear in input,
-	 *            indicating that checkout would not produce the original
-	 *            stream.
-	 * @since 2.1
 	 */
-	public EolCanonicalizingInputStream(InputStream in, boolean detectBinary,
-			boolean safe) {
+	public EolCanonicalizingInputStream(InputStream in) {
 		this.in = in;
-		this.safe = safe;
-		this.detectBinary = detectBinary;
 	}
 
 	@Override
@@ -124,11 +95,8 @@ public class EolCanonicalizingInputStream extends InputStream {
 			}
 
 			byte b = buf[ptr++];
-			if (isBinary || b != '\r') {
-				// Logic for binary files ends here
+			if (b != '\r') {
 				bs[off++] = b;
-				if (b == '\n')
-					lfOnlyFound = true;
 				continue;
 			}
 
@@ -138,22 +106,13 @@ public class EolCanonicalizingInputStream extends InputStream {
 			}
 
 			if (buf[ptr] == '\n') {
-				crlfFound = true;
 				bs[off++] = '\n';
 				ptr++;
 			} else
 				bs[off++] = '\r';
 		}
 
-		if (crlfFound && lfOnlyFound && safe)
-			throw new UnsafeCRLFConversionException();
-
-		if (startOff == off)
-			return -1;
-
-		int read = off - startOff;
-		dstBytes += read;
-		return read;
+		return startOff == off ? -1 : off - startOff;
 	}
 
 	@Override
@@ -161,32 +120,10 @@ public class EolCanonicalizingInputStream extends InputStream {
 		in.close();
 	}
 
-	/**
-	 * @return number of bytes sent to this stream
-	 *         <em>This counter is not reliable until the stream has been closed or flushed</emA>
-	 */
-	public long getSourceLength() {
-		return srcBytes;
-	}
-
-	/**
-	 * @return number of bytes sent to the underlying stream.
-	 *         <em>This counter is not reliable until the stream has been closed or flused</emA>
-	 */
-	public long getDestinationLength() {
-		return dstBytes;
-	}
-
 	private boolean fillBuffer() throws IOException {
 		cnt = in.read(buf, 0, buf.length);
 		if (cnt < 1)
 			return false;
-		if (detectBinary) {
-			isBinary = RawText.isBinary(buf, cnt);
-			detectBinary = false;
-		}
-		srcBytes += cnt;
-
 		ptr = 0;
 		return true;
 	}
