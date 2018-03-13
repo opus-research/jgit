@@ -99,6 +99,10 @@ public class ObjectWalk extends RevWalk {
 
 	private BlockObjQueue pendingObjects;
 
+	private RevCommit firstCommit;
+
+	private RevCommit lastCommit;
+
 	private TreeVisit freeVisit;
 
 	private TreeVisit currVisit;
@@ -129,7 +133,6 @@ public class ObjectWalk extends RevWalk {
 	 */
 	public ObjectWalk(ObjectReader or) {
 		super(or);
-		setRetainBody(false);
 		rootObjects = new ArrayList<RevObject>();
 		pendingObjects = new BlockObjQueue();
 		pathBuf = new byte[256];
@@ -256,6 +259,8 @@ public class ObjectWalk extends RevWalk {
 		for (;;) {
 			final RevCommit r = super.next();
 			if (r == null) {
+				if (firstCommit != null)
+					reader.walkAdviceBeginTrees(this, firstCommit, lastCommit);
 				return null;
 			}
 			if ((r.flags & UNINTERESTING) != 0) {
@@ -264,6 +269,9 @@ public class ObjectWalk extends RevWalk {
 					return r;
 				continue;
 			}
+			if (firstCommit == null)
+				firstCommit = r;
+			lastCommit = r;
 			pendingObjects.add(r.getTree());
 			return r;
 		}
@@ -357,6 +365,7 @@ public class ObjectWalk extends RevWalk {
 		for (;;) {
 			RevObject o = pendingObjects.next();
 			if (o == null) {
+				reader.walkAdviceEnd();
 				return null;
 			}
 			int flags = o.flags;
@@ -624,6 +633,8 @@ public class ObjectWalk extends RevWalk {
 	public void dispose() {
 		super.dispose();
 		pendingObjects = new BlockObjQueue();
+		firstCommit = null;
+		lastCommit = null;
 		currVisit = null;
 		freeVisit = null;
 	}
@@ -637,6 +648,8 @@ public class ObjectWalk extends RevWalk {
 
 		rootObjects = new ArrayList<RevObject>();
 		pendingObjects = new BlockObjQueue();
+		firstCommit = null;
+		lastCommit = null;
 		currVisit = null;
 		freeVisit = null;
 	}
