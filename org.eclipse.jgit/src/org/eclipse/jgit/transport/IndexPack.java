@@ -75,7 +75,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdSubclassMap;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.lib.ObjectStream;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.PackIndexWriter;
@@ -145,16 +144,12 @@ public class IndexPack {
 
 	private final Repository repo;
 
-	private int streamFileThreshold;
-
 	/**
 	 * Object database used for loading existing objects
 	 */
 	private final ObjectDatabase objectDatabase;
 
 	private InflaterStream inflater;
-
-	private byte[] readBuffer;
 
 	private final MessageDigest objectDigest;
 
@@ -216,9 +211,6 @@ public class IndexPack {
 
 	private LongMap<UnresolvedDelta> baseByPos;
 
-	/** Objects whose contents need to be double-checked after indexing. */
-	private ArrayList<PackedObjectInfo> deferredCheckContent;
-
 	private MessageDigest packDigest;
 
 	private RandomAccessFile packOut;
@@ -244,13 +236,11 @@ public class IndexPack {
 	public IndexPack(final Repository db, final InputStream src,
 			final File dstBase) throws IOException {
 		repo = db;
-		streamFileThreshold = 5 * (1 << 20); // A reasonable default for now.
 		objectDatabase = db.getObjectDatabase().newCachedDatabase();
 		in = src;
 		inflater = new InflaterStream();
 		readCurs = objectDatabase.newReader();
 		buf = new byte[BUFFER_SIZE];
-		readBuffer = new byte[BUFFER_SIZE];
 		objectDigest = Constants.newMessageDigest();
 		tempObjectId = new MutableObjectId();
 		packDigest = Constants.newMessageDigest();
@@ -266,10 +256,6 @@ public class IndexPack {
 			dstPack = null;
 			dstIdx = null;
 		}
-	}
-
-	void setStreamFileThreshold(int sz) {
-		streamFileThreshold = sz;
 	}
 
 	/**
@@ -410,7 +396,6 @@ public class IndexPack {
 				entries = new PackedObjectInfo[(int) objectCount];
 				baseById = new ObjectIdSubclassMap<DeltaChain>();
 				baseByPos = new LongMap<UnresolvedDelta>();
-				deferredCheckContent = new ArrayList<PackedObjectInfo>();
 
 				progress.beginTask(JGitText.get().receivingObjects,
 						(int) objectCount);
@@ -422,8 +407,6 @@ public class IndexPack {
 				}
 				readPackFooter();
 				endInput();
-				if (!deferredCheckContent.isEmpty())
-					doDeferredContentChecks();
 				progress.endTask();
 				if (deltaCount > 0) {
 					if (packOut == null)
@@ -854,38 +837,17 @@ public class IndexPack {
 
 	private void whole(final int type, final long pos, final long sz)
 			throws IOException {
+		final byte[] data = inflateAndReturn(Source.INPUT, sz);
 		objectDigest.update(Constants.encodedTypeString(type));
 		objectDigest.update((byte) ' ');
 		objectDigest.update(Constants.encodeASCII(sz));
 		objectDigest.update((byte) 0);
+		objectDigest.update(data);
+		tempObjectId.fromRaw(objectDigest.digest(), 0);
 
-		boolean checkContentLater = false;
-		if (type == Constants.OBJ_BLOB && sz >= streamFileThreshold) {
-			InputStream inf = inflate(Source.INPUT, sz);
-			long cnt = 0;
-			while (cnt < sz) {
-				int r = inf.read(readBuffer);
-				if (r <= 0)
-					break;
-				objectDigest.update(readBuffer, 0, r);
-				cnt += r;
-			}
-			inf.close();
-			tempObjectId.fromRaw(objectDigest.digest(), 0);
-			checkContentLater = readCurs.has(tempObjectId);
-
-		} else {
-			final byte[] data = inflateAndReturn(Source.INPUT, sz);
-			objectDigest.update(data);
-			tempObjectId.fromRaw(objectDigest.digest(), 0);
-			verifySafeObject(tempObjectId, type, data);
-		}
-
+		verifySafeObject(tempObjectId, type, data);
 		final int crc32 = (int) crc.getValue();
-		PackedObjectInfo obj = new PackedObjectInfo(pos, crc32, tempObjectId);
-		addObjectAndTrack(obj);
-		if (checkContentLater)
-			deferredCheckContent.add(obj);
+		addObjectAndTrack(new PackedObjectInfo(pos, crc32, tempObjectId));
 	}
 
 	private void verifySafeObject(final AnyObjectId id, final int type,
@@ -901,7 +863,7 @@ public class IndexPack {
 
 		try {
 			final ObjectLoader ldr = readCurs.open(id, type);
-			final byte[] existingData = ldr.getCachedBytes(data.length);
+			final byte[] existingData = ldr.getCachedBytes(Integer.MAX_VALUE);
 			if (!Arrays.equals(data, existingData)) {
 				throw new IOException(MessageFormat.format(JGitText.get().collisionOn, id.name()));
 			}
@@ -909,57 +871,6 @@ public class IndexPack {
 			// This is OK, we don't have a copy of the object locally
 			// but the API throws when we try to read it as usually its
 			// an error to read something that doesn't exist.
-		}
-	}
-
-	private void doDeferredContentChecks() throws IOException {
-		final byte[] curBuffer = new byte[readBuffer.length];
-		for (PackedObjectInfo obj : deferredCheckContent) {
-			position(obj.getOffset());
-
-			int c = readFrom(Source.FILE);
-			final int type = (c >> 4) & 7;
-			long sz = c & 15;
-			int shift = 4;
-			while ((c & 0x80) != 0) {
-				c = readFrom(Source.FILE);
-				sz += (c & 0x7f) << shift;
-				shift += 7;
-			}
-
-			switch (type) {
-			case Constants.OBJ_COMMIT:
-			case Constants.OBJ_TREE:
-			case Constants.OBJ_BLOB:
-			case Constants.OBJ_TAG: {
-				ObjectStream cur = readCurs.open(obj, type).openStream();
-				try {
-					if (cur.getSize() != sz)
-						throw new IOException(MessageFormat.format(JGitText
-								.get().collisionOn, obj.name()));
-					InputStream pck = inflate(Source.FILE, sz);
-					while (0 < sz) {
-						int n = (int) Math.min(readBuffer.length, sz);
-						IO.readFully(cur, curBuffer, 0, n);
-						IO.readFully(pck, readBuffer, 0, n);
-						for (int i = 0; i < n; i++) {
-							if (curBuffer[i] != readBuffer[i])
-								throw new IOException(MessageFormat.format(
-										JGitText.get().collisionOn, obj.name()));
-						}
-						sz -= n;
-					}
-					pck.close();
-				} finally {
-					cur.close();
-				}
-				break;
-			}
-
-			default:
-				throw new IOException(MessageFormat.format(
-						JGitText.get().unknownObjectType, type));
-			}
 		}
 	}
 
