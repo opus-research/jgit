@@ -1,8 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
- * Copyright (C) 2008, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -44,48 +41,30 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.errors;
+package org.eclipse.jgit.revwalk;
 
 import java.io.IOException;
-import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.lib.AsyncOperation;
 
 /**
- * An expected object is missing.
+ * Queue to lookup and parse objects asynchronously.
+ *
+ * A queue may perform background lookup of objects and supply them (possibly
+ * out-of-order) to the application.
  */
-public class MissingObjectException extends IOException {
-	private static final long serialVersionUID = 1L;
-
-	private final ObjectId missing;
-
+public interface AsyncRevObjectQueue extends AsyncOperation {
 	/**
-	 * Construct a MissingObjectException for the specified object id.
-	 * Expected type is reported to simplify tracking down the problem.
+	 * Obtain the next object.
 	 *
-	 * @param id SHA-1
-	 * @param type object type
+	 * @return the object; null if there are no more objects remaining.
+	 * @throws MissingObjectException
+	 *             the object does not exist. There may be more objects
+	 *             remaining in the iteration, the application should call
+	 *             {@link #next()} again.
+	 * @throws IOException
+	 *             the object store cannot be accessed.
 	 */
-	public MissingObjectException(final ObjectId id, final String type) {
-		super(MessageFormat.format(JGitText.get().missingObject, type, id.name()));
-		missing = id.copy();
-	}
-
-	/**
-	 * Construct a MissingObjectException for the specified object id.
-	 * Expected type is reported to simplify tracking down the problem.
-	 *
-	 * @param id SHA-1
-	 * @param type object type
-	 */
-	public MissingObjectException(final ObjectId id, final int type) {
-		this(id, Constants.typeString(type));
-	}
-
-	/** @return the ObjectId that was not found. */
-	public ObjectId getObjectId() {
-		return missing;
-	}
+	public RevObject next() throws MissingObjectException, IOException;
 }

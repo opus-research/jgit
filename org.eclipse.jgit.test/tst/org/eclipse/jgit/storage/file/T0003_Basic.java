@@ -46,31 +46,37 @@
 
 package org.eclipse.jgit.storage.file;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.ConfigInvalidException;
-import org.eclipse.jgit.lib.Commit;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileTreeEntry;
 import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectWriter;
+import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.SampleDataRepositoryTestCase;
-import org.eclipse.jgit.lib.Tag;
+import org.eclipse.jgit.lib.TagBuilder;
 import org.eclipse.jgit.lib.Tree;
 import org.eclipse.jgit.lib.TreeEntry;
 import org.eclipse.jgit.lib.WriteTree;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevTag;
+import org.eclipse.jgit.revwalk.RevWalk;
 
 public class T0003_Basic extends SampleDataRepositoryTestCase {
 	public void test001_Initalize() {
@@ -243,7 +249,8 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 		assertEqualsPath(theDir.getParentFile(), r.getWorkTree());
 		assertEqualsPath(indexFile, r.getIndexFile());
 		assertEqualsPath(objDir, r.getObjectDatabase().getDirectory());
-		assertNotNull(r.mapCommit("6db9c2ebf75590eef973081736730a9ea169a0c4"));
+		assertNotNull(r.open(ObjectId
+				.fromString("6db9c2ebf75590eef973081736730a9ea169a0c4")));
 		// Must close or the default repo pack files created by this test gets
 		// locked via the alternate object directories on Windows.
 		r.close();
@@ -285,7 +292,7 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 
 	public void test003_WriteShouldBeEmptyTree() throws IOException {
 		final Tree t = new Tree(db);
-		final ObjectId emptyId = new ObjectWriter(db).writeBlob(new byte[0]);
+		final ObjectId emptyId = insertEmptyBlob();
 		t.addFile("should-be-empty").setId(emptyId);
 		t.accept(new WriteTree(trash, db), TreeEntry.MODIFIED_ONLY);
 		assertEquals("7bb943559a305bdd6bdee2cef6e5df2413c3d30a", t.getId()
@@ -374,13 +381,15 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 		assertEquals(ObjectId.fromString("00b1f73724f493096d1ffa0b0f1f1482dbb8c936"),
 				t.getTreeId());
 
-		final Commit c = new Commit(db);
+		final CommitBuilder c = new CommitBuilder();
 		c.setAuthor(new PersonIdent(author, 1154236443000L, -4 * 60));
 		c.setCommitter(new PersonIdent(committer, 1154236443000L, -4 * 60));
 		c.setMessage("A Commit\n");
-		c.setTree(t);
+		c.setTreeId(t.getTreeId());
 		assertEquals(t.getTreeId(), c.getTreeId());
-		c.commit();
+
+		insertCommit(c);
+
 		final ObjectId cmtid = ObjectId.fromString(
 				"803aec4aba175e8ab1d666873c984c0308179099");
 		assertEquals(cmtid, c.getCommitId());
@@ -399,16 +408,16 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 		}
 
 		// Verify we can read it.
-		final Commit c2 = db.mapCommit(cmtid);
+		RevCommit c2 = parseCommit(c.getCommitId());
 		assertNotNull(c2);
-		assertEquals(c.getMessage(), c2.getMessage());
-		assertEquals(c.getTreeId(), c2.getTreeId());
-		assertEquals(c.getAuthor(), c2.getAuthor());
-		assertEquals(c.getCommitter(), c2.getCommitter());
+		assertEquals(c.getMessage(), c2.getFullMessage());
+		assertEquals(c.getTreeId(), c2.getTree());
+		assertEquals(c.getAuthor(), c2.getAuthorIdent());
+		assertEquals(c.getCommitter(), c2.getCommitterIdent());
 	}
 
 	public void test012_SubtreeExternalSorting() throws IOException {
-		final ObjectId emptyBlob = new ObjectWriter(db).writeBlob(new byte[0]);
+		final ObjectId emptyBlob = insertEmptyBlob();
 		final Tree t = new Tree(db);
 		final FileTreeEntry e0 = t.addFile("a-");
 		final FileTreeEntry e1 = t.addFile("a-b");
@@ -428,168 +437,106 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 	}
 
 	public void test020_createBlobTag() throws IOException {
-		final ObjectId emptyId = new ObjectWriter(db).writeBlob(new byte[0]);
-		final Tag t = new Tag(db);
-		t.setObjId(emptyId);
-		t.setType("blob");
+		final ObjectId emptyId = insertEmptyBlob();
+		final TagBuilder t = new TagBuilder();
+		t.setObjectId(emptyId, Constants.OBJ_BLOB);
 		t.setTag("test020");
 		t.setTagger(new PersonIdent(author, 1154236443000L, -4 * 60));
 		t.setMessage("test020 tagged\n");
-		t.tag();
+		insertTag(t);
 		assertEquals("6759556b09fbb4fd8ae5e315134481cc25d46954", t.getTagId().name());
 
-		Tag mapTag = db.mapTag("test020");
-		assertEquals("blob", mapTag.getType());
-		assertEquals("test020 tagged\n", mapTag.getMessage());
-		assertEquals(new PersonIdent(author, 1154236443000L, -4 * 60), mapTag.getTagger());
-		assertEquals("e69de29bb2d1d6434b8b29ae775ad8c2e48c5391", mapTag.getObjId().name());
-	}
-
-	public void test020b_createBlobPlainTag() throws IOException {
-		test020_createBlobTag();
-		Tag t = new Tag(db);
-		t.setTag("test020b");
-		t.setObjId(ObjectId.fromString("e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"));
-		t.tag();
-
-		Tag mapTag = db.mapTag("test020b");
-		assertEquals("e69de29bb2d1d6434b8b29ae775ad8c2e48c5391", mapTag.getObjId().name());
-
-		// We do not repeat the plain tag test for other object types
+		RevTag mapTag = parseTag(t.getTagId());
+		assertEquals(Constants.OBJ_BLOB, mapTag.getObject().getType());
+		assertEquals("test020 tagged\n", mapTag.getFullMessage());
+		assertEquals(new PersonIdent(author, 1154236443000L, -4 * 60), mapTag.getTaggerIdent());
+		assertEquals("e69de29bb2d1d6434b8b29ae775ad8c2e48c5391", mapTag.getObject().getId().name());
 	}
 
 	public void test021_createTreeTag() throws IOException {
-		final ObjectId emptyId = new ObjectWriter(db).writeBlob(new byte[0]);
+		final ObjectId emptyId = insertEmptyBlob();
 		final Tree almostEmptyTree = new Tree(db);
 		almostEmptyTree.addEntry(new FileTreeEntry(almostEmptyTree, emptyId, "empty".getBytes(), false));
-		final ObjectId almostEmptyTreeId = new ObjectWriter(db).writeTree(almostEmptyTree);
-		final Tag t = new Tag(db);
-		t.setObjId(almostEmptyTreeId);
-		t.setType("tree");
+		final ObjectId almostEmptyTreeId = insertTree(almostEmptyTree);
+		final TagBuilder t = new TagBuilder();
+		t.setObjectId(almostEmptyTreeId, Constants.OBJ_TREE);
 		t.setTag("test021");
 		t.setTagger(new PersonIdent(author, 1154236443000L, -4 * 60));
 		t.setMessage("test021 tagged\n");
-		t.tag();
+		insertTag(t);
 		assertEquals("b0517bc8dbe2096b419d42424cd7030733f4abe5", t.getTagId().name());
 
-		Tag mapTag = db.mapTag("test021");
-		assertEquals("tree", mapTag.getType());
-		assertEquals("test021 tagged\n", mapTag.getMessage());
-		assertEquals(new PersonIdent(author, 1154236443000L, -4 * 60), mapTag.getTagger());
-		assertEquals("417c01c8795a35b8e835113a85a5c0c1c77f67fb", mapTag.getObjId().name());
+		RevTag mapTag = parseTag(t.getTagId());
+		assertEquals(Constants.OBJ_TREE, mapTag.getObject().getType());
+		assertEquals("test021 tagged\n", mapTag.getFullMessage());
+		assertEquals(new PersonIdent(author, 1154236443000L, -4 * 60), mapTag.getTaggerIdent());
+		assertEquals("417c01c8795a35b8e835113a85a5c0c1c77f67fb", mapTag.getObject().getId().name());
 	}
 
 	public void test022_createCommitTag() throws IOException {
-		final ObjectId emptyId = new ObjectWriter(db).writeBlob(new byte[0]);
+		final ObjectId emptyId = insertEmptyBlob();
 		final Tree almostEmptyTree = new Tree(db);
 		almostEmptyTree.addEntry(new FileTreeEntry(almostEmptyTree, emptyId, "empty".getBytes(), false));
-		final ObjectId almostEmptyTreeId = new ObjectWriter(db).writeTree(almostEmptyTree);
-		final Commit almostEmptyCommit = new Commit(db);
+		final ObjectId almostEmptyTreeId = insertTree(almostEmptyTree);
+		final CommitBuilder almostEmptyCommit = new CommitBuilder();
 		almostEmptyCommit.setAuthor(new PersonIdent(author, 1154236443000L, -2 * 60)); // not exactly the same
 		almostEmptyCommit.setCommitter(new PersonIdent(author, 1154236443000L, -2 * 60));
 		almostEmptyCommit.setMessage("test022\n");
 		almostEmptyCommit.setTreeId(almostEmptyTreeId);
-		ObjectId almostEmptyCommitId = new ObjectWriter(db).writeCommit(almostEmptyCommit);
-		final Tag t = new Tag(db);
-		t.setObjId(almostEmptyCommitId);
-		t.setType("commit");
+		ObjectId almostEmptyCommitId = insertCommit(almostEmptyCommit);
+		final TagBuilder t = new TagBuilder();
+		t.setObjectId(almostEmptyCommitId,Constants.OBJ_COMMIT);
 		t.setTag("test022");
 		t.setTagger(new PersonIdent(author, 1154236443000L, -4 * 60));
 		t.setMessage("test022 tagged\n");
-		t.tag();
+		insertTag(t);
 		assertEquals("0ce2ebdb36076ef0b38adbe077a07d43b43e3807", t.getTagId().name());
 
-		Tag mapTag = db.mapTag("test022");
-		assertEquals("commit", mapTag.getType());
-		assertEquals("test022 tagged\n", mapTag.getMessage());
-		assertEquals(new PersonIdent(author, 1154236443000L, -4 * 60), mapTag.getTagger());
-		assertEquals("b5d3b45a96b340441f5abb9080411705c51cc86c", mapTag.getObjId().name());
+		RevTag mapTag = parseTag(t.getTagId());
+		assertEquals(Constants.OBJ_COMMIT, mapTag.getObject().getType());
+		assertEquals("test022 tagged\n", mapTag.getFullMessage());
+		assertEquals(new PersonIdent(author, 1154236443000L, -4 * 60), mapTag.getTaggerIdent());
+		assertEquals("b5d3b45a96b340441f5abb9080411705c51cc86c", mapTag.getObject().getId().name());
 	}
 
 	public void test023_createCommitNonAnullii() throws IOException {
-		final ObjectId emptyId = new ObjectWriter(db).writeBlob(new byte[0]);
+		final ObjectId emptyId = insertEmptyBlob();
 		final Tree almostEmptyTree = new Tree(db);
 		almostEmptyTree.addEntry(new FileTreeEntry(almostEmptyTree, emptyId, "empty".getBytes(), false));
-		final ObjectId almostEmptyTreeId = new ObjectWriter(db).writeTree(almostEmptyTree);
-		Commit commit = new Commit(db);
+		final ObjectId almostEmptyTreeId = insertTree(almostEmptyTree);
+		CommitBuilder commit = new CommitBuilder();
 		commit.setTreeId(almostEmptyTreeId);
 		commit.setAuthor(new PersonIdent("Joe H\u00e4cker","joe@example.com",4294967295000L,60));
 		commit.setCommitter(new PersonIdent("Joe Hacker","joe2@example.com",4294967295000L,60));
 		commit.setEncoding("UTF-8");
 		commit.setMessage("\u00dcbergeeks");
-		ObjectId cid = new ObjectWriter(db).writeCommit(commit);
+		ObjectId cid = insertCommit(commit);
 		assertEquals("4680908112778718f37e686cbebcc912730b3154", cid.name());
-		Commit loadedCommit = db.mapCommit(cid);
-		assertNotSame(loadedCommit, commit);
-		assertEquals(commit.getMessage(), loadedCommit.getMessage());
+
+		RevCommit loadedCommit = parseCommit(cid);
+		assertEquals(commit.getMessage(), loadedCommit.getFullMessage());
 	}
 
 	public void test024_createCommitNonAscii() throws IOException {
-		final ObjectId emptyId = new ObjectWriter(db).writeBlob(new byte[0]);
+		final ObjectId emptyId = insertEmptyBlob();
 		final Tree almostEmptyTree = new Tree(db);
 		almostEmptyTree.addEntry(new FileTreeEntry(almostEmptyTree, emptyId, "empty".getBytes(), false));
-		final ObjectId almostEmptyTreeId = new ObjectWriter(db).writeTree(almostEmptyTree);
-		Commit commit = new Commit(db);
+		final ObjectId almostEmptyTreeId = insertTree(almostEmptyTree);
+		CommitBuilder commit = new CommitBuilder();
 		commit.setTreeId(almostEmptyTreeId);
 		commit.setAuthor(new PersonIdent("Joe H\u00e4cker","joe@example.com",4294967295000L,60));
 		commit.setCommitter(new PersonIdent("Joe Hacker","joe2@example.com",4294967295000L,60));
 		commit.setEncoding("ISO-8859-1");
 		commit.setMessage("\u00dcbergeeks");
-		ObjectId cid = new ObjectWriter(db).writeCommit(commit);
+		ObjectId cid = insertCommit(commit);
 		assertEquals("2979b39d385014b33287054b87f77bcb3ecb5ebf", cid.name());
-	}
-
-	public void test025_packedRefs() throws IOException {
-		test020_createBlobTag();
-		test021_createTreeTag();
-		test022_createCommitTag();
-
-		if (!new File(db.getDirectory(),"refs/tags/test020").delete()) throw new Error("Cannot delete unpacked tag");
-		if (!new File(db.getDirectory(),"refs/tags/test021").delete()) throw new Error("Cannot delete unpacked tag");
-		if (!new File(db.getDirectory(),"refs/tags/test022").delete()) throw new Error("Cannot delete unpacked tag");
-
-		// We cannot resolve it now, since we have no ref
-		Tag mapTag20missing = db.mapTag("test020");
-		assertNull(mapTag20missing);
-
-		// Construct packed refs file
-		PrintWriter w = new PrintWriter(new FileWriter(new File(db.getDirectory(), "packed-refs")));
-		w.println("# packed-refs with: peeled");
-		w.println("6759556b09fbb4fd8ae5e315134481cc25d46954 refs/tags/test020");
-		w.println("^e69de29bb2d1d6434b8b29ae775ad8c2e48c5391");
-		w.println("b0517bc8dbe2096b419d42424cd7030733f4abe5 refs/tags/test021");
-		w.println("^417c01c8795a35b8e835113a85a5c0c1c77f67fb");
-		w.println("0ce2ebdb36076ef0b38adbe077a07d43b43e3807 refs/tags/test022");
-		w.println("^b5d3b45a96b340441f5abb9080411705c51cc86c");
-		w.close();
-		((RefDirectory)db.getRefDatabase()).rescan();
-
-		Tag mapTag20 = db.mapTag("test020");
-		assertNotNull("have tag test020", mapTag20);
-		assertEquals("blob", mapTag20.getType());
-		assertEquals("test020 tagged\n", mapTag20.getMessage());
-		assertEquals(new PersonIdent(author, 1154236443000L, -4 * 60), mapTag20.getTagger());
-		assertEquals("e69de29bb2d1d6434b8b29ae775ad8c2e48c5391", mapTag20.getObjId().name());
-
-		Tag mapTag21 = db.mapTag("test021");
-		assertEquals("tree", mapTag21.getType());
-		assertEquals("test021 tagged\n", mapTag21.getMessage());
-		assertEquals(new PersonIdent(author, 1154236443000L, -4 * 60), mapTag21.getTagger());
-		assertEquals("417c01c8795a35b8e835113a85a5c0c1c77f67fb", mapTag21.getObjId().name());
-
-		Tag mapTag22 = db.mapTag("test022");
-		assertEquals("commit", mapTag22.getType());
-		assertEquals("test022 tagged\n", mapTag22.getMessage());
-		assertEquals(new PersonIdent(author, 1154236443000L, -4 * 60), mapTag22.getTagger());
-		assertEquals("b5d3b45a96b340441f5abb9080411705c51cc86c", mapTag22.getObjId().name());
 	}
 
 	public void test025_computeSha1NoStore() throws IOException {
 		byte[] data = "test025 some data, more than 16 bytes to get good coverage"
 				.getBytes("ISO-8859-1");
-		// TODO: but we do not test legacy header writing
-		final ObjectId id = new ObjectWriter(db).computeBlobSha1(data.length,
-				new ByteArrayInputStream(data));
+		final ObjectId id = new ObjectInserter.Formatter().idFor(
+				Constants.OBJ_BLOB, data);
 		assertEquals("4f561df5ecf0dfbd53a0dc0f37262fef075d9dde", id.name());
 	}
 
@@ -601,82 +548,82 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 		assertEquals(ObjectId.fromString("00b1f73724f493096d1ffa0b0f1f1482dbb8c936"),
 				t.getTreeId());
 
-		final Commit c1 = new Commit(db);
+		final CommitBuilder c1 = new CommitBuilder();
 		c1.setAuthor(new PersonIdent(author, 1154236443000L, -4 * 60));
 		c1.setCommitter(new PersonIdent(committer, 1154236443000L, -4 * 60));
 		c1.setMessage("A Commit\n");
-		c1.setTree(t);
+		c1.setTreeId(t.getTreeId());
 		assertEquals(t.getTreeId(), c1.getTreeId());
-		c1.commit();
+		insertCommit(c1);
 		final ObjectId cmtid1 = ObjectId.fromString(
 				"803aec4aba175e8ab1d666873c984c0308179099");
 		assertEquals(cmtid1, c1.getCommitId());
 
-		final Commit c2 = new Commit(db);
+		final CommitBuilder c2 = new CommitBuilder();
 		c2.setAuthor(new PersonIdent(author, 1154236443000L, -4 * 60));
 		c2.setCommitter(new PersonIdent(committer, 1154236443000L, -4 * 60));
 		c2.setMessage("A Commit 2\n");
-		c2.setTree(t);
+		c2.setTreeId(t.getTreeId());
 		assertEquals(t.getTreeId(), c2.getTreeId());
-		c2.setParentIds(new ObjectId[] { c1.getCommitId() } );
-		c2.commit();
+		c2.setParentIds(c1.getCommitId());
+		insertCommit(c2);
 		final ObjectId cmtid2 = ObjectId.fromString(
 				"95d068687c91c5c044fb8c77c5154d5247901553");
 		assertEquals(cmtid2, c2.getCommitId());
 
-		Commit rm2 = db.mapCommit(cmtid2);
+		RevCommit rm2 = parseCommit(cmtid2);
 		assertNotSame(c2, rm2); // assert the parsed objects is not from the cache
-		assertEquals(c2.getAuthor(), rm2.getAuthor());
-		assertEquals(c2.getCommitId(), rm2.getCommitId());
-		assertEquals(c2.getMessage(), rm2.getMessage());
-		assertEquals(c2.getTree().getTreeId(), rm2.getTree().getTreeId());
-		assertEquals(1, rm2.getParentIds().length);
-		assertEquals(c1.getCommitId(), rm2.getParentIds()[0]);
+		assertEquals(c2.getAuthor(), rm2.getAuthorIdent());
+		assertEquals(c2.getCommitId(), rm2.getId());
+		assertEquals(c2.getMessage(), rm2.getFullMessage());
+		assertEquals(c2.getTreeId(), rm2.getTree().getId());
+		assertEquals(1, rm2.getParentCount());
+		assertEquals(c1.getCommitId(), rm2.getParent(0));
 
-		final Commit c3 = new Commit(db);
+		final CommitBuilder c3 = new CommitBuilder();
 		c3.setAuthor(new PersonIdent(author, 1154236443000L, -4 * 60));
 		c3.setCommitter(new PersonIdent(committer, 1154236443000L, -4 * 60));
 		c3.setMessage("A Commit 3\n");
-		c3.setTree(t);
+		c3.setTreeId(t.getTreeId());
 		assertEquals(t.getTreeId(), c3.getTreeId());
-		c3.setParentIds(new ObjectId[] { c1.getCommitId(), c2.getCommitId() });
-		c3.commit();
+		c3.setParentIds(c1.getCommitId(), c2.getCommitId());
+		insertCommit(c3);
 		final ObjectId cmtid3 = ObjectId.fromString(
 				"ce6e1ce48fbeeb15a83f628dc8dc2debefa066f4");
 		assertEquals(cmtid3, c3.getCommitId());
 
-		Commit rm3 = db.mapCommit(cmtid3);
+		RevCommit rm3 = parseCommit(cmtid3);
 		assertNotSame(c3, rm3); // assert the parsed objects is not from the cache
-		assertEquals(c3.getAuthor(), rm3.getAuthor());
-		assertEquals(c3.getCommitId(), rm3.getCommitId());
-		assertEquals(c3.getMessage(), rm3.getMessage());
-		assertEquals(c3.getTree().getTreeId(), rm3.getTree().getTreeId());
-		assertEquals(2, rm3.getParentIds().length);
-		assertEquals(c1.getCommitId(), rm3.getParentIds()[0]);
-		assertEquals(c2.getCommitId(), rm3.getParentIds()[1]);
+		assertEquals(c3.getAuthor(), rm3.getAuthorIdent());
+		assertEquals(c3.getCommitId(), rm3.getId());
+		assertEquals(c3.getMessage(), rm3.getFullMessage());
+		assertEquals(c3.getTreeId(), rm3.getTree().getId());
+		assertEquals(2, rm3.getParentCount());
+		assertEquals(c1.getCommitId(), rm3.getParent(0));
+		assertEquals(c2.getCommitId(), rm3.getParent(1));
 
-		final Commit c4 = new Commit(db);
+		final CommitBuilder c4 = new CommitBuilder();
 		c4.setAuthor(new PersonIdent(author, 1154236443000L, -4 * 60));
 		c4.setCommitter(new PersonIdent(committer, 1154236443000L, -4 * 60));
 		c4.setMessage("A Commit 4\n");
-		c4.setTree(t);
+		c4.setTreeId(t.getTreeId());
 		assertEquals(t.getTreeId(), c3.getTreeId());
-		c4.setParentIds(new ObjectId[] { c1.getCommitId(), c2.getCommitId(), c3.getCommitId() });
-		c4.commit();
+		c4.setParentIds(c1.getCommitId(), c2.getCommitId(), c3.getCommitId());
+		insertCommit(c4);
 		final ObjectId cmtid4 = ObjectId.fromString(
 				"d1fca9fe3fef54e5212eb67902c8ed3e79736e27");
 		assertEquals(cmtid4, c4.getCommitId());
 
-		Commit rm4 = db.mapCommit(cmtid4);
+		RevCommit rm4 = parseCommit(cmtid4);
 		assertNotSame(c4, rm3); // assert the parsed objects is not from the cache
-		assertEquals(c4.getAuthor(), rm4.getAuthor());
-		assertEquals(c4.getCommitId(), rm4.getCommitId());
-		assertEquals(c4.getMessage(), rm4.getMessage());
-		assertEquals(c4.getTree().getTreeId(), rm4.getTree().getTreeId());
-		assertEquals(3, rm4.getParentIds().length);
-		assertEquals(c1.getCommitId(), rm4.getParentIds()[0]);
-		assertEquals(c2.getCommitId(), rm4.getParentIds()[1]);
-		assertEquals(c3.getCommitId(), rm4.getParentIds()[2]);
+		assertEquals(c4.getAuthor(), rm4.getAuthorIdent());
+		assertEquals(c4.getCommitId(), rm4.getId());
+		assertEquals(c4.getMessage(), rm4.getFullMessage());
+		assertEquals(c4.getTreeId(), rm4.getTree().getId());
+		assertEquals(3, rm4.getParentCount());
+		assertEquals(c1.getCommitId(), rm4.getParent(0));
+		assertEquals(c2.getCommitId(), rm4.getParent(1));
+		assertEquals(c3.getCommitId(), rm4.getParent(2));
 	}
 
 	public void test027_UnpackedRefHigherPriorityThanPacked() throws IOException {
@@ -717,13 +664,6 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 		assertEquals(newId2, db.resolve("refs/heads/foobar"));
 	}
 
-	public void test029_mapObject() throws IOException {
-		assertEquals(new byte[0].getClass(), db.mapObject(ObjectId.fromString("5b6e7c66c276e7610d4a73c70ec1a1f7c1003259"), null).getClass());
-		assertEquals(Commit.class, db.mapObject(ObjectId.fromString("540a36d136cf413e4b064c2b0e0a4db60f77feab"), null).getClass());
-		assertEquals(Tree.class, db.mapObject(ObjectId.fromString("aabf2ffaec9b497f0950352b3e582d73035c2035"), null).getClass());
-		assertEquals(Tag.class, db.mapObject(ObjectId.fromString("17768080a2318cd89bba4c8b87834401e2095703"), null).getClass());
-	}
-
 	public void test30_stripWorkDir() {
 		File relCwd = new File(".");
 		File absCwd = relCwd.getAbsoluteFile();
@@ -748,6 +688,74 @@ public class T0003_Basic extends SampleDataRepositoryTestCase {
 		File file = new File(new File(db.getWorkTree(), "subdir"), "File.java");
 		assertEquals("subdir/File.java", Repository.stripWorkDir(db.getWorkTree(), file));
 
+	}
+
+	private ObjectId insertEmptyBlob() throws IOException {
+		final ObjectId emptyId;
+		ObjectInserter oi = db.newObjectInserter();
+		try {
+			emptyId = oi.insert(Constants.OBJ_BLOB, new byte[] {});
+			oi.flush();
+		} finally {
+			oi.release();
+		}
+		return emptyId;
+	}
+
+	private ObjectId insertTree(Tree tree) throws IOException {
+		ObjectInserter oi = db.newObjectInserter();
+		try {
+			ObjectId id = oi.insert(Constants.OBJ_TREE, tree.format());
+			oi.flush();
+			return id;
+		} finally {
+			oi.release();
+		}
+	}
+
+	private ObjectId insertCommit(final CommitBuilder builder) throws IOException,
+			UnsupportedEncodingException {
+		ObjectInserter oi = db.newObjectInserter();
+		try {
+			ObjectId id = oi.insert(builder);
+			oi.flush();
+			return id;
+		} finally {
+			oi.release();
+		}
+	}
+
+	private RevCommit parseCommit(AnyObjectId id)
+			throws MissingObjectException, IncorrectObjectTypeException,
+			IOException {
+		RevWalk rw = new RevWalk(db);
+		try {
+			return rw.parseCommit(id);
+		} finally {
+			rw.release();
+		}
+	}
+
+	private ObjectId insertTag(final TagBuilder tag) throws IOException,
+			UnsupportedEncodingException {
+		ObjectInserter oi = db.newObjectInserter();
+		try {
+			ObjectId id = oi.insert(tag);
+			oi.flush();
+			return id;
+		} finally {
+			oi.release();
+		}
+	}
+
+	private RevTag parseTag(AnyObjectId id) throws MissingObjectException,
+			IncorrectObjectTypeException, IOException {
+		RevWalk rw = new RevWalk(db);
+		try {
+			return rw.parseTag(id);
+		} finally {
+			rw.release();
+		}
 	}
 
 	/**

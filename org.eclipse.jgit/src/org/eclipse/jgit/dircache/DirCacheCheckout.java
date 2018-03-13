@@ -72,6 +72,7 @@ import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.NameConflictTreeWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
+import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.util.FS;
 
@@ -186,7 +187,7 @@ public class DirCacheCheckout {
 	public DirCacheCheckout(Repository repo, ObjectId headCommitTree, DirCache dc,
 			ObjectId mergeCommitTree) throws IOException {
 		this(repo, headCommitTree, dc, mergeCommitTree, new FileTreeIterator(
-				repo.getWorkTree(), repo.getFS()));
+				repo.getWorkTree(), repo.getFS(), WorkingTreeOptions.createDefaultInstance()));
 	}
 
 	/**
@@ -340,7 +341,7 @@ public class DirCacheCheckout {
 			file.getParentFile().mkdirs();
 			file.createNewFile();
 			DirCacheEntry entry = dc.getEntry(path);
-			checkoutEntry(repo, file, entry, config_filemode());
+			checkoutEntry(file, entry, config_filemode());
 		}
 
 
@@ -390,15 +391,21 @@ public class DirCacheCheckout {
 			DirCacheBuildIterator i, WorkingTreeIterator f) throws IOException {
 		DirCacheEntry dce;
 
-		if (i == null && m == null && h == null)
+		String name = walk.getPathString();
+
+		if (i == null && m == null && h == null) {
+			// File/Directory conflict case #20
+			if (walk.isDirectoryFileConflict())
+				// TODO: check whether it is always correct to report a conflict here
+				conflict(name, null, h, m);
+
 			// file only exists in working tree -> ignore it
 			return;
+		}
 
 		ObjectId iId = (i == null ? null : i.getEntryObjectId());
 		ObjectId mId = (m == null ? null : m.getEntryObjectId());
 		ObjectId hId = (h == null ? null : h.getEntryObjectId());
-
-		String name = walk.getPathString();
 
 		/**
 		 * <pre>
@@ -427,6 +434,7 @@ public class DirCacheCheckout {
 		 * 17   0        D       F                 N       N       N           Conflict
 		 * 18   F        0       D                                             Update
 		 * 19   D        0       F                                             Update
+		 * 20   0        0       F       N (worktree=dir)                      Conflict
 		 * </pre>
 		 */
 
@@ -484,6 +492,7 @@ public class DirCacheCheckout {
 				break;
 			case 0xDFF: // 5 6
 			case 0xFDD: // 10 11
+				// TODO: make use of tree extension as soon as available in jgit
 				// we would like to do something like
 				// if (!iId.equals(mId))
 				//   conflict(name, i.getDirCacheEntry(), h, m);
@@ -492,6 +501,8 @@ public class DirCacheCheckout {
 				// are found later
 				break;
 			case 0xD0F: // 19
+				update(name, mId, m.getEntryFileMode());
+				break;
 			case 0xDF0: // conflict without a rule
 			case 0x0FD: // 15
 				conflict(name, (i != null) ? i.getDirCacheEntry() : null, h, m);
@@ -539,6 +550,11 @@ public class DirCacheCheckout {
 		// if we have no file at all then there is nothing to do
 		if ((ffMask & 0x222) == 0)
 			return;
+
+		if ((ffMask == 0x00F) && f != null && FileMode.TREE.equals(f.getEntryFileMode())) {
+			// File/Directory conflict case #20
+			conflict(name, null, h, m);
+		}
 
 		if (i == null) {
 			/**
@@ -727,7 +743,7 @@ public class DirCacheCheckout {
 		NameConflictTreeWalk tw = new NameConflictTreeWalk(repo);
 		tw.reset();
 		tw.addTree(new DirCacheIterator(dc));
-		tw.addTree(new FileTreeIterator(repo.getWorkTree(), repo.getFS()));
+		tw.addTree(new FileTreeIterator(repo.getWorkTree(), repo.getFS(), WorkingTreeOptions.createDefaultInstance()));
 		tw.setRecursive(true);
 		tw.setFilter(PathFilter.create(path));
 		DirCacheIterator dcIt;
@@ -753,7 +769,7 @@ public class DirCacheCheckout {
 	 * TODO: this method works directly on File IO, we may need another
 	 * abstraction (like WorkingTreeIterator). This way we could tell e.g.
 	 * Eclipse that Files in the workspace got changed
-	 * @param repo
+	 *
 	 * @param f
 	 *            the file to be modified. The parent directory for this file
 	 *            has to exist already
@@ -763,7 +779,7 @@ public class DirCacheCheckout {
 	 *            whether the mode bits should be handled at all.
 	 * @throws IOException
 	 */
-	public static void checkoutEntry(final Repository repo, File f, DirCacheEntry entry,
+	public void checkoutEntry(File f, DirCacheEntry entry,
 			boolean config_filemode) throws IOException {
 		ObjectLoader ol = repo.open(entry.getObjectId());
 		if (ol == null)
@@ -773,8 +789,7 @@ public class DirCacheCheckout {
 		byte[] bytes = ol.getCachedBytes();
 
 		File parentDir = f.getParentFile();
-		File tmpFile = java.io.File
-				.createTempFile("__"+f.getName(), null, parentDir);
+		File tmpFile = File.createTempFile("._" + f.getName(), null, parentDir);
 		FileChannel channel = new FileOutputStream(tmpFile).getChannel();
 		ByteBuffer buffer = ByteBuffer.wrap(bytes);
 		try {
