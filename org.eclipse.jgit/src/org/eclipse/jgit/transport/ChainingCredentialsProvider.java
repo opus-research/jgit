@@ -42,7 +42,9 @@
  */
 package org.eclipse.jgit.transport;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import org.eclipse.jgit.errors.UnsupportedCredentialItem;
 
@@ -53,7 +55,7 @@ import org.eclipse.jgit.errors.UnsupportedCredentialItem;
  */
 public class ChainingCredentialsProvider extends CredentialsProvider {
 
-	private LinkedList<CredentialsProvider> credentialProviders;
+	private List<CredentialsProvider> credentialProviders;
 
 	/**
 	 * Create a new chaining credential provider. This provider tries to
@@ -66,7 +68,8 @@ public class ChainingCredentialsProvider extends CredentialsProvider {
 	 *            here
 	 */
 	public ChainingCredentialsProvider(CredentialsProvider... providers) {
-		this.credentialProviders = new LinkedList<CredentialsProvider>();
+		this.credentialProviders = new ArrayList<CredentialsProvider>(
+				Arrays.asList(providers));
 		for (CredentialsProvider p : providers)
 			credentialProviders.add(p);
 	}
