@@ -45,6 +45,7 @@
 
 package org.eclipse.jgit.treewalk;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -60,6 +61,7 @@ import java.util.Collections;
 import java.util.Comparator;
 
 import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.errors.CorruptObjectException;
@@ -68,7 +70,8 @@ import org.eclipse.jgit.ignore.IgnoreRule;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.util.FS;
+import org.eclipse.jgit.util.IO;
+import org.eclipse.jgit.util.io.EolCanonicalizingInputStream;
 
 /**
  * Walks a working directory tree as part of a {@link TreeWalk}.
@@ -86,22 +89,22 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	protected static final Entry[] EOF = {};
 
 	/** Size we perform file IO in if we have to read and hash a file. */
-	private static final int BUFFER_SIZE = 2048;
+	static final int BUFFER_SIZE = 2048;
+
+	/**
+	 * Maximum size of files which may be read fully into memory for performance
+	 * reasons.
+	 */
+	private static final long MAXIMUM_FILE_SIZE_TO_READ_FULLY = 65536;
+
+	/** Inherited state of this iterator, describing working tree, etc. */
+	private final IteratorState state;
 
 	/** The {@link #idBuffer()} for the current entry. */
 	private byte[] contentId;
 
 	/** Index within {@link #entries} that {@link #contentId} came from. */
 	private int contentIdFromPtr;
-
-	/** Buffer used to perform {@link #contentId} computations. */
-	private byte[] contentReadBuffer;
-
-	/** Digest computer for {@link #contentId} computations. */
-	private MessageDigest contentDigest;
-
-	/** File name character encoder. */
-	private final CharsetEncoder nameEncoder;
 
 	/** List of entries obtained from the subclass. */
 	private Entry[] entries;
@@ -115,10 +118,15 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	/** If there is a .gitignore file present, the parsed rules from it. */
 	private IgnoreNode ignoreNode;
 
-	/** Create a new iterator with no parent. */
-	protected WorkingTreeIterator() {
+	/**
+	 * Create a new iterator with no parent.
+	 *
+	 * @param options
+	 *            working tree options to be used
+	 */
+	protected WorkingTreeIterator(WorkingTreeOptions options) {
 		super();
-		nameEncoder = Constants.CHARSET.newEncoder();
+		state = new IteratorState(options);
 	}
 
 	/**
@@ -135,10 +143,13 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *            may be null or the empty string to indicate the prefix is the
 	 *            root of the repository. A trailing slash ('/') is
 	 *            automatically appended if the prefix does not end in '/'.
+	 * @param options
+	 *            working tree options to be used
 	 */
-	protected WorkingTreeIterator(final String prefix) {
+	protected WorkingTreeIterator(final String prefix,
+			WorkingTreeOptions options) {
 		super(prefix);
-		nameEncoder = Constants.CHARSET.newEncoder();
+		state = new IteratorState(options);
 	}
 
 	/**
@@ -149,7 +160,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 */
 	protected WorkingTreeIterator(final WorkingTreeIterator p) {
 		super(p);
-		nameEncoder = p.nameEncoder;
+		state = p.state;
 	}
 
 	/**
@@ -168,6 +179,13 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		else
 			entry = null;
 		ignoreNode = new RootIgnoreNode(entry, repo);
+	}
+
+	@Override
+	public boolean hasId() {
+		if (contentIdFromPtr == ptr)
+			return true;
+		return (mode & FileMode.TYPE_MASK) == FileMode.TYPE_FILE;
 	}
 
 	@Override
@@ -191,21 +209,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		return zeroid;
 	}
 
-	private void initializeDigest() {
-		if (contentDigest != null)
-			return;
-
-		if (parent == null) {
-			contentReadBuffer = new byte[BUFFER_SIZE];
-			contentDigest = Constants.newMessageDigest();
-		} else {
-			final WorkingTreeIterator p = (WorkingTreeIterator) parent;
-			p.initializeDigest();
-			contentReadBuffer = p.contentReadBuffer;
-			contentDigest = p.contentDigest;
-		}
-	}
-
 	private static final byte[] digits = { '0', '1', '2', '3', '4', '5', '6',
 			'7', '8', '9' };
 
@@ -218,56 +221,111 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			if (is == null)
 				return zeroid;
 			try {
-				initializeDigest();
+				state.initializeDigestAndReadBuffer();
 
-				contentDigest.reset();
-				contentDigest.update(hblob);
-				contentDigest.update((byte) ' ');
+				final long len = e.getLength();
+				if (!mightNeedCleaning())
+					return computeHash(is, len);
 
-				final long blobLength = e.getLength();
-				long sz = blobLength;
-				if (sz == 0) {
-					contentDigest.update((byte) '0');
-				} else {
-					final int bufn = contentReadBuffer.length;
-					int p = bufn;
-					do {
-						contentReadBuffer[--p] = digits[(int) (sz % 10)];
-						sz /= 10;
-					} while (sz > 0);
-					contentDigest.update(contentReadBuffer, p, bufn - p);
+				if (len <= MAXIMUM_FILE_SIZE_TO_READ_FULLY) {
+					ByteBuffer rawbuf = IO.readWholeStream(is, (int) len);
+					byte[] raw = rawbuf.array();
+					int n = rawbuf.limit();
+					if (!isBinary(raw, n)) {
+						rawbuf = filterClean(raw, n);
+						raw = rawbuf.array();
+						n = rawbuf.limit();
+					}
+					return computeHash(new ByteArrayInputStream(raw, 0, n), n);
 				}
-				contentDigest.update((byte) 0);
 
-				for (;;) {
-					final int r = is.read(contentReadBuffer);
-					if (r <= 0)
-						break;
-					contentDigest.update(contentReadBuffer, 0, r);
-					sz += r;
-				}
-				if (sz != blobLength)
-					return zeroid;
-				return contentDigest.digest();
-			} finally {
+				if (isBinary(e))
+					return computeHash(is, len);
+
+				final long canonLen;
+				final InputStream lenIs = filterClean(e.openInputStream());
 				try {
-					is.close();
-				} catch (IOException err2) {
-					// Suppress any error related to closing an input
-					// stream. We don't care, we should not have any
-					// outstanding data to flush or anything like that.
+					canonLen = computeLength(lenIs);
+				} finally {
+					safeClose(lenIs);
 				}
+
+				return computeHash(filterClean(is), canonLen);
+			} finally {
+				safeClose(is);
 			}
 		} catch (IOException err) {
 			// Can't read the file? Don't report the failure either.
-			//
 			return zeroid;
 		}
+	}
+
+	private static void safeClose(final InputStream in) {
+		try {
+			in.close();
+		} catch (IOException err2) {
+			// Suppress any error related to closing an input
+			// stream. We don't care, we should not have any
+			// outstanding data to flush or anything like that.
+		}
+	}
+
+	private boolean mightNeedCleaning() {
+		switch (getOptions().getAutoCRLF()) {
+		case FALSE:
+		default:
+			return false;
+
+		case TRUE:
+		case INPUT:
+			return true;
+		}
+	}
+
+	private boolean isBinary(byte[] content, int sz) {
+		return RawText.isBinary(content, sz);
+	}
+
+	private boolean isBinary(Entry entry) throws IOException {
+		InputStream in = entry.openInputStream();
+		try {
+			return RawText.isBinary(in);
+		} finally {
+			safeClose(in);
+		}
+	}
+
+	private ByteBuffer filterClean(byte[] src, int n)
+			throws IOException {
+		InputStream in = new ByteArrayInputStream(src);
+		return IO.readWholeStream(filterClean(in), n);
+	}
+
+	private InputStream filterClean(InputStream in) {
+		return new EolCanonicalizingInputStream(in);
+	}
+
+	/**
+	 * Returns the working tree options used by this iterator.
+	 *
+	 * @return working tree options
+	 */
+	public WorkingTreeOptions getOptions() {
+		return state.options;
 	}
 
 	@Override
 	public int idOffset() {
 		return 0;
+	}
+
+	@Override
+	public void reset() {
+		if (!first()) {
+			ptr = 0;
+			if (!eof())
+				parseEntry();
+		}
 	}
 
 	@Override
@@ -320,6 +378,26 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 */
 	public long getEntryLastModified() {
 		return current().getLastModified();
+	}
+
+	/**
+	 * Obtain an input stream to read the file content.
+	 * <p>
+	 * Efficient implementations are not required. The caller will usually
+	 * obtain the stream only once per entry, if at all.
+	 * <p>
+	 * The input stream should not use buffering if the implementation can avoid
+	 * it. The caller will buffer as necessary to perform efficient block IO
+	 * operations.
+	 * <p>
+	 * The caller will close the stream once complete.
+	 *
+	 * @return a stream to read from the file.
+	 * @throws IOException
+	 *             the file could not be opened for reading.
+	 */
+	public InputStream openEntryStream() throws IOException {
+		return current().openInputStream();
 	}
 
 	/**
@@ -414,6 +492,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		entries = list;
 		int i, o;
 
+		final CharsetEncoder nameEncoder = state.nameEncoder;
 		for (i = 0, o = 0; i < entries.length; i++) {
 			final Entry e = entries[i];
 			if (e == null)
@@ -461,17 +540,9 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 * @param forceContentCheck
 	 *            True if the actual file content should be checked if
 	 *            modification time differs.
-	 * @param checkFilemode
-	 *            whether the executable-bit in the filemode should be checked
-	 *            to detect modifications
-	 * @param fs
-	 *            The filesystem this repo uses. Needed to find out whether the
-	 *            executable-bits are supported
-	 *
 	 * @return true if content is most likely different.
 	 */
-	public boolean isModified(DirCacheEntry entry, boolean forceContentCheck,
-			boolean checkFilemode, FS fs) {
+	public boolean isModified(DirCacheEntry entry, boolean forceContentCheck) {
 		if (entry.isAssumeValid())
 			return false;
 
@@ -485,15 +556,19 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		// bitwise presentation of modeDiff we'll have a '1' when the two modes
 		// differ at this position.
 		int modeDiff = getEntryRawMode() ^ entry.getRawMode();
-		// Ignore the executable file bits if checkFilemode tells me to do so.
-		// Ignoring is done by setting the bits representing a EXECUTABLE_FILE
-		// to '0' in modeDiff
-		if (!checkFilemode)
-			modeDiff &= ~FileMode.EXECUTABLE_FILE.getBits();
-		if (modeDiff != 0)
-			// Report a modification if the modes still (after potentially
-			// ignoring EXECUTABLE_FILE bits) differ
-			return true;
+
+		// Do not rely on filemode differences in case of symbolic links
+		if (modeDiff != 0 && !FileMode.SYMLINK.equals(entry.getRawMode())) {
+			// Ignore the executable file bits if WorkingTreeOptions tell me to
+			// do so. Ignoring is done by setting the bits representing a
+			// EXECUTABLE_FILE to '0' in modeDiff
+			if (!state.options.isFileMode())
+				modeDiff &= ~FileMode.EXECUTABLE_FILE.getBits();
+			if (modeDiff != 0)
+				// Report a modification if the modes still (after potentially
+				// ignoring EXECUTABLE_FILE bits) differ
+				return true;
+		}
 
 		// Git under windows only stores seconds so we round the timestamp
 		// Java gives us if it looks like the timestamp in index is seconds
@@ -557,6 +632,54 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
+	private long computeLength(InputStream in) throws IOException {
+		// Since we only care about the length, use skip. The stream
+		// may be able to more efficiently wade through its data.
+		//
+		long length = 0;
+		for (;;) {
+			long n = in.skip(1 << 20);
+			if (n <= 0)
+				break;
+			length += n;
+		}
+		return length;
+	}
+
+	private byte[] computeHash(InputStream in, long length) throws IOException {
+		final MessageDigest contentDigest = state.contentDigest;
+		final byte[] contentReadBuffer = state.contentReadBuffer;
+
+		contentDigest.reset();
+		contentDigest.update(hblob);
+		contentDigest.update((byte) ' ');
+
+		long sz = length;
+		if (sz == 0) {
+			contentDigest.update((byte) '0');
+		} else {
+			final int bufn = contentReadBuffer.length;
+			int p = bufn;
+			do {
+				contentReadBuffer[--p] = digits[(int) (sz % 10)];
+				sz /= 10;
+			} while (sz > 0);
+			contentDigest.update(contentReadBuffer, p, bufn - p);
+		}
+		contentDigest.update((byte) 0);
+
+		for (;;) {
+			final int r = in.read(contentReadBuffer);
+			if (r <= 0)
+				break;
+			contentDigest.update(contentReadBuffer, 0, r);
+			sz += r;
+		}
+		if (sz != length)
+			return zeroid;
+		return contentDigest.digest();
+	}
+
 	/** A single entry within a working directory tree. */
 	protected static abstract class Entry {
 		byte[] encodedName;
@@ -569,7 +692,8 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 				b = enc.encode(CharBuffer.wrap(getName()));
 			} catch (CharacterCodingException e) {
 				// This should so never happen.
-				throw new RuntimeException(MessageFormat.format(JGitText.get().unencodeableFile, getName()));
+				throw new RuntimeException(MessageFormat.format(
+						JGitText.get().unencodeableFile, getName()));
 			}
 
 			encodedNameLen = b.limit();
@@ -703,6 +827,32 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			}
 
 			return r.getRules().isEmpty() ? null : r;
+		}
+	}
+
+	private static final class IteratorState {
+		/** Options used to process the working tree. */
+		final WorkingTreeOptions options;
+
+		/** File name character encoder. */
+		final CharsetEncoder nameEncoder;
+
+		/** Digest computer for {@link #contentId} computations. */
+		MessageDigest contentDigest;
+
+		/** Buffer used to perform {@link #contentId} computations. */
+		byte[] contentReadBuffer;
+
+		IteratorState(WorkingTreeOptions options) {
+			this.options = options;
+			this.nameEncoder = Constants.CHARSET.newEncoder();
+		}
+
+		void initializeDigestAndReadBuffer() {
+			if (contentDigest == null) {
+				contentDigest = Constants.newMessageDigest();
+				contentReadBuffer = new byte[BUFFER_SIZE];
+			}
 		}
 	}
 }

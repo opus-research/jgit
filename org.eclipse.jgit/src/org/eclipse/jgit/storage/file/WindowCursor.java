@@ -45,17 +45,23 @@
 package org.eclipse.jgit.storage.file;
 
 import java.io.IOException;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
+import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.InflaterCache;
+import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.storage.pack.ObjectReuseAsIs;
 import org.eclipse.jgit.storage.pack.ObjectToPack;
@@ -80,6 +86,16 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 	@Override
 	public ObjectReader newReader() {
 		return new WindowCursor(db);
+	}
+
+	@Override
+	public Collection<ObjectId> resolve(AbbreviatedObjectId id)
+			throws IOException {
+		if (id.isComplete())
+			return Collections.singleton(id.toObjectId());
+		HashSet<ObjectId> matches = new HashSet<ObjectId>(4);
+		db.resolve(matches, id);
+		return matches;
 	}
 
 	public boolean has(AnyObjectId objectId) throws IOException {
@@ -116,15 +132,25 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 		return new LocalObjectToPack(obj);
 	}
 
-	public void selectObjectRepresentation(PackWriter packer, ObjectToPack otp)
+	public void selectObjectRepresentation(PackWriter packer,
+			ProgressMonitor monitor, Iterable<ObjectToPack> objects)
 			throws IOException, MissingObjectException {
-		db.selectObjectRepresentation(packer, otp, this);
+		for (ObjectToPack otp : objects) {
+			db.selectObjectRepresentation(packer, otp, this);
+			monitor.update(1);
+		}
 	}
 
 	public void copyObjectAsIs(PackOutputStream out, ObjectToPack otp)
 			throws IOException, StoredObjectRepresentationNotAvailableException {
 		LocalObjectToPack src = (LocalObjectToPack) otp;
 		src.pack.copyAsIs(out, src, this);
+	}
+
+	public void writeObjects(PackOutputStream out, Iterable<ObjectToPack> list)
+			throws IOException {
+		for (ObjectToPack otp : list)
+			out.writeObject(otp);
 	}
 
 	/**
@@ -241,9 +267,7 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 	}
 
 	int getStreamFileThreshold() {
-		if (db == null)
-			return ObjectLoader.STREAM_THRESHOLD;
-		return db.getStreamFileThreshold();
+		return WindowCache.getStreamFileThreshold();
 	}
 
 	/** Release the current window cursor. */

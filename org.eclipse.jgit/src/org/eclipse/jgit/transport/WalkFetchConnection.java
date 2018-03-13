@@ -87,6 +87,7 @@ import org.eclipse.jgit.storage.file.PackIndex;
 import org.eclipse.jgit.storage.file.PackLock;
 import org.eclipse.jgit.storage.file.UnpackedObject;
 import org.eclipse.jgit.treewalk.TreeWalk;
+import org.eclipse.jgit.util.FileUtils;
 
 /**
  * Generic fetch support for dumb transport protocols.
@@ -317,7 +318,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 		// If we had any prior errors fetching this object they are
 		// now resolved, as the object was parsed successfully.
 		//
-		fetchErrors.remove(id.copy());
+		fetchErrors.remove(id);
 	}
 
 	private void processBlob(final RevObject obj) throws TransportException {
@@ -461,7 +462,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 
 			// We could not obtain the object. There may be reasons why.
 			//
-			List<Throwable> failures = fetchErrors.get(id.copy());
+			List<Throwable> failures = fetchErrors.get(id);
 			final TransportException te;
 
 			te = new TransportException(MessageFormat.format(JGitText.get().cannotGet, id.name()));
@@ -540,8 +541,12 @@ class WalkFetchConnection extends BaseFetchConnection {
 				// it failed the index and pack are unusable and we
 				// shouldn't consult them again.
 				//
-				if (pack.tmpIdx != null)
-					pack.tmpIdx.delete();
+				try {
+					if (pack.tmpIdx != null)
+						FileUtils.delete(pack.tmpIdx);
+				} catch (IOException e) {
+					throw new TransportException(e.getMessage(), e);
+				}
 				packItr.remove();
 			}
 
@@ -830,7 +835,7 @@ class WalkFetchConnection extends BaseFetchConnection {
 					fos.close();
 				}
 			} catch (IOException err) {
-				tmpIdx.delete();
+				FileUtils.delete(tmpIdx);
 				throw err;
 			} finally {
 				s.in.close();
@@ -838,14 +843,14 @@ class WalkFetchConnection extends BaseFetchConnection {
 			pm.endTask();
 
 			if (pm.isCancelled()) {
-				tmpIdx.delete();
+				FileUtils.delete(tmpIdx);
 				return;
 			}
 
 			try {
 				index = PackIndex.open(tmpIdx);
 			} catch (IOException e) {
-				tmpIdx.delete();
+				FileUtils.delete(tmpIdx);
 				throw e;
 			}
 		}

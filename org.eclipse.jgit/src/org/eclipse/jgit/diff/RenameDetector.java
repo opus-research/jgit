@@ -43,6 +43,9 @@
 
 package org.eclipse.jgit.diff;
 
+import static org.eclipse.jgit.diff.DiffEntry.Side.NEW;
+import static org.eclipse.jgit.diff.DiffEntry.Side.OLD;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -54,8 +57,8 @@ import java.util.List;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
+import org.eclipse.jgit.diff.SimilarityIndex.TableFullException;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
-import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectReader;
@@ -100,11 +103,11 @@ public class RenameDetector {
 		}
 	};
 
-	private List<DiffEntry> entries = new ArrayList<DiffEntry>();
+	private List<DiffEntry> entries;
 
-	private List<DiffEntry> deleted = new ArrayList<DiffEntry>();
+	private List<DiffEntry> deleted;
 
-	private List<DiffEntry> added = new ArrayList<DiffEntry>();
+	private List<DiffEntry> added;
 
 	private boolean done;
 
@@ -137,6 +140,8 @@ public class RenameDetector {
 
 		DiffConfig cfg = repo.getConfig().get(DiffConfig.KEY);
 		renameLimit = cfg.getRenameLimit();
+
+		reset();
 	}
 
 	/**
@@ -305,19 +310,65 @@ public class RenameDetector {
 	 */
 	public List<DiffEntry> compute(ProgressMonitor pm) throws IOException {
 		if (!done) {
+			ObjectReader reader = repo.newObjectReader();
+			try {
+				return compute(reader, pm);
+			} finally {
+				reader.release();
+			}
+		}
+		return Collections.unmodifiableList(entries);
+	}
+
+	/**
+	 * Detect renames in the current file set.
+	 *
+	 * @param reader
+	 *            reader to obtain objects from the repository with.
+	 * @param pm
+	 *            report progress during the detection phases.
+	 * @return an unmodifiable list of {@link DiffEntry}s representing all files
+	 *         that have been changed.
+	 * @throws IOException
+	 *             file contents cannot be read from the repository.
+	 */
+	public List<DiffEntry> compute(ObjectReader reader, ProgressMonitor pm)
+			throws IOException {
+		final ContentSource cs = ContentSource.create(reader);
+		return compute(new ContentSource.Pair(cs, cs), pm);
+	}
+
+	/**
+	 * Detect renames in the current file set.
+	 *
+	 * @param reader
+	 *            reader to obtain objects from the repository with.
+	 * @param pm
+	 *            report progress during the detection phases.
+	 * @return an unmodifiable list of {@link DiffEntry}s representing all files
+	 *         that have been changed.
+	 * @throws IOException
+	 *             file contents cannot be read from the repository.
+	 */
+	public List<DiffEntry> compute(ContentSource.Pair reader, ProgressMonitor pm)
+			throws IOException {
+		if (!done) {
 			done = true;
 
 			if (pm == null)
 				pm = NullProgressMonitor.INSTANCE;
-			ObjectReader reader = repo.newObjectReader();
-			try {
+
+			if (0 < breakScore)
 				breakModifies(reader, pm);
+
+			if (!added.isEmpty() && !deleted.isEmpty())
 				findExactRenames(pm);
+
+			if (!added.isEmpty() && !deleted.isEmpty())
 				findContentRenames(reader, pm);
+
+			if (0 < breakScore && !added.isEmpty() && !deleted.isEmpty())
 				rejoinModifies(pm);
-			} finally {
-				reader.release();
-			}
 
 			entries.addAll(added);
 			added = null;
@@ -330,11 +381,16 @@ public class RenameDetector {
 		return Collections.unmodifiableList(entries);
 	}
 
-	private void breakModifies(ObjectReader reader, ProgressMonitor pm)
-			throws IOException {
-		if (breakScore <= 0)
-			return;
+	/** Reset this rename detector for another rename detection pass. */
+	public void reset() {
+		entries = new ArrayList<DiffEntry>();
+		deleted = new ArrayList<DiffEntry>();
+		added = new ArrayList<DiffEntry>();
+		done = false;
+	}
 
+	private void breakModifies(ContentSource.Pair reader, ProgressMonitor pm)
+			throws IOException {
 		ArrayList<DiffEntry> newEntries = new ArrayList<DiffEntry>(entries.size());
 
 		pm.beginTask(JGitText.get().renamesBreakingModifies, entries.size());
@@ -393,30 +449,38 @@ public class RenameDetector {
 		deleted = new ArrayList<DiffEntry>(nameMap.values());
 	}
 
-	private int calculateModifyScore(ObjectReader reader, DiffEntry d)
+	private int calculateModifyScore(ContentSource.Pair reader, DiffEntry d)
 			throws IOException {
-		SimilarityIndex src = new SimilarityIndex();
-		src.hash(reader.open(d.oldId.toObjectId(), Constants.OBJ_BLOB));
-		src.sort();
+		try {
+			SimilarityIndex src = new SimilarityIndex();
+			src.hash(reader.open(OLD, d));
+			src.sort();
 
-		SimilarityIndex dst = new SimilarityIndex();
-		dst.hash(reader.open(d.newId.toObjectId(), Constants.OBJ_BLOB));
-		dst.sort();
-		return src.score(dst, 100);
+			SimilarityIndex dst = new SimilarityIndex();
+			dst.hash(reader.open(NEW, d));
+			dst.sort();
+			return src.score(dst, 100);
+		} catch (TableFullException tableFull) {
+			// If either table overflowed while being constructed, don't allow
+			// the pair to be broken. Returning 1 higher than breakScore will
+			// ensure its not similar, but not quite dissimilar enough to break.
+			//
+			overRenameLimit = true;
+			return breakScore + 1;
+		}
 	}
 
-	private void findContentRenames(ObjectReader reader, ProgressMonitor pm)
+	private void findContentRenames(ContentSource.Pair reader,
+			ProgressMonitor pm)
 			throws IOException {
 		int cnt = Math.max(added.size(), deleted.size());
-		if (cnt == 0)
-			return;
-
 		if (getRenameLimit() == 0 || cnt <= getRenameLimit()) {
 			SimilarityRenameDetector d;
 
 			d = new SimilarityRenameDetector(reader, deleted, added);
 			d.setRenameScore(getRenameScore());
 			d.compute(pm);
+			overRenameLimit |= d.isTableOverflow();
 			deleted = d.getLeftOverSources();
 			added = d.getLeftOverDestinations();
 			entries.addAll(d.getMatches());
@@ -427,9 +491,6 @@ public class RenameDetector {
 
 	@SuppressWarnings("unchecked")
 	private void findExactRenames(ProgressMonitor pm) {
-		if (added.isEmpty() || deleted.isEmpty())
-			return;
-
 		pm.beginTask(JGitText.get().renamesFindingExact, //
 				added.size() + added.size() + deleted.size()
 						+ added.size() * deleted.size());
@@ -508,14 +569,14 @@ public class RenameDetector {
 				List<DiffEntry> dels = (List<DiffEntry>) o;
 				long[] matrix = new long[dels.size() * adds.size()];
 				int mNext = 0;
-				for (int addIdx = 0; addIdx < adds.size(); addIdx++) {
-					String addedName = adds.get(addIdx).newPath;
+				for (int delIdx = 0; delIdx < dels.size(); delIdx++) {
+					String deletedName = dels.get(delIdx).oldPath;
 
-					for (int delIdx = 0; delIdx < dels.size(); delIdx++) {
-						String deletedName = dels.get(delIdx).oldPath;
+					for (int addIdx = 0; addIdx < adds.size(); addIdx++) {
+						String addedName = adds.get(addIdx).newPath;
 
 						int score = SimilarityRenameDetector.nameScore(addedName, deletedName);
-						matrix[mNext] = SimilarityRenameDetector.encode(score, addIdx, delIdx);
+						matrix[mNext] = SimilarityRenameDetector.encode(score, delIdx, addIdx);
 						mNext++;
 					}
 				}

@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
+ * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -50,6 +51,21 @@ public class ConfigConstants {
 	/** The "core" section */
 	public static final String CONFIG_CORE_SECTION = "core";
 
+	/** The "branch" section */
+	public static final String CONFIG_BRANCH_SECTION = "branch";
+
+	/** The "remote" section */
+	public static final String CONFIG_REMOTE_SECTION = "remote";
+
+	/** The "diff" section */
+	public static final String CONFIG_DIFF_SECTION = "diff";
+
+	/** The "user" section */
+	public static final String CONFIG_USER_SECTION = "user";
+
+	/** The "algorithm" key */
+	public static final String CONFIG_KEY_ALGORITHM = "algorithm";
+
 	/** The "autocrlf" key */
 	public static final String CONFIG_KEY_AUTOCRLF = "autocrlf";
 
@@ -67,4 +83,25 @@ public class ConfigConstants {
 
 	/** The "worktree" key */
 	public static final String CONFIG_KEY_WORKTREE = "worktree";
+
+	/** The "remote" key */
+	public static final String CONFIG_KEY_REMOTE = "remote";
+
+	/** The "merge" key */
+	public static final String CONFIG_KEY_MERGE = "merge";
+
+	/** The "rebase" key */
+	public static final String CONFIG_KEY_REBASE = "rebase";
+
+	/** The "url" key */
+	public static final String CONFIG_KEY_URL = "url";
+
+	/** The "autosetupmerge" key */
+	public static final String CONFIG_KEY_AUTOSETUPMERGE = "autosetupmerge";
+
+	/** The "name" key */
+	public static final String CONFIG_KEY_NAME = "name";
+
+	/** The "email" key */
+	public static final String CONFIG_KEY_EMAIL = "email";
 }

@@ -45,12 +45,14 @@
 package org.eclipse.jgit.merge;
 
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
-import static org.eclipse.jgit.lib.Constants.OBJ_COMMIT;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEntry;
-import org.eclipse.jgit.lib.Commit;
+import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
@@ -58,8 +60,10 @@ import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.treewalk.TreeWalk;
+import org.junit.Test;
 
 public class CherryPickTest extends RepositoryTestCase {
+	@Test
 	public void testPick() throws Exception {
 		// B---O
 		// \----P---T
@@ -124,6 +128,64 @@ public class CherryPickTest extends RepositoryTestCase {
 		assertFalse(tw.next());
 	}
 
+	@Test
+	public void testRevert() throws Exception {
+		// B---P---T
+		//
+		// Revert P, this should result in a tree with a
+		// from B and t from T as the change to a in P
+		// and addition of t in P is reverted.
+		//
+		// We use the standard merge, but change the order
+		// of the sources.
+		//
+		final DirCache treeB = db.readDirCache();
+		final DirCache treeP = db.readDirCache();
+		final DirCache treeT = db.readDirCache();
+		{
+			final DirCacheBuilder b = treeB.builder();
+			final DirCacheBuilder p = treeP.builder();
+			final DirCacheBuilder t = treeT.builder();
+
+			b.add(makeEntry("a", FileMode.REGULAR_FILE));
+
+			p.add(makeEntry("a", FileMode.REGULAR_FILE, "q"));
+			p.add(makeEntry("p-fail", FileMode.REGULAR_FILE));
+
+			t.add(makeEntry("a", FileMode.REGULAR_FILE, "q"));
+			t.add(makeEntry("p-fail", FileMode.REGULAR_FILE));
+			t.add(makeEntry("t", FileMode.REGULAR_FILE));
+
+			b.finish();
+			p.finish();
+			t.finish();
+		}
+
+		final ObjectInserter ow = db.newObjectInserter();
+		final ObjectId B = commit(ow, treeB, new ObjectId[] {});
+		final ObjectId P = commit(ow, treeP, new ObjectId[] { B });
+		final ObjectId T = commit(ow, treeT, new ObjectId[] { P });
+
+		ThreeWayMerger twm = MergeStrategy.SIMPLE_TWO_WAY_IN_CORE.newMerger(db);
+		twm.setBase(P);
+		boolean merge = twm.merge(new ObjectId[] { B, T });
+		assertTrue(merge);
+
+		final TreeWalk tw = new TreeWalk(db);
+		tw.setRecursive(true);
+		tw.reset(twm.getResultTreeId());
+
+		assertTrue(tw.next());
+		assertEquals("a", tw.getPathString());
+		assertCorrectId(treeB, tw);
+
+		assertTrue(tw.next());
+		assertEquals("t", tw.getPathString());
+		assertCorrectId(treeT, tw);
+
+		assertFalse(tw.next());
+	}
+
 	private void assertCorrectId(final DirCache treeT, final TreeWalk tw) {
 		assertEquals(treeT.getEntry(tw.getPathString()).getObjectId(), tw
 				.getObjectId(0));
@@ -131,13 +193,13 @@ public class CherryPickTest extends RepositoryTestCase {
 
 	private ObjectId commit(final ObjectInserter odi, final DirCache treeB,
 			final ObjectId[] parentIds) throws Exception {
-		final Commit c = new Commit(db);
+		final CommitBuilder c = new CommitBuilder();
 		c.setTreeId(treeB.writeTree(odi));
 		c.setAuthor(new PersonIdent("A U Thor", "a.u.thor", 1L, 0));
 		c.setCommitter(c.getAuthor());
 		c.setParentIds(parentIds);
 		c.setMessage("Tree " + c.getTreeId().name());
-		ObjectId id = odi.insert(OBJ_COMMIT, odi.format(c));
+		ObjectId id = odi.insert(c);
 		odi.flush();
 		return id;
 	}
