@@ -43,10 +43,9 @@
 
 package org.eclipse.jgit.internal.storage.reftree;
 
-import static org.eclipse.jgit.internal.storage.reftree.RefTreeDatabase.Layering.REJECT_REFS_TXN;
-import static org.eclipse.jgit.internal.storage.reftree.RefTreeDatabase.Layering.SHOW_ALL;
 import static org.eclipse.jgit.lib.Ref.Storage.LOOSE;
 import static org.eclipse.jgit.lib.Ref.Storage.PACKED;
+import static org.eclipse.jgit.util.Paths.stripTrailingSeparator;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -82,45 +81,10 @@ import org.eclipse.jgit.util.RefMap;
  * reference files inside of {@code $GIT_DIR/refs}.
  */
 public class RefTreeDatabase extends RefDatabase {
-	static final String R_TXN = "refs/txn/"; //$NON-NLS-1$
-	static final String R_TXN_COMMITTED = "refs/txn/committed"; //$NON-NLS-1$
-
-	/** How the RefTreeDb should handle the bootstrap layer. */
-	public enum Layering {
-		/**
-		 * Union the bootstrap references into the same namespace.
-		 * <p>
-		 * Users will be able to see and directly update bootstrap references.
-		 * Some updates may fail, for example {@code refs/heads/master} and
-		 * {@code refs/txn/committed} at the same time is not possible.
-		 */
-		SHOW_ALL,
-
-		/**
-		 * Hide bootstrap references and reject updates in its namespace.
-		 * <p>
-		 * Bootstrap references cannot be read through this database, so it is
-		 * as if they do not exist. Updates to the bootstrap namespace are
-		 * rejected with "funny refname" errors to prevent users from
-		 * overwriting a bootstrap reference.
-		 */
-		REJECT_REFS_TXN,
-
-		/**
-		 * Hide the bootstrap references and store over them.
-		 * <p>
-		 * This behavior makes the bootstrap invisible to users and requires any
-		 * code that needs to access a bootstrap reference to explicitly do so
-		 * through {@link RefTreeDatabase#getBootstrap()}. By making the
-		 * bootstrap layer invisible to users, users may use the bootstrap
-		 * namespace for their own data.
-		 */
-		HIDE_REFS_TXN;
-	}
-
 	private final Repository repo;
 	private final RefDatabase bootstrap;
-	private final Layering behavior;
+	private final String txnCommitted;
+	private final String txnNamespace;
 	private volatile Scanner.Result refs;
 
 	/**
@@ -131,28 +95,51 @@ public class RefTreeDatabase extends RefDatabase {
 	 * @param bootstrap
 	 *            bootstrap reference database storing the references that
 	 *            anchor the {@link RefTree}.
-	 * @param behavior
-	 *            how this database should expose the bootstrap references.
+	 * @param txnNamespace
+	 *            if non-empty the namespace containing the references that
+	 *            store the RefTree. To minimize confusion this namespace is
+	 *            forbidden to be stored through the {@link RefTreeDatabase} and
+	 *            must use {@link #getBootstrap()}.
+	 * @param txnCommitted
+	 *            name of the bootstrap reference holding the committed RefTree.
 	 */
 	public RefTreeDatabase(Repository repo, RefDatabase bootstrap,
-			Layering behavior) {
+			String txnNamespace, String txnCommitted) {
 		this.repo = repo;
 		this.bootstrap = bootstrap;
-		this.behavior = behavior;
+		this.txnCommitted = txnCommitted;
+
+		if (txnNamespace == null || txnNamespace.isEmpty()) {
+			this.txnNamespace = null;
+		} else {
+			this.txnNamespace = stripTrailingSeparator(txnNamespace) + '/';
+		}
 	}
 
 	Repository getRepository() {
 		return repo;
 	}
 
-	/** @return how the bootstrap layer is treated by this database. */
-	public Layering getBehavior() {
-		return behavior;
-	}
-
-	/** @return the bootstrap reference database. */
+	/**
+	 * @return the bootstrap reference database, which must be used to access
+	 *         {@link #getTxnCommitted()}, {@link #getTxnNamespace()}.
+	 */
 	public RefDatabase getBootstrap() {
 		return bootstrap;
+	}
+
+	/** @return name of bootstrap reference anchoring committed RefTree. */
+	public String getTxnCommitted() {
+		return txnCommitted;
+	}
+
+	/**
+	 * @return namespace used by bootstrap layer, e.g. {@code refs/txn/}.
+	 *         Always ends in {@code '/'}.
+	 */
+	@Nullable
+	public String getTxnNamespace() {
+		return txnNamespace;
 	}
 
 	@Override
@@ -183,12 +170,12 @@ public class RefTreeDatabase extends RefDatabase {
 
 	@Override
 	public Ref exactRef(String name) throws IOException {
-		if (behavior == SHOW_ALL && name.startsWith(R_TXN)) {
-			return bootstrap.exactRef(name);
+		if (conflictsWithBootstrap(name)) {
+			return null;
 		}
 
 		boolean partial = false;
-		Ref src = bootstrap.exactRef(R_TXN_COMMITTED);
+		Ref src = bootstrap.exactRef(txnCommitted);
 		Scanner.Result c = refs;
 		if (c == null || !c.refTreeId.equals(idOf(src))) {
 			c = Scanner.scanRefTree(repo, src, prefixOf(name), false);
@@ -218,23 +205,11 @@ public class RefTreeDatabase extends RefDatabase {
 
 	@Override
 	public Map<String, Ref> getRefs(String prefix) throws IOException {
-		if (behavior == SHOW_ALL && prefix.startsWith(R_TXN)) {
-			return bootstrap.getRefs(prefix);
-		}
 		if (!prefix.isEmpty() && prefix.charAt(prefix.length() - 1) != '/') {
 			return new HashMap<>(0);
 		}
 
-		RefList<Ref> txn;
-		Ref src;
-		if (behavior == SHOW_ALL && prefix.isEmpty()) {
-			txn = listRefsTxn();
-			src = txn.get(R_TXN_COMMITTED);
-		} else {
-			txn = RefList.emptyList();
-			src = bootstrap.exactRef(R_TXN_COMMITTED);
-		}
-
+		Ref src = bootstrap.exactRef(txnCommitted);
 		Scanner.Result c = refs;
 		if (c == null || !c.refTreeId.equals(idOf(src))) {
 			c = Scanner.scanRefTree(repo, src, prefix, true);
@@ -242,7 +217,9 @@ public class RefTreeDatabase extends RefDatabase {
 				refs = c;
 			}
 		}
-		return new RefMap(prefix, txn, c.all, c.sym);
+
+		RefList<Ref> empty = RefList.emptyList();
+		return new RefMap(prefix, empty, c.all, c.sym);
 	}
 
 	private static ObjectId idOf(@Nullable Ref src) {
@@ -251,20 +228,8 @@ public class RefTreeDatabase extends RefDatabase {
 				: ObjectId.zeroId();
 	}
 
-	private RefList<Ref> listRefsTxn() throws IOException {
-		RefList.Builder<Ref> txn = new RefList.Builder<>();
-		for (Ref r : bootstrap.getRefs(R_TXN).values()) {
-			txn.add(r);
-		}
-		txn.sort();
-		return txn.toRefList();
-	}
-
 	@Override
 	public List<Ref> getAdditionalRefs() throws IOException {
-		if (behavior == SHOW_ALL) {
-			return bootstrap.getAdditionalRefs();
-		}
 		return Collections.emptyList();
 	}
 
@@ -297,10 +262,8 @@ public class RefTreeDatabase extends RefDatabase {
 
 	@Override
 	public boolean isNameConflicting(String name) throws IOException {
-		if (behavior == SHOW_ALL && name.startsWith(R_TXN)) {
-			return bootstrap.isNameConflicting(name);
-		}
-		return !getConflictingNames(name).isEmpty();
+		return conflictsWithBootstrap(name)
+				|| !getConflictingNames(name).isEmpty();
 	}
 
 	@Override
@@ -310,12 +273,8 @@ public class RefTreeDatabase extends RefDatabase {
 
 	@Override
 	public RefUpdate newUpdate(String name, boolean detach) throws IOException {
-		if (name.startsWith(R_TXN)) {
-			if (behavior == SHOW_ALL) {
-				return bootstrap.newUpdate(name, detach);
-			} else if (behavior == REJECT_REFS_TXN) {
-				return new FailUpdate(this, name);
-			}
+		if (conflictsWithBootstrap(name)) {
+			return new AlwaysFailUpdate(this, name);
 		}
 
 		Ref r = exactRef(name);
@@ -338,13 +297,21 @@ public class RefTreeDatabase extends RefDatabase {
 	@Override
 	public RefRename newRename(String fromName, String toName)
 			throws IOException {
-		if (behavior == SHOW_ALL && fromName.startsWith(R_TXN)
-				&& toName.startsWith(R_TXN)) {
-			return bootstrap.newRename(fromName, toName);
-		}
-
 		RefUpdate from = newUpdate(fromName, true);
 		RefUpdate to = newUpdate(toName, true);
 		return new RefTreeRename(this, from, to);
+	}
+
+	boolean conflictsWithBootstrap(String name) {
+		if (txnNamespace != null && name.startsWith(txnNamespace)) {
+			return true;
+		} else if (txnCommitted.equals(name)) {
+			return true;
+		} else if (name.length() > txnCommitted.length()
+				&& name.charAt(txnCommitted.length()) == '/'
+				&& name.startsWith(txnCommitted)) {
+			return true;
+		}
+		return false;
 	}
 }

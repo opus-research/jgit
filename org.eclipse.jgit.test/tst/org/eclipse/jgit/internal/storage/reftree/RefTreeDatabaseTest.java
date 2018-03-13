@@ -43,7 +43,6 @@
 
 package org.eclipse.jgit.internal.storage.reftree;
 
-import static org.eclipse.jgit.internal.storage.reftree.RefTreeDatabase.R_TXN_COMMITTED;
 import static org.eclipse.jgit.lib.Constants.HEAD;
 import static org.eclipse.jgit.lib.Constants.R_HEADS;
 import static org.eclipse.jgit.lib.Constants.R_TAGS;
@@ -73,7 +72,6 @@ import java.util.Map;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
 import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
-import org.eclipse.jgit.internal.storage.reftree.RefTreeDatabase.Layering;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.BatchRefUpdate;
@@ -94,7 +92,7 @@ import org.eclipse.jgit.transport.ReceiveCommand;
 import org.junit.Before;
 import org.junit.Test;
 
-public class RefTreeDbTest {
+public class RefTreeDatabaseTest {
 	private InMemRefTreeRepo repo;
 	private RefTreeDatabase refdb;
 	private RefDatabase bootstrap;
@@ -413,123 +411,20 @@ public class RefTreeDbTest {
 		// existing reference must not be used as a container
 		assertTrue(refdb.isNameConflicting("refs/heads/a/b/c"));
 		assertTrue(refdb.isNameConflicting("refs/heads/q/master"));
-	}
 
-	@Test
-	public void testUnionBehavior_UpdateGetRefs() throws IOException {
-		repo.setBehavior(Layering.SHOW_ALL);
-		update("refs/heads/master", A);
-		ObjectId txnId = txnCommitted();
-
-		RefUpdate u = refdb.newUpdate("refs/txn/tmp", false);
-		u.setNewObjectId(A);
-		assertEquals(RefUpdate.Result.NEW, u.update());
-		assertEquals(txnId, txnCommitted());
-
-		Map<String, Ref> all = refdb.getRefs(ALL);
-		assertEquals(
-				"[refs/heads/master, refs/txn/committed, refs/txn/tmp]",
-				all.keySet().toString());
-		assertEquals(A, all.get("refs/heads/master").getObjectId());
-		assertEquals(txnId, all.get("refs/txn/committed").getObjectId());
-		assertEquals(A, all.get("refs/txn/tmp").getObjectId());
-	}
-
-	@Test
-	public void testUnionBehavior_OnlyRefsTxnVisible() throws IOException {
-		repo.setBehavior(Layering.SHOW_ALL);
-		update("refs/heads/master", A);
-		ObjectId txnId = txnCommitted();
-
-		RefUpdate u = bootstrap.newUpdate("refs/heads/tmp", false);
-		u.setNewObjectId(A);
-		assertEquals(RefUpdate.Result.NEW, u.update());
-		assertEquals(A, bootstrap.exactRef("refs/heads/tmp").getObjectId());
-		assertEquals(txnId, txnCommitted());
-
-		Map<String, Ref> all = refdb.getRefs(ALL);
-		assertEquals(
-				"[refs/heads/master, refs/txn/committed]",
-				all.keySet().toString());
-		assertEquals(A, all.get("refs/heads/master").getObjectId());
-		assertEquals(txnId, all.get("refs/txn/committed").getObjectId());
-	}
-
-	@Test
-	public void testUnionBehavior_BatchSuccess() throws IOException {
-		repo.setBehavior(Layering.SHOW_ALL);
-		update("refs/heads/master", A);
-		ObjectId txnId = txnCommitted();
-
-		ReceiveCommand cmd1 = command(A, B, "refs/heads/master");
-		ReceiveCommand cmd2 = command(null, A, "refs/txn/tmp");
-		BatchRefUpdate batch = refdb.newBatchUpdate();
-		batch.addCommand(cmd1);
-		batch.addCommand(cmd2);
-		batch.execute(new RevWalk(repo), NullProgressMonitor.INSTANCE);
-
-		assertEquals(OK, cmd1.getResult());
-		assertEquals(OK, cmd2.getResult());
-		assertNotEquals(txnId, txnCommitted());
-		assertEquals(B, refdb.exactRef("refs/heads/master").getObjectId());
-		assertEquals(A, refdb.exactRef("refs/txn/tmp").getObjectId());
-	}
-
-	@Test
-	public void testUnionBehavior_BatchFailure() throws IOException {
-		repo.setBehavior(Layering.SHOW_ALL);
-		update("refs/heads/master", A);
-		ObjectId txnId = txnCommitted();
-		txnId = txnCommitted();
-
-		RefUpdate u = bootstrap.newUpdate("refs/heads/tmp", false);
-		u.setNewObjectId(B);
-		assertEquals(RefUpdate.Result.NEW, u.update());
-		assertEquals(B, bootstrap.exactRef("refs/heads/tmp").getObjectId());
-
-		ReceiveCommand cmd1 = command(A, B, "refs/heads/master");
-		ReceiveCommand cmd2 = command(A, null, "refs/txn/tmp");
-		BatchRefUpdate batch = refdb.newBatchUpdate();
-		batch.addCommand(cmd1);
-		batch.addCommand(cmd2);
-		batch.execute(new RevWalk(repo), NullProgressMonitor.INSTANCE);
-
-		assertEquals(REJECTED_OTHER_REASON, cmd1.getResult());
-		assertEquals(LOCK_FAILURE, cmd2.getResult());
-		assertEquals(txnId, txnCommitted());
-	}
-
-	@Test
-	public void testUnionBehavior_BatchCannotAlsoUpdateRefsTxnCommitted()
-			throws IOException {
-		repo.setBehavior(Layering.SHOW_ALL);
-		update("refs/heads/master", A);
-		ObjectId txnId = txnCommitted();
-		txnId = txnCommitted();
-
-		ReceiveCommand cmd1 = command(A, B, "refs/heads/master");
-		ReceiveCommand cmd2 = command(txnId, B, "refs/txn/committed");
-		BatchRefUpdate batch = refdb.newBatchUpdate();
-		batch.setAllowNonFastForwards(true);
-		batch.addCommand(cmd1);
-		batch.addCommand(cmd2);
-		batch.execute(new RevWalk(repo), NullProgressMonitor.INSTANCE);
-
-		assertEquals(REJECTED_OTHER_REASON, cmd1.getResult());
-		assertEquals(JGitText.get().transactionAborted, cmd1.getMessage());
-		assertEquals(REJECTED_OTHER_REASON, cmd2.getResult());
-		assertEquals(JGitText.get().transactionAborted, cmd2.getMessage());
-		assertEquals(txnId, txnCommitted());
+		// refs/txn/ names always conflict.
+		assertTrue(refdb.isNameConflicting(refdb.getTxnCommitted()));
+		assertTrue(refdb.isNameConflicting("refs/txn/foo"));
 	}
 
 	@Test
 	public void testUpdate_RefusesRefsTxnNamespace() throws IOException {
-		ObjectId txnId = txnCommitted();
+		ObjectId txnId = getTxnCommitted();
 
 		RefUpdate u = refdb.newUpdate("refs/txn/tmp", false);
 		u.setNewObjectId(B);
 		assertEquals(RefUpdate.Result.LOCK_FAILURE, u.update());
-		assertEquals(txnId, txnCommitted());
+		assertEquals(txnId, getTxnCommitted());
 
 		ReceiveCommand cmd = command(null, B, "refs/txn/tmp");
 		BatchRefUpdate batch = refdb.newBatchUpdate();
@@ -539,39 +434,17 @@ public class RefTreeDbTest {
 		assertEquals(REJECTED_OTHER_REASON, cmd.getResult());
 		assertEquals(MessageFormat.format(JGitText.get().invalidRefName,
 				"refs/txn/tmp"), cmd.getMessage());
-		assertEquals(txnId, txnCommitted());
-	}
-
-	@Test
-	public void testHiddenBehavior_AllowsRefsTxnNamespace() throws IOException {
-		repo.setBehavior(Layering.HIDE_REFS_TXN);
-		ObjectId txnId = txnCommitted();
-
-		RefUpdate u = refdb.newUpdate("refs/txn/tmp", false);
-		u.setNewObjectId(A);
-		assertEquals(RefUpdate.Result.NEW, u.update());
-		assertNotEquals(txnId, txnCommitted());
-
-		assertEquals(A, refdb.exactRef("refs/txn/tmp").getObjectId());
-		assertNull(bootstrap.exactRef("refs/txn/tmp"));
-
-		ReceiveCommand cmd = command(A, B, "refs/txn/tmp");
-		BatchRefUpdate batch = refdb.newBatchUpdate();
-		batch.addCommand(cmd);
-		batch.execute(new RevWalk(repo), NullProgressMonitor.INSTANCE);
-		assertEquals(OK, cmd.getResult());
-		assertEquals(B, refdb.exactRef("refs/txn/tmp").getObjectId());
-		assertNull(bootstrap.exactRef("refs/txn/tmp"));
+		assertEquals(txnId, getTxnCommitted());
 	}
 
 	@Test
 	public void testUpdate_RefusesDotLockInRefName() throws IOException {
-		ObjectId txnId = txnCommitted();
+		ObjectId txnId = getTxnCommitted();
 
 		RefUpdate u = refdb.newUpdate("refs/heads/pu.lock", false);
 		u.setNewObjectId(B);
 		assertEquals(RefUpdate.Result.REJECTED, u.update());
-		assertEquals(txnId, txnCommitted());
+		assertEquals(txnId, getTxnCommitted());
 
 		ReceiveCommand cmd = command(null, B, "refs/heads/pu.lock");
 		BatchRefUpdate batch = refdb.newBatchUpdate();
@@ -580,14 +453,14 @@ public class RefTreeDbTest {
 
 		assertEquals(REJECTED_OTHER_REASON, cmd.getResult());
 		assertEquals(JGitText.get().funnyRefname, cmd.getMessage());
-		assertEquals(txnId, txnCommitted());
+		assertEquals(txnId, getTxnCommitted());
 	}
 
 	@Test
 	public void testBatchRefUpdate_NonFastForwardAborts() throws IOException {
 		update("refs/heads/master", A);
 		update("refs/heads/masters", B);
-		ObjectId txnId = txnCommitted();
+		ObjectId txnId = getTxnCommitted();
 
 		List<ReceiveCommand> commands = Arrays.asList(
 				command(A, B, "refs/heads/master"),
@@ -595,7 +468,7 @@ public class RefTreeDbTest {
 		BatchRefUpdate batchUpdate = refdb.newBatchUpdate();
 		batchUpdate.addCommand(commands);
 		batchUpdate.execute(new RevWalk(repo), NullProgressMonitor.INSTANCE);
-		assertEquals(txnId, txnCommitted());
+		assertEquals(txnId, getTxnCommitted());
 
 		assertEquals(REJECTED_NONFASTFORWARD,
 				commands.get(1).getResult());
@@ -609,7 +482,7 @@ public class RefTreeDbTest {
 	public void testBatchRefUpdate_ForceUpdate() throws IOException {
 		update("refs/heads/master", A);
 		update("refs/heads/masters", B);
-		ObjectId txnId = txnCommitted();
+		ObjectId txnId = getTxnCommitted();
 
 		List<ReceiveCommand> commands = Arrays.asList(
 				command(A, B, "refs/heads/master"),
@@ -618,7 +491,7 @@ public class RefTreeDbTest {
 		batchUpdate.setAllowNonFastForwards(true);
 		batchUpdate.addCommand(commands);
 		batchUpdate.execute(new RevWalk(repo), NullProgressMonitor.INSTANCE);
-		assertNotEquals(txnId, txnCommitted());
+		assertNotEquals(txnId, getTxnCommitted());
 
 		Map<String, Ref> refs = refdb.getRefs(ALL);
 		assertEquals(OK, commands.get(0).getResult());
@@ -634,7 +507,7 @@ public class RefTreeDbTest {
 	public void testBatchRefUpdate_NonFastForwardDoesNotDoExpensiveMergeCheck()
 			throws IOException {
 		update("refs/heads/master", B);
-		ObjectId txnId = txnCommitted();
+		ObjectId txnId = getTxnCommitted();
 
 		List<ReceiveCommand> commands = Arrays.asList(
 				command(B, A, "refs/heads/master"));
@@ -648,7 +521,7 @@ public class RefTreeDbTest {
 				return false;
 			}
 		}, NullProgressMonitor.INSTANCE);
-		assertNotEquals(txnId, txnCommitted());
+		assertNotEquals(txnId, getTxnCommitted());
 
 		Map<String, Ref> refs = refdb.getRefs(ALL);
 		assertEquals(OK, commands.get(0).getResult());
@@ -659,7 +532,7 @@ public class RefTreeDbTest {
 	public void testBatchRefUpdate_ConflictCausesAbort() throws IOException {
 		update("refs/heads/master", A);
 		update("refs/heads/masters", B);
-		ObjectId txnId = txnCommitted();
+		ObjectId txnId = getTxnCommitted();
 
 		List<ReceiveCommand> commands = Arrays.asList(
 				command(A, B, "refs/heads/master"),
@@ -669,7 +542,7 @@ public class RefTreeDbTest {
 		batchUpdate.setAllowNonFastForwards(true);
 		batchUpdate.addCommand(commands);
 		batchUpdate.execute(new RevWalk(repo), NullProgressMonitor.INSTANCE);
-		assertEquals(txnId, txnCommitted());
+		assertEquals(txnId, getTxnCommitted());
 
 		assertEquals(LOCK_FAILURE, commands.get(0).getResult());
 
@@ -686,7 +559,7 @@ public class RefTreeDbTest {
 	public void testBatchRefUpdate_NoConflictIfDeleted() throws IOException {
 		update("refs/heads/master", A);
 		update("refs/heads/masters", B);
-		ObjectId txnId = txnCommitted();
+		ObjectId txnId = getTxnCommitted();
 
 		List<ReceiveCommand> commands = Arrays.asList(
 				command(A, B, "refs/heads/master"),
@@ -696,7 +569,7 @@ public class RefTreeDbTest {
 		batchUpdate.setAllowNonFastForwards(true);
 		batchUpdate.addCommand(commands);
 		batchUpdate.execute(new RevWalk(repo), NullProgressMonitor.INSTANCE);
-		assertNotEquals(txnId, txnCommitted());
+		assertNotEquals(txnId, getTxnCommitted());
 
 		assertEquals(OK, commands.get(0).getResult());
 		assertEquals(OK, commands.get(1).getResult());
@@ -709,8 +582,8 @@ public class RefTreeDbTest {
 		assertEquals(A.getId(), refs.get("refs/heads/masters/x").getObjectId());
 	}
 
-	private ObjectId txnCommitted() throws IOException {
-		Ref r = bootstrap.exactRef(R_TXN_COMMITTED);
+	private ObjectId getTxnCommitted() throws IOException {
+		Ref r = bootstrap.exactRef(refdb.getTxnCommitted());
 		if (r != null && r.getObjectId() != null) {
 			return r.getObjectId();
 		}
@@ -766,11 +639,11 @@ public class RefTreeDbTest {
 		try (ObjectReader reader = repo.newObjectReader();
 				ObjectInserter inserter = repo.newObjectInserter();
 				RevWalk rw = new RevWalk(reader)) {
-			RefUpdate u = bootstrap.newUpdate(R_TXN_COMMITTED, false);
+			RefUpdate u = bootstrap.newUpdate(refdb.getTxnCommitted(), false);
 			CommitBuilder cb = new CommitBuilder();
 			testRepo.setAuthorAndCommitter(cb);
 
-			Ref ref = bootstrap.exactRef(R_TXN_COMMITTED);
+			Ref ref = bootstrap.exactRef(refdb.getTxnCommitted());
 			RefTree tree;
 			if (ref != null && ref.getObjectId() != null) {
 				tree = RefTree.read(reader, rw.parseTree(ref.getObjectId()));
@@ -796,20 +669,17 @@ public class RefTreeDbTest {
 	}
 
 	private class InMemRefTreeRepo extends InMemoryRepository {
-		private RefTreeDatabase rdb;
+		private final RefTreeDatabase refs;
 
 		InMemRefTreeRepo(DfsRepositoryDescription repoDesc) {
 			super(repoDesc);
-			setBehavior(Layering.REJECT_REFS_TXN);
-		}
-
-		void setBehavior(Layering behavior) {
-			rdb = new RefTreeDatabase(this, super.getRefDatabase(), behavior);
-			refdb = rdb;
+			refs = new RefTreeDatabase(this, super.getRefDatabase(),
+					"refs/txn/", "refs/txn/committed");
+			RefTreeDatabaseTest.this.refdb = refs;
 		}
 
 		public RefDatabase getRefDatabase() {
-			return rdb;
+			return refs;
 		}
 	}
 }

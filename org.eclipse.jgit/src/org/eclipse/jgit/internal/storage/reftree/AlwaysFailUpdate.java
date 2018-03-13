@@ -52,10 +52,10 @@ import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
 
 /** Update that always rejects with {@code LOCK_FAILURE}. */
-class FailUpdate extends RefUpdate {
+class AlwaysFailUpdate extends RefUpdate {
 	private final RefTreeDatabase refdb;
 
-	FailUpdate(RefTreeDatabase refdb, String name) {
+	AlwaysFailUpdate(RefTreeDatabase refdb, String name) {
 		super(new ObjectIdRef.Unpeeled(Ref.Storage.NEW, name, null));
 		this.refdb = refdb;
 		setCheckConflicting(false);
@@ -82,17 +82,17 @@ class FailUpdate extends RefUpdate {
 	}
 
 	@Override
-	protected Result doUpdate(Result desiredResult) throws IOException {
+	protected Result doUpdate(Result desiredResult) {
 		return Result.LOCK_FAILURE;
 	}
 
 	@Override
-	protected Result doDelete(Result desiredResult) throws IOException {
+	protected Result doDelete(Result desiredResult) {
 		return Result.LOCK_FAILURE;
 	}
 
 	@Override
-	protected Result doLink(String target) throws IOException {
+	protected Result doLink(String target) {
 		return Result.LOCK_FAILURE;
 	}
 }

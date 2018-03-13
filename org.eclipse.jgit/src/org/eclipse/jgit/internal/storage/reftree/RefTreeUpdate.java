@@ -66,8 +66,9 @@ import org.eclipse.jgit.transport.ReceiveCommand;
 /** Single reference update to {@link RefTreeDatabase}. */
 class RefTreeUpdate extends RefUpdate {
 	private final RefTreeDatabase refdb;
-	private Ref oldRef;
+	private RevWalk rw;
 	private RefTreeBatch batch;
+	private Ref oldRef;
 
 	RefTreeUpdate(RefTreeDatabase refdb, Ref ref) {
 		super(ref);
@@ -87,22 +88,25 @@ class RefTreeUpdate extends RefUpdate {
 
 	@Override
 	protected boolean tryLock(boolean deref) throws IOException {
+		rw = new RevWalk(getRepository());
 		batch = new RefTreeBatch(refdb);
-		try (RevWalk rw = new RevWalk(getRepository())) {
-			batch.init(rw);
-			oldRef = batch.exactRef(rw.getObjectReader(), getName());
-			if (oldRef != null && oldRef.getObjectId() != null) {
-				setOldObjectId(oldRef.getObjectId());
-			} else if (oldRef == null && getExpectedOldObjectId() != null) {
-				setOldObjectId(ObjectId.zeroId());
-			}
+		batch.init(rw);
+		oldRef = batch.exactRef(rw.getObjectReader(), getName());
+		if (oldRef != null && oldRef.getObjectId() != null) {
+			setOldObjectId(oldRef.getObjectId());
+		} else if (oldRef == null && getExpectedOldObjectId() != null) {
+			setOldObjectId(ObjectId.zeroId());
 		}
 		return true;
 	}
 
 	@Override
 	protected void unlock() {
-		// No locks are held here.
+		batch = null;
+		if (rw != null) {
+			rw.close();
+			rw = null;
+		}
 	}
 
 	@Override
@@ -112,14 +116,12 @@ class RefTreeUpdate extends RefUpdate {
 
 	private Ref newRef(String name, ObjectId id)
 			throws MissingObjectException, IOException {
-		try (RevWalk rw = new RevWalk(getRepository())) {
-			RevObject o = rw.parseAny(id);
-			if (o instanceof RevTag) {
-				RevObject p = rw.peel(o);
-				return new ObjectIdRef.PeeledTag(LOOSE, name, id, p.copy());
-			}
-			return new ObjectIdRef.PeeledNonTag(LOOSE, name, id);
+		RevObject o = rw.parseAny(id);
+		if (o instanceof RevTag) {
+			RevObject p = rw.peel(o);
+			return new ObjectIdRef.PeeledTag(LOOSE, name, id, p.copy());
 		}
+		return new ObjectIdRef.PeeledNonTag(LOOSE, name, id);
 	}
 
 	@Override
@@ -140,13 +142,9 @@ class RefTreeUpdate extends RefUpdate {
 	private Result run(@Nullable Ref newRef, Result desiredResult)
 			throws IOException {
 		Command c = new Command(oldRef, newRef);
-		try (RevWalk rw = new RevWalk(getRepository())) {
-			batch.setRefLogIdent(getRefLogIdent());
-			batch.setRefLogMessage(
-					getRefLogMessage(),
-					isRefLogIncludingResult());
-			batch.execute(rw, Collections.singletonList(c));
-		}
+		batch.setRefLogIdent(getRefLogIdent());
+		batch.setRefLogMessage(getRefLogMessage(), isRefLogIncludingResult());
+		batch.execute(rw, Collections.singletonList(c));
 		return translate(c.getResult(), desiredResult);
 	}
 
