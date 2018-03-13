@@ -920,10 +920,6 @@ public class TestRepository<R extends Repository> {
 			return this;
 		}
 
-		public List<RevCommit> parents() {
-			return Collections.unmodifiableList(parents);
-		}
-
 		public CommitBuilder noParents() {
 			parents.clear();
 			return this;
@@ -974,10 +970,6 @@ public class TestRepository<R extends Repository> {
 			return this;
 		}
 
-		public String message() {
-			return message;
-		}
-
 		public CommitBuilder tick(int secs) {
 			tick = secs;
 			return this;
@@ -994,17 +986,9 @@ public class TestRepository<R extends Repository> {
 			return this;
 		}
 
-		public PersonIdent author() {
-			return author;
-		}
-
 		public CommitBuilder committer(PersonIdent c) {
 			committer = c;
 			return this;
-		}
-
-		public PersonIdent committer() {
-			return committer;
 		}
 
 		public CommitBuilder insertChangeId() {
