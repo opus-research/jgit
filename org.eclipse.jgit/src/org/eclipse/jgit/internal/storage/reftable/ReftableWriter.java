@@ -44,7 +44,14 @@
 package org.eclipse.jgit.internal.storage.reftable;
 
 import static java.lang.Math.log;
-import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.*;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_FOOTER_LEN;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_HEADER_LEN;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_HEADER_MAGIC;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.INDEX_BLOCK_TYPE;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_BLOCK_TYPE;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.MAX_BLOCK_SIZE;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.REF_BLOCK_TYPE;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.VERSION_1;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -62,6 +69,7 @@ import org.eclipse.jgit.internal.storage.reftable.BlockWriter.Entry;
 import org.eclipse.jgit.internal.storage.reftable.BlockWriter.LogEntry;
 import org.eclipse.jgit.internal.storage.reftable.BlockWriter.ObjEntry;
 import org.eclipse.jgit.internal.storage.reftable.BlockWriter.RefEntry;
+import org.eclipse.jgit.internal.storage.reftable.BlockWriter.TextEntry;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
@@ -199,14 +207,16 @@ public class ReftableWriter {
 	 *
 	 * @param ref
 	 *            the reference to store.
-	 * @return {@code this}
 	 * @throws IOException
 	 *             reftable cannot be written.
 	 */
-	public ReftableWriter writeRef(Ref ref) throws IOException {
+	public void writeRef(Ref ref) throws IOException {
 		int blockId = write(refIndex, new RefEntry(ref));
 		indexRef(ref, blockId);
-		return this;
+	}
+
+	void writeText(String name, String content) throws IOException {
+		write(refIndex, new TextEntry(name, content));
 	}
 
 	private void indexRef(Ref ref, int blockId) {
@@ -246,17 +256,16 @@ public class ReftableWriter {
 	 *            new id; pass {@link ObjectId#zeroId()} for deletions.
 	 * @param message
 	 *            optional message (may be null).
-	 * @return {@code this}
 	 * @throws IOException
 	 *             reftable cannot be written.
 	 */
-	public ReftableWriter writeLog(String name, PersonIdent who, ObjectId oldId,
+	public void writeLog(String name, PersonIdent who, ObjectId oldId,
 			ObjectId newId, @Nullable String message) throws IOException {
 		long timeUsec = who.getWhen().getTime() * 1000L + 999L;
 		if (logLastRef.equals(name) && timeUsec >= logLastTimeUsec) {
 			timeUsec = logLastTimeUsec - 1;
 		}
-		return writeLog(name, timeUsec, who, oldId, newId, message);
+		writeLog(name, timeUsec, who, oldId, newId, message);
 	}
 
 	/**
@@ -278,11 +287,10 @@ public class ReftableWriter {
 	 *            new id; pass {@link ObjectId#zeroId()} for deletions.
 	 * @param message
 	 *            optional message (may be null).
-	 * @return {@code this}
 	 * @throws IOException
 	 *             reftable cannot be written.
 	 */
-	public ReftableWriter writeLog(String name, long timeUsec, PersonIdent who,
+	public void writeLog(String name, long timeUsec, PersonIdent who,
 			ObjectId oldId, ObjectId newId, @Nullable String message)
 					throws IOException {
 		String msg = message != null ? message : ""; //$NON-NLS-1$
@@ -291,7 +299,6 @@ public class ReftableWriter {
 		logLastTimeUsec = timeUsec;
 		logCnt++;
 		write(logIndex, new LogEntry(name, timeUsec, who, oldId, newId, msg));
-		return this;
 	}
 
 	private void beginLog() throws IOException {
