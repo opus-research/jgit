@@ -67,8 +67,6 @@ public class AbortedByHookException extends GitAPIException {
 	private final int returnCode;
 
 	/**
-	 * Constructor.
-	 *
 	 * @param message
 	 *            The error details.
 	 * @param hookName
