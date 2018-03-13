@@ -68,7 +68,6 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.file.ReflogReader;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.util.FileUtils;
 import org.junit.Test;
@@ -151,8 +150,8 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 
 	@Test
 	public void testSomeCommits() throws NoHeadException, NoMessageException,
-			ConcurrentRefUpdateException, JGitInternalException,
-			WrongRepositoryStateException, IOException {
+			UnmergedPathException, ConcurrentRefUpdateException,
+			JGitInternalException, WrongRepositoryStateException {
 
 		// do 4 commits
 		Git git = new Git(db);
@@ -181,8 +180,6 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 			l--;
 		}
 		assertEquals(l, -1);
-		ReflogReader reader = db.getReflogReader(Constants.HEAD);
-		assertTrue(reader.getLastEntry().getComment().startsWith("commit:"));
 	}
 
 	// try to do a commit without specifying a message. Should fail!
@@ -322,8 +319,8 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 
 	@Test
 	public void testCommitAmend() throws NoHeadException, NoMessageException,
-			ConcurrentRefUpdateException, JGitInternalException,
-			WrongRepositoryStateException, IOException {
+			UnmergedPathException, ConcurrentRefUpdateException,
+			JGitInternalException, WrongRepositoryStateException {
 		Git git = new Git(db);
 		git.commit().setMessage("first comit").call(); // typo
 		git.commit().setAmend(true).setMessage("first commit").call();
@@ -335,9 +332,6 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 			c++;
 		}
 		assertEquals(1, c);
-		ReflogReader reader = db.getReflogReader(Constants.HEAD);
-		assertTrue(reader.getLastEntry().getComment()
-				.startsWith("commit (amend):"));
 	}
 
 	@Test
