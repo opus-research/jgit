@@ -40,21 +40,23 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.attributes;
+package org.eclipse.jgit.util;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
- * An abstraction for JGit's builtin implementations for hooks and filters.
+ * An abstraction for JGits builtin implementations for hooks and filters.
  * Instead of spawning an external processes to start a filter/hook and to pump
- * data from/to stdin/stdout these builtin commmands may be used. They are
- * constructed by {@link FilterCommandFactory}.
+ * data from/to stdin/stdout these builtin coammnds may be used. The are
+ * constructed by {@link BuiltinCommandFactory} and take an InputStream,
+ * OutputStream and a repository as constructor parameters. They offer a method
+ * {@link #run()} which triggers the execution of the command().
  *
- * @since 4.6
+ * @since 4.4
  */
-public abstract class FilterCommand {
+public abstract class BuiltinCommand {
 	/**
 	 * The {@link InputStream} this command should read from
 	 */
@@ -67,17 +69,15 @@ public abstract class FilterCommand {
 
 	/**
 	 * @param in
-	 *            The {@link InputStream} this command should read from
 	 * @param out
-	 *            The {@link OutputStream} this command should write to
 	 */
-	public FilterCommand(InputStream in, OutputStream out) {
+	public BuiltinCommand(InputStream in, OutputStream out) {
 		this.in = in;
 		this.out = out;
 	}
 
 	/**
-	 * Execute the command. The command is supposed to read data from
+	 * Executes the command. The command is supposed to read data from
 	 * {@link #in} and to write the result to {@link #out}. It returns the
 	 * number of bytes it read from {@link #in}. It should be called in a loop
 	 * until it returns -1 signaling that the {@link InputStream} is completely

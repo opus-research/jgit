@@ -53,7 +53,6 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.Git;
@@ -107,12 +106,10 @@ import org.eclipse.jgit.util.FileUtils;
 public class RepoCommand extends GitCommand<RevCommit> {
 	private String path;
 	private String uri;
-	private String groupsParam;
+	private String groups;
 	private String branch;
 	private String targetBranch = Constants.HEAD;
 	private boolean recordRemoteBranch = false;
-	private boolean recordSubmoduleLabels = false;
-	private boolean recordShallowSubmodules = false;
 	private PersonIdent author;
 	private RemoteReader callback;
 	private InputStream inputStream;
@@ -286,7 +283,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	 * @return this command
 	 */
 	public RepoCommand setGroups(String groups) {
-		this.groupsParam = groups;
+		this.groups = groups;
 		return this;
 	}
 
@@ -344,36 +341,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	 */
 	public RepoCommand setRecordRemoteBranch(boolean enable) {
 		this.recordRemoteBranch = enable;
-		return this;
-	}
-
-	/**
-	 * Set whether the labels field should be recorded as a label in
-	 * .gitattributes.
-	 * <p>
-	 * Not implemented for non-bare repositories.
-	 *
-	 * @param enable Whether to record the labels in the .gitattributes
-	 * @return this command
-	 * @since 4.4
-	 */
-	public RepoCommand setRecordSubmoduleLabels(boolean enable) {
-		this.recordSubmoduleLabels = enable;
-		return this;
-	}
-
-	/**
-	 * Set whether the clone-depth field should be recorded as a shallow
-	 * recommendation in .gitmodules.
-	 * <p>
-	 * Not implemented for non-bare repositories.
-	 *
-	 * @param enable Whether to record the shallow recommendation.
-	 * @return this command
-	 * @since 4.4
-	 */
-	public RepoCommand setRecommendShallow(boolean enable) {
-		this.recordShallowSubmodules = enable;
 		return this;
 	}
 
@@ -478,16 +445,14 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				git = new Git(repo);
 
 			ManifestParser parser = new ManifestParser(
-					includedReader, path, branch, uri, groupsParam, repo);
+					includedReader, path, branch, uri, groups, repo);
 			try {
 				parser.read(inputStream);
 				for (RepoProject proj : parser.getFilteredProjects()) {
 					addSubmodule(proj.getUrl(),
 							proj.getPath(),
 							proj.getRevision(),
-							proj.getCopyFiles(),
-							proj.getGroups(),
-							proj.getRecommendShallow());
+							proj.getCopyFiles());
 				}
 			} catch (GitAPIException | IOException e) {
 				throw new ManifestErrorException(e);
@@ -507,7 +472,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			ObjectInserter inserter = repo.newObjectInserter();
 			try (RevWalk rw = new RevWalk(repo)) {
 				Config cfg = new Config();
-				StringBuilder attributes = new StringBuilder();
 				for (RepoProject proj : bareProjects) {
 					String name = proj.getPath();
 					String nameUri = proj.getName();
@@ -528,27 +492,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 							cfg.setString("submodule", name, "branch", //$NON-NLS-1$ //$NON-NLS-2$
 									proj.getRevision());
 						}
-
-						if (recordShallowSubmodules && proj.getRecommendShallow() != null) {
-							// The shallow recommendation is losing information.
-							// As the repo manifests stores the recommended
-							// depth in the 'clone-depth' field, while
-							// git core only uses a binary 'shallow = true/false'
-							// hint, we'll map any depth to 'shallow = true'
-							cfg.setBoolean("submodule", name, "shallow", //$NON-NLS-1$ //$NON-NLS-2$
-									true);
-						}
-					}
-					if (recordSubmoduleLabels) {
-						StringBuilder rec = new StringBuilder();
-						rec.append("/"); //$NON-NLS-1$
-						rec.append(name);
-						for (String group : proj.getGroups()) {
-							rec.append(" "); //$NON-NLS-1$
-							rec.append(group);
-						}
-						rec.append("\n"); //$NON-NLS-1$
-						attributes.append(rec.toString());
 					}
 					cfg.setString("submodule", name, "path", name); //$NON-NLS-1$ //$NON-NLS-2$
 					cfg.setString("submodule", name, "url", nameUri); //$NON-NLS-1$ //$NON-NLS-2$
@@ -578,16 +521,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				dcEntry.setObjectId(objectId);
 				dcEntry.setFileMode(FileMode.REGULAR_FILE);
 				builder.add(dcEntry);
-
-				if (recordSubmoduleLabels) {
-					// create a new DirCacheEntry for .gitattributes file.
-					final DirCacheEntry dcEntryAttr = new DirCacheEntry(Constants.DOT_GIT_ATTRIBUTES);
-					ObjectId attrId = inserter.insert(Constants.OBJ_BLOB,
-							attributes.toString().getBytes(Constants.CHARACTER_ENCODING));
-					dcEntryAttr.setObjectId(attrId);
-					dcEntryAttr.setFileMode(FileMode.REGULAR_FILE);
-					builder.add(dcEntryAttr);
-				}
 
 				builder.finish();
 				ObjectId treeId = index.writeTree(inserter);
@@ -642,10 +575,9 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	}
 
 	private void addSubmodule(String url, String name, String revision,
-			List<CopyFile> copyfiles, Set<String> groups, String recommendShallow)
-			throws GitAPIException, IOException {
+			List<CopyFile> copyfiles) throws GitAPIException, IOException {
 		if (repo.isBare()) {
-			RepoProject proj = new RepoProject(url, name, revision, null, groups, recommendShallow);
+			RepoProject proj = new RepoProject(url, name, revision, null, null);
 			proj.addCopyFiles(copyfiles);
 			bareProjects.add(proj);
 		} else {

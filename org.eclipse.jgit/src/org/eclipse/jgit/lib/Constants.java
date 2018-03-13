@@ -392,16 +392,16 @@ public final class Constants {
 	public static final String ATTR_FILTER_TYPE_SMUDGE = "smudge";
 
 	/**
-	 * Whether to use JGit's implementations of filters and hooks
+	 * whether to use JGits builtin implementation of filters and hooks
 	 *
-	 * @since 4.6
+	 * @since 4.4
 	 */
 	public static final String ATTR_FILTER_USE_BUILTIN = "useJGitBuiltin";
 
 	/**
-	 * Builtin filter commands start with this prefix
+	 * Builtin commands are starting with this prefix
 	 *
-	 * @since 4.6
+	 * @since 4.4
 	 */
 	public static final String BUILTIN_FILTER_PREFIX = "jgit://builtin/";
 

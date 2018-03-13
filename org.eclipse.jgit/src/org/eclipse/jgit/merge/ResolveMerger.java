@@ -761,7 +761,7 @@ public class ResolveMerger extends ThreeWayMerger {
 				: FileMode.fromBits(newMode));
 		if (mergedFile != null) {
 			long len = mergedFile.length();
-			dce.setLastModified(FS.DETECTED.lastModified(mergedFile));
+			dce.setLastModified(mergedFile.lastModified());
 			dce.setLength((int) len);
 			InputStream is = new FileInputStream(mergedFile);
 			try {
@@ -1005,14 +1005,13 @@ public class ResolveMerger extends ThreeWayMerger {
 		builder = dircache.builder();
 		DirCacheBuildIterator buildIt = new DirCacheBuildIterator(builder);
 
-		tw = new NameConflictTreeWalk(db, reader);
+		tw = new NameConflictTreeWalk(reader);
 		tw.addTree(baseTree);
 		tw.addTree(headTree);
 		tw.addTree(mergeTree);
-		int dciPos = tw.addTree(buildIt);
+		tw.addTree(buildIt);
 		if (workingTreeIterator != null) {
 			tw.addTree(workingTreeIterator);
-			workingTreeIterator.setDirCacheIterator(tw, dciPos);
 		} else {
 			tw.setFilter(TreeFilter.ANY_DIFF);
 		}
