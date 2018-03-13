@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2010,Mathias Kinzler <mathias.kinzler@sap.com> and
- * other copyright owners as documented in the project's IP log.
+ * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
+ * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Distribution License v1.0 which accompanies this
@@ -40,15 +41,31 @@ package org.eclipse.jgit.api.errors;
 import org.eclipse.jgit.JGitText;
 
 /**
- * Thrown when branch deletion fails due to unmerged data
+ * Exception thrown when a command expected a non-detached {@code HEAD}
+ * reference
  */
-public class NotMergedException extends GitAPIException {
+public class DetachedHeadException extends GitAPIException {
 	private static final long serialVersionUID = 1L;
 
 	/**
 	 * The default constructor with a default message
 	 */
-	public NotMergedException() {
-		super(JGitText.get().notMergedExceptionMessage);
+	public DetachedHeadException() {
+		this(JGitText.get().detachedHeadDetected);
+	}
+
+	/**
+	 * @param message
+	 * @param cause
+	 */
+	public DetachedHeadException(String message, Throwable cause) {
+		super(message, cause);
+	}
+
+	/**
+	 * @param message
+	 */
+	public DetachedHeadException(String message) {
+		super(message);
 	}
 }

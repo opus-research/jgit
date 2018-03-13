@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2010,Mathias Kinzler <mathias.kinzler@sap.com> and
- * other copyright owners as documented in the project's IP log.
+ * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
+ * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Distribution License v1.0 which accompanies this
@@ -37,19 +38,16 @@
  */
 package org.eclipse.jgit.api.errors;
 
-import org.eclipse.jgit.lib.Ref;
-
 /**
- * Thrown when trying to create a {@link Ref} with the same name as an exsiting
- * one
+ * Exception thrown when an operation was canceled
  */
-public class RefAlreadyExistsException extends GitAPIException {
+public class CanceledException extends GitAPIException {
 	private static final long serialVersionUID = 1L;
 
 	/**
 	 * @param message
 	 */
-	public RefAlreadyExistsException(String message) {
+	public CanceledException(String message) {
 		super(message);
 	}
 }

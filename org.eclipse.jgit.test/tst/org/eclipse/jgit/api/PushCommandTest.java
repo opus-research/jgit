@@ -1,5 +1,4 @@
 /*
- * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
  * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
@@ -41,50 +40,57 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.api;
 
-/**
- * Constants for use with the Configuration classes: section names,
- * configuration keys
- */
-public class ConfigConstants {
-	/** The "core" section */
-	public static final String CONFIG_CORE_SECTION = "core";
+import java.io.IOException;
+import java.net.URISyntaxException;
 
-	/** The "branch" section */
-	public static final String CONFIG_BRANCH_SECTION = "branch";
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.lib.Config;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevTag;
+import org.eclipse.jgit.transport.RefSpec;
+import org.eclipse.jgit.transport.RemoteConfig;
+import org.eclipse.jgit.transport.URIish;
 
-	/** The "remote" section */
-	public static final String CONFIG_REMOTE_SECTION = "remote";
+public class PushCommandTest extends RepositoryTestCase {
 
-	/** The "autocrlf" key */
-	public static final String CONFIG_KEY_AUTOCRLF = "autocrlf";
+	public void testPush() throws JGitInternalException, IOException,
+			GitAPIException, URISyntaxException {
 
-	/** The "bare" key */
-	public static final String CONFIG_KEY_BARE = "bare";
+		// create other repository
+		Repository db2 = createWorkRepository();
 
-	/** The "filemode" key */
-	public static final String CONFIG_KEY_FILEMODE = "filemode";
+		// setup the first repository
+		final Config config = db.getConfig();
+		RemoteConfig remoteConfig = new RemoteConfig(config, "test");
+		URIish uri = new URIish(db2.getDirectory().toURI().toURL());
+		remoteConfig.addURI(uri);
+		remoteConfig.update(config);
 
-	/** The "logallrefupdates" key */
-	public static final String CONFIG_KEY_LOGALLREFUPDATES = "logallrefupdates";
+		Git git1 = new Git(db);
+		// create some refs via commits and tag
+		RevCommit commit = git1.commit().setMessage("initial commit").call();
+		RevTag tag = git1.tag().setName("tag").call();
 
-	/** The "repositoryformatversion" key */
-	public static final String CONFIG_KEY_REPO_FORMAT_VERSION = "repositoryformatversion";
+		try {
+			db2.resolve(commit.getId().getName() + "^{commit}");
+			fail("id shouldn't exist yet");
+		} catch (MissingObjectException e) {
+			// we should get here
+		}
 
-	/** The "worktree" key */
-	public static final String CONFIG_KEY_WORKTREE = "worktree";
+		RefSpec spec = new RefSpec("refs/heads/master:refs/heads/x");
+		git1.push().setRemote("test").setRefSpecs(spec)
+				.call();
 
-	/** The "remote" key */
-	public static final String CONFIG_KEY_REMOTE = "remote";
-
-	/** The "merge" key */
-	public static final String CONFIG_KEY_MERGE = "merge";
-
-	/** The "rebase" key */
-	public static final String CONFIG_KEY_REBASE = "rebase";
-
-	/** The "url" key */
-	public static final String CONFIG_KEY_URL = "url";
+		assertEquals(commit.getId(),
+				db2.resolve(commit.getId().getName() + "^{commit}"));
+		assertEquals(tag.getId(), db2.resolve(tag.getId().getName()));
+	}
 
 }
