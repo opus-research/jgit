@@ -139,6 +139,22 @@ class Log extends RevWalkTextBuiltin {
 		diffFmt.setAbbreviationLength(Constants.OBJECT_ID_STRING_LENGTH);
 	}
 
+	@Option(name = "--src-prefix", usage = "usage_srcPrefix")
+	void sourcePrefix(String path) {
+		diffFmt.setOldPrefix(path);
+	}
+
+	@Option(name = "--dst-prefix", usage = "usage_dstPrefix")
+	void dstPrefix(String path) {
+		diffFmt.setNewPrefix(path);
+	}
+
+	@Option(name = "--no-prefix", usage = "usage_noPrefix")
+	void noPrefix(@SuppressWarnings("unused") boolean on) {
+		diffFmt.setOldPrefix("");
+		diffFmt.setNewPrefix("");
+	}
+
 	// END -- Options shared with Diff
 
 	Log() {
@@ -218,10 +234,10 @@ class Log extends RevWalkTextBuiltin {
 		if (showNameAndStatusOnly)
 			Diff.nameStatus(out, diffFmt.scan(a, b));
 		else {
+			out.flush();
 			diffFmt.format(a, b);
 			diffFmt.flush();
 		}
 		out.println();
-		out.flush();
 	}
 }
