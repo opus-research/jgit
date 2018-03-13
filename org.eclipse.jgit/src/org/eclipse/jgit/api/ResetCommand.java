@@ -234,12 +234,17 @@ public class ResetCommand extends GitCommand<Ref> {
 	}
 
 	private RevCommit parseCommit(final ObjectId commitId) {
-		try (RevWalk rw = new RevWalk(repo)) {
-			return rw.parseCommit(commitId);
+		RevCommit commit;
+		RevWalk rw = new RevWalk(repo);
+		try {
+			commit = rw.parseCommit(commitId);
 		} catch (IOException e) {
 			throw new JGitInternalException(MessageFormat.format(
 					JGitText.get().cannotReadCommit, commitId.toString()), e);
+		} finally {
+			rw.release();
 		}
+		return commit;
 	}
 
 	private ObjectId resolveRefToCommitId() {
@@ -300,10 +305,11 @@ public class ResetCommand extends GitCommand<Ref> {
 
 	private void resetIndexForPaths(ObjectId commitTree) {
 		DirCache dc = null;
-		try (final TreeWalk tw = new TreeWalk(repo)) {
+		try {
 			dc = repo.lockDirCache();
 			DirCacheBuilder builder = dc.builder();
 
+			final TreeWalk tw = new TreeWalk(repo);
 			tw.addTree(new DirCacheBuildIterator(builder));
 			if (commitTree != null)
 				tw.addTree(commitTree);
@@ -336,9 +342,11 @@ public class ResetCommand extends GitCommand<Ref> {
 
 	private void resetIndex(ObjectId commitTree) throws IOException {
 		DirCache dc = repo.lockDirCache();
-		try (TreeWalk walk = new TreeWalk(repo)) {
+		TreeWalk walk = null;
+		try {
 			DirCacheBuilder builder = dc.builder();
 
+			walk = new TreeWalk(repo);
 			if (commitTree != null)
 				walk.addTree(commitTree);
 			else
@@ -372,6 +380,8 @@ public class ResetCommand extends GitCommand<Ref> {
 			builder.commit();
 		} finally {
 			dc.unlock();
+			if (walk != null)
+				walk.release();
 		}
 	}
 
