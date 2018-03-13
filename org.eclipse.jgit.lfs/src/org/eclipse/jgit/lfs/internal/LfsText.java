@@ -64,4 +64,5 @@ public class LfsText extends TranslationBundle {
 	/***/ public String requiredHashFunctionNotAvailable;
 	/***/ public String repositoryNotFound;
 	/***/ public String repositoryReadOnly;
+	/***/ public String lfsUnavailable;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, Tomasz Zarna <tomasz.zarna@tasktop.com> and others.
+ * Copyright (C) 2016, David Pursehouse <david.pursehouse@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,57 +40,26 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.pgm;
 
-import static org.junit.Assert.assertEquals;
+package org.eclipse.jgit.lfs.errors;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.lib.CLIRepositoryTestCase;
-import org.eclipse.jgit.lib.Ref;
-import org.junit.Before;
-import org.junit.Test;
+import java.text.MessageFormat;
 
-public class TagTest extends CLIRepositoryTestCase {
-	private Git git;
+import org.eclipse.jgit.lfs.internal.LfsText;
 
-	@Override
-	@Before
-	public void setUp() throws Exception {
-		super.setUp();
-		git = new Git(db);
-		git.commit().setMessage("initial commit").call();
-	}
+/**
+ * Thrown when LFS is not available.
+ *
+ * @since 4.5
+ */
+public class LfsUnavailable extends LfsException {
+	private static final long serialVersionUID = 1L;
 
-	@Test
-	public void testTagTwice() throws Exception {
-		git.tag().setName("test").call();
-		writeTrashFile("file", "content");
-		git.add().addFilepattern("file").call();
-		git.commit().setMessage("commit").call();
-
-		assertEquals("fatal: tag 'test' already exists",
-				executeUnchecked("git tag test")[0]);
-	}
-
-	@Test
-	public void testTagDelete() throws Exception {
-		git.tag().setName("test").call();
-
-		Ref ref = git.getRepository().getTags().get("test");
-		assertEquals("refs/tags/test", ref.getName());
-
-		assertEquals("", executeUnchecked("git tag -d test")[0]);
-		Ref deletedRef = git.getRepository().getTags().get("test");
-		assertEquals(null, deletedRef);
-	}
-
-	@Test
-	public void testTagDeleteFail() throws Exception {
-		try {
-			assertEquals("fatal: error: tag 'test' not found.",
-					executeUnchecked("git tag -d test")[0]);
-		} catch (Die e) {
-			assertEquals("fatal: error: tag 'test' not found", e.getMessage());
-		}
+	/**
+	 * @param name
+	 *            the repository name.
+	 */
+	public LfsUnavailable(String name) {
+		super(MessageFormat.format(LfsText.get().lfsUnavailable, name));
 	}
 }
