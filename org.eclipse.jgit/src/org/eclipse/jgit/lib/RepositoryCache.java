@@ -47,6 +47,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -223,7 +225,7 @@ public class RepositoryCache {
 	private volatile long expireAfter;
 
 	private RepositoryCache() {
-		cacheMap = new ConcurrentHashMap<>();
+		cacheMap = new ConcurrentHashMap<Key, Repository>();
 		openLocks = new Lock[4];
 		for (int i = 0; i < openLocks.length; i++) {
 			openLocks[i] = new Lock();
@@ -312,8 +314,9 @@ public class RepositoryCache {
 	}
 
 	private void clearAll() {
-		for (Key k : cacheMap.keySet()) {
-			unregisterAndCloseRepository(k);
+		for (Iterator<Map.Entry<Key, Repository>> i = cacheMap
+				.entrySet().iterator(); i.hasNext();) {
+			unregisterAndCloseRepository(i.next().getKey());
 		}
 	}
 
