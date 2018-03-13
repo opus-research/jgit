@@ -40,97 +40,84 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
+package org.eclipse.jgit.lib;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.fail;
 
-import java.util.Collection;
-import java.util.Iterator;
-
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.RefUpdate;
-import org.eclipse.jgit.lib.RefUpdate.Result;
-import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.errors.RevisionSyntaxException;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.junit.Test;
 
 /**
- * Unit tests of {@link StashListCommand}
+ * Unit tests for resolving reflog-based revisions
  */
-public class StashListCommandTest extends RepositoryTestCase {
+public class ReflogResolveTest extends RepositoryTestCase {
 
 	@Test
-	public void noStashRef() throws Exception {
-		StashListCommand command = Git.wrap(db).stashList();
-		Collection<RevCommit> stashed = command.call();
-		assertNotNull(stashed);
-		assertTrue(stashed.isEmpty());
-	}
-
-	@Test
-	public void emptyStashReflog() throws Exception {
-		Git git = Git.wrap(db);
+	public void resolveMasterCommits() throws Exception {
+		Git git = new Git(db);
 		writeTrashFile("file.txt", "content");
 		git.add().addFilepattern("file.txt").call();
-		RevCommit commit = git.commit().setMessage("create file").call();
-
-		RefUpdate update = db.updateRef(Constants.R_STASH);
-		update.setNewObjectId(commit);
-		update.disableRefLog();
-		assertEquals(Result.NEW, update.update());
-
-		StashListCommand command = Git.wrap(db).stashList();
-		Collection<RevCommit> stashed = command.call();
-		assertNotNull(stashed);
-		assertTrue(stashed.isEmpty());
-	}
-
-	@Test
-	public void singleStashedCommit() throws Exception {
-		Git git = Git.wrap(db);
-		writeTrashFile("file.txt", "content");
-		git.add().addFilepattern("file.txt").call();
-		RevCommit commit = git.commit().setMessage("create file").call();
-
-		RefUpdate update = db.updateRef(Constants.R_STASH);
-		update.setNewObjectId(commit);
-		assertEquals(Result.NEW, update.update());
-
-		StashListCommand command = git.stashList();
-		Collection<RevCommit> stashed = command.call();
-		assertNotNull(stashed);
-		assertEquals(1, stashed.size());
-		assertEquals(commit, stashed.iterator().next());
-	}
-
-	@Test
-	public void multipleStashedCommits() throws Exception {
-		Git git = Git.wrap(db);
-
-		writeTrashFile("file.txt", "content");
-		git.add().addFilepattern("file.txt").call();
-		RevCommit commit1 = git.commit().setMessage("create file").call();
-
+		RevCommit c1 = git.commit().setMessage("create file").call();
 		writeTrashFile("file.txt", "content2");
 		git.add().addFilepattern("file.txt").call();
-		RevCommit commit2 = git.commit().setMessage("edit file").call();
+		RevCommit c2 = git.commit().setMessage("edit file").call();
 
-		RefUpdate create = db.updateRef(Constants.R_STASH);
-		create.setNewObjectId(commit1);
-		assertEquals(Result.NEW, create.update());
+		assertEquals(c2, db.resolve("master@{0}"));
+		assertEquals(c1, db.resolve("master@{1}"));
+	}
 
-		RefUpdate update = db.updateRef(Constants.R_STASH);
-		update.setNewObjectId(commit2);
-		assertEquals(Result.FAST_FORWARD, update.update());
+	@Test
+	public void resolveReflogParent() throws Exception {
+		Git git = new Git(db);
+		writeTrashFile("file.txt", "content");
+		git.add().addFilepattern("file.txt").call();
+		RevCommit c1 = git.commit().setMessage("create file").call();
+		writeTrashFile("file.txt", "content2");
+		git.add().addFilepattern("file.txt").call();
+		git.commit().setMessage("edit file").call();
 
-		StashListCommand command = git.stashList();
-		Collection<RevCommit> stashed = command.call();
-		assertNotNull(stashed);
-		assertEquals(2, stashed.size());
-		Iterator<RevCommit> iter = stashed.iterator();
-		assertEquals(commit2, iter.next());
-		assertEquals(commit1, iter.next());
+		assertEquals(c1, db.resolve("master@{0}~1"));
+	}
+
+	@Test
+	public void resolveNonExistingBranch() throws Exception {
+		Git git = new Git(db);
+		writeTrashFile("file.txt", "content");
+		git.add().addFilepattern("file.txt").call();
+		git.commit().setMessage("create file").call();
+		assertNull(db.resolve("notabranch@{7}"));
+	}
+
+	@Test
+	public void resolveNegativeEntryNumber() throws Exception {
+		Git git = new Git(db);
+		writeTrashFile("file.txt", "content");
+		git.add().addFilepattern("file.txt").call();
+		git.commit().setMessage("create file").call();
+		try {
+			db.resolve("master@{-12}");
+			fail("Exception not thrown");
+		} catch (RevisionSyntaxException e) {
+			assertNotNull(e);
+		}
+	}
+
+	@Test
+	public void resolveDate() throws Exception {
+		Git git = new Git(db);
+		writeTrashFile("file.txt", "content");
+		git.add().addFilepattern("file.txt").call();
+		git.commit().setMessage("create file").call();
+		try {
+			db.resolve("master@{yesterday}");
+			fail("Exception not thrown");
+		} catch (RevisionSyntaxException e) {
+			assertNotNull(e);
+		}
 	}
 }

@@ -40,74 +40,51 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api;
+package org.eclipse.jgit.errors;
 
+import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
 
 import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.api.errors.InvalidRefNameException;
-import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.revwalk.RevCommit;
-import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.file.ReflogEntry;
 
 /**
- * Command class to list the stashed commits in a repository.
- *
- * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-stash.html"
- *      >Git documentation about Stash</a>
+ * An exception occurring when a file cannot be locked
  */
-public class StashListCommand extends GitCommand<Collection<RevCommit>> {
+public class LockFailedException extends IOException {
+	private static final long serialVersionUID = 1L;
+
+	private File file;
 
 	/**
-	 * Create a new stash list command
+	 * Construct a CannotLockException for the given file and message
 	 *
-	 * @param repo
+	 * @param file
+	 *            file that could not be locked
+	 * @param message
+	 *            exception message
 	 */
-	public StashListCommand(final Repository repo) {
-		super(repo);
+	public LockFailedException(File file, String message) {
+		super(message);
+		this.file = file;
 	}
 
-	public Collection<RevCommit> call() throws Exception {
-		checkCallable();
+	/**
+	 * Construct a CannotLockException for the given file
+	 *
+	 * @param file
+	 *            file that could not be locked
+	 */
+	public LockFailedException(File file) {
+		this(file, MessageFormat.format(JGitText.get().cannotLock, file));
+	}
 
-		try {
-			if (repo.getRef(Constants.R_STASH) == null)
-				return Collections.emptyList();
-		} catch (IOException e) {
-			throw new InvalidRefNameException(MessageFormat.format(
-					JGitText.get().cannotRead, Constants.R_STASH), e);
-		}
-
-		final ReflogCommand refLog = new ReflogCommand(repo);
-		refLog.setRef(Constants.R_STASH);
-		final Collection<ReflogEntry> stashEntries = refLog.call();
-		if (stashEntries.isEmpty())
-			return Collections.emptyList();
-
-		final List<RevCommit> stashCommits = new ArrayList<RevCommit>(
-				stashEntries.size());
-		final RevWalk walk = new RevWalk(repo);
-		walk.setRetainBody(true);
-		try {
-			for (ReflogEntry entry : stashEntries)
-				try {
-					stashCommits.add(walk.parseCommit(entry.getNewId()));
-				} catch (IOException e) {
-					throw new JGitInternalException(MessageFormat.format(
-							JGitText.get().cannotReadCommit, entry.getNewId()),
-							e);
-				}
-		} finally {
-			walk.dispose();
-		}
-		return stashCommits;
+	/**
+	 * Get the file that could not be locked
+	 *
+	 * @return file
+	 */
+	public File getFile() {
+		return file;
 	}
 }
