@@ -47,11 +47,9 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.security.MessageDigest;
-import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.zip.Deflater;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
@@ -135,9 +133,7 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 			ol.getCachedBytes();
 			fail("Should have thrown LargeObjectException");
 		} catch (LargeObjectException tooBig) {
-			assertEquals(MessageFormat.format(
-					JGitText.get().largeObjectException, id.name()), tooBig
-					.getMessage());
+			assertEquals(id.name(), tooBig.getMessage());
 		}
 
 		ObjectStream in = ol.openStream();
@@ -261,9 +257,7 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 			ol.getCachedBytes();
 			fail("Should have thrown LargeObjectException");
 		} catch (LargeObjectException tooBig) {
-			assertEquals(MessageFormat.format(
-					JGitText.get().largeObjectException, id3.name()), tooBig
-					.getMessage());
+			assertEquals(id3.name(), tooBig.getMessage());
 		}
 
 		ObjectStream in = ol.openStream();
@@ -290,8 +284,7 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 		byte[] delta3 = tmp.toByteArray();
 		assertTrue(delta3.length > ObjectLoader.STREAM_THRESHOLD);
 
-		TemporaryBuffer.Heap pack = new TemporaryBuffer.Heap(
-				ObjectLoader.STREAM_THRESHOLD + 1024);
+		TemporaryBuffer.Heap pack = new TemporaryBuffer.Heap(64 * 1024);
 		packHeader(pack, 2);
 		objectHeader(pack, Constants.OBJ_BLOB, data0.length);
 		deflate(pack, data0);
@@ -319,9 +312,7 @@ public class PackFileTest extends LocalDiskRepositoryTestCase {
 			ol.getCachedBytes();
 			fail("Should have thrown LargeObjectException");
 		} catch (LargeObjectException tooBig) {
-			assertEquals(MessageFormat.format(
-					JGitText.get().largeObjectException, id3.name()), tooBig
-					.getMessage());
+			assertEquals(id3.name(), tooBig.getMessage());
 		}
 
 		ObjectStream in = ol.openStream();

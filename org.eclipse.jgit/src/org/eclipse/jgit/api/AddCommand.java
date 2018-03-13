@@ -43,8 +43,8 @@
  */
 package org.eclipse.jgit.api;
 
+import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.Collection;
 import java.util.LinkedList;
 
@@ -54,8 +54,7 @@ import org.eclipse.jgit.dircache.DirCacheBuildIterator;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectInserter;
+import org.eclipse.jgit.lib.ObjectWriter;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -76,8 +75,6 @@ public class AddCommand extends GitCommand<DirCache> {
 	private Collection<String> filepatterns;
 
 	private WorkingTreeIterator workingTreeIterator;
-
-	private boolean update = false;
 
 	/**
 	 *
@@ -129,9 +126,9 @@ public class AddCommand extends GitCommand<DirCache> {
 		if (filepatterns.contains("."))
 			addAll = true;
 
-		ObjectInserter inserter = repo.newObjectInserter();
 		try {
 			dc = repo.lockDirCache();
+			ObjectWriter ow = new ObjectWriter(repo);
 			DirCacheIterator c;
 
 			DirCacheBuilder builder = dc.builder();
@@ -150,6 +147,7 @@ public class AddCommand extends GitCommand<DirCache> {
 			while (tw.next()) {
 				String path = tw.getPathString();
 
+				final File file = new File(repo.getWorkTree(), path);
 				WorkingTreeIterator f = tw.getTree(1, WorkingTreeIterator.class);
 				if (tw.getTree(0, DirCacheIterator.class) == null &&
 						f != null && f.isEntryIgnored()) {
@@ -160,39 +158,27 @@ public class AddCommand extends GitCommand<DirCache> {
 				// this path, we however want to add only one
 				// new DirCacheEntry per path.
 				else if (!(path.equals(lastAddedFile))) {
-					if (!(update && tw.getTree(0, DirCacheIterator.class) == null)) {
-						if (f != null) { // the file exists
-							long sz = f.getEntryLength();
-							DirCacheEntry entry = new DirCacheEntry(path);
-							entry.setLength(sz);
-							entry.setLastModified(f.getEntryLastModified());
-							entry.setFileMode(f.getEntryFileMode());
+					 if (f != null) { // the file exists
+						DirCacheEntry entry = new DirCacheEntry(path);
+						entry.setLength((int)f.getEntryLength());
+						entry.setLastModified(f.getEntryLastModified());
+						entry.setFileMode(f.getEntryFileMode());
+						entry.setObjectId(ow.writeBlob(file));
 
-							InputStream in = f.openEntryStream();
-							try {
-								entry.setObjectId(inserter.insert(
-										Constants.OBJ_BLOB, sz, in));
-							} finally {
-								in.close();
-							}
-
-							builder.add(entry);
-							lastAddedFile = path;
-						} else if (!update){
-							c = tw.getTree(0, DirCacheIterator.class);
-							builder.add(c.getDirCacheEntry());
-						}
+						builder.add(entry);
+						lastAddedFile = path;
+					} else {
+						c = tw.getTree(0, DirCacheIterator.class);
+						builder.add(c.getDirCacheEntry());
 					}
 				}
 			}
-			inserter.flush();
 			builder.commit();
 			setCallable(false);
 		} catch (IOException e) {
 			throw new JGitInternalException(
 					JGitText.get().exceptionCaughtDuringExecutionOfAddCommand, e);
 		} finally {
-			inserter.release();
 			if (dc != null)
 				dc.unlock();
 		}
@@ -200,29 +186,4 @@ public class AddCommand extends GitCommand<DirCache> {
 		return dc;
 	}
 
-	/**
-	 * @param update
-	 *            If set to true, the command only matches {@code filepattern}
-	 *            against already tracked files in the index rather than the
-	 *            working tree. That means that it will never stage new files,
-	 *            but that it will stage modified new contents of tracked files
-	 *            and that it will remove files from the index if the
-	 *            corresponding files in the working tree have been removed.
-	 *            In contrast to the git command line a {@code filepattern} must
-	 *            exist also if update is set to true as there is no
-	 *            concept of a working directory here.
-	 *
-	 * @return {@code this}
-	 */
-	public AddCommand setUpdate(boolean update) {
-		this.update = update;
-		return this;
-	}
-
-	/**
-	 * @return is the parameter update is set
-	 */
-	public boolean isUpdate() {
-		return update;
-	}
 }

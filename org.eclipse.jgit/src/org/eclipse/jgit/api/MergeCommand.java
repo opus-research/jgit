@@ -43,32 +43,28 @@
  */
 package org.eclipse.jgit.api;
 
+import java.io.File;
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.MergeResult.MergeStatus;
-import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.GitIndex;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.RefUpdate;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.Ref.Storage;
+import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RefUpdate.Result;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lib.WorkDirCheckout;
 import org.eclipse.jgit.merge.MergeStrategy;
-import org.eclipse.jgit.merge.ResolveMerger;
-import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
-import org.eclipse.jgit.merge.ThreeWayMerger;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.treewalk.FileTreeIterator;
 
 /**
  * A class used to execute a {@code Merge} command. It has setters for all
@@ -105,7 +101,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 	 */
 	public MergeResult call() throws NoHeadException,
 			ConcurrentRefUpdateException, CheckoutConflictException,
-			InvalidMergeHeadsException, WrongRepositoryStateException, NoMessageException {
+			InvalidMergeHeadsException {
 		checkCallable();
 
 		if (commits.size() != 1)
@@ -113,116 +109,83 @@ public class MergeCommand extends GitCommand<MergeResult> {
 					commits.isEmpty() ? JGitText.get().noMergeHeadSpecified
 							: MessageFormat.format(
 									JGitText.get().mergeStrategyDoesNotSupportHeads,
-									mergeStrategy.getName(),
-									Integer.valueOf(commits.size())));
+									mergeStrategy.getName(), commits.size()));
 
-		RevWalk revWalk = null;
 		try {
 			Ref head = repo.getRef(Constants.HEAD);
 			if (head == null)
-				throw new NoHeadException(
-						JGitText.get().commitOnRepoWithoutHEADCurrentlyNotSupported);
+				throw new NoHeadException(JGitText.get().commitOnRepoWithoutHEADCurrentlyNotSupported);
 			StringBuilder refLogMessage = new StringBuilder("merge ");
 
 			// Check for FAST_FORWARD, ALREADY_UP_TO_DATE
-			revWalk = new RevWalk(repo);
-			RevCommit headCommit = revWalk.lookupCommit(head.getObjectId());
+			RevWalk revWalk = new RevWalk(repo);
+			try {
+				RevCommit headCommit = revWalk.lookupCommit(head.getObjectId());
 
-			// we know for know there is only one commit
-			Ref ref = commits.get(0);
+				Ref ref = commits.get(0);
 
-			refLogMessage.append(ref.getName());
+				refLogMessage.append(ref.getName());
 
-			// handle annotated tags
-			ObjectId objectId = ref.getPeeledObjectId();
-			if (objectId == null)
-				objectId = ref.getObjectId();
+				// handle annotated tags
+				ObjectId objectId = ref.getPeeledObjectId();
+				if (objectId == null)
+					objectId = ref.getObjectId();
 
-			RevCommit srcCommit = revWalk.lookupCommit(objectId);
-			if (revWalk.isMergedInto(srcCommit, headCommit)) {
-				setCallable(false);
-				return new MergeResult(headCommit, srcCommit, new ObjectId[] {
-						headCommit, srcCommit },
-						MergeStatus.ALREADY_UP_TO_DATE, mergeStrategy, null, null);
-			} else if (revWalk.isMergedInto(headCommit, srcCommit)) {
-				// FAST_FORWARD detected: skip doing a real merge but only
-				// update HEAD
-				refLogMessage.append(": " + MergeStatus.FAST_FORWARD);
-				DirCacheCheckout dco = new DirCacheCheckout(repo,
-						headCommit.getTree(), repo.lockDirCache(),
-						srcCommit.getTree());
-				dco.setFailOnConflict(true);
-				dco.checkout();
-
-				updateHead(refLogMessage, srcCommit, head.getObjectId());
-				setCallable(false);
-				return new MergeResult(srcCommit, srcCommit, new ObjectId[] {
-						headCommit, srcCommit }, MergeStatus.FAST_FORWARD,
-						mergeStrategy, null, null);
-			} else {
-				repo.writeMergeCommitMsg("merging " + ref.getName() + " into "
-						+ head.getName());
-				repo.writeMergeHeads(Arrays.asList(ref.getObjectId()));
-				ThreeWayMerger merger = (ThreeWayMerger) mergeStrategy
-						.newMerger(repo);
-				boolean noProblems;
-				Map<String, org.eclipse.jgit.merge.MergeResult> lowLevelResults = null;
-				Map<String, MergeFailureReason> failingPaths = null;
-				if (merger instanceof ResolveMerger) {
-					ResolveMerger resolveMerger = (ResolveMerger) merger;
-					resolveMerger.setCommitNames(new String[] {
-							"BASE", "HEAD", ref.getName() });
-					resolveMerger.setWorkingTreeIt(new FileTreeIterator(repo));
-					noProblems = merger.merge(headCommit, srcCommit);
-					lowLevelResults = resolveMerger
-							.getMergeResults();
-					failingPaths = resolveMerger.getFailingPathes();
-				} else
-					noProblems = merger.merge(headCommit, srcCommit);
-
-				if (noProblems) {
-					DirCacheCheckout dco = new DirCacheCheckout(repo,
-							headCommit.getTree(), repo.lockDirCache(),
-							merger.getResultTreeId());
-					dco.setFailOnConflict(true);
-					dco.checkout();
-					RevCommit newHead = new Git(getRepository()).commit().call();
-					return new MergeResult(newHead.getId(),
-							null, new ObjectId[] {
-									headCommit.getId(), srcCommit.getId() },
-							MergeStatus.MERGED, mergeStrategy, null, null);
+				RevCommit srcCommit = revWalk.lookupCommit(objectId);
+				if (revWalk.isMergedInto(srcCommit, headCommit)) {
+					setCallable(false);
+					return new MergeResult(headCommit,
+							MergeStatus.ALREADY_UP_TO_DATE, mergeStrategy);
+				} else if (revWalk.isMergedInto(headCommit, srcCommit)) {
+					// FAST_FORWARD detected: skip doing a real merge but only
+					// update HEAD
+					refLogMessage.append(": " + MergeStatus.FAST_FORWARD);
+					checkoutNewHead(revWalk, headCommit, srcCommit);
+					updateHead(refLogMessage, srcCommit, head.getObjectId());
+					setCallable(false);
+					return new MergeResult(srcCommit, MergeStatus.FAST_FORWARD,
+							mergeStrategy);
 				} else {
-					if (failingPaths != null) {
-						repo.writeMergeCommitMsg(null);
-						repo.writeMergeHeads(null);
-						return new MergeResult(null,
-								merger.getBaseCommit(0, 1),
-								new ObjectId[] {
-										headCommit.getId(), srcCommit.getId() },
-								MergeStatus.FAILED, mergeStrategy,
-								lowLevelResults, null);
-					} else
-						return new MergeResult(null,
-								merger.getBaseCommit(0, 1),
-								new ObjectId[] { headCommit.getId(),
-										srcCommit.getId() },
-								MergeStatus.CONFLICTING, mergeStrategy,
-								lowLevelResults, null);
+					return new MergeResult(
+							headCommit,
+							MergeResult.MergeStatus.NOT_SUPPORTED,
+							mergeStrategy,
+							JGitText.get().onlyAlreadyUpToDateAndFastForwardMergesAreAvailable);
 				}
+			} finally {
+				revWalk.release();
 			}
 		} catch (IOException e) {
 			throw new JGitInternalException(
 					MessageFormat.format(
 							JGitText.get().exceptionCaughtDuringExecutionOfMergeCommand,
-							e), e);
-		} finally {
-			if (revWalk != null)
-				revWalk.release();
+							e));
 		}
 	}
 
-	private void updateHead(StringBuilder refLogMessage, ObjectId newHeadId,
-			ObjectId oldHeadID) throws IOException,
+	private void checkoutNewHead(RevWalk revWalk, RevCommit headCommit,
+			RevCommit newHeadCommit) throws IOException, CheckoutConflictException {
+		GitIndex index = repo.getIndex();
+
+		File workDir = repo.getWorkTree();
+		if (workDir != null) {
+			WorkDirCheckout workDirCheckout = new WorkDirCheckout(repo,
+					workDir, headCommit.asCommit(revWalk).getTree(), index,
+					newHeadCommit.asCommit(revWalk).getTree());
+			workDirCheckout.setFailOnConflict(true);
+			try {
+				workDirCheckout.checkout();
+			} catch (org.eclipse.jgit.errors.CheckoutConflictException e) {
+				throw new CheckoutConflictException(
+						JGitText.get().couldNotCheckOutBecauseOfConflicts,
+						workDirCheckout.getConflicts(), e);
+			}
+			index.write();
+		}
+	}
+
+	private void updateHead(StringBuilder refLogMessage,
+			ObjectId newHeadId, ObjectId oldHeadID) throws IOException,
 			ConcurrentRefUpdateException {
 		RefUpdate refUpdate = repo.updateRef(Constants.HEAD);
 		refUpdate.setNewObjectId(newHeadId);
@@ -258,7 +221,8 @@ public class MergeCommand extends GitCommand<MergeResult> {
 
 	/**
 	 * @param commit
-	 *            a reference to a commit which is merged with the current head
+	 *            a reference to a commit which is merged with the current
+	 *            head
 	 * @return {@code this}
 	 */
 	public MergeCommand include(Ref commit) {
@@ -277,8 +241,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 	}
 
 	/**
-	 * @param name
-	 *            a name given to the commit
+	 * @param name a name given to the commit
 	 * @param commit
 	 *            the Id of a commit which is merged with the current head
 	 * @return {@code this}
