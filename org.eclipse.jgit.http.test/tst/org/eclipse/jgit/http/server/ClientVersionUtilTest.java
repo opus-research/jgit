@@ -41,53 +41,45 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.transport;
+package org.eclipse.jgit.http.server;
 
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.List;
-import java.util.Map;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.eclipse.jgit.http.server.ClientVersionUtil.hasPushStatusBug;
+import static org.eclipse.jgit.http.server.ClientVersionUtil.invalidVersion;
+import static org.eclipse.jgit.http.server.ClientVersionUtil.parseVersion;
 
-import org.eclipse.jgit.errors.TransportException;
+import org.junit.Assert;
+import org.junit.Test;
 
-/**
- * SubscribeConnection sends a list of repository names with a list of
- * SubscribeCommands and ref states for each repository to a Publisher instance.
- * The connection is left open, and the Publisher responds by sending any
- * matching ref updates in packs.
- */
-public interface SubscribeConnection extends Connection {
-	/**
-	 * Do the initial advertisement with only repository names to determine if
-	 * authentication is needed for this request.
-	 *
-	 * @param subscriber
-	 * @throws IOException
-	 * @throws TransportException
-	 *             thrown if the client is unauthorized to view the remote
-	 *             repository, the remote repository does not exist, or a
-	 *             protocol level error occurred.
-	 */
-	void sendSubscribeAdvertisement(SubscribeState subscriber)
-			throws IOException, TransportException;
+public class ClientVersionUtilTest {
+	@Test
+	public void testParse() {
+		assertEquals("1.6.5", parseVersion("git/1.6.6-rc0"));
+		assertEquals("1.6.6", parseVersion("git/1.6.6"));
+		assertEquals("1.7.5", parseVersion("git/1.7.5.GIT"));
+		assertEquals("1.7.6.1", parseVersion("git/1.7.6.1.45.gbe0cc"));
 
-	/**
-	 * Subscribe to a remote Publisher instance by sending the server a list of
-	 * repositories and refspecs it wants to receive updates for. It also sends
-	 * the client's state for all locally-matching refs, and optionally a
-	 * restart token to reconnect a dropped connection.
-	 *
-	 * @param subscriber
-	 * @param subscribeCommands
-	 *            map from repository name to a list of SubscribeCommands to
-	 *            execute for that repository
-	 * @param output
-	 * @throws InterruptedException
-	 * @throws IOException
-	 * @throws TransportException
-	 */
-	void subscribe(SubscribeState subscriber,
-			Map<String, List<SubscribeCommand>> subscribeCommands,
-			PrintWriter output)
-			throws InterruptedException, TransportException, IOException;
+		assertEquals("1.5.4.3", parseVersion("git/1.5.4.3,gzip(proxy)"));
+		assertEquals("1.7.0.2", parseVersion("git/1.7.0.2.msysgit.0.14.g956d7,gzip"));
+		assertEquals("1.7.10.2", parseVersion("git/1.7.10.2 (Apple Git-33)"));
+
+		assertEquals(ClientVersionUtil.toString(invalidVersion()), parseVersion("foo"));
+	}
+
+	@Test
+	public void testPushStatusBug() {
+		assertTrue(hasPushStatusBug(parseVersion("git/1.6.6")));
+		assertTrue(hasPushStatusBug(parseVersion("git/1.6.6.1")));
+		assertTrue(hasPushStatusBug(parseVersion("git/1.7.9")));
+
+		assertFalse(hasPushStatusBug(parseVersion("git/1.7.8.6")));
+		assertFalse(hasPushStatusBug(parseVersion("git/1.7.9.1")));
+		assertFalse(hasPushStatusBug(parseVersion("git/1.7.9.2")));
+		assertFalse(hasPushStatusBug(parseVersion("git/1.7.10")));
+	}
+
+	private static void assertEquals(String exp, int[] act) {
+		Assert.assertEquals(exp, ClientVersionUtil.toString(act));
+	}
 }
