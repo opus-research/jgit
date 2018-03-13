@@ -105,7 +105,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	private String uri;
 	private String groups;
 	private String branch;
-	private String targetBranch = Constants.MASTER;
 	private PersonIdent author;
 	private RemoteReader callback;
 	private InputStream inputStream;
@@ -296,24 +295,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 	}
 
 	/**
-	 * Set target branch.
-	 *
-	 * This is the target branch of the super project to be updated.
-	 *
-	 * If not set, default is master.
-	 *
-	 * It's only used with bare repositories.
-	 *
-	 * @param branch
-	 * @return this command
-	 * @since 4.1
-	 */
-	public RepoCommand setTargetBranch(final String branch) {
-		this.targetBranch = branch;
-		return this;
-	}
-
-	/**
 	 * The progress monitor associated with the clone operation. By default,
 	 * this is set to <code>NullProgressMonitor</code>
 	 *
@@ -416,7 +397,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 		}
 
 		if (repo.isBare()) {
-			String ref = Constants.R_HEADS + targetBranch;
 			DirCache index = DirCache.newInCore();
 			DirCacheBuilder builder = index.builder();
 			ObjectInserter inserter = repo.newObjectInserter();
@@ -465,7 +445,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				ObjectId treeId = index.writeTree(inserter);
 
 				// Create a Commit object, populate it and write it
-				ObjectId headId = repo.resolve(ref + "^{commit}"); //$NON-NLS-1$
+				ObjectId headId = repo.resolve(Constants.HEAD + "^{commit}"); //$NON-NLS-1$
 				CommitBuilder commit = new CommitBuilder();
 				commit.setTreeId(treeId);
 				if (headId != null)
@@ -477,7 +457,7 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				ObjectId commitId = inserter.insert(commit);
 				inserter.flush();
 
-				RefUpdate ru = repo.updateRef(ref);
+				RefUpdate ru = repo.updateRef(Constants.HEAD);
 				ru.setNewObjectId(commitId);
 				ru.setExpectedOldObjectId(headId != null ? headId : ObjectId.zeroId());
 				Result rc = ru.update(rw);
@@ -491,14 +471,12 @@ public class RepoCommand extends GitCommand<RevCommit> {
 					case REJECTED:
 					case LOCK_FAILURE:
 						throw new ConcurrentRefUpdateException(
-								MessageFormat.format(
-										JGitText.get().cannotLock, ref),
-								ru.getRef(),
+								JGitText.get().couldNotLockHEAD, ru.getRef(),
 								rc);
 					default:
 						throw new JGitInternalException(MessageFormat.format(
 								JGitText.get().updatingRefFailed,
-								ref, commitId.name(), rc));
+								Constants.HEAD, commitId.name(), rc));
 				}
 
 				return rw.parseCommit(commitId);
