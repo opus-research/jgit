@@ -264,9 +264,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		}
 		http = local.getConfig().get(HTTP_KEY);
 		proxySelector = ProxySelector.getDefault();
-
-		if (getCredentialsProvider() == null)
-			setCredentialsProvider(new NetRCCredentialsProvider());
 	}
 
 	/**
@@ -497,9 +494,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 						throw new TransportException(uri, MessageFormat.format(
 								JGitText.get().authenticationNotSupported, uri));
 					CredentialsProvider credentialsProvider = getCredentialsProvider();
-					if (credentialsProvider == null)
-						throw new TransportException(uri,
-								JGitText.get().noCredentialsProvider);
 					if (authAttempts > 1)
 						credentialsProvider.reset(uri);
 					if (3 < authAttempts
