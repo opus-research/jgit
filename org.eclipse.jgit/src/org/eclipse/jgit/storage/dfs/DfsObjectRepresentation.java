@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Roberto Tyley <roberto.tyley@gmail.com>
+ * Copyright (C) 2011, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,30 +41,50 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.api;
+package org.eclipse.jgit.storage.dfs;
 
-import org.eclipse.jgit.transport.Transport;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.storage.pack.ObjectToPack;
+import org.eclipse.jgit.storage.pack.StoredObjectRepresentation;
 
-/**
- * Receives a callback allowing type-specific configuration to be set
- * on the Transport instance after it's been created.
- * <p>
- * This allows consumers of the JGit command API to perform custom
- * configuration that would be difficult anticipate and expose on the
- * API command builders.
- * <p>
- * For instance, if a client needs to replace the SshSessionFactorys
- * on any SSHTransport used (eg to control available SSH identities),
- * they can set the TransportConfigCallback on the JGit API command -
- * once the transport has been created by the command, the callback
- * will be invoked and passed the transport instance, which the
- * client can then inspect and configure as necessary.
- */
-public interface TransportConfigCallback {
+class DfsObjectRepresentation extends StoredObjectRepresentation {
+	final ObjectToPack object;
+
+	DfsPackFile pack;
 
 	/**
-	 * Add any additional transport-specific configuration required.
-	 * @param transport
+	 * Position of {@link #pack} in the reader's pack list. Lower numbers are
+	 * newer/more recent packs and less likely to contain the best format for a
+	 * base object. Higher numbered packs are bigger, more stable, and favored
+	 * by PackWriter when selecting representations... but only if they come
+	 * last in the representation ordering.
 	 */
-	public void configure(Transport transport);
+	int packIndex;
+
+	long offset;
+
+	int format;
+
+	long length;
+
+	ObjectId baseId;
+
+	DfsObjectRepresentation(ObjectToPack object) {
+		this.object = object;
+	}
+
+	@Override
+	public int getFormat() {
+		return format;
+	}
+
+	@Override
+	public int getWeight() {
+		return (int) Math.min(length, Integer.MAX_VALUE);
+	}
+
+	@Override
+	public ObjectId getDeltaBase() {
+		return baseId;
+	}
 }
