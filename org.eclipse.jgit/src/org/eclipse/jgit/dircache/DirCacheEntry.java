@@ -450,7 +450,6 @@ public class DirCacheEntry {
 	 * Returns whether this entry is in the fully-merged stage (0).
 	 *
 	 * @return true if this entry is merged
-	 * @since 2.2
 	 */
 	public boolean isMerged() {
 		return getStage() == STAGE_0;
