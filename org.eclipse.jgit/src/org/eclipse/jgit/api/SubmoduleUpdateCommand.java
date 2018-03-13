@@ -91,8 +91,6 @@ public class SubmoduleUpdateCommand extends
 
 	private CloneCommand.Callback callback;
 
-	private FetchCommand.Callback fetchCallback;
-
 	private boolean fetch = false;
 
 	/**
@@ -193,8 +191,10 @@ public class SubmoduleUpdateCommand extends
 						clone.setProgressMonitor(monitor);
 					submoduleRepo = clone.call().getRepository();
 				} else if (this.fetch) {
-					if (fetchCallback != null) {
-						fetchCallback.fetchingSubmodule(generator.getPath());
+					if (callback != null) {
+						// FIXME: Do we need a new callback to tell them we're
+						// fetching?
+						callback.cloningSubmodule(generator.getPath());
 					}
 					FetchCommand fetchCommand = Git.wrap(submoduleRepo).fetch();
 					if (monitor != null) {
@@ -272,20 +272,6 @@ public class SubmoduleUpdateCommand extends
 	 */
 	public SubmoduleUpdateCommand setCallback(CloneCommand.Callback callback) {
 		this.callback = callback;
-		return this;
-	}
-
-	/**
-	 * Set status callback for submodule fetch operation.
-	 *
-	 * @param callback
-	 *            the callback
-	 * @return {@code this}
-	 * @since 4.9
-	 */
-	public SubmoduleUpdateCommand setFetchCallback(
-			FetchCommand.Callback callback) {
-		this.fetchCallback = callback;
 		return this;
 	}
 }
