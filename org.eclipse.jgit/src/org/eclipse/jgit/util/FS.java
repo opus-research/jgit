@@ -97,20 +97,6 @@ public abstract class FS {
 	private static FSFactory factory;
 
 	/**
-	 * Set the factory class to use
-	 *
-	 * @param factory
-	 */
-	@SuppressWarnings("nls")
-	public static void setFactory(FSFactory factory) {
-		if (FS.factory != null)
-			throw new IllegalStateException("FSFactory alread set to "
-					+ FS.factory.getClass() + ", cannot change to "
-					+ factory.getClass());
-		FS.factory = factory;
-	}
-
-	/**
 	 * Auto-detect the appropriate file system abstraction.
 	 *
 	 * @return detected file system abstraction
@@ -257,7 +243,7 @@ public abstract class FS {
 	}
 
 	/**
-	 * Get the last modified time of a file system object. If the OS/JRE support
+	 * Set the last modified time of a file system object. If the OS/JRE support
 	 * symbolic links, the link is modified, not the target,
 	 *
 	 * @param f
@@ -543,7 +529,7 @@ public abstract class FS {
 	/**
 	 * Check if path is a directory. If the OS/JRE supports symbolic links and
 	 * path is a symbolic link to a directory, this method returns false.
-	 * 
+	 *
 	 * @param path
 	 * @return true if file is a directory,
 	 */
