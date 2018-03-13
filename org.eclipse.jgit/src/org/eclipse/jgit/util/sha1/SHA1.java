@@ -233,11 +233,6 @@ public class SHA1 {
 			buffer[bufferLen++] = (byte) 0x80;
 			Arrays.fill(buffer, bufferLen, 56, (byte) 0);
 		}
-
-		// SHA-1 appends the length of the message in bits after the
-		// padding block (above). Here length is in bytes. Multiply by
-		// 8 by shifting by 3 as part of storing the 64 bit byte length
-		// into the two words expected in the trailer.
 		NB.encodeInt32(buffer, 56, (int) (length >>> (32 - 3)));
 		NB.encodeInt32(buffer, 60, (int) (length << 3));
 		compress(buffer, 0);
