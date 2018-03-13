@@ -78,6 +78,7 @@ public class MergeResult {
 		},
 		/** */
 		ALREADY_UP_TO_DATE {
+			@Override
 			public String toString() {
 				return "Already-up-to-date";
 			}
@@ -89,6 +90,7 @@ public class MergeResult {
 		},
 		/** */
 		FAILED {
+			@Override
 			public String toString() {
 				return "Failed";
 			}
@@ -100,6 +102,7 @@ public class MergeResult {
 		},
 		/** */
 		MERGED {
+			@Override
 			public String toString() {
 				return "Merged";
 			}
@@ -111,6 +114,7 @@ public class MergeResult {
 		},
 		/** */
 		CONFLICTING {
+			@Override
 			public String toString() {
 				return "Conflicting";
 			}
@@ -122,6 +126,7 @@ public class MergeResult {
 		},
 		/** */
 		NOT_SUPPORTED {
+			@Override
 			public String toString() {
 				return "Not-yet-supported";
 			}
@@ -165,19 +170,17 @@ public class MergeResult {
 	 *            all the commits which have been merged together
 	 * @param mergeStatus
 	 *            the status the merge resulted in
-	 * @param mergeStrategy
-	 *            the used {@link MergeStrategy}
 	 * @param lowLevelResults
 	 *            merge results as returned by
 	 *            {@link ResolveMerger#getMergeResults()}
-	 * @since 2.0
+	 * @param mergeStrategy
+	 *            the used {@link MergeStrategy}
 	 */
 	public MergeResult(ObjectId newHead, ObjectId base,
 			ObjectId[] mergedCommits, MergeStatus mergeStatus,
-			MergeStrategy mergeStrategy,
-			Map<String, org.eclipse.jgit.merge.MergeResult<?>> lowLevelResults) {
-		this(newHead, base, mergedCommits, mergeStatus, mergeStrategy,
-				lowLevelResults, null);
+			Map<String, org.eclipse.jgit.merge.MergeResult<?>> lowLevelResults,
+			MergeStrategy mergeStrategy) {
+		this(newHead, base, mergedCommits, mergeStatus, mergeStrategy, lowLevelResults, null);
 	}
 
 	/**
@@ -204,7 +207,7 @@ public class MergeResult {
 			Map<String, org.eclipse.jgit.merge.MergeResult<?>> lowLevelResults,
 			String description) {
 		this(newHead, base, mergedCommits, mergeStatus, mergeStrategy,
-				lowLevelResults, null, description);
+				lowLevelResults, null, null);
 	}
 
 	/**
