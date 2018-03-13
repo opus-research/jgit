@@ -63,10 +63,13 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.PackMismatchException;
+import org.eclipse.jgit.events.ConfigChangedEvent;
+import org.eclipse.jgit.events.ConfigChangedListener;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.CoreConfig;
 import org.eclipse.jgit.lib.ObjectDatabase;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
@@ -95,7 +98,8 @@ import org.eclipse.jgit.util.FS;
  * searched (recursively through all alternates) before the slow half is
  * considered.
  */
-public class ObjectDirectory extends FileObjectDatabase {
+public class ObjectDirectory extends FileObjectDatabase implements
+		ConfigChangedListener {
 	private static final PackList NO_PACKS = new PackList(-1, -1, new PackFile[0]);
 
 	/** Maximum number of candidates offered as resolutions of abbreviation. */
@@ -116,6 +120,8 @@ public class ObjectDirectory extends FileObjectDatabase {
 	private final FS fs;
 
 	private final AtomicReference<AlternateHandle[]> alternates;
+
+	private int streamFileThreshold;
 
 	/**
 	 * Initialize a reference to an on-disk object directory.
@@ -151,6 +157,13 @@ public class ObjectDirectory extends FileObjectDatabase {
 				alt[i] = openAlternate(alternatePaths[i]);
 			alternates.set(alt);
 		}
+
+		onConfigChanged(new ConfigChangedEvent());
+	}
+
+	public void onConfigChanged(ConfigChangedEvent event) {
+		CoreConfig core = config.get(CoreConfig.KEY);
+		streamFileThreshold = core.getStreamFileThreshold();
 	}
 
 	/**
@@ -730,5 +743,10 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	FileObjectDatabase newCachedFileObjectDatabase() {
 		return new CachedObjectDirectory(this);
+	}
+
+	@Override
+	int getStreamFileThreshold() {
+		return streamFileThreshold;
 	}
 }

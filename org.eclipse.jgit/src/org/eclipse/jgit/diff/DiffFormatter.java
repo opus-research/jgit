@@ -49,8 +49,6 @@ import static org.eclipse.jgit.diff.DiffEntry.ChangeType.COPY;
 import static org.eclipse.jgit.diff.DiffEntry.ChangeType.DELETE;
 import static org.eclipse.jgit.diff.DiffEntry.ChangeType.MODIFY;
 import static org.eclipse.jgit.diff.DiffEntry.ChangeType.RENAME;
-import static org.eclipse.jgit.diff.DiffEntry.Side.NEW;
-import static org.eclipse.jgit.diff.DiffEntry.Side.OLD;
 import static org.eclipse.jgit.lib.Constants.encode;
 import static org.eclipse.jgit.lib.Constants.encodeASCII;
 import static org.eclipse.jgit.lib.FileMode.GITLINK;
@@ -87,9 +85,7 @@ import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.filter.AndTreeFilter;
-import org.eclipse.jgit.treewalk.filter.NotIgnoredFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.QuotedString;
 import org.eclipse.jgit.util.io.DisabledOutputStream;
@@ -118,7 +114,7 @@ public class DiffFormatter {
 
 	private int abbreviationLength = 7;
 
-	private RawText.Factory rawTextFactory = RawText.FACTORY;
+	private RawTextComparator comparator = RawTextComparator.DEFAULT;
 
 	private int binaryFileThreshold = DEFAULT_BINARY_FILE_THRESHOLD;
 
@@ -131,8 +127,6 @@ public class DiffFormatter {
 	private RenameDetector renameDetector;
 
 	private ProgressMonitor progressMonitor;
-
-	private ContentSource.Pair source;
 
 	/**
 	 * Create a new formatter with a default level of context.
@@ -166,9 +160,6 @@ public class DiffFormatter {
 
 		db = repository;
 		reader = db.newObjectReader();
-
-		ContentSource cs = ContentSource.create(reader);
-		source = new ContentSource.Pair(cs, cs);
 
 		DiffConfig dc = db.getConfig().get(DiffConfig.KEY);
 		if (dc.isNoPrefix()) {
@@ -213,14 +204,14 @@ public class DiffFormatter {
 	 *            the factory to create different output. Different types of
 	 *            factories can produce different whitespace behavior, for
 	 *            example.
-	 * @see RawText#FACTORY
-	 * @see RawTextIgnoreAllWhitespace#FACTORY
-	 * @see RawTextIgnoreLeadingWhitespace#FACTORY
-	 * @see RawTextIgnoreTrailingWhitespace#FACTORY
-	 * @see RawTextIgnoreWhitespaceChange#FACTORY
+	 * @see RawTextComparator#DEFAULT
+	 * @see RawTextComparator#WS_IGNORE_ALL
+	 * @see RawTextComparator#WS_IGNORE_CHANGE
+	 * @see RawTextComparator#WS_IGNORE_LEADING
+	 * @see RawTextComparator#WS_IGNORE_TRAILING
 	 */
-	public void setRawTextFactory(RawText.Factory type) {
-		rawTextFactory = type;
+	public void setDiffComparator(RawTextComparator type) {
+		comparator = type;
 	}
 
 	/**
@@ -415,17 +406,14 @@ public class DiffFormatter {
 		walk.addTree(b);
 		walk.setRecursive(true);
 
-		TreeFilter filter = pathFilter;
-
-		if (a instanceof WorkingTreeIterator)
-			filter = AndTreeFilter.create(filter, new NotIgnoredFilter(0));
-		if (b instanceof WorkingTreeIterator)
-			filter = AndTreeFilter.create(filter, new NotIgnoredFilter(1));
-		if (!(pathFilter instanceof FollowFilter))
-			filter = AndTreeFilter.create(filter, TreeFilter.ANY_DIFF);
-		walk.setFilter(filter);
-
-		source = new ContentSource.Pair(source(a), source(b));
+		if (pathFilter == TreeFilter.ALL) {
+			walk.setFilter(TreeFilter.ANY_DIFF);
+		} else if (pathFilter instanceof FollowFilter) {
+			walk.setFilter(pathFilter);
+		} else {
+			walk.setFilter(AndTreeFilter
+					.create(pathFilter, TreeFilter.ANY_DIFF));
+		}
 
 		List<DiffEntry> files = DiffEntry.scan(walk);
 		if (pathFilter instanceof FollowFilter && isAdd(files)) {
@@ -438,13 +426,7 @@ public class DiffFormatter {
 			walk.reset();
 			walk.addTree(a);
 			walk.addTree(b);
-
-			filter = TreeFilter.ANY_DIFF;
-			if (a instanceof WorkingTreeIterator)
-				filter = AndTreeFilter.create(new NotIgnoredFilter(0), filter);
-			if (b instanceof WorkingTreeIterator)
-				filter = AndTreeFilter.create(new NotIgnoredFilter(1), filter);
-			walk.setFilter(filter);
+			walk.setFilter(TreeFilter.ANY_DIFF);
 
 			if (renameDetector == null)
 				setDetectRenames(true);
@@ -454,12 +436,6 @@ public class DiffFormatter {
 			files = detectRenames(files);
 
 		return files;
-	}
-
-	private ContentSource source(AbstractTreeIterator iterator) {
-		if (iterator instanceof WorkingTreeIterator)
-			return ContentSource.create((WorkingTreeIterator) iterator);
-		return ContentSource.create(reader);
 	}
 
 	private List<DiffEntry> detectRenames(List<DiffEntry> files)
@@ -600,7 +576,8 @@ public class DiffFormatter {
 	}
 
 	private static String quotePath(String name) {
-		return QuotedString.GIT_PATH.quote(name);
+		String q = QuotedString.GIT_PATH.quote(name);
+		return ('"' + name + '"').equals(q) ? name : q;
 	}
 
 	/**
@@ -858,8 +835,12 @@ public class DiffFormatter {
 		} else {
 			assertHaveRepository();
 
-			byte[] aRaw = open(OLD, ent);
-			byte[] bRaw = open(NEW, ent);
+			byte[] aRaw = open(ent.getOldPath(), //
+					ent.getOldMode(), //
+					ent.getOldId());
+			byte[] bRaw = open(ent.getNewPath(), //
+					ent.getNewMode(), //
+					ent.getNewId());
 
 			if (aRaw == BINARY || bRaw == BINARY //
 					|| RawText.isBinary(aRaw) || RawText.isBinary(bRaw)) {
@@ -869,9 +850,9 @@ public class DiffFormatter {
 				type = PatchType.BINARY;
 
 			} else {
-				res.a = rawTextFactory.create(aRaw);
-				res.b = rawTextFactory.create(bRaw);
-				editList = new MyersDiff(res.a, res.b).getEdits();
+				RawText a = new RawText(comparator, aRaw);
+				RawText b = new RawText(comparator, bRaw);
+				editList = new MyersDiff<RawText>(comparator, a, b).getEdits();
 				type = PatchType.UNIFIED;
 
 				switch (ent.getChangeType()) {
@@ -897,38 +878,29 @@ public class DiffFormatter {
 			throw new IllegalStateException(JGitText.get().repositoryIsRequired);
 	}
 
-	private byte[] open(DiffEntry.Side side, DiffEntry entry)
+	private byte[] open(String path, FileMode mode, AbbreviatedObjectId id)
 			throws IOException {
-		if (entry.getMode(side) == FileMode.MISSING)
+		if (mode == FileMode.MISSING)
 			return EMPTY;
 
-		if (entry.getMode(side).getObjectType() != Constants.OBJ_BLOB)
+		if (mode.getObjectType() != Constants.OBJ_BLOB)
 			return EMPTY;
 
-		if (isBinary(entry.getPath(side)))
+		if (isBinary(path))
 			return BINARY;
 
-		AbbreviatedObjectId id = entry.getId(side);
 		if (!id.isComplete()) {
 			Collection<ObjectId> ids = reader.resolve(id);
-			if (ids.size() == 1) {
+			if (ids.size() == 1)
 				id = AbbreviatedObjectId.fromObjectId(ids.iterator().next());
-				switch (side) {
-				case OLD:
-					entry.oldId = id;
-					break;
-				case NEW:
-					entry.newId = id;
-					break;
-				}
-			} else if (ids.size() == 0)
+			else if (ids.size() == 0)
 				throw new MissingObjectException(id, Constants.OBJ_BLOB);
 			else
 				throw new AmbiguousObjectException(id, ids);
 		}
 
 		try {
-			ObjectLoader ldr = source.open(side, entry);
+			ObjectLoader ldr = reader.open(id.toObjectId());
 			return ldr.getBytes(binaryFileThreshold);
 
 		} catch (LargeObjectException.ExceedsLimit overLimit) {

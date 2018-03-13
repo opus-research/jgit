@@ -234,11 +234,6 @@ public class CanonicalTreeParser extends AbstractTreeIterator {
 	}
 
 	@Override
-	public boolean hasId() {
-		return true;
-	}
-
-	@Override
 	public byte[] idBuffer() {
 		return raw;
 	}
