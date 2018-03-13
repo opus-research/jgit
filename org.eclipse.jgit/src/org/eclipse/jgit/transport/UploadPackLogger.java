@@ -56,7 +56,7 @@ import org.eclipse.jgit.internal.storage.pack.PackWriter;
  * @deprecated use {@link PostUploadHook} instead
  */
 @Deprecated
-public interface UploadPackLogger { // TODO remove in JGit 5.0
+public interface UploadPackLogger {
 	/** A simple no-op logger. */
 	public static final UploadPackLogger NULL = new UploadPackLogger() {
 		public void onPackStatistics(PackWriter.Statistics stats) {

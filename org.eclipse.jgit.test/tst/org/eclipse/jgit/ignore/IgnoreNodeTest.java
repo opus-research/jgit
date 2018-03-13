@@ -480,9 +480,8 @@ public class IgnoreNodeTest extends RepositoryTestCase {
 		writeTrashFile("a/a", "");
 		writeTrashFile("a/a ", "");
 		writeTrashFile("a/a  ", "");
-		writeTrashFile("b/c", "");
 
-		writeIgnoreFile(".gitignore", "a\\ ", "a \\ ", "b/ ");
+		writeIgnoreFile(".gitignore", "a\\ ", "a \\ ");
 
 		beginWalk();
 		assertEntry(F, tracked, ".gitignore");
@@ -498,8 +497,6 @@ public class IgnoreNodeTest extends RepositoryTestCase {
 		assertEntry(F, tracked, "a/a");
 		assertEntry(F, ignored, "a/a ");
 		assertEntry(F, ignored, "a/a  ");
-		assertEntry(D, ignored, "b");
-		assertEntry(F, ignored, "b/c");
 		endWalk();
 	}
 
