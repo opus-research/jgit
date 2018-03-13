@@ -45,8 +45,6 @@ package org.eclipse.jgit.transport;
 
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.List;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.ObjectId;
@@ -122,27 +120,6 @@ public class ReceiveCommand {
 		OK;
 	}
 
-	/**
-	 * Filter a list of commands according to result.
-	 *
-	 * @param commands
-	 *            commands to filter.
-	 * @param want
-	 *            desired status to filter by.
-	 * @return a copy of the command list containing only those commands with the
-	 *         desired status.
-	 */
-	public static List<ReceiveCommand> filter(List<ReceiveCommand> commands,
-			final Result want) {
-		final List<ReceiveCommand> r = new ArrayList<ReceiveCommand>(commands
-				.size());
-		for (final ReceiveCommand cmd : commands) {
-			if (cmd.getResult() == want)
-				r.add(cmd);
-		}
-		return r;
-	}
-
 	private final ObjectId oldId;
 
 	private final ObjectId newId;
@@ -199,16 +176,6 @@ public class ReceiveCommand {
 	 */
 	public ReceiveCommand(final ObjectId oldId, final ObjectId newId,
 			final String name, final Type type) {
-		if (type != Type.CREATE && ObjectId.zeroId().equals(oldId))
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().illegalCombinationOfArguments,
-					"oldId=" + ObjectId.zeroId(),
-					"type=" + type));
-		if (type != Type.DELETE && ObjectId.zeroId().equals(newId))
-			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().illegalCombinationOfArguments,
-					"newId=" + ObjectId.zeroId(),
-					"type=" + type));
 		this.oldId = oldId;
 		this.newId = newId;
 		this.name = name;

@@ -631,8 +631,7 @@ public class ReceivePack {
 	 * <p>
 	 * When possible, prefer {@link #sendMessage(String)} or
 	 * {@link #sendError(String)}; this method is intended only for callers who
-	 * need to do their own
-	 * encoding.
+	 * need to do their own encoding.
 	 *
 	 * @param what
 	 *            bytes to send.
@@ -1154,7 +1153,13 @@ public class ReceivePack {
 	}
 
 	private List<ReceiveCommand> filterCommands(final Result want) {
-		return ReceiveCommand.filter(commands, want);
+		final List<ReceiveCommand> r = new ArrayList<ReceiveCommand>(commands
+				.size());
+		for (final ReceiveCommand cmd : commands) {
+			if (cmd.getResult() == want)
+				r.add(cmd);
+		}
+		return r;
 	}
 
 	private void sendStatusReport(final boolean forClient, final Reporter out)
