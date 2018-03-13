@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2013, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,61 +40,36 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.pgm;
 
-package org.eclipse.jgit.http.server;
+import org.eclipse.jgit.api.DescribeCommand;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.RefNotFoundException;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.pgm.internal.CLIText;
+import org.kohsuke.args4j.Argument;
 
-import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
+@Command(common = true, usage = "usage_Describe")
+class Describe extends TextBuiltin {
 
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.util.Map;
+	@Argument(index = 0, metaVar = "metaVar_treeish")
+	private ObjectId tree;
 
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+	@Override
+	protected void run() throws Exception {
+		DescribeCommand cmd = new Git(db).describe();
+		if (tree != null)
+			cmd.setTarget(tree);
+		String result = null;
+		try {
+			result = cmd.call();
+		} catch (RefNotFoundException e) {
+			throw die(CLIText.get().noNamesFound, e);
+		}
+		if (result == null)
+			throw die(CLIText.get().noNamesFound);
 
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.RefAdvertiser;
-import org.eclipse.jgit.util.HttpSupport;
-
-/** Send a complete list of current refs, including peeled values for tags. */
-class InfoRefsServlet extends HttpServlet {
-	private static final long serialVersionUID = 1L;
-
-	public void doGet(final HttpServletRequest req,
-			final HttpServletResponse rsp) throws IOException {
-		// Assume a dumb client and send back the dumb client
-		// version of the info/refs file.
-		rsp.setContentType(HttpSupport.TEXT_PLAIN);
-		rsp.setCharacterEncoding(Constants.CHARACTER_ENCODING);
-
-		final Repository db = getRepository(req);
-		final OutputStreamWriter out = new OutputStreamWriter(
-				new SmartOutputStream(req, rsp, true),
-				Constants.CHARSET);
-		final RefAdvertiser adv = new RefAdvertiser() {
-			@Override
-			protected void writeOne(final CharSequence line) throws IOException {
-				// Whoever decided that info/refs should use a different
-				// delimiter than the native git:// protocol shouldn't
-				// be allowed to design this sort of stuff. :-(
-				out.append(line.toString().replace(' ', '\t'));
-			}
-
-			@Override
-			protected void end() {
-				// No end marker required for info/refs format.
-			}
-		};
-		adv.init(db);
-		adv.setDerefTags(true);
-
-		Map<String, Ref> refs = db.getRefDatabase().getRefs(ALL);
-		refs.remove(Constants.HEAD);
-		adv.send(refs);
-		out.close();
+		outw.println(result);
 	}
+
 }
