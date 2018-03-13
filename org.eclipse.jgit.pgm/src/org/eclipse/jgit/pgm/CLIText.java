@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2010, 2012 Sasa Zivkov <sasa.zivkov@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,6 +43,8 @@
 
 package org.eclipse.jgit.pgm;
 
+import java.text.MessageFormat;
+
 import org.eclipse.jgit.nls.NLS;
 import org.eclipse.jgit.nls.TranslationBundle;
 
@@ -58,7 +60,24 @@ public class CLIText extends TranslationBundle {
 		return NLS.getBundleFor(CLIText.class);
 	}
 
+	/**
+	 * Format the given line for using the format defined by {@link #lineFormat}
+	 * ("# " by default).
+	 *
+	 * @param line
+	 *            the line to format
+	 * @return the formatted line
+	 * @since 2.2
+	 */
+	public static String formatLine(String line) {
+		return MessageFormat.format(get().lineFormat, line);
+	}
+
+	// @formatter:off
 	/***/ public String IPZillaPasswordPrompt;
+	/***/ public String alreadyOnBranch;
+	/***/ public String alreadyUpToDate;
+	/***/ public String archiveEntryModeIgnored;
 	/***/ public String authorInfo;
 	/***/ public String averageMSPerRead;
 	/***/ public String branchAlreadyExists;
@@ -70,6 +89,7 @@ public class CLIText extends TranslationBundle {
 	/***/ public String configFileNotFound;
 	/***/ public String cannotBeRenamed;
 	/***/ public String cannotChekoutNoHeadsAdvertisedByRemote;
+	/***/ public String cannotCombineSquashWithNoff;
 	/***/ public String cannotCreateCommand;
 	/***/ public String cannotCreateOutputStream;
 	/***/ public String cannotDeatchHEAD;
@@ -87,6 +107,8 @@ public class CLIText extends TranslationBundle {
 	/***/ public String cannotWrite;
 	/***/ public String cantFindGitDirectory;
 	/***/ public String cantWrite;
+	/***/ public String changesNotStagedForCommit;
+	/***/ public String changesToBeCommitted;
 	/***/ public String commitLabel;
 	/***/ public String conflictingUsageOf_git_dir_andArguments;
 	/***/ public String couldNotCreateBranch;
@@ -102,18 +124,20 @@ public class CLIText extends TranslationBundle {
 	/***/ public String failedToLockIndex;
 	/***/ public String failedToLockTag;
 	/***/ public String fatalError;
-	/***/ public String fatalErrorTagExists;
 	/***/ public String fatalThisProgramWillDestroyTheRepository;
 	/***/ public String fileIsRequired;
+	/***/ public String ffNotPossibleAborting;
 	/***/ public String forcedUpdate;
 	/***/ public String fromURI;
 	/***/ public String initializedEmptyGitRepositoryIn;
 	/***/ public String invalidHttpProxyOnlyHttpSupported;
 	/***/ public String jgitVersion;
+	/***/ public String lineFormat;
 	/***/ public String listeningOn;
 	/***/ public String mergeConflict;
 	/***/ public String mergeFailed;
 	/***/ public String mergeMadeBy;
+	/***/ public String mergedSquashed;
 	/***/ public String metaVar_KEY;
 	/***/ public String metaVar_arg;
 	/***/ public String metaVar_author;
@@ -168,8 +192,14 @@ public class CLIText extends TranslationBundle {
 	/***/ public String notAnIndexFile;
 	/***/ public String notAnObject;
 	/***/ public String notFound;
+	/***/ public String notOnAnyBranch;
 	/***/ public String noteObjectTooLargeToPrint;
+	/***/ public String nothingToSquash;
+	/***/ public String onBranchToBeBorn;
+	/***/ public String onBranch;
 	/***/ public String onlyOneMetaVarExpectedIn;
+	/***/ public String onlyOneOfIncludeOnlyAllInteractiveCanBeUsed;
+	/***/ public String pathspecDidNotMatch;
 	/***/ public String pushTo;
 	/***/ public String pathsRequired;
 	/***/ public String refDoesNotExistOrNoCommit;
@@ -179,9 +209,24 @@ public class CLIText extends TranslationBundle {
 	/***/ public String repaint;
 	/***/ public String serviceNotSupported;
 	/***/ public String skippingObject;
+	/***/ public String statusFileListFormat;
+	/***/ public String statusFileListFormatWithPrefix;
+	/***/ public String statusModified;
+	/***/ public String statusNewFile;
+	/***/ public String statusRemoved;
+	/***/ public String switchedToNewBranch;
+	/***/ public String switchedToBranch;
+	/***/ public String tagAlreadyExists;
+	/***/ public String tagLabel;
+	/***/ public String taggerInfo;
 	/***/ public String timeInMilliSeconds;
 	/***/ public String tooManyRefsGiven;
-	/***/ public String unknownMergeStratey;
+	/***/ public String treeIsRequired;
+	/***/ public char[] unknownIoErrorStdout;
+	/***/ public String unknownMergeStrategy;
+	/***/ public String unmergedPaths;
 	/***/ public String unsupportedOperation;
+	/***/ public String untrackedFiles;
+	/***/ public String updating;
 	/***/ public String warningNoCommitGivenOnCommandLine;
 }

@@ -45,6 +45,7 @@
 
 package org.eclipse.jgit.storage.file;
 
+import static org.eclipse.jgit.junit.Assert.assertEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -639,7 +640,7 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 		ObjectId rb = db.resolve("refs/heads/b");
 		writeSymref(Constants.HEAD, "refs/heads/b");
 		ObjectId oldHead = db.resolve(Constants.HEAD);
-		assertTrue("internal test condition, b == HEAD", rb.equals(oldHead));
+		assertEquals("internal test condition, b == HEAD", oldHead, rb);
 		writeReflog(db, rb, "Just a message", "refs/heads/b");
 		assertTrue("log on old branch", new File(db.getDirectory(),
 				"logs/refs/heads/b").exists());
@@ -804,7 +805,7 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 		updateRef.setRefLogMessage("Setup", false);
 		assertEquals(Result.FAST_FORWARD, updateRef.update());
 		ObjectId oldHead = db.resolve(Constants.HEAD);
-		assertTrue(rb.equals(oldHead)); // assumption for this test
+		assertEquals(oldHead, rb); // assumption for this test
 		writeReflog(db, rb, "Just a message", "refs/heads/a");
 		assertTrue("internal check, we have a log", new File(db.getDirectory(),
 				"logs/refs/heads/a").exists());
@@ -838,7 +839,7 @@ public class RefUpdateTest extends SampleDataRepositoryTestCase {
 		updateRef.setForceUpdate(true);
 		assertEquals(Result.FORCED, updateRef.update());
 		ObjectId oldHead = db.resolve(Constants.HEAD);
-		assertTrue(rb.equals(oldHead)); // assumption for this test
+		assertEquals(oldHead, rb); // assumption for this test
 		writeReflog(db, rb, "Just a message", "refs/heads/prefix/a");
 		assertTrue("internal check, we have a log", new File(db.getDirectory(),
 				"logs/refs/heads/prefix/a").exists());

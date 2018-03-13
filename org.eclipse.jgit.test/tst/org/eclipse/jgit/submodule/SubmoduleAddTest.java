@@ -53,6 +53,7 @@ import java.text.MessageFormat;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.api.SubmoduleAddCommand;
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEditor;
@@ -75,9 +76,9 @@ import org.junit.Test;
 public class SubmoduleAddTest extends RepositoryTestCase {
 
 	@Test
-	public void commandWithNullPath() {
+	public void commandWithNullPath() throws GitAPIException {
 		try {
-			new SubmoduleAddCommand(db).setURI("uri").call();
+			new SubmoduleAddCommand(db).setURI("uri").call().close();
 			fail("Exception not thrown");
 		} catch (IllegalArgumentException e) {
 			assertEquals(JGitText.get().pathNotConfigured, e.getMessage());
@@ -85,9 +86,10 @@ public class SubmoduleAddTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void commandWithEmptyPath() {
+	public void commandWithEmptyPath() throws GitAPIException {
 		try {
-			new SubmoduleAddCommand(db).setPath("").setURI("uri").call();
+			new SubmoduleAddCommand(db).setPath("").setURI("uri").call()
+					.close();
 			fail("Exception not thrown");
 		} catch (IllegalArgumentException e) {
 			assertEquals(JGitText.get().pathNotConfigured, e.getMessage());
@@ -95,9 +97,9 @@ public class SubmoduleAddTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void commandWithNullUri() {
+	public void commandWithNullUri() throws GitAPIException {
 		try {
-			new SubmoduleAddCommand(db).setPath("sub").call();
+			new SubmoduleAddCommand(db).setPath("sub").call().close();
 			fail("Exception not thrown");
 		} catch (IllegalArgumentException e) {
 			assertEquals(JGitText.get().uriNotConfigured, e.getMessage());
@@ -105,9 +107,10 @@ public class SubmoduleAddTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void commandWithEmptyUri() {
+	public void commandWithEmptyUri() throws GitAPIException {
 		try {
-			new SubmoduleAddCommand(db).setPath("sub").setURI("").call();
+			new SubmoduleAddCommand(db).setPath("sub").setURI("").call()
+					.close();
 			fail("Exception not thrown");
 		} catch (IllegalArgumentException e) {
 			assertEquals(JGitText.get().uriNotConfigured, e.getMessage());
@@ -128,6 +131,7 @@ public class SubmoduleAddTest extends RepositoryTestCase {
 		command.setURI(uri);
 		Repository repo = command.call();
 		assertNotNull(repo);
+		addRepoToClose(repo);
 
 		SubmoduleWalk generator = SubmoduleWalk.forIndex(db);
 		assertTrue(generator.next());
@@ -136,7 +140,9 @@ public class SubmoduleAddTest extends RepositoryTestCase {
 		assertEquals(uri, generator.getModulesUrl());
 		assertEquals(path, generator.getModulesPath());
 		assertEquals(uri, generator.getConfigUrl());
-		assertNotNull(generator.getRepository());
+		Repository subModRepo = generator.getRepository();
+		addRepoToClose(subModRepo);
+		assertNotNull(subModRepo);
 		assertEquals(commit, repo.resolve(Constants.HEAD));
 
 		Status status = Git.wrap(db).status().call();
@@ -164,7 +170,7 @@ public class SubmoduleAddTest extends RepositoryTestCase {
 		command.setPath(path);
 		command.setURI("git://server/repo.git");
 		try {
-			command.call();
+			command.call().close();
 			fail("Exception not thrown");
 		} catch (JGitInternalException e) {
 			assertEquals(
@@ -187,6 +193,7 @@ public class SubmoduleAddTest extends RepositoryTestCase {
 		command.setURI(uri);
 		Repository repo = command.call();
 		assertNotNull(repo);
+		addRepoToClose(repo);
 
 		SubmoduleWalk generator = SubmoduleWalk.forIndex(db);
 		assertTrue(generator.next());
@@ -198,11 +205,12 @@ public class SubmoduleAddTest extends RepositoryTestCase {
 		if (File.separatorChar == '\\')
 			fullUri = fullUri.replace('\\', '/');
 		assertEquals(fullUri, generator.getConfigUrl());
-		assertNotNull(generator.getRepository());
+		Repository subModRepo = generator.getRepository();
+		addRepoToClose(subModRepo);
+		assertNotNull(subModRepo);
 		assertEquals(
 				fullUri,
-				generator
-						.getRepository()
+				subModRepo
 						.getConfig()
 						.getString(ConfigConstants.CONFIG_REMOTE_SECTION,
 								Constants.DEFAULT_REMOTE_NAME,
@@ -237,7 +245,9 @@ public class SubmoduleAddTest extends RepositoryTestCase {
 		command.setPath(path2);
 		String url2 = db.getDirectory().toURI().toString();
 		command.setURI(url2);
-		assertNotNull(command.call());
+		Repository r = command.call();
+		assertNotNull(r);
+		addRepoToClose(r);
 
 		modulesConfig.load();
 		assertEquals(path1, modulesConfig.getString(

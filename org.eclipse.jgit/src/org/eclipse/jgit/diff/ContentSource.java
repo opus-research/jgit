@@ -64,7 +64,7 @@ import org.eclipse.jgit.treewalk.filter.PathFilter;
 
 /**
  * Supplies the content of a file for {@link DiffFormatter}.
- *
+ * <p>
  * A content source is not thread-safe. Sources may contain state, including
  * information about the last ObjectLoader they returned. Callers must be
  * careful to ensure there is no more than one ObjectLoader pending on any
@@ -184,9 +184,10 @@ public abstract class ContentSource {
 				@Override
 				public ObjectStream openStream() throws MissingObjectException,
 						IOException {
+					long contentLength = ptr.getEntryContentLength();
 					InputStream in = ptr.openEntryStream();
 					in = new BufferedInputStream(in);
-					return new ObjectStream.Filter(getType(), getSize(), in);
+					return new ObjectStream.Filter(getType(), contentLength, in);
 				}
 
 				@Override

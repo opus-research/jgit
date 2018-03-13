@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com> and
+ * Copyright (C) 2010, 2012 Christian Halstrick <christian.halstrick@sap.com> and
  * other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available under the
@@ -67,6 +67,9 @@ class Commit extends TextBuiltin {
 	@Option(name = "--only", aliases = { "-o" }, usage = "usage_CommitOnly")
 	private boolean only;
 
+	@Option(name = "--all", aliases = { "-a" }, usage = "usage_CommitAll")
+	private boolean all;
+
 	@Option(name = "--amend", usage = "usage_CommitAmend")
 	private boolean amend;
 
@@ -83,12 +86,20 @@ class Commit extends TextBuiltin {
 			commitCmd.setMessage(message);
 		if (only && paths.isEmpty())
 			throw die(CLIText.get().pathsRequired);
+		if (only && all)
+			throw die(CLIText.get().onlyOneOfIncludeOnlyAllInteractiveCanBeUsed);
 		if (!paths.isEmpty())
 			for (String p : paths)
 				commitCmd.setOnly(p);
 		commitCmd.setAmend(amend);
+		commitCmd.setAll(all);
 		Ref head = db.getRef(Constants.HEAD);
-		RevCommit commit = commitCmd.call();
+		RevCommit commit;
+		try {
+			commit = commitCmd.call();
+		} catch (JGitInternalException e) {
+			throw die(e.getMessage());
+		}
 
 		String branchName;
 		if (!head.isSymbolic())
@@ -98,7 +109,7 @@ class Commit extends TextBuiltin {
 			if (branchName.startsWith(Constants.R_HEADS))
 				branchName = branchName.substring(Constants.R_HEADS.length());
 		}
-		out.println("[" + branchName + " " + commit.name() + "] "
+		outw.println("[" + branchName + " " + commit.name() + "] "
 				+ commit.getShortMessage());
 	}
 }

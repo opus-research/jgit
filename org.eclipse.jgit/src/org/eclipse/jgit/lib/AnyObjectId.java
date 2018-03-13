@@ -57,7 +57,7 @@ import org.eclipse.jgit.util.NB;
  * with this instance can alter at any time, if this instance is modified to
  * represent a different object name.
  */
-public abstract class AnyObjectId implements Comparable {
+public abstract class AnyObjectId implements Comparable<Object> {
 
 	/**
 	 * Compare to object identifier byte sequences for equality.
@@ -510,8 +510,8 @@ public abstract class AnyObjectId implements Comparable {
 
 	/**
 	 * Return an abbreviation (prefix) of this object SHA-1.
-	 *
-	 * This implementation does not guaranteeing uniqueness. Callers should
+	 * <p>
+	 * This implementation does not guarantee uniqueness. Callers should
 	 * instead use {@link ObjectReader#abbreviate(AnyObjectId, int)} to obtain a
 	 * unique abbreviation within the scope of a particular object database.
 	 *

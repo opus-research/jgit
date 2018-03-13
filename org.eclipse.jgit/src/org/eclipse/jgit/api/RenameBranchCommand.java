@@ -48,6 +48,7 @@ import java.text.MessageFormat;
 import java.util.Arrays;
 
 import org.eclipse.jgit.api.errors.DetachedHeadException;
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
@@ -58,9 +59,9 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefRename;
+import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.StoredConfig;
-import org.eclipse.jgit.lib.RefUpdate.Result;
 
 /**
  * Used to rename branches.
@@ -94,7 +95,7 @@ public class RenameBranchCommand extends GitCommand<Ref> {
 	 *             if rename is tried without specifying the old name and HEAD
 	 *             is detached
 	 */
-	public Ref call() throws RefNotFoundException, InvalidRefNameException,
+	public Ref call() throws GitAPIException, RefNotFoundException, InvalidRefNameException,
 			RefAlreadyExistsException, DetachedHeadException {
 		checkCallable();
 
@@ -107,7 +108,7 @@ public class RenameBranchCommand extends GitCommand<Ref> {
 			String fullNewName;
 			if (repo.getRef(newName) != null)
 				throw new RefAlreadyExistsException(MessageFormat.format(
-						JGitText.get().refAlreadyExists, newName));
+						JGitText.get().refAlreadyExists1, newName));
 			if (oldName != null) {
 				Ref ref = repo.getRef(oldName);
 				if (ref == null)

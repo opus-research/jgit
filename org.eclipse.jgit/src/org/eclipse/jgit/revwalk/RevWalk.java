@@ -620,6 +620,9 @@ public class RevWalk implements Iterable<RevCommit> {
 	 * <p>
 	 * The commit may or may not exist in the repository. It is impossible to
 	 * tell from this method's return value.
+	 * <p>
+	 * See {@link #parseHeaders(RevObject)} and {@link #parseBody(RevObject)}
+	 * for loading contents.
 	 *
 	 * @param id
 	 *            name of the commit object.
@@ -682,7 +685,8 @@ public class RevWalk implements Iterable<RevCommit> {
 				r = new RevTag(id);
 				break;
 			default:
-				throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidGitType, type));
+				throw new IllegalArgumentException(MessageFormat.format(
+						JGitText.get().invalidGitType, Integer.valueOf(type)));
 			}
 			objects.add(r);
 		}
@@ -843,8 +847,8 @@ public class RevWalk implements Iterable<RevCommit> {
 			break;
 		}
 		default:
-			throw new IllegalArgumentException(MessageFormat.format(JGitText
-					.get().badObjectType, type));
+			throw new IllegalArgumentException(MessageFormat.format(
+					JGitText.get().badObjectType, Integer.valueOf(type)));
 		}
 		objects.add(r);
 		return r;
@@ -1026,7 +1030,8 @@ public class RevWalk implements Iterable<RevCommit> {
 	int allocFlag() {
 		if (freeFlags == 0)
 			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().flagsAlreadyCreated, 32 - RESERVED_FLAGS));
+					JGitText.get().flagsAlreadyCreated,
+					Integer.valueOf(32 - RESERVED_FLAGS)));
 		final int m = Integer.lowestOneBit(freeFlags);
 		freeFlags &= ~m;
 		return m;

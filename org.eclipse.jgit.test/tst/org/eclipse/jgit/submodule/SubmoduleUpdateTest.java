@@ -52,6 +52,7 @@ import java.util.Collection;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.SubmoduleUpdateCommand;
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEditor;
 import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
@@ -73,7 +74,7 @@ import org.junit.Test;
 public class SubmoduleUpdateTest extends RepositoryTestCase {
 
 	@Test
-	public void repositoryWithNoSubmodules() {
+	public void repositoryWithNoSubmodules() throws GitAPIException {
 		SubmoduleUpdateCommand command = new SubmoduleUpdateCommand(db);
 		Collection<String> modules = command.call();
 		assertNotNull(modules);
@@ -120,12 +121,14 @@ public class SubmoduleUpdateTest extends RepositoryTestCase {
 		SubmoduleWalk generator = SubmoduleWalk.forIndex(db);
 		assertTrue(generator.next());
 		Repository subRepo = generator.getRepository();
+		addRepoToClose(subRepo);
 		assertNotNull(subRepo);
 		assertEquals(commit, subRepo.resolve(Constants.HEAD));
 	}
 
 	@Test
-	public void repositoryWithUnconfiguredSubmodule() throws IOException {
+	public void repositoryWithUnconfiguredSubmodule() throws IOException,
+			GitAPIException {
 		final ObjectId id = ObjectId
 				.fromString("abcd1234abcd1234abcd1234abcd1234abcd1234");
 		final String path = "sub";
@@ -159,7 +162,8 @@ public class SubmoduleUpdateTest extends RepositoryTestCase {
 	}
 
 	@Test
-	public void repositoryWithInitializedSubmodule() throws IOException {
+	public void repositoryWithInitializedSubmodule() throws IOException,
+			GitAPIException {
 		final ObjectId id = ObjectId
 				.fromString("abcd1234abcd1234abcd1234abcd1234abcd1234");
 		final String path = "sub";

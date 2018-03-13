@@ -63,6 +63,8 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
 import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.LinkedList;
@@ -71,6 +73,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.eclipse.jgit.errors.InvalidObjectIdException;
 import org.eclipse.jgit.errors.LockFailedException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.ObjectWritingException;
@@ -258,10 +261,17 @@ public class RefDirectory extends RefDatabase {
 		final RefList<Ref> packed = getPackedRefs();
 		Ref ref = null;
 		for (String prefix : SEARCH_PATH) {
-			ref = readRef(prefix + needle, packed);
-			if (ref != null) {
-				ref = resolve(ref, 0, null, null, packed);
-				break;
+			try {
+				ref = readRef(prefix + needle, packed);
+				if (ref != null) {
+					ref = resolve(ref, 0, null, null, packed);
+					break;
+				}
+			} catch (IOException e) {
+				if (!(!needle.contains("/") && "".equals(prefix) && e
+						.getCause() instanceof InvalidObjectIdException)) {
+					throw e;
+				}
 			}
 		}
 		fireRefsChanged();
@@ -583,6 +593,112 @@ public class RefDirectory extends RefDatabase {
 		fireRefsChanged();
 	}
 
+	/**
+	 * Adds a set of refs to the set of packed-refs. Only non-symbolic refs are
+	 * added. If a ref with the given name already existed in packed-refs it is
+	 * updated with the new value. Each loose ref which was added to the
+	 * packed-ref file is deleted. If a given ref can't be locked it will not be
+	 * added to the pack file.
+	 *
+	 * @param refs
+	 *            the refs to be added. Must be fully qualified.
+	 * @throws IOException
+	 */
+	public void pack(List<String> refs) throws IOException {
+		if (refs.size() == 0)
+			return;
+		FS fs = parent.getFS();
+
+		// Lock the packed refs file and read the content
+		LockFile lck = new LockFile(packedRefsFile, fs);
+		if (!lck.lock())
+			throw new IOException(MessageFormat.format(
+					JGitText.get().cannotLock, packedRefsFile));
+
+		try {
+			final PackedRefList packed = getPackedRefs();
+			RefList<Ref> cur = readPackedRefs();
+
+			// Iterate over all refs to be packed
+			for (String refName : refs) {
+				Ref ref = readRef(refName, cur);
+				if (ref.isSymbolic())
+					continue; // can't pack symbolic refs
+				// Add/Update it to packed-refs
+				int idx = cur.find(refName);
+				if (idx >= 0)
+					cur = cur.set(idx, peeledPackedRef(ref));
+				else
+					cur = cur.add(idx, peeledPackedRef(ref));
+			}
+
+			// The new content for packed-refs is collected. Persist it.
+			commitPackedRefs(lck, cur, packed);
+
+			// Now delete the loose refs which are now packed
+			for (String refName : refs) {
+				// Lock the loose ref
+				File refFile = fileFor(refName);
+				if (!refFile.exists())
+					continue;
+				LockFile rLck = new LockFile(refFile,
+						parent.getFS());
+				if (!rLck.lock())
+					continue;
+				try {
+					LooseRef currentLooseRef = scanRef(null, refName);
+					if (currentLooseRef == null || currentLooseRef.isSymbolic())
+						continue;
+					Ref packedRef = cur.get(refName);
+					ObjectId clr_oid = currentLooseRef.getObjectId();
+					if (clr_oid != null
+							&& clr_oid.equals(packedRef.getObjectId())) {
+						RefList<LooseRef> curLoose, newLoose;
+						do {
+							curLoose = looseRefs.get();
+							int idx = curLoose.find(refName);
+							if (idx < 0)
+								break;
+							newLoose = curLoose.remove(idx);
+						} while (!looseRefs.compareAndSet(curLoose, newLoose));
+						int levels = levelsIn(refName) - 2;
+						delete(fileFor(refName), levels);
+					}
+				} finally {
+					rLck.unlock();
+				}
+			}
+			// Don't fire refsChanged. The refs have not change, only their
+			// storage.
+		} finally {
+			lck.unlock();
+		}
+	}
+
+	/**
+	 * Make sure a ref is peeled and has the Storage PACKED. If the given ref
+	 * has this attributes simply return it. Otherwise create a new peeled
+	 * {@link ObjectIdRef} where Storage is set to PACKED.
+	 *
+	 * @param f
+	 * @return a ref for Storage PACKED having the same name, id, peeledId as f
+	 * @throws MissingObjectException
+	 * @throws IOException
+	 */
+	private Ref peeledPackedRef(Ref f)
+			throws MissingObjectException, IOException {
+		if (f.getStorage().isPacked() && f.isPeeled())
+			return f;
+		if (!f.isPeeled())
+			f = peel(f);
+		if (f.getPeeledObjectId() != null)
+			return new ObjectIdRef.PeeledTag(PACKED, f.getName(),
+					f.getObjectId(), f.getPeeledObjectId());
+		else
+			return new ObjectIdRef.PeeledNonTag(PACKED, f.getName(),
+					f.getObjectId());
+	}
+
 	void log(final RefUpdate update, final String msg, final boolean deref)
 			throws IOException {
 		logWriter.log(update, msg, deref);
@@ -626,24 +742,27 @@ public class RefDirectory extends RefDatabase {
 			return curList;
 
 		final PackedRefList newList = readPackedRefs();
-		if (packedRefs.compareAndSet(curList, newList))
+		if (packedRefs.compareAndSet(curList, newList)
+				&& !curList.id.equals(newList.id))
 			modCnt.incrementAndGet();
 		return newList;
 	}
 
-	private PackedRefList readPackedRefs()
-			throws IOException {
+	private PackedRefList readPackedRefs() throws IOException {
 		final FileSnapshot snapshot = FileSnapshot.save(packedRefsFile);
 		final BufferedReader br;
+		final MessageDigest digest = Constants.newMessageDigest();
 		try {
-			br = new BufferedReader(new InputStreamReader(new FileInputStream(
-					packedRefsFile), CHARSET));
+			br = new BufferedReader(new InputStreamReader(
+					new DigestInputStream(new FileInputStream(packedRefsFile),
+							digest), CHARSET));
 		} catch (FileNotFoundException noPackedRefs) {
 			// Ignore it and leave the new list empty.
 			return PackedRefList.NO_PACKED_REFS;
 		}
 		try {
-			return new PackedRefList(parsePackedRefs(br), snapshot);
+			return new PackedRefList(parsePackedRefs(br), snapshot,
+					ObjectId.fromRaw(digest.digest()));
 		} finally {
 			br.close();
 		}
@@ -724,8 +843,9 @@ public class RefDirectory extends RefDatabase {
 				if (!lck.commit())
 					throw new ObjectWritingException(MessageFormat.format(JGitText.get().unableToWrite, name));
 
-				packedRefs.compareAndSet(oldPackedList, new PackedRefList(
-						refs, lck.getCommitSnapshot()));
+				byte[] digest = Constants.newMessageDigest().digest(content);
+				packedRefs.compareAndSet(oldPackedList, new PackedRefList(refs,
+						lck.getCommitSnapshot(), ObjectId.fromRaw(digest)));
 			}
 		}.writePackedRefs();
 	}
@@ -825,7 +945,11 @@ public class RefDirectory extends RefDatabase {
 			while (0 < n && Character.isWhitespace(buf[n - 1]))
 				n--;
 			String content = RawParseUtils.decode(buf, 0, n);
-			throw new IOException(MessageFormat.format(JGitText.get().notARef, name, content));
+
+			IOException ioException = new IOException(MessageFormat.format(JGitText.get().notARef,
+					name, content));
+			ioException.initCause(notRef);
+			throw ioException;
 		}
 		return new LooseUnpeeled(otherSnapshot, name, id);
 	}
@@ -899,13 +1023,17 @@ public class RefDirectory extends RefDatabase {
 
 	private static class PackedRefList extends RefList<Ref> {
 		static final PackedRefList NO_PACKED_REFS = new PackedRefList(
-				RefList.emptyList(), FileSnapshot.MISSING_FILE);
+				RefList.emptyList(), FileSnapshot.MISSING_FILE,
+				ObjectId.zeroId());
 
 		final FileSnapshot snapshot;
 
-		PackedRefList(RefList<Ref> src, FileSnapshot s) {
+		final ObjectId id;
+
+		PackedRefList(RefList<Ref> src, FileSnapshot s, ObjectId i) {
 			super(src);
 			snapshot = s;
+			id = i;
 		}
 	}
 

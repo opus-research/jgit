@@ -47,10 +47,14 @@ import java.text.MessageFormat;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.MultipleParentsNotAllowedException;
 import org.eclipse.jgit.api.errors.NoHeadException;
+import org.eclipse.jgit.api.errors.NoMessageException;
+import org.eclipse.jgit.api.errors.UnmergedPathsException;
+import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
@@ -80,6 +84,8 @@ import org.eclipse.jgit.treewalk.FileTreeIterator;
 public class CherryPickCommand extends GitCommand<CherryPickResult> {
 	private List<Ref> commits = new LinkedList<Ref>();
 
+	private String ourCommitName = null;
+
 	/**
 	 * @param repo
 	 */
@@ -94,8 +100,16 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 	 * invocation of the command. Don't call this method twice on an instance.
 	 *
 	 * @return the result of the cherry-pick
+	 * @throws GitAPIException
+	 * @throws WrongRepositoryStateException
+	 * @throws ConcurrentRefUpdateException
+	 * @throws UnmergedPathsException
+	 * @throws NoMessageException
+	 * @throws NoHeadException
 	 */
-	public CherryPickResult call() throws GitAPIException {
+	public CherryPickResult call() throws GitAPIException, NoMessageException,
+			UnmergedPathsException, ConcurrentRefUpdateException,
+			WrongRepositoryStateException, NoHeadException {
 		RevCommit newHead = null;
 		List<Ref> cherryPickedRefs = new LinkedList<Ref>();
 		checkCallable();
@@ -132,10 +146,16 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 				RevCommit srcParent = srcCommit.getParent(0);
 				revWalk.parseHeaders(srcParent);
 
+				String ourName = calculateOurName(headRef);
+				String cherryPickName = srcCommit.getId().abbreviate(7).name()
+						+ " " + srcCommit.getShortMessage();
+
 				ResolveMerger merger = (ResolveMerger) MergeStrategy.RESOLVE
 						.newMerger(repo);
 				merger.setWorkingTreeIterator(new FileTreeIterator(repo));
 				merger.setBase(srcParent.getTree());
+				merger.setCommitNames(new String[] { "BASE", ourName,
+						cherryPickName });
 				if (merger.merge(headCommit, srcCommit)) {
 					if (AnyObjectId.equals(headCommit.getTree().getId(), merger
 							.getResultTreeId()))
@@ -210,5 +230,25 @@ public class CherryPickCommand extends GitCommand<CherryPickResult> {
 	public CherryPickCommand include(String name, AnyObjectId commit) {
 		return include(new ObjectIdRef.Unpeeled(Storage.LOOSE, name,
 				commit.copy()));
+	}
+
+	/**
+	 * @param ourCommitName
+	 *            the name that should be used in the "OURS" place for conflict
+	 *            markers
+	 * @return {@code this}
+	 */
+	public CherryPickCommand setOurCommitName(String ourCommitName) {
+		this.ourCommitName = ourCommitName;
+		return this;
+	}
+
+	private String calculateOurName(Ref headRef) {
+		if (ourCommitName != null)
+			return ourCommitName;
+
+		String targetRefName = headRef.getTarget().getName();
+		String headName = Repository.shortenRefName(targetRefName);
+		return headName;
 	}
 }

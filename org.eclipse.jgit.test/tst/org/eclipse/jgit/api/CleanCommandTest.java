@@ -42,12 +42,14 @@
  */
 package org.eclipse.jgit.api;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import java.io.IOException;
 import java.util.Set;
 import java.util.TreeSet;
 
+import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.junit.Before;
@@ -69,13 +71,23 @@ public class CleanCommandTest extends RepositoryTestCase {
 		writeTrashFile("File2.txt", "Delete Me");
 		writeTrashFile("File3.txt", "Delete Me");
 
+		// create files in sub-directories.
+		writeTrashFile("sub-noclean/File1.txt", "Hello world");
+		writeTrashFile("sub-noclean/File2.txt", "Delete Me");
+		writeTrashFile("sub-clean/File4.txt", "Delete Me");
+		writeTrashFile("sub-noclean/Ignored.txt", "Ignored");
+		writeTrashFile(".gitignore", "/ignored-dir\n/sub-noclean/Ignored.txt");
+		writeTrashFile("ignored-dir/Ignored2.txt", "Ignored");
+
 		// add and commit first file
 		git.add().addFilepattern("File1.txt").call();
+		git.add().addFilepattern("sub-noclean/File1.txt").call();
+		git.add().addFilepattern(".gitignore").call();
 		git.commit().setMessage("Initial commit").call();
 	}
 
 	@Test
-	public void testClean() throws NoWorkTreeException, IOException {
+	public void testClean() throws NoWorkTreeException, GitAPIException {
 		// create status
 		StatusCommand command = git.status();
 		Status status = command.call();
@@ -88,13 +100,39 @@ public class CleanCommandTest extends RepositoryTestCase {
 		status = git.status().call();
 		files = status.getUntracked();
 
-		assertTrue(files.size() == 0);
+		assertTrue(files.size() == 1); // one remains (directories not cleaned)
 		assertTrue(cleanedFiles.contains("File2.txt"));
 		assertTrue(cleanedFiles.contains("File3.txt"));
+		assertTrue(!cleanedFiles.contains("sub-noclean/File1.txt"));
+		assertTrue(cleanedFiles.contains("sub-noclean/File2.txt"));
+		assertTrue(!cleanedFiles.contains("sub-clean/File4.txt"));
 	}
 
 	@Test
-	public void testCleanWithPaths() throws NoWorkTreeException, IOException {
+	public void testCleanDirs() throws NoWorkTreeException, GitAPIException {
+		// create status
+		StatusCommand command = git.status();
+		Status status = command.call();
+		Set<String> files = status.getUntracked();
+		assertTrue(files.size() > 0);
+
+		// run clean
+		Set<String> cleanedFiles = git.clean().setCleanDirectories(true).call();
+
+		status = git.status().call();
+		files = status.getUntracked();
+
+		assertTrue(files.size() == 0);
+		assertTrue(cleanedFiles.contains("File2.txt"));
+		assertTrue(cleanedFiles.contains("File3.txt"));
+		assertTrue(!cleanedFiles.contains("sub-noclean/File1.txt"));
+		assertTrue(cleanedFiles.contains("sub-noclean/File2.txt"));
+		assertTrue(cleanedFiles.contains("sub-clean/"));
+	}
+
+	@Test
+	public void testCleanWithPaths() throws NoWorkTreeException,
+			GitAPIException {
 		// create status
 		StatusCommand command = git.status();
 		Status status = command.call();
@@ -108,13 +146,14 @@ public class CleanCommandTest extends RepositoryTestCase {
 
 		status = git.status().call();
 		files = status.getUntracked();
-		assertTrue(files.size() == 1);
+		assertTrue(files.size() == 3);
 		assertTrue(cleanedFiles.contains("File3.txt"));
-		assertTrue(!cleanedFiles.contains("File2.txt"));
+		assertFalse(cleanedFiles.contains("File2.txt"));
 	}
 
 	@Test
-	public void testCleanWithDryRun() throws NoWorkTreeException, IOException {
+	public void testCleanWithDryRun() throws NoWorkTreeException,
+			GitAPIException {
 		// create status
 		StatusCommand command = git.status();
 		Status status = command.call();
@@ -127,9 +166,65 @@ public class CleanCommandTest extends RepositoryTestCase {
 		status = git.status().call();
 		files = status.getUntracked();
 
-		assertTrue(files.size() == 2);
+		assertEquals(4, files.size());
 		assertTrue(cleanedFiles.contains("File2.txt"));
 		assertTrue(cleanedFiles.contains("File3.txt"));
+		assertTrue(!cleanedFiles.contains("sub-noclean/File1.txt"));
+		assertTrue(cleanedFiles.contains("sub-noclean/File2.txt"));
+	}
+
+	@Test
+	public void testCleanDirsWithDryRun() throws NoWorkTreeException,
+			GitAPIException {
+		// create status
+		StatusCommand command = git.status();
+		Status status = command.call();
+		Set<String> files = status.getUntracked();
+		assertTrue(files.size() > 0);
+
+		// run clean
+		Set<String> cleanedFiles = git.clean().setDryRun(true)
+				.setCleanDirectories(true).call();
+
+		status = git.status().call();
+		files = status.getUntracked();
+
+		assertTrue(files.size() == 4);
+		assertTrue(cleanedFiles.contains("File2.txt"));
+		assertTrue(cleanedFiles.contains("File3.txt"));
+		assertTrue(!cleanedFiles.contains("sub-noclean/File1.txt"));
+		assertTrue(cleanedFiles.contains("sub-noclean/File2.txt"));
+		assertTrue(cleanedFiles.contains("sub-clean/"));
+	}
+
+	@Test
+	public void testCleanWithDryRunAndNoIgnore() throws NoWorkTreeException,
+			GitAPIException {
+		// run clean
+		Set<String> cleanedFiles = git.clean().setDryRun(true).setIgnore(false)
+				.call();
+
+		Status status = git.status().call();
+		Set<String> files = status.getIgnoredNotInIndex();
+
+		assertTrue(files.size() == 2);
+		assertTrue(cleanedFiles.contains("sub-noclean/Ignored.txt"));
+		assertTrue(!cleanedFiles.contains("ignored-dir/"));
+	}
+
+	@Test
+	public void testCleanDirsWithDryRunAndNoIgnore()
+			throws NoWorkTreeException, GitAPIException {
+		// run clean
+		Set<String> cleanedFiles = git.clean().setDryRun(true).setIgnore(false)
+				.setCleanDirectories(true).call();
+
+		Status status = git.status().call();
+		Set<String> files = status.getIgnoredNotInIndex();
+
+		assertTrue(files.size() == 2);
+		assertTrue(cleanedFiles.contains("sub-noclean/Ignored.txt"));
+		assertTrue(cleanedFiles.contains("ignored-dir/"));
 	}
 
 }

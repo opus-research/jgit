@@ -96,6 +96,8 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 	private final File packFile;
 
+	private File keepFile;
+
 	private volatile String packName;
 
 	final int hash;
@@ -177,6 +179,14 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		return packFile;
 	}
 
+	/**
+	 * @return the index for this pack file.
+	 * @throws IOException
+	 */
+	public PackIndex getIndex() throws IOException {
+		return idx();
+	}
+
 	/** @return name extracted from {@code pack-*.pack} pattern. */
 	public String getPackName() {
 		String name = packName;
@@ -207,6 +217,17 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 	public boolean hasObject(final AnyObjectId id) throws IOException {
 		final long offset = idx().findOffset(id);
 		return 0 < offset && !isCorrupt(offset);
+	}
+
+	/**
+	 * Determines whether a .keep file exists for this pack file.
+	 *
+	 * @return true if a .keep file exist.
+	 */
+	public boolean shouldBeKept() {
+		if (keepFile == null)
+			keepFile = new File(packFile.getPath() + ".keep");
+		return keepFile.exists();
 	}
 
 	/**
@@ -306,7 +327,9 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		}
 
 		if (curs.inflate(this, position, dstbuf, 0) != sz)
-			throw new EOFException(MessageFormat.format(JGitText.get().shortCompressedStreamAt, position));
+			throw new EOFException(MessageFormat.format(
+					JGitText.get().shortCompressedStreamAt,
+					Long.valueOf(position)));
 		return dstbuf;
 	}
 
@@ -345,7 +368,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		int headerCnt = 1;
 		while ((c & 0x80) != 0) {
 			c = buf[headerCnt++] & 0xff;
-			inflatedLength += (c & 0x7f) << shift;
+			inflatedLength += ((long) (c & 0x7f)) << shift;
 			shift += 7;
 		}
 
@@ -406,7 +429,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 					setCorrupt(src.offset);
 					throw new CorruptObjectException(MessageFormat.format(
 							JGitText.get().objectAtHasBadZlibStream,
-							src.offset, getPackFile()));
+							Long.valueOf(src.offset), getPackFile()));
 				}
 			} else if (validate) {
 				// We don't have a CRC32 code in the index, so compute it
@@ -435,7 +458,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 					setCorrupt(src.offset);
 					throw new EOFException(MessageFormat.format(
 							JGitText.get().shortCompressedStreamAt,
-							src.offset));
+							Long.valueOf(src.offset)));
 				}
 				expectedCRC = crc1.getValue();
 			} else {
@@ -447,7 +470,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			CorruptObjectException corruptObject = new CorruptObjectException(
 					MessageFormat.format(
 							JGitText.get().objectAtHasBadZlibStream,
-							src.offset, getPackFile()));
+							Long.valueOf(src.offset), getPackFile()));
 			corruptObject.initCause(dataFormat);
 
 			StoredObjectRepresentationNotAvailableException gone;
@@ -503,9 +526,9 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 				cnt -= n;
 			}
 			if (validate && crc2.getValue() != expectedCRC) {
-				throw new CorruptObjectException(MessageFormat.format(JGitText
-						.get().objectAtHasBadZlibStream, src.offset,
-						getPackFile()));
+				throw new CorruptObjectException(MessageFormat.format(
+						JGitText.get().objectAtHasBadZlibStream,
+						Long.valueOf(src.offset), getPackFile()));
 			}
 		}
 	}
@@ -650,11 +673,14 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		final long vers = NB.decodeUInt32(buf, 4);
 		final long packCnt = NB.decodeUInt32(buf, 8);
 		if (vers != 2 && vers != 3)
-			throw new IOException(MessageFormat.format(JGitText.get().unsupportedPackVersion, vers));
+			throw new IOException(MessageFormat.format(
+					JGitText.get().unsupportedPackVersion, Long.valueOf(vers)));
 
 		if (packCnt != idx.getObjectCount())
 			throw new PackMismatchException(MessageFormat.format(
-					JGitText.get().packObjectCountMismatch, packCnt, idx.getObjectCount(), getPackFile()));
+					JGitText.get().packObjectCountMismatch,
+					Long.valueOf(packCnt), Long.valueOf(idx.getObjectCount()),
+					getPackFile()));
 
 		fd.seek(length - 20);
 		fd.readFully(buf, 0, 20);
@@ -684,7 +710,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 				int p = 1;
 				while ((c & 0x80) != 0) {
 					c = ib[p++] & 0xff;
-					sz += (c & 0x7f) << shift;
+					sz += ((long) (c & 0x7f)) << shift;
 					shift += 7;
 				}
 
@@ -753,7 +779,8 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 				default:
 					throw new IOException(MessageFormat.format(
-							JGitText.get().unknownObjectType, typeCode));
+							JGitText.get().unknownObjectType,
+							Integer.valueOf(typeCode)));
 				}
 			}
 
@@ -801,8 +828,8 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		} catch (DataFormatException dfe) {
 			CorruptObjectException coe = new CorruptObjectException(
 					MessageFormat.format(
-							JGitText.get().objectAtHasBadZlibStream, pos,
-							getPackFile()));
+							JGitText.get().objectAtHasBadZlibStream,
+							Long.valueOf(pos), getPackFile()));
 			coe.initCause(dfe);
 			throw coe;
 		}
@@ -906,8 +933,9 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 			}
 
 			default:
-				throw new IOException(MessageFormat.format(
-						JGitText.get().unknownObjectType, type));
+				throw new IOException(
+						MessageFormat.format(JGitText.get().unknownObjectType,
+								Integer.valueOf(type)));
 			}
 		}
 	}
@@ -929,7 +957,7 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		int p = 1;
 		while ((c & 0x80) != 0) {
 			c = ib[p++] & 0xff;
-			sz += (c & 0x7f) << shift;
+			sz += ((long) (c & 0x7f)) << shift;
 			shift += 7;
 		}
 
@@ -954,14 +982,15 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 
 		default:
 			throw new IOException(MessageFormat.format(
-					JGitText.get().unknownObjectType, type));
+					JGitText.get().unknownObjectType, Integer.valueOf(type)));
 		}
 
 		try {
 			return BinaryDelta.getResultSize(getDeltaHeader(curs, deltaAt));
 		} catch (DataFormatException e) {
-			throw new CorruptObjectException(MessageFormat.format(JGitText
-					.get().objectAtHasBadZlibStream, pos, getPackFile()));
+			throw new CorruptObjectException(MessageFormat.format(
+					JGitText.get().objectAtHasBadZlibStream, Long.valueOf(pos),
+					getPackFile()));
 		}
 	}
 
@@ -1009,8 +1038,9 @@ public class PackFile implements Iterable<PackIndex.MutableEntry> {
 		}
 
 		default:
-			throw new IOException(MessageFormat.format(
-					JGitText.get().unknownObjectType, typeCode));
+			throw new IOException(
+					MessageFormat.format(JGitText.get().unknownObjectType,
+							Integer.valueOf(typeCode)));
 		}
 	}
 

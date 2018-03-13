@@ -48,13 +48,16 @@
 
 package org.eclipse.jgit.pgm;
 
+import java.text.MessageFormat;
 import java.util.List;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.ListTagCommand;
 import org.eclipse.jgit.api.TagCommand;
+import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.revwalk.RevTag;
+import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.Option;
@@ -84,13 +87,17 @@ class Tag extends TextBuiltin {
 				RevWalk walk = new RevWalk(db);
 				command.setObjectId(walk.parseAny(object));
 			}
-
-			command.call();
+			try {
+				command.call();
+			} catch (RefAlreadyExistsException e) {
+				throw die(MessageFormat.format(CLIText.get().tagAlreadyExists,
+						tagName));
+			}
 		} else {
 			ListTagCommand command = git.tagList();
-			List<RevTag> list = command.call();
-			for (RevTag revTag : list) {
-				out.println(revTag.getTagName());
+			List<Ref> list = command.call();
+			for (Ref ref : list) {
+				outw.println(Repository.shortenRefName(ref.getName()));
 			}
 		}
 	}
