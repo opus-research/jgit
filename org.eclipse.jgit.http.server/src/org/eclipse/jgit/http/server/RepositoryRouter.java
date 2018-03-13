@@ -59,13 +59,8 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.eclipse.jgit.http.server.resolver.DefaultReceivePackFactory;
 import org.eclipse.jgit.http.server.resolver.FileResolver;
-import org.eclipse.jgit.http.server.resolver.ReceivePackFactory;
 import org.eclipse.jgit.http.server.resolver.RepositoryResolver;
-import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.ReceivePack;
 
 /**
  * Routes requests which match Git repository access over HTTP.
@@ -75,8 +70,6 @@ import org.eclipse.jgit.transport.ReceivePack;
  */
 public class RepositoryRouter implements Filter {
 	private RepositoryResolver resolver;
-
-	private ReceivePackFactory receivePackFactory;
 
 	private ServletContext context;
 
@@ -90,7 +83,6 @@ public class RepositoryRouter implements Filter {
 	 */
 	public RepositoryRouter() {
 		this.resolver = null;
-		this.receivePackFactory = new DefaultReceivePackFactory();
 	}
 
 	/**
@@ -98,26 +90,11 @@ public class RepositoryRouter implements Filter {
 	 * 
 	 * @param resolver
 	 *            the resolver to use when matching URL to Git repository.
-	 * @param receivePackFactory
-	 *            factory to create ReceivePack instances when a client wants to
-	 *            write to a repository. If null receive-pack is disabled for
-	 *            all repositories. See {@link DefaultReceivePackFactory}.
 	 */
-	public RepositoryRouter(final RepositoryResolver resolver,
-			ReceivePackFactory receivePackFactory) {
+	public RepositoryRouter(final RepositoryResolver resolver) {
 		if (resolver == null)
 			throw new NullPointerException("RepositoryResolver not supplied");
-
-		if (receivePackFactory == null)
-			receivePackFactory = new ReceivePackFactory() {
-				public ReceivePack create(HttpServletRequest req, Repository db)
-						throws ServiceNotEnabledException {
-					throw new ServiceNotEnabledException();
-				}
-			};
-
 		this.resolver = resolver;
-		this.receivePackFactory = receivePackFactory;
 	}
 
 	public void init(FilterConfig filterConfig) throws ServletException {
@@ -132,14 +109,12 @@ public class RepositoryRouter implements Filter {
 		servlets = new ArrayList<ServletDefinition>();
 
 		bind("^/(.*)/(HEAD|refs/.*)$", new GetRefServlet());
-		bind("^/(.*)/info/refs$", new InfoRefsServlet(receivePackFactory));
+		bind("^/(.*)/info/refs$", new InfoRefsServlet());
 		bind("^/(.*)/objects/info/packs$", new InfoPacksServlet());
 		bind("^/(.*)/objects/([0-9a-f]{2}/[0-9a-f]{38})$",
 				new LooseObjectFileServlet());
 		bind("^/(.*)/objects/(pack/pack-[0-9a-f]{40}\\.(?:pack|idx))$",
 				new PackFileServlet());
-
-		bind("^/(.*)/git-receive-pack$", new ReceivePackServlet());
 
 		for (ServletDefinition d : servlets)
 			d.init(context);
