@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2014 Obeo.
+ * Copyright (C) 2010, Marc Strapetz <marc.strapetz@syntevo.com>
+ * Copyright (C) 2013, Gunnar Wagenknecht
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,73 +41,37 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.attributes;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+
+import org.eclipse.jgit.attributes.Attribute.State;
+import org.junit.Test;
 
 /**
- * Describes the result of running an external process.
- *
- * @since 3.6
+ * Tests {@link Attribute}
  */
-public class ProcessResult {
-	/**
-	 * Status of a process' execution.
-	 */
-	public static enum Status {
-		/**
-		 * The process was found and launched properly. It may still have exited
-		 * with a non-zero {@link #exitCode}.
-		 */
-		OK,
+public class AttributeTest {
 
-		/** The process was not found on disk and thus could not be launched. */
-		NOT_PRESENT,
+	@Test
+	public void testBasic() {
+		Attribute a = new Attribute("delta", State.SET);
+		assertEquals(a.getKey(), "delta");
+		assertEquals(a.getState(), State.SET);
+		assertNull(a.getValue());
+		assertEquals(a.toString(), "delta");
 
-		/**
-		 * The process was found but could not be launched since it was not
-		 * supported by the current {@link FS}.
-		 */
-		NOT_SUPPORTED;
-	}
+		a = new Attribute("delta", State.UNSET);
+		assertEquals(a.getKey(), "delta");
+		assertEquals(a.getState(), State.UNSET);
+		assertNull(a.getValue());
+		assertEquals(a.toString(), "-delta");
 
-	/** The exit code of the process. */
-	private final int exitCode;
-
-	/** Status of the process' execution. */
-	private final Status status;
-
-	/**
-	 * Instantiates a process result with the given status and an exit code of
-	 * <code>-1</code>.
-	 *
-	 * @param status
-	 *            Status describing the execution of the external process.
-	 */
-	public ProcessResult(Status status) {
-		this(-1, status);
-	}
-
-	/**
-	 * @param exitCode
-	 *            Exit code of the process.
-	 * @param status
-	 *            Status describing the execution of the external process.
-	 */
-	public ProcessResult(int exitCode, Status status) {
-		this.exitCode = exitCode;
-		this.status = status;
-	}
-
-	/**
-	 * @return The exit code of the process.
-	 */
-	public int getExitCode() {
-		return exitCode;
-	}
-
-	/**
-	 * @return The status of the process' execution.
-	 */
-	public Status getStatus() {
-		return status;
+		a = new Attribute("delta", "value");
+		assertEquals(a.getKey(), "delta");
+		assertEquals(a.getState(), State.CUSTOM);
+		assertEquals(a.getValue(), "value");
+		assertEquals(a.toString(), "delta=value");
 	}
 }
