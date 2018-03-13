@@ -87,10 +87,12 @@ public class JschSession implements RemoteSession {
 		this.uri = uri;
 	}
 
+	@Override
 	public Process exec(String command, int timeout) throws IOException {
 		return new JschProcess(command, timeout);
 	}
 
+	@Override
 	public void disconnect() {
 		if (sock.isConnected())
 			sock.disconnect();
@@ -218,6 +220,7 @@ public class JschSession implements RemoteSession {
 		public void destroy() {
 			if (channel.isConnected())
 				channel.disconnect();
+			closeOutputStream();
 		}
 
 		@Override

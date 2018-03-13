@@ -68,7 +68,7 @@ class RevParse extends TextBuiltin {
 	boolean verify;
 
 	@Argument(index = 0, metaVar = "metaVar_commitish")
-	private final List<ObjectId> commits = new ArrayList<ObjectId>();
+	private final List<ObjectId> commits = new ArrayList<>();
 
 	@Override
 	protected void run() throws Exception {
@@ -86,7 +86,8 @@ class RevParse extends TextBuiltin {
 		} else {
 			if (verify && commits.size() > 1) {
 				final CmdLineParser clp = new CmdLineParser(this);
-				throw new CmdLineException(clp, CLIText.get().needSingleRevision);
+				throw new CmdLineException(clp,
+						CLIText.format(CLIText.get().needSingleRevision));
 			}
 
 			for (final ObjectId o : commits) {

@@ -359,7 +359,13 @@ public class ObjectChecker {
 			checkTree(id, raw);
 			break;
 		case OBJ_BLOB:
-			checkBlob(raw);
+			BlobObjectChecker checker = newBlobObjectChecker();
+			if (checker == null) {
+				checkBlob(raw);
+			} else {
+				checker.update(raw, 0, raw.length);
+				checker.endBlob(id);
+			}
 			break;
 		default:
 			report(UNKNOWN_TYPE, id, MessageFormat.format(
@@ -611,7 +617,7 @@ public class ObjectChecker {
 		int ptr = 0;
 		int lastNameB = 0, lastNameE = 0, lastMode = 0;
 		Set<String> normalized = windows || macosx
-				? new HashSet<String>()
+				? new HashSet<>()
 				: null;
 
 		while (ptr < sz) {
@@ -1067,7 +1073,21 @@ public class ObjectChecker {
 	}
 
 	/**
+	 * Create a new {@link BlobObjectChecker}.
+	 *
+	 * @return new BlobObjectChecker or null if it's not provided.
+	 * @since 4.9
+	 */
+	@Nullable
+	public BlobObjectChecker newBlobObjectChecker() {
+		return null;
+	}
+
+	/**
 	 * Check a blob for errors.
+	 *
+	 * <p>This may not be called from PackParser in some cases. Use {@link
+	 * #newBlobObjectChecker} instead.
 	 *
 	 * @param raw
 	 *            the blob data. The array is never modified.

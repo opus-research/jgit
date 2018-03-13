@@ -58,6 +58,8 @@ import java.security.MessageDigest;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.Deflater;
 
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -108,7 +110,7 @@ public class ReceivePackAdvertiseRefsHookTest extends LocalDiskRepositoryTestCas
 
 		// Fill dst with a some common history.
 		//
-		TestRepository<Repository> d = new TestRepository<Repository>(dst);
+		TestRepository<Repository> d = new TestRepository<>(dst);
 		a = d.blob("a");
 		A = d.commit(d.tree(d.file("a", a)));
 		B = d.commit().parent(A).create();
@@ -126,16 +128,6 @@ public class ReceivePackAdvertiseRefsHookTest extends LocalDiskRepositoryTestCas
 		b = d.blob("b");
 		P = d.commit(d.tree(d.file("b", b)), A);
 		d.update(R_PRIVATE, P);
-	}
-
-	@Override
-	@After
-	public void tearDown() throws Exception {
-		if (src != null)
-			src.close();
-		if (dst != null)
-			dst.close();
-		super.tearDown();
 	}
 
 	@Test
@@ -169,6 +161,45 @@ public class ReceivePackAdvertiseRefsHookTest extends LocalDiskRepositoryTestCas
 	}
 
 	@Test
+	public void resetsHaves() throws Exception {
+		AtomicReference<Set<ObjectId>> haves = new AtomicReference<>();
+		try (TransportLocal t = new TransportLocal(src, uriOf(dst),
+				dst.getDirectory()) {
+			@Override
+			ReceivePack createReceivePack(Repository db) {
+				dst.incrementOpen();
+
+				ReceivePack rp = super.createReceivePack(dst);
+				rp.setAdvertiseRefsHook(new AdvertiseRefsHook() {
+					@Override
+					public void advertiseRefs(BaseReceivePack rp2)
+							throws ServiceMayNotContinueException {
+						rp.setAdvertisedRefs(rp.getRepository().getAllRefs(),
+								null);
+						new HidePrivateHook().advertiseRefs(rp);
+						haves.set(rp.getAdvertisedObjects());
+					}
+
+					@Override
+					public void advertiseRefs(UploadPack uploadPack)
+							throws ServiceMayNotContinueException {
+						throw new UnsupportedOperationException();
+					}
+				});
+				return rp;
+			}
+		}) {
+			try (PushConnection c = t.openPush()) {
+				// Just has to open/close for advertisement.
+			}
+		}
+
+		assertEquals(1, haves.get().size());
+		assertTrue(haves.get().contains(B));
+		assertFalse(haves.get().contains(P));
+	}
+
+	@Test
 	public void testSuccess() throws Exception {
 		// Manually force a delta of an object so we reuse it later.
 		//
@@ -193,7 +224,7 @@ public class ReceivePackAdvertiseRefsHookTest extends LocalDiskRepositoryTestCas
 
 		// Now use b but in a different commit than what is hidden.
 		//
-		TestRepository<Repository> s = new TestRepository<Repository>(src);
+		TestRepository<Repository> s = new TestRepository<>(src);
 		RevCommit N = s.commit().parent(B).add("q", b).create();
 		s.update(R_MASTER, N);
 
@@ -284,7 +315,7 @@ public class ReceivePackAdvertiseRefsHookTest extends LocalDiskRepositoryTestCas
 	@Test
 	public void testUsingHiddenDeltaBaseFails() throws Exception {
 		byte[] delta = { 0x1, 0x1, 0x1, 'c' };
-		TestRepository<Repository> s = new TestRepository<Repository>(src);
+		TestRepository<Repository> s = new TestRepository<>(src);
 		RevCommit N = s.commit().parent(B).add("q",
 				s.blob(BinaryDelta.apply(dst.open(b).getCachedBytes(), delta)))
 				.create();
@@ -337,7 +368,7 @@ public class ReceivePackAdvertiseRefsHookTest extends LocalDiskRepositoryTestCas
 	public void testUsingHiddenCommonBlobFails() throws Exception {
 		// Try to use the 'b' blob that is hidden.
 		//
-		TestRepository<Repository> s = new TestRepository<Repository>(src);
+		TestRepository<Repository> s = new TestRepository<>(src);
 		RevCommit N = s.commit().parent(B).add("q", s.blob("b")).create();
 
 		// But don't include it in the pack.
@@ -387,7 +418,7 @@ public class ReceivePackAdvertiseRefsHookTest extends LocalDiskRepositoryTestCas
 	public void testUsingUnknownBlobFails() throws Exception {
 		// Try to use the 'n' blob that is not on the server.
 		//
-		TestRepository<Repository> s = new TestRepository<Repository>(src);
+		TestRepository<Repository> s = new TestRepository<>(src);
 		RevBlob n = s.blob("n");
 		RevCommit N = s.commit().parent(B).add("q", n).create();
 
@@ -436,7 +467,7 @@ public class ReceivePackAdvertiseRefsHookTest extends LocalDiskRepositoryTestCas
 
 	@Test
 	public void testUsingUnknownTreeFails() throws Exception {
-		TestRepository<Repository> s = new TestRepository<Repository>(src);
+		TestRepository<Repository> s = new TestRepository<>(src);
 		RevCommit N = s.commit().parent(B).add("q", s.blob("a")).create();
 		RevTree t = s.parseBody(N).getTree();
 
@@ -556,8 +587,9 @@ public class ReceivePackAdvertiseRefsHookTest extends LocalDiskRepositoryTestCas
 	}
 
 	private static final class HidePrivateHook extends AbstractAdvertiseRefsHook {
+		@Override
 		public Map<String, Ref> getAdvertisedRefs(Repository r, RevWalk revWalk) {
-			Map<String, Ref> refs = new HashMap<String, Ref>(r.getAllRefs());
+			Map<String, Ref> refs = new HashMap<>(r.getAllRefs());
 			assertNotNull(refs.remove(R_PRIVATE));
 			return refs;
 		}

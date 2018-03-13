@@ -50,7 +50,20 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 /** Manages a thread-safe list of {@link RepositoryListener}s. */
 public class ListenerList {
-	private final ConcurrentMap<Class<? extends RepositoryListener>, CopyOnWriteArrayList<ListenerHandle>> lists = new ConcurrentHashMap<Class<? extends RepositoryListener>, CopyOnWriteArrayList<ListenerHandle>>();
+	private final ConcurrentMap<Class<? extends RepositoryListener>, CopyOnWriteArrayList<ListenerHandle>> lists = new ConcurrentHashMap<>();
+
+	/**
+	 * Register a {@link WorkingTreeModifiedListener}.
+	 *
+	 * @param listener
+	 *            the listener implementation.
+	 * @return handle to later remove the listener.
+	 * @since 4.9
+	 */
+	public ListenerHandle addWorkingTreeModifiedListener(
+			WorkingTreeModifiedListener listener) {
+		return addListener(WorkingTreeModifiedListener.class, listener);
+	}
 
 	/**
 	 * Register an IndexChangedListener.
@@ -126,7 +139,7 @@ public class ListenerList {
 		if (list == null) {
 			CopyOnWriteArrayList<ListenerHandle> newList;
 
-			newList = new CopyOnWriteArrayList<ListenerHandle>();
+			newList = new CopyOnWriteArrayList<>();
 			list = lists.putIfAbsent(handle.type, newList);
 			if (list == null)
 				list = newList;

@@ -54,6 +54,7 @@ import java.util.TreeSet;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
+import org.eclipse.jgit.events.WorkingTreeModifiedEvent;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
@@ -94,15 +95,16 @@ public class CleanCommand extends GitCommand<Set<String>> {
 	 * @throws GitAPIException
 	 * @throws NoWorkTreeException
 	 */
+	@Override
 	public Set<String> call() throws NoWorkTreeException, GitAPIException {
-		Set<String> files = new TreeSet<String>();
+		Set<String> files = new TreeSet<>();
 		try {
 			StatusCommand command = new StatusCommand(repo);
 			Status status = command.call();
 
-			Set<String> untrackedAndIgnoredFiles = new TreeSet<String>(
+			Set<String> untrackedAndIgnoredFiles = new TreeSet<>(
 					status.getUntracked());
-			Set<String> untrackedAndIgnoredDirs = new TreeSet<String>(
+			Set<String> untrackedAndIgnoredDirs = new TreeSet<>(
 					status.getUntrackedFolders());
 
 			FS fs = getRepository().getFS();
@@ -134,6 +136,10 @@ public class CleanCommand extends GitCommand<Set<String>> {
 				}
 		} catch (IOException e) {
 			throw new JGitInternalException(e.getMessage(), e);
+		} finally {
+			if (!files.isEmpty()) {
+				repo.fireEvent(new WorkingTreeModifiedEvent(null, files));
+			}
 		}
 		return files;
 	}
@@ -191,7 +197,7 @@ public class CleanCommand extends GitCommand<Set<String>> {
 	private Set<String> filterIgnorePaths(Set<String> inputPaths,
 			Set<String> ignoredNotInIndex, boolean exact) {
 		if (ignore) {
-			Set<String> filtered = new TreeSet<String>(inputPaths);
+			Set<String> filtered = new TreeSet<>(inputPaths);
 			for (String path : inputPaths)
 				for (String ignored : ignoredNotInIndex)
 					if ((exact && path.equals(ignored))
@@ -207,7 +213,7 @@ public class CleanCommand extends GitCommand<Set<String>> {
 
 	private Set<String> filterFolders(Set<String> untracked,
 			Set<String> untrackedFolders) {
-		Set<String> filtered = new TreeSet<String>(untracked);
+		Set<String> filtered = new TreeSet<>(untracked);
 		for (String file : untracked)
 			for (String folder : untrackedFolders)
 				if (file.startsWith(folder)) {
