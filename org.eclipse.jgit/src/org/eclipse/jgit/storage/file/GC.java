@@ -53,7 +53,6 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -69,13 +68,14 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
+import org.eclipse.jgit.lib.Ref.Storage;
+import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -83,7 +83,6 @@ import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.FileUtils;
-import org.eclipse.jgit.util.GitDateParser;
 
 /**
  * A garbage collector for git {@link FileRepository}. Instances of this class
@@ -93,15 +92,11 @@ import org.eclipse.jgit.util.GitDateParser;
  * adapted to FileRepositories.
  */
 public class GC {
-	private static final String PRUNE_EXPIRE_DEFAULT = "2.weeks.ago";
-
 	private final FileRepository repo;
 
 	private ProgressMonitor pm;
 
-	private long expireAgeMillis = -1;
-
-	private Date expire = null;
+	private long expireAgeMillis;
 
 	/**
 	 * the refs which existed during the last call to {@link #repack()}. This is
@@ -128,6 +123,7 @@ public class GC {
 	public GC(FileRepository repo) {
 		this.repo = repo;
 		this.pm = NullProgressMonitor.INSTANCE;
+		this.expireAgeMillis = 14 * 24 * 60 * 60 * 1000L;
 	}
 
 	/**
@@ -257,21 +253,8 @@ public class GC {
 	 */
 	public void prune(Set<ObjectId> objectsToKeep)
 			throws IOException {
-		long expireDate = Long.MAX_VALUE;
-
-		if (expire == null && expireAgeMillis == -1) {
-			String pruneExpireStr = repo.getConfig().getString(
-					ConfigConstants.CONFIG_GC_SECTION, null,
-					ConfigConstants.CONFIG_KEY_PRUNEEXPIRE);
-			if (pruneExpireStr == null)
-				pruneExpireStr = PRUNE_EXPIRE_DEFAULT;
-			expire = GitDateParser.parse(pruneExpireStr, null);
-			expireAgeMillis = -1;
-		}
-		if (expire != null)
-			expireDate = expire.getTime();
-		if (expireAgeMillis != -1)
-			expireDate = System.currentTimeMillis() - expireAgeMillis;
+		long expireDate = (expireAgeMillis == 0) ? Long.MAX_VALUE : System
+				.currentTimeMillis() - expireAgeMillis;
 
 		// Collect all loose objects which are old enough, not referenced from
 		// the index and not in objectsToKeep
@@ -735,6 +718,26 @@ public class GC {
 		 * The number of objects stored as loose objects.
 		 */
 		public long numberOfLooseObjects;
+
+		/**
+		 * The sum of the sizes of all files used to persist loose objects.
+		 */
+		public long sizeOfLooseObjects;
+
+		/**
+		 * The sum of the sizes of all pack files.
+		 */
+		public long sizeOfPackedObjects;
+
+		/**
+		 * The number of loose refs.
+		 */
+		public long numberOfLooseRefs;
+
+		/**
+		 * The number of refs stored in pack files.
+		 */
+		public long numberOfPackedRefs;
 	}
 
 	/**
@@ -747,25 +750,38 @@ public class GC {
 	public RepoStatistics getStatistics() throws IOException {
 		RepoStatistics ret = new RepoStatistics();
 		Collection<PackFile> packs = repo.getObjectDatabase().getPacks();
-		for (PackFile f : packs)
+		for (PackFile f : packs) {
 			ret.numberOfPackedObjects += f.getIndex().getObjectCount();
-		ret.numberOfPackFiles = packs.size();
+			ret.numberOfPackFiles++;
+			ret.sizeOfPackedObjects += f.getPackFile().length();
+		}
 		File objDir = repo.getObjectsDirectory();
 		String[] fanout = objDir.list();
 		if (fanout != null && fanout.length > 0) {
 			for (String d : fanout) {
 				if (d.length() != 2)
 					continue;
-				String[] entries = new File(objDir, d).list();
+				File[] entries = new File(objDir, d).listFiles();
 				if (entries == null)
 					continue;
-				for (String e : entries) {
-					if (e.length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
+				for (File f : entries) {
+					if (f.getName().length() != Constants.OBJECT_ID_STRING_LENGTH - 2)
 						continue;
 					ret.numberOfLooseObjects++;
+					ret.sizeOfLooseObjects += f.length();
 				}
 			}
 		}
+
+		RefDatabase refDb = repo.getRefDatabase();
+		for (Ref r : refDb.getRefs(RefDatabase.ALL).values()) {
+			Storage storage = r.getStorage();
+			if (storage == Storage.LOOSE || storage == Storage.LOOSE_PACKED)
+				ret.numberOfLooseRefs++;
+			if (storage == Storage.PACKED || storage == Storage.LOOSE_PACKED)
+				ret.numberOfPackedRefs++;
+		}
+
 		return ret;
 	}
 
@@ -791,21 +807,5 @@ public class GC {
 	 */
 	public void setExpireAgeMillis(long expireAgeMillis) {
 		this.expireAgeMillis = expireAgeMillis;
-		expire = null;
 	}
-
-	/**
-	 * During gc() or prune() each unreferenced, loose object which has been
-	 * created or modified after <code>expire</code> will not be pruned. Only
-	 * older objects may be pruned. If set to null then every object is a
-	 * candidate for pruning.
-	 *
-	 * @param expire
-	 *            minimal age of objects to be pruned in milliseconds.
-	 */
-	public void setExpire(Date expire) {
-		this.expire = expire;
-		expireAgeMillis = -1;
-	}
-
 }
