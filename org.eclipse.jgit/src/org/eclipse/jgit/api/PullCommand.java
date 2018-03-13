@@ -70,7 +70,6 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryState;
-import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.FetchResult;
 
 /**
@@ -85,8 +84,6 @@ public class PullCommand extends GitCommand<PullResult> {
 	private final static String DOT = ".";
 
 	private ProgressMonitor monitor = NullProgressMonitor.INSTANCE;
-
-	private CredentialsProvider credentialsProvider;
 
 	/**
 	 * @param repo
@@ -112,18 +109,6 @@ public class PullCommand extends GitCommand<PullResult> {
 	 */
 	public PullCommand setProgressMonitor(ProgressMonitor monitor) {
 		this.monitor = monitor;
-		return this;
-	}
-
-	/**
-	 * @param credentialsProvider
-	 *            the {@link CredentialsProvider} to use
-	 * @return this instance
-	 */
-	public PullCommand setCredentialsProvider(
-			CredentialsProvider credentialsProvider) {
-		checkCallable();
-		this.credentialsProvider = credentialsProvider;
 		return this;
 	}
 
@@ -221,7 +206,6 @@ public class PullCommand extends GitCommand<PullResult> {
 			fetch.setRemote(remote);
 			fetch.setProgressMonitor(monitor);
 			fetch.setTimeout(this.timeout);
-			fetch.setCredentialsProvider(credentialsProvider);
 
 			fetchRes = fetch.call();
 		} else {
@@ -309,5 +293,4 @@ public class PullCommand extends GitCommand<PullResult> {
 		monitor.endTask();
 		return result;
 	}
-
 }
