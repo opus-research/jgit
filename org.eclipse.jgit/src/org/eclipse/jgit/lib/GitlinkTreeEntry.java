@@ -1,5 +1,7 @@
 /*
- * Copyright (C) 2016, Google Inc.
+ * Copyright (C) 2009, Jonas Fonseca <fonseca@diku.dk>
+ * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,58 +43,45 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.reftree;
+package org.eclipse.jgit.lib;
 
-import java.io.IOException;
+/**
+ * A tree entry representing a gitlink entry used for submodules.
+ *
+ * Note. Java cannot really handle these as file system objects.
+ *
+ * @deprecated To look up information about a single path, use
+ * {@link org.eclipse.jgit.treewalk.TreeWalk#forPath(Repository, String, org.eclipse.jgit.revwalk.RevTree)}.
+ * To lookup information about multiple paths at once, use a
+ * {@link org.eclipse.jgit.treewalk.TreeWalk} and obtain the current entry's
+ * information from its getter methods.
+ */
+@Deprecated
+public class GitlinkTreeEntry extends TreeEntry {
 
-import org.eclipse.jgit.lib.ObjectIdRef;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.RefDatabase;
-import org.eclipse.jgit.lib.RefUpdate;
-import org.eclipse.jgit.lib.Repository;
+	/**
+	 * Construct a {@link GitlinkTreeEntry} with the specified name and SHA-1 in
+	 * the specified parent
+	 *
+	 * @param parent
+	 * @param id
+	 * @param nameUTF8
+	 */
+	public GitlinkTreeEntry(final Tree parent, final ObjectId id,
+			final byte[] nameUTF8) {
+		super(parent, id, nameUTF8);
+	}
 
-/** Update that always rejects with {@code LOCK_FAILURE}. */
-class AlwaysFailUpdate extends RefUpdate {
-	private final RefTreeDatabase refdb;
-
-	AlwaysFailUpdate(RefTreeDatabase refdb, String name) {
-		super(new ObjectIdRef.Unpeeled(Ref.Storage.NEW, name, null));
-		this.refdb = refdb;
-		setCheckConflicting(false);
+	public FileMode getMode() {
+		return FileMode.GITLINK;
 	}
 
 	@Override
-	protected RefDatabase getRefDatabase() {
-		return refdb;
-	}
-
-	@Override
-	protected Repository getRepository() {
-		return refdb.getRepository();
-	}
-
-	@Override
-	protected boolean tryLock(boolean deref) throws IOException {
-		return false;
-	}
-
-	@Override
-	protected void unlock() {
-		// No locks are held here.
-	}
-
-	@Override
-	protected Result doUpdate(Result desiredResult) {
-		return Result.LOCK_FAILURE;
-	}
-
-	@Override
-	protected Result doDelete(Result desiredResult) {
-		return Result.LOCK_FAILURE;
-	}
-
-	@Override
-	protected Result doLink(String target) {
-		return Result.LOCK_FAILURE;
+	public String toString() {
+		final StringBuilder r = new StringBuilder();
+		r.append(ObjectId.toString(getId()));
+		r.append(" G "); //$NON-NLS-1$
+		r.append(getFullName());
+		return r.toString();
 	}
 }

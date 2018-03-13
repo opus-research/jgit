@@ -59,7 +59,6 @@ import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
-import org.eclipse.jgit.util.Paths;
 
 /**
  * Walks a Git tree (directory) in Git sort order.
@@ -383,9 +382,20 @@ public abstract class AbstractTreeIterator {
 	}
 
 	private int pathCompare(byte[] b, int bPos, int bEnd, int bMode, int aPos) {
-		return Paths.compare(
-				path, aPos, pathLen, mode,
-				b, bPos, bEnd, bMode);
+		final byte[] a = path;
+		final int aEnd = pathLen;
+
+		for (; aPos < aEnd && bPos < bEnd; aPos++, bPos++) {
+			final int cmp = (a[aPos] & 0xff) - (b[bPos] & 0xff);
+			if (cmp != 0)
+				return cmp;
+		}
+
+		if (aPos < aEnd)
+			return (a[aPos] & 0xff) - lastPathChar(bMode);
+		if (bPos < bEnd)
+			return lastPathChar(mode) - (b[bPos] & 0xff);
+		return lastPathChar(mode) - lastPathChar(bMode);
 	}
 
 	private static int alreadyMatch(AbstractTreeIterator a,
@@ -400,6 +410,10 @@ public abstract class AbstractTreeIterator {
 			a = ap;
 			b = bp;
 		}
+	}
+
+	private static int lastPathChar(final int mode) {
+		return FileMode.TREE.equals(mode) ? '/' : '\0';
 	}
 
 	/**
