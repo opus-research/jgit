@@ -433,11 +433,11 @@ public abstract class FS {
 				LOG.debug("readpipe " + Arrays.asList(command) + "," //$NON-NLS-1$ //$NON-NLS-2$
 						+ dir);
 			}
-			final ProcessBuilder pb = new ProcessBuilder(command);
+			ProcessBuilder pb = new ProcessBuilder(command);
 			pb.directory(dir);
 			if (env != null)
 				pb.environment().putAll(env);
-			Process p = pb.start();
+			final Process p = pb.start();
 			final BufferedReader lineRead = new BufferedReader(
 					new InputStreamReader(p.getInputStream(), encoding));
 			p.getOutputStream().close();
