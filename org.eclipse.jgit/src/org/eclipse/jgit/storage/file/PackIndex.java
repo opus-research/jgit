@@ -183,7 +183,7 @@ public abstract class PackIndex implements Iterable<PackIndex.MutableEntry> {
 	 * @return number of objects in this index, and likewise in the associated
 	 *         pack that this index was generated from.
 	 */
-	public abstract long getObjectCount();
+	abstract long getObjectCount();
 
 	/**
 	 * Obtain the total number of objects needing 64 bit offsets.
@@ -191,7 +191,7 @@ public abstract class PackIndex implements Iterable<PackIndex.MutableEntry> {
 	 * @return number of objects in this index using a 64 bit offset; that is an
 	 *         object positioned after the 2 GB position within the file.
 	 */
-	public abstract long getOffset64Count();
+	abstract long getOffset64Count();
 
 	/**
 	 * Get ObjectId for the n-th object entry returned by {@link #iterator()}.
@@ -212,7 +212,7 @@ public abstract class PackIndex implements Iterable<PackIndex.MutableEntry> {
 	 *            {@link MutableEntry} is 0, the second is 1, etc.
 	 * @return the ObjectId for the corresponding entry.
 	 */
-	public abstract ObjectId getObjectId(long nthPosition);
+	abstract ObjectId getObjectId(long nthPosition);
 
 	/**
 	 * Get ObjectId for the n-th object entry returned by {@link #iterator()}.
@@ -234,7 +234,7 @@ public abstract class PackIndex implements Iterable<PackIndex.MutableEntry> {
 	 *            etc. Positions past 2**31-1 are negative, but still valid.
 	 * @return the ObjectId for the corresponding entry.
 	 */
-	public final ObjectId getObjectId(final int nthPosition) {
+	final ObjectId getObjectId(final int nthPosition) {
 		if (nthPosition >= 0)
 			return getObjectId((long) nthPosition);
 		final int u31 = nthPosition >>> 1;
@@ -251,7 +251,7 @@ public abstract class PackIndex implements Iterable<PackIndex.MutableEntry> {
 	 *         object does not exist in this index and is thus not stored in the
 	 *         associated pack.
 	 */
-	public abstract long findOffset(AnyObjectId objId);
+	abstract long findOffset(AnyObjectId objId);
 
 	/**
 	 * Retrieve stored CRC32 checksum of the requested object raw-data
@@ -265,31 +265,17 @@ public abstract class PackIndex implements Iterable<PackIndex.MutableEntry> {
 	 * @throws UnsupportedOperationException
 	 *             when this index doesn't support CRC32 checksum
 	 */
-	public abstract long findCRC32(AnyObjectId objId)
-			throws MissingObjectException, UnsupportedOperationException;
+	abstract long findCRC32(AnyObjectId objId) throws MissingObjectException,
+			UnsupportedOperationException;
 
 	/**
 	 * Check whether this index supports (has) CRC32 checksums for objects.
 	 *
 	 * @return true if CRC32 is stored, false otherwise
 	 */
-	public abstract boolean hasCRC32Support();
+	abstract boolean hasCRC32Support();
 
-	/**
-	 * Find objects matching the prefix abbreviation.
-	 *
-	 * @param matches
-	 *            set to add any located ObjectIds to. This is an output
-	 *            parameter.
-	 * @param id
-	 *            prefix to search for.
-	 * @param matchLimit
-	 *            maximum number of results to return. At most this many
-	 *            ObjectIds should be added to matches before returning.
-	 * @throws IOException
-	 *             the index cannot be read.
-	 */
-	public abstract void resolve(Set<ObjectId> matches, AbbreviatedObjectId id,
+	abstract void resolve(Set<ObjectId> matches, AbbreviatedObjectId id,
 			int matchLimit) throws IOException;
 
 	/**
