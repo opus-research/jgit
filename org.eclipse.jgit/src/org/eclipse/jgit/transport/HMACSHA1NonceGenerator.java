@@ -42,6 +42,7 @@
  */
 package org.eclipse.jgit.transport;
 
+import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -51,7 +52,6 @@ import javax.crypto.spec.SecretKeySpec;
 
 import org.eclipse.jgit.internal.storage.dfs.DfsRepository;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.NonceGenerator;
 import org.eclipse.jgit.transport.PushCertificate.NonceStatus;
 
 /**
@@ -85,12 +85,16 @@ public class HMACSHA1NonceGenerator implements NonceGenerator {
 	public synchronized String createNonce(Repository repo, long timestamp)
 			throws IllegalStateException {
 		String path;
-		if (repo instanceof DfsRepository)
+		if (repo instanceof DfsRepository) {
 			path = ((DfsRepository) repo).getDescription().getRepositoryName();
-		else if (repo.getDirectory() != null)
-			path = repo.getDirectory().getPath();
-		else
-			throw new IllegalStateException();
+		} else {
+			File directory = repo.getDirectory();
+			if (directory != null) {
+				path = directory.getPath();
+			} else {
+				throw new IllegalStateException();
+			}
+		}
 
 		String input = path + ":" + String.valueOf(timestamp); //$NON-NLS-1$
 		byte[] rawHmac;

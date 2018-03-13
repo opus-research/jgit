@@ -50,8 +50,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 
-import com.googlecode.javaewah.EWAHCompressedBitmap;
-
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.file.BitmapIndexImpl.CompressedBitmap;
 import org.eclipse.jgit.internal.storage.pack.ObjectToPack;
@@ -62,6 +60,8 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdOwnerMap;
 import org.eclipse.jgit.util.BlockList;
+
+import com.googlecode.javaewah.EWAHCompressedBitmap;
 
 /**
  * Helper for constructing {@link PackBitmapIndex}es.
@@ -74,9 +74,9 @@ public class PackBitmapIndexBuilder extends BasePackBitmapIndex {
 	private final EWAHCompressedBitmap blobs;
 	private final EWAHCompressedBitmap tags;
 	private final BlockList<PositionEntry> byOffset;
-	private final BlockList<StoredBitmap>
+	final BlockList<StoredBitmap>
 			byAddOrder = new BlockList<StoredBitmap>();
-	private final ObjectIdOwnerMap<PositionEntry>
+	final ObjectIdOwnerMap<PositionEntry>
 			positionEntries = new ObjectIdOwnerMap<PositionEntry>();
 
 	/**
@@ -330,7 +330,7 @@ public class PackBitmapIndexBuilder extends BasePackBitmapIndex {
 		private final int xorOffset;
 		private final int flags;
 
-		private StoredEntry(long objectId, EWAHCompressedBitmap bitmap,
+		StoredEntry(long objectId, EWAHCompressedBitmap bitmap,
 				int xorOffset, int flags) {
 			this.objectId = objectId;
 			this.bitmap = bitmap;
@@ -360,11 +360,11 @@ public class PackBitmapIndexBuilder extends BasePackBitmapIndex {
 	}
 
 	private static final class PositionEntry extends ObjectIdOwnerMap.Entry {
-		private final int namePosition;
+		final int namePosition;
 
-		private int offsetPosition;
+		int offsetPosition;
 
-		private PositionEntry(AnyObjectId objectId, int namePosition) {
+		PositionEntry(AnyObjectId objectId, int namePosition) {
 			super(objectId);
 			this.namePosition = namePosition;
 		}

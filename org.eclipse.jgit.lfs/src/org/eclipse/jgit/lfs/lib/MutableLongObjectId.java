@@ -56,7 +56,7 @@ import org.eclipse.jgit.util.RawParseUtils;
  *
  * Ported to SHA-256 from {@link MutableObjectId}
  *
- * @since 4.2
+ * @since 4.3
  */
 public class MutableLongObjectId extends AnyLongObjectId {
 	/**

@@ -73,8 +73,8 @@ import org.eclipse.jgit.junit.LocalDiskRepositoryTestCase;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.BatchRefUpdate;
-import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.NullProgressMonitor;
+import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefDatabase;
@@ -858,6 +858,36 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 	}
 
 	@Test
+	public void testGetRef_CycleInSymbolicRef() throws IOException {
+		Ref r;
+
+		writeLooseRef("refs/1", "ref: refs/2\n");
+		writeLooseRef("refs/2", "ref: refs/3\n");
+		writeLooseRef("refs/3", "ref: refs/4\n");
+		writeLooseRef("refs/4", "ref: refs/5\n");
+		writeLooseRef("refs/5", "ref: refs/end\n");
+		writeLooseRef("refs/end", A);
+
+		r = refdir.getRef("1");
+		assertEquals("refs/1", r.getName());
+		assertEquals(A, r.getObjectId());
+		assertTrue(r.isSymbolic());
+
+		writeLooseRef("refs/5", "ref: refs/6\n");
+		writeLooseRef("refs/6", "ref: refs/end\n");
+
+		r = refdir.getRef("1");
+		assertNull("missing 1 due to cycle", r);
+
+		writeLooseRef("refs/heads/1", B);
+
+		r = refdir.getRef("1");
+		assertEquals("refs/heads/1", r.getName());
+		assertEquals(B, r.getObjectId());
+		assertFalse(r.isSymbolic());
+	}
+
+	@Test
 	public void testGetRefs_PackedNotPeeled_Sorted() throws IOException {
 		Map<String, Ref> all;
 
@@ -1022,6 +1052,25 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 		assertNull(refdir.getRef("NOT.A.REF.NAME"));
 		assertNull(refdir.getRef("master"));
 		assertNull(refdir.getRef("v1.0"));
+	}
+
+	@Test
+	public void testExactRef_EmptyDatabase() throws IOException {
+		Ref r;
+
+		r = refdir.exactRef(HEAD);
+		assertTrue(r.isSymbolic());
+		assertSame(LOOSE, r.getStorage());
+		assertEquals("refs/heads/master", r.getTarget().getName());
+		assertSame(NEW, r.getTarget().getStorage());
+		assertNull(r.getTarget().getObjectId());
+
+		assertNull(refdir.exactRef("refs/heads/master"));
+		assertNull(refdir.exactRef("refs/tags/v1.0"));
+		assertNull(refdir.exactRef("FETCH_HEAD"));
+		assertNull(refdir.exactRef("NOT.A.REF.NAME"));
+		assertNull(refdir.exactRef("master"));
+		assertNull(refdir.exactRef("v1.0"));
 	}
 
 	@Test
@@ -1395,8 +1444,8 @@ public class RefDirectoryTest extends LocalDiskRepositoryTestCase {
 			// empty
 		}
 
-		public void beginTask(String title, int totalWork) {
-			this.totalWork = totalWork;
+		public void beginTask(String title, int total) {
+			this.totalWork = total;
 			lastWork = 0;
 		}
 

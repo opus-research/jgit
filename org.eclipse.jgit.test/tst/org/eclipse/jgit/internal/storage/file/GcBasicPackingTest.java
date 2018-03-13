@@ -132,7 +132,8 @@ public class GcBasicPackingTest extends GcTestCase {
 	}
 
 	@Theory
-	public void testPackCommitsAndLooseOne(boolean aggressive) throws Exception {
+	public void testPackCommitsAndLooseOne(boolean aggressive)
+			throws Exception {
 		BranchBuilder bb = tr.branch("refs/heads/master");
 		RevCommit first = bb.commit().add("A", "A").add("B", "B").create();
 		bb.commit().add("A", "A2").add("B", "B2").create();
@@ -212,9 +213,20 @@ public class GcBasicPackingTest extends GcTestCase {
 		assertEquals(9, stats.numberOfPackedObjects);
 		assertEquals(2, stats.numberOfPackFiles);
 
+		// repack again but now without a grace period for loose objects. Since
+		// we don't have loose objects anymore this shouldn't change anything
+		gc.setExpireAgeMillis(0);
+		gc.gc();
+		stats = gc.getStatistics();
+		assertEquals(0, stats.numberOfLooseObjects);
+		// if objects exist in multiple packFiles then they are counted multiple
+		// times
+		assertEquals(9, stats.numberOfPackedObjects);
+		assertEquals(2, stats.numberOfPackFiles);
+
 		// repack again but now without a grace period for packfiles. We should
 		// end up with one packfile
-		gc.setExpireAgeMillis(0);
+		gc.setPackExpireAgeMillis(0);
 		gc.gc();
 		stats = gc.getStatistics();
 		assertEquals(0, stats.numberOfLooseObjects);
@@ -223,74 +235,6 @@ public class GcBasicPackingTest extends GcTestCase {
 		assertEquals(6, stats.numberOfPackedObjects);
 		assertEquals(1, stats.numberOfPackFiles);
 
-	}
-
-	@Test
-	public void testCommitRangeForBitmaps() throws Exception {
-		BranchBuilder bb1 = tr.branch("refs/heads/master");
-		bb1.commit().message("A1").add("A1", "A1").create();
-		bb1.commit().message("B1").add("B1", "B1").create();
-		bb1.commit().message("C1").add("C1", "C1").create();
-		BranchBuilder bb2 = tr.branch("refs/heads/working");
-		bb2.commit().message("A2").add("A2", "A2").create();
-		bb2.commit().message("B2").add("B2", "B2").create();
-		bb2.commit().message("C2").add("C2", "C2").create();
-
-		// Consider all commits. Since history isn't deep all commits are
-		// selected.
-		configureGcRange(gc, -1);
-		gc.gc();
-		assertEquals(6, gc.getStatistics().numberOfBitmaps);
-
-		// Range==0 means don't examine commit history, create bitmaps only for
-		// branch tips, C1 & C2.
-		configureGcRange(gc, 0);
-		gc.gc();
-		assertEquals(2, gc.getStatistics().numberOfBitmaps);
-
-		// Consider only the most recent commit (C2, which is also a branch
-		// tip).
-		configureGcRange(gc, 1);
-		gc.gc();
-		assertEquals(2, gc.getStatistics().numberOfBitmaps);
-
-		// Consider only the two most recent commits, C2 & B2. C1 gets included
-		// too since it is a branch tip.
-		configureGcRange(gc, 2);
-		gc.gc();
-		assertEquals(3, gc.getStatistics().numberOfBitmaps);
-
-		// Consider C2 & B2 & A2. C1 gets included too since it is a branch tip.
-		configureGcRange(gc, 3);
-		gc.gc();
-		assertEquals(4, gc.getStatistics().numberOfBitmaps);
-
-		// Consider C2 & B2 & A2 & C1.
-		configureGcRange(gc, 4);
-		gc.gc();
-		assertEquals(4, gc.getStatistics().numberOfBitmaps);
-
-		// Consider C2 & B2 & A2 & C1 & B1.
-		configureGcRange(gc, 5);
-		gc.gc();
-		assertEquals(5, gc.getStatistics().numberOfBitmaps);
-
-		// Consider all six commits.
-		configureGcRange(gc, 6);
-		gc.gc();
-		assertEquals(6, gc.getStatistics().numberOfBitmaps);
-
-		// Input is out of range but should be capped to the total number of
-		// commits.
-		configureGcRange(gc, 1000);
-		gc.gc();
-		assertEquals(6, gc.getStatistics().numberOfBitmaps);
-	}
-
-	private void configureGcRange(GC myGc, int range) {
-		PackConfig pconfig = new PackConfig(repo);
-		pconfig.setBitmapCommitRange(range);
-		myGc.setPackConfig(pconfig);
 	}
 
 	private void configureGc(GC myGc, boolean aggressive) {

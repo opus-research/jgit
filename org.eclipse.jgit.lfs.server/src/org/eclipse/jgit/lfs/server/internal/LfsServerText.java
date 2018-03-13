@@ -58,6 +58,15 @@ public class LfsServerText extends TranslationBundle {
 	}
 
 	// @formatter:off
+	/***/ public String failedToCalcSignature;
 	/***/ public String invalidPathInfo;
 	/***/ public String objectNotFound;
+	/***/ public String undefinedS3AccessKey;
+	/***/ public String undefinedS3Bucket;
+	/***/ public String undefinedS3Region;
+	/***/ public String undefinedS3SecretKey;
+	/***/ public String undefinedS3StorageClass;
+	/***/ public String unparsableEndpoint;
+	/***/ public String unsupportedOperation;
+	/***/ public String unsupportedUtf8;
 }

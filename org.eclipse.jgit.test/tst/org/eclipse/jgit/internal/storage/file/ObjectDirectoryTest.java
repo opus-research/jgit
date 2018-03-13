@@ -49,7 +49,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-import org.eclipse.jgit.internal.storage.file.ObjectDirectory;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -62,18 +61,18 @@ public class ObjectDirectoryTest extends RepositoryTestCase {
 			throws Exception {
 		ExecutorService e = Executors.newCachedThreadPool();
 		for (int i=0; i < 100; ++i) {
-			ObjectDirectory db = createBareRepository().getObjectDatabase();
-			for (Future f : e.invokeAll(blobInsertersForTheSameFanOutDir(db))) {
+			ObjectDirectory dir = createBareRepository().getObjectDatabase();
+			for (Future f : e.invokeAll(blobInsertersForTheSameFanOutDir(dir))) {
 				f.get();
 			}
 		}
 	}
 
 	private Collection<Callable<ObjectId>> blobInsertersForTheSameFanOutDir(
-			final ObjectDirectory db) {
+			final ObjectDirectory dir) {
 		Callable<ObjectId> callable = new Callable<ObjectId>() {
 			public ObjectId call() throws Exception {
-				return db.newInserter().insert(Constants.OBJ_BLOB, new byte[0]);
+				return dir.newInserter().insert(Constants.OBJ_BLOB, new byte[0]);
 			}
 		};
 		return Collections.nCopies(4, callable);

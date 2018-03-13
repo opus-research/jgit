@@ -71,7 +71,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.transport.GitProtocolConstants.MultiAck;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevCommitList;
 import org.eclipse.jgit.revwalk.RevFlag;
@@ -80,6 +79,7 @@ import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.revwalk.filter.CommitTimeRevFilter;
 import org.eclipse.jgit.revwalk.filter.RevFilter;
+import org.eclipse.jgit.transport.GitProtocolConstants.MultiAck;
 import org.eclipse.jgit.transport.PacketLineIn.AckNackResult;
 import org.eclipse.jgit.util.TemporaryBuffer;
 
@@ -464,8 +464,12 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		final PacketLineOut p = statelessRPC ? pckState : pckOut;
 		boolean first = true;
 		for (final Ref r : want) {
+			ObjectId objectId = r.getObjectId();
+			if (objectId == null) {
+				continue;
+			}
 			try {
-				if (walk.parseAny(r.getObjectId()).has(REACHABLE)) {
+				if (walk.parseAny(objectId).has(REACHABLE)) {
 					// We already have this object. Asking for it is
 					// not a very good idea.
 					//
@@ -478,7 +482,7 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 			final StringBuilder line = new StringBuilder(46);
 			line.append("want "); //$NON-NLS-1$
-			line.append(r.getObjectId().name());
+			line.append(objectId.name());
 			if (first) {
 				line.append(enableCapabilities());
 				first = false;

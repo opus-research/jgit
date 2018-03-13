@@ -46,17 +46,18 @@ package org.eclipse.jgit.lfs.errors;
 import org.eclipse.jgit.lfs.lib.AnyLongObjectId;
 
 /**
- * Thrown when an invalid long object id is passed in as an argument.
+ * Thrown when an object id is given that doesn't match the hash of the object's
+ * content
  *
- * @since 4.2
+ * @since 4.3
  */
 public class CorruptLongObjectException extends IllegalArgumentException {
 
 	private static final long serialVersionUID = 1L;
 
-	private AnyLongObjectId id;
+	private final AnyLongObjectId id;
 
-	private AnyLongObjectId contentHash;
+	private final AnyLongObjectId contentHash;
 
 	/**
 	 * Corrupt long object detected.
@@ -77,16 +78,17 @@ public class CorruptLongObjectException extends IllegalArgumentException {
 	}
 
 	/**
-	 * @return the id of the object
+	 * @return the id of the object, i.e. the expected hash of the object's
+	 *         content
 	 */
 	public AnyLongObjectId getId() {
 		return id;
 	}
 
 	/**
-	 * @return the hash of the object content which doesn't match the object's
-	 *         id when this exception is thrown which signals that the object
-	 *         has been corrupted
+	 * @return the actual hash of the object's content which doesn't match the
+	 *         object's id when this exception is thrown which signals that the
+	 *         object has been corrupted
 	 */
 	public AnyLongObjectId getContentHash() {
 		return contentHash;

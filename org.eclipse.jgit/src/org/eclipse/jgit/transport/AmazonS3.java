@@ -175,7 +175,7 @@ public class AmazonS3 {
 	private final String acl;
 
 	/** Maximum number of times to try an operation. */
-	private final int maxAttempts;
+	final int maxAttempts;
 
 	/** Encryption algorithm, may be a null instance that provides pass-through. */
 	private final WalkEncryption encryption;
@@ -483,7 +483,7 @@ public class AmazonS3 {
 		return encryption.encrypt(new DigestOutputStream(buffer, md5));
 	}
 
-	private void putImpl(final String bucket, final String key,
+	void putImpl(final String bucket, final String key,
 			final byte[] csum, final TemporaryBuffer buf,
 			ProgressMonitor monitor, String monitorTask) throws IOException {
 		if (monitor == null)
@@ -522,32 +522,40 @@ public class AmazonS3 {
 		throw maxAttempts(JGitText.get().s3ActionWriting, key);
 	}
 
-	private IOException error(final String action, final String key,
+	IOException error(final String action, final String key,
 			final HttpURLConnection c) throws IOException {
 		final IOException err = new IOException(MessageFormat.format(
 				JGitText.get().amazonS3ActionFailed, action, key,
 				Integer.valueOf(HttpSupport.response(c)),
 				c.getResponseMessage()));
 		final InputStream errorStream = c.getErrorStream();
-		if (errorStream == null)
+		if (errorStream == null) {
 			return err;
-
-		final ByteArrayOutputStream b = new ByteArrayOutputStream();
-		byte[] buf = new byte[2048];
-		for (;;) {
-			final int n = errorStream.read(buf);
-			if (n < 0)
-				break;
-			if (n > 0)
-				b.write(buf, 0, n);
 		}
-		buf = b.toByteArray();
-		if (buf.length > 0)
-			err.initCause(new IOException("\n" + new String(buf))); //$NON-NLS-1$
+
+		try {
+			final ByteArrayOutputStream b = new ByteArrayOutputStream();
+			byte[] buf = new byte[2048];
+			for (;;) {
+				final int n = errorStream.read(buf);
+				if (n < 0) {
+					break;
+				}
+				if (n > 0) {
+					b.write(buf, 0, n);
+				}
+			}
+			buf = b.toByteArray();
+			if (buf.length > 0) {
+				err.initCause(new IOException("\n" + new String(buf))); //$NON-NLS-1$
+			}
+		} finally {
+			errorStream.close();
+		}
 		return err;
 	}
 
-	private IOException maxAttempts(final String action, final String key) {
+	IOException maxAttempts(final String action, final String key) {
 		return new IOException(MessageFormat.format(
 				JGitText.get().amazonS3ActionFailedGivingUp, action, key,
 				Integer.valueOf(maxAttempts)));
@@ -559,7 +567,7 @@ public class AmazonS3 {
 		return open(method, bucket, key, noArgs);
 	}
 
-	private HttpURLConnection open(final String method, final String bucket,
+	HttpURLConnection open(final String method, final String bucket,
 			final String key, final Map<String, String> args)
 			throws IOException {
 		final StringBuilder urlstr = new StringBuilder();
@@ -596,7 +604,7 @@ public class AmazonS3 {
 		return c;
 	}
 
-	private void authorize(final HttpURLConnection c) throws IOException {
+	void authorize(final HttpURLConnection c) throws IOException {
 		final Map<String, List<String>> reqHdr = c.getRequestProperties();
 		final SortedMap<String, String> sigHdr = new TreeMap<String, String>();
 		for (final Map.Entry<String, List<String>> entry : reqHdr.entrySet()) {
