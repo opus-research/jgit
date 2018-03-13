@@ -49,15 +49,20 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Iterator;
 
 import org.eclipse.jgit.api.MergeResult.MergeStatus;
 import org.eclipse.jgit.api.errors.InvalidMergeHeadsException;
+import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RepositoryState;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.merge.MergeStrategy;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.junit.Test;
 
 public class MergeCommandTest extends RepositoryTestCase {
@@ -157,6 +162,7 @@ public class MergeCommandTest extends RepositoryTestCase {
 			// expected this exception
 		}
 	}
+
 
 	@Test
 	public void testContentMerge() throws Exception {
@@ -405,7 +411,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertEquals("1\nb(side)\n3\n", read(new File(db.getWorkTree(), "b")));
 		assertEquals("1\nc(main)\n3\n", read(new File(db.getWorkTree(),
 				"c/c/c")));
-		assertEquals("--- dirty ---", read(new File(db.getWorkTree(), "d")));
 
 		assertEquals(null, result.getConflicts());
 
@@ -463,7 +468,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertFalse(new File(db.getWorkTree(), "b").exists());
 		assertEquals("1\nc(main)\n3\n",
 				read(new File(db.getWorkTree(), "c/c/c")));
-		assertEquals("1\nd\n3\n", read(new File(db.getWorkTree(), "d")));
 
 		// Do the opposite, be on a branch where we have deleted a file and
 		// merge in a old commit where this file was not deleted
@@ -478,7 +482,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertFalse(new File(db.getWorkTree(), "b").exists());
 		assertEquals("1\nc(main)\n3\n",
 				read(new File(db.getWorkTree(), "c/c/c")));
-		assertEquals("1\nd\n3\n", read(new File(db.getWorkTree(), "d")));
 	}
 
 	@Test
@@ -551,7 +554,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertFalse(new File(db.getWorkTree(), "b").exists());
 		assertEquals("1\nc(main)\n3\n",
 				read(new File(db.getWorkTree(), "c/c/c")));
-		assertEquals("1\nd\n3\n", read(new File(db.getWorkTree(), "d")));
 	}
 
 	@Test
@@ -632,161 +634,24 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertEquals(RepositoryState.MERGING, db.getRepositoryState());
 	}
 
-	@Test
-	public void testSuccessfulMergeFailsDueToDirtyIndex() throws Exception {
-		Git git = new Git(db);
-
-		File fileA = writeTrashFile("a", "a");
-		RevCommit initialCommit = addAllAndCommit(git);
-
-		// switch branch
-		createBranch(initialCommit, "refs/heads/side");
-		checkoutBranch("refs/heads/side");
-		// modify file a
-		write(fileA, "a(side)");
-		writeTrashFile("b", "b");
-		RevCommit sideCommit = addAllAndCommit(git);
-
-		// switch branch
-		checkoutBranch("refs/heads/master");
-		writeTrashFile("c", "c");
-		addAllAndCommit(git);
-
-		// modify and add file a
-		write(fileA, "a(modified)");
-		git.add().addFilepattern("a").call();
-		// do not commit
-
-		// get current index state
-		String indexState = indexState(CONTENT);
-
-		// merge
-		MergeResult result = git.merge().include(sideCommit.getId())
-				.setStrategy(MergeStrategy.RESOLVE).call();
-
-		checkMergeFailedResult(result, indexState, fileA);
+	private void createBranch(ObjectId objectId, String branchName) throws IOException {
+		RefUpdate updateRef = db.updateRef(branchName);
+		updateRef.setNewObjectId(objectId);
+		updateRef.update();
 	}
 
-	@Test
-	public void testConflictingMergeFailsDueToDirtyIndex() throws Exception {
-		Git git = new Git(db);
-
-		File fileA = writeTrashFile("a", "a");
-		RevCommit initialCommit = addAllAndCommit(git);
-
-		// switch branch
-		createBranch(initialCommit, "refs/heads/side");
-		checkoutBranch("refs/heads/side");
-		// modify file a
-		write(fileA, "a(side)");
-		writeTrashFile("b", "b");
-		RevCommit sideCommit = addAllAndCommit(git);
-
-		// switch branch
-		checkoutBranch("refs/heads/master");
-		// modify file a - this will cause a conflict during merge
-		write(fileA, "a(master)");
-		writeTrashFile("c", "c");
-		addAllAndCommit(git);
-
-		// modify and add file a
-		write(fileA, "a(modified)");
-		git.add().addFilepattern("a").call();
-		// do not commit
-
-		// get current index state
-		String indexState = indexState(CONTENT);
-
-		// merge
-		MergeResult result = git.merge().include(sideCommit.getId())
-				.setStrategy(MergeStrategy.RESOLVE).call();
-
-		checkMergeFailedResult(result, indexState, fileA);
-	}
-
-	@Test
-	public void testSuccessfulMergeFailsDueToDirtyWorktree() throws Exception {
-		Git git = new Git(db);
-
-		File fileA = writeTrashFile("a", "a");
-		RevCommit initialCommit = addAllAndCommit(git);
-
-		// switch branch
-		createBranch(initialCommit, "refs/heads/side");
-		checkoutBranch("refs/heads/side");
-		// modify file a
-		write(fileA, "a(side)");
-		writeTrashFile("b", "b");
-		RevCommit sideCommit = addAllAndCommit(git);
-
-		// switch branch
-		checkoutBranch("refs/heads/master");
-		writeTrashFile("c", "c");
-		addAllAndCommit(git);
-
-		// modify file a
-		write(fileA, "a(modified)");
-		// do not add and commit
-
-		// get current index state
-		String indexState = indexState(CONTENT);
-
-		// merge
-		MergeResult result = git.merge().include(sideCommit.getId())
-				.setStrategy(MergeStrategy.RESOLVE).call();
-
-		checkMergeFailedResult(result, indexState, fileA);
-	}
-
-	@Test
-	public void testConflictingMergeFailsDueToDirtyWorktree() throws Exception {
-		Git git = new Git(db);
-
-		File fileA = writeTrashFile("a", "a");
-		RevCommit initialCommit = addAllAndCommit(git);
-
-		// switch branch
-		createBranch(initialCommit, "refs/heads/side");
-		checkoutBranch("refs/heads/side");
-		// modify file a
-		write(fileA, "a(side)");
-		writeTrashFile("b", "b");
-		RevCommit sideCommit = addAllAndCommit(git);
-
-		// switch branch
-		checkoutBranch("refs/heads/master");
-		// modify file a - this will cause a conflict during merge
-		write(fileA, "a(master)");
-		writeTrashFile("c", "c");
-		addAllAndCommit(git);
-
-		// modify file a
-		write(fileA, "a(modified)");
-		// do not add and commit
-
-		// get current index state
-		String indexState = indexState(CONTENT);
-
-		// merge
-		MergeResult result = git.merge().include(sideCommit.getId())
-				.setStrategy(MergeStrategy.RESOLVE).call();
-
-		checkMergeFailedResult(result, indexState, fileA);
-	}
-
-	private RevCommit addAllAndCommit(final Git git) throws Exception {
-		git.add().addFilepattern(".").call();
-		return git.commit().setMessage("message").call();
-	}
-
-	private void checkMergeFailedResult(final MergeResult result,
-			final String indexState, final File fileA) throws Exception {
-		assertEquals(MergeStatus.FAILED, result.getMergeStatus());
-		assertEquals("a(modified)", read(fileA));
-		assertFalse(new File(db.getWorkTree(), "b").exists());
-		assertEquals("c", read(new File(db.getWorkTree(), "c")));
-		assertEquals(indexState, indexState(CONTENT));
-		assertEquals(null, result.getConflicts());
-		assertEquals(RepositoryState.SAFE, db.getRepositoryState());
+	private void checkoutBranch(String branchName) throws IllegalStateException, IOException {
+		RevWalk walk = new RevWalk(db);
+		RevCommit head = walk.parseCommit(db.resolve(Constants.HEAD));
+		RevCommit branch = walk.parseCommit(db.resolve(branchName));
+		DirCacheCheckout dco = new DirCacheCheckout(db,
+				head.getTree().getId(), db.lockDirCache(),
+				branch.getTree().getId());
+		dco.setFailOnConflict(true);
+		dco.checkout();
+		walk.release();
+		// update the HEAD
+		RefUpdate refUpdate = db.updateRef(Constants.HEAD);
+		refUpdate.link(branchName);
 	}
 }
