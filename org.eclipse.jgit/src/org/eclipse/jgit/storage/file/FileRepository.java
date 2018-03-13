@@ -60,7 +60,6 @@ import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.BaseRepositoryBuilder;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.CoreConfig.SymLinks;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefDatabase;
@@ -273,20 +272,6 @@ public class FileRepository extends Repository {
 			fileMode = false;
 		}
 
-		SymLinks symLinks = SymLinks.FALSE;
-		if (getFS().supportsSymlinks()) {
-			File tmp = new File(getDirectory(), "tmplink"); //$NON-NLS-1$
-			try {
-				getFS().createSymLink(tmp, "target"); //$NON-NLS-1$
-				symLinks = null;
-			} finally {
-				FileUtils.delete(tmp);
-			}
-		}
-		if (symLinks != null)
-			cfg.setString(ConfigConstants.CONFIG_CORE_SECTION, null,
-					ConfigConstants.CONFIG_KEY_SYMLINKS, symLinks.name()
-							.toLowerCase());
 		cfg.setInt(ConfigConstants.CONFIG_CORE_SECTION, null,
 				ConfigConstants.CONFIG_KEY_REPO_FORMAT_VERSION, 0);
 		cfg.setBoolean(ConfigConstants.CONFIG_CORE_SECTION, null,
@@ -384,14 +369,12 @@ public class FileRepository extends Repository {
 	 *
 	 * @param pack
 	 *            path of the pack file to open.
-	 * @param idx
-	 *            path of the corresponding index file.
 	 * @throws IOException
 	 *             index file could not be opened, read, or is not recognized as
 	 *             a Git pack file index.
 	 */
-	public void openPack(final File pack, final File idx) throws IOException {
-		objectDatabase.openPack(pack, idx);
+	public void openPack(final File pack) throws IOException {
+		objectDatabase.openPack(pack);
 	}
 
 	@Override
