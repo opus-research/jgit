@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Robin Rosenberg
+ * Copyright (C) 2011-2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,24 +40,63 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.util;
 
-package org.eclipse.jgit.dircache;
+import static org.junit.Assert.assertEquals;
 
-import java.text.MessageFormat;
+import java.util.ArrayList;
+import java.util.List;
 
-import org.eclipse.jgit.internal.JGitText;
+import org.junit.Before;
+import org.junit.Test;
 
-/**
- * Thrown when JGit detects and refuses to use an invalid path
- */
-public class InvalidPathException extends IllegalArgumentException {
+public class ReadLinesTest {
+	List<String> l = new ArrayList<String>();
 
-	private static final long serialVersionUID = 1L;
+	@Before
+	public void clearList() {
+		l.clear();
+	}
 
-	/**
-	 * @param path
-	 */
-	public InvalidPathException(String path) {
-		super(MessageFormat.format(JGitText.get().invalidPath, path));
+	@Test
+	public void testReadLines_singleLine() {
+		l.add("[0]");
+		assertEquals(l, IO.readLines("[0]"));
+	}
+
+	@Test
+	public void testReadLines_LF() {
+		l.add("[0]");
+		l.add("[1]");
+		assertEquals(l, IO.readLines("[0]\n[1]"));
+	}
+
+	@Test
+	public void testReadLines_CRLF() {
+		l.add("[0]");
+		l.add("[1]");
+		assertEquals(l, IO.readLines("[0]\r\n[1]"));
+	}
+
+	@Test
+	public void testReadLines_endLF() {
+		l.add("[0]");
+		l.add("");
+		assertEquals(l, IO.readLines("[0]\n"));
+	}
+
+	@Test
+	public void testReadLines_endCRLF() {
+		l.add("[0]");
+		l.add("");
+		assertEquals(l, IO.readLines("[0]\r\n"));
+	}
+
+	@Test
+	public void testReadLines_mixed() {
+		l.add("[0]");
+		l.add("[1]");
+		l.add("[2]");
+		assertEquals(l, IO.readLines("[0]\r\n[1]\n[2]"));
 	}
 }
