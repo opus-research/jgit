@@ -987,7 +987,7 @@ public class PackWriter implements AutoCloseable {
 		}
 
 		stats.totalBytes = out.length();
-		reader.release();
+		reader.close();
 		endPhase(writeMonitor);
 	}
 
@@ -1003,14 +1003,6 @@ public class PackWriter implements AutoCloseable {
 	/** @return snapshot of the current state of this PackWriter. */
 	public State getState() {
 		return state.snapshot();
-	}
-
-	/**
-	 * Release all resources used by this writer. Use {@link #close()} instead.
-	 */
-	@Deprecated
-	public void release() {
-		close();
 	}
 
 	/**
@@ -1599,6 +1591,7 @@ public class PackWriter implements AutoCloseable {
 				findObjectsToPackUsingBitmaps(bitmapWalker, want, have);
 				endPhase(countingMonitor);
 				stats.timeCounting = System.currentTimeMillis() - countingStart;
+				stats.bitmapIndexMisses = bitmapWalker.getCountOfBitmapIndexMisses();
 				return;
 			}
 		}
@@ -2092,6 +2085,8 @@ public class PackWriter implements AutoCloseable {
 
 		long totalObjects;
 
+		long bitmapIndexMisses;
+
 		long totalDeltas;
 
 		long reusedObjects;
@@ -2171,6 +2166,16 @@ public class PackWriter implements AutoCloseable {
 		 */
 		public long getTotalObjects() {
 			return totalObjects;
+		}
+
+		/**
+		 * @return the count of objects that needed to be discovered through an
+		 *         object walk because they were not found in bitmap indices.
+		 *
+		 * @since 4.0
+		 */
+		public long getBitmapIndexMisses() {
+			return bitmapIndexMisses;
 		}
 
 		/**

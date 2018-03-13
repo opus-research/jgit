@@ -53,10 +53,13 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintStream;
 import java.io.PrintWriter;
+import java.nio.charset.Charset;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.text.MessageFormat;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -154,7 +157,7 @@ public abstract class FS {
 
 	private volatile Holder<File> userHome;
 
-	private volatile Holder<File> gitPrefix;
+	private volatile Holder<File> gitSystemConfig;
 
 	/**
 	 * Constructs a file system abstraction.
@@ -171,7 +174,7 @@ public abstract class FS {
 	 */
 	protected FS(FS src) {
 		userHome = src.userHome;
-		gitPrefix = src.gitPrefix;
+		gitSystemConfig = src.gitSystemConfig;
 	}
 
 	/** @return a new instance of the same type of FS. */
@@ -403,49 +406,45 @@ public abstract class FS {
 	 * @param command
 	 *            as component array
 	 * @param encoding
+	 *            to be used to parse the command's output
 	 * @return the one-line output of the command
 	 */
 	protected static String readPipe(File dir, String[] command, String encoding) {
+		return readPipe(dir, command, encoding, null);
+	}
+
+	/**
+	 * Execute a command and return a single line of output as a String
+	 *
+	 * @param dir
+	 *            Working directory for the command
+	 * @param command
+	 *            as component array
+	 * @param encoding
+	 *            to be used to parse the command's output
+	 * @param env
+	 *            Map of environment variables to be merged with those of the
+	 *            current process
+	 * @return the one-line output of the command
+	 * @since 4.0
+	 */
+	protected static String readPipe(File dir, String[] command, String encoding, Map<String, String> env) {
 		final boolean debug = LOG.isDebugEnabled();
 		try {
 			if (debug) {
 				LOG.debug("readpipe " + Arrays.asList(command) + "," //$NON-NLS-1$ //$NON-NLS-2$
 						+ dir);
 			}
-			final Process p = Runtime.getRuntime().exec(command, null, dir);
-			final BufferedReader lineRead = new BufferedReader(
+			ProcessBuilder pb = new ProcessBuilder(command);
+			pb.directory(dir);
+			if (env != null) {
+				pb.environment().putAll(env);
+			}
+			Process p = pb.start();
+			BufferedReader lineRead = new BufferedReader(
 					new InputStreamReader(p.getInputStream(), encoding));
 			p.getOutputStream().close();
-			final AtomicBoolean gooblerFail = new AtomicBoolean(false);
-			Thread gobbler = new Thread() {
-				public void run() {
-					InputStream is = p.getErrorStream();
-					try {
-						int ch;
-						if (debug)
-							while ((ch = is.read()) != -1)
-								System.err.print((char) ch);
-						else
-							while (is.read() != -1) {
-								// ignore
-							}
-					} catch (IOException e) {
-						// Just print on stderr for debugging
-						if (debug)
-							e.printStackTrace(System.err);
-						gooblerFail.set(true);
-					}
-					try {
-						is.close();
-					} catch (IOException e) {
-						// Just print on stderr for debugging
-						if (debug) {
-							LOG.debug("Caught exception in gobbler thread", e); //$NON-NLS-1$
-						}
-						gooblerFail.set(true);
-					}
-				}
-			};
+			GobblerThread gobbler = new GobblerThread(p, command, dir);
 			gobbler.start();
 			String r = null;
 			try {
@@ -470,7 +469,7 @@ public abstract class FS {
 					int rc = p.waitFor();
 					gobbler.join();
 					if (rc == 0 && r != null && r.length() > 0
-							&& !gooblerFail.get())
+							&& !gobbler.fail.get())
 						return r;
 					if (debug) {
 						LOG.debug("readpipe rc=" + rc); //$NON-NLS-1$
@@ -489,34 +488,130 @@ public abstract class FS {
 		return null;
 	}
 
-	/** @return the $prefix directory C Git would use. */
-	public File gitPrefix() {
-		Holder<File> p = gitPrefix;
-		if (p == null) {
-			String overrideGitPrefix = SystemReader.getInstance().getProperty(
-					"jgit.gitprefix"); //$NON-NLS-1$
-			if (overrideGitPrefix != null)
-				p = new Holder<File>(new File(overrideGitPrefix));
-			else
-				p = new Holder<File>(discoverGitPrefix());
-			gitPrefix = p;
+	private static class GobblerThread extends Thread {
+		private final Process p;
+		private final String desc;
+		private final String dir;
+		private final boolean debug = LOG.isDebugEnabled();
+		private final AtomicBoolean fail = new AtomicBoolean();
+
+		private GobblerThread(Process p, String[] command, File dir) {
+			this.p = p;
+			if (debug) {
+				this.desc = Arrays.asList(command).toString();
+				this.dir = dir.toString();
+			} else {
+				this.desc = null;
+				this.dir = null;
+			}
 		}
-		return p.value;
+
+		public void run() {
+			InputStream is = p.getErrorStream();
+			try {
+				int ch;
+				if (debug) {
+					while ((ch = is.read()) != -1) {
+						System.err.print((char) ch);
+					}
+				} else {
+					while (is.read() != -1) {
+						// ignore
+					}
+				}
+			} catch (IOException e) {
+				logError(e);
+				fail.set(true);
+			}
+			try {
+				is.close();
+			} catch (IOException e) {
+				logError(e);
+				fail.set(true);
+			}
+		}
+
+		private void logError(Throwable t) {
+			if (!debug) {
+				return;
+			}
+			String msg = MessageFormat.format(
+					JGitText.get().exceptionCaughtDuringExcecutionOfCommand, desc, dir);
+			LOG.debug(msg, t);
+		}
 	}
 
-	/** @return the $prefix directory C Git would use. */
-	protected abstract File discoverGitPrefix();
+	/**
+	 * @return the path to the Git executable or {@code null} if it cannot be
+	 *         determined.
+	 * @since 4.0
+	 */
+	protected abstract File discoverGitExe();
 
 	/**
-	 * Set the $prefix directory C Git uses.
-	 *
-	 * @param path
-	 *            the directory. Null if C Git is not installed.
-	 * @return {@code this}
+	 * @return the path to the system-wide Git configuration file or
+	 *         {@code null} if it cannot be determined.
+	 * @since 4.0
 	 */
-	public FS setGitPrefix(File path) {
-		gitPrefix = new Holder<File>(path);
+	protected File discoverGitSystemConfig() {
+		File gitExe = discoverGitExe();
+		if (gitExe == null) {
+			return null;
+		}
+
+		// Trick Git into printing the path to the config file by using "echo"
+		// as the editor.
+		Map<String, String> env = new HashMap<>();
+		env.put("GIT_EDITOR", "echo"); //$NON-NLS-1$ //$NON-NLS-2$
+
+		String w = readPipe(gitExe.getParentFile(),
+				new String[] { "git", "config", "--system", "--edit" }, //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
+				Charset.defaultCharset().name(), env);
+		if (StringUtils.isEmptyOrNull(w)) {
+			return null;
+		}
+
+		return new File(w);
+	}
+
+	/**
+	 * @return the currently used path to the system-wide Git configuration
+	 *         file or {@code null} if none has been set.
+	 * @since 4.0
+	 */
+	public File getGitSystemConfig() {
+		if (gitSystemConfig == null) {
+			gitSystemConfig = new Holder<File>(discoverGitSystemConfig());
+		}
+		return gitSystemConfig.value;
+	}
+
+	/**
+	 * Set the path to the system-wide Git configuration file to use.
+	 *
+	 * @param configFile
+	 *            the path to the config file.
+	 * @return {@code this}
+	 * @since 4.0
+	 */
+	public FS setGitSystemConfig(File configFile) {
+		gitSystemConfig = new Holder<File>(configFile);
 		return this;
+	}
+
+	/**
+	 * @param grandchild
+	 * @return the parent directory of this file's parent directory or
+	 *         {@code null} in case there's no grandparent directory
+	 * @since 4.0
+	 */
+	protected static File resolveGrandparentFile(File grandchild) {
+		if (grandchild != null) {
+			File parent = grandchild.getParentFile();
+			if (parent != null)
+				return parent.getParentFile();
+		}
+		return null;
 	}
 
 	/**
@@ -600,7 +695,7 @@ public abstract class FS {
 	public void setHidden(File path, boolean hidden) throws IOException {
 		if (!path.getName().startsWith(".")) //$NON-NLS-1$
 			throw new IllegalArgumentException(
-					"Hiding only allowed for names that start with a period");
+					JGitText.get().hiddenFilesStartWithDot);
 	}
 
 	/**
@@ -901,7 +996,7 @@ public abstract class FS {
 	}
 
 	/**
-	 * Initialize a ProcesssBuilder to run a command using the system shell.
+	 * Initialize a ProcessBuilder to run a command using the system shell.
 	 *
 	 * @param cmd
 	 *            command to execute. This string should originate from the
