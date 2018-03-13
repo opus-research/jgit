@@ -50,7 +50,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.util.List;
 
-import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
+import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.lib.ConfigConstants;
@@ -422,7 +422,7 @@ public class CommitCommandTest extends RepositoryTestCase {
 				.getReflogReader(db.getBranch()).getLastEntry().getComment());
 	}
 
-	@Test(expected = WrongRepositoryStateException.class)
+	@Test(expected = JGitInternalException.class)
 	public void commitAmendOnInitialShouldFail() throws Exception {
 		Git git = new Git(db);
 		git.commit().setAmend(true).setMessage("initial commit").call();

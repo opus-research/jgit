@@ -177,7 +177,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 			// determine the current HEAD and the commit it is referring to
 			ObjectId headId = repo.resolve(Constants.HEAD + "^{commit}");
 			if (headId == null && amend)
-				throw new WrongRepositoryStateException(
+				throw new JGitInternalException(
 						JGitText.get().commitAmendOnInitialNotPossible);
 
 			if (headId != null)
