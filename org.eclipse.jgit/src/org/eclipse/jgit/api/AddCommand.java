@@ -63,7 +63,6 @@ import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
-import org.eclipse.jgit.util.FS;
 
 /**
  * A class used to execute a {@code Add} command. It has setters for all
@@ -138,7 +137,6 @@ public class AddCommand extends GitCommand<DirCache> {
 			DirCacheIterator c;
 
 			DirCacheBuilder builder = dc.builder();
-			final FS fs = repo.getFS();
 			final TreeWalk tw = new TreeWalk(repo);
 			tw.addTree(new DirCacheBuildIterator(builder));
 			if (workingTreeIterator == null)
@@ -172,13 +170,7 @@ public class AddCommand extends GitCommand<DirCache> {
 									|| !c.getDirCacheEntry().isAssumeValid()) {
 								entry.setLength(sz);
 								entry.setLastModified(f.getEntryLastModified());
-
-								if (c != null
-										&& f.useIndexMode(c.getEntryFileMode(),
-												fs))
-									entry.setFileMode(c.getEntryFileMode());
-								else
-									entry.setFileMode(f.getEntryFileMode());
+								entry.setFileMode(f.getEntryFileMode());
 
 								InputStream in = f.openEntryStream();
 								try {
