@@ -73,9 +73,11 @@ public class CLIText extends TranslationBundle {
 	/***/ public String cannotCreateCommand;
 	/***/ public String cannotCreateOutputStream;
 	/***/ public String cannotDeatchHEAD;
+	/***/ public String cannotDeleteFile;
 	/***/ public String cannotDeleteTheBranchWhichYouAreCurrentlyOn;
 	/***/ public String cannotGuessLocalNameFrom;
 	/***/ public String cannotLock;
+	/***/ public String cannotMergeDetachedHead;
 	/***/ public String cannotReadBecause;
 	/***/ public String cannotReadPackageInformation;
 	/***/ public String cannotRenameDetachedHEAD;
@@ -92,6 +94,7 @@ public class CLIText extends TranslationBundle {
 	/***/ public String deletedBranch;
 	/***/ public String deletedRemoteBranch;
 	/***/ public String doesNotExist;
+	/***/ public String dontOverwriteLocalChanges;
 	/***/ public String everythingUpToDate;
 	/***/ public String expectedNumberOfbytes;
 	/***/ public String exporting;
@@ -107,6 +110,9 @@ public class CLIText extends TranslationBundle {
 	/***/ public String invalidHttpProxyOnlyHttpSupported;
 	/***/ public String jgitVersion;
 	/***/ public String listeningOn;
+	/***/ public String mergeConflict;
+	/***/ public String mergeFailed;
+	/***/ public String mergeMadeBy;
 	/***/ public String metaVar_command;
 	/***/ public String metaVar_commitish;
 	/***/ public String metaVar_object;
@@ -130,8 +136,11 @@ public class CLIText extends TranslationBundle {
 	/***/ public String notAnIndexFile;
 	/***/ public String notAnObject;
 	/***/ public String notFound;
+	/***/ public String noteObjectTooLargeToPrint;
 	/***/ public String onlyOneMetaVarExpectedIn;
 	/***/ public String pushTo;
+	/***/ public String pathsRequired;
+	/***/ public String refDoesNotExistOrNoCommit;
 	/***/ public String remoteMessage;
 	/***/ public String remoteRefObjectChangedIsNotExpectedOne;
 	/***/ public String remoteSideDoesNotSupportDeletingRefs;
@@ -140,6 +149,7 @@ public class CLIText extends TranslationBundle {
 	/***/ public String skippingObject;
 	/***/ public String timeInMilliSeconds;
 	/***/ public String tooManyRefsGiven;
+	/***/ public String unknownMergeStratey;
 	/***/ public String unsupportedOperation;
 	/***/ public String warningNoCommitGivenOnCommandLine;
 }

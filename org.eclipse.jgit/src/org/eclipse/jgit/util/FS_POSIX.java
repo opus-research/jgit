@@ -46,10 +46,13 @@ import java.io.File;
 import java.nio.charset.Charset;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 abstract class FS_POSIX extends FS {
 	@Override
-	public File gitPrefix() {
+	protected File discoverGitPrefix() {
 		String path = SystemReader.getInstance().getenv("PATH");
 		File gitExe = searchPath(path, "git");
 		if (gitExe != null)
@@ -63,10 +66,36 @@ abstract class FS_POSIX extends FS {
 			String w = readPipe(userHome(), //
 					new String[] { "bash", "--login", "-c", "which git" }, //
 					Charset.defaultCharset().name());
-			return new File(w).getParentFile().getParentFile();
+			if (w == null || w.length() == 0)
+				return null;
+			File parentFile = new File(w).getParentFile();
+			if (parentFile == null)
+				return null;
+			return parentFile.getParentFile();
 		}
 
 		return null;
+	}
+
+	FS_POSIX() {
+		super();
+	}
+
+	FS_POSIX(FS src) {
+		super(src);
+	}
+
+	@Override
+	public ProcessBuilder runInShell(String cmd, String[] args) {
+		List<String> argv = new ArrayList<String>(4 + args.length);
+		argv.add("sh");
+		argv.add("-c");
+		argv.add(cmd + " \"$@\"");
+		argv.add(cmd);
+		argv.addAll(Arrays.asList(args));
+		ProcessBuilder proc = new ProcessBuilder();
+		proc.command(argv);
+		return proc;
 	}
 
 	private static boolean isMacOS() {

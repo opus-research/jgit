@@ -181,11 +181,6 @@ public abstract class Repository {
 	}
 
 	/**
-	 * @return the directory containing the objects owned by this repository.
-	 */
-	public abstract File getObjectsDirectory();
-
-	/**
 	 * @return the object database which stores this repository's data.
 	 */
 	public abstract ObjectDatabase getObjectDatabase();
@@ -273,53 +268,6 @@ public abstract class Repository {
 			throws MissingObjectException, IncorrectObjectTypeException,
 			IOException {
 		return getObjectDatabase().open(objectId, typeHint);
-	}
-
-	/**
-	 * Access a Tree object using a symbolic reference. This reference may
-	 * be a SHA-1 or ref in combination with a number of symbols translating
-	 * from one ref or SHA1-1 to another, such as HEAD^{tree} etc.
-	 *
-	 * @param revstr a reference to a git commit object
-	 * @return a Tree named by the specified string
-	 * @throws IOException
-	 *
-	 * @see #resolve(String)
-	 * @deprecated Use {@link #resolve(String)} and pass its return value to
-	 * {@link org.eclipse.jgit.treewalk.TreeWalk#addTree(AnyObjectId)}.
-	 */
-	@Deprecated
-	public Tree mapTree(final String revstr) throws IOException {
-		final ObjectId id = resolve(revstr);
-		return id != null ? mapTree(id) : null;
-	}
-
-	/**
-	 * Access a Tree by SHA'1 id.
-	 * @param id
-	 * @return Tree or null
-	 * @throws IOException for I/O error or unexpected object type.
-	 * @deprecated Use {@link org.eclipse.jgit.treewalk.TreeWalk#addTree(AnyObjectId)}.
-	 */
-	@Deprecated
-	public Tree mapTree(final ObjectId id) throws IOException {
-		final ObjectLoader or;
-		try {
-			or = open(id);
-		} catch (MissingObjectException notFound) {
-			return null;
-		}
-		final byte[] raw = or.getCachedBytes();
-		switch (or.getType()) {
-		case Constants.OBJ_TREE:
-			return new Tree(this, id, raw);
-
-		case Constants.OBJ_COMMIT:
-			return mapTree(ObjectId.fromString(raw, 5));
-
-		default:
-			throw new IncorrectObjectTypeException(id, Constants.TYPE_TREE);
-		}
 	}
 
 	/**
@@ -582,24 +530,6 @@ public abstract class Repository {
 							revstr);
 				i = m - 1;
 				break;
-			case '-':
-				if (i + 4 < rev.length && rev[i + 1] == 'g'
-						&& isHex(rev[i + 2]) && isHex(rev[i + 3])) {
-					// Possibly output from git describe?
-					// Resolve longest valid abbreviation.
-					int cnt = 2;
-					while (i + 2 + cnt < rev.length && isHex(rev[i + 2 + cnt]))
-						cnt++;
-					String s = new String(rev, i + 2, cnt);
-					if (AbbreviatedObjectId.isId(s)) {
-						ObjectId id = resolveAbbreviation(s);
-						if (id != null) {
-							ref = rw.parseAny(id);
-							i += 1 + s.length();
-						}
-					}
-				}
-				break;
 			case ':': {
 				RevTree tree;
 				if (ref == null) {
@@ -642,6 +572,14 @@ public abstract class Repository {
 				|| ('A' <= c && c <= 'F');
 	}
 
+	private static boolean isAllHex(String str, int ptr) {
+		while (ptr < str.length()) {
+			if (!isHex(str.charAt(ptr++)))
+				return false;
+		}
+		return true;
+	}
+
 	private RevObject parseSimple(RevWalk rw, String revstr) throws IOException {
 		ObjectId id = resolveSimple(revstr);
 		return id != null ? rw.parseAny(id) : null;
@@ -657,6 +595,17 @@ public abstract class Repository {
 
 		if (AbbreviatedObjectId.isId(revstr))
 			return resolveAbbreviation(revstr);
+
+		int dashg = revstr.indexOf("-g");
+		if (4 < revstr.length() && 0 <= dashg
+				&& isHex(revstr.charAt(dashg + 2))
+				&& isHex(revstr.charAt(dashg + 3))
+				&& isAllHex(revstr, dashg + 4)) {
+			// Possibly output from git describe?
+			String s = revstr.substring(dashg + 2);
+			if (AbbreviatedObjectId.isId(s))
+				return resolveAbbreviation(s);
+		}
 
 		return null;
 	}
@@ -699,19 +648,6 @@ public abstract class Repository {
 		getObjectDatabase().close();
 		getRefDatabase().close();
 	}
-
-	/**
-	 * Add a single existing pack to the list of available pack files.
-	 *
-	 * @param pack
-	 *            path of the pack file to open.
-	 * @param idx
-	 *            path of the corresponding index file.
-	 * @throws IOException
-	 *             index file could not be opened, read, or is not recognized as
-	 *             a Git pack file index.
-	 */
-	public abstract void openPack(File pack, File idx) throws IOException;
 
 	public String toString() {
 		String desc;

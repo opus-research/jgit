@@ -56,10 +56,12 @@ import java.io.IOException;
 import org.eclipse.jgit.api.CreateBranchCommand.SetupUpstreamMode;
 import org.eclipse.jgit.api.MergeResult.MergeStatus;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.RefUpdate;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.RepositoryState;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
@@ -100,6 +102,43 @@ public class PullCommandTest extends RepositoryTestCase {
 		assertEquals(res.getMergeResult().getMergeStatus(),
 				MergeStatus.FAST_FORWARD);
 		assertFileContentsEqual(targetFile, "Another change");
+		assertEquals(RepositoryState.SAFE, target.getRepository()
+				.getRepositoryState());
+
+		res = target.pull().call();
+		assertEquals(res.getMergeResult().getMergeStatus(),
+				MergeStatus.ALREADY_UP_TO_DATE);
+	}
+
+	@Test
+	public void testPullMerge() throws Exception {
+		PullResult res = target.pull().call();
+		// nothing to update since we don't have different data yet
+		assertTrue(res.getFetchResult().getTrackingRefUpdates().isEmpty());
+		assertTrue(res.getMergeResult().getMergeStatus()
+				.equals(MergeStatus.ALREADY_UP_TO_DATE));
+
+		writeToFile(sourceFile, "Source change");
+		source.add().addFilepattern("SomeFile.txt");
+		RevCommit sourceCommit = source.commit()
+				.setMessage("Source change in remote").call();
+
+		File targetFile2 = new File(dbTarget.getWorkTree(), "OtherFile.txt");
+		writeToFile(targetFile2, "Unconflicting change");
+		target.add().addFilepattern("OtherFile.txt").call();
+		RevCommit targetCommit = target.commit()
+				.setMessage("Unconflicting change in local").call();
+
+		res = target.pull().call();
+
+		MergeResult mergeResult = res.getMergeResult();
+		ObjectId[] mergedCommits = mergeResult.getMergedCommits();
+		assertEquals(targetCommit.getId(), mergedCommits[0]);
+		assertEquals(sourceCommit.getId(), mergedCommits[1]);
+		RevCommit mergeCommit = new RevWalk(dbTarget).parseCommit(mergeResult
+				.getNewHead());
+		String message = "Merge branch 'master' of " + db.getWorkTree();
+		assertEquals(message, mergeCommit.getShortMessage());
 	}
 
 	@Test
@@ -124,7 +163,7 @@ public class PullCommandTest extends RepositoryTestCase {
 
 		res = target.pull().call();
 
-		String sourceChangeString = "Source change\n>>>>>>> branch 'refs/heads/master' of "
+		String sourceChangeString = "Source change\n>>>>>>> branch 'master' of "
 				+ target.getRepository().getConfig().getString("remote",
 						"origin", "url");
 
@@ -134,6 +173,8 @@ public class PullCommandTest extends RepositoryTestCase {
 		String result = "<<<<<<< HEAD\nTarget change\n=======\n"
 				+ sourceChangeString + "\n";
 		assertFileContentsEqual(targetFile, result);
+		assertEquals(RepositoryState.MERGING, target.getRepository()
+				.getRepositoryState());
 	}
 
 	@Test
@@ -167,7 +208,7 @@ public class PullCommandTest extends RepositoryTestCase {
 
 		res = target.pull().call();
 
-		String sourceChangeString = "Master change\n>>>>>>> branch 'refs/heads/master' of local repository";
+		String sourceChangeString = "Master change\n>>>>>>> branch 'master' of local repository";
 
 		assertNull(res.getFetchResult());
 		assertEquals(res.getMergeResult().getMergeStatus(),
@@ -175,6 +216,8 @@ public class PullCommandTest extends RepositoryTestCase {
 		String result = "<<<<<<< HEAD\nSlave change\n=======\n"
 				+ sourceChangeString + "\n";
 		assertFileContentsEqual(targetFile, result);
+		assertEquals(RepositoryState.MERGING, target.getRepository()
+				.getRepositoryState());
 	}
 
 	@Override
@@ -190,13 +233,7 @@ public class PullCommandTest extends RepositoryTestCase {
 		writeToFile(sourceFile, "Hello world");
 		// and commit it
 		source.add().addFilepattern("SomeFile.txt").call();
-		RevCommit commit = source.commit().setMessage(
-				"Initial commit for source").call();
-
-		// point the master branch to the new commit
-		RefUpdate upd = dbTarget.updateRef("refs/heads/master");
-		upd.setNewObjectId(commit.getId());
-		upd.update();
+		source.commit().setMessage("Initial commit for source").call();
 
 		// configure the target repo to connect to the source via "origin"
 		StoredConfig targetConfig = dbTarget.getConfig();
@@ -214,9 +251,9 @@ public class PullCommandTest extends RepositoryTestCase {
 		targetConfig.save();
 
 		targetFile = new File(dbTarget.getWorkTree(), "SomeFile.txt");
-		writeToFile(targetFile, "Hello world");
 		// make sure we have the same content
 		target.pull().call();
+		assertFileContentsEqual(targetFile, "Hello world");
 	}
 
 	private void writeToFile(File actFile, String string) throws IOException {
