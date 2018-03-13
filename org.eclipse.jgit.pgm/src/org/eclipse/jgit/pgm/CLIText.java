@@ -139,7 +139,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String mergeMadeBy;
 	/***/ public String mergedSquashed;
 	/***/ public String metaVar_KEY;
-	/***/ public String metaVar_archiveFormat;
 	/***/ public String metaVar_arg;
 	/***/ public String metaVar_author;
 	/***/ public String metaVar_bucket;
@@ -153,7 +152,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String metaVar_diffAlg;
 	/***/ public String metaVar_directory;
 	/***/ public String metaVar_file;
-	/***/ public String metaVar_filepattern;
 	/***/ public String metaVar_gitDir;
 	/***/ public String metaVar_hostName;
 	/***/ public String metaVar_linesOfContext;

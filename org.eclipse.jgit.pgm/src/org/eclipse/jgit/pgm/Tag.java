@@ -68,7 +68,7 @@ class Tag extends TextBuiltin {
 	private boolean force;
 
 	@Option(name = "-m", metaVar = "metaVar_message", usage = "usage_tagMessage")
-	private String message = ""; //$NON-NLS-1$
+	private String message = "";
 
 	@Argument(index = 0, metaVar = "metaVar_name")
 	private String tagName;
