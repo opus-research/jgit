@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, Google Inc.
+ * Copyright (C) 2012, IBM Corporation and others.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,63 +40,62 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.pgm;
 
-package org.eclipse.jgit.lib;
-
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-
-import java.io.UnsupportedEncodingException;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.junit.Assert;
 import org.junit.Test;
 
-public class ConstantsEncodingTest {
+public class CheckoutTest extends CLIRepositoryTestCase {
+
 	@Test
-	public void testEncodeASCII_SimpleASCII()
-			throws UnsupportedEncodingException {
-		final String src = "abc";
-		final byte[] exp = { 'a', 'b', 'c' };
-		final byte[] res = Constants.encodeASCII(src);
-		assertArrayEquals(exp, res);
-		assertEquals(src, new String(res, 0, res.length, "UTF-8"));
+	public void testCheckoutSelf() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
+
+		assertEquals("Already on 'master'", execute("git checkout master"));
 	}
 
 	@Test
-	public void testEncodeASCII_FailOnNonASCII() {
-		final String src = "Ūnĭcōde̽";
-		try {
-			Constants.encodeASCII(src);
-			fail("Incorrectly accepted a Unicode character");
-		} catch (IllegalArgumentException err) {
-			assertEquals("Not ASCII string: " + src, err.getMessage());
-		}
+	public void testCheckoutBranch() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
+		new Git(db).branchCreate().setName("side").call();
+
+		assertEquals("Switched to branch 'side'", execute("git checkout side"));
 	}
 
 	@Test
-	public void testEncodeASCII_Number13() {
-		final long src = 13;
-		final byte[] exp = { '1', '3' };
-		final byte[] res = Constants.encodeASCII(src);
-		assertArrayEquals(exp, res);
+	public void testCheckoutNewBranch() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
+
+		assertEquals("Switched to a new branch 'side'",
+				execute("git checkout -b side"));
 	}
 
 	@Test
-	public void testEncode_SimpleASCII() throws UnsupportedEncodingException {
-		final String src = "abc";
-		final byte[] exp = { 'a', 'b', 'c' };
-		final byte[] res = Constants.encode(src);
-		assertArrayEquals(exp, res);
-		assertEquals(src, new String(res, 0, res.length, "UTF-8"));
+	public void testCheckoutNonExistingBranch() throws Exception {
+		assertEquals(
+				"error: pathspec 'side' did not match any file(s) known to git.",
+				execute("git checkout side"));
 	}
 
 	@Test
-	public void testEncode_Unicode() throws UnsupportedEncodingException {
-		final String src = "Ūnĭcōde̽";
-		final byte[] exp = { (byte) 0xC5, (byte) 0xAA, 0x6E, (byte) 0xC4,
-				(byte) 0xAD, 0x63, (byte) 0xC5, (byte) 0x8D, 0x64, 0x65,
-				(byte) 0xCC, (byte) 0xBD };
-		final byte[] res = Constants.encode(src);
-		assertArrayEquals(exp, res);
-		assertEquals(src, new String(res, 0, res.length, "UTF-8"));
+	public void testCheckoutNewBranchThatAlreadyExists() throws Exception {
+		new Git(db).commit().setMessage("initial commit").call();
+
+		assertEquals("A branch named 'master' already exists.",
+				execute("git checkout -b master"));
+	}
+
+	@Test
+	public void testCheckoutNewBranchOnBranchToBeBorn() throws Exception {
+		assertEquals("You are on a branch yet to be born",
+				execute("git checkout -b side"));
+	}
+
+	static private void assertEquals(String expected, String[] actual) {
+		Assert.assertEquals(actual[actual.length - 1].equals("") ? 2 : 1,
+				actual.length); // ignore last line if empty
+		Assert.assertEquals(expected, actual[0]);
 	}
 }
