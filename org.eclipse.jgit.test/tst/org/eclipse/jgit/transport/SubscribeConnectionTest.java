@@ -55,6 +55,8 @@ import java.io.InterruptedIOException;
 import java.io.OutputStreamWriter;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.errors.NotSupportedException;
@@ -100,9 +102,25 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 		public SubscribeConnection openSubscribe()
 				throws NotSupportedException, TransportException {
 			BasePackSubscribeConnection c = new BasePackSubscribeConnection(
-					this);
-			c.init(new ByteArrayInputStream(publisherOut.toByteArray()),
-					testOut);
+					this) {
+				@Override
+				public void doSubscribeAdvertisment(
+						Subscriber s) throws IOException {
+					// Nothing
+				}
+				
+				@Override
+				public void doSubscribe(Subscriber s, Map<
+						String,
+						List<SubscribeCommand>> subscribeCommands,
+						ProgressMonitor monitor)
+						throws InterruptedException, TransportException,
+						IOException {
+					init(new ByteArrayInputStream(publisherOut.toByteArray()),
+							testOut);
+					super.doSubscribe(s, subscribeCommands, monitor);
+				}
+			};
 			return c;
 		}
 
