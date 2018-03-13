@@ -246,7 +246,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String remoteMessage;
 	/***/ public String remoteRefObjectChangedIsNotExpectedOne;
 	/***/ public String remoteSideDoesNotSupportDeletingRefs;
-	/***/ public String removing;
 	/***/ public String repaint;
 	/***/ public String s3InvalidBucket;
 	/***/ public String serviceNotSupported;
