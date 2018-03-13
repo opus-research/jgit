@@ -139,38 +139,12 @@ public class IO {
 			throws FileNotFoundException, IOException {
 		final FileInputStream in = new FileInputStream(path);
 		try {
-			long sz = Math.max(path.length(), 1);
+			final long sz = in.getChannel().size();
 			if (sz > max)
 				throw new IOException(MessageFormat.format(
 						JGitText.get().fileIsTooLarge, path));
-
-			byte[] buf = new byte[(int) sz];
-			int valid = 0;
-			for (;;) {
-				if (buf.length == valid) {
-					if (buf.length == max) {
-						int next = in.read();
-						if (next < 0)
-							break;
-
-						throw new IOException(MessageFormat.format(
-								JGitText.get().fileIsTooLarge, path));
-					}
-
-					byte[] nb = new byte[Math.min(buf.length * 2, max)];
-					System.arraycopy(buf, 0, nb, 0, valid);
-					buf = nb;
-				}
-				int n = in.read(buf, valid, buf.length - valid);
-				if (n < 0)
-					break;
-				valid += n;
-			}
-			if (valid < buf.length) {
-				byte[] nb = new byte[valid];
-				System.arraycopy(buf, 0, nb, 0, valid);
-				buf = nb;
-			}
+			final byte[] buf = new byte[(int) sz];
+			IO.readFully(in, buf, 0);
 			return buf;
 		} finally {
 			try {
@@ -339,7 +313,6 @@ public class IO {
 	 * @param s
 	 *            the string to read
 	 * @return the string divided into lines
-	 * @since 2.0
 	 */
 	public static List<String> readLines(final String s) {
 		List<String> l = new ArrayList<String>();

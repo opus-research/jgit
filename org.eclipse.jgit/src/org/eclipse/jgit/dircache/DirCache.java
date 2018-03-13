@@ -60,8 +60,8 @@ import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Comparator;
 
-import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.LockFailedException;
+import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.events.IndexChangedEvent;
 import org.eclipse.jgit.events.IndexChangedListener;
@@ -398,15 +398,10 @@ public class DirCache {
 		if (ver == 3)
 			extended = true;
 		else if (ver != 2)
-			throw new CorruptObjectException(MessageFormat.format(
-					JGitText.get().unknownDIRCVersion, Integer.valueOf(ver)));
+			throw new CorruptObjectException(MessageFormat.format(JGitText.get().unknownDIRCVersion, ver));
 		entryCnt = NB.decodeInt32(hdr, 8);
 		if (entryCnt < 0)
 			throw new CorruptObjectException(JGitText.get().DIRCHasTooManyEntries);
-
-		snapshot = FileSnapshot.save(liveFile);
-		int smudge_s = (int) (snapshot.lastModified() / 1000);
-		int smudge_ns = ((int) (snapshot.lastModified() % 1000)) * 1000000;
 
 		// Load the individual file entries.
 		//
@@ -416,7 +411,8 @@ public class DirCache {
 
 		final MutableInteger infoAt = new MutableInteger();
 		for (int i = 0; i < entryCnt; i++)
-			sortedEntries[i] = new DirCacheEntry(infos, infoAt, in, md, smudge_s, smudge_ns);
+			sortedEntries[i] = new DirCacheEntry(infos, infoAt, in, md);
+		snapshot = FileSnapshot.save(liveFile);
 
 		// After the file entries are index extensions, and then a footer.
 		//
@@ -437,9 +433,8 @@ public class DirCache {
 			switch (NB.decodeInt32(hdr, 0)) {
 			case EXT_TREE: {
 				if (Integer.MAX_VALUE < sz) {
-					throw new CorruptObjectException(MessageFormat.format(
-							JGitText.get().DIRCExtensionIsTooLargeAt,
-							formatExtensionName(hdr), Long.valueOf(sz)));
+					throw new CorruptObjectException(MessageFormat.format(JGitText.get().DIRCExtensionIsTooLargeAt
+							, formatExtensionName(hdr), sz));
 				}
 				final byte[] raw = new byte[(int) sz];
 				IO.readFully(in, raw, 0, raw.length);
@@ -479,10 +474,8 @@ public class DirCache {
 		while (0 < sz) {
 			int n = in.read(b, 0, (int) Math.min(b.length, sz));
 			if (n < 0) {
-				throw new EOFException(
-						MessageFormat.format(
-								JGitText.get().shortReadOfOptionalDIRCExtensionExpectedAnotherBytes,
-								formatExtensionName(hdr), Long.valueOf(sz)));
+				throw new EOFException(MessageFormat.format(JGitText.get().shortReadOfOptionalDIRCExtensionExpectedAnotherBytes
+						, formatExtensionName(hdr), sz));
 			}
 			md.update(b, 0, n);
 			sz -= n;
@@ -573,29 +566,21 @@ public class DirCache {
 		dos.write(tmp, 0, 12);
 
 		// Write the individual file entries.
-
-		final int smudge_s;
-		final int smudge_ns;
-		if (myLock != null) {
-			// For new files we need to smudge the index entry
-			// if they have been modified "now". Ideally we'd
-			// want the timestamp when we're done writing the index,
-			// so we use the current timestamp as a approximation.
-			myLock.createCommitSnapshot();
-			snapshot = myLock.getCommitSnapshot();
-			smudge_s = (int) (snapshot.lastModified() / 1000);
-			smudge_ns = ((int) (snapshot.lastModified() % 1000)) * 1000000;
+		//
+		if (snapshot == null) {
+			// Write a new index, as no entries require smudging.
+			//
+			for (int i = 0; i < entryCnt; i++)
+				sortedEntries[i].write(dos);
 		} else {
-			// Used in unit tests only
-			smudge_ns = 0;
-			smudge_s = 0;
-		}
-
-		for (int i = 0; i < entryCnt; i++) {
-			final DirCacheEntry e = sortedEntries[i];
-			if (e.mightBeRacilyClean(smudge_s, smudge_ns))
-				e.smudgeRacilyClean();
-			e.write(dos);
+			final int smudge_s = (int) (snapshot.lastModified() / 1000);
+			final int smudge_ns = ((int) (snapshot.lastModified() % 1000)) * 1000000;
+			for (int i = 0; i < entryCnt; i++) {
+				final DirCacheEntry e = sortedEntries[i];
+				if (e.mightBeRacilyClean(smudge_s, smudge_ns))
+					e.smudgeRacilyClean();
+				e.write(dos);
+			}
 		}
 
 		if (tree != null) {

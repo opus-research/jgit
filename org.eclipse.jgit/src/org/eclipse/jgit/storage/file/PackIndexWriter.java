@@ -137,8 +137,7 @@ public abstract class PackIndexWriter {
 			return new PackIndexWriterV2(dst);
 		default:
 			throw new IllegalArgumentException(MessageFormat.format(
-					JGitText.get().unsupportedPackIndexVersion,
-					Integer.valueOf(version)));
+					JGitText.get().unsupportedPackIndexVersion, version));
 		}
 	}
 

@@ -45,7 +45,6 @@ package org.eclipse.jgit.transport.resolver;
 
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.ServiceMayNotContinueException;
 
 /**
  * Locate a Git {@link Repository} by name from the URL.
@@ -77,18 +76,12 @@ public interface RepositoryResolver<C> {
 	 *             the repository does not exist or the name is incorrectly
 	 *             formatted as a repository name.
 	 * @throws ServiceNotAuthorizedException
-	 *             the repository may exist, but HTTP access is not allowed
-	 *             without authentication, i.e. this corresponds to an HTTP 401
-	 *             Unauthorized.
+	 *             the repository exists, but HTTP access is not allowed for the
+	 *             current user.
 	 * @throws ServiceNotEnabledException
-	 *             the repository may exist, but HTTP access is not allowed on the
-	 *             target repository, for the current user.
-	 * @throws ServiceMayNotContinueException
-	 *             the repository may exist, but HTTP access is not allowed for
-	 *             the current request. The exception message contains a detailed
-	 *             message that should be shown to the user.
+	 *             the repository exists, but HTTP access is not allowed on the
+	 *             target repository, by any user.
 	 */
 	Repository open(C req, String name) throws RepositoryNotFoundException,
-			ServiceNotAuthorizedException, ServiceNotEnabledException,
-			ServiceMayNotContinueException;
+			ServiceNotAuthorizedException, ServiceNotEnabledException;
 }
