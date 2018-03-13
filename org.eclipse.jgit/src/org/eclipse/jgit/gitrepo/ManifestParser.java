@@ -289,12 +289,7 @@ public class ManifestParser extends DefaultHandler {
 			}
 			String remoteUrl = remoteUrls.get(remote);
 			if (remoteUrl == null) {
-				String fetch = remotes.get(remote).fetch;
-				if (fetch == null) {
-					throw new SAXException(MessageFormat
-							.format(RepoText.get().errorNoFetch, remote));
-				}
-				remoteUrl = baseUrl.resolve(fetch).toString();
+				remoteUrl = baseUrl.resolve(remotes.get(remote).fetch).toString();
 				if (!remoteUrl.endsWith("/")) //$NON-NLS-1$
 					remoteUrl = remoteUrl + "/"; //$NON-NLS-1$
 				remoteUrls.put(remote, remoteUrl);
