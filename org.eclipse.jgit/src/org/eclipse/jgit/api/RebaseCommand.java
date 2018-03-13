@@ -496,37 +496,45 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 					commitToPick.getShortMessage()), ProgressMonitor.UNKNOWN);
 			if (preserveMerges)
 				return cherryPickCommitPreservingMerges(commitToPick);
-			// if the first parent of commitToPick is the current HEAD,
-			// we do a fast-forward instead of cherry-pick to avoid
-			// unnecessary object rewriting
-			newHead = tryFastForward(commitToPick);
-			lastStepWasForward = newHead != null;
-			if (!lastStepWasForward) {
-				// TODO if the content of this commit is already merged
-				// here we should skip this step in order to avoid
-				// confusing pseudo-changed
-				String ourCommitName = getOurCommitName();
-				CherryPickResult cherryPickResult = new Git(repo).cherryPick()
-						.include(commitToPick).setOurCommitName(ourCommitName)
-						.setReflogPrefix(REFLOG_PREFIX).setStrategy(strategy)
-						.call();
-				switch (cherryPickResult.getStatus()) {
-				case FAILED:
-					if (operation == Operation.BEGIN)
-						return abort(RebaseResult.failed(cherryPickResult
-								.getFailingPaths()));
-					else
-						return stop(commitToPick, Status.STOPPED);
-				case CONFLICTING:
-					return stop(commitToPick, Status.STOPPED);
-				case OK:
-					newHead = cherryPickResult.getNewHead();
-				}
-			}
-			return null;
+			else
+				return cherryPickCommitFlattening(commitToPick);
 		} finally {
 			monitor.endTask();
 		}
+	}
+
+	private RebaseResult cherryPickCommitFlattening(RevCommit commitToPick)
+			throws IOException, GitAPIException, NoMessageException,
+			UnmergedPathsException, ConcurrentRefUpdateException,
+			WrongRepositoryStateException, NoHeadException {
+		// If the first parent of commitToPick is the current HEAD,
+		// we do a fast-forward instead of cherry-pick to avoid
+		// unnecessary object rewriting
+		newHead = tryFastForward(commitToPick);
+		lastStepWasForward = newHead != null;
+		if (!lastStepWasForward) {
+			// TODO if the content of this commit is already merged
+			// here we should skip this step in order to avoid
+			// confusing pseudo-changed
+			String ourCommitName = getOurCommitName();
+			CherryPickResult cherryPickResult = new Git(repo).cherryPick()
+					.include(commitToPick).setOurCommitName(ourCommitName)
+					.setReflogPrefix(REFLOG_PREFIX).setStrategy(strategy)
+					.call();
+			switch (cherryPickResult.getStatus()) {
+			case FAILED:
+				if (operation == Operation.BEGIN)
+					return abort(RebaseResult.failed(cherryPickResult
+							.getFailingPaths()));
+				else
+					return stop(commitToPick, Status.STOPPED);
+			case CONFLICTING:
+				return stop(commitToPick, Status.STOPPED);
+			case OK:
+				newHead = cherryPickResult.getNewHead();
+			}
+		}
+		return null;
 	}
 
 	private RebaseResult cherryPickCommitPreservingMerges(RevCommit commitToPick)
@@ -541,7 +549,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		for (int i = 1; i < commitToPick.getParentCount(); i++)
 			otherParentsUnchanged &= newParents.get(i).equals(
 					commitToPick.getParent(i));
-		// if the first parent of commitToPick is the current HEAD,
+		// If the first parent of commitToPick is the current HEAD,
 		// we do a fast-forward instead of cherry-pick to avoid
 		// unnecessary object rewriting
 		newHead = otherParentsUnchanged ? tryFastForward(commitToPick) : null;
@@ -551,7 +559,9 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			if (!AnyObjectId.equals(headId, newParents.get(0)))
 				checkoutCommit(headId.getName(), newParents.get(0));
 
-			// Use the cherry-pick strategy if all non-first parents did not change
+			// Use the cherry-pick strategy if all non-first parents did not
+			// change. This is different from C Git, which always uses the merge
+			// strategy (see below).
 			if (otherParentsUnchanged) {
 				boolean isMerge = commitToPick.getParentCount() > 1;
 				String ourCommitName = getOurCommitName();
