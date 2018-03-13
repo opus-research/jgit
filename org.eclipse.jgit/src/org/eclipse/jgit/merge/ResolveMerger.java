@@ -59,10 +59,10 @@ import java.util.Map;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.DiffAlgorithm;
+import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.diff.RawTextComparator;
 import org.eclipse.jgit.diff.Sequence;
-import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuildIterator;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
@@ -83,7 +83,6 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.NameConflictTreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
-import org.eclipse.jgit.util.FileUtils;
 
 /**
  * A three-way merger performing a content-merge if necessary
@@ -183,6 +182,7 @@ public class ResolveMerger extends ThreeWayMerger {
 			DirCacheBuildIterator buildIt = new DirCacheBuildIterator(builder);
 
 			tw = new NameConflictTreeWalk(db);
+			tw.reset();
 			tw.addTree(mergeBase());
 			tw.addTree(sourceTrees[0]);
 			tw.addTree(sourceTrees[1]);
@@ -261,7 +261,7 @@ public class ResolveMerger extends ThreeWayMerger {
 				p = p.getParentFile();
 			if (p == null || p.isDirectory())
 				throw new IOException(JGitText.get().cannotCreateDirectory);
-			FileUtils.delete(p);
+			p.delete();
 			if (!f.mkdirs())
 				throw new IOException(JGitText.get().cannotCreateDirectory);
 		}
@@ -447,7 +447,7 @@ public class ResolveMerger extends ThreeWayMerger {
 				if (work != null
 						&& (!nonTree(work.getEntryRawMode()) || work
 								.isModified(index.getDirCacheEntry(), true,
-										true))) {
+										true, db.getFS()))) {
 					failingPathes.put(tw.getPathString(),
 							MergeFailureReason.DIRTY_WORKTREE);
 					return false;
@@ -467,12 +467,10 @@ public class ResolveMerger extends ThreeWayMerger {
 			throws FileNotFoundException, IllegalStateException, IOException {
 		MergeFormatter fmt = new MergeFormatter();
 
-		RawText baseText = base == null ? RawText.EMPTY_TEXT : getRawText(
-				base.getEntryObjectId(), db);
-
 		// do the merge
 		MergeResult<RawText> result = mergeAlgorithm.merge(
-				RawTextComparator.DEFAULT, baseText,
+				RawTextComparator.DEFAULT,
+				getRawText(base.getEntryObjectId(), db),
 				getRawText(ours.getEntryObjectId(), db),
 				getRawText(theirs.getEntryObjectId(), db));
 
@@ -530,7 +528,7 @@ public class ResolveMerger extends ThreeWayMerger {
 			} finally {
 				is.close();
 				if (inCore)
-					FileUtils.delete(of);
+					of.delete();
 			}
 			builder.add(dce);
 			return true;

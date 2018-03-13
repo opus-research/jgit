@@ -45,6 +45,8 @@ package org.eclipse.jgit.dircache;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -57,6 +59,7 @@ import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.IndexWriteException;
 import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
@@ -72,7 +75,6 @@ import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FileUtils;
 
 /**
  * This class handles checking out one or two trees merging with the index. This
@@ -243,6 +245,7 @@ public class DirCacheCheckout {
 		walk = new NameConflictTreeWalk(repo);
 		builder = dc.builder();
 
+		walk.reset();
 		addTree(walk, headCommitTree);
 		addTree(walk, mergeCommitTree);
 		walk.addTree(new DirCacheBuildIterator(builder));
@@ -284,6 +287,7 @@ public class DirCacheCheckout {
 		builder = dc.builder();
 
 		walk = new NameConflictTreeWalk(repo);
+		walk.reset();
 		walk.addTree(mergeCommitTree);
 		walk.addTree(new DirCacheBuildIterator(builder));
 		walk.addTree(workingTree);
@@ -311,8 +315,8 @@ public class DirCacheCheckout {
 		if (m != null) {
 			if (i == null || f == null || !m.idEqual(i)
 					|| (i.getDirCacheEntry() != null && (f.isModified(
-							i.getDirCacheEntry(), true, config_filemode()) ||
-							i.getDirCacheEntry().getStage() != 0))) {
+							i.getDirCacheEntry(), true, config_filemode(),
+							repo.getFS()) || i.getDirCacheEntry().getStage() != 0))) {
 				update(m.getEntryPathString(), m.getEntryObjectId(),
 						m.getEntryFileMode());
 			} else
@@ -575,7 +579,9 @@ public class DirCacheCheckout {
 			case 0xFFD: // 12 13 14
 				if (hId.equals(iId)) {
 					dce = i.getDirCacheEntry();
-					if (f == null || f.isModified(dce, true, config_filemode()))
+					if (f == null
+							|| f.isModified(dce, true, config_filemode(),
+									repo.getFS()))
 						conflict(name, i.getDirCacheEntry(), h, m);
 					else
 						remove(name);
@@ -642,7 +648,7 @@ public class DirCacheCheckout {
 					if (m==null && walk.isDirectoryFileConflict()) {
 						if (dce != null
 								&& (f == null || f.isModified(dce, true,
-										config_filemode())))
+										config_filemode(), repo.getFS())))
 							conflict(name, i.getDirCacheEntry(), h, m);
 						else
 							remove(name);
@@ -664,7 +670,9 @@ public class DirCacheCheckout {
 				 */
 
 				if (hId.equals(iId)) {
-					if (f == null || f.isModified(dce, true, config_filemode()))
+					if (f == null
+							|| f.isModified(dce, true, config_filemode(),
+									repo.getFS()))
 						conflict(name, i.getDirCacheEntry(), h, m);
 					else
 						remove(name);
@@ -676,7 +684,7 @@ public class DirCacheCheckout {
 				else if (hId.equals(iId) && !mId.equals(iId)) {
 					if (dce != null
 							&& (f == null || f.isModified(dce, true,
-									config_filemode())))
+									config_filemode(), repo.getFS())))
 						conflict(name, i.getDirCacheEntry(), h, m);
 					else
 						update(name, mId, m.getEntryFileMode());
@@ -779,16 +787,14 @@ public class DirCacheCheckout {
 		}
 		for (String r : removed) {
 			File file = new File(repo.getWorkTree(), r);
-			if (!file.delete())
-				throw new CheckoutConflictException(
-						MessageFormat.format(JGitText.get().cannotDeleteFile,
-								file.getAbsolutePath()));
+			file.delete();
 			removeEmptyParents(file);
 		}
 	}
 
 	private boolean isModified(String path) throws CorruptObjectException, IOException {
 		NameConflictTreeWalk tw = new NameConflictTreeWalk(repo);
+		tw.reset();
 		tw.addTree(new DirCacheIterator(dc));
 		tw.addTree(new FileTreeIterator(repo.getWorkTree(), repo.getFS(),
 				WorkingTreeOptions.createDefaultInstance()));
@@ -801,8 +807,7 @@ public class DirCacheCheckout {
 			wtIt = tw.getTree(1, WorkingTreeIterator.class);
 			if (dcIt == null || wtIt == null)
 				return true;
-			if (wtIt.isModified(dcIt.getDirCacheEntry(), true,
-					config_filemode())) {
+			if (wtIt.isModified(dcIt.getDirCacheEntry(), true, config_filemode(), repo.getFS())) {
 				return true;
 			}
 		}
@@ -831,11 +836,21 @@ public class DirCacheCheckout {
 	public static void checkoutEntry(final Repository repo, File f, DirCacheEntry entry,
 			boolean config_filemode) throws IOException {
 		ObjectLoader ol = repo.open(entry.getObjectId());
+		if (ol == null)
+			throw new MissingObjectException(entry.getObjectId(),
+					Constants.TYPE_BLOB);
+
+		byte[] bytes = ol.getCachedBytes();
+
 		File parentDir = f.getParentFile();
 		File tmpFile = File.createTempFile("._" + f.getName(), null, parentDir);
-		FileOutputStream channel = new FileOutputStream(tmpFile);
+		FileChannel channel = new FileOutputStream(tmpFile).getChannel();
+		ByteBuffer buffer = ByteBuffer.wrap(bytes);
 		try {
-			ol.copyTo(channel);
+			int j = channel.write(buffer);
+			if (j != bytes.length)
+				throw new IOException(MessageFormat.format(
+						JGitText.get().couldNotWriteFile, tmpFile));
 		} finally {
 			channel.close();
 		}
@@ -852,7 +867,7 @@ public class DirCacheCheckout {
 		if (!tmpFile.renameTo(f)) {
 			// tried to rename which failed. Let' delete the target file and try
 			// again
-			FileUtils.delete(f);
+			f.delete();
 			if (!tmpFile.renameTo(f)) {
 				throw new IOException(MessageFormat.format(
 						JGitText.get().couldNotWriteFile, tmpFile.getPath(),

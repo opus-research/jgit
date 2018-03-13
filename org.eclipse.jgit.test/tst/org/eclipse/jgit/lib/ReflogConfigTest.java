@@ -110,9 +110,8 @@ public class ReflogConfigTest extends RepositoryTestCase {
 		commit.setMessage(commitMsg);
 		commit.setTreeId(t.getTreeId());
 		ObjectInserter inserter = db.newObjectInserter();
-		ObjectId id;
 		try {
-			id = inserter.insert(commit);
+			inserter.insert(commit);
 			inserter.flush();
 		} finally {
 			inserter.release();
@@ -120,7 +119,7 @@ public class ReflogConfigTest extends RepositoryTestCase {
 
 		int nl = commitMsg.indexOf('\n');
 		final RefUpdate ru = db.updateRef(Constants.HEAD);
-		ru.setNewObjectId(id);
+		ru.setNewObjectId(commit.getCommitId());
 		ru.setRefLogMessage("commit : "
 				+ ((nl == -1) ? commitMsg : commitMsg.substring(0, nl)), false);
 		ru.forceUpdate();
