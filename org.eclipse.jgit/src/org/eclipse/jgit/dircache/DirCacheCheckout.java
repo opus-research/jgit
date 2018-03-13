@@ -327,7 +327,8 @@ public class DirCacheCheckout {
 						m.getEntryFileMode());
 			} else if (i.getDirCacheEntry() != null) {
 				// The index contains a file (and not a folder)
-				if (f.isModified(i.getDirCacheEntry(), true)
+				if (f.isModified(i.getDirCacheEntry(), true,
+						this.walk.getObjectReader())
 						|| i.getDirCacheEntry().getStage() != 0)
 					// The working tree file is dirty or the index contains a
 					// conflict
@@ -659,7 +660,9 @@ public class DirCacheCheckout {
 				break;
 			case 0xFFD: // 12 13 14
 				if (equalIdAndMode(hId, hMode, iId, iMode))
-					if (f == null || f.isModified(dce, true))
+					if (f == null
+							|| f.isModified(dce, true,
+									this.walk.getObjectReader()))
 						conflict(name, dce, h, m);
 					else
 						remove(name);
@@ -773,7 +776,8 @@ public class DirCacheCheckout {
 						// Nothing in Head
 						// Something in Index
 						if (dce != null
-								&& (f == null || f.isModified(dce, true)))
+								&& (f == null || f.isModified(dce, true,
+										this.walk.getObjectReader())))
 							// No file or file is dirty
 							// Nothing in Merge and current path is part of
 							// File/Folder conflict
@@ -840,7 +844,9 @@ public class DirCacheCheckout {
 						// Something different from a submodule in Index
 						// Nothing in Merge
 						// Something in Head
-						if (f == null || f.isModified(dce, true))
+						if (f == null
+								|| f.isModified(dce, true,
+										this.walk.getObjectReader()))
 							// file is dirty
 							// Index contains the same as Head
 							// Something different from a submodule in Index
@@ -903,7 +909,8 @@ public class DirCacheCheckout {
 						// file content
 						update(name, mId, mMode);
 					} else if (dce != null
-							&& (f == null || f.isModified(dce, true))) {
+							&& (f == null || f.isModified(dce, true,
+									this.walk.getObjectReader()))) {
 						// File doesn't exist or is dirty
 						// Head and Index don't contain a submodule
 						// Head contains the same as Index. Merge differs
@@ -1040,7 +1047,8 @@ public class DirCacheCheckout {
 			wtIt = tw.getTree(1, WorkingTreeIterator.class);
 			if (dcIt == null || wtIt == null)
 				return true;
-			if (wtIt.isModified(dcIt.getDirCacheEntry(), true)) {
+			if (wtIt.isModified(dcIt.getDirCacheEntry(), true,
+					this.walk.getObjectReader())) {
 				return true;
 			}
 		}
@@ -1157,19 +1165,51 @@ public class DirCacheCheckout {
 
 	private static byte[][] forbidden;
 	static {
+		String[] list = getSortedForbiddenFileNames();
+		forbidden = new byte[list.length][];
+		for (int i = 0; i < list.length; ++i)
+			forbidden[i] = Constants.encodeASCII(list[i]);
+	}
+
+	static String[] getSortedForbiddenFileNames() {
 		String[] list = new String[] { "AUX", "COM1", "COM2", "COM3", "COM4", //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$ //$NON-NLS-5$
 				"COM5", "COM6", "COM7", "COM8", "COM9", "CON", "LPT1", "LPT2", //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$ //$NON-NLS-5$ //$NON-NLS-6$ //$NON-NLS-7$ //$NON-NLS-8$
 				"LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9", "NUL", //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$ //$NON-NLS-5$ //$NON-NLS-6$ //$NON-NLS-7$ //$NON-NLS-8$
 				"PRN" }; //$NON-NLS-1$
-		forbidden = new byte[list.length][];
-		for (int i = 0; i < list.length; ++i)
-			forbidden[i] = Constants.encodeASCII(list[i]);
+		return list;
 	}
 
 	private static void checkValidPath(CanonicalTreeParser t)
 			throws InvalidPathException {
 		for (CanonicalTreeParser i = t; i != null; i = i.getParent())
 			checkValidPathSegment(i);
+	}
+
+	/**
+	 * Check if path is a valid path for a checked out file name or ref name.
+	 *
+	 * @param path
+	 * @throws InvalidPathException
+	 *             if the path is invalid
+	 * @since 3.3
+	 */
+	public static void checkValidPath(String path) throws InvalidPathException {
+		boolean isWindows = SystemReader.getInstance().isWindows();
+		boolean isOSX = SystemReader.getInstance().isMacOS();
+		boolean ignCase = isOSX || isWindows;
+
+		byte[] bytes = Constants.encode(path);
+		int segmentStart = 0;
+		for (int i = 0; i < bytes.length; i++) {
+			if (bytes[i] == '/') {
+				checkValidPathSegment(isWindows, ignCase, bytes, segmentStart,
+						i, path);
+				segmentStart = i + 1;
+			}
+		}
+		if (segmentStart < bytes.length)
+			checkValidPathSegment(isWindows, ignCase, bytes, segmentStart,
+					bytes.length, path);
 	}
 
 	private static void checkValidPathSegment(CanonicalTreeParser t)
@@ -1182,33 +1222,38 @@ public class DirCacheCheckout {
 		byte[] raw = t.getEntryPathBuffer();
 		int end = ptr + t.getNameLength();
 
+		checkValidPathSegment(isWindows, ignCase, raw, ptr, end,
+				t.getEntryPathString());
+	}
+
+	private static void checkValidPathSegment(boolean isWindows,
+			boolean ignCase, byte[] raw, int ptr, int end, String path) {
 		// Validate path component at this level of the tree
 		int start = ptr;
 		while (ptr < end) {
 			if (raw[ptr] == '/')
 				throw new InvalidPathException(
-						JGitText.get().invalidPathContainsSeparator,
-						"/", t.getEntryPathString()); //$NON-NLS-1$
+						JGitText.get().invalidPathContainsSeparator, "/", path); //$NON-NLS-1$
 			if (isWindows) {
 				if (raw[ptr] == '\\')
 					throw new InvalidPathException(
 							JGitText.get().invalidPathContainsSeparator,
-							"\\", t.getEntryPathString()); //$NON-NLS-1$
+							"\\", path); //$NON-NLS-1$
 				if (raw[ptr] == ':')
 					throw new InvalidPathException(
 							JGitText.get().invalidPathContainsSeparator,
-							":", t.getEntryPathString()); //$NON-NLS-1$
+							":", path); //$NON-NLS-1$
 			}
 			ptr++;
 		}
 		// '.' and '..' are invalid here
 		if (ptr - start == 1) {
 			if (raw[start] == '.')
-				throw new InvalidPathException(t.getEntryPathString());
+				throw new InvalidPathException(path);
 		} else if (ptr - start == 2) {
 			if (raw[start] == '.')
 				if (raw[start + 1] == '.')
-					throw new InvalidPathException(t.getEntryPathString());
+					throw new InvalidPathException(path);
 		} else if (ptr - start == 4) {
 			// .git (possibly case insensitive) is disallowed
 			if (raw[start] == '.')
@@ -1217,8 +1262,7 @@ public class DirCacheCheckout {
 							|| (ignCase && raw[start + 2] == 'I'))
 						if (raw[start + 3] == 't'
 								|| (ignCase && raw[start + 3] == 'T'))
-							throw new InvalidPathException(
-									t.getEntryPathString());
+							throw new InvalidPathException(path);
 		}
 		if (isWindows) {
 			// Space or period at end of file name is ignored by Windows.
@@ -1227,12 +1271,10 @@ public class DirCacheCheckout {
 			if (ptr > 0) {
 				if (raw[ptr - 1] == '.')
 					throw new InvalidPathException(
-							JGitText.get().invalidPathPeriodAtEndWindows,
-							t.getEntryPathString());
+							JGitText.get().invalidPathPeriodAtEndWindows, path);
 				if (raw[ptr - 1] == ' ')
 					throw new InvalidPathException(
-							JGitText.get().invalidPathSpaceAtEndWindows,
-							t.getEntryPathString());
+							JGitText.get().invalidPathSpaceAtEndWindows, path);
 			}
 
 			int i;
@@ -1254,8 +1296,7 @@ public class DirCacheCheckout {
 						if (k == len)
 							throw new InvalidPathException(
 									JGitText.get().invalidPathReservedOnWindows,
-									RawParseUtils.decode(forbidden[j]), t
-											.getEntryPathString());
+									RawParseUtils.decode(forbidden[j]), path);
 					}
 				}
 			}
