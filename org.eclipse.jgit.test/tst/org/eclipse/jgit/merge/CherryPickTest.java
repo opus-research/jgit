@@ -45,12 +45,11 @@
 package org.eclipse.jgit.merge;
 
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
-import static org.eclipse.jgit.lib.Constants.OBJ_COMMIT;
 
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEntry;
-import org.eclipse.jgit.lib.Commit;
+import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
@@ -131,13 +130,13 @@ public class CherryPickTest extends RepositoryTestCase {
 
 	private ObjectId commit(final ObjectInserter odi, final DirCache treeB,
 			final ObjectId[] parentIds) throws Exception {
-		final Commit c = new Commit(db);
+		final CommitBuilder c = new CommitBuilder();
 		c.setTreeId(treeB.writeTree(odi));
 		c.setAuthor(new PersonIdent("A U Thor", "a.u.thor", 1L, 0));
 		c.setCommitter(c.getAuthor());
 		c.setParentIds(parentIds);
 		c.setMessage("Tree " + c.getTreeId().name());
-		ObjectId id = odi.insert(OBJ_COMMIT, odi.format(c));
+		ObjectId id = odi.insert(c);
 		odi.flush();
 		return id;
 	}
