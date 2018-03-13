@@ -68,7 +68,6 @@ import org.kohsuke.args4j.IllegalAnnotationError;
 import org.kohsuke.args4j.NamedOptionDef;
 import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.OptionDef;
-import org.kohsuke.args4j.OptionHandlerRegistry;
 import org.kohsuke.args4j.spi.OptionHandler;
 import org.kohsuke.args4j.spi.RestOfArgumentsHandler;
 import org.kohsuke.args4j.spi.Setter;
@@ -83,14 +82,13 @@ import org.kohsuke.args4j.spi.Setter;
  */
 public class CmdLineParser extends org.kohsuke.args4j.CmdLineParser {
 	static {
-		OptionHandlerRegistry registry = OptionHandlerRegistry.getRegistry();
-		registry.registerHandler(AbstractTreeIterator.class,
+		registerHandler(AbstractTreeIterator.class,
 				AbstractTreeIteratorHandler.class);
-		registry.registerHandler(ObjectId.class, ObjectIdHandler.class);
-		registry.registerHandler(RefSpec.class, RefSpecHandler.class);
-		registry.registerHandler(RevCommit.class, RevCommitHandler.class);
-		registry.registerHandler(RevTree.class, RevTreeHandler.class);
-		registry.registerHandler(List.class, OptionWithValuesListHandler.class);
+		registerHandler(ObjectId.class, ObjectIdHandler.class);
+		registerHandler(RefSpec.class, RefSpecHandler.class);
+		registerHandler(RevCommit.class, RevCommitHandler.class);
+		registerHandler(RevTree.class, RevTreeHandler.class);
+		registerHandler(List.class, OptionWithValuesListHandler.class);
 	}
 
 	private final Repository db;
@@ -269,8 +267,8 @@ public class CmdLineParser extends org.kohsuke.args4j.CmdLineParser {
 	class MyOptionDef extends OptionDef {
 
 		public MyOptionDef(OptionDef o) {
-			super(o.usage(), o.metaVar(), o.required(), o.help(), o.hidden(),
-					o.handler(), o.isMultiValued());
+			super(o.usage(), o.metaVar(), o.required(), o.handler(), o
+					.isMultiValued());
 		}
 
 		@Override
@@ -302,12 +300,8 @@ public class CmdLineParser extends org.kohsuke.args4j.CmdLineParser {
 
 	}
 
-	/**
-	 * @since 4.6
-	 */
 	@SuppressWarnings("unchecked")
-	@Override
-	public List<OptionHandler> getOptions() {
+	private List<OptionHandler> getOptions() {
 		List<OptionHandler> options = null;
 		try {
 			Field field = org.kohsuke.args4j.CmdLineParser.class
