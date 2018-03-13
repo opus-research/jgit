@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014, Google Inc.
+ * Copyright (C) 2014 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,7 +40,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.gitrepo;
+package org.eclipse.jgit.pgm;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -52,12 +52,12 @@ import java.io.FileReader;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.junit.JGitTestUtil;
-import org.eclipse.jgit.junit.RepositoryTestCase;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
 import org.eclipse.jgit.lib.Repository;
+import org.junit.Before;
 import org.junit.Test;
 
-public class RepoCommandTest extends RepositoryTestCase {
-
+public class RepoTest extends CLIRepositoryTestCase {
 	private Repository defaultDb;
 	private Repository notDefaultDb;
 	private Repository groupADb;
@@ -69,6 +69,8 @@ public class RepoCommandTest extends RepositoryTestCase {
 	private String groupAUri;
 	private String groupBUri;
 
+	@Override
+	@Before
 	public void setUp() throws Exception {
 		super.setUp();
 
@@ -108,30 +110,6 @@ public class RepoCommandTest extends RepositoryTestCase {
 			.append("<default revision=\"master\" remote=\"remote1\" />")
 			.append("<project path=\"foo\" name=\"")
 			.append(defaultUri)
-			.append("\" />")
-			.append("</manifest>");
-		writeTrashFile("manifest.xml", xmlContent.toString());
-		RepoCommand command = new RepoCommand(db);
-		command.setPath(db.getWorkTree().getAbsolutePath() + "/manifest.xml")
-			.setURI(rootUri)
-			.call();
-		File hello = new File(db.getWorkTree(), "foo/hello.txt");
-		assertTrue("submodule was checked out", hello.exists());
-		BufferedReader reader = new BufferedReader(new FileReader(hello));
-		String content = reader.readLine();
-		reader.close();
-		assertEquals("submodule content is as expected.", "world", content);
-	}
-
-	@Test
-	public void testRepoManifestGroups() throws Exception {
-		StringBuilder xmlContent = new StringBuilder();
-		xmlContent.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
-			.append("<manifest>")
-			.append("<remote name=\"remote1\" fetch=\".\" />")
-			.append("<default revision=\"master\" remote=\"remote1\" />")
-			.append("<project path=\"foo\" name=\"")
-			.append(defaultUri)
 			.append("\" groups=\"a,test\" />")
 			.append("<project path=\"bar\" name=\"")
 			.append(notDefaultUri)
@@ -143,38 +121,21 @@ public class RepoCommandTest extends RepositoryTestCase {
 			.append(groupBUri)
 			.append("\" groups=\"b\" />")
 			.append("</manifest>");
+		writeTrashFile("manifest.xml", xmlContent.toString());
+		StringBuilder cmd = new StringBuilder("git repo --base-uri=\"")
+			.append(rootUri)
+			.append("\" --groups=\"all,-a\" \"")
+			.append(db.getWorkTree().getAbsolutePath())
+			.append("/manifest.xml\"");
+		execute(cmd.toString());
 
-		// default should have foo, a & b
-		Repository localDb = createWorkRepository();
-		JGitTestUtil.writeTrashFile(localDb, "manifest.xml", xmlContent.toString());
-		RepoCommand command = new RepoCommand(localDb);
-		command.setPath(localDb.getWorkTree().getAbsolutePath() + "/manifest.xml")
-			.setURI(rootUri)
-			.call();
-		File file = new File(localDb.getWorkTree(), "foo/hello.txt");
-		assertTrue("default has foo", file.exists());
-		file = new File(localDb.getWorkTree(), "bar/world.txt");
-		assertFalse("default doesn't have bar", file.exists());
-		file = new File(localDb.getWorkTree(), "a/a.txt");
-		assertTrue("default has a", file.exists());
-		file = new File(localDb.getWorkTree(), "b/b.txt");
-		assertTrue("default has b", file.exists());
-
-		// all,-a should have bar & b
-		localDb = createWorkRepository();
-		JGitTestUtil.writeTrashFile(localDb, "manifest.xml", xmlContent.toString());
-		command = new RepoCommand(localDb);
-		command.setPath(localDb.getWorkTree().getAbsolutePath() + "/manifest.xml")
-			.setURI(rootUri)
-			.setGroups("all,-a")
-			.call();
-		file = new File(localDb.getWorkTree(), "foo/hello.txt");
+		File file = new File(db.getWorkTree(), "foo/hello.txt");
 		assertFalse("\"all,-a\" doesn't have foo", file.exists());
-		file = new File(localDb.getWorkTree(), "bar/world.txt");
+		file = new File(db.getWorkTree(), "bar/world.txt");
 		assertTrue("\"all,-a\" has bar", file.exists());
-		file = new File(localDb.getWorkTree(), "a/a.txt");
+		file = new File(db.getWorkTree(), "a/a.txt");
 		assertFalse("\"all,-a\" doesn't have a", file.exists());
-		file = new File(localDb.getWorkTree(), "b/b.txt");
+		file = new File(db.getWorkTree(), "b/b.txt");
 		assertTrue("\"all,-a\" has have b", file.exists());
 	}
 
