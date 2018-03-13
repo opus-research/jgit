@@ -49,8 +49,8 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.internal.storage.reftable.ReftableWriter.Stats;
+import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.ReflogEntry;
 
 /**
@@ -220,7 +220,7 @@ public class ReftableCompactor {
 	private void mergeRefs(MergedReftable mr) throws IOException {
 		try (RefCursor rc = mr.allRefs()) {
 			while (rc.next()) {
-				writer.writeRef(rc.getRef());
+				writer.writeRef(rc.getRef(), rc.getUpdateIndex());
 			}
 		}
 	}
