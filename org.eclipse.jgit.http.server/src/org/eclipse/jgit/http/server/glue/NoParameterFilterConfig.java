@@ -63,7 +63,7 @@ final class NoParameterFilterConfig implements FilterConfig {
 		return null;
 	}
 
-	public Enumeration<String> getInitParameterNames() {
+	public Enumeration getInitParameterNames() {
 		return new Enumeration<String>() {
 			public boolean hasMoreElements() {
 				return false;

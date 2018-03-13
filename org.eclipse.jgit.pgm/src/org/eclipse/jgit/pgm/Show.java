@@ -154,14 +154,14 @@ class Show extends TextBuiltin {
 
 	@Option(name = "--no-prefix", usage = "usage_noPrefix")
 	void noPrefix(@SuppressWarnings("unused") boolean on) {
-		diffFmt.setOldPrefix(""); //$NON-NLS-1$
-		diffFmt.setNewPrefix(""); //$NON-NLS-1$
+		diffFmt.setOldPrefix("");
+		diffFmt.setNewPrefix("");
 	}
 
 	// END -- Options shared with Diff
 
 	Show() {
-		fmt = new SimpleDateFormat("EEE MMM dd HH:mm:ss yyyy ZZZZZ", Locale.US); //$NON-NLS-1$
+		fmt = new SimpleDateFormat("EEE MMM dd HH:mm:ss yyyy ZZZZZ", Locale.US);
 	}
 
 	@SuppressWarnings("boxing")
@@ -198,7 +198,7 @@ class Show extends TextBuiltin {
 					break;
 
 				case Constants.OBJ_TREE:
-					outw.print("tree "); //$NON-NLS-1$
+					outw.print("tree ");
 					outw.print(objectName);
 					outw.println();
 					outw.println();
@@ -225,7 +225,7 @@ class Show extends TextBuiltin {
 
 	private void show(RevTag tag) throws IOException {
 		outw.print(CLIText.get().tagLabel);
-		outw.print(" "); //$NON-NLS-1$
+		outw.print(" ");
 		outw.print(tag.getTagName());
 		outw.println();
 
@@ -241,9 +241,9 @@ class Show extends TextBuiltin {
 		}
 
 		outw.println();
-		final String[] lines = tag.getFullMessage().split("\n"); //$NON-NLS-1$
+		final String[] lines = tag.getFullMessage().split("\n");
 		for (final String s : lines) {
-			outw.print("    "); //$NON-NLS-1$
+			outw.print("    ");
 			outw.print(s);
 			outw.println();
 		}
@@ -261,7 +261,7 @@ class Show extends TextBuiltin {
 			outw.print(walk.getPathString());
 			final FileMode mode = walk.getFileMode(0);
 			if (mode == FileMode.TREE)
-				outw.print("/"); //$NON-NLS-1$
+				outw.print("/");
 			outw.println();
 		}
 	}
@@ -270,7 +270,7 @@ class Show extends TextBuiltin {
 		char[] outbuffer = new char[Constants.OBJECT_ID_LENGTH * 2];
 
 		outw.print(CLIText.get().commitLabel);
-		outw.print(" "); //$NON-NLS-1$
+		outw.print(" ");
 		c.getId().copyTo(outbuffer, outw);
 		outw.println();
 
@@ -284,9 +284,9 @@ class Show extends TextBuiltin {
 				fmt.format(author.getWhen())));
 
 		outw.println();
-		final String[] lines = c.getFullMessage().split("\n"); //$NON-NLS-1$
+		final String[] lines = c.getFullMessage().split("\n");
 		for (final String s : lines) {
-			outw.print("    "); //$NON-NLS-1$
+			outw.print("    ");
 			outw.print(s);
 			outw.println();
 		}

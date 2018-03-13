@@ -110,7 +110,7 @@ public class ReflogReaderTest extends SampleDataRepositoryTestCase {
 				e.getComment());
 	}
 
-	private static String iso(PersonIdent id) {
+	private String iso(PersonIdent id) {
 		final SimpleDateFormat fmt;
 		fmt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
 		fmt.setTimeZone(id.getTimeZone());
