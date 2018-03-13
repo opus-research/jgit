@@ -55,6 +55,7 @@ import java.net.URLEncoder;
 import java.text.MessageFormat;
 
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.transport.http.HttpConnection;
 
 /** Extra utilities to support usage of HTTP. */
 public class HttpSupport {

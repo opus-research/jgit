@@ -59,8 +59,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
 
+import org.eclipse.jgit.transport.http.HttpConnection;
 import org.eclipse.jgit.util.Base64;
-import org.eclipse.jgit.util.HttpConnection;
 
 /**
  * Support class to populate user authentication data on a connection.

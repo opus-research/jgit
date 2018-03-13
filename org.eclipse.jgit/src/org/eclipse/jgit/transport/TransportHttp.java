@@ -102,9 +102,7 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.SymbolicRef;
-import org.eclipse.jgit.util.HttpClientConnectionFactory;
-import org.eclipse.jgit.util.HttpConnection;
-import org.eclipse.jgit.util.HttpConnectionFactory;
+import org.eclipse.jgit.transport.http.HttpConnection;
 import org.eclipse.jgit.util.HttpSupport;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
@@ -130,7 +128,6 @@ import org.eclipse.jgit.util.io.UnionInputStream;
  */
 public class TransportHttp extends HttpTransport implements WalkTransport,
 		PackTransport {
-	private static HttpConnectionFactory connFact = new HttpClientConnectionFactory();
 
 	private static final String SVC_UPLOAD_PACK = "git-upload-pack"; //$NON-NLS-1$
 
@@ -517,7 +514,7 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 	protected HttpConnection httpOpen(String method, URL u)
 			throws IOException {
 		final Proxy proxy = HttpSupport.proxyFor(proxySelector, u);
-		HttpConnection conn = connFact.create(u, proxy);
+		HttpConnection conn = connectionFactory.create(u, proxy);
 
 		if (!http.sslVerify && "https".equals(u.getProtocol())) { //$NON-NLS-1$
 			disableSslVerify(conn);
@@ -998,23 +995,5 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 			// always accept
 			return true;
 		}
-	}
-
-	/**
-	 * @return the {@link HttpConnectionFactory} used when new connections are
-	 *         created
-	 */
-	public static HttpConnectionFactory getConnectionFactory() {
-		return connFact;
-	}
-
-	/**
-	 * Set the {@link HttpConnectionFactory} to be used to create new
-	 * connections
-	 *
-	 * @param c
-	 */
-	public static void setConnectionFactory(HttpConnectionFactory c) {
-		connFact = c;
 	}
 }

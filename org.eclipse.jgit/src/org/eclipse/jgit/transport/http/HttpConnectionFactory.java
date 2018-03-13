@@ -40,22 +40,36 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.transport.http;
 
 import java.io.IOException;
 import java.net.Proxy;
 import java.net.URL;
 
 /**
- * A factory returning instances of {@link JDKHttpConnection}
+ * The interface of a factory returning {@link HttpConnection}
  */
-public class JDKHttpConnectionFactory implements HttpConnectionFactory {
-	public HttpConnection create(URL url) throws IOException {
-		return new JDKHttpConnection(url);
-	}
+public interface HttpConnectionFactory {
+	/**
+	 * Creates a new connection to a destination defined by a {@link URL}
+	 *
+	 * @param url
+	 * @return a {@link HttpConnection}
+	 * @throws IOException
+	 */
+	public HttpConnection create(URL url) throws IOException;
 
+	/**
+	 * Creates a new connection to a destination defined by a {@link URL} using
+	 * a proxy
+	 *
+	 * @param url
+	 * @param proxy
+	 *            the proxy to be used
+	 * @return a {@link HttpConnection}
+	 *
+	 * @throws IOException
+	 */
 	public HttpConnection create(URL url, Proxy proxy)
-			throws IOException {
-		return new JDKHttpConnection(url, proxy);
-	}
+			throws IOException;
 }

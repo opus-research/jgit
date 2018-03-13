@@ -52,7 +52,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.eclipse.jgit.util.JDKHttpConnection;
+import org.eclipse.jgit.transport.http.JDKHttpConnection;
 import org.junit.Test;
 
 public class HttpAuthTest {
