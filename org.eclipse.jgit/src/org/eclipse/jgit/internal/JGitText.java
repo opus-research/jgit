@@ -556,7 +556,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String tagAlreadyExists;
 	/***/ public String tagNameInvalid;
 	/***/ public String tagOnRepoWithoutHEADCurrentlyNotSupported;
-	/***/ public String transactionAborted;
 	/***/ public String theFactoryMustNotBeNull;
 	/***/ public String timerAlreadyTerminated;
 	/***/ public String topologicalSortRequired;
@@ -640,7 +639,4 @@ public class JGitText extends TranslationBundle {
 	/***/ public String years0MonthsAgo;
 	/***/ public String yearsAgo;
 	/***/ public String yearsMonthsAgo;
-
-	/***/ public String initFailedBareRepoDifferentDirs;
-	/***/ public String initFailedNonBareRepoSameDirs;
 }
