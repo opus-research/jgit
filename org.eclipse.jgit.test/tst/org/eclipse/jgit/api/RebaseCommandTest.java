@@ -48,7 +48,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
-import org.eclipse.jgit.api.RebaseCommand.Action;
 import org.eclipse.jgit.api.RebaseCommand.Operation;
 import org.eclipse.jgit.api.RebaseResult.Status;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
@@ -851,14 +850,7 @@ public class RebaseCommandTest extends RepositoryTestCase {
 		try {
 			String line = br.readLine();
 			while (line != null) {
-				String actionToken = line.substring(0, line.indexOf(' '));
-				Action action = null;
-				try {
-					action = Action.parse(actionToken);
-				} catch (Exception e) {
-					// ignore
-				}
-				if (action != null)
+				if (line.startsWith("pick "))
 					count++;
 				line = br.readLine();
 			}
