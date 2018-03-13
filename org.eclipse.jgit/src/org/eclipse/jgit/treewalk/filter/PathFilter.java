@@ -74,7 +74,7 @@ public class PathFilter extends TreeFilter {
 	 *             the path supplied was the empty string.
 	 */
 	public static PathFilter create(String path) {
-		while (path.endsWith("/")) //$NON-NLS-1$
+		while (path.endsWith("/"))
 			path = path.substring(0, path.length() - 1);
 		if (path.length() == 0)
 			throw new IllegalArgumentException(JGitText.get().emptyPathNotPermitted);
@@ -113,7 +113,6 @@ public class PathFilter extends TreeFilter {
 		return this;
 	}
 
-	@SuppressWarnings("nls")
 	public String toString() {
 		return "PATH(\"" + pathStr + "\")";
 	}

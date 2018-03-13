@@ -63,7 +63,6 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Set;
 
-import org.eclipse.jgit.api.MergeCommand.FastForwardMode;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.junit.MockSystemReader;
 import org.eclipse.jgit.util.FS;
@@ -288,7 +287,7 @@ public class ConfigTest {
 		assertSame(CoreConfig.AutoCRLF.FALSE, c.getEnum("s", null, "d",
 				CoreConfig.AutoCRLF.FALSE));
 
-		c = parse("[s \"b\"]\n\tc = one-two\n");
+		c = parse("[s \"b\"]\n\tc = one two\n");
 		assertSame(TestEnum.ONE_TWO, c.getEnum("s", "b", "c", TestEnum.ONE_TWO));
 	}
 
@@ -296,81 +295,31 @@ public class ConfigTest {
 	public void testSetEnum() {
 		final Config c = new Config();
 		c.setEnum("s", "b", "c", TestEnum.ONE_TWO);
-		assertEquals("[s \"b\"]\n\tc = one-two\n", c.toText());
+		assertEquals("[s \"b\"]\n\tc = one two\n", c.toText());
+	}
+
+	static enum TestEnumToString {
+		ONE_TWO;
+
+		@Override
+		public String toString() {
+			// --one-two
+			return "--" + name().toLowerCase().replace('_', '-');
+		}
 	}
 
 	@Test
-	public void testGetFastForwardMergeoptions() throws ConfigInvalidException {
-		Config c = new Config(null); // not set
-		assertSame(FastForwardMode.MergeOptions.__FF, c.getEnum(
-				ConfigConstants.CONFIG_BRANCH_SECTION, "side",
-				ConfigConstants.CONFIG_KEY_MERGEOPTIONS,
-				FastForwardMode.MergeOptions.__FF));
-		c = parse("[branch \"side\"]\n\tmergeoptions = --ff-only\n");
-		assertSame(FastForwardMode.MergeOptions.__FF_ONLY, c.getEnum(
-				ConfigConstants.CONFIG_BRANCH_SECTION, "side",
-				ConfigConstants.CONFIG_KEY_MERGEOPTIONS,
-				FastForwardMode.MergeOptions.__FF_ONLY));
-		c = parse("[branch \"side\"]\n\tmergeoptions = --ff\n");
-		assertSame(FastForwardMode.MergeOptions.__FF, c.getEnum(
-				ConfigConstants.CONFIG_BRANCH_SECTION, "side",
-				ConfigConstants.CONFIG_KEY_MERGEOPTIONS,
-				FastForwardMode.MergeOptions.__FF));
-		c = parse("[branch \"side\"]\n\tmergeoptions = --no-ff\n");
-		assertSame(FastForwardMode.MergeOptions.__NO_FF, c.getEnum(
-				ConfigConstants.CONFIG_BRANCH_SECTION, "side",
-				ConfigConstants.CONFIG_KEY_MERGEOPTIONS,
-				FastForwardMode.MergeOptions.__NO_FF));
+	public void testGetEnumToString() throws ConfigInvalidException {
+		Config c = parse("[s \"b\"]\n\tc = --one-two\n");
+		assertSame(TestEnumToString.ONE_TWO,
+				c.getEnum("s", "b", "c", TestEnumToString.ONE_TWO));
 	}
 
 	@Test
-	public void testSetFastForwardMergeoptions() {
+	public void testSetEnumToString() {
 		final Config c = new Config();
-		c.setEnum("branch", "side", "mergeoptions",
-				FastForwardMode.MergeOptions.valueOf(FastForwardMode.FF));
-		assertEquals("[branch \"side\"]\n\tmergeoptions = --ff\n", c.toText());
-		c.setEnum("branch", "side", "mergeoptions",
-				FastForwardMode.MergeOptions.valueOf(FastForwardMode.FF_ONLY));
-		assertEquals("[branch \"side\"]\n\tmergeoptions = --ff-only\n",
-				c.toText());
-		c.setEnum("branch", "side", "mergeoptions",
-				FastForwardMode.MergeOptions.valueOf(FastForwardMode.NO_FF));
-		assertEquals("[branch \"side\"]\n\tmergeoptions = --no-ff\n",
-				c.toText());
-	}
-
-	@Test
-	public void testGetFastForwardMerge() throws ConfigInvalidException {
-		Config c = new Config(null); // not set
-		assertSame(FastForwardMode.Merge.TRUE, c.getEnum(
-				ConfigConstants.CONFIG_KEY_MERGE, null,
-				ConfigConstants.CONFIG_KEY_FF, FastForwardMode.Merge.TRUE));
-		c = parse("[merge]\n\tff = only\n");
-		assertSame(FastForwardMode.Merge.ONLY, c.getEnum(
-				ConfigConstants.CONFIG_KEY_MERGE, null,
-				ConfigConstants.CONFIG_KEY_FF, FastForwardMode.Merge.ONLY));
-		c = parse("[merge]\n\tff = true\n");
-		assertSame(FastForwardMode.Merge.TRUE, c.getEnum(
-				ConfigConstants.CONFIG_KEY_MERGE, null,
-				ConfigConstants.CONFIG_KEY_FF, FastForwardMode.Merge.TRUE));
-		c = parse("[merge]\n\tff = false\n");
-		assertSame(FastForwardMode.Merge.FALSE, c.getEnum(
-				ConfigConstants.CONFIG_KEY_MERGE, null,
-				ConfigConstants.CONFIG_KEY_FF, FastForwardMode.Merge.FALSE));
-	}
-
-	@Test
-	public void testSetFastForwardMerge() {
-		final Config c = new Config();
-		c.setEnum("merge", null, "ff", FastForwardMode.Merge.valueOf(FastForwardMode.FF));
-		assertEquals("[merge]\n\tff = true\n", c.toText());
-		c.setEnum("merge", null, "ff",
-				FastForwardMode.Merge.valueOf(FastForwardMode.FF_ONLY));
-		assertEquals("[merge]\n\tff = only\n",
-				c.toText());
-		c.setEnum("merge", null, "ff",
-				FastForwardMode.Merge.valueOf(FastForwardMode.NO_FF));
-		assertEquals("[merge]\n\tff = false\n", c.toText());
+		c.setEnum("s", "b", "c", TestEnumToString.ONE_TWO);
+		assertEquals("[s \"b\"]\n\tc = --one-two\n", c.toText());
 	}
 
 	@Test
@@ -540,18 +489,17 @@ public class ConfigTest {
 		assertEquals(result, config.toText());
 	}
 
-	private static void assertReadLong(long exp) throws ConfigInvalidException {
+	private void assertReadLong(long exp) throws ConfigInvalidException {
 		assertReadLong(exp, String.valueOf(exp));
 	}
 
-	private static void assertReadLong(long exp, String act)
+	private void assertReadLong(long exp, String act)
 			throws ConfigInvalidException {
 		final Config c = parse("[s]\na = " + act + "\n");
 		assertEquals(exp, c.getLong("s", null, "a", 0L));
 	}
 
-	private static Config parse(final String content)
-			throws ConfigInvalidException {
+	private Config parse(final String content) throws ConfigInvalidException {
 		final Config c = new Config(null);
 		c.fromText(content);
 		return c;

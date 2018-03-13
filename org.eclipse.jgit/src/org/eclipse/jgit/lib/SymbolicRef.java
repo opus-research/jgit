@@ -102,7 +102,6 @@ public class SymbolicRef implements Ref {
 		return getLeaf().isPeeled();
 	}
 
-	@SuppressWarnings("nls")
 	@Override
 	public String toString() {
 		StringBuilder r = new StringBuilder();
