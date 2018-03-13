@@ -42,7 +42,6 @@
  */
 package org.eclipse.jgit.api;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -164,8 +163,6 @@ public class SubmoduleUpdateCommand extends
 					configure(clone);
 					clone.setURI(url);
 					clone.setDirectory(generator.getDirectory());
-					clone.setGitDir(new File(new File(repo.getDirectory(),
-							Constants.MODULES), generator.getPath()));
 					if (monitor != null)
 						clone.setProgressMonitor(monitor);
 					submoduleRepo = clone.call().getRepository();
