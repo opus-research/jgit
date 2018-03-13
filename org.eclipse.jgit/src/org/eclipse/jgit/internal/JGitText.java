@@ -104,7 +104,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotBeRecursiveWhenTreesAreIncluded;
 	/***/ public String cannotChangeActionOnComment;
 	/***/ public String cannotChangeToComment;
-	/***/ public String cannotCheckoutFromUnbornBranch;
 	/***/ public String cannotCheckoutOursSwitchBranch;
 	/***/ public String cannotCombineSquashWithNoff;
 	/***/ public String cannotCombineTreeFilterWithRevFilter;
@@ -147,7 +146,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String cannotReadCommit;
 	/***/ public String cannotReadFile;
 	/***/ public String cannotReadHEAD;
-	/***/ public String cannotReadIndex;
 	/***/ public String cannotReadObject;
 	/***/ public String cannotReadObjectsPath;
 	/***/ public String cannotReadTree;
@@ -412,7 +410,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String invalidURL;
 	/***/ public String invalidWildcards;
 	/***/ public String invalidRefSpec;
-	/***/ public String invalidRepositoryStateNoHead;
 	/***/ public String invalidWindowSize;
 	/***/ public String isAStaticFlagAndHasNorevWalkInstance;
 	/***/ public String JRELacksMD5Implementation;
@@ -512,7 +509,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String packfileIsTruncatedNoParam;
 	/***/ public String packHandleIsStale;
 	/***/ public String packHasUnresolvedDeltas;
-	/***/ public String packInaccessible;
 	/***/ public String packingCancelledDuringObjectsWriting;
 	/***/ public String packObjectCountMismatch;
 	/***/ public String packRefs;
