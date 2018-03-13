@@ -346,7 +346,15 @@ public class ObjectChecker {
 				if (c == '/')
 					throw new CorruptObjectException("name contains '/'");
 			}
-			checkPathSegment(raw, thisNameB, ptr - 1);
+			if (thisNameB + 1 == ptr)
+				throw new CorruptObjectException("zero length name");
+			if (raw[thisNameB] == '.') {
+				final int nameLen = (ptr - 1) - thisNameB;
+				if (nameLen == 1)
+					throw new CorruptObjectException("invalid name '.'");
+				if (nameLen == 2 && raw[thisNameB + 1] == '.')
+					throw new CorruptObjectException("invalid name '..'");
+			}
 			if (duplicateName(raw, thisNameB, ptr - 1))
 				throw new CorruptObjectException("duplicate entry names");
 
@@ -364,19 +372,6 @@ public class ObjectChecker {
 			ptr += Constants.OBJECT_ID_LENGTH;
 			if (ptr > sz)
 				throw new CorruptObjectException("truncated in object id");
-		}
-	}
-
-	private static void checkPathSegment(byte[] raw, int ptr, int end)
-			throws CorruptObjectException {
-		if (ptr == end)
-			throw new CorruptObjectException("zero length name");
-		if (raw[ptr] == '.') {
-			int nameLen = end - ptr;
-			if (nameLen == 1)
-				throw new CorruptObjectException("invalid name '.'");
-			if (nameLen == 2 && raw[ptr + 1] == '.')
-				throw new CorruptObjectException("invalid name '..'");
 		}
 	}
 
