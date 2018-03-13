@@ -69,7 +69,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 
-import org.eclipse.jgit.annotations.NonNull;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -579,7 +578,7 @@ public class GC {
 				ret.add(rest);
 		}
 		if (!txnHeads.isEmpty()) {
-			PackFile txn = writePack(txnHeads, PackWriter.NONE, null, excluded);
+			PackFile txn = writePack(txnHeads, null, null, excluded);
 			if (txn != null)
 				ret.add(txn);
 		}
@@ -699,8 +698,8 @@ public class GC {
 		}
 	}
 
-	private PackFile writePack(@NonNull Set<? extends ObjectId> want,
-			@NonNull Set<? extends ObjectId> have, Set<ObjectId> tagTargets,
+	private PackFile writePack(Set<? extends ObjectId> want,
+			Set<? extends ObjectId> have, Set<ObjectId> tagTargets,
 			List<ObjectIdSet> excludeObjects) throws IOException {
 		File tmpPack = null;
 		Map<PackExt, File> tmpExts = new TreeMap<PackExt, File>(

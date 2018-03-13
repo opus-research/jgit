@@ -278,7 +278,7 @@ public class DfsGarbageCollector {
 
 		try (PackWriter pw = newPackWriter()) {
 			pw.setTagTargets(tagTargets);
-			pw.preparePack(pm, allHeads, PackWriter.NONE);
+			pw.preparePack(pm, allHeads, none());
 			if (0 < pw.getObjectCount())
 				writePack(GC, pw, pm);
 		}
@@ -303,10 +303,14 @@ public class DfsGarbageCollector {
 		try (PackWriter pw = newPackWriter()) {
 			for (ObjectIdSet packedObjs : newPackObj)
 				pw.excludeObjects(packedObjs);
-			pw.preparePack(pm, txnHeads, PackWriter.NONE);
+			pw.preparePack(pm, txnHeads, none());
 			if (0 < pw.getObjectCount())
 				writePack(GC_TXN, pw, pm);
 		}
+	}
+
+	private static Set<ObjectId> none() {
+		return Collections.<ObjectId> emptySet();
 	}
 
 	private void packGarbage(ProgressMonitor pm) throws IOException {
