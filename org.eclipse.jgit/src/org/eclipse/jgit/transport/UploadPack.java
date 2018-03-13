@@ -68,7 +68,6 @@ import org.eclipse.jgit.revwalk.RevFlagSet;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 import org.eclipse.jgit.util.io.InterruptTimer;
 import org.eclipse.jgit.util.io.TimeoutInputStream;
 import org.eclipse.jgit.util.io.TimeoutOutputStream;
@@ -274,7 +273,7 @@ public class UploadPack {
 
 	private void service() throws IOException {
 		if (biDirectionalPipe)
-			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
+			sendAdvertisedRefs();
 		else {
 			refs = db.getAllRefs();
 			for (Ref r : refs.values()) {
@@ -294,16 +293,8 @@ public class UploadPack {
 			sendPack();
 	}
 
-	/**
-	 * Generate an advertisement of available refs and capabilities.
-	 *
-	 * @param adv
-	 *            the advertisement formatter.
-	 * @throws IOException
-	 *             the formatter failed to write an advertisement.
-	 */
-	public void sendAdvertisedRefs(final RefAdvertiser adv) throws IOException {
-		adv.init(walk, ADVERTISED);
+	private void sendAdvertisedRefs() throws IOException {
+		final RefAdvertiser adv = new RefAdvertiser(pckOut, walk, ADVERTISED);
 		adv.advertiseCapability(OPTION_INCLUDE_TAG);
 		adv.advertiseCapability(OPTION_MULTI_ACK);
 		adv.advertiseCapability(OPTION_OFS_DELTA);
@@ -314,7 +305,7 @@ public class UploadPack {
 		adv.setDerefTags(true);
 		refs = db.getAllRefs();
 		adv.send(refs.values());
-		adv.end();
+		pckOut.end();
 	}
 
 	private void recvWants() throws IOException {
