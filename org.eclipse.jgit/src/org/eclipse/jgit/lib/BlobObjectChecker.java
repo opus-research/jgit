@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, IBM Corporation and others.
+ * Copyright (C) 2017, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,38 +40,53 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api.errors;
 
-import java.text.MessageFormat;
-import java.util.List;
+package org.eclipse.jgit.lib;
 
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.patch.FormatError;
+import org.eclipse.jgit.errors.CorruptObjectException;
 
 /**
- * Exception thrown when applying a patch fails due to an invalid format
+ * Verifies that a blob object is a valid object.
+ * <p>
+ * Unlike trees, commits and tags, there's no validity of blobs. Implementers
+ * can optionally implement this blob checker to reject certain blobs.
  *
- * @since 2.0
- *
+ * @since 4.9
  */
-public class PatchFormatException extends GitAPIException {
-	private static final long serialVersionUID = 1L;
+public interface BlobObjectChecker {
+	/** No-op implementation of {@link BlobObjectChecker}. */
+	public static final BlobObjectChecker NULL_CHECKER =
+			new BlobObjectChecker() {
+				@Override
+				public void update(byte[] in, int p, int len) {
+					// Empty implementation.
+				}
 
-	private List<FormatError> errors;
+				@Override
+				public void endBlob(AnyObjectId id) {
+					// Empty implementation.
+				}
+			};
 
 	/**
-	 * @param errors
+	 * Check a new fragment of the blob.
+	 *
+	 * @param in
+	 *            input array of bytes.
+	 * @param offset
+	 *            offset to start at from {@code in}.
+	 * @param len
+	 *            length of the fragment to check.
 	 */
-	public PatchFormatException(List<FormatError> errors) {
-		super(MessageFormat.format(JGitText.get().patchFormatException, errors));
-		this.errors = errors;
-	}
+	void update(byte[] in, int offset, int len);
 
 	/**
-	 * @return all the errors where unresolved conflicts have been detected
+	 * Finalize the blob checking.
+	 *
+	 * @param id
+	 *            identity of the object being checked.
+	 * @throws CorruptObjectException
+	 *             if any error was detected.
 	 */
-	public List<FormatError> getErrors() {
-		return errors;
-	}
-
+	void endBlob(AnyObjectId id) throws CorruptObjectException;
 }
