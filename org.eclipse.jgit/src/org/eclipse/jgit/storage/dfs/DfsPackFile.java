@@ -45,10 +45,9 @@
 
 package org.eclipse.jgit.storage.dfs;
 
-import static org.eclipse.jgit.storage.dfs.DfsObjDatabase.PackSource.UNREACHABLE_GARBAGE;
 import static org.eclipse.jgit.storage.pack.PackExt.BITMAP_INDEX;
-import static org.eclipse.jgit.storage.pack.PackExt.INDEX;
 import static org.eclipse.jgit.storage.pack.PackExt.PACK;
+import static org.eclipse.jgit.storage.pack.PackExt.INDEX;
 
 import java.io.BufferedInputStream;
 import java.io.EOFException;
@@ -277,12 +276,8 @@ public final class DfsPackFile {
 		}
 	}
 
-	final boolean isGarbage() {
-		return packDesc.getPackSource() == UNREACHABLE_GARBAGE;
-	}
-
 	PackBitmapIndex getBitmapIndex(DfsReader ctx) throws IOException {
-		if (invalid || isGarbage())
+		if (invalid)
 			return null;
 		DfsBlockCache.Ref<PackBitmapIndex> idxref = bitmapIndex;
 		if (idxref != null) {
