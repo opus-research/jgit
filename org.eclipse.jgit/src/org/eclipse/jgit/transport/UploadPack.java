@@ -90,8 +90,6 @@ import org.eclipse.jgit.util.io.TimeoutOutputStream;
  * Implements the server side of a fetch connection, transmitting objects.
  */
 public class UploadPack {
-	static final String OPTION_ALLOW_TIP_SHA1_IN_WANT = BasePackFetchConnection.OPTION_ALLOW_TIP_SHA1_IN_WANT;
-
 	static final String OPTION_INCLUDE_TAG = BasePackFetchConnection.OPTION_INCLUDE_TAG;
 
 	static final String OPTION_MULTI_ACK = BasePackFetchConnection.OPTION_MULTI_ACK;
@@ -124,8 +122,8 @@ public class UploadPack {
 		REACHABLE_COMMIT,
 
 		/**
-		 * Client may ask for objects that are the tip of any reference, even if not
-		 * advertised.
+		 * Client may ask for objects that are the tip of some reference, even if
+		 * that reference wasn't advertised.
 		 * <p>
 		 * This may happen, for example, when a custom {@link RefFilter} is set.
 		 */
@@ -724,9 +722,6 @@ public class UploadPack {
 		adv.advertiseCapability(OPTION_SHALLOW);
 		if (!biDirectionalPipe)
 			adv.advertiseCapability(OPTION_NO_DONE);
-		if (requestPolicy == RequestPolicy.TIP
-				|| requestPolicy == RequestPolicy.REACHABLE_COMMIT_TIP)
-			adv.advertiseCapability(OPTION_ALLOW_TIP_SHA1_IN_WANT);
 		adv.setDerefTags(true);
 		advertised = adv.send(getAdvertisedOrDefaultRefs());
 		adv.end();
@@ -853,10 +848,10 @@ public class UploadPack {
 	private ObjectId processHaveLines(List<ObjectId> peerHas, ObjectId last)
 			throws IOException {
 		preUploadHook.onBeginNegotiateRound(this, wantIds, peerHas.size());
-		if (peerHas.isEmpty())
-			return last;
 		if (wantAll.isEmpty() && !wantIds.isEmpty())
 			parseWants();
+		if (peerHas.isEmpty())
+			return last;
 
 		sentReady = false;
 		int haveCnt = 0;
