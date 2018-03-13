@@ -169,7 +169,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String couldNotLockHEAD;
 	/***/ public String couldNotReadIndexInOneGo;
 	/***/ public String couldNotRenameDeleteOldIndex;
-	/***/ public String couldNotRenameTemporaryFile;
 	/***/ public String couldNotRenameTemporaryIndexFileToIndex;
 	/***/ public String couldNotURLEncodeToUTF8;
 	/***/ public String couldNotWriteFile;
@@ -181,7 +180,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String dirCacheDoesNotHaveABackingFile;
 	/***/ public String dirCacheFileIsNotLocked;
 	/***/ public String dirCacheIsNotLocked;
-	/***/ public String dirtyFilesExist;
 	/***/ public String doesNotHandleMode;
 	/***/ public String downloadCancelled;
 	/***/ public String downloadCancelledDuringIndexing;
@@ -189,7 +187,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String duplicateRef;
 	/***/ public String duplicateRemoteRefUpdateIsIllegal;
 	/***/ public String duplicateStagesNotAllowed;
-	/***/ public String eitherGIT_DIRorGIT_WORK_TREEmustBePassed;
+	/***/ public String eitherGitDirOrWorkTreeRequired;
 	/***/ public String emptyPathNotPermitted;
 	/***/ public String encryptionError;
 	/***/ public String endOfFileInEscape;
@@ -242,7 +240,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String indexFileIsInUse;
 	/***/ public String indexFileIsTooLargeForJgit;
 	/***/ public String indexSignatureIsInvalid;
-	/***/ public String indexWriteException;
 	/***/ public String integerValueOutOfRange;
 	/***/ public String internalRevisionError;
 	/***/ public String interruptedWriting;
@@ -287,6 +284,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String mergeStrategyDoesNotSupportHeads;
 	/***/ public String mergeUsingStrategyResultedInDescription;
 	/***/ public String missingAccesskey;
+	/***/ public String missingDeltaBase;
 	/***/ public String missingForwardImageInGITBinaryPatch;
 	/***/ public String missingObject;
 	/***/ public String missingPrerequisiteCommits;
@@ -363,9 +361,12 @@ public class JGitText extends TranslationBundle {
 	/***/ public String remoteHungUpUnexpectedly;
 	/***/ public String remoteNameCantBeNull;
 	/***/ public String renamesAlreadyFound;
+	/***/ public String renamesBreakingModifies;
 	/***/ public String renamesFindingByContent;
 	/***/ public String renamesFindingExact;
+	/***/ public String renamesRejoiningModifies;
 	/***/ public String repositoryAlreadyExists;
+	/***/ public String repositoryConfigFileInvalid;
 	/***/ public String repositoryIsRequired;
 	/***/ public String repositoryNotFound;
 	/***/ public String repositoryState_applyMailbox;
@@ -393,6 +394,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String staleRevFlagsOn;
 	/***/ public String startingReadStageWithoutWrittenRequestDataPendingIsNotSupported;
 	/***/ public String statelessRPCRequiresOptionToBeEnabled;
+	/***/ public String submodulesNotSupported;
 	/***/ public String symlinkCannotBeWrittenAsTheLinkTarget;
 	/***/ public String tSizeMustBeGreaterOrEqual1;
 	/***/ public String theFactoryMustNotBeNull;

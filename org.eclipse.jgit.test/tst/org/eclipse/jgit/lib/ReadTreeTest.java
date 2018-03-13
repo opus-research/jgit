@@ -45,16 +45,12 @@
  */
 package org.eclipse.jgit.lib;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 import org.eclipse.jgit.errors.CheckoutConflictException;
 import org.eclipse.jgit.errors.CorruptObjectException;
@@ -70,8 +66,9 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 	// Rule 0 is left out for obvious reasons :)
 	public void testRules1thru3_NoIndexEntry() throws IOException {
 		Tree head = new Tree(db);
-		head = buildTree(mk("foo"));
-		ObjectId objectId = head.findBlobMember("foo").getId();
+		FileTreeEntry headFile = head.addFile("foo");
+		ObjectId objectId = ObjectId.fromString("ba78e065e2c261d4f7b8f42107588051e87e18e9");
+		headFile.setId(objectId);
 		Tree merge = new Tree(db);
 
 		prescanTwoTrees(head, merge);
@@ -82,8 +79,8 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 
 		assertEquals(objectId, getUpdated().get("foo"));
 
-		merge = buildTree(mkmap("foo", "a"));
-		ObjectId anotherId = merge.findBlobMember("foo").getId();
+		ObjectId anotherId = ObjectId.fromString("ba78e065e2c261d4f7b8f42107588051e87e18ee");
+		merge.addFile("foo").setId(anotherId);
 
 		prescanTwoTrees(head, merge);
 
@@ -132,13 +129,15 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 	}
 
 	ObjectId genSha1(String data) {
-		InputStream is = new ByteArrayInputStream(data.getBytes());
-		ObjectWriter objectWriter = new ObjectWriter(db);
+		ObjectInserter w = db.newObjectInserter();
 		try {
-			return objectWriter.writeObject(Constants.OBJ_BLOB, data
-					.getBytes().length, is, true);
+			ObjectId id = w.insert(Constants.OBJ_BLOB, data.getBytes());
+			w.flush();
+			return id;
 		} catch (IOException e) {
 			fail(e.toString());
+		} finally {
+			w.release();
 		}
 		return null;
 	}
@@ -360,15 +359,8 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		writeTrashFile("DF/DF/DF/DF/DF", "diff");
 		go();
 		assertConflict("DF/DF/DF/DF/DF");
+		assertUpdated("DF/DF");
 
-		// assertUpdated("DF/DF");
-								// Why do we expect an update on DF/DF. H==M,
-								// H&M are files and index contains a dir, index
-								// is dirty: that case is not in the table but
-								// we cannot update DF/DF to a file, this would
-								// require that we delete DF/DF/DF/DF/DF in workdir
-								// throwing away unsaved contents.
-								// This test would fail in DirCacheCheckoutTests.
 	}
 
 	// 8 ?
@@ -384,7 +376,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		// 10
 		cleanUpDF();
 		doit(mk("DF"), mk("DF/DF"), mk("DF/DF"));
-		// TODO Check this failing test
 		assertNoConflicts();
 
 	}
@@ -424,23 +415,14 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 	public void testDirectoryFileConflicts_15() throws Exception {
 		// 15
 		doit(mkmap(), mk("DF/DF"), mk("DF"));
-
-		// This test would fail in DirCacheCheckoutTests. I think this test is wrong,
-		// it should check for conflicts according to rule 15
-		// assertRemoved("DF");
-
+		assertRemoved("DF");
 		assertUpdated("DF/DF");
 	}
 
 	public void testDirectoryFileConflicts_15b() throws Exception {
 		// 15, take 2, just to check multi-leveled
 		doit(mkmap(), mk("DF/DF/DF/DF"), mk("DF"));
-
-		// I think this test is wrong, it should
-		// check for conflicts according to rule 15
-		// This test would fail in DirCacheCheckouts
-		// assertRemoved("DF");
-
+		assertRemoved("DF");
 		assertUpdated("DF/DF/DF/DF");
 	}
 
@@ -459,12 +441,7 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		writeTrashFile("DF/DF/DF", "asdf");
 		go();
 		assertConflict("DF/DF/DF");
-
-		// Why do we expect an update on DF. If we really update
-		// DF and update also the working tree we would have to
-		// overwrite a dirty file in the work-tree DF/DF/DF
-		// This test would fail in DirCacheCheckout
-		// assertUpdated("DF");
+		assertUpdated("DF");
 	}
 
 	public void testDirectoryFileConflicts_18() throws Exception {
@@ -479,37 +456,33 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		// 19
 		cleanUpDF();
 		doit(mk("DF/DF/DF/DF"), mk("DF/DF/DF"), null);
-
-		// I think this test is wrong, it should
-		// check for conflicts according to rule 19.
-		// This test would fail in DirCacheCheckout
-		// assertRemoved("DF/DF/DF/DF");
-		// assertUpdated("DF/DF/DF");
+		assertRemoved("DF/DF/DF/DF");
+		assertUpdated("DF/DF/DF");
 	}
 
-	protected void cleanUpDF() throws Exception {
+	private void cleanUpDF() throws Exception {
 		tearDown();
 		setUp();
 		recursiveDelete(new File(trash, "DF"));
 	}
 
-	protected void assertConflict(String s) {
+	private void assertConflict(String s) {
 		assertTrue(getConflicts().contains(s));
 	}
 
-	protected void assertUpdated(String s) {
+	private void assertUpdated(String s) {
 		assertTrue(getUpdated().containsKey(s));
 	}
 
-	protected void assertRemoved(String s) {
+	private void assertRemoved(String s) {
 		assertTrue(getRemoved().contains(s));
 	}
 
-	protected void assertNoConflicts() {
+	private void assertNoConflicts() {
 		assertTrue(getConflicts().isEmpty());
 	}
 
-	protected void doit(HashMap<String, String> h, HashMap<String, String> m,
+	private void doit(HashMap<String, String> h, HashMap<String, String> m,
 			HashMap<String, String> i) throws IOException {
 		setupCase(h, m, i);
 		go();
@@ -536,12 +509,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		writeTrashFile("foo", "foo");
 		go();
 
-		// Why shouldn't we check for conflicts here?
-		// H and M are emtpy and according to rule #5 of
-		// the carry-over rules a dirty index is no reason
-		// for a conflict. (I also feel it should be a
-		// conflict because we are going to overwrite
-		// unsaved content in the working tree
 		assertConflict("foo");
 
 		recursiveDelete(new File(trash, "foo"));
@@ -583,23 +550,6 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 		assertIndex(mkmap("a/a", "a/a", "a.a/a.a", "a.a/a.a"));
 		assertWorkDir(mkmap("a/a", "a/a", "a.a/a.a", "a.a/a.a"));
 		assertNoConflicts();
-	}
-
-	public void testCheckoutHierarchy() throws IOException {
-		setupCase(
-				mkmap("a", "a", "b/c", "b/c", "d", "d", "e/f", "e/f", "e/g",
-						"e/g"),
-				mkmap("a", "a2", "b/c", "b/c", "d", "d", "e/f", "e/f", "e/g",
-						"e/g2"),
-				mkmap("a", "a", "b/c", "b/c", "d", "d", "e/f", "e/f", "e/g",
-						"e/g3"));
-		try {
-			checkout();
-		} catch (CheckoutConflictException e) {
-			assertWorkDir(mkmap("a", "a", "b/c", "b/c", "d", "d", "e/f",
-					"e/f", "e/g", "e/g3"));
-			assertConflict("e/g");
-		}
 	}
 
 	public void testCheckoutOutChanges() throws IOException {
@@ -673,7 +623,7 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 			expectedValue = i.get(path);
 			assertNotNull("found unexpected file for path "
 					+ path + " in workdir", expectedValue);
-			File file = new File(db.getWorkDir(), path);
+			File file = new File(db.getWorkTree(), path);
 			assertTrue(file.exists());
 			if (file.isFile()) {
 				FileInputStream is = new FileInputStream(file);
@@ -711,14 +661,14 @@ public abstract class ReadTreeTest extends RepositoryTestCase {
 			assertTrue("unexpected content for path " + path
 					+ " in index. Expected: <" + expectedValue + ">",
 					Arrays.equals(
-							db.openBlob(theIndex.getMembers()[j].getObjectId())
-									.getBytes(), i.get(path).getBytes()));
+							db.open(theIndex.getMembers()[j].getObjectId())
+									.getCachedBytes(), i.get(path).getBytes()));
 		}
 	}
 
 	public abstract void prescanTwoTrees(Tree head, Tree merge) throws IllegalStateException, IOException;
 	public abstract void checkout() throws IOException;
-	public abstract List<String> getRemoved();
-	public abstract Map<String, ObjectId> getUpdated();
-	public abstract List<String> getConflicts();
+	public abstract ArrayList<String> getRemoved();
+	public abstract HashMap<String, ObjectId> getUpdated();
+	public abstract ArrayList<String> getConflicts();
 }

@@ -50,7 +50,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.TimeZone;
 
-import org.eclipse.jgit.lib.FileBasedConfig;
+import org.eclipse.jgit.storage.file.FileBasedConfig;
 
 /**
  * Interface to read values from the system.
@@ -74,7 +74,7 @@ public abstract class SystemReader {
 
 		public FileBasedConfig openUserConfig(FS fs) {
 			final File home = fs.userHome();
-			return new FileBasedConfig(new File(home, ".gitconfig"));
+			return new FileBasedConfig(new File(home, ".gitconfig"), fs);
 		}
 
 		public String getHostname() {

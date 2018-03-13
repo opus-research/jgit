@@ -46,6 +46,7 @@ package org.eclipse.jgit.treewalk;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.lib.FileMode;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 
 /**
@@ -86,7 +87,7 @@ public class NameConflictTreeWalk extends TreeWalk {
 
 	private boolean fastMinHasMatch;
 
-	private String dfConflictPath;
+	private AbstractTreeIterator dfConflict;
 
 	/**
 	 * Create a new tree walker for a given repository.
@@ -95,7 +96,17 @@ public class NameConflictTreeWalk extends TreeWalk {
 	 *            the repository the walker will obtain data from.
 	 */
 	public NameConflictTreeWalk(final Repository repo) {
-		super(repo);
+		this(repo.newObjectReader());
+	}
+
+	/**
+	 * Create a new tree walker for a given repository.
+	 *
+	 * @param or
+	 *            the reader the walker will obtain tree data from.
+	 */
+	public NameConflictTreeWalk(final ObjectReader or) {
+		super(or);
 	}
 
 	@Override
@@ -132,6 +143,7 @@ public class NameConflictTreeWalk extends TreeWalk {
 		if (minRef.eof())
 			return minRef;
 
+		boolean hasConflict = false;
 		minRef.matches = minRef;
 		while (++i < trees.length) {
 			final AbstractTreeIterator t = trees[i];
@@ -147,6 +159,7 @@ public class NameConflictTreeWalk extends TreeWalk {
 					// tree anyway.
 					//
 					t.matches = minRef;
+					hasConflict = true;
 				} else {
 					fastMinHasMatch = false;
 					t.matches = t;
@@ -173,14 +186,13 @@ public class NameConflictTreeWalk extends TreeWalk {
 				}
 				t.matches = t;
 				minRef = t;
-				// remember where D/F conflicts started
-				if (dfConflictPath == null)
-					dfConflictPath = t.getEntryPathString()+"/";
-
+				hasConflict = true;
 			} else
 				fastMinHasMatch = false;
 		}
 
+		if (hasConflict && fastMinHasMatch && dfConflict == null)
+			dfConflict = minRef;
 		return minRef;
 	}
 
@@ -277,9 +289,8 @@ public class NameConflictTreeWalk extends TreeWalk {
 				if (t.matches == minRef)
 					t.matches = treeMatch;
 
-			// remember where D/F conflicts started
-			if (dfConflictPath == null)
-				dfConflictPath = treeMatch.getEntryPathString()+"/";
+			if (dfConflict == null)
+				dfConflict = treeMatch;
 
 			return treeMatch;
 		}
@@ -302,6 +313,9 @@ public class NameConflictTreeWalk extends TreeWalk {
 				t.matches = null;
 			}
 		}
+
+		if (ch == dfConflict)
+			dfConflict = null;
 	}
 
 	@Override
@@ -319,27 +333,26 @@ public class NameConflictTreeWalk extends TreeWalk {
 				t.matches = null;
 			}
 		}
+
+		if (ch == dfConflict)
+			dfConflict = null;
 	}
 
 	/**
-	 * Tells whether the current entry is covered by a directory/file conflict.
-	 * This means that for some of the prefix-pathes of the current entry this
-	 * walk has detected a directory/file conflict.
-	 * <p>
+	 * True if the current entry is covered by a directory/file conflict.
+	 *
+	 * This means that for some prefix of the current entry's path, this walk
+	 * has detected a directory/file conflict. Also true if the current entry
+	 * itself is a directory/file conflict.
+	 *
 	 * Example: If this TreeWalk points to foo/bar/a.txt and this method returns
-	 * true then you know that either for path foo or for path foo/bar files AND
-	 * folders and been detected.
+	 * true then you know that either for path foo or for path foo/bar files and
+	 * folders were detected.
 	 *
 	 * @return <code>true</code> if the current entry is covered by a
 	 *         directory/file conflict, <code>false</code> otherwise
-	 *
 	 */
 	public boolean isDirectoryFileConflict() {
-		if (dfConflictPath != null) {
-			if ((currentHead.getEntryPathString()+"/").startsWith(dfConflictPath))
-				return true;
-			dfConflictPath = null;
-		}
-		return false;
+		return dfConflict != null;
 	}
 }
