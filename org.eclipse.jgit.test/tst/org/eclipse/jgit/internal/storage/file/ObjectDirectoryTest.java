@@ -62,18 +62,18 @@ public class ObjectDirectoryTest extends RepositoryTestCase {
 			throws Exception {
 		ExecutorService e = Executors.newCachedThreadPool();
 		for (int i=0; i < 100; ++i) {
-			ObjectDirectory dir = createBareRepository().getObjectDatabase();
-			for (Future f : e.invokeAll(blobInsertersForTheSameFanOutDir(dir))) {
+			ObjectDirectory db = createBareRepository().getObjectDatabase();
+			for (Future f : e.invokeAll(blobInsertersForTheSameFanOutDir(db))) {
 				f.get();
 			}
 		}
 	}
 
 	private Collection<Callable<ObjectId>> blobInsertersForTheSameFanOutDir(
-			final ObjectDirectory dir) {
+			final ObjectDirectory db) {
 		Callable<ObjectId> callable = new Callable<ObjectId>() {
 			public ObjectId call() throws Exception {
-				return dir.newInserter().insert(Constants.OBJ_BLOB, new byte[0]);
+				return db.newInserter().insert(Constants.OBJ_BLOB, new byte[0]);
 			}
 		};
 		return Collections.nCopies(4, callable);
