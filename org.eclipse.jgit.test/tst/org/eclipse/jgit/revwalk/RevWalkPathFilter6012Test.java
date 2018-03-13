@@ -69,7 +69,6 @@ public class RevWalkPathFilter6012Test extends RevWalkTestCase {
 
 	private HashMap<RevCommit, String> byName;
 
-	@Override
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();

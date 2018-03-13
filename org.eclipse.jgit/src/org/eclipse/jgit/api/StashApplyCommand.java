@@ -157,7 +157,6 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 	 * @throws NoHeadException
 	 * @throws StashApplyFailureException
 	 */
-	@Override
 	public ObjectId call() throws GitAPIException,
 			WrongRepositoryStateException, NoHeadException,
 			StashApplyFailureException {

@@ -156,7 +156,6 @@ public class CLIGitCommand extends Main {
 		return new PrintWriter(result.err);
 	}
 
-	@Override
 	void init(final TextBuiltin cmd) throws IOException {
 		cmd.outs = result.out;
 		cmd.errs = result.err;

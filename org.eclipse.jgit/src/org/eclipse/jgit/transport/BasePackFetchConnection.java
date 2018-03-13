@@ -280,7 +280,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 
 	private static class FetchConfig {
 		static final SectionParser<FetchConfig> KEY = new SectionParser<FetchConfig>() {
-			@Override
 			public FetchConfig parse(final Config cfg) {
 				return new FetchConfig(cfg);
 			}
@@ -293,7 +292,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		}
 	}
 
-	@Override
 	public final void fetch(final ProgressMonitor monitor,
 			final Collection<Ref> want, final Set<ObjectId> have)
 			throws TransportException {
@@ -303,7 +301,6 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 	/**
 	 * @since 3.0
 	 */
-	@Override
 	public final void fetch(final ProgressMonitor monitor,
 			final Collection<Ref> want, final Set<ObjectId> have,
 			OutputStream outputStream) throws TransportException {
@@ -311,22 +308,18 @@ public abstract class BasePackFetchConnection extends BasePackConnection
 		doFetch(monitor, want, have, outputStream);
 	}
 
-	@Override
 	public boolean didFetchIncludeTags() {
 		return false;
 	}
 
-	@Override
 	public boolean didFetchTestConnectivity() {
 		return false;
 	}
 
-	@Override
 	public void setPackLockMessage(final String message) {
 		lockMessage = message;
 	}
 
-	@Override
 	public Collection<PackLock> getPackLocks() {
 		if (packLock != null)
 			return Collections.singleton(packLock);

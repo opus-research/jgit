@@ -293,7 +293,6 @@ public class DfsPackCompactor {
 		// older packs, allowing the PackWriter to be handed newer objects
 		// first and older objects last.
 		Collections.sort(srcPacks, new Comparator<DfsPackFile>() {
-			@Override
 			public int compare(DfsPackFile a, DfsPackFile b) {
 				return a.getPackDescription().compareTo(b.getPackDescription());
 			}
@@ -359,7 +358,6 @@ public class DfsPackCompactor {
 			want.add(new ObjectIdWithOffset(id, ent.getOffset()));
 		}
 		Collections.sort(want, new Comparator<ObjectIdWithOffset>() {
-			@Override
 			public int compare(ObjectIdWithOffset a, ObjectIdWithOffset b) {
 				return Long.signum(a.offset - b.offset);
 			}

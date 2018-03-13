@@ -91,7 +91,6 @@ public class FileResolver<C> implements RepositoryResolver<C> {
 		setExportAll(exportAll);
 	}
 
-	@Override
 	public Repository open(final C req, final String name)
 			throws RepositoryNotFoundException, ServiceNotEnabledException {
 		if (isUnreasonableName(name))

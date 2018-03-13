@@ -170,14 +170,12 @@ public class PackWriter implements AutoCloseable {
 			new ConcurrentHashMap<WeakReference<PackWriter>, Boolean>();
 
 	private static final Iterable<PackWriter> instancesIterable = new Iterable<PackWriter>() {
-		@Override
 		public Iterator<PackWriter> iterator() {
 			return new Iterator<PackWriter>() {
 				private final Iterator<WeakReference<PackWriter>> it =
 						instances.keySet().iterator();
 				private PackWriter next;
 
-				@Override
 				public boolean hasNext() {
 					if (next != null)
 						return true;
@@ -191,7 +189,6 @@ public class PackWriter implements AutoCloseable {
 					return false;
 				}
 
-				@Override
 				public PackWriter next() {
 					if (hasNext()) {
 						PackWriter result = next;
@@ -201,7 +198,6 @@ public class PackWriter implements AutoCloseable {
 					throw new NoSuchElementException();
 				}
 
-				@Override
 				public void remove() {
 					throw new UnsupportedOperationException();
 				}
@@ -1258,7 +1254,6 @@ public class PackWriter implements AutoCloseable {
 		// bigger ones, because source files grow and hardly ever shrink.
 		//
 		Arrays.sort(list, 0, cnt, new Comparator<ObjectToPack>() {
-			@Override
 			public int compare(ObjectToPack a, ObjectToPack b) {
 				int cmp = (a.isDoNotDelta() ? 1 : 0)
 						- (b.isDoNotDelta() ? 1 : 0);
@@ -1404,7 +1399,6 @@ public class PackWriter implements AutoCloseable {
 			// can schedule these for us.
 			for (final DeltaTask task : taskBlock.tasks) {
 				executor.execute(new Runnable() {
-					@Override
 					public void run() {
 						try {
 							task.call();

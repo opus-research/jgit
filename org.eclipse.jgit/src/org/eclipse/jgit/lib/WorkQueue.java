@@ -67,7 +67,6 @@ class WorkQueue {
 					private final ThreadFactory baseFactory = Executors
 							.defaultThreadFactory();
 
-					@Override
 					public Thread newThread(Runnable taskBody) {
 						Thread thr = baseFactory.newThread(taskBody);
 						thr.setName("JGit-WorkQueue"); //$NON-NLS-1$
