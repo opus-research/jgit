@@ -47,12 +47,14 @@ import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.text.MessageFormat;
 
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarConstants;
 import org.eclipse.jgit.api.ArchiveCommand;
+import org.eclipse.jgit.archive.internal.ArchiveText;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectLoader;
 
@@ -73,7 +75,7 @@ public class TarFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
 	public void putEntry(ArchiveOutputStream out,
 			String path, FileMode mode, ObjectLoader loader)
 			throws IOException {
-		if (FileMode.SYMLINK.equals(mode)) {
+		if (mode == FileMode.SYMLINK) {
 			final TarArchiveEntry entry = new TarArchiveEntry(
 					path, TarConstants.LF_SYMLINK);
 			entry.setLinkName(new String(
@@ -85,28 +87,27 @@ public class TarFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
 
 		// TarArchiveEntry detects directories by checking
 		// for '/' at the end of the filename.
-		if (path.endsWith("/") != FileMode.TREE.equals(mode)) {
-			throw new IllegalArgumentException(
-					"TarFormat.putEntry: path " //$NON-NLS-1$
-					+ path + " does not match mode " //$NON-NLS-1$
-					+ mode);
-		}
+		if (path.endsWith("/") && mode != FileMode.TREE)
+			throw new IllegalArgumentException(MessageFormat.format(
+					ArchiveText.get().pathDoesNotMatchMode, path, mode));
+		if (!path.endsWith("/") && mode == FileMode.TREE)
+			path = path + "/";
+
 		final TarArchiveEntry entry = new TarArchiveEntry(path);
-		if (FileMode.TREE.equals(mode)) {
+		if (mode == FileMode.TREE) {
 			out.putArchiveEntry(entry);
 			out.closeArchiveEntry();
 			return;
 		}
 
-		if (FileMode.REGULAR_FILE.equals(mode)) {
+		if (mode == FileMode.REGULAR_FILE) {
 			// ok
-		} else if (FileMode.EXECUTABLE_FILE.equals(mode)) {
+		} else if (mode == FileMode.EXECUTABLE_FILE) {
 			entry.setMode(mode.getBits());
 		} else {
 			// Unsupported mode (e.g., GITLINK).
-			throw new IllegalArgumentException(
-					"TarFormat.putEntry: Unsupported mode " //$NON-NLS-1$
-					+ mode);
+			throw new IllegalArgumentException(MessageFormat.format(
+					ArchiveText.get().unsupportedMode, mode));
 		}
 		entry.setSize(loader.getSize());
 		out.putArchiveEntry(entry);
