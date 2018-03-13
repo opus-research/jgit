@@ -57,13 +57,13 @@ public abstract class HttpTransport extends Transport {
 	/**
 	 * factory for creating HTTP connections
 	 *
-	 * @since 3.2
+	 * @since 3.3
 	 */
 	protected static HttpConnectionFactory connectionFactory = new JDKHttpConnectionFactory();
 
 	/**
 	 * @return the {@link HttpConnectionFactory} used to create new connections
-	 * @since 3.2
+	 * @since 3.3
 	 */
 	public static HttpConnectionFactory getConnectionFactory() {
 		return connectionFactory;
@@ -74,7 +74,7 @@ public abstract class HttpTransport extends Transport {
 	 * connections
 	 *
 	 * @param cf
-	 * @since 3.2
+	 * @since 3.3
 	 */
 	public static void setConnectionFactory(HttpConnectionFactory cf) {
 		connectionFactory = cf;

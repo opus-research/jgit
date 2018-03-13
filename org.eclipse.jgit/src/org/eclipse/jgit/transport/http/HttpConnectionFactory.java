@@ -49,7 +49,7 @@ import java.net.URL;
 /**
  * The interface of a factory returning {@link HttpConnection}
  *
- * @since 3.2
+ * @since 3.3
  */
 public interface HttpConnectionFactory {
 	/**

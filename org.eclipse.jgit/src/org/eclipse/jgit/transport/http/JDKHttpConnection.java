@@ -66,7 +66,7 @@ import javax.net.ssl.TrustManager;
  * A {@link HttpConnection} which simply delegates every call to a
  * {@link HttpURLConnection}. This is the default implementation used by JGit
  *
- * @since 3.2
+ * @since 3.3
  */
 public class JDKHttpConnection implements HttpConnection {
 	HttpURLConnection wrappedUrlConnection;

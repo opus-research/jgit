@@ -161,6 +161,7 @@ public class HttpSupport {
 	 *         {@link HttpConnection} for other defined constants.
 	 * @throws IOException
 	 *             communications error prevented obtaining the response code.
+	 * @since 3.3
 	 */
 	public static int response(final HttpConnection c) throws IOException {
 		try {
