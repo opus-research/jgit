@@ -90,8 +90,6 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 
 	private boolean applyIndex = true;
 
-	private boolean ignoreRepositoryState;
-
 	/**
 	 * Create command to apply the changes of a stashed commit
 	 *
@@ -112,16 +110,6 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 	 */
 	public StashApplyCommand setStashRef(final String stashRef) {
 		this.stashRef = stashRef;
-		return this;
-	}
-
-	/**
-	 * @param ignoreRepositoryState
-	 * @return {@code this}
-	 * @since 3.2
-	 */
-	public StashApplyCommand ignoreRepositoryState(boolean ignoreRepositoryState) {
-		this.ignoreRepositoryState = ignoreRepositoryState;
 		return this;
 	}
 
@@ -155,8 +143,7 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 			StashApplyFailureException {
 		checkCallable();
 
-		if (!ignoreRepositoryState
-				&& repo.getRepositoryState() != RepositoryState.SAFE)
+		if (repo.getRepositoryState() != RepositoryState.SAFE)
 			throw new WrongRepositoryStateException(MessageFormat.format(
 					JGitText.get().stashApplyOnUnsafeRepository,
 					repo.getRepositoryState()));
@@ -176,12 +163,12 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 						JGitText.get().stashCommitMissingTwoParents,
 						stashId.name()));
 
-			ObjectId headTree = repo.resolve(Constants.HEAD + "^{tree}"); //$NON-NLS-1$
+			ObjectId headTree = repo.resolve(Constants.HEAD + "^{tree}");
 			ObjectId stashIndexCommit = revWalk.parseCommit(stashCommit
 					.getParent(1));
 			ObjectId stashHeadCommit = stashCommit.getParent(0);
 
-			ResolveMerger merger = (ResolveMerger) MergeStrategy.RECURSIVE
+			ResolveMerger merger = (ResolveMerger) MergeStrategy.RESOLVE
 					.newMerger(repo);
 			merger.setCommitNames(new String[] { "stashed HEAD", "HEAD",
 					"stash" });
@@ -194,11 +181,10 @@ public class StashApplyCommand extends GitCommand<ObjectId> {
 				dco.setFailOnConflict(true);
 				dco.checkout(); // Ignoring failed deletes....
 				if (applyIndex) {
-					ResolveMerger ixMerger = (ResolveMerger) MergeStrategy.RECURSIVE
+					ResolveMerger ixMerger = (ResolveMerger) MergeStrategy.RESOLVE
 							.newMerger(repo, true);
 					ixMerger.setCommitNames(new String[] { "stashed HEAD",
 							"HEAD", "stashed index" });
-					ixMerger.setBase(stashHeadCommit);
 					boolean ok = ixMerger.merge(headCommit, stashIndexCommit);
 					if (ok) {
 						resetIndex(revWalk

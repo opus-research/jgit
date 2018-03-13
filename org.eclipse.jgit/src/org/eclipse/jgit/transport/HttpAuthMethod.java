@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2013, Google Inc.
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -48,18 +48,16 @@ import static org.eclipse.jgit.util.HttpSupport.HDR_WWW_AUTHENTICATE;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Random;
 
-import org.eclipse.jgit.transport.http.HttpConnection;
 import org.eclipse.jgit.util.Base64;
 
 /**
@@ -71,8 +69,6 @@ import org.eclipse.jgit.util.Base64;
 abstract class HttpAuthMethod {
 	/** No authentication is configured. */
 	static final HttpAuthMethod NONE = new None();
-	static final String EMPTY_STRING = ""; //$NON-NLS-1$
-	static final String SCHEMA_NAME_SEPARATOR = " "; //$NON-NLS-1$
 
 	/**
 	 * Handle an authentication failure and possibly return a new response.
@@ -81,39 +77,22 @@ abstract class HttpAuthMethod {
 	 *            the connection that failed.
 	 * @return new authentication method to try.
 	 */
-	static HttpAuthMethod scanResponse(final HttpConnection conn) {
-		final Map<String, List<String>> headers = conn.getHeaderFields();
-		HttpAuthMethod authentication = NONE;
+	static HttpAuthMethod scanResponse(HttpURLConnection conn) {
+		String hdr = conn.getHeaderField(HDR_WWW_AUTHENTICATE);
+		if (hdr == null || hdr.length() == 0)
+			return NONE;
 
-		for (final Entry<String, List<String>> entry : headers.entrySet()) {
-			if (HDR_WWW_AUTHENTICATE.equalsIgnoreCase(entry.getKey())) {
-				if (entry.getValue() != null) {
-					for (final String value : entry.getValue()) {
-						if (value != null && value.length() != 0) {
-							final String[] valuePart = value.split(
-									SCHEMA_NAME_SEPARATOR, 2);
+		int sp = hdr.indexOf(' ');
+		if (sp < 0)
+			return NONE;
 
-							if (Digest.NAME.equalsIgnoreCase(valuePart[0])) {
-								final String param;
-								if (valuePart.length == 1)
-									param = EMPTY_STRING;
-								else
-									param = valuePart[1];
-
-								authentication = new Digest(param);
-								break;
-							}
-
-							if (Basic.NAME.equalsIgnoreCase(valuePart[0]))
-								authentication = new Basic();
-						}
-					}
-				}
-				break;
-			}
-		}
-
-		return authentication;
+		String type = hdr.substring(0, sp);
+		if (Basic.NAME.equalsIgnoreCase(type))
+			return new Basic();
+		else if (Digest.NAME.equalsIgnoreCase(type))
+			return new Digest(hdr.substring(sp + 1));
+		else
+			return NONE;
 	}
 
 	/**
@@ -168,7 +147,7 @@ abstract class HttpAuthMethod {
 	 * @param conn
 	 * @throws IOException
 	 */
-	abstract void configureRequest(HttpConnection conn) throws IOException;
+	abstract void configureRequest(HttpURLConnection conn) throws IOException;
 
 	/** Performs no user authentication. */
 	private static class None extends HttpAuthMethod {
@@ -178,7 +157,7 @@ abstract class HttpAuthMethod {
 		}
 
 		@Override
-		void configureRequest(HttpConnection conn) throws IOException {
+		void configureRequest(HttpURLConnection conn) throws IOException {
 			// Do nothing when no authentication is enabled.
 		}
 	}
@@ -198,7 +177,7 @@ abstract class HttpAuthMethod {
 		}
 
 		@Override
-		void configureRequest(final HttpConnection conn) throws IOException {
+		void configureRequest(final HttpURLConnection conn) throws IOException {
 			String ident = user + ":" + pass; //$NON-NLS-1$
 			String enc = Base64.encodeBytes(ident.getBytes("UTF-8")); //$NON-NLS-1$
 			conn.setRequestProperty(HDR_AUTHORIZATION, NAME + " " + enc); //$NON-NLS-1$
@@ -238,7 +217,7 @@ abstract class HttpAuthMethod {
 
 		@SuppressWarnings("boxing")
 		@Override
-		void configureRequest(final HttpConnection conn) throws IOException {
+		void configureRequest(final HttpURLConnection conn) throws IOException {
 			final Map<String, String> r = new LinkedHashMap<String, String>();
 
 			final String realm = params.get("realm"); //$NON-NLS-1$

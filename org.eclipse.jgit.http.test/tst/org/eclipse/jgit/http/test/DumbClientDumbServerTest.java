@@ -55,14 +55,11 @@ import static org.junit.Assert.fail;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
 import org.eclipse.jetty.servlet.DefaultServlet;
 import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.junit.http.AccessEvent;
@@ -73,21 +70,15 @@ import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.transport.FetchConnection;
 import org.eclipse.jgit.transport.HttpTransport;
 import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.TransportHttp;
 import org.eclipse.jgit.transport.URIish;
-import org.eclipse.jgit.transport.http.HttpConnectionFactory;
-import org.eclipse.jgit.transport.http.JDKHttpConnectionFactory;
-import org.eclipse.jgit.transport.http.apache.HttpClientConnectionFactory;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
 
-@RunWith(Parameterized.class)
 public class DumbClientDumbServerTest extends HttpTestCase {
 	private Repository remoteRepository;
 
@@ -97,31 +88,18 @@ public class DumbClientDumbServerTest extends HttpTestCase {
 
 	private RevCommit A, B;
 
-	@Parameters
-	public static Collection<Object[]> data() {
-		// run all tests with both connection factories we have
-		return Arrays.asList(new Object[][] {
-				{ new JDKHttpConnectionFactory() },
-				{ new HttpClientConnectionFactory() } });
-	}
-
-	public DumbClientDumbServerTest(HttpConnectionFactory cf) {
-		HttpTransport.setConnectionFactory(cf);
-	}
-
 	@Before
 	public void setUp() throws Exception {
 		super.setUp();
 
-		final TestRepository<Repository> src = createTestRepository();
+		final TestRepository<FileRepository> src = createTestRepository();
 		final File srcGit = src.getRepository().getDirectory();
 		final URI base = srcGit.getParentFile().toURI();
 
 		ServletContextHandler app = server.addContext("/git");
 		app.setResourceBase(base.toString());
-		ServletHolder holder = app.addServlet(DefaultServlet.class, "/");
-		// The tmp directory is symlinked on OS X
-		holder.setInitParameter("aliases", "true");
+		app.addServlet(DefaultServlet.class, "/");
+
 		server.setUp();
 
 		remoteRepository = src.getRepository();

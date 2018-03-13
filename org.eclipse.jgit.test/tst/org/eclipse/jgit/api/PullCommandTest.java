@@ -65,6 +65,7 @@ import org.eclipse.jgit.lib.RepositoryState;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.transport.URIish;
@@ -73,7 +74,7 @@ import org.junit.Test;
 
 public class PullCommandTest extends RepositoryTestCase {
 	/** Second Test repository */
-	protected Repository dbTarget;
+	protected FileRepository dbTarget;
 
 	private Git source;
 
@@ -139,8 +140,7 @@ public class PullCommandTest extends RepositoryTestCase {
 		assertEquals(sourceCommit.getId(), mergedCommits[1]);
 		RevCommit mergeCommit = new RevWalk(dbTarget).parseCommit(mergeResult
 				.getNewHead());
-		String message = "Merge branch 'master' of "
-				+ db.getWorkTree().getAbsolutePath();
+		String message = "Merge branch 'master' of " + db.getWorkTree();
 		assertEquals(message, mergeCommit.getShortMessage());
 	}
 
@@ -232,71 +232,6 @@ public class PullCommandTest extends RepositoryTestCase {
 		Git.wrap(empty).pull().call();
 	}
 
-	@Test
-	public void testPullMergeProgrammaticConfiguration() throws Exception {
-		// create another commit on another branch in source
-		source.checkout().setCreateBranch(true).setName("other").call();
-		sourceFile = new File(db.getWorkTree(), "file2.txt");
-		writeToFile(sourceFile, "content");
-		source.add().addFilepattern("file2.txt").call();
-		RevCommit sourceCommit = source.commit()
-				.setMessage("source commit on branch other").call();
-
-		File targetFile2 = new File(dbTarget.getWorkTree(), "OtherFile.txt");
-		writeToFile(targetFile2, "Unconflicting change");
-		target.add().addFilepattern("OtherFile.txt").call();
-		RevCommit targetCommit = target.commit()
-				.setMessage("Unconflicting change in local").call();
-
-		PullResult res = target.pull().setRemote("origin")
-				.setRemoteBranchName("other")
-				.setRebase(false).call();
-
-		MergeResult mergeResult = res.getMergeResult();
-		ObjectId[] mergedCommits = mergeResult.getMergedCommits();
-		assertEquals(targetCommit.getId(), mergedCommits[0]);
-		assertEquals(sourceCommit.getId(), mergedCommits[1]);
-		RevCommit mergeCommit = new RevWalk(dbTarget).parseCommit(mergeResult
-				.getNewHead());
-		String message = "Merge branch 'other' of "
-				+ db.getWorkTree().getAbsolutePath();
-		assertEquals(message, mergeCommit.getShortMessage());
-	}
-
-	@Test
-	public void testPullMergeProgrammaticConfigurationImpliedTargetBranch()
-			throws Exception {
-		// create another commit on another branch in source
-		source.checkout().setCreateBranch(true).setName("other").call();
-		sourceFile = new File(db.getWorkTree(), "file2.txt");
-		writeToFile(sourceFile, "content");
-		source.add().addFilepattern("file2.txt").call();
-		RevCommit sourceCommit = source.commit()
-				.setMessage("source commit on branch other").call();
-
-		target.checkout().setCreateBranch(true).setName("other").call();
-		File targetFile2 = new File(dbTarget.getWorkTree(), "OtherFile.txt");
-		writeToFile(targetFile2, "Unconflicting change");
-		target.add().addFilepattern("OtherFile.txt").call();
-		RevCommit targetCommit = target.commit()
-				.setMessage("Unconflicting change in local").call();
-
-		// the source branch "other" matching the target branch should be
-		// implied
-		PullResult res = target.pull().setRemote("origin").setRebase(false)
-				.call();
-
-		MergeResult mergeResult = res.getMergeResult();
-		ObjectId[] mergedCommits = mergeResult.getMergedCommits();
-		assertEquals(targetCommit.getId(), mergedCommits[0]);
-		assertEquals(sourceCommit.getId(), mergedCommits[1]);
-		RevCommit mergeCommit = new RevWalk(dbTarget).parseCommit(mergeResult
-				.getNewHead());
-		String message = "Merge branch 'other' of "
-				+ db.getWorkTree().getAbsolutePath() + " into other";
-		assertEquals(message, mergeCommit.getShortMessage());
-	}
-
 	@Override
 	@Before
 	public void setUp() throws Exception {
@@ -321,7 +256,7 @@ public class PullCommandTest extends RepositoryTestCase {
 
 		config
 				.addURI(new URIish(source.getRepository().getWorkTree()
-						.getAbsolutePath()));
+						.getPath()));
 		config.addFetchRefSpec(new RefSpec(
 				"+refs/heads/*:refs/remotes/origin/*"));
 		config.update(targetConfig);
