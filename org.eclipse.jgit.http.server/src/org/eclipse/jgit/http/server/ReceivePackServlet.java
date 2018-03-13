@@ -128,7 +128,7 @@ class ReceivePackServlet extends HttpServlet {
 				return;
 
 			} catch (ServiceNotEnabledException e) {
-				RepositoryFilter.sendError(SC_FORBIDDEN, req, rsp);
+				rsp.sendError(SC_FORBIDDEN);
 				return;
 			}
 
