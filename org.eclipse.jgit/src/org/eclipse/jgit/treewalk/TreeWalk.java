@@ -54,7 +54,8 @@ import org.eclipse.jgit.attributes.Attribute;
 import org.eclipse.jgit.attributes.Attributes;
 import org.eclipse.jgit.attributes.AttributesNodeProvider;
 import org.eclipse.jgit.attributes.AttributesProvider;
-import org.eclipse.jgit.attributes.MacroExpander;
+import org.eclipse.jgit.dircache.DirCacheBuildIterator;
+import org.eclipse.jgit.attributes.AttributesHandler;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -63,7 +64,6 @@ import org.eclipse.jgit.errors.StopWalkException;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.CoreConfig.StreamType;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
@@ -74,8 +74,6 @@ import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.QuotedString;
 import org.eclipse.jgit.util.RawParseUtils;
-import org.eclipse.jgit.util.io.StreamTypeManager;
-import org.eclipse.jgit.util.io.StreamTypeProvider;
 
 /**
  * Walks one or more {@link AbstractTreeIterator}s in parallel.
@@ -97,8 +95,7 @@ import org.eclipse.jgit.util.io.StreamTypeProvider;
  * Multiple simultaneous TreeWalk instances per {@link Repository} are
  * permitted, even from concurrent threads.
  */
-public class TreeWalk
-		implements AutoCloseable, AttributesProvider, StreamTypeProvider {
+public class TreeWalk implements AutoCloseable, AttributesProvider {
 	private static final AbstractTreeIterator[] NO_TREES = {};
 
 	/**
@@ -258,7 +255,7 @@ public class TreeWalk
 
 	private boolean postOrderTraversal;
 
-	private int depth;
+	int depth;
 
 	private boolean advance;
 
@@ -271,11 +268,8 @@ public class TreeWalk
 	/** Cached attribute for the current entry */
 	private Attributes attrs = null;
 
-	/** Cached macro expander */
-	private MacroExpander macroExpander;
-
-	/** Cached stream type manager */
-	private StreamTypeManager streamTypeManager;
+	/** Cached attributes handler */
+	private AttributesHandler attributesHandler;
 
 	private Config config;
 
@@ -318,7 +312,7 @@ public class TreeWalk
 
 	/**
 	 * @return the {@link OperationType}
-	 * @since 4.2
+	 * @since 4.3
 	 */
 	public OperationType getOperationType() {
 		return operationType;
@@ -452,7 +446,7 @@ public class TreeWalk
 
 	/**
 	 * @return the {@link AttributesNodeProvider} for this {@link TreeWalk}.
-	 * @since 4.2
+	 * @since 4.3
 	 */
 	public AttributesNodeProvider getAttributesNodeProvider() {
 		return attributesNodeProvider;
@@ -509,13 +503,13 @@ public class TreeWalk
 		}
 
 		try {
-			// Lazy create the macro expander on the first access of
+			// Lazy create the attributesHandler on the first access of
 			// attributes. This requires the info, global and root
 			// attributes nodes
-			if (macroExpander == null) {
-				macroExpander = new MacroExpander(this);
+			if (attributesHandler == null) {
+				attributesHandler = new AttributesHandler(this);
 			}
-			attrs = macroExpander.getAttributes();
+			attrs = attributesHandler.getAttributes();
 			return attrs;
 		} catch (IOException e) {
 			throw new JGitInternalException("Error while parsing attributes", //$NON-NLS-1$
@@ -523,19 +517,10 @@ public class TreeWalk
 		}
 	}
 
-	@Override
-	public StreamType getStreamType() {
-		if (streamTypeManager == null) {
-			streamTypeManager = new StreamTypeManager(
-					config.get(WorkingTreeOptions.KEY), operationType, this);
-		}
-		return streamTypeManager.getStreamType();
-	}
-
 	/** Reset this walker so new tree iterators can be added to it. */
 	public void reset() {
 		attrs = null;
-		macroExpander = null;
+		attributesHandler = null;
 		trees = NO_TREES;
 		advance = false;
 		depth = 0;
@@ -672,18 +657,13 @@ public class TreeWalk
 	 * @param p
 	 *            an iterator to walk over. The iterator should be new, with no
 	 *            parent, and should still be positioned before the first entry.
-	 *            The tree which the iterator operates on must have the same root
-	 *            as other trees in the walk.
-	 *
+	 *            The tree which the iterator operates on must have the same
+	 *            root as other trees in the walk.
 	 * @return position of this tree within the walker.
-	 * @throws CorruptObjectException
-	 *             the iterator was unable to obtain its first entry, due to
-	 *             possible data corruption within the backing data store.
 	 */
-	public int addTree(final AbstractTreeIterator p)
-			throws CorruptObjectException {
-		final int n = trees.length;
-		final AbstractTreeIterator[] newTrees = new AbstractTreeIterator[n + 1];
+	public int addTree(AbstractTreeIterator p) {
+		int n = trees.length;
+		AbstractTreeIterator[] newTrees = new AbstractTreeIterator[n + 1];
 
 		System.arraycopy(trees, 0, newTrees, 0, n);
 		newTrees[n] = p;
@@ -764,9 +744,26 @@ public class TreeWalk
 				return true;
 			}
 		} catch (StopWalkException stop) {
-			for (final AbstractTreeIterator t : trees)
-				t.stopWalk();
+			stopWalk();
 			return false;
+		}
+	}
+
+	/**
+	 * Notify iterators the walk is aborting.
+	 * <p>
+	 * Primarily to notify {@link DirCacheBuildIterator} the walk is aborting so
+	 * that it can copy any remaining entries.
+	 *
+	 * @throws IOException
+	 *             if traversal of remaining entries throws an exception during
+	 *             object access. This should never occur as remaining trees
+	 *             should already be in memory, however the methods used to
+	 *             finish traversal are declared to throw IOException.
+	 */
+	void stopWalk() throws IOException {
+		for (AbstractTreeIterator t : trees) {
+			t.stopWalk();
 		}
 	}
 
@@ -829,7 +826,7 @@ public class TreeWalk
 	 * Obtain the {@link FileMode} for the current entry on the currentHead tree
 	 *
 	 * @return mode for the current entry of the currentHead tree.
-	 * @since 4.2
+	 * @since 4.3
 	 */
 	public FileMode getFileMode() {
 		return FileMode.fromBits(currentHead.mode);
@@ -970,10 +967,13 @@ public class TreeWalk
 	 * Test if the supplied path matches the current entry's path.
 	 * <p>
 	 * This method tests that the supplied path is exactly equal to the current
-	 * entry, or is one of its parent directories. It is faster to use this
+	 * entry or is one of its parent directories. It is faster to use this
 	 * method then to use {@link #getPathString()} to first create a String
 	 * object, then test <code>startsWith</code> or some other type of string
 	 * match function.
+	 * <p>
+	 * If the current entry is a subtree, then all paths within the subtree
+	 * are considered to match it.
 	 *
 	 * @param p
 	 *            path buffer to test. Callers should ensure the path does not
@@ -1009,7 +1009,7 @@ public class TreeWalk
 			// If p[ci] == '/' then pattern matches this subtree,
 			// otherwise we cannot be certain so we return -1.
 			//
-			return p[ci] == '/' ? 0 : -1;
+			return p[ci] == '/' && FileMode.TREE.equals(t.mode) ? 0 : -1;
 		}
 
 		// Both strings are identical.
@@ -1171,7 +1171,7 @@ public class TreeWalk
 		}
 	}
 
-	private void exitSubtree() {
+	void exitSubtree() {
 		depth--;
 		for (int i = 0; i < trees.length; i++)
 			trees[i] = trees[i].parent;
@@ -1205,7 +1205,7 @@ public class TreeWalk
 	 * @param type
 	 *            of the tree to be queried
 	 * @return the tree of that type or null if none is present
-	 * @since 4.2
+	 * @since 4.3
 	 */
 	public <T extends AbstractTreeIterator> T getTree(
 			Class<T> type) {

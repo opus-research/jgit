@@ -1,10 +1,58 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <component id="org.eclipse.jgit" version="2">
+    <resource path="META-INF/MANIFEST.MF" type="org.eclipse.jgit.lib.FileTreeEntry">
+        <filter id="305324134">
+            <message_arguments>
+                <message_argument value="org.eclipse.jgit.lib.FileTreeEntry"/>
+                <message_argument value="org.eclipse.jgit_4.2.0"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="META-INF/MANIFEST.MF" type="org.eclipse.jgit.lib.GitlinkTreeEntry">
+        <filter id="305324134">
+            <message_arguments>
+                <message_argument value="org.eclipse.jgit.lib.GitlinkTreeEntry"/>
+                <message_argument value="org.eclipse.jgit_4.2.0"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="META-INF/MANIFEST.MF" type="org.eclipse.jgit.lib.SymlinkTreeEntry">
+        <filter id="305324134">
+            <message_arguments>
+                <message_argument value="org.eclipse.jgit.lib.SymlinkTreeEntry"/>
+                <message_argument value="org.eclipse.jgit_4.2.0"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="META-INF/MANIFEST.MF" type="org.eclipse.jgit.lib.Tree">
+        <filter id="305324134">
+            <message_arguments>
+                <message_argument value="org.eclipse.jgit.lib.Tree"/>
+                <message_argument value="org.eclipse.jgit_4.2.0"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="META-INF/MANIFEST.MF" type="org.eclipse.jgit.lib.TreeEntry">
+        <filter id="305324134">
+            <message_arguments>
+                <message_argument value="org.eclipse.jgit.lib.TreeEntry"/>
+                <message_argument value="org.eclipse.jgit_4.2.0"/>
+            </message_arguments>
+        </filter>
+    </resource>
     <resource path="src/org/eclipse/jgit/attributes/AttributesNode.java" type="org.eclipse.jgit.attributes.AttributesNode">
-        <filter comment="attributes weren't really usable in earlier versions" id="338792546">
+        <filter comment="moved to new AttributesManager" id="338792546">
             <message_arguments>
                 <message_argument value="org.eclipse.jgit.attributes.AttributesNode"/>
-                <message_argument value="getAttributes(String, boolean, Map&lt;String,Attribute&gt;)"/>
+                <message_argument value="getAttributes(String, boolean, Attributes)"/>
+            </message_arguments>
+        </filter>
+    </resource>
+    <resource path="src/org/eclipse/jgit/attributes/AttributesRule.java" type="org.eclipse.jgit.attributes.AttributesRule">
+        <filter comment="used only in tests: bean naming" id="338792546">
+            <message_arguments>
+                <message_argument value="org.eclipse.jgit.attributes.AttributesRule"/>
+                <message_argument value="dirOnly()"/>
             </message_arguments>
         </filter>
     </resource>
@@ -48,27 +96,6 @@
         <filter comment="PushCertificates haven't been really usable in 4.0" id="338849923">
             <message_arguments>
                 <message_argument value="org.eclipse.jgit.transport.PushCertificateParser"/>
-            </message_arguments>
-        </filter>
-    </resource>
-    <resource path="src/org/eclipse/jgit/treewalk/TreeWalk.java" type="org.eclipse.jgit.treewalk.TreeWalk">
-        <filter comment="added support for handling stream CRLF / LF using gitattributes and core config" id="1143996420">
-            <message_arguments>
-                <message_argument value="getStreamType()"/>
-            </message_arguments>
-        </filter>
-    </resource>
-    <resource path="src/org/eclipse/jgit/treewalk/WorkingTreeIterator.java" type="org.eclipse.jgit.treewalk.WorkingTreeIterator">
-        <filter comment="attributes weren't really usable in earlier versions" id="338792546">
-            <message_arguments>
-                <message_argument value="org.eclipse.jgit.treewalk.WorkingTreeIterator"/>
-                <message_argument value="getGlobalAttributesNode()"/>
-            </message_arguments>
-        </filter>
-        <filter comment="attributes weren't really usable in earlier versions" id="338792546">
-            <message_arguments>
-                <message_argument value="org.eclipse.jgit.treewalk.WorkingTreeIterator"/>
-                <message_argument value="getInfoAttributesNode()"/>
             </message_arguments>
         </filter>
     </resource>

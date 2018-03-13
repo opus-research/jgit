@@ -237,9 +237,14 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 			}
 
 			final StringBuilder sb = new StringBuilder();
-			final Ref advertisedRef = getRef(rru.getRemoteName());
-			final ObjectId oldId = (advertisedRef == null ? ObjectId.zeroId()
-					: advertisedRef.getObjectId());
+			ObjectId oldId = rru.getExpectedOldObjectId();
+			if (oldId == null) {
+				final Ref advertised = getRef(rru.getRemoteName());
+				oldId = advertised != null ? advertised.getObjectId() : null;
+				if (oldId == null) {
+					oldId = ObjectId.zeroId();
+				}
+			}
 			sb.append(oldId.name());
 			sb.append(' ');
 			sb.append(rru.getNewObjectId().name());
@@ -380,7 +385,8 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 		final int oldTimeout = timeoutIn.getTimeout();
 		final int sendTime = (int) Math.min(packTransferTime, 28800000L);
 		try {
-			timeoutIn.setTimeout(10 * Math.max(sendTime, oldTimeout));
+			int timeout = 10 * Math.max(sendTime, oldTimeout);
+			timeoutIn.setTimeout((timeout < 0) ? Integer.MAX_VALUE : timeout);
 			return pckIn.readString();
 		} finally {
 			timeoutIn.setTimeout(oldTimeout);
