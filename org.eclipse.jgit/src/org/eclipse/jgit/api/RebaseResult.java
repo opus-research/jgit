@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,36 +42,63 @@
  */
 package org.eclipse.jgit.api;
 
-import java.io.IOException;
+import org.eclipse.jgit.revwalk.RevCommit;
 
-import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.api.errors.NoFilepatternException;
-import org.eclipse.jgit.lib.RepositoryTestCase;
-
-public class RmCommandTest extends RepositoryTestCase {
-
-	private Git git;
-
-	private static final String FILE = "test.txt";
-
-	@Override
-	protected void setUp() throws Exception {
-		super.setUp();
-		git = new Git(db);
-		// commit something
-		writeTrashFile(FILE, "Hello world");
-		git.add().addFilepattern(FILE).call();
-		git.commit().setMessage("Initial commit").call();
+/**
+ * The result of a {@link RebaseCommand} execution
+ */
+public class RebaseResult {
+	/**
+	 * The overall status
+	 */
+	public enum Status {
+		/**
+		 * Rebase was successful, HEAD points to the new commit
+		 */
+		OK,
+		/**
+		 * Aborted; the original HEAD was restored
+		 */
+		ABORTED,
+		/**
+		 * Stopped due to a conflict; must either abort or resolve or skip
+		 */
+		STOPPED,
+		/**
+		 * Already up-to-date
+		 */
+		UP_TO_DATE;
 	}
 
-	public void testRemove() throws JGitInternalException,
-			NoFilepatternException, IllegalStateException, IOException {
-		assertEquals("[test.txt, mode:100644, content:Hello world]",
-				indexState(CONTENT));
-		RmCommand command = git.rm();
-		command.addFilepattern(FILE);
-		command.call();
-		assertEquals("", indexState(CONTENT));
+	static final RebaseResult UP_TO_DATE_RESULT = new RebaseResult(
+			Status.UP_TO_DATE);
+
+	private final Status mySatus;
+
+	private final RevCommit currentCommit;
+
+	RebaseResult(Status status) {
+		this.mySatus = status;
+		currentCommit = null;
 	}
 
+	RebaseResult(RevCommit commit) {
+		this.mySatus = Status.STOPPED;
+		currentCommit = commit;
+	}
+
+	/**
+	 * @return the overall status
+	 */
+	public Status getStatus() {
+		return mySatus;
+	}
+
+	/**
+	 * @return the current commit if status is {@link Status#STOPPED}, otherwise
+	 *         <code>null</code>
+	 */
+	public RevCommit getCurrentCommit() {
+		return currentCommit;
+	}
 }

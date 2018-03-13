@@ -244,16 +244,16 @@ public class Git {
 	}
 
 	/**
-	 * Returns a command object to execute a {@code rm} command
-	 * 
+	 * Returns a command object to execute a {@code Rebase} command
+	 *
 	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-rm.html"
-	 *      >Git documentation about rm</a>
-	 * @return a {@link RmCommand} used to collect all optional parameters and
-	 *         to finally execute the {@code rm} command
+	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-rebase.html"
+	 *      >Git documentation about rebase</a>
+	 * @return a {@link RebaseCommand} used to collect all optional parameters
+	 *         and to finally execute the {@code rebase} command
 	 */
-	public RmCommand rm() {
-		return new RmCommand(repo);
+	public RebaseCommand rebase() {
+		return new RebaseCommand(repo);
 	}
 
 	/**
