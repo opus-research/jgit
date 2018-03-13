@@ -50,7 +50,7 @@ import java.io.IOException;
 import java.nio.channels.FileLock;
 import java.text.MessageFormat;
 
-import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.internal.JGitText;
 
 /**
  * File Utilities
@@ -79,6 +79,7 @@ public class FileUtils {
 
 	/**
 	 * Option not to throw exceptions when a deletion finally doesn't succeed.
+	 * @since 2.0
 	 */
 	public static final int IGNORE_ERRORS = 8;
 
