@@ -715,7 +715,7 @@ public class URIish implements Serializable {
 	 */
 	public String getHumanishName() throws IllegalArgumentException {
 		String s = getPath();
-		if ("/".equals(s) || "".equals(s)) //$NON-NLS-1$ //$NON-NLS-2$
+		if ("/".equals(s) || "".equals(s)) //$NON-NLS-1$
 			s = getHost();
 		if (s == null) // $NON-NLS-1$
 			throw new IllegalArgumentException();
