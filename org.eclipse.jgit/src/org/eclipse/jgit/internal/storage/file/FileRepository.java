@@ -273,11 +273,8 @@ public class FileRepository extends Repository {
 				ConfigConstants.CONFIG_CORE_SECTION, null,
 				ConfigConstants.CONFIG_KEY_HIDEDOTFILES,
 				HideDotFiles.DOTGITONLY);
-		if (hideDotFiles != HideDotFiles.FALSE) {
-			File d = getDirectory();
-			if (d.getName().startsWith(".")) //$NON-NLS-1$
-				getFS().setHidden(d, true);
-		}
+		if (hideDotFiles != HideDotFiles.FALSE)
+			getFS().setHidden(getDirectory(), true);
 		refs.create();
 		objectDatabase.create();
 
