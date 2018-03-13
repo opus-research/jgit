@@ -68,10 +68,8 @@ import org.eclipse.jgit.revwalk.RevWalk;
 /**
  * Command to find human-readable names of revisions.
  *
- * @see <a
- *      href="http://www.kernel.org/pub/software/scm/git/docs/git-name-rev.html"
+ * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-name-rev.html"
  *      >Git documentation about name-rev</a>
- * @since 3.0
  */
 public class NameRevCommand extends GitCommand<Map<ObjectId, String>> {
 	/** Amount of slop to allow walking past the earliest requested commit. */
@@ -103,7 +101,7 @@ public class NameRevCommand extends GitCommand<Map<ObjectId, String>> {
 			if (tip != null)
 				sb.append(format());
 			else
-				sb.append((Object) null);
+				sb.append(String.valueOf(null));
 			sb.append(',').append(cost).append(']').append(' ')
 				.append(super.toString()).toString();
 			return sb.toString();
@@ -114,7 +112,6 @@ public class NameRevCommand extends GitCommand<Map<ObjectId, String>> {
 	private final List<String> prefixes;
 	private final List<Ref> refs;
 	private final List<ObjectId> revs;
-	private int mergeCost;
 
 	/**
 	 * Create a new name-rev command.
@@ -123,7 +120,6 @@ public class NameRevCommand extends GitCommand<Map<ObjectId, String>> {
 	 */
 	protected NameRevCommand(Repository repo) {
 		super(repo);
-		mergeCost = MERGE_COST;
 		prefixes = new ArrayList<String>(2);
 		refs = new ArrayList<Ref>();
 		revs = new ArrayList<ObjectId>(2);
@@ -151,11 +147,12 @@ public class NameRevCommand extends GitCommand<Map<ObjectId, String>> {
 					break;
 				if (c.getCommitTime() < cutoff)
 					continue;
+				boolean merge = c.getParentCount() > 1;
+				long cost = c.cost + (merge ? MERGE_COST : 1);
 				for (int i = 0; i < c.getParentCount(); i++) {
 					NameRevCommit p = (NameRevCommit) walk.parseCommit(c.getParent(i));
-					long cost = c.cost + (i > 0 ? mergeCost : 1);
 					if (p.tip == null || compare(c.tip, cost, p.tip, p.cost) < 0) {
-						if (i > 0) {
+						if (merge) {
 							p.tip = c.format().append('^').append(i + 1).toString();
 							p.distance = 0;
 						} else {
@@ -299,11 +296,6 @@ public class NameRevCommand extends GitCommand<Map<ObjectId, String>> {
 	public NameRevCommand addRef(Ref ref) {
 		checkCallable();
 		refs.add(ref);
-		return this;
-	}
-
-	NameRevCommand setMergeCost(int cost) {
-		mergeCost = cost;
 		return this;
 	}
 

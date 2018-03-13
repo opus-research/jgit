@@ -178,8 +178,6 @@ public abstract class RefUpdate {
 	 */
 	private boolean detachingSymbolicRef;
 
-	private boolean checkConflicting = true;
-
 	/**
 	 * Construct a new update operation for the reference.
 	 * <p>
@@ -531,7 +529,7 @@ public abstract class RefUpdate {
 		final String myName = getRef().getLeaf().getName();
 		if (myName.startsWith(Constants.R_HEADS)) {
 			Ref head = getRefDatabase().getRef(Constants.HEAD);
-			while (head != null && head.isSymbolic()) {
+			while (head.isSymbolic()) {
 				head = head.getTarget();
 				if (myName.equals(head.getName()))
 					return result = Result.REJECTED_CURRENT_BRANCH;
@@ -566,7 +564,7 @@ public abstract class RefUpdate {
 	public Result link(String target) throws IOException {
 		if (!target.startsWith(Constants.R_REFS))
 			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().illegalArgumentNotA, Constants.R_REFS));
-		if (checkConflicting && getRefDatabase().isNameConflicting(getName()))
+		if (getRefDatabase().isNameConflicting(getName()))
 			return Result.LOCK_FAILURE;
 		try {
 			if (!tryLock(false))
@@ -601,7 +599,7 @@ public abstract class RefUpdate {
 		RevObject oldObj;
 
 		// don't make expensive conflict check if this is an existing Ref
-		if (oldValue == null && checkConflicting && getRefDatabase().isNameConflicting(getName()))
+		if (oldValue == null && getRefDatabase().isNameConflicting(getName()))
 			return Result.LOCK_FAILURE;
 		try {
 			if (!tryLock(true))
@@ -631,17 +629,6 @@ public abstract class RefUpdate {
 		} finally {
 			unlock();
 		}
-	}
-
-	/**
-	 * Enable/disable the check for conflicting ref names. By default conflicts
-	 * are checked explicitly.
-	 *
-	 * @param check
-	 * @since 3.0
-	 */
-	public void setCheckConflicting(boolean check) {
-		checkConflicting = check;
 	}
 
 	private static RevObject safeParse(final RevWalk rw, final AnyObjectId id)
