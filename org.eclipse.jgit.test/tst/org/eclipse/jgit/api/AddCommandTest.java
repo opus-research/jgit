@@ -44,7 +44,6 @@
 package org.eclipse.jgit.api;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
@@ -107,7 +106,7 @@ public class AddCommandTest extends RepositoryTestCase {
 
 	@Test
 	public void testAddExistingSingleFileInSubDir() throws IOException, NoFilepatternException {
-		assertTrue(new File(db.getWorkTree(), "sub").mkdir());
+		FileUtils.mkdir(new File(db.getWorkTree(), "sub"));
 		File file = new File(db.getWorkTree(), "sub/a.txt");
 		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
@@ -297,7 +296,7 @@ public class AddCommandTest extends RepositoryTestCase {
 
 	@Test
 	public void testAddFolder() throws Exception  {
-		assertTrue(new File(db.getWorkTree(), "sub").mkdir());
+		FileUtils.mkdir(new File(db.getWorkTree(), "sub"));
 		File file = new File(db.getWorkTree(), "sub/a.txt");
 		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
@@ -320,7 +319,7 @@ public class AddCommandTest extends RepositoryTestCase {
 
 	@Test
 	public void testAddIgnoredFile() throws Exception  {
-		assertTrue(new File(db.getWorkTree(), "sub").mkdir());
+		FileUtils.mkdir(new File(db.getWorkTree(), "sub"));
 		File file = new File(db.getWorkTree(), "sub/a.txt");
 		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
@@ -349,7 +348,7 @@ public class AddCommandTest extends RepositoryTestCase {
 
 	@Test
 	public void testAddWholeRepo() throws Exception  {
-		assertTrue(new File(db.getWorkTree(), "sub").mkdir());
+		FileUtils.mkdir(new File(db.getWorkTree(), "sub"));
 		File file = new File(db.getWorkTree(), "sub/a.txt");
 		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
@@ -376,7 +375,7 @@ public class AddCommandTest extends RepositoryTestCase {
 	// file c exists in workdir but not in index -> added
 	@Test
 	public void testAddWithoutParameterUpdate() throws Exception {
-		assertTrue(new File(db.getWorkTree(), "sub").mkdir());
+		FileUtils.mkdir(new File(db.getWorkTree(), "sub"));
 		File file = new File(db.getWorkTree(), "sub/a.txt");
 		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);
@@ -430,7 +429,7 @@ public class AddCommandTest extends RepositoryTestCase {
 	// file c exists in workdir but not in index -> unchanged
 	@Test
 	public void testAddWithParameterUpdate() throws Exception {
-		assertTrue(new File(db.getWorkTree(), "sub").mkdir());
+		FileUtils.mkdir(new File(db.getWorkTree(), "sub"));
 		File file = new File(db.getWorkTree(), "sub/a.txt");
 		FileUtils.createNewFile(file);
 		PrintWriter writer = new PrintWriter(file);

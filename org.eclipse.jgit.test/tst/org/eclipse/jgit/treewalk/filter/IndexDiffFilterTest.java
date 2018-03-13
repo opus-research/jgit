@@ -537,7 +537,7 @@ public class IndexDiffFilterTest extends RepositoryTestCase {
 
 	private void createEmptyFolder() throws Exception {
 		File path = new File(db.getWorkTree(), FOLDER);
-		assertTrue(path.mkdir());
+		path.mkdir();
 		assertTrue(path.isDirectory());
 	}
 
@@ -548,13 +548,13 @@ public class IndexDiffFilterTest extends RepositoryTestCase {
 
 	private void createEmptyFolderUntracked() throws Exception {
 		File path = new File(db.getWorkTree(), UNTRACKED_FOLDER);
-		assertTrue(path.mkdir());
+		path.mkdir();
 		assertTrue(path.isDirectory());
 	}
 
 	private void createEmptyFolderIgnored() throws Exception {
 		File path = new File(db.getWorkTree(), IGNORED_FOLDER);
-		assertTrue(path.mkdir());
+		path.mkdir();
 		assertTrue(path.isDirectory());
 		writeTrashFile(GITIGNORE, GITIGNORE + "\n" + IGNORED_FOLDER + "/");
 	}
