@@ -56,6 +56,9 @@ import static org.eclipse.jgit.lib.Constants.R_REFS;
 import static org.eclipse.jgit.lib.Constants.R_REMOTES;
 import static org.eclipse.jgit.lib.Constants.R_TAGS;
 import static org.eclipse.jgit.lib.Constants.encode;
+import static org.eclipse.jgit.lib.Ref.Storage.LOOSE;
+import static org.eclipse.jgit.lib.Ref.Storage.NEW;
+import static org.eclipse.jgit.lib.Ref.Storage.PACKED;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -64,10 +67,10 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.jgit.errors.ObjectWritingException;
 import org.eclipse.jgit.revwalk.RevObject;
@@ -76,6 +79,8 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
+import org.eclipse.jgit.util.RefList;
+import org.eclipse.jgit.util.RefMap;
 
 /**
  * Traditional file system based {@link RefDatabase}.
@@ -92,10 +97,15 @@ import org.eclipse.jgit.util.RawParseUtils;
  * reduces the number of files needed for large reference spaces, reducing the
  * overall size of a Git repository on disk.
  */
-class RefDirectory extends RefDatabase {
-	static final String SYMREF = "ref: ";//$NON-NLS-1$
+public class RefDirectory extends RefDatabase {
+	/** Magic string denoting the start of a symbolic reference file. */
+	public static final String SYMREF = "ref: "; //$NON-NLS-1$
 
-	private static final String PACKED_REFS_HEADER = "# pack-refs with:";//$NON-NLS-1$
+	/** Magic string denoting the header of a packed-refs file. */
+	public static final String PACKED_REFS_HEADER = "# pack-refs with:"; //$NON-NLS-1$
+
+	/** If in the header, denotes the file has peeled data. */
+	public static final String PACKED_REFS_PEELED = " peeled"; //$NON-NLS-1$
 
 	private final Repository parent;
 
@@ -109,31 +119,18 @@ class RefDirectory extends RefDatabase {
 
 	private final File packedRefsFile;
 
-	/** Lock to protect {@link #cache}. */
-	private final Object cacheLock;
-
 	/**
-	 * Map of reference name (e.g. {@code refs/heads/master}) to definition.
+	 * Immutable sorted list of loose references.
 	 * <p>
-	 * Each named reference stored may have up to two {@link Ref} instances in
-	 * the holder. The first, {@link RefHolder#packRef} exists only if the
-	 * reference was parsed out of the {@code packed-refs} file. The second,
-	 * {@link RefHolder#currRef} is always pointing to the current definition.
-	 * <p>
-	 * Symbolic references (such as {@code HEAD}) are stored by creating a
-	 * {@link SymbolicRef} whose target is always a {@link Ref.Storage#NEW}
-	 * {@link ObjectIdRef} with a null ObjectId. When reading the symbolic
-	 * reference from this map the target is resolved dynamically by calling the
-	 * {@link #resolve(Ref, int, String)} method, and a cloned reference is
-	 * returned to the caller.
+	 * Symbolic references in this collection are stored unresolved, that is
+	 * their target appears to be a new reference with no ObjectId. These are
+	 * converted into resolved references during a get operation, ensuring the
+	 * live value is always returned.
 	 */
-	private Map<String, RefHolder> cache;
+	private final AtomicReference<RefList<LooseRef>> looseRefs = new AtomicReference<RefList<LooseRef>>();
 
-	/** Last length of the packed-refs file when we read it. */
-	private long packedRefsLastLength;
-
-	/** Last modified time of the packed-refs file when we read it. */
-	private long packedRefsLastModified;
+	/** Immutable sorted list of packed references. */
+	private final AtomicReference<PackedRefList> packedRefs = new AtomicReference<PackedRefList>();
 
 	/**
 	 * Number of modifications made to this database.
@@ -141,7 +138,7 @@ class RefDirectory extends RefDatabase {
 	 * This counter is incremented when a change is made, or detected from the
 	 * filesystem during a read operation.
 	 */
-	private volatile int modCnt;
+	private final AtomicInteger modCnt = new AtomicInteger();
 
 	/**
 	 * Last {@link #modCnt} that we sent to listeners.
@@ -159,8 +156,8 @@ class RefDirectory extends RefDatabase {
 		logsRefsDir = FS.resolve(gitDir, LOGS + '/' + R_REFS);
 		packedRefsFile = FS.resolve(gitDir, PACKED_REFS);
 
-		cacheLock = new Object();
-		cache = new HashMap<String, RefHolder>();
+		looseRefs.set(RefList.<LooseRef> emptyList());
+		packedRefs.set(PackedRefList.NO_PACKED_REFS);
 	}
 
 	Repository getRepository() {
@@ -177,26 +174,70 @@ class RefDirectory extends RefDatabase {
 		new File(logsRefsDir, R_HEADS.substring(R_REFS.length())).mkdir();
 	}
 
+	@Override
+	public void close() {
+		// We have no resources to close.
+	}
+
 	void rescan() {
-		synchronized (cacheLock) {
-			cache = new HashMap<String, RefHolder>();
-			packedRefsLastModified = 0;
-			packedRefsLastLength = 0;
-		}
+		looseRefs.set(RefList.<LooseRef> emptyList());
+		packedRefs.set(PackedRefList.NO_PACKED_REFS);
 	}
 
 	@Override
-	public Ref getRef(String name) throws IOException {
-		Ref ref = null;
-		synchronized (cacheLock) {
-			scanPackedRefs();
+	public boolean isNameConflicting(String name) throws IOException {
+		RefList<Ref> packed = getPackedRefs();
+		RefList<LooseRef> loose = getLooseRefs();
 
-			for (String prefix : SEARCH_PATH) {
-				ref = scanRef(prefix + name);
-				if (ref != null) {
-					ref = resolve(ref, 0, null);
-					break;
-				}
+		// Cannot be nested within an existing reference.
+		int lastSlash = name.lastIndexOf('/');
+		while (0 < lastSlash) {
+			String needle = name.substring(0, lastSlash);
+			if (loose.contains(needle) || packed.contains(needle))
+				return true;
+			lastSlash = name.lastIndexOf('/', lastSlash - 1);
+		}
+
+		// Cannot be the container of an existing reference.
+		String prefix = name + '/';
+		int idx;
+
+		idx = -(packed.find(prefix) + 1);
+		if (idx < packed.size() && packed.get(idx).getName().startsWith(prefix))
+			return true;
+
+		idx = -(loose.find(prefix) + 1);
+		if (idx < loose.size() && loose.get(idx).getName().startsWith(prefix))
+			return true;
+
+		return false;
+	}
+
+	private RefList<LooseRef> getLooseRefs() {
+		final RefList<LooseRef> oldLoose = looseRefs.get();
+
+		LooseScanner scan = new LooseScanner(oldLoose);
+		scan.scan(ALL);
+
+		RefList<LooseRef> loose;
+		if (scan.newLoose != null) {
+			loose = scan.newLoose.toRefList();
+			if (looseRefs.compareAndSet(oldLoose, loose))
+				modCnt.incrementAndGet();
+		} else
+			loose = oldLoose;
+		return loose;
+	}
+
+	@Override
+	public Ref getRef(final String needle) throws IOException {
+		final RefList<Ref> packed = getPackedRefs();
+		Ref ref = null;
+		for (String prefix : SEARCH_PATH) {
+			ref = readRef(prefix + needle, packed);
+			if (ref != null) {
+				ref = resolve(ref, 0, null, null, packed);
+				break;
 			}
 		}
 		fireRefsChanged();
@@ -205,85 +246,227 @@ class RefDirectory extends RefDatabase {
 
 	@Override
 	public Map<String, Ref> getRefs(String prefix) throws IOException {
-		Map<String, Ref> out;
-		synchronized (cacheLock) {
-			scanPackedRefs();
+		final RefList<Ref> packed = getPackedRefs();
+		final RefList<LooseRef> oldLoose = looseRefs.get();
 
-			if (prefix.equals(ALL)) {
-				scanLooseRefs(R_REFS, refsDir);
-				scanRef(HEAD);
-			} else if (prefix.startsWith(R_REFS)) {
-				String name = prefix.substring(R_REFS.length());
-				scanLooseRefs(prefix, new File(refsDir, name));
+		LooseScanner scan = new LooseScanner(oldLoose);
+		scan.scan(prefix);
+
+		RefList<LooseRef> loose;
+		if (scan.newLoose != null) {
+			loose = scan.newLoose.toRefList();
+			if (looseRefs.compareAndSet(oldLoose, loose))
+				modCnt.incrementAndGet();
+		} else
+			loose = oldLoose;
+		fireRefsChanged();
+
+		RefList.Builder<Ref> symbolic = scan.symbolic;
+		for (int idx = 0; idx < symbolic.size();) {
+			Ref ref = symbolic.get(idx);
+			ref = resolve(ref, 0, prefix, loose, packed);
+			if (ref != null && ref.getObjectId() != null) {
+				symbolic.set(idx, ref);
+				idx++;
+			} else {
+				// A broken symbolic reference, we have to drop it from the
+				// collections the client is about to receive. Should be a
+				// rare occurrence so pay a copy penalty.
+				loose = loose.remove(idx);
+				symbolic.remove(idx);
 			}
+		}
 
-			out = new HashMap<String, Ref>(Math.max(cache.size() * 2, 16));
-			for (RefHolder holder : cache.values()) {
-				Ref ref = holder.currRef;
-				if (ref.getName().startsWith(prefix)) {
-					ref = resolve(ref, 0, prefix);
-					if (ref != null && ref.getObjectId() != null)
-						out.put(ref.getName().substring(prefix.length()), ref);
+		return new RefMap(prefix, packed, upcast(loose), symbolic.toRefList());
+	}
+
+	@SuppressWarnings("unchecked")
+	private RefList<Ref> upcast(RefList<? extends Ref> loose) {
+		return (RefList<Ref>) loose;
+	}
+
+	private class LooseScanner {
+		private final RefList<LooseRef> curLoose;
+
+		private int curIdx;
+
+		final RefList.Builder<Ref> symbolic = new RefList.Builder<Ref>(4);
+
+		RefList.Builder<LooseRef> newLoose;
+
+		LooseScanner(final RefList<LooseRef> curLoose) {
+			this.curLoose = curLoose;
+		}
+
+		void scan(String prefix) {
+			if (ALL.equals(prefix)) {
+				scanOne(HEAD);
+				scanTree(R_REFS, refsDir);
+
+				// If any entries remain, they are deleted, drop them.
+				if (newLoose == null && curIdx < curLoose.size())
+					newLoose = curLoose.copy(curIdx);
+
+			} else if (prefix.startsWith(R_REFS) && prefix.endsWith("/")) {
+				curIdx = -(curLoose.find(prefix) + 1);
+				File dir = new File(refsDir, prefix.substring(R_REFS.length()));
+				scanTree(prefix, dir);
+
+				// Skip over entries still within the prefix; these have
+				// been removed from the directory.
+				while (curIdx < curLoose.size()) {
+					if (!curLoose.get(curIdx).getName().startsWith(prefix))
+						break;
+					if (newLoose == null)
+						newLoose = curLoose.copy(curIdx);
+					curIdx++;
+				}
+
+				// Keep any entries outside of the prefix space, we
+				// do not know anything about their status.
+				if (newLoose != null) {
+					while (curIdx < curLoose.size())
+						newLoose.add(curLoose.get(curIdx++));
 				}
 			}
 		}
-		fireRefsChanged();
-		return out;
+
+		private void scanTree(String prefix, File dir) {
+			final String[] entries = dir.list(LockFile.FILTER);
+			if (entries != null && 0 < entries.length) {
+				Arrays.sort(entries);
+				for (String name : entries) {
+					File e = new File(dir, name);
+					if (e.isDirectory())
+						scanTree(prefix + name + '/', e);
+					else
+						scanOne(prefix + name);
+				}
+			}
+		}
+
+		private void scanOne(String name) {
+			LooseRef cur;
+
+			if (curIdx < curLoose.size()) {
+				do {
+					cur = curLoose.get(curIdx);
+					int cmp = RefComparator.compareTo(cur, name);
+					if (cmp < 0) {
+						// Reference is not loose anymore, its been deleted.
+						// Skip the name in the new result list.
+						if (newLoose == null)
+							newLoose = curLoose.copy(curIdx);
+						curIdx++;
+						cur = null;
+						continue;
+					}
+
+					if (cmp > 0) // Newly discovered loose reference.
+						cur = null;
+					break;
+				} while (curIdx < curLoose.size());
+			} else
+				cur = null; // Newly discovered loose reference.
+
+			LooseRef n;
+			try {
+				n = scanRef(cur, name);
+			} catch (IOException notValid) {
+				n = null;
+			}
+
+			if (n != null) {
+				if (cur != n && newLoose == null)
+					newLoose = curLoose.copy(curIdx);
+				if (newLoose != null)
+					newLoose.add(n);
+				if (n.isSymbolic())
+					symbolic.add(n);
+			} else if (cur != null) {
+				// Tragically, this file is no longer a loose reference.
+				// Kill our cached entry of it.
+				if (newLoose == null)
+					newLoose = curLoose.copy(curIdx);
+			}
+
+			if (cur != null)
+				curIdx++;
+		}
 	}
 
 	@Override
 	public Ref peel(final Ref ref) throws IOException {
-		final Ref cur = ref.getLeaf();
-		if (cur.isPeeled() || cur.getObjectId() == null)
+		final Ref leaf = ref.getLeaf();
+		if (leaf.isPeeled() || leaf.getObjectId() == null)
 			return ref;
 
 		RevWalk rw = new RevWalk(getRepository());
-		RevObject obj = rw.parseAny(cur.getObjectId());
+		RevObject obj = rw.parseAny(leaf.getObjectId());
+		ObjectIdRef newLeaf;
 		if (obj instanceof RevTag) {
 			do {
 				obj = rw.parseAny(((RevTag) obj).getObject());
 			} while (obj instanceof RevTag);
+
+			newLeaf = new ObjectIdRef.PeeledTag(leaf.getStorage(), leaf
+					.getName(), leaf.getObjectId(), obj.copy());
 		} else {
-			obj = null;
+			newLeaf = new ObjectIdRef.PeeledNonTag(leaf.getStorage(), leaf
+					.getName(), leaf.getObjectId());
 		}
 
-		ObjectIdRef newLeaf = new ObjectIdRef(cur.getStorage(), cur.getName(),
-				cur.getObjectId(), obj != null ? obj.copy() : null, true);
-
 		// Try to remember this peeling in the cache, so we don't have to do
-		// it again in the future. But we only bother with the update if the
-		// reference hasn't changed since we last read it.
-		synchronized (cacheLock) {
-			RefHolder h = cache.get(cur.getName());
-			if (h != null && cur.getObjectId().equals(h.currRef.getObjectId()))
-				h.currRef = newLeaf;
+		// it again in the future, but only if the reference is unchanged.
+		if (leaf.getStorage().isLoose()) {
+			RefList<LooseRef> curList = looseRefs.get();
+			int idx = curList.find(leaf.getName());
+			if (0 <= idx && curList.get(idx) == leaf) {
+				LooseRef asPeeled = ((LooseRef) leaf).peel(newLeaf);
+				RefList<LooseRef> newList = curList.set(idx, asPeeled);
+				looseRefs.compareAndSet(curList, newList);
+			}
 		}
 
 		return recreate(ref, newLeaf);
 	}
 
 	private static Ref recreate(final Ref old, final ObjectIdRef leaf) {
-		if (old instanceof SymbolicRef) {
-			Ref dst = recreate(((SymbolicRef) old).getTarget(), leaf);
-			return new SymbolicRef(dst, old.getName());
+		if (old.isSymbolic()) {
+			Ref dst = recreate(old.getTarget(), leaf);
+			return new SymbolicRef(old.getName(), dst);
 		}
 		return leaf;
 	}
 
 	@Override
+	public void link(String name, String target) throws IOException {
+		LockFile lck = new LockFile(fileFor(name));
+		if (!lck.lock())
+			throw new IOException("Cannot lock " + name);
+		lck.setNeedStatInformation(true);
+		try {
+			lck.write(encode(SYMREF + target + '\n'));
+			if (!lck.commit())
+				throw new IOException("Cannot write " + name);
+		} finally {
+			lck.unlock();
+		}
+		putLooseRef(newSymbolicRef(lck.getCommitLastModified(), name, target));
+		fireRefsChanged();
+	}
+
+	@Override
 	public RefDirectoryUpdate newUpdate(String name, boolean detach)
 			throws IOException {
-		Ref ref;
-		synchronized (cacheLock) {
-			scanPackedRefs();
-			ref = scanRef(name);
-			if (ref != null)
-				ref = resolve(ref, 0, null);
-		}
+		final RefList<Ref> packed = getPackedRefs();
+		Ref ref = readRef(name, packed);
+		if (ref != null)
+			ref = resolve(ref, 0, null, null, packed);
 		if (ref == null)
-			ref = new ObjectIdRef(Ref.Storage.NEW, name, null);
-		else if (detach && ref instanceof SymbolicRef)
-			ref = new ObjectIdRef(Ref.Storage.LOOSE, name, ref.getObjectId());
+			ref = new ObjectIdRef.Unpeeled(NEW, name, null);
+		else if (detach && ref.isSymbolic())
+			ref = new ObjectIdRef.Unpeeled(LOOSE, name, ref.getObjectId());
 		return new RefDirectoryUpdate(this, ref);
 	}
 
@@ -295,51 +478,19 @@ class RefDirectory extends RefDatabase {
 		return new RefDirectoryRename(from, to);
 	}
 
-	void stored(RefDirectoryUpdate update, long lastModified) {
-		Ref dst = update.getRef().getLeaf();
-		String name = dst.getName();
-		synchronized (cacheLock) {
-			RefHolder holder = cache.get(name);
-			if (holder != null)
-				name = holder.currRef.getName();
-			else {
-				holder = new RefHolder();
-				cache.put(name, holder);
-			}
-
-			Ref.Storage storage;
-			if (holder.packRef != null)
-				storage = Ref.Storage.LOOSE_PACKED;
-			else
-				storage = Ref.Storage.LOOSE;
-			ObjectId id = update.getNewObjectId().copy();
-			holder.currRef = new ObjectIdRef(storage, name, id);
-			holder.looseModified = lastModified;
-			modCnt++;
-		}
-		fireRefsChanged();
+	void stored(RefDirectoryUpdate update, long modified) {
+		final ObjectId target = update.getNewObjectId().copy();
+		final Ref leaf = update.getRef().getLeaf();
+		putLooseRef(new LooseUnpeeled(modified, leaf.getName(), target));
 	}
 
-	void storedSymbolicRef(RefDirectoryUpdate u, long modified, String target)
-			throws IOException {
-		String name = u.getRef().getName();
-		synchronized (cacheLock) {
-			RefHolder holder = cache.get(name);
-			if (holder != null) {
-				if (holder.packRef != null) {
-					holder.packRef = null;
-					savePackedRefs();
-				}
-				name = holder.currRef.getName();
-			} else {
-				holder = new RefHolder();
-				cache.put(name, holder);
-			}
-
-			holder.currRef = newSymbolicRef(name, target);
-			holder.looseModified = modified;
-			modCnt++;
-		}
+	private void putLooseRef(LooseRef ref) {
+		RefList<LooseRef> cList, nList;
+		do {
+			cList = looseRefs.get();
+			nList = cList.put(ref);
+		} while (!looseRefs.compareAndSet(cList, nList));
+		modCnt.incrementAndGet();
 		fireRefsChanged();
 	}
 
@@ -347,12 +498,32 @@ class RefDirectory extends RefDatabase {
 		Ref dst = update.getRef().getLeaf();
 		String name = dst.getName();
 
-		synchronized (cacheLock) {
-			scanPackedRefs();
-			RefHolder holder = cache.remove(name);
-			if (holder.packRef != null)
-				savePackedRefs();
+		// Write the packed-refs file using an atomic update. We might
+		// wind up reading it twice, before and after the lock, to ensure
+		// we don't miss an edit made externally.
+		final PackedRefList packed = getPackedRefs();
+		if (packed.contains(name)) {
+			LockFile lck = new LockFile(packedRefsFile);
+			if (!lck.lock())
+				throw new IOException("Cannot lock " + packedRefsFile);
+			try {
+				PackedRefList cur = readPackedRefs(0, 0);
+				int idx = cur.find(name);
+				if (0 <= idx)
+					commitPackedRefs(lck, cur.remove(idx), packed);
+			} finally {
+				lck.unlock();
+			}
 		}
+
+		RefList<LooseRef> curLoose, newLoose;
+		do {
+			curLoose = looseRefs.get();
+			int idx = curLoose.find(name);
+			if (idx < 0)
+				break;
+			newLoose = curLoose.remove(idx);
+		} while (!looseRefs.compareAndSet(curLoose, newLoose));
 
 		int levels = levelsIn(name) - 2;
 		delete(logFor(name), levels);
@@ -361,14 +532,11 @@ class RefDirectory extends RefDatabase {
 			delete(fileFor(name), levels);
 		}
 
-		synchronized (cacheLock) {
-			modCnt++;
-		}
+		modCnt.incrementAndGet();
 		fireRefsChanged();
 	}
 
-	void log(final RefUpdate update, final String msg, final boolean deref)
-			throws IOException {
+	void log(final RefUpdate update, final String msg) throws IOException {
 		final ObjectId oldId = update.getOldObjectId();
 		final ObjectId newId = update.getNewObjectId();
 		final Ref ref = update.getRef();
@@ -390,12 +558,9 @@ class RefDirectory extends RefDatabase {
 		r.append('\n');
 		final byte[] rec = encode(r.toString());
 
-		if (deref && ref instanceof SymbolicRef) {
+		if (ref.isSymbolic())
 			log(ref.getName(), rec);
-			log(ref.getLeaf().getName(), rec);
-		} else {
-			log(ref.getName(), rec);
-		}
+		log(ref.getLeaf().getName(), rec);
 	}
 
 	private void log(final String refName, final byte[] rec) throws IOException {
@@ -438,76 +603,82 @@ class RefDirectory extends RefDatabase {
 				|| refName.startsWith(R_REMOTES);
 	}
 
-	private Ref resolve(final Ref ref, int depth, String prefix)
-			throws IOException {
-		if (ref instanceof SymbolicRef) {
-			Ref dst = ((SymbolicRef) ref).getTarget();
+	private Ref resolve(final Ref ref, int depth, String prefix,
+			RefList<LooseRef> loose, RefList<Ref> packed) throws IOException {
+		if (ref.isSymbolic()) {
+			Ref dst = ref.getTarget();
 
 			if (MAX_SYMBOLIC_REF_DEPTH <= depth)
 				return null; // claim it doesn't exist
 
 			// If the cached value can be assumed to be current due to a
 			// recent scan of the loose directory, use it.
-			if (prefix != null && dst.getName().startsWith(prefix)) {
-				RefHolder h = cache.get(dst.getName());
-				if (h == null)
+			if (loose != null && dst.getName().startsWith(prefix)) {
+				int idx;
+				if (0 <= (idx = loose.find(dst.getName())))
+					dst = loose.get(idx);
+				else if (0 <= (idx = packed.find(dst.getName())))
+					dst = packed.get(idx);
+				else
 					return ref;
-				dst = h.currRef;
 			} else {
-				dst = scanRef(dst.getName());
+				dst = readRef(dst.getName(), packed);
 				if (dst == null)
 					return ref;
 			}
 
-			dst = resolve(dst, depth + 1, prefix);
+			dst = resolve(dst, depth + 1, prefix, loose, packed);
 			if (dst == null)
 				return null;
-			return new SymbolicRef(dst, ref.getName());
+			return new SymbolicRef(ref.getName(), dst);
 		}
 		return ref;
 	}
 
-	/* ensure the current packed-refs is loaded into memory. */
-	private void scanPackedRefs() throws IOException {
-		long sz = packedRefsFile.length();
-		long mt = packedRefsFile.lastModified();
-		if (sz != packedRefsLastLength && mt != packedRefsLastModified)
-			reloadPackedRefs(sz, mt);
+	private PackedRefList getPackedRefs() throws IOException {
+		long size = packedRefsFile.length();
+		long mtime = size != 0 ? packedRefsFile.lastModified() : 0;
+
+		final PackedRefList curList = packedRefs.get();
+		if (size == curList.lastSize && mtime == curList.lastModified)
+			return curList;
+
+		final PackedRefList newList = readPackedRefs(size, mtime);
+		if (packedRefs.compareAndSet(curList, newList))
+			modCnt.incrementAndGet();
+		return newList;
 	}
 
-	private void reloadPackedRefs(long length, long modified)
+	private PackedRefList readPackedRefs(long size, long mtime)
 			throws IOException {
-		Map<String, RefHolder> next;
+		final BufferedReader br;
 		try {
-			final BufferedReader b = openReader(packedRefsFile);
-			try {
-				next = parsePackedRefs(b);
-			} finally {
-				b.close();
-			}
+			br = new BufferedReader(new InputStreamReader(new FileInputStream(
+					packedRefsFile), CHARSET));
 		} catch (FileNotFoundException noPackedRefs) {
-			// Ignore it and leave the new map empty.
-			next = new HashMap<String, RefHolder>();
+			// Ignore it and leave the new list empty.
+			return PackedRefList.NO_PACKED_REFS;
 		}
-
-		cache = next;
-		packedRefsLastModified = modified;
-		packedRefsLastLength = length;
-		modCnt++;
+		try {
+			return new PackedRefList(parsePackedRefs(br), size, mtime);
+		} finally {
+			br.close();
+		}
 	}
 
-	private Map<String, RefHolder> parsePackedRefs(final BufferedReader b)
+	private RefList<Ref> parsePackedRefs(final BufferedReader br)
 			throws IOException {
-		Map<String, RefHolder> all = new HashMap<String, RefHolder>();
+		RefList.Builder<Ref> all = new RefList.Builder<Ref>();
 		Ref last = null;
 		boolean peeled = false;
+		boolean needSort = false;
 
 		String p;
-		while ((p = b.readLine()) != null) {
+		while ((p = br.readLine()) != null) {
 			if (p.charAt(0) == '#') {
 				if (p.startsWith(PACKED_REFS_HEADER)) {
 					p = p.substring(PACKED_REFS_HEADER.length());
-					peeled = p.contains(" peeled"); //$NON-NLS-1$
+					peeled = p.contains(PACKED_REFS_PEELED);
 				}
 				continue;
 			}
@@ -517,134 +688,156 @@ class RefDirectory extends RefDatabase {
 					throw new IOException("Peeled line before ref.");
 
 				ObjectId id = ObjectId.fromString(p.substring(1));
-				last = new ObjectIdRef(Ref.Storage.PACKED, last.getName(), last
-						.getObjectId(), id, true);
-				all.put(last.getName(), packedHolder(last));
+				last = new ObjectIdRef.PeeledTag(PACKED, last.getName(), last
+						.getObjectId(), id);
+				all.set(all.size() - 1, last);
 				continue;
 			}
 
 			int sp = p.indexOf(' ');
 			ObjectId id = ObjectId.fromString(p.substring(0, sp));
 			String name = copy(p, sp + 1, p.length());
-			last = new ObjectIdRef(Ref.Storage.PACKED, name, id, null, peeled);
-			all.put(last.getName(), packedHolder(last));
+			ObjectIdRef cur;
+			if (peeled)
+				cur = new ObjectIdRef.PeeledNonTag(PACKED, name, id);
+			else
+				cur = new ObjectIdRef.Unpeeled(PACKED, name, id);
+			if (last != null && RefComparator.compareTo(last, cur) > 0)
+				needSort = true;
+			all.add(cur);
+			last = cur;
 		}
-		return all;
+
+		if (needSort)
+			all.sort();
+		return all.toRefList();
 	}
 
-	private void savePackedRefs() throws IOException {
-		ArrayList<Ref> toPack = new ArrayList<Ref>(cache.size());
-		for (RefHolder holder : cache.values())
-			if (holder.packRef != null)
-				toPack.add(holder.packRef);
-		new RefWriter(toPack) {
+	private static String copy(final String src, final int off, final int end) {
+		// Don't use substring since it could leave a reference to the much
+		// larger existing string. Force construction of a full new object.
+		return new StringBuilder(end - off).append(src, off, end).toString();
+	}
+
+	private void commitPackedRefs(final LockFile lck, final RefList<Ref> refs,
+			final PackedRefList oldPackedList) throws IOException {
+		new RefWriter(refs) {
 			@Override
 			protected void writeFile(String name, byte[] content)
 					throws IOException {
-				packedRefsLastModified = write(packedRefsFile, content);
-				packedRefsLastLength = content.length;
+				lck.setNeedStatInformation(true);
+				try {
+					lck.write(content);
+				} catch (IOException ioe) {
+					throw new ObjectWritingException("Unable to write " + name,
+							ioe);
+				}
+				try {
+					lck.waitForStatChange();
+				} catch (InterruptedException e) {
+					lck.unlock();
+					throw new ObjectWritingException("Interrupted writing "
+							+ name);
+				}
+				if (!lck.commit())
+					throw new ObjectWritingException("Unable to write " + name);
+
+				packedRefs.compareAndSet(oldPackedList, new PackedRefList(refs,
+						content.length, lck.getCommitLastModified()));
 			}
 		}.writePackedRefs();
 	}
 
-	private void scanLooseRefs(final String prefix, final File dir) {
-		final File[] entries = dir.listFiles(LockFile.FILTER);
-		if (entries != null) {
-			for (final File ent : entries) {
-				final String name = ent.getName();
-				if (ent.isDirectory()) {
-					scanLooseRefs(prefix + name + '/', ent);
-				} else {
-					try {
-						scanRef(prefix + name);
-					} catch (IOException e) {
-						continue;
-					}
-				}
+	private Ref readRef(String name, RefList<Ref> packed) throws IOException {
+		final RefList<LooseRef> curList = looseRefs.get();
+		final int idx = curList.find(name);
+		if (0 <= idx) {
+			final LooseRef o = curList.get(idx);
+			final LooseRef n = scanRef(o, name);
+			if (n == null) {
+				if (looseRefs.compareAndSet(curList, curList.remove(idx)))
+					modCnt.incrementAndGet();
+				return packed.get(name);
 			}
+
+			if (o == n)
+				return n;
+			if (looseRefs.compareAndSet(curList, curList.set(idx, n)))
+				modCnt.incrementAndGet();
+			return n;
 		}
+
+		final LooseRef n = scanRef(null, name);
+		if (n == null)
+			return packed.get(name);
+		if (looseRefs.compareAndSet(curList, curList.add(idx, n)))
+			modCnt.incrementAndGet();
+		return n;
 	}
 
-	private Ref scanRef(String name) throws IOException {
+	private LooseRef scanRef(LooseRef ref, String name) throws IOException {
 		final File path = fileFor(name);
 		final long modified = path.lastModified();
-		Ref ref;
 
-		RefHolder holder = cache.get(name);
-		if (holder != null) {
-			ref = holder.currRef;
-			if (holder.looseModified == modified)
+		if (ref != null) {
+			if (ref.getLastModified() == modified)
 				return ref;
 			name = ref.getName();
-		} else {
-			if (modified == 0)
-				return null;
-			ref = null;
-		}
-
-		String content = read(path);
-		if ("".equals(content)) {
-			// Loose file doesn't exist, or exists but is empty.
-			// We might still have a packed copy, or its gone.
-			if (holder != null) {
-				ref = holder.packRef;
-				if (ref != null) {
-					holder.currRef = ref;
-					holder.looseModified = modified;
-					modCnt++;
-					return ref;
-				}
-				cache.remove(name);
-				modCnt++;
-			}
+		} else if (modified == 0)
 			return null;
+
+		final byte[] buf;
+		try {
+			buf = IO.readFully(path, 4096);
+		} catch (FileNotFoundException noFile) {
+			return null; // doesn't exist; not a reference.
 		}
 
-		if (content.startsWith(SYMREF)) {
-			ref = newSymbolicRef(name, copy(content, SYMREF.length()));
+		int n = buf.length;
+		if (n == 0)
+			return null; // empty file; not a reference.
 
-		} else {
-			final ObjectId id;
-			try {
-				if (content.length() > OBJECT_ID_STRING_LENGTH)
-					content = content.substring(0, OBJECT_ID_STRING_LENGTH);
-				id = ObjectId.fromString(content);
-			} catch (IllegalArgumentException notRef) {
+		if (isSymRef(buf, n)) {
+			// trim trailing whitespace
+			while (0 < n && Character.isWhitespace(buf[n - 1]))
+				n--;
+			if (n < 6) {
+				String content = RawParseUtils.decode(buf, 0, n);
 				throw new IOException("Not a ref: " + name + ": " + content);
 			}
-
-			if (holder != null) {
-				final Ref.Storage storage;
-				if (holder.packRef != null)
-					storage = Ref.Storage.LOOSE_PACKED;
-				else
-					storage = Ref.Storage.LOOSE;
-
-				if (id.equals(ref.getObjectId()))
-					ref = new ObjectIdRef(storage, name, id, ref
-							.getPeeledObjectId(), ref.isPeeled());
-				else
-					ref = new ObjectIdRef(storage, name, id);
-			} else {
-				ref = new ObjectIdRef(Ref.Storage.LOOSE, name, id);
-			}
+			final String target = RawParseUtils.decode(buf, 5, n);
+			return newSymbolicRef(modified, name, target);
 		}
 
-		if (holder == null) {
-			holder = new RefHolder();
-			cache.put(name, holder);
-		}
+		if (n < OBJECT_ID_STRING_LENGTH)
+			return null; // impossibly short object identifier; not a reference.
 
-		holder.currRef = ref;
-		holder.looseModified = modified;
-		modCnt++;
-		return ref;
+		final ObjectId id;
+		try {
+			id = ObjectId.fromString(buf, 0);
+		} catch (IllegalArgumentException notRef) {
+			while (0 < n && Character.isWhitespace(buf[n - 1]))
+				n--;
+			String content = RawParseUtils.decode(buf, 0, n);
+			throw new IOException("Not a ref: " + name + ": " + content);
+		}
+		return new LooseUnpeeled(modified, name, id);
+	}
+
+	private static boolean isSymRef(final byte[] buf, int n) {
+		if (n < 6)
+			return false;
+		return /**/buf[0] == 'r' //
+				&& buf[1] == 'e' //
+				&& buf[2] == 'f' //
+				&& buf[3] == ':' //
+				&& buf[4] == ' ';
 	}
 
 	/** If the parent should fire listeners, fires them. */
 	private void fireRefsChanged() {
-		final int curr = modCnt;
 		final int last = lastNotifiedModCnt.get();
+		final int curr = modCnt.get();
 		if (last != curr && lastNotifiedModCnt.compareAndSet(last, curr))
 			parent.fireRefsChanged();
 	}
@@ -659,7 +852,7 @@ class RefDirectory extends RefDatabase {
 	RefDirectoryUpdate newTemporaryUpdate() throws IOException {
 		File tmp = File.createTempFile("renamed_", "_ref", refsDir);
 		String name = Constants.R_REFS + tmp.getName();
-		Ref ref = new ObjectIdRef(Ref.Storage.NEW, name, null);
+		Ref ref = new ObjectIdRef.Unpeeled(NEW, name, null);
 		return new RefDirectoryUpdate(this, ref);
 	}
 
@@ -669,7 +862,7 @@ class RefDirectory extends RefDatabase {
 	 * @param name
 	 *            name of the ref, relative to the Git repository top level
 	 *            directory (so typically starts with refs/).
-	 * @return the file location.
+	 * @return the loose file location.
 	 */
 	File fileFor(String name) {
 		if (name.startsWith(R_REFS)) {
@@ -679,6 +872,14 @@ class RefDirectory extends RefDatabase {
 		return new File(gitDir, name);
 	}
 
+	/**
+	 * Locate the log file on disk for a single reference name.
+	 *
+	 * @param name
+	 *            name of the ref, relative to the Git repository top level
+	 *            directory (so typically starts with refs/).
+	 * @return the log file location.
+	 */
 	File logFor(String name) {
 		if (name.startsWith(R_REFS)) {
 			name = name.substring(R_REFS.length());
@@ -694,59 +895,6 @@ class RefDirectory extends RefDatabase {
 		return count;
 	}
 
-	private static String copy(String src, int off) {
-		return copy(src, off, src.length());
-	}
-
-	private static String copy(final String src, final int off, final int end) {
-		return new StringBuilder(end - off).append(src, off, end).toString();
-	}
-
-	private static String read(final File file) throws IOException {
-		final byte[] buf;
-		try {
-			buf = IO.readFully(file, 4096);
-		} catch (FileNotFoundException noFile) {
-			return "";
-		}
-
-		// remove trailing whitespace
-		int n = buf.length;
-		while (n > 0 && Character.isWhitespace(buf[n - 1]))
-			n--;
-		if (n == 0)
-			return "";
-		return RawParseUtils.decode(buf, 0, n);
-	}
-
-	private static BufferedReader openReader(final File path)
-			throws FileNotFoundException {
-		FileInputStream in = new FileInputStream(path);
-		return new BufferedReader(new InputStreamReader(in, CHARSET));
-	}
-
-	private static long write(File file, byte[] content) throws IOException {
-		String name = file.getName();
-		LockFile lck = new LockFile(file);
-		lck.setNeedStatInformation(true);
-		if (!lck.lock())
-			throw new ObjectWritingException("Unable to lock " + name);
-		try {
-			lck.write(content);
-		} catch (IOException ioe) {
-			throw new ObjectWritingException("Unable to write " + name, ioe);
-		}
-		try {
-			lck.waitForStatChange();
-		} catch (InterruptedException e) {
-			lck.unlock();
-			throw new ObjectWritingException("Interrupted writing " + name);
-		}
-		if (!lck.commit())
-			throw new ObjectWritingException("Unable to write " + name);
-		return lck.getCommitLastModified();
-	}
-
 	static void delete(final File file, final int depth) throws IOException {
 		if (!file.delete() && file.isFile())
 			throw new IOException("File cannot be deleted: " + file);
@@ -759,26 +907,109 @@ class RefDirectory extends RefDatabase {
 		}
 	}
 
-	private static Ref newSymbolicRef(String name, String target) {
-		Ref dst = new ObjectIdRef(Ref.Storage.NEW, target, null);
-		return new SymbolicRef(dst, name);
+	private static class PackedRefList extends RefList<Ref> {
+		static final PackedRefList NO_PACKED_REFS = new PackedRefList(RefList
+				.emptyList(), 0, 0);
+
+		/** Last length of the packed-refs file when we read it. */
+		final long lastSize;
+
+		/** Last modified time of the packed-refs file when we read it. */
+		final long lastModified;
+
+		PackedRefList(RefList<Ref> src, long size, long mtime) {
+			super(src);
+			lastSize = size;
+			lastModified = mtime;
+		}
 	}
 
-	private static RefHolder packedHolder(Ref r) {
-		RefHolder h = new RefHolder();
-		h.packRef = r;
-		h.currRef = r;
-		return h;
+	private static LooseSymbolicRef newSymbolicRef(long lastModified,
+			String name, String target) {
+		Ref dst = new ObjectIdRef.Unpeeled(NEW, target, null);
+		return new LooseSymbolicRef(lastModified, name, dst);
 	}
 
-	private static class RefHolder {
-		/** Original ref read from the packed-refs file; null if only loose. */
-		Ref packRef;
+	private static interface LooseRef extends Ref {
+		long getLastModified();
 
-		/** Current value of the reference; never null. */
-		Ref currRef;
+		LooseRef peel(ObjectIdRef newLeaf);
+	}
 
-		/** Last time the loose file was modified; 0 if not exists. */
-		long looseModified;
+	private final static class LoosePeeledTag extends ObjectIdRef.PeeledTag
+			implements LooseRef {
+		private final long lastModified;
+
+		LoosePeeledTag(long mtime, String refName, ObjectId id, ObjectId p) {
+			super(LOOSE, refName, id, p);
+			this.lastModified = mtime;
+		}
+
+		public long getLastModified() {
+			return lastModified;
+		}
+
+		public LooseRef peel(ObjectIdRef newLeaf) {
+			return this;
+		}
+	}
+
+	private final static class LooseNonTag extends ObjectIdRef.PeeledNonTag
+			implements LooseRef {
+		private final long lastModified;
+
+		LooseNonTag(long mtime, String refName, ObjectId id) {
+			super(LOOSE, refName, id);
+			this.lastModified = mtime;
+		}
+
+		public long getLastModified() {
+			return lastModified;
+		}
+
+		public LooseRef peel(ObjectIdRef newLeaf) {
+			return this;
+		}
+	}
+
+	private final static class LooseUnpeeled extends ObjectIdRef.Unpeeled
+			implements LooseRef {
+		private final long lastModified;
+
+		LooseUnpeeled(long mtime, String refName, ObjectId id) {
+			super(LOOSE, refName, id);
+			this.lastModified = mtime;
+		}
+
+		public long getLastModified() {
+			return lastModified;
+		}
+
+		public LooseRef peel(ObjectIdRef newLeaf) {
+			if (newLeaf.getPeeledObjectId() != null)
+				return new LoosePeeledTag(lastModified, getName(),
+						getObjectId(), newLeaf.getPeeledObjectId());
+			else
+				return new LooseNonTag(lastModified, getName(), getObjectId());
+		}
+	}
+
+	private final static class LooseSymbolicRef extends SymbolicRef implements
+			LooseRef {
+		private final long lastModified;
+
+		LooseSymbolicRef(long mtime, String refName, Ref target) {
+			super(refName, target);
+			this.lastModified = mtime;
+		}
+
+		public long getLastModified() {
+			return lastModified;
+		}
+
+		public LooseRef peel(ObjectIdRef newLeaf) {
+			// We should never try to peel the symbolic references.
+			throw new UnsupportedOperationException();
+		}
 	}
 }

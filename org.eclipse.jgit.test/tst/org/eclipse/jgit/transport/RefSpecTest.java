@@ -60,12 +60,12 @@ public class RefSpecTest extends TestCase {
 		assertEquals(sn + ":" + sn, rs.toString());
 		assertEquals(rs, new RefSpec(rs.toString()));
 
-		Ref r = new ObjectIdRef(Ref.Storage.LOOSE, sn, null);
+		Ref r = new ObjectIdRef.Unpeeled(Ref.Storage.LOOSE, sn, null);
 		assertTrue(rs.matchSource(r));
 		assertTrue(rs.matchDestination(r));
 		assertSame(rs, rs.expandFromSource(r));
 
-		r = new ObjectIdRef(Ref.Storage.LOOSE, sn + "-and-more", null);
+		r = new ObjectIdRef.Unpeeled(Ref.Storage.LOOSE, sn + "-and-more", null);
 		assertFalse(rs.matchSource(r));
 		assertFalse(rs.matchDestination(r));
 	}
@@ -92,12 +92,12 @@ public class RefSpecTest extends TestCase {
 		assertEquals("+" + sn + ":" + sn, rs.toString());
 		assertEquals(rs, new RefSpec(rs.toString()));
 
-		Ref r = new ObjectIdRef(Ref.Storage.LOOSE, sn, null);
+		Ref r = new ObjectIdRef.Unpeeled(Ref.Storage.LOOSE, sn, null);
 		assertTrue(rs.matchSource(r));
 		assertTrue(rs.matchDestination(r));
 		assertSame(rs, rs.expandFromSource(r));
 
-		r = new ObjectIdRef(Ref.Storage.LOOSE, sn + "-and-more", null);
+		r = new ObjectIdRef.Unpeeled(Ref.Storage.LOOSE, sn + "-and-more", null);
 		assertFalse(rs.matchSource(r));
 		assertFalse(rs.matchDestination(r));
 	}
@@ -112,12 +112,12 @@ public class RefSpecTest extends TestCase {
 		assertEquals(sn, rs.toString());
 		assertEquals(rs, new RefSpec(rs.toString()));
 
-		Ref r = new ObjectIdRef(Ref.Storage.LOOSE, sn, null);
+		Ref r = new ObjectIdRef.Unpeeled(Ref.Storage.LOOSE, sn, null);
 		assertTrue(rs.matchSource(r));
 		assertFalse(rs.matchDestination(r));
 		assertSame(rs, rs.expandFromSource(r));
 
-		r = new ObjectIdRef(Ref.Storage.LOOSE, sn + "-and-more", null);
+		r = new ObjectIdRef.Unpeeled(Ref.Storage.LOOSE, sn + "-and-more", null);
 		assertFalse(rs.matchSource(r));
 		assertFalse(rs.matchDestination(r));
 	}
@@ -132,12 +132,12 @@ public class RefSpecTest extends TestCase {
 		assertEquals("+" + sn, rs.toString());
 		assertEquals(rs, new RefSpec(rs.toString()));
 
-		Ref r = new ObjectIdRef(Ref.Storage.LOOSE, sn, null);
+		Ref r = new ObjectIdRef.Unpeeled(Ref.Storage.LOOSE, sn, null);
 		assertTrue(rs.matchSource(r));
 		assertFalse(rs.matchDestination(r));
 		assertSame(rs, rs.expandFromSource(r));
 
-		r = new ObjectIdRef(Ref.Storage.LOOSE, sn + "-and-more", null);
+		r = new ObjectIdRef.Unpeeled(Ref.Storage.LOOSE, sn + "-and-more", null);
 		assertFalse(rs.matchSource(r));
 		assertFalse(rs.matchDestination(r));
 	}
@@ -152,12 +152,12 @@ public class RefSpecTest extends TestCase {
 		assertEquals(":" + sn, rs.toString());
 		assertEquals(rs, new RefSpec(rs.toString()));
 
-		Ref r = new ObjectIdRef(Ref.Storage.LOOSE, sn, null);
+		Ref r = new ObjectIdRef.Unpeeled(Ref.Storage.LOOSE, sn, null);
 		assertFalse(rs.matchSource(r));
 		assertTrue(rs.matchDestination(r));
 		assertSame(rs, rs.expandFromSource(r));
 
-		r = new ObjectIdRef(Ref.Storage.LOOSE, sn + "-and-more", null);
+		r = new ObjectIdRef.Unpeeled(Ref.Storage.LOOSE, sn + "-and-more", null);
 		assertFalse(rs.matchSource(r));
 		assertFalse(rs.matchDestination(r));
 	}
@@ -176,7 +176,7 @@ public class RefSpecTest extends TestCase {
 		Ref r;
 		RefSpec expanded;
 
-		r = new ObjectIdRef(Ref.Storage.LOOSE, "refs/heads/master", null);
+		r = new ObjectIdRef.Unpeeled(Ref.Storage.LOOSE, "refs/heads/master", null);
 		assertTrue(rs.matchSource(r));
 		assertFalse(rs.matchDestination(r));
 		expanded = rs.expandFromSource(r);
@@ -186,11 +186,11 @@ public class RefSpecTest extends TestCase {
 		assertEquals(r.getName(), expanded.getSource());
 		assertEquals("refs/remotes/origin/master", expanded.getDestination());
 
-		r = new ObjectIdRef(Ref.Storage.LOOSE, "refs/remotes/origin/next", null);
+		r = new ObjectIdRef.Unpeeled(Ref.Storage.LOOSE, "refs/remotes/origin/next", null);
 		assertFalse(rs.matchSource(r));
 		assertTrue(rs.matchDestination(r));
 
-		r = new ObjectIdRef(Ref.Storage.LOOSE, "refs/tags/v1.0", null);
+		r = new ObjectIdRef.Unpeeled(Ref.Storage.LOOSE, "refs/tags/v1.0", null);
 		assertFalse(rs.matchSource(r));
 		assertFalse(rs.matchDestination(r));
 	}

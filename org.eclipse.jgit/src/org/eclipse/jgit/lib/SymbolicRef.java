@@ -49,45 +49,57 @@ package org.eclipse.jgit.lib;
  * A symbolic reference always derives its current value from the target
  * reference.
  */
-public class SymbolicRef extends Ref {
+public class SymbolicRef implements Ref {
+	private final String name;
+
 	private final Ref target;
 
 	/**
 	 * Create a new ref pairing.
 	 *
-	 * @param target
-	 *            the ref we reference and derive our value from.
 	 * @param refName
 	 *            name of this ref.
+	 * @param target
+	 *            the ref we reference and derive our value from.
 	 */
-	public SymbolicRef(Ref target, String refName) {
-		super(refName);
+	public SymbolicRef(String refName, Ref target) {
+		this.name = refName;
 		this.target = target;
 	}
 
-	/** @return the {@link Ref} this reference derives its value from. */
+	public String getName() {
+		return name;
+	}
+
+	public boolean isSymbolic() {
+		return true;
+	}
+
+	public Ref getLeaf() {
+		Ref dst = getTarget();
+		while (dst.isSymbolic())
+			dst = dst.getTarget();
+		return dst;
+	}
+
 	public Ref getTarget() {
 		return target;
 	}
 
-	@Override
 	public ObjectId getObjectId() {
-		return getTarget().getObjectId();
+		return getLeaf().getObjectId();
 	}
 
-	@Override
 	public Storage getStorage() {
 		return Storage.LOOSE;
 	}
 
-	@Override
 	public ObjectId getPeeledObjectId() {
-		return getTarget().getPeeledObjectId();
+		return getLeaf().getPeeledObjectId();
 	}
 
-	@Override
 	public boolean isPeeled() {
-		return getTarget().isPeeled();
+		return getLeaf().isPeeled();
 	}
 
 	@Override
@@ -95,10 +107,10 @@ public class SymbolicRef extends Ref {
 		StringBuilder r = new StringBuilder();
 		r.append("SymbolicRef[");
 		Ref cur = this;
-		while (cur instanceof SymbolicRef) {
+		while (cur.isSymbolic()) {
 			r.append(cur.getName());
 			r.append(" -> ");
-			cur = ((SymbolicRef) cur).getTarget();
+			cur = cur.getTarget();
 		}
 		r.append(cur.getName());
 		r.append('=');

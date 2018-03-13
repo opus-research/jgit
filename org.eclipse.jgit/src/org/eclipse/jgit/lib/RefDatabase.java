@@ -86,14 +86,10 @@ public abstract class RefDatabase {
 	 * @throws IOException
 	 *             the database could not be created.
 	 */
-	public void create() throws IOException {
-		// Assume no action is required.
-	}
+	public abstract void create() throws IOException;
 
 	/** Close any resources held by this database. */
-	public void close() {
-		// Assume no action is required.
-	}
+	public abstract void close();
 
 	/**
 	 * Determine if a proposed reference name overlaps with an existing one.
@@ -111,6 +107,7 @@ public abstract class RefDatabase {
 	public boolean isNameConflicting(final String name) throws IOException {
 		Map<String, Ref> all = getRefs(ALL);
 
+		// Cannot be nested within an existing reference.
 		int lastSlash = name.lastIndexOf('/');
 		while (0 < lastSlash) {
 			if (all.containsKey(name.substring(0, lastSlash)))
@@ -118,6 +115,7 @@ public abstract class RefDatabase {
 			lastSlash = name.lastIndexOf('/', lastSlash - 1);
 		}
 
+		// Cannot be the container of an existing reference.
 		final String rName = name + '/';
 		for (String other : all.keySet()) {
 			if (other.startsWith(rName))
@@ -126,6 +124,19 @@ public abstract class RefDatabase {
 
 		return false;
 	}
+
+	/**
+	 * Create a symbolic reference from one name to another.
+	 *
+	 * @param name
+	 *            the name of the reference. Should be {@link Constants#HEAD} or
+	 *            starting with {@link Constants#R_REFS}.
+	 * @param target
+	 *            the target of the reference.
+	 * @throws IOException
+	 *             the reference could not be created or overwritten.
+	 */
+	public abstract void link(String name, String target) throws IOException;
 
 	/**
 	 * Create a new update command to create, modify or delete a reference.

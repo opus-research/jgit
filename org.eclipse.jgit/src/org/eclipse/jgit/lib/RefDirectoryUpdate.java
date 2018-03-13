@@ -44,8 +44,6 @@
 
 package org.eclipse.jgit.lib;
 
-import static org.eclipse.jgit.lib.Constants.encode;
-
 import java.io.IOException;
 
 /** Updates any reference stored by {@link RefDirectory}. */
@@ -70,10 +68,8 @@ class RefDirectoryUpdate extends RefUpdate {
 	}
 
 	@Override
-	protected boolean tryLock(boolean deref) throws IOException {
-		Ref dst = getRef();
-		if (deref)
-			dst = dst.getLeaf();
+	protected boolean tryLock() throws IOException {
+		Ref dst = getRef().getLeaf();
 		String name = dst.getName();
 		lock = new LockFile(database.fileFor(name));
 		if (lock.lock()) {
@@ -109,7 +105,7 @@ class RefDirectoryUpdate extends RefUpdate {
 						msg = strResult;
 				}
 			}
-			database.log(this, msg, true);
+			database.log(this, msg);
 		}
 		if (!lock.commit())
 			return Result.LOCK_FAILURE;
@@ -135,22 +131,5 @@ class RefDirectoryUpdate extends RefUpdate {
 		if (getRef().getLeaf().getStorage() != Ref.Storage.NEW)
 			database.delete(this);
 		return status;
-	}
-
-	@Override
-	protected Result doLink(final String target) throws IOException {
-		lock.setNeedStatInformation(true);
-		lock.write(encode(RefDirectory.SYMREF + target + '\n'));
-
-		String msg = getRefLogMessage();
-		if (msg != null)
-			database.log(this, msg, false);
-		if (!lock.commit())
-			return Result.LOCK_FAILURE;
-		database.storedSymbolicRef(this, lock.getCommitLastModified(), target);
-
-		if (getRef().getStorage() == Ref.Storage.NEW)
-			return Result.NEW;
-		return Result.FORCED;
 	}
 }
