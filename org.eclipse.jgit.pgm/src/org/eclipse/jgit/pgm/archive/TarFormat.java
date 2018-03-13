@@ -57,9 +57,8 @@ class TarFormat implements ArchiveCommand.Format<ArchiveOutputStream> {
 		return new TarArchiveOutputStream(s);
 	}
 
-	public void putEntry(ArchiveOutputStream out,
-			String path, FileMode mode, ObjectLoader loader)
-			throws IOException {
+	public void putEntry(String path, FileMode mode, ObjectLoader loader,
+				ArchiveOutputStream out) throws IOException {
 		if (mode == FileMode.SYMLINK) {
 			final TarArchiveEntry entry = new TarArchiveEntry(
 					path, TarConstants.LF_SYMLINK);

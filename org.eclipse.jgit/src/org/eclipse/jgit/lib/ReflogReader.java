@@ -48,8 +48,6 @@ import java.util.List;
 
 /**
  * Utility for reading reflog entries
- *
- * @since 3.0
  */
 public interface ReflogReader {
 
