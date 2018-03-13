@@ -44,15 +44,12 @@
 package org.eclipse.jgit.nls;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 
 import java.util.Locale;
-import java.util.concurrent.Callable;
+import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
 import org.junit.Test;
 
@@ -109,32 +106,43 @@ public class NLSTest {
 	}
 
 	@Test
-	public void testParallelThreadsWithDifferentLocales()
-			throws InterruptedException, ExecutionException {
+	public void testParallelThreadsWithDifferentLocales() throws InterruptedException {
 
 		final CyclicBarrier barrier = new CyclicBarrier(2);
 
-		class GetBundle implements Callable<TranslationBundle> {
+		class T extends Thread {
+			Locale locale;
+			GermanTranslatedBundle bundle;
+			Exception e;
 
-			private Locale locale;
-
-			GetBundle(Locale locale) {
+			T(Locale locale) {
 				this.locale = locale;
 			}
 
-			public TranslationBundle call() throws Exception {
-				NLS.setLocale(locale);
-				barrier.await(); // wait for the other thread to set its locale
-				return GermanTranslatedBundle.get();
+			@Override
+			public void run() {
+				try {
+					NLS.setLocale(locale);
+					barrier.await(); // wait for the other thread to set its locale
+					bundle = GermanTranslatedBundle.get();
+				} catch (InterruptedException e) {
+					this.e = e;
+				} catch (BrokenBarrierException e) {
+					this.e = e;
+				}
 			}
 		}
 
-		ExecutorService pool = Executors.newFixedThreadPool(2);
-		Future<TranslationBundle> root = pool.submit(new GetBundle(
-				NLS.ROOT_LOCALE));
-		Future<TranslationBundle> german = pool.submit(new GetBundle(
-				Locale.GERMAN));
-		assertEquals(NLS.ROOT_LOCALE, root.get().effectiveLocale());
-		assertEquals(Locale.GERMAN, german.get().effectiveLocale());
+		T t1 = new T(NLS.ROOT_LOCALE);
+		T t2 = new T(Locale.GERMAN);
+		t1.start();
+		t2.start();
+		t1.join();
+		t2.join();
+
+		assertNull("t1 was interrupted or barrier was broken", t1.e);
+		assertNull("t2 was interrupted or barrier was broken", t2.e);
+		assertEquals(NLS.ROOT_LOCALE, t1.bundle.effectiveLocale());
+		assertEquals(Locale.GERMAN, t2.bundle.effectiveLocale());
 	}
 }
