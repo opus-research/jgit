@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
- * Copyright (C) 2008, Google Inc.
+ * Copyright (C) 2010, Mathias Kinzler <mathias.kinzler@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,32 +40,65 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.api;
 
-package org.eclipse.jgit.pgm;
+import org.eclipse.jgit.revwalk.RevCommit;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.RmCommand;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.StopOptionHandler;
-
-@Command(usage = "usage_StopTrackingAFile", common = true)
-class Rm extends TextBuiltin {
-	@Argument(metaVar = "metaVar_path", usage = "usage_path", multiValued = true, required = true)
-
-	@Option(name = "--", handler = StopOptionHandler.class)
-	private List<String> paths = new ArrayList<String>();
-
-
-	@Override
-	protected void run() throws Exception {
-		RmCommand command = new Git(db).rm();
-		for (String p : paths)
-			command.addFilepattern(p);
-		command.call();
+/**
+ * The result of a {@link RebaseCommand} execution
+ */
+public class RebaseResult {
+	/**
+	 * The overall status
+	 */
+	public enum Status {
+		/**
+		 * Rebase was successful, HEAD points to the new commit
+		 */
+		OK,
+		/**
+		 * Aborted; the original HEAD was restored
+		 */
+		ABORTED,
+		/**
+		 * Stopped due to a conflict; must either abort or resolve or skip
+		 */
+		STOPPED,
+		/**
+		 * Already up-to-date
+		 */
+		UP_TO_DATE;
 	}
 
+	static final RebaseResult UP_TO_DATE_RESULT = new RebaseResult(
+			Status.UP_TO_DATE);
+
+	private final Status mySatus;
+
+	private final RevCommit currentCommit;
+
+	RebaseResult(Status status) {
+		this.mySatus = status;
+		currentCommit = null;
+	}
+
+	RebaseResult(RevCommit commit) {
+		this.mySatus = Status.STOPPED;
+		currentCommit = commit;
+	}
+
+	/**
+	 * @return the overall status
+	 */
+	public Status getStatus() {
+		return mySatus;
+	}
+
+	/**
+	 * @return the current commit if status is {@link Status#STOPPED}, otherwise
+	 *         <code>null</code>
+	 */
+	public RevCommit getCurrentCommit() {
+		return currentCommit;
+	}
 }

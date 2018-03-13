@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
- * Copyright (C) 2008, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,32 +40,38 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.api;
 
-package org.eclipse.jgit.pgm;
+import java.io.IOException;
 
-import java.util.ArrayList;
-import java.util.List;
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.api.errors.NoFilepatternException;
+import org.eclipse.jgit.lib.RepositoryTestCase;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.RmCommand;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.StopOptionHandler;
+public class RmCommandTest extends RepositoryTestCase {
 
-@Command(usage = "usage_StopTrackingAFile", common = true)
-class Rm extends TextBuiltin {
-	@Argument(metaVar = "metaVar_path", usage = "usage_path", multiValued = true, required = true)
+	private Git git;
 
-	@Option(name = "--", handler = StopOptionHandler.class)
-	private List<String> paths = new ArrayList<String>();
-
+	private static final String FILE = "test.txt";
 
 	@Override
-	protected void run() throws Exception {
-		RmCommand command = new Git(db).rm();
-		for (String p : paths)
-			command.addFilepattern(p);
+	protected void setUp() throws Exception {
+		super.setUp();
+		git = new Git(db);
+		// commit something
+		writeTrashFile(FILE, "Hello world");
+		git.add().addFilepattern(FILE).call();
+		git.commit().setMessage("Initial commit").call();
+	}
+
+	public void testRemove() throws JGitInternalException,
+			NoFilepatternException, IllegalStateException, IOException {
+		assertEquals("[test.txt, mode:100644, content:Hello world]",
+				indexState(CONTENT));
+		RmCommand command = git.rm();
+		command.addFilepattern(FILE);
 		command.call();
+		assertEquals("", indexState(CONTENT));
 	}
 
 }
