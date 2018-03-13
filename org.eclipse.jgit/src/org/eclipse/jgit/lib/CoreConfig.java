@@ -74,6 +74,25 @@ public class CoreConfig {
 		INPUT;
 	}
 
+	/**
+	 * Permissible values for {@code core.checkstat}
+	 *
+	 * @since 2.3
+	 */
+	public static enum CheckStat {
+		/**
+		 * Only check the size and whole second part of time stamp when
+		 * comparing the stat info in the dircache with actual file stat info.
+		 */
+		MINIMAL,
+
+		/**
+		 * Check as much of the dircache stat info as possible. Implementation
+		 * limits may apply.
+		 */
+		DEFAULT
+	}
+
 	private final int compression;
 
 	private final int packIndexVersion;
@@ -90,18 +109,6 @@ public class CoreConfig {
 		FALSE,
 		/** Checkout symbolic links as links */
 		TRUE
-	}
-
-	/**
-	 * Options for hiding files whose names start with a period
-	 */
-	public static enum HideDotFiles {
-		/** Do not hide .files */
-		FALSE,
-		/** Hide add .files */
-		TRUE,
-		/** Hide only .git */
-		DOTGITONLY
 	}
 
 	private CoreConfig(final Config rc) {
