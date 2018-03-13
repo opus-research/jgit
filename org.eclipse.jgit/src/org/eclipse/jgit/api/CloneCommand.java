@@ -171,9 +171,11 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 
 		final String dst = (bare ? Constants.R_HEADS : Constants.R_REMOTES
 				+ config.getName() + "/") + "*"; //$NON-NLS-1$//$NON-NLS-2$
-		List<RefSpec> refSpecs = calculateRefSpecs(dst);
+		RefSpec refSpec = new RefSpec();
+		refSpec = refSpec.setForceUpdate(true);
+		refSpec = refSpec.setSourceDestination(Constants.R_HEADS + "*", dst); //$NON-NLS-1$
 
-		config.setFetchRefSpecs(refSpecs);
+		config.addFetchRefSpec(refSpec);
 		config.update(clonedRepo.getConfig());
 
 		clonedRepo.getConfig().save();
@@ -184,6 +186,9 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 		command.setProgressMonitor(monitor);
 		command.setTagOpt(TagOpt.FETCH_TAGS);
 		configure(command);
+
+		List<RefSpec> specs = calculateRefSpecs(dst);
+		command.setRefSpecs(specs);
 
 		return command.call();
 	}
