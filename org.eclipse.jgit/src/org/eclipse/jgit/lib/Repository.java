@@ -64,7 +64,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.eclipse.jgit.attributes.AttributesNodeProvider;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.errors.CorruptObjectException;
@@ -209,16 +208,6 @@ public abstract class Repository implements AutoCloseable {
 	 * @return the configuration of this repository
 	 */
 	public abstract StoredConfig getConfig();
-
-	/**
-	 * @return a new {@link AttributesNodeProvider}. This
-	 *         {@link AttributesNodeProvider} is lazy loaded only once. It means
-	 *         that it will not be updated after loading. Prefer creating new
-	 *         instance for each use.
-	 * @since 4.2
-	 */
-	public abstract AttributesNodeProvider newAttributesNodeProvider();
-
 
 	/**
 	 * @return the used file system abstraction
