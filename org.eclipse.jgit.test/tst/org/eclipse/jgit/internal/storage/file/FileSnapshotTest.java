@@ -61,14 +61,7 @@ public class FileSnapshotTest {
 
 	private List<File> files = new ArrayList<File>();
 
-	private File trash;
-
-	@Before
-	public void setUp() throws Exception {
-		trash = File.createTempFile("tmp_", "");
-		trash.delete();
-		assertTrue("mkdir " + trash, trash.mkdir());
-	}
+	private final File trash = new File(new File("target"), "trash");
 
 	@Before
 	@After

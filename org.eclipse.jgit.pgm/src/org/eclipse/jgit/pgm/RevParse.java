@@ -44,8 +44,6 @@
 
 package org.eclipse.jgit.pgm;
 
-import static org.eclipse.jgit.lib.RefDatabase.ALL;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -55,18 +53,17 @@ import org.kohsuke.args4j.Option;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 
-@Command(usage = "usage_RevParse")
 class RevParse extends TextBuiltin {
-	@Option(name = "--all", usage = "usage_RevParseAll")
+	@Option(name = "--all")
 	boolean all = false;
 
-	@Argument(index = 0, metaVar = "metaVar_commitish")
+	@Argument(index = 0, metaVar = "commit-ish")
 	private final List<ObjectId> commits = new ArrayList<ObjectId>();
 
 	@Override
 	protected void run() throws Exception {
 		if (all) {
-			Map<String, Ref> allRefs = db.getRefDatabase().getRefs(ALL);
+			Map<String, Ref> allRefs = db.getAllRefs();
 			for (final Ref r : allRefs.values())
 				outw.println(r.getObjectId().name());
 		} else {
