@@ -150,12 +150,9 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	private static final ConcurrentMap<String, Format<?>> formats =
 			new ConcurrentHashMap<String, Format<?>>();
 
-	public static void registerFormat(String name, Format<?> fmt) {
-		formats.put(name, fmt);
-	}
-
-	public static void unregisterFormat(String name) {
-		formats.remove(name);
+	static {
+		formats.put("zip", new ZipFormat());
+		formats.put("tar", new TarFormat());
 	}
 
 	private static Format<?> lookupFormat(String formatName) throws UnsupportedFormatException {
