@@ -113,9 +113,9 @@ public class SubscribedRepository {
 	}
 
 	/**
-	 * Get the remote ref location from a pubsub ref. This strips off the pubsub
-	 * prefix /heads/. Translation is only allowed from a pubsub branch ref to a
-	 * remote ref, because the /remotes/ tree only stores branches.
+	 * Get the tracking ref location from a pubsub ref. This strips off the
+	 * pubsub prefix /heads/. Translation is only allowed from a pubsub branch
+	 * ref to a remote ref, because the /remotes/ tree only stores branches.
 	 *
 	 * @param rc
 	 * @param pubsubRef
