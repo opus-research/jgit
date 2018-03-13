@@ -190,20 +190,6 @@ public class ReceiveCommand {
 		}
 	}
 
-	/**
-	 * Check whether a command failed due to transaction aborted.
-	 *
-	 * @param cmd
-	 *            command.
-	 * @return whether the command failed due to transaction aborted, as in {@link
-	 *         #abort(Iterable)}.
-	 * @since 4.9
-	 */
-	public static boolean isTransactionAborted(ReceiveCommand cmd) {
-		return cmd.getResult() == REJECTED_OTHER_REASON
-				&& cmd.getMessage().equals(JGitText.get().transactionAborted);
-	}
-
 	private final ObjectId oldId;
 
 	private final ObjectId newId;
@@ -224,7 +210,7 @@ public class ReceiveCommand {
 	 * Create a new command for {@link BaseReceivePack}.
 	 *
 	 * @param oldId
-	 *            the expected old object id; must not be null. Use
+	 *            the old object id; must not be null. Use
 	 *            {@link ObjectId#zeroId()} to indicate a ref creation.
 	 * @param newId
 	 *            the new object id; must not be null. Use
@@ -234,23 +220,15 @@ public class ReceiveCommand {
 	 */
 	public ReceiveCommand(final ObjectId oldId, final ObjectId newId,
 			final String name) {
-		if (oldId == null) {
-			throw new IllegalArgumentException(JGitText.get().oldIdMustNotBeNull);
-		}
-		if (newId == null) {
-			throw new IllegalArgumentException(JGitText.get().newIdMustNotBeNull);
-		}
 		this.oldId = oldId;
 		this.newId = newId;
 		this.name = name;
 
 		type = Type.UPDATE;
-		if (ObjectId.zeroId().equals(oldId)) {
+		if (ObjectId.zeroId().equals(oldId))
 			type = Type.CREATE;
-		}
-		if (ObjectId.zeroId().equals(newId)) {
+		if (ObjectId.zeroId().equals(newId))
 			type = Type.DELETE;
-		}
 	}
 
 	/**
@@ -265,45 +243,14 @@ public class ReceiveCommand {
 	 * @param name
 	 *            name of the ref being affected.
 	 * @param type
-	 *            type of the command. Must be {@link Type#CREATE} if {@code
-	 *            oldId} is zero, or {@link Type#DELETE} if {@code newId} is zero.
+	 *            type of the command.
 	 * @since 2.0
 	 */
 	public ReceiveCommand(final ObjectId oldId, final ObjectId newId,
 			final String name, final Type type) {
-		if (oldId == null) {
-			throw new IllegalArgumentException(JGitText.get().oldIdMustNotBeNull);
-		}
-		if (newId == null) {
-			throw new IllegalArgumentException(JGitText.get().newIdMustNotBeNull);
-		}
 		this.oldId = oldId;
 		this.newId = newId;
 		this.name = name;
-		switch (type) {
-		case CREATE:
-			if (!ObjectId.zeroId().equals(oldId)) {
-				throw new IllegalArgumentException(
-						JGitText.get().createRequiresZeroOldId);
-			}
-			break;
-		case DELETE:
-			if (!ObjectId.zeroId().equals(newId)) {
-				throw new IllegalArgumentException(
-						JGitText.get().deleteRequiresZeroNewId);
-			}
-			break;
-		case UPDATE:
-		case UPDATE_NONFASTFORWARD:
-			if (ObjectId.zeroId().equals(newId)
-					|| ObjectId.zeroId().equals(oldId)) {
-				throw new IllegalArgumentException(
-						JGitText.get().updateRequiresOldIdAndNewId);
-			}
-			break;
-		default:
-			throw new IllegalStateException(JGitText.get().enumValueNotSupported0);
-		}
 		this.type = type;
 	}
 
@@ -479,14 +426,6 @@ public class ReceiveCommand {
 
 		case REJECTED_CURRENT_BRANCH:
 			setResult(Result.REJECTED_CURRENT_BRANCH);
-			break;
-
-		case REJECTED_MISSING_OBJECT:
-			setResult(Result.REJECTED_MISSING_OBJECT);
-			break;
-
-		case REJECTED_OTHER_REASON:
-			setResult(Result.REJECTED_OTHER_REASON);
 			break;
 
 		default:
