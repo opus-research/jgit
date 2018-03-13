@@ -1,7 +1,6 @@
 /*
  * Copyright (C) 2009, Google Inc.
  * Copyright (C) 2009, Yann Simon <yann.simon.fr@gmail.com>
- * Copyright (C) 2011, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -119,19 +118,13 @@ public class UserConfig {
 			// try to get the user name for the system property GIT_XXX_NAME
 			username = system().getenv(envKey);
 		}
-
-		return username;
-	}
-
-	/**
-	 * @return try to get user name of the logged on user from the operating
-	 *         system
-	 */
-	public static String getDefaultUserName() {
-		// get the system user name
-		String username = system().getProperty(Constants.OS_USER_NAME_KEY);
-		if (username == null)
+		if (username == null) {
+			// get the system user name
+			username = system().getProperty(Constants.OS_USER_NAME_KEY);
+		}
+		if (username == null) {
 			username = Constants.UNKNOWN_USER_DEFAULT;
+		}
 		return username;
 	}
 
@@ -144,17 +137,16 @@ public class UserConfig {
 			email = system().getenv(envKey);
 		}
 
-		return email;
-	}
+		if (email == null) {
+			// try to construct an email
+			String username = system().getProperty(Constants.OS_USER_NAME_KEY);
+			if (username == null){
+				username = Constants.UNKNOWN_USER_DEFAULT;
+			}
+			email = username + "@" + system().getHostname();
+		}
 
-	/**
-	 * @return try to construct email for logged on user using system
-	 *         information
-	 */
-	public static String getDefaultEmail() {
-		// try to construct an email
-		String username = getDefaultUserName();
-		return username + "@" + system().getHostname();
+		return email;
 	}
 
 	private static SystemReader system() {
