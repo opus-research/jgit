@@ -82,9 +82,6 @@ class Push extends TextBuiltin {
 	@Option(name = "--all")
 	private boolean all;
 
-	@Option(name = "--atomic")
-	private boolean atomic;
-
 	@Option(name = "--tags")
 	private boolean tags;
 
@@ -125,7 +122,6 @@ class Push extends TextBuiltin {
 				push.setPushTags();
 			push.setRemote(remote);
 			push.setThin(thin);
-			push.setAtomic(atomic);
 			push.setTimeout(timeout);
 			Iterable<PushResult> results = push.call();
 			for (PushResult result : results) {
