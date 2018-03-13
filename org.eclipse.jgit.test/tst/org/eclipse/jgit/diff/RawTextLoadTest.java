@@ -68,21 +68,20 @@ public class RawTextLoadTest extends RepositoryTestCase {
 		return data;
 	}
 
-	private RawText textFor(byte[] data, int threshold) throws IOException, BinaryBlobException {
+	private RawText textFor(byte[] data, int limit) throws IOException, BinaryBlobException {
 		FileRepository repo = createBareRepository();
 		ObjectId id;
 		try (ObjectInserter ins = repo.getObjectDatabase().newInserter()) {
 			id = ins.insert(Constants.OBJ_BLOB, data);
 		}
 		ObjectLoader ldr = repo.open(id);
-		return RawText.load(ldr, threshold);
+		return RawText.load(ldr, limit);
 	}
 
 	@Test
 	public void testSmallOK() throws Exception {
 		byte[] data = generate(1000, -1);
 		RawText result = textFor(data, 1 << 20);
-		assertNotNull(result);
 		Assert.assertArrayEquals(result.content, data);
 	}
 

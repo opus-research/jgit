@@ -50,7 +50,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.BinaryBlobException;
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.lib.ObjectLoader;
@@ -302,23 +301,19 @@ public class RawText extends Sequence {
 	}
 
 	/**
-	 * Read a blob object into RawText, or return null if the blob is binary.
+	 * Read a blob object into RawText, or throw BinaryBlobException if
+	 * the blob is binary.
 	 *
 	 * @param ldr
 	 *   the ObjectLoader for the blob
 	 * @param threshold
 	 *   if the blob is larger than this size, it is always assumed to be binary.
-	 *   This threshold is assumed to be larger than FIRST_FEW_BYTES.
 	 * @return the RawText representing the blob.
 	 * @throws BinaryBlobException if the blob contains binary data.
 	 */
-	@Nullable
 	public static RawText load(ObjectLoader ldr, int threshold) throws IOException, BinaryBlobException {
 		long sz = ldr.getSize();
 
-		if (threshold < FIRST_FEW_BYTES) {
-			threshold = FIRST_FEW_BYTES;
-		}
 		if (sz > threshold) {
 			throw new BinaryBlobException();
 		}
