@@ -46,9 +46,9 @@ package org.eclipse.jgit.transport;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_ATOMIC;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_DELETE_REFS;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_OFS_DELTA;
+import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_PUSH_OPTIONS;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_QUIET;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_REPORT_STATUS;
-import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_PUSH_OPTIONS;
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_SIDE_BAND_64K;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_AGENT;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_DATA;
@@ -250,18 +250,6 @@ public abstract class BaseReceivePack {
 	private boolean sideBand;
 
 	private boolean quiet;
-
-	/**
-	 * A list of option strings associated with a push.
-	 * @since 4.5
-	 */
-	protected List<String> pushOptions;
-
-	/**
-	 * Whether the client intends to use push options.
-	 * @since 4.5
-	 */
-	protected boolean usePushOptions;
 
 	/** Lock around the received pack file, while updating refs. */
 	private PackLock packLock;
@@ -781,8 +769,7 @@ public abstract class BaseReceivePack {
 	 *             read.
 	 */
 	public boolean isSideBand() throws RequestNotYetReadException {
-		if (enabledCapabilities == null)
-			throw new RequestNotYetReadException();
+		checkRequestWasRead();
 		return enabledCapabilities.contains(CAPABILITY_SIDE_BAND_64K);
 	}
 
@@ -809,7 +796,7 @@ public abstract class BaseReceivePack {
 	}
 
 	/**
-	 * @return true if the server supports the receiving of push options.
+	 * @return true if the server supports receiving push options.
 	 * @since 4.5
 	 */
 	public boolean isAllowPushOptions() {
@@ -817,10 +804,10 @@ public abstract class BaseReceivePack {
 	}
 
 	/**
-	 * Configure if the server supports the receiving of push options.
+	 * Configure if the server supports receiving push options.
 	 *
 	 * @param allow
-	 *            true to permit option strings.
+	 *            true to optionally accept option strings from the client.
 	 * @since 4.5
 	 */
 	public void setAllowPushOptions(boolean allow) {
@@ -839,27 +826,8 @@ public abstract class BaseReceivePack {
 	 * @since 4.0
 	 */
 	public boolean isQuiet() throws RequestNotYetReadException {
-		if (enabledCapabilities == null)
-			throw new RequestNotYetReadException();
+		checkRequestWasRead();
 		return quiet;
-	}
-
-	/**
-	 * Gets the list of string options associated with this push.
-	 *
-	 * @return pushOptions
-	 * @throws RequestNotYetReadException
-	 *             if the client's request has not yet been read from the wire,
-	 *             so we do not know if they expect push options. Note that the
-	 *             client may have already written the request, it just has not
-	 *             been read.
-	 * @since 4.5
-	 */
-	public List<String> getPushOptions() throws RequestNotYetReadException {
-		if (enabledCapabilities == null) {
-			throw new RequestNotYetReadException();
-		}
-		return Collections.unmodifiableList(pushOptions);
 	}
 
 	/**
@@ -1136,7 +1104,6 @@ public abstract class BaseReceivePack {
 			adv.advertiseCapability(CAPABILITY_OFS_DELTA);
 		if (allowPushOptions) {
 			adv.advertiseCapability(CAPABILITY_PUSH_OPTIONS);
-			pushOptions = new ArrayList<>();
 		}
 		adv.advertiseCapability(OPTION_AGENT, UserAgent.get());
 		adv.send(getAdvertisedOrDefaultRefs());
@@ -1254,8 +1221,6 @@ public abstract class BaseReceivePack {
 	protected void enableCapabilities() {
 		sideBand = isCapabilityEnabled(CAPABILITY_SIDE_BAND_64K);
 		quiet = allowQuiet && isCapabilityEnabled(CAPABILITY_QUIET);
-		usePushOptions = allowPushOptions
-				&& isCapabilityEnabled(CAPABILITY_PUSH_OPTIONS);
 		if (sideBand) {
 			OutputStream out = rawOut;
 
@@ -1269,17 +1234,6 @@ public abstract class BaseReceivePack {
 	}
 
 	/**
-	 * Sets the client's intention regarding push options.
-	 *
-	 * @param usePushOptions
-	 *            whether the client intends to use push options
-	 * @since 4.5
-	 */
-	public void setUsePushOptions(boolean usePushOptions) {
-		this.usePushOptions = usePushOptions;
-	}
-
-	/**
 	 * Check if the peer requested a capability.
 	 *
 	 * @param name
@@ -1288,6 +1242,11 @@ public abstract class BaseReceivePack {
 	 */
 	protected boolean isCapabilityEnabled(String name) {
 		return enabledCapabilities.contains(name);
+	}
+
+	void checkRequestWasRead() {
+		if (enabledCapabilities == null)
+			throw new RequestNotYetReadException();
 	}
 
 	/** @return true if a pack is expected based on the list of commands. */

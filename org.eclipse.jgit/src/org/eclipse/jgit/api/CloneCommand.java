@@ -58,7 +58,6 @@ import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.BranchConfig.BranchRebaseMode;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -327,9 +326,9 @@ public class CloneCommand extends TransportCommand<CloneCommand, Git> {
 				ConfigConstants.CONFIG_KEY_AUTOSETUPREBASE);
 		if (ConfigConstants.CONFIG_KEY_ALWAYS.equals(autosetupRebase)
 				|| ConfigConstants.CONFIG_KEY_REMOTE.equals(autosetupRebase))
-			clonedRepo.getConfig().setEnum(
+			clonedRepo.getConfig().setBoolean(
 					ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
-					ConfigConstants.CONFIG_KEY_REBASE, BranchRebaseMode.REBASE);
+					ConfigConstants.CONFIG_KEY_REBASE, true);
 		clonedRepo.getConfig().save();
 	}
 
