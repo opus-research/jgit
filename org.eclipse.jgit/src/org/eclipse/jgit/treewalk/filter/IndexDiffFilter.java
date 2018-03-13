@@ -43,8 +43,6 @@
 package org.eclipse.jgit.treewalk.filter;
 
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.Set;
 
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
@@ -80,8 +78,6 @@ public class IndexDiffFilter extends TreeFilter {
 	private final int workingTree;
 
 	private final boolean honorIgnores;
-
-	private final Set<String> ignoredPaths = new HashSet<String>();
 
 	/**
 	 * Creates a new instance of this filter. Do not use an instance of this
@@ -133,10 +129,8 @@ public class IndexDiffFilter extends TreeFilter {
 		// other tree.
 		final int cnt = tw.getTreeCount();
 		final int dm = tw.getRawMode(dirCache);
-		WorkingTreeIterator workingTreeIterator = workingTree(tw);
 		if (dm == 0) {
-			if (honorIgnores && workingTreeIterator.isEntryIgnored()) {
-				ignoredPaths.add(workingTreeIterator.getEntryPathString());
+			if (honorIgnores && workingTree(tw).isEntryIgnored()) {
 				int i = 0;
 				for (; i < cnt; i++) {
 					if (i == dirCache || i == workingTree)
@@ -172,7 +166,7 @@ public class IndexDiffFilter extends TreeFilter {
 		// Only one chance left to detect a diff: between index and working
 		// tree. Make use of the WorkingTreeIterator#isModified() method to
 		// avoid computing SHA1 on filesystem content if not really needed.
-		WorkingTreeIterator wi = workingTreeIterator;
+		WorkingTreeIterator wi = workingTree(tw);
 		DirCacheIterator di = tw.getTree(dirCache, DirCacheIterator.class);
 		return wi.isModified(di.getDirCacheEntry(), true);
 	}
@@ -196,12 +190,5 @@ public class IndexDiffFilter extends TreeFilter {
 	@Override
 	public String toString() {
 		return "INDEX_DIFF_FILTER";
-	}
-
-	/**
-	 * @return ignored paths
-	 */
-	public Set<String> getIgnoredPaths() {
-		return ignoredPaths;
 	}
 }

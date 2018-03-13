@@ -157,8 +157,6 @@ public class IndexDiff {
 
 	private Set<String> conflicts = new HashSet<String>();
 
-	private Set<String> ignored;
-
 	private Set<String> assumeUnchanged;
 
 	private DirCache dirCache;
@@ -278,8 +276,7 @@ public class IndexDiff {
 		if (filter != null)
 			filters.add(filter);
 		filters.add(new SkipWorkTreeFilter(INDEX));
-		IndexDiffFilter indexDiffFilter = new IndexDiffFilter(INDEX, WORKDIR);
-		filters.add(indexDiffFilter);
+		filters.add(new IndexDiffFilter(INDEX, WORKDIR));
 		treeWalk.setFilter(AndTreeFilter.create(filters));
 		while (treeWalk.next()) {
 			AbstractTreeIterator treeIterator = treeWalk.getTree(TREE,
@@ -343,7 +340,6 @@ public class IndexDiff {
 		if (monitor != null)
 			monitor.endTask();
 
-		ignored = indexDiffFilter.getIgnoredPaths();
 		if (added.isEmpty() && changed.isEmpty() && removed.isEmpty()
 				&& missing.isEmpty() && modified.isEmpty()
 				&& untracked.isEmpty())
@@ -399,13 +395,6 @@ public class IndexDiff {
 	 */
 	public Set<String> getConflicting() {
 		return conflicts;
-	}
-
-	/**
-	 * @return list of files / folders that are ignored
-	 */
-	public Set<String> getIgnored() {
-		return ignored;
 	}
 
 	/**
