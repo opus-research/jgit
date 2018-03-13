@@ -350,12 +350,12 @@ containing block.
 When reftable is stored in a file-backed Git repository, the stack is
 represented as a series of reftable files:
 
-    $GIT_DIR/reftable
-    $GIT_DIR/reftable.1
-    $GIT_DIR/reftable.2
-    $GIT_DIR/reftable.3
+    $GIT_DIR/reftable/reftable
+    $GIT_DIR/reftable/reftable.1
+    $GIT_DIR/reftable/reftable.2
+    $GIT_DIR/reftable/reftable.3
     ...
-    $GIT_DIR/reftable.10
+    $GIT_DIR/reftable/reftable.10
 
 where a larger suffix ordinal indicates a more recent table.
 
@@ -370,8 +370,8 @@ most-recent (`reftable.10`) to the base file (`reftable`).
 
 Updating references follows an update protocol:
 
-1. Atomically create `$GIT_DIR/reftable.lock`.
-2. `readdir($GIT_DIR)` to determine the highest suffix ordinal, `n`.
+1. Atomically create `$GIT_DIR/reftable/reftable.lock`.
+2. `readdir("$GIT_DIR/reftable")` to determine the highest suffix ordinal, `n`.
 3. Compute the update transaction (e.g. compare expected values).
 4. Write only modified references as a reftable to `reftable.lock`.
 5. Rename `reftable.lock` to `reftable.${n + 1}`. 
@@ -411,23 +411,31 @@ that is being prepared.
 Compaction is similar to the update process, but an explicit temporary
 file must be used:
 
-1. Atomically create `$GIT_DIR/reftable.lock`.
-2. `readdir($GIT_DIR)` to determine the highest suffix ordinal, `n`.
+1. Atomically create `$GIT_DIR/reftable/reftable.lock`.
+2. `readdir("$GIT_DIR/reftable")` to determine the highest suffix ordinal, `n`.
 3. Compute the update transaction (e.g. compare expected values).
 4. Select files from (2) to collapse as part of this transaction.
-5. Create temp file by `mktemp("$GIT_DIR/.reftableXXXXXX")`.
+5. Create temp file by `mktemp("$GIT_DIR/reftable/.reftableXXXXXX")`.
 6. Write modified and collapsed references to temp file.
 7. Rename temp file to `reftable.${n + 1}`. 
-8. Delete collapsed files `reftable.${n}`, `reftable.${n - 1}`, ...
+8. Delete collapsed files _ascending_ order: `..., reftable.${n - 2}`, `reftable.${n - 1}`.
 9. Delete `reftable.lock`.
+
+Ascending deletion in step 8 is critical to prevent deleted references
+from reapparing.  A reference "foo" may have been created in
+`reftable.2`, then deleted by `reftable.3`.  Compacting both of these
+into `reftable.4` can omit the reference if it does not appear in
+`reftable`, or `reftable.1`.  Deletions must remove `.2` before `.3`
+to prevent readers from observing the creation.  Alternatively,
+partial compactions can always carry forward deletions.
 
 Because `reftable.9` can disappear after `reftable.10` is created,
 readers receiving ENOENT when opening `reftable.9` must peform
 another readdir to look for new reftables.
 
-Rebuilding the base `$GIT_TABLE/reftable` follows the same protocol,
-except in step 7 the temp file is renamed to `reftable`, and step 8
-removes all files with an ordinal suffix.
+Rebuilding the base `$GIT_TABLE/reftable/reftable` follows the same
+protocol, except in step 7 the temp file is renamed to `reftable`, and
+step 8 removes all files with an ordinal suffix.
 
 ## Alternatives considered
 
@@ -475,7 +483,7 @@ David Turner proposed [using LMDB][dt-lmdb], as LMDB is lightweight
 
 A downside of LMDB is its reliance on a single C implementation.  This
 makes embedding inside JGit (a popular reimplemenation of Git)
-difficult, and hositing onto virtual storage (for JGit DFS) virtually
+difficult, and hoisting onto virtual storage (for JGit DFS) virtually
 impossible.
 
 A common format that can be supported by all major Git implementations
