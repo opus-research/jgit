@@ -216,35 +216,35 @@ public abstract class RepositoryTestCase extends LocalDiskRepositoryTestCase {
 	 * somewhere in the filesystem (e.g. in the working-tree) and then want to
 	 * have an index which matches their prepared content.
 	 *
-	 * @param treeItr
+	 * @param fIt
 	 *            a {@link FileTreeIterator} which determines which files should
 	 *            go into the new index
 	 * @throws FileNotFoundException
 	 * @throws IOException
 	 */
-	protected void resetIndex(FileTreeIterator treeItr)
-			throws FileNotFoundException, IOException {
-		ObjectInserter inserter = db.newObjectInserter();
-		DirCacheBuilder builder = db.lockDirCache().builder();
-		DirCacheEntry dce;
+	protected void resetIndex(FileTreeIterator fIt) throws FileNotFoundException,
+			IOException {
+				ObjectInserter inserter = db.newObjectInserter();
+				DirCacheBuilder builder = db.lockDirCache().builder();
+				DirCacheEntry dce;
 
-		while (!treeItr.eof()) {
-			long len = treeItr.getEntryLength();
-
-			dce = new DirCacheEntry(treeItr.getEntryPathString());
-			dce.setFileMode(treeItr.getEntryFileMode());
-			dce.setLastModified(treeItr.getEntryLastModified());
-			dce.setLength((int) len);
-			FileInputStream in = new FileInputStream(treeItr.getEntryFile());
-			dce.setObjectId(inserter.insert(Constants.OBJ_BLOB, len, in));
-			in.close();
-			builder.add(dce);
-			treeItr.next(1);
-		}
-		builder.commit();
-		inserter.flush();
-		inserter.release();
-	}
+				while (!fIt.eof()) {
+					dce = new DirCacheEntry(fIt.getEntryPathString());
+					dce.setFileMode(fIt.getEntryFileMode());
+					dce.setLastModified(fIt.getEntryLastModified());
+					dce.setLength((int) fIt.getEntryLength());
+					FileInputStream in = new FileInputStream(new File(fIt.getDirectory(), fIt
+							.getEntryPathString()));
+					dce.setObjectId(inserter.insert(
+							Constants.OBJ_BLOB,
+							fIt.getEntryLength(),
+							in));
+					in.close();
+					builder.add(dce);
+					fIt.next(1);
+				}
+				builder.commit();
+			}
 
 	/**
 	 * Helper method to map arbitrary objects to user-defined names. This can be
