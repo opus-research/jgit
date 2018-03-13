@@ -67,7 +67,6 @@ import java.util.concurrent.TimeUnit;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.BatchRefUpdate;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.Constants;
@@ -136,10 +135,10 @@ public abstract class BaseReceivePack {
 	}
 
 	/** Database we write the stored objects into. */
-	private final Repository db;
+	protected final Repository db;
 
 	/** Revision traversal support over {@link #db}. */
-	private final RevWalk walk;
+	protected final RevWalk walk;
 
 	/**
 	 * Is the client connection a bi-directional socket or pipe?
@@ -152,22 +151,19 @@ public abstract class BaseReceivePack {
 	 * If false, this class runs in a read everything then output results mode,
 	 * making it suitable for single round-trip systems RPCs such as HTTP.
 	 */
-	private boolean biDirectionalPipe = true;
-
-	/** Expecting data after the pack footer */
-	private boolean expectDataAfterPackFooter;
+	protected boolean biDirectionalPipe = true;
 
 	/** Should an incoming transfer validate objects? */
-	private boolean checkReceivedObjects;
+	protected boolean checkReceivedObjects;
 
 	/** Should an incoming transfer permit create requests? */
-	private boolean allowCreates;
+	protected boolean allowCreates;
 
 	/** Should an incoming transfer permit delete requests? */
-	private boolean allowDeletes;
+	protected boolean allowDeletes;
 
 	/** Should an incoming transfer permit non-fast-forward requests? */
-	private boolean allowNonFastForwards;
+	protected boolean allowNonFastForwards;
 
 	private boolean allowOfsDelta;
 
@@ -212,20 +208,23 @@ public abstract class BaseReceivePack {
 	private PackParser parser;
 
 	/** The refs we advertised as existing at the start of the connection. */
-	private Map<String, Ref> refs;
+	protected Map<String, Ref> refs;
 
 	/** All SHA-1s shown to the client, which can be possible edges. */
-	private Set<ObjectId> advertisedHaves;
+	protected Set<ObjectId> advertisedHaves;
 
 	/** Capabilities requested by the client. */
-	private Set<String> enabledCapabilities;
+	protected Set<String> enabledCapabilities;
 
 	private List<ReceiveCommand> commands;
 
 	private StringBuilder advertiseError;
 
+	/** If {@link BasePackPushConnection#CAPABILITY_REPORT_STATUS} is enabled. */
+	protected boolean reportStatus;
+
 	/** If {@link BasePackPushConnection#CAPABILITY_SIDE_BAND_64K} is enabled. */
-	private boolean sideBand;
+	protected boolean sideBand;
 
 	/** Lock around the received pack file, while updating refs. */
 	private PackLock packLock;
@@ -452,19 +451,6 @@ public abstract class BaseReceivePack {
 	 */
 	public void setBiDirectionalPipe(final boolean twoWay) {
 		biDirectionalPipe = twoWay;
-	}
-
-	/** @return true if there is data expected after the pack footer. */
-	public boolean isExpectDataAfterPackFooter() {
-		return expectDataAfterPackFooter;
-	}
-
-	/**
-	 * @param e
-	 *            true if there is additional data in InputStream after pack.
-	 */
-	public void setExpectDataAfterPackFooter(boolean e) {
-		expectDataAfterPackFooter = e;
 	}
 
 	/**
@@ -869,7 +855,9 @@ public abstract class BaseReceivePack {
 
 	/** Enable capabilities based on a previously read capabilities line. */
 	protected void enableCapabilities() {
-		sideBand = isCapabilityEnabled(CAPABILITY_SIDE_BAND_64K);
+		reportStatus = enabledCapabilities.contains(CAPABILITY_REPORT_STATUS);
+
+		sideBand = enabledCapabilities.contains(CAPABILITY_SIDE_BAND_64K);
 		if (sideBand) {
 			OutputStream out = rawOut;
 
@@ -879,17 +867,6 @@ public abstract class BaseReceivePack {
 			pckOut = new PacketLineOut(rawOut);
 			pckOut.setFlushOnEnd(false);
 		}
-	}
-
-	/**
-	 * Check if the peer requested a capability.
-	 *
-	 * @param name
-	 *            protocol name identifying the capability.
-	 * @return true if the peer requested the capability to be enabled.
-	 */
-	protected boolean isCapabilityEnabled(String name) {
-		return enabledCapabilities.contains(name);
 	}
 
 	/** @return true if a pack is expected based on the list of commands. */
@@ -930,9 +907,7 @@ public abstract class BaseReceivePack {
 			parser.setAllowThin(true);
 			parser.setNeedNewObjectIds(checkReferencedIsReachable);
 			parser.setNeedBaseObjectIds(checkReferencedIsReachable);
-			parser.setCheckEofAfterPackFooter(!biDirectionalPipe
-					&& !isExpectDataAfterPackFooter());
-			parser.setExpectDataAfterPackFooter(isExpectDataAfterPackFooter());
+			parser.setCheckEofAfterPackFooter(!biDirectionalPipe);
 			parser.setObjectChecking(isCheckReceivedObjects());
 			parser.setLockMessage(lockMsg);
 			parser.setMaxObjectSizeLimit(maxObjectSizeLimit);
@@ -963,7 +938,7 @@ public abstract class BaseReceivePack {
 
 		final ObjectWalk ow = new ObjectWalk(db);
 		ow.setRetainBody(false);
-		if (baseObjects != null) {
+		if (checkReferencedIsReachable) {
 			ow.sort(RevSort.TOPO);
 			if (!baseObjects.isEmpty())
 				ow.sort(RevSort.BOUNDARY, true);
@@ -980,7 +955,7 @@ public abstract class BaseReceivePack {
 			RevObject o = ow.parseAny(have);
 			ow.markUninteresting(o);
 
-			if (baseObjects != null && !baseObjects.isEmpty()) {
+			if (checkReferencedIsReachable && !baseObjects.isEmpty()) {
 				o = ow.peel(o);
 				if (o instanceof RevCommit)
 					o = ((RevCommit) o).getTree();
@@ -991,7 +966,7 @@ public abstract class BaseReceivePack {
 
 		RevCommit c;
 		while ((c = ow.next()) != null) {
-			if (providedObjects != null //
+			if (checkReferencedIsReachable //
 					&& !c.has(RevFlag.UNINTERESTING) //
 					&& !providedObjects.contains(c))
 				throw new MissingObjectException(c, Constants.TYPE_COMMIT);
@@ -1002,7 +977,7 @@ public abstract class BaseReceivePack {
 			if (o.has(RevFlag.UNINTERESTING))
 				continue;
 
-			if (providedObjects != null) {
+			if (checkReferencedIsReachable) {
 				if (providedObjects.contains(o))
 					continue;
 				else
@@ -1013,7 +988,7 @@ public abstract class BaseReceivePack {
 				throw new MissingObjectException(o, Constants.TYPE_BLOB);
 		}
 
-		if (baseObjects != null) {
+		if (checkReferencedIsReachable) {
 			for (ObjectId id : baseObjects) {
 				o = ow.parseAny(id);
 				if (!o.has(RevFlag.UNINTERESTING))
@@ -1111,11 +1086,11 @@ public abstract class BaseReceivePack {
 
 				if (oldObj instanceof RevCommit && newObj instanceof RevCommit) {
 					try {
-						if (walk.isMergedInto((RevCommit) oldObj,
-								(RevCommit) newObj))
-							cmd.setTypeFastForwardUpdate();
-						else
-							cmd.setType(ReceiveCommand.Type.UPDATE_NONFASTFORWARD);
+						if (!walk.isMergedInto((RevCommit) oldObj,
+								(RevCommit) newObj)) {
+							cmd
+									.setType(ReceiveCommand.Type.UPDATE_NONFASTFORWARD);
+						}
 					} catch (MissingObjectException e) {
 						cmd.setResult(Result.REJECTED_MISSING_OBJECT, e
 								.getMessage());
@@ -1124,12 +1099,6 @@ public abstract class BaseReceivePack {
 					}
 				} else {
 					cmd.setType(ReceiveCommand.Type.UPDATE_NONFASTFORWARD);
-				}
-
-				if (cmd.getType() == ReceiveCommand.Type.UPDATE_NONFASTFORWARD
-						&& !isAllowNonFastForwards()) {
-					cmd.setResult(Result.REJECTED_NONFASTFORWARD);
-					continue;
 				}
 			}
 
@@ -1154,30 +1123,20 @@ public abstract class BaseReceivePack {
 
 	/** Execute commands to update references. */
 	protected void executeCommands() {
-		List<ReceiveCommand> toApply = filterCommands(Result.NOT_ATTEMPTED);
-		if (toApply.isEmpty())
-			return;
-
+		List<ReceiveCommand> toApply = ReceiveCommand.filter(commands,
+				Result.NOT_ATTEMPTED);
 		ProgressMonitor updating = NullProgressMonitor.INSTANCE;
 		if (sideBand) {
 			SideBandProgressMonitor pm = new SideBandProgressMonitor(msgOut);
 			pm.setDelayStart(250, TimeUnit.MILLISECONDS);
 			updating = pm;
 		}
-
-		BatchRefUpdate batch = db.getRefDatabase().newBatchUpdate();
-		batch.setAllowNonFastForwards(isAllowNonFastForwards());
-		batch.setRefLogIdent(getRefLogIdent());
-		batch.setRefLogMessage("push", true);
-		batch.addCommand(toApply);
-		try {
-			batch.execute(walk, updating);
-		} catch (IOException err) {
-			for (ReceiveCommand cmd : toApply) {
-				if (cmd.getResult() == Result.NOT_ATTEMPTED)
-					cmd.reject(err);
-			}
+		updating.beginTask(JGitText.get().updatingReferences, toApply.size());
+		for (ReceiveCommand cmd : toApply) {
+			updating.update(1);
+			cmd.execute(this);
 		}
+		updating.endTask();
 	}
 
 	/**
@@ -1216,10 +1175,9 @@ public abstract class BaseReceivePack {
 			}
 
 			final StringBuilder r = new StringBuilder();
-			if (forClient)
-				r.append("ng ").append(cmd.getRefName()).append(" ");
-			else
-				r.append(" ! [rejected] ").append(cmd.getRefName()).append(" (");
+			r.append("ng ");
+			r.append(cmd.getRefName());
+			r.append(" ");
 
 			switch (cmd.getResult()) {
 			case NOT_ATTEMPTED:
@@ -1266,8 +1224,6 @@ public abstract class BaseReceivePack {
 				// We shouldn't have reached this case (see 'ok' case above).
 				continue;
 			}
-			if (!forClient)
-				r.append(")");
 			out.sendString(r.toString());
 		}
 	}

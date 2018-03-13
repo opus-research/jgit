@@ -79,7 +79,7 @@ public class FetchCommandTest extends RepositoryTestCase {
 
 		// create some refs via commits and tag
 		RevCommit commit = git2.commit().setMessage("initial commit")
-				.setAllowEmpty(true).call();
+                .setAllowEmpty(true).call();
 		Ref tagRef = git2.tag().setName("tag").call();
 
 		Git git1 = new Git(db);

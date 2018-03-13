@@ -68,6 +68,7 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.transport.FetchResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
@@ -107,12 +108,10 @@ public class BranchCommandTest extends RepositoryTestCase {
 		Repository remoteRepository = createWorkRepository();
 		Git remoteGit = new Git(remoteRepository);
 		// commit something
-		JGitTestUtil
-				.writeTrashFile(remoteRepository, "Test.txt", "Hello world");
+		writeTrashFile("Test.txt", "Hello world");
 		remoteGit.add().addFilepattern("Test.txt").call();
 		initialCommit = remoteGit.commit().setMessage("Initial commit").call();
-		JGitTestUtil
-				.writeTrashFile(remoteRepository, "Test.txt", "Some change");
+		writeTrashFile("Test.txt", "Some change");
 		remoteGit.add().addFilepattern("Test.txt").call();
 		secondCommit = remoteGit.commit().setMessage("Second commit").call();
 		// create a master branch
@@ -469,7 +468,9 @@ public class BranchCommandTest extends RepositoryTestCase {
 
 	public Ref createBranch(Git actGit, String name, boolean force,
 			String startPoint, SetupUpstreamMode mode)
-			throws JGitInternalException, GitAPIException {
+			throws JGitInternalException, RefAlreadyExistsException,
+			RefNotFoundException,
+			InvalidRefNameException {
 		CreateBranchCommand cmd = actGit.branchCreate();
 		cmd.setName(name);
 		cmd.setForce(force);

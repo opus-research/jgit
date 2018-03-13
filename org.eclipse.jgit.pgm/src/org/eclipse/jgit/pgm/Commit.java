@@ -73,9 +73,6 @@ class Commit extends TextBuiltin {
 	@Option(name = "--amend", usage = "usage_CommitAmend")
 	private boolean amend;
 
-	@Option(name = "--allow-empty", usage = "usage_CommitAllowEmpty")
-	private boolean allowEmpty;
-
 	@Argument(metaVar = "metaVar_commitPaths", usage = "usage_CommitPaths")
 	private List<String> paths = new ArrayList<String>();
 
@@ -95,15 +92,9 @@ class Commit extends TextBuiltin {
 			for (String p : paths)
 				commitCmd.setOnly(p);
 		commitCmd.setAmend(amend);
-		commitCmd.setAllowEmpty(allowEmpty);
 		commitCmd.setAll(all);
 		Ref head = db.getRef(Constants.HEAD);
-		RevCommit commit;
-		try {
-			commit = commitCmd.call();
-		} catch (JGitInternalException e) {
-			throw die(e.getMessage());
-		}
+		RevCommit commit = commitCmd.call();
 
 		String branchName;
 		if (!head.isSymbolic())
@@ -113,7 +104,7 @@ class Commit extends TextBuiltin {
 			if (branchName.startsWith(Constants.R_HEADS))
 				branchName = branchName.substring(Constants.R_HEADS.length());
 		}
-		outw.println("[" + branchName + " " + commit.name() + "] "
+		out.println("[" + branchName + " " + commit.name() + "] "
 				+ commit.getShortMessage());
 	}
 }

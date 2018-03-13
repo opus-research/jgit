@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2012, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -50,12 +50,10 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.api.errors.NoMessageException;
-import org.eclipse.jgit.api.errors.UnmergedPathsException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
@@ -104,11 +102,11 @@ public class CommitCommand extends GitCommand<RevCommit> {
 
 	private List<String> only = new ArrayList<String>();
 
-	private boolean[] onlyProcessed;
+    private boolean[] onlyProcessed;
 
-	private boolean amend;
+    private boolean amend;
 
-	private boolean allowEmpty;
+    private boolean allowEmpty;
 
 	private boolean insertChangeId;
 
@@ -138,18 +136,21 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 *             when called on a git repo without a HEAD reference
 	 * @throws NoMessageException
 	 *             when called without specifying a commit message
-	 * @throws UnmergedPathsException
+	 * @throws UnmergedPathException
 	 *             when the current index contained unmerged paths (conflicts)
-	 * @throws ConcurrentRefUpdateException
-	 *             when HEAD or branch ref is updated concurrently by someone
-	 *             else
 	 * @throws WrongRepositoryStateException
 	 *             when repository is not in the right state for committing
+	 * @throws JGitInternalException
+	 *             a low-level exception of JGit has occurred. The original
+	 *             exception can be retrieved by calling
+	 *             {@link Exception#getCause()}. Expect only
+	 *             {@code IOException's} to be wrapped. Subclasses of
+	 *             {@link IOException} (e.g. {@link UnmergedPathException}) are
+	 *             typically not wrapped here but thrown as original exception
 	 */
-	public RevCommit call() throws GitAPIException, NoHeadException,
-			NoMessageException, UnmergedPathsException,
-			ConcurrentRefUpdateException,
-			WrongRepositoryStateException {
+	public RevCommit call() throws NoHeadException, NoMessageException,
+			UnmergedPathException, ConcurrentRefUpdateException,
+			JGitInternalException, WrongRepositoryStateException {
 		checkCallable();
 
 		RepositoryState state = repo.getRepositoryState();
@@ -159,7 +160,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 		processOptions(state);
 
 		try {
-			Git git = new Git(repo);
+            Git git = new Git(repo);
 			if (all && !repo.isBare() && repo.getWorkTree() != null) {
 				try {
 					git.add()
@@ -176,23 +177,20 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				throw new NoHeadException(
 						JGitText.get().commitOnRepoWithoutHEADCurrentlyNotSupported);
 
-			// Check if there are any files to commit
-			if (!allowEmpty) {
-				// files could have been added to only list, in that case the
-				// commit is not empty
-				if (only.isEmpty()) {
-					Status status = git.status().call();
-					if ((status.getAdded().size() + status.getChanged().size() + status
-							.getRemoved().size()) == 0) {
-						throw new JGitInternalException(
-								JGitText.get().emptyCommit);
-					}
-				}
-			}
+            // Check if there are any files to commit
+            if (!allowEmpty) {
+                // files could have been added to only list, in that case the commit is not empty
+                if (only.isEmpty()) {
+                    Status status = git.status().call();
+                    if ((status.getAdded().size() + status.getChanged().size() + status.getRemoved().size()) == 0) {
+                        throw new JGitInternalException(JGitText.get().emptyCommit);
+                    }
+                }
+            }
 
-			// determine the current HEAD and the commit it is referring to
+            // determine the current HEAD and the commit it is referring to
 			ObjectId headId = repo.resolve(Constants.HEAD + "^{commit}");
-			if (headId != null)
+			if (headId != null) {
 				if (amend) {
 					RevCommit previousCommit = new RevWalk(repo)
 							.parseCommit(headId);
@@ -202,6 +200,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				} else {
 					parents.add(0, headId);
 				}
+            }
 
 			// lock the index
 			DirCache index = repo.lockDirCache();
@@ -284,7 +283,10 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				index.unlock();
 			}
 		} catch (UnmergedPathException e) {
-			throw new UnmergedPathsException(e);
+			// since UnmergedPathException is a subclass of IOException
+			// which should not be wrapped by a JGitInternalException we
+			// have to catch and re-throw it here
+			throw e;
 		} catch (IOException e) {
 			throw new JGitInternalException(
 					JGitText.get().exceptionCaughtDuringExecutionOfCommitCommand, e);
@@ -504,20 +506,9 @@ public class CommitCommand extends GitCommand<RevCommit> {
 							Constants.MERGE_MSG, e), e);
 				}
 			}
-		} else if (state == RepositoryState.SAFE && message == null) {
-			try {
-				message = repo.readSquashCommitMsg();
-				if (message != null)
-					repo.writeSquashCommitMsg(null /* delete */);
-			} catch (IOException e) {
-				throw new JGitInternalException(MessageFormat.format(
-						JGitText.get().exceptionOccurredDuringReadingOfGIT_DIR,
-						Constants.MERGE_MSG, e), e);
-			}
-
 		}
 		if (message == null)
-			// as long as we don't support -C option we have to have
+			// as long as we don't suppport -C option we have to have
 			// an explicit message
 			throw new NoMessageException(JGitText.get().commitMessageNotSpecified);
 	}
@@ -658,21 +649,21 @@ public class CommitCommand extends GitCommand<RevCommit> {
 		return this;
 	}
 
-	/**
-	 * Used to allow an empty commit, i.e. a commit without any changes added.
-	 * This is equivalent to --allow-empty on the command line.
-	 *
-	 * The default is false.
-	 *
-	 * @param allowEmpty
-	 * @return {@code this}
-	 */
-	public CommitCommand setAllowEmpty(boolean allowEmpty) {
-		this.allowEmpty = allowEmpty;
-		return this;
-	}
+    /**
+     * Used to allow an empty commit, i.e. a commit without any changes added.
+     * This is equivalent to --allow-empty on the command line.
+     *
+     * Default is false.
+     *
+     * @param allowEmpty
+     * @return {@code this}
+     */
+    public CommitCommand setAllowEmpty(boolean allowEmpty) {
+        this.allowEmpty = allowEmpty;
+        return this;
+    }
 
-	/**
+    /**
 	 * Commit dedicated path only
 	 *
 	 * This method can be called several times to add multiple paths. Full file

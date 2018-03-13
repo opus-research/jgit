@@ -141,8 +141,7 @@ public class DirCacheEntry {
 	private byte inCoreFlags;
 
 	DirCacheEntry(final byte[] sharedInfo, final MutableInteger infoAt,
-			final InputStream in, final MessageDigest md, final int smudge_s,
-			final int smudge_ns) throws IOException {
+			final InputStream in, final MessageDigest md) throws IOException {
 		info = sharedInfo;
 		infoOffset = infoAt.value;
 
@@ -200,10 +199,6 @@ public class DirCacheEntry {
 			IO.skipFully(in, padLen);
 			md.update(nullpad, 0, padLen);
 		}
-
-		if (mightBeRacilyClean(smudge_s, smudge_ns))
-			smudgeRacilyClean();
-
 	}
 
 	/**
@@ -724,7 +719,8 @@ public class DirCacheEntry {
 			case ':':
 				// Tree's never have a backslash in them, not even on Windows
 				// but even there we regard it as an invalid path
-				if (SystemReader.getInstance().isWindows())
+				if ("Windows".equals(SystemReader.getInstance().getProperty(
+						"os.name")))
 					return false;
 				//$FALL-THROUGH$
 			default:

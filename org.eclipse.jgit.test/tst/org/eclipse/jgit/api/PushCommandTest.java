@@ -84,8 +84,7 @@ public class PushCommandTest extends RepositoryTestCase {
 
 		Git git1 = new Git(db);
 		// create some refs via commits and tag
-		RevCommit commit = git1.commit().setMessage("initial commit")
-				.setAllowEmpty(true).call();
+		RevCommit commit = git1.commit().setMessage("initial commit").setAllowEmpty(true).call();
 		Ref tagRef = git1.tag().setName("tag").call();
 
 		try {
@@ -135,8 +134,9 @@ public class PushCommandTest extends RepositoryTestCase {
 		remoteConfig.update(config);
 		config.save();
 
-		RevCommit commit2 = git.commit().setMessage("Commit to push")
-				.setAllowEmpty(true).call();
+
+		RevCommit commit2 = git.commit().setMessage("Commit to push").
+                setAllowEmpty(true).call();
 
 		RefSpec spec = new RefSpec(branch + ":" + branch);
 		Iterable<PushResult> resultIterable = git.push().setRemote(remote)
