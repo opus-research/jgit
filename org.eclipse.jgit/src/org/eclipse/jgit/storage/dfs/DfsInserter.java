@@ -43,6 +43,9 @@
 
 package org.eclipse.jgit.storage.dfs;
 
+import static org.eclipse.jgit.storage.pack.PackConstants.PACK_EXT;
+import static org.eclipse.jgit.storage.pack.PackConstants.PACK_INDEX_EXT;
+
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -150,7 +153,7 @@ public class DfsInserter extends ObjectInserter {
 			throw new IOException();
 
 		byte[] packHash = packOut.writePackFooter();
-		packDsc.setPackSize(packOut.getCount());
+		packDsc.setFileSize(PACK_EXT, packOut.getCount());
 		packOut.close();
 		packOut = null;
 
@@ -220,7 +223,7 @@ public class DfsInserter extends ObjectInserter {
 
 		rollback = true;
 		packDsc = db.newPack(DfsObjDatabase.PackSource.INSERT);
-		packOut = new PackStream(db.writePackFile(packDsc));
+		packOut = new PackStream(db.writeFile(packDsc, PACK_EXT));
 		packKey = new DfsPackKey();
 
 		// Write the header as though it were a single object pack.
@@ -250,14 +253,14 @@ public class DfsInserter extends ObjectInserter {
 			packIndex = PackIndex.read(buf.openInputStream());
 		}
 
-		DfsOutputStream os = db.writePackIndex(pack);
+		DfsOutputStream os = db.writeFile(pack, PACK_INDEX_EXT);
 		try {
 			CountingOutputStream cnt = new CountingOutputStream(os);
 			if (buf != null)
 				buf.writeTo(cnt, null);
 			else
 				index(cnt, packHash, list);
-			pack.setIndexSize(cnt.getCount());
+			pack.setFileSize(PACK_INDEX_EXT, cnt.getCount());
 		} finally {
 			os.close();
 		}
