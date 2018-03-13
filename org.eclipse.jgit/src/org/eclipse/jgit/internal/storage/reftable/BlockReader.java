@@ -364,14 +364,7 @@ class BlockReader {
 		ptr += 4;
 
 		blockType = (byte) (typeAndSize >>> 24);
-		int blockLen;
-		if ((blockType & INDEX_BLOCK_TYPE) == INDEX_BLOCK_TYPE) {
-			// Index blocks are allowed to grow up to 31-bit blockSize.
-			blockType = INDEX_BLOCK_TYPE;
-			blockLen = decodeIndexSize(typeAndSize);
-		} else {
-			blockLen = typeAndSize & 0xffffff;
-		}
+		int blockLen = decodeBlockSize(typeAndSize);
 		if (blockType == LOG_BLOCK_TYPE) {
 			// Log blocks must be inflated after the header.
 			long deflatedSize = inflateBuf(src, pos, blockLen, fileBlockSize);
@@ -397,8 +390,8 @@ class BlockReader {
 		}
 	}
 
-	static int decodeIndexSize(int typeAndSize) {
-		return typeAndSize & 0x7fffffff;
+	static int decodeBlockSize(int typeAndSize) {
+		return typeAndSize & 0xffffff;
 	}
 
 	private long inflateBuf(BlockSource src, long pos, int blockLen,

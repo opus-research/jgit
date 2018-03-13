@@ -54,7 +54,7 @@ class ReftableConstants {
 	static final byte REF_BLOCK_TYPE = 'r';
 	static final byte OBJ_BLOCK_TYPE = 'o';
 	static final byte LOG_BLOCK_TYPE = 'g';
-	static final byte INDEX_BLOCK_TYPE = (byte) 0x80;
+	static final byte INDEX_BLOCK_TYPE = 'i';
 
 	static final int VALUE_NONE = 0x0;
 	static final int VALUE_1ID = 0x1;
@@ -79,7 +79,6 @@ class ReftableConstants {
 	static final int LOG_SAME_MESSAGE = 0x2;
 
 	static final int MAX_BLOCK_SIZE = (1 << 24) - 1;
-	static final int MAX_INDEX_SIZE = 0x7fffffff;
 	static final int MAX_RESTARTS = 65535;
 
 	static boolean isFileHeaderMagic(byte[] buf, int o, int n) {
