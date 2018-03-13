@@ -238,11 +238,12 @@ public abstract class RefDatabase {
 	 * @return the reference (if it exists); else {@code null}.
 	 * @throws IOException
 	 *             the reference space cannot be accessed.
+	 * @since 4.2
 	 */
 	public Ref findRef(String name) throws IOException {
-		String[] names = SEARCH_PATH.clone();
-		for (int i = 0; i < names.length; i++) {
-			names[i] += name;
+		String[] names = new String[SEARCH_PATH.length];
+		for (int i = 0; i < SEARCH_PATH.length; i++) {
+			names[i] = SEARCH_PATH[i] + name;
 		}
 		return firstExactRef(names);
 	}
@@ -250,7 +251,7 @@ public abstract class RefDatabase {
 	/**
 	 * Read a single reference.
 	 * <p>
-	 * Unlike {@link #getRef}, this method expects an unshortened reference
+	 * Unlike {@link #findRef}, this method expects an unshortened reference
 	 * name and does not search using the standard {@link #SEARCH_PATH}.
 	 *
 	 * @param name
@@ -260,22 +261,7 @@ public abstract class RefDatabase {
 	 *             the reference space cannot be accessed.
 	 * @since 4.1
 	 */
-	public Ref exactRef(String name) throws IOException {
-		int slash = name.lastIndexOf('/');
-		String prefix = name.substring(0, slash + 1);
-		String rest = name.substring(slash + 1);
-		Ref result = getRefs(prefix).get(rest);
-		if (result != null || slash != -1) {
-			return result;
-		}
-
-		for (Ref ref : getAdditionalRefs()) {
-			if (name.equals(ref.getName())) {
-				return ref;
-			}
-		}
-		return null;
-	}
+	public abstract Ref exactRef(String name) throws IOException;
 
 	/**
 	 * Read the specified references.
@@ -346,8 +332,8 @@ public abstract class RefDatabase {
 	 * <p>
 	 * The result list includes non-ref items such as MERGE_HEAD and
 	 * FETCH_RESULT cast to be refs. The names of these refs are not returned by
-	 * <code>getRefs(ALL)</code> but are accepted by {@link #getRef(String)}
-	 * and {@link exactRef(String)}.
+	 * <code>getRefs(ALL)</code> but are accepted by {@link #findRef(String)}
+	 * and {@link #exactRef(String)}.
 	 *
 	 * @return a list of additional refs
 	 * @throws IOException
