@@ -46,9 +46,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import org.eclipse.jgit.lfs.lib.AnyLongObjectId;
-import org.eclipse.jgit.lfs.lib.Constants;
-import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.lfs.lib.LongObjectId;
 
 /**
  * Class which represents the lfs folder hierarchy inside a .git folder
@@ -63,11 +61,11 @@ public class Lfs {
 	private Path tmpDir;
 
 	/**
-	 * @param db
-	 *            the associated repo
+	 * @param root
+	 *            the path to the LFS media directory. Will be "<repo>/.git/lfs"
 	 */
-	public Lfs(Repository db) {
-		this.root = db.getDirectory().toPath().resolve(Constants.LFS);
+	public Lfs(Path root) {
+		this.root = root;
 	}
 
 	/**
@@ -104,12 +102,12 @@ public class Lfs {
 	 *            the id of the mediafile
 	 * @return the file which stores the original content. This will be files
 	 *         underneath
-	 *         "<repo>/.git/lfs/objects/<firstTwoLettersOfID>/<nextTwoLettersOfID>/<fullID>"
+	 *         "<repo>/.git/lfs/objects/<firstTwoLettersOfID>/<remainingLettersOfID>"
 	 */
-	public Path getMediaFile(AnyLongObjectId id) {
-		String idStr = id.name();
+	public Path getMediaFile(LongObjectId id) {
+		String idStr = LongObjectId.toString(id);
 		return getLfsObjDir().resolve(idStr.substring(0, 2))
-				.resolve(idStr.substring(2, 4)).resolve(idStr);
+				.resolve(idStr.substring(2));
 	}
 
 	/**
