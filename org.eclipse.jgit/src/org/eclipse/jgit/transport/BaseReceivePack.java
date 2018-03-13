@@ -51,7 +51,6 @@ import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_REPORT_
 import static org.eclipse.jgit.transport.GitProtocolConstants.CAPABILITY_SIDE_BAND_64K;
 import static org.eclipse.jgit.transport.GitProtocolConstants.OPTION_AGENT;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_DATA;
-import static org.eclipse.jgit.transport.SideBandOutputStream.CH_ERROR;
 import static org.eclipse.jgit.transport.SideBandOutputStream.CH_PROGRESS;
 import static org.eclipse.jgit.transport.SideBandOutputStream.MAX_BUF;
 
@@ -216,7 +215,6 @@ public abstract class BaseReceivePack {
 
 	/** Optional message output stream. */
 	protected OutputStream msgOut;
-	private SideBandOutputStream errOut;
 
 	/** Packet line input stream around {@link #rawIn}. */
 	protected PacketLineIn pckIn;
@@ -881,19 +879,6 @@ public abstract class BaseReceivePack {
 		}
 	}
 
-	private void fatalError(String msg) {
-		if (errOut != null) {
-			try {
-				errOut.write(Constants.encode(msg));
-				errOut.flush();
-			} catch (IOException e) {
-				// Ignore write failures
-			}
-		} else {
-			sendError(msg);
-		}
-	}
-
 	/**
 	 * Send a message to the client, if it supports receiving them.
 	 * <p>
@@ -1108,7 +1093,7 @@ public abstract class BaseReceivePack {
 				}
 
 				if (line.length() >= 48 && line.startsWith("shallow ")) { //$NON-NLS-1$
-					clientShallowCommits.add(ObjectId.fromString(line.substring(8, 48)));
+					parseShallow(line.substring(8, 48));
 					continue;
 				}
 
@@ -1142,27 +1127,37 @@ public abstract class BaseReceivePack {
 				}
 			}
 			pushCert = certParser.build();
-		} catch (PackProtocolException | InvalidObjectIdException e) {
-			if (sideBand) {
-				try {
-					pckIn.discardUntilEnd();
-				} catch (IOException e2) {
-					// Ignore read failures attempting to discard.
-				}
-			}
-			fatalError(e.getMessage());
+		} catch (PackProtocolException e) {
+			sendError(e.getMessage());
 			throw e;
 		}
 	}
 
+	private void parseShallow(String idStr) throws PackProtocolException {
+		ObjectId id;
+		try {
+			id = ObjectId.fromString(idStr);
+		} catch (InvalidObjectIdException e) {
+			throw new PackProtocolException(e.getMessage(), e);
+		}
+		clientShallowCommits.add(id);
+	}
+
 	static ReceiveCommand parseCommand(String line) throws PackProtocolException {
-		if (line == null || line.length() < 83) {
+          if (line == null || line.length() < 83) {
 			throw new PackProtocolException(
 					JGitText.get().errorInvalidProtocolWantedOldNewRef);
 		}
-
-		ObjectId oldId = ObjectId.fromString(line.substring(0, 40));
-		ObjectId newId = ObjectId.fromString(line.substring(41, 81));
+		String oldStr = line.substring(0, 40);
+		String newStr = line.substring(41, 81);
+		ObjectId oldId, newId;
+		try {
+			oldId = ObjectId.fromString(oldStr);
+			newId = ObjectId.fromString(newStr);
+		} catch (InvalidObjectIdException e) {
+			throw new PackProtocolException(
+					JGitText.get().errorInvalidProtocolWantedOldNewRef, e);
+		}
 		String name = line.substring(82);
 		if (!Repository.isValidRefName(name)) {
 			throw new PackProtocolException(
@@ -1180,7 +1175,6 @@ public abstract class BaseReceivePack {
 
 			rawOut = new SideBandOutputStream(CH_DATA, MAX_BUF, out);
 			msgOut = new SideBandOutputStream(CH_PROGRESS, MAX_BUF, out);
-			errOut = new SideBandOutputStream(CH_ERROR, MAX_BUF, out);
 
 			pckOut = new PacketLineOut(rawOut);
 			pckOut.setFlushOnEnd(false);
