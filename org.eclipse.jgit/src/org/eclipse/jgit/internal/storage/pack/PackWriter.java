@@ -1147,9 +1147,7 @@ public class PackWriter {
 		AsyncObjectSizeQueue<ObjectToPack> sizeQueue = reader.getObjectSize(
 				Arrays.<ObjectToPack> asList(list).subList(0, cnt), false);
 		try {
-			final long limit = Math.min(
-					config.getBigFileThreshold(),
-					Integer.MAX_VALUE);
+			final long limit = config.getBigFileThreshold();
 			for (;;) {
 				try {
 					if (!sizeQueue.next())
@@ -1159,13 +1157,13 @@ public class PackWriter {
 					if (ignoreMissingUninteresting) {
 						ObjectToPack otp = sizeQueue.getCurrent();
 						if (otp != null && otp.isEdge()) {
-							otp.setDoNotDelta();
+							otp.setDoNotDelta(true);
 							continue;
 						}
 
 						otp = objectsMap.get(notFound.getObjectId());
 						if (otp != null && otp.isEdge()) {
-							otp.setDoNotDelta();
+							otp.setDoNotDelta(true);
 							continue;
 						}
 					}
@@ -1177,10 +1175,14 @@ public class PackWriter {
 					otp = objectsMap.get(sizeQueue.getObjectId());
 
 				long sz = sizeQueue.getSize();
-				if (40 < sz && sz < limit)
-					otp.setWeight((int) sz);
+				if (limit <= sz || Integer.MAX_VALUE <= sz)
+					otp.setDoNotDelta(true); // too big, avoid costly files
+
+				else if (sz <= DeltaIndex.BLKSZ)
+					otp.setDoNotDelta(true); // too small, won't work
+
 				else
-					otp.setDoNotDelta(); // too small, or too big
+					otp.setWeight((int) sz);
 				monitor.update(1);
 			}
 		} finally {
