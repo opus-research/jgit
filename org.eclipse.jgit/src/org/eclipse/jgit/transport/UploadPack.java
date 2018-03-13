@@ -68,7 +68,6 @@ import org.eclipse.jgit.revwalk.RevFlagSet;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 import org.eclipse.jgit.util.io.InterruptTimer;
 import org.eclipse.jgit.util.io.TimeoutInputStream;
 import org.eclipse.jgit.util.io.TimeoutOutputStream;
@@ -99,6 +98,14 @@ public class UploadPack {
 
 	/** Timeout in seconds to wait for client interaction. */
 	private int timeout;
+
+	/**
+	 * Should we start by advertising our refs to the client?
+	 * <p>
+	 * If false this class runs in a read everything then output results mode,
+	 * making it suitable for single call RPCs like HTTP.
+	 */
+	private boolean biDirectionalPipe = true;
 
 	/** Timer to manage {@link #timeout}. */
 	private InterruptTimer timer;
@@ -196,6 +203,27 @@ public class UploadPack {
 	}
 
 	/**
+	 * @return true if this class expects a bi-directional pipe opened between
+	 *         the client and itself. The default is true.
+	 */
+	public boolean isBiDirectionalPipe() {
+		return biDirectionalPipe;
+	}
+
+	/**
+	 * @param twoWay
+	 *            if true, this class will assume the socket is a fully
+	 *            bidirectional pipe between the two peers and takes advantage
+	 *            of that by first transmitting the known refs, then waiting to
+	 *            read commands. If false, this class assumes it must read the
+	 *            commands before writing output and does not perform the
+	 *            initial advertising.
+	 */
+	public void setBiDirectionalPipe(final boolean twoWay) {
+		biDirectionalPipe = twoWay;
+	}
+
+	/**
 	 * Execute the upload task on the socket.
 	 *
 	 * @param input
@@ -244,25 +272,29 @@ public class UploadPack {
 	}
 
 	private void service() throws IOException {
-		sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
+		if (biDirectionalPipe)
+			sendAdvertisedRefs();
+		else {
+			refs = db.getAllRefs();
+			for (Ref r : refs.values()) {
+				try {
+					walk.parseAny(r.getObjectId()).add(ADVERTISED);
+				} catch (IOException e) {
+					// Skip missing/corrupt objects
+				}
+			}
+		}
+
 		recvWants();
 		if (wantAll.isEmpty())
 			return;
 		multiAck = options.contains(OPTION_MULTI_ACK);
-		negotiate();
-		sendPack();
+		if (negotiate())
+			sendPack();
 	}
 
-	/**
-	 * Generate an advertisement of available refs and capabilities.
-	 *
-	 * @param adv
-	 *            the advertisement formatter.
-	 * @throws IOException
-	 *             the formatter failed to write an advertisement.
-	 */
-	public void sendAdvertisedRefs(final RefAdvertiser adv) throws IOException {
-		adv.init(walk, ADVERTISED);
+	private void sendAdvertisedRefs() throws IOException {
+		final RefAdvertiser adv = new RefAdvertiser(pckOut, walk, ADVERTISED);
 		adv.advertiseCapability(OPTION_INCLUDE_TAG);
 		adv.advertiseCapability(OPTION_MULTI_ACK);
 		adv.advertiseCapability(OPTION_OFS_DELTA);
@@ -273,7 +305,7 @@ public class UploadPack {
 		adv.setDerefTags(true);
 		refs = db.getAllRefs();
 		adv.send(refs.values());
-		adv.end();
+		pckOut.end();
 	}
 
 	private void recvWants() throws IOException {
@@ -333,7 +365,7 @@ public class UploadPack {
 		}
 	}
 
-	private void negotiate() throws IOException {
+	private boolean negotiate() throws IOException {
 		ObjectId last = ObjectId.zeroId();
 		for (;;) {
 			String line;
@@ -347,6 +379,9 @@ public class UploadPack {
 				if (commonBase.isEmpty() || multiAck)
 					pckOut.writeString("NAK\n");
 				pckOut.flush();
+				if (!biDirectionalPipe)
+					return false;
+
 			} else if (line.startsWith("have ") && line.length() == 45) {
 				final ObjectId id = ObjectId.fromString(line.substring(5));
 				if (matchHave(id)) {
@@ -370,7 +405,8 @@ public class UploadPack {
 
 				else if (multiAck)
 					pckOut.writeString("ACK " + last.name() + "\n");
-				break;
+
+				return true;
 
 			} else {
 				throw new PackProtocolException("expected have; got " + line);
