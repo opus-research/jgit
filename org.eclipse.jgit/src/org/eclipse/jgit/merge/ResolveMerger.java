@@ -44,9 +44,6 @@
  */
 package org.eclipse.jgit.merge;
 
-import static org.eclipse.jgit.lib.Constants.CHARACTER_ENCODING;
-import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -79,8 +76,10 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ConfigConstants;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
@@ -90,7 +89,6 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
-import org.eclipse.jgit.util.TemporaryBuffer;
 
 /**
  * A three-way merger performing a content-merge if necessary
@@ -308,24 +306,29 @@ public class ResolveMerger extends ThreeWayMerger {
 	}
 
 	private void checkout() throws NoWorkTreeException, IOException {
-		for (Map.Entry<String, DirCacheEntry> entry : toBeCheckedOut
-				.entrySet()) {
-			File f = new File(db.getWorkTree(), entry.getKey());
-			createDir(f.getParentFile());
-			DirCacheCheckout.checkoutEntry(db, f, entry.getValue(), reader);
-			modifiedFiles.add(entry.getKey());
-		}
-		// Iterate in reverse so that "folder/file" is deleted before
-		// "folder". Otherwise this could result in a failing path because
-		// of a non-empty directory, for which delete() would fail.
-		for (int i = toBeDeleted.size() - 1; i >= 0; i--) {
-			String fileName = toBeDeleted.get(i);
-			File f = new File(db.getWorkTree(), fileName);
-			if (!f.delete())
-				if (!f.isDirectory())
-					failingPaths.put(fileName,
-							MergeFailureReason.COULD_NOT_DELETE);
-			modifiedFiles.add(fileName);
+		ObjectReader r = db.getObjectDatabase().newReader();
+		try {
+			for (Map.Entry<String, DirCacheEntry> entry : toBeCheckedOut
+					.entrySet()) {
+				File f = new File(db.getWorkTree(), entry.getKey());
+				createDir(f.getParentFile());
+				DirCacheCheckout.checkoutEntry(db, f, entry.getValue(), r);
+				modifiedFiles.add(entry.getKey());
+			}
+			// Iterate in reverse so that "folder/file" is deleted before
+			// "folder". Otherwise this could result in a failing path because
+			// of a non-empty directory, for which delete() would fail.
+			for (int i = toBeDeleted.size() - 1; i >= 0; i--) {
+				String fileName = toBeDeleted.get(i);
+				File f = new File(db.getWorkTree(), fileName);
+				if (!f.delete())
+					if (!f.isDirectory())
+						failingPaths.put(fileName,
+								MergeFailureReason.COULD_NOT_DELETE);
+				modifiedFiles.add(fileName);
+			}
+		} finally {
+			r.release();
 		}
 	}
 
@@ -362,6 +365,7 @@ public class ResolveMerger extends ThreeWayMerger {
 		}
 
 		DirCache dc = db.readDirCache();
+		ObjectReader or = db.getObjectDatabase().newReader();
 		Iterator<String> mpathsIt=modifiedFiles.iterator();
 		while(mpathsIt.hasNext()) {
 			String mpath=mpathsIt.next();
@@ -371,7 +375,7 @@ public class ResolveMerger extends ThreeWayMerger {
 			FileOutputStream fos = new FileOutputStream(new File(
 					db.getWorkTree(), mpath));
 			try {
-				reader.open(entry.getObjectId()).copyTo(fos);
+				or.open(entry.getObjectId()).copyTo(fos);
 			} finally {
 				fos.close();
 			}
@@ -752,90 +756,88 @@ public class ResolveMerger extends ThreeWayMerger {
 			CanonicalTreeParser ours, CanonicalTreeParser theirs,
 			MergeResult<RawText> result) throws FileNotFoundException,
 			IOException {
-		File mergedFile = !inCore ? writeMergedFile(result) : null;
+		File of = writeMergedFile(result);
 		if (result.containsConflicts()) {
-			// A conflict occurred, the file will contain conflict markers
-			// the index will be populated with the three stages and the
-			// workdir (if used) contains the halfway merged content.
+			// a conflict occurred, the file will contain conflict markers
+			// the index will be populated with the three stages and only the
+			// workdir (if used) contains the halfways merged content
 			add(tw.getRawPath(), base, DirCacheEntry.STAGE_1, 0, 0);
 			add(tw.getRawPath(), ours, DirCacheEntry.STAGE_2, 0, 0);
 			add(tw.getRawPath(), theirs, DirCacheEntry.STAGE_3, 0, 0);
 			mergeResults.put(tw.getPathString(), result);
-			return;
-		}
-
-		// No conflict occurred, the file will contain fully merged content.
-		// The index will be populated with the new merged version.
-		DirCacheEntry dce = new DirCacheEntry(tw.getPathString());
-
-		// Set the mode for the new content. Fall back to REGULAR_FILE if
-		// we can't merge modes of OURS and THEIRS.
-		int newMode = mergeFileModes(
-				tw.getRawMode(0),
-				tw.getRawMode(1),
-				tw.getRawMode(2));
-		dce.setFileMode(newMode == FileMode.MISSING.getBits()
-				? FileMode.REGULAR_FILE
-				: FileMode.fromBits(newMode));
-		if (mergedFile != null) {
-			long len = mergedFile.length();
-			dce.setLastModified(mergedFile.lastModified());
-			dce.setLength((int) len);
-			InputStream is = new FileInputStream(mergedFile);
+		} else {
+			// no conflict occurred, the file will contain fully merged content.
+			// the index will be populated with the new merged version
+			DirCacheEntry dce = new DirCacheEntry(tw.getPathString());
+			int newMode = mergeFileModes(tw.getRawMode(0), tw.getRawMode(1),
+					tw.getRawMode(2));
+			// set the mode for the new content. Fall back to REGULAR_FILE if
+			// you can't merge modes of OURS and THEIRS
+			dce.setFileMode((newMode == FileMode.MISSING.getBits()) ? FileMode.REGULAR_FILE
+					: FileMode.fromBits(newMode));
+			dce.setLastModified(of.lastModified());
+			dce.setLength((int) of.length());
+			InputStream is = new FileInputStream(of);
 			try {
-				dce.setObjectId(getObjectInserter().insert(OBJ_BLOB, len, is));
+				dce.setObjectId(getObjectInserter().insert(
+				    Constants.OBJ_BLOB, of.length(), is));
 			} finally {
 				is.close();
+				if (inCore)
+					FileUtils.delete(of);
 			}
-		} else
-			dce.setObjectId(insertMergeResult(result));
-		builder.add(dce);
+			builder.add(dce);
+		}
 	}
 
 	/**
-	 * Writes merged file content to the working tree.
+	 * Writes merged file content to the working tree. In case {@link #inCore}
+	 * is set and we don't have a working tree the content is written to a
+	 * temporary file
 	 *
 	 * @param result
 	 *            the result of the content merge
-	 * @return the working tree file to which the merged content was written.
+	 * @return the file to which the merged content was written
 	 * @throws FileNotFoundException
 	 * @throws IOException
 	 */
 	private File writeMergedFile(MergeResult<RawText> result)
 			throws FileNotFoundException, IOException {
-		File workTree = db.getWorkTree();
-		if (workTree == null)
-			// TODO: This should be handled by WorkingTreeIterators which
-			// support write operations
-			throw new UnsupportedOperationException();
+		MergeFormatter fmt = new MergeFormatter();
+		File of = null;
+		FileOutputStream fos;
+		if (!inCore) {
+			File workTree = db.getWorkTree();
+			if (workTree == null)
+				// TODO: This should be handled by WorkingTreeIterators which
+				// support write operations
+				throw new UnsupportedOperationException();
 
-		FS fs = db.getFS();
-		File of = new File(workTree, tw.getPathString());
-		File parentFolder = of.getParentFile();
-		if (!fs.exists(parentFolder))
-			parentFolder.mkdirs();
-		FileOutputStream fos = new FileOutputStream(of);
-		try {
-			new MergeFormatter().formatMerge(fos, result,
-					Arrays.asList(commitNames), CHARACTER_ENCODING);
-		} finally {
-			fos.close();
+			FS fs = db.getFS();
+			of = new File(workTree, tw.getPathString());
+			File parentFolder = of.getParentFile();
+			if (!fs.exists(parentFolder))
+				parentFolder.mkdirs();
+			fos = new FileOutputStream(of);
+			try {
+				fmt.formatMerge(fos, result, Arrays.asList(commitNames),
+						Constants.CHARACTER_ENCODING);
+			} finally {
+				fos.close();
+			}
+		} else if (!result.containsConflicts()) {
+			// When working inCore, only trivial merges can be handled,
+			// so we generate objects only in conflict free cases
+			of = File.createTempFile("merge_", "_temp", null); //$NON-NLS-1$ //$NON-NLS-2$
+			fos = new FileOutputStream(of);
+			try {
+				fmt.formatMerge(fos, result, Arrays.asList(commitNames),
+						Constants.CHARACTER_ENCODING);
+			} finally {
+				fos.close();
+			}
 		}
 		return of;
-	}
-
-	private ObjectId insertMergeResult(MergeResult<RawText> result)
-			throws IOException {
-		TemporaryBuffer.LocalFile buf = new TemporaryBuffer.LocalFile(10 << 20);
-		try {
-			new MergeFormatter().formatMerge(buf, result,
-					Arrays.asList(commitNames), CHARACTER_ENCODING);
-			buf.close();
-			return getObjectInserter().insert(OBJ_BLOB, buf.length(),
-					buf.openInputStream());
-		} finally {
-			buf.destroy();
-		}
 	}
 
 	/**
@@ -870,7 +872,7 @@ public class ResolveMerger extends ThreeWayMerger {
 			throws IOException {
 		if (id.equals(ObjectId.zeroId()))
 			return new RawText(new byte[] {});
-		return new RawText(db.open(id, OBJ_BLOB).getCachedBytes());
+		return new RawText(db.open(id, Constants.OBJ_BLOB).getCachedBytes());
 	}
 
 	private static boolean nonTree(final int mode) {
