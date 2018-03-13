@@ -378,13 +378,6 @@ public final class Constants {
 	public static final String ATTR_FILTER = "filter";
 
 	/**
-	 * Prefix for all LFS related filters.
-	 *
-	 * @since 4.2
-	 */
-	public static final String ATTR_FILTER_DRIVER_PREFIX = "lfs/";
-
-	/**
 	 * clean command name, used to call filter driver
 	 *
 	 * @since 4.2
@@ -441,13 +434,6 @@ public final class Constants {
 	 * @since 4.9
 	 */
 	public static final String ATTR_MERGE = "merge"; //$NON-NLS-1$
-
-	/**
-	 * Merge attribute.
-	 *
-	 * @since 4.10
-	 */
-	public static final String ATTR_DIFF = "diff"; //$NON-NLS-1$
 
 	/**
 	 * Binary value for custom merger.
