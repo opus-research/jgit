@@ -42,21 +42,21 @@ package org.eclipse.jgit.api.errors;
  *
  * @since 4.2
  */
-public class EmptyCommitException extends GitAPIException {
+public class EmtpyCommitException extends GitAPIException {
 	private static final long serialVersionUID = 1L;
 
 	/**
 	 * @param message
 	 * @param cause
 	 */
-	public EmptyCommitException(String message, Throwable cause) {
+	public EmtpyCommitException(String message, Throwable cause) {
 		super(message, cause);
 	}
 
 	/**
 	 * @param message
 	 */
-	public EmptyCommitException(String message) {
+	public EmtpyCommitException(String message) {
 		super(message);
 	}
 }
