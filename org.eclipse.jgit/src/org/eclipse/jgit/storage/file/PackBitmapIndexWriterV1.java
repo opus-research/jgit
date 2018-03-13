@@ -107,9 +107,7 @@ public class PackBitmapIndexWriterV1 {
 
 	private void writeHeader(byte options, byte[] packDataChecksum)
 			throws IOException {
-		byte[] tmp = new byte[4];
-		NB.encodeInt32(tmp, 0, 1);
-		out.write(tmp, 0, 4);
+		dataOutput.writeInt(1);
 		out.write(options);
 		out.write(packDataChecksum);
 	}
