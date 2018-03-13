@@ -47,7 +47,6 @@ import java.io.File;
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.Task;
 import org.eclipse.jgit.api.CloneCommand;
-import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.transport.URIish;
@@ -61,7 +60,7 @@ import org.eclipse.jgit.transport.URIish;
 public class GitCloneTask extends Task {
 
 	private String uri;
-	private File destination;
+	private File dest;
 	private boolean bare;
 	private String branch = Constants.HEAD;
 
@@ -79,11 +78,11 @@ public class GitCloneTask extends Task {
 	 * 
 	 * @see URIish#getHumanishName()
 	 * 
-	 * @param destination
+	 * @param dest
 	 *            the directory to clone to
 	 */
-	public void setDest(File destination) {
-		this.destination = destination;
+	public void setDest(File dest) {
+		this.dest = dest;
 	}
 
 	/**
@@ -105,9 +104,10 @@ public class GitCloneTask extends Task {
 	@Override
 	public void execute() throws BuildException {
 		log("Cloning repository " + uri);
-		
-		CloneCommand clone = Git.cloneRepository();
-		clone.setURI(uri).setDirectory(destination).setBranch(branch).setBare(bare);
+
+		CloneCommand clone = new CloneCommand();
+
+		clone.setURI(uri).setDirectory(dest).setBranch(branch).setBare(bare);
 		try {
 			clone.call();
 		} catch (JGitInternalException e) {
