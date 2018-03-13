@@ -214,6 +214,8 @@ public class GitSmartHttpTools {
 			sendUploadPackError(req, res, textForGit);
 		} else if (isReceivePack(req)) {
 			sendReceivePackError(req, res, textForGit);
+		} else if (isPublishSubscribe(req)) {
+			sendPublishSubscribeError(req, res, textForGit);
 		} else {
 			if (httpStatus < 400)
 				ServletUtils.consumeRequestBody(req);
@@ -293,6 +295,14 @@ public class GitSmartHttpTools {
 		else
 			writePacket(pckOut, textForGit);
 		send(req, res, RECEIVE_PACK_RESULT_TYPE, buf.toByteArray());
+	}
+
+	private static void sendPublishSubscribeError(HttpServletRequest req,
+			HttpServletResponse res, String textForGit) throws IOException {
+		ByteArrayOutputStream buf = new ByteArrayOutputStream(128);
+		PacketLineOut pckOut = new PacketLineOut(buf);
+		writePacket(pckOut, textForGit);
+		send(req, res, PUBLISH_SUBSCRIBE_RESULT_TYPE, buf.toByteArray());
 	}
 
 	private static boolean isReceivePackSideBand(HttpServletRequest req) {

@@ -78,7 +78,11 @@ public class DefaultPublisherClientFactory
 					throws RepositoryNotFoundException,
 					ServiceMayNotContinueException,
 					ServiceNotAuthorizedException, ServiceNotEnabledException {
-				return resolver.open(req, name);
+				try {
+					return resolver.open(req, name);
+				} catch (ServiceNotEnabledException e) {
+					throw new ServiceNotEnabledException(name);
+				}
 			}
 		};
 	}

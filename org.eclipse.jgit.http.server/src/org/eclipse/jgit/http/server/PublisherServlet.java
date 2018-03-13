@@ -45,6 +45,7 @@ package org.eclipse.jgit.http.server;
 
 import static javax.servlet.http.HttpServletResponse.SC_FORBIDDEN;
 import static javax.servlet.http.HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
+import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
 import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
 import static javax.servlet.http.HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE;
 import static org.eclipse.jgit.http.server.GitSmartHttpTools.PUBLISH_SUBSCRIBE_REQUEST_TYPE;
@@ -65,8 +66,8 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.transport.PublisherClient;
-import org.eclipse.jgit.transport.ServiceMayNotContinueException;
 import org.eclipse.jgit.transport.resolver.PublisherClientFactory;
 import org.eclipse.jgit.transport.resolver.ServiceNotAuthorizedException;
 import org.eclipse.jgit.transport.resolver.ServiceNotEnabledException;
@@ -135,18 +136,18 @@ public class PublisherServlet extends HttpServlet {
 			// Block inside subscribe until the client disconnects
 			pc.subscribe(getInputStream(req), out, null);
 			out.close();
-		} catch (ServiceMayNotContinueException e) {
-			if (e.isOutput())
-				out.close();
-			else if (!rsp.isCommitted()) {
-				rsp.reset();
-				sendError(req, rsp, SC_FORBIDDEN, e.getMessage());
-			}
+		} catch (RepositoryNotFoundException e) {
+			sendError(req, rsp, SC_NOT_FOUND, e.getMessage());
+			return;
 		} catch (ServiceNotAuthorizedException e) {
-			if (!rsp.isCommitted()) {
-				rsp.reset();
+			// The user needs to authenticate first (401)
+			if (!rsp.isCommitted())
 				rsp.sendError(SC_UNAUTHORIZED);
-			}
+			return;
+		} catch (ServiceNotEnabledException e) {
+			// The current user does not have access to this service (403)
+			sendError(req, rsp, SC_FORBIDDEN, e.getMessage());
+			return;
 		} catch (Throwable e) {
 			getServletContext().log(
 					HttpServerText.get().internalErrorDuringPublishSubscribe,
