@@ -51,6 +51,7 @@ import java.io.InputStreamReader;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Abstraction to support various file system operations not in Java. */
 public abstract class FS {
@@ -265,16 +266,17 @@ public abstract class FS {
 	 * @return the one-line output of the command
 	 */
 	protected static String readPipe(File dir, String[] command, String encoding) {
-		final boolean debug = SystemReader.getInstance().getProperty(
-				"jgit.fs.debug") != null;
+		final boolean debug = Boolean.parseBoolean(SystemReader.getInstance()
+				.getProperty("jgit.fs.debug"));
 		try {
 			if (debug)
-				System.out.println("readpipe " + Arrays.asList(command) + ","
+				System.err.println("readpipe " + Arrays.asList(command) + ","
 						+ dir);
 			final Process p = Runtime.getRuntime().exec(command, null, dir);
 			final BufferedReader lineRead = new BufferedReader(
 					new InputStreamReader(p.getInputStream(), encoding));
 			p.getOutputStream().close();
+			final AtomicBoolean gooblerFail = new AtomicBoolean(false);
 			Thread gobbler = new Thread() {
 				public void run() {
 					InputStream is = p.getErrorStream();
@@ -288,13 +290,16 @@ public abstract class FS {
 								// ignore
 							}
 					} catch (IOException e) {
+						// Just print on stderr for debugging
 						e.printStackTrace(System.err);
+						gooblerFail.set(true);
 					}
 					try {
 						is.close();
 					} catch (IOException e) {
+						// Just print on stderr for debugging
 						e.printStackTrace(System.err);
-						// can't do anything sensible
+						gooblerFail.set(true);
 					}
 				}
 			};
@@ -302,8 +307,10 @@ public abstract class FS {
 			String r = null;
 			try {
 				r = lineRead.readLine();
-				if (debug)
-					System.err.println("readpipe returned '" + r + "'");
+				if (debug) {
+					System.err.println("readpipe may return '" + r + "'");
+					System.err.println("(ignoring remaing output:");
+				}
 				String l;
 				while ((l = lineRead.readLine()) != null) {
 					if (debug)
@@ -317,7 +324,9 @@ public abstract class FS {
 			for (;;) {
 				try {
 					int rc = p.waitFor();
-					if (rc == 0 && r != null && r.length() > 0)
+					gobbler.join();
+					if (rc == 0 && r != null && r.length() > 0
+							&& !gooblerFail.get())
 						return r;
 					if (debug)
 						System.err.println("readpipe rc=" + rc);
@@ -331,6 +340,8 @@ public abstract class FS {
 				System.err.println(e);
 			// Ignore error (but report)
 		}
+		if (debug)
+			System.err.println("readpipe returns null");
 		return null;
 	}
 
