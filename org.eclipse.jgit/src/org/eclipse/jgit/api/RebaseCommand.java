@@ -396,6 +396,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		FileOutputStream fos = new FileOutputStream(file);
 		try {
 			fos.write(content.getBytes("UTF-8"));
+			fos.write('\n');
 		} finally {
 			fos.close();
 		}
@@ -434,7 +435,8 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 				case NO_CHANGE:
 					break;
 				default:
-					throw new IOException("Could not abort rebase");
+					throw new JGitInternalException(
+							JGitText.get().abortingRebaseFailed);
 				}
 			}
 			// cleanup the files
@@ -457,8 +459,12 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	}
 
 	private String readFile(File directory, String fileName) throws IOException {
-		return RawParseUtils
-				.decode(IO.readFully(new File(directory, fileName)));
+		byte[] content = IO.readFully(new File(directory, fileName));
+		// strip off the last LF
+		int end = content.length;
+		while (0 < end && content[end - 1] == '\n')
+			end--;
+		return RawParseUtils.decode(content, 0, end);
 	}
 
 	private void checkoutCommit(RevCommit commit) throws IOException {
