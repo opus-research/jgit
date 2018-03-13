@@ -106,7 +106,7 @@ public class FileTreeEntry extends TreeEntry {
 	}
 
 	public String toString() {
-		final StringBuilder r = new StringBuilder();
+		final StringBuffer r = new StringBuffer();
 		r.append(ObjectId.toString(getId()));
 		r.append(' ');
 		r.append(isExecutable() ? 'X' : 'F');
