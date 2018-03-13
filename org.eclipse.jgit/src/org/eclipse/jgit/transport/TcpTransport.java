@@ -72,6 +72,7 @@ public abstract class TcpTransport extends Transport {
 	 *
 	 * @param uri the URI used to access the remote repository. This must be the
 	 *            URI passed to {@link #open(URIish)}.
+	 * @since 3.5
 	 */
 	protected TcpTransport(URIish uri) {
 		super(uri);

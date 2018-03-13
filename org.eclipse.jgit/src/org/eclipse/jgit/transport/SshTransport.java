@@ -86,13 +86,14 @@ public abstract class SshTransport extends TcpTransport {
 	 *
 	 * @param uri the URI used to access the remote repository. This must be the
 	 *            URI passed to {@link #open(URIish)}.
+	 * @since 3.5
 	 */
 	protected SshTransport(URIish uri) {
 		super(uri);
 		sch = SshSessionFactory.getInstance();
 	}
 
-    /**
+	/**
 	 * Set SSH session factory instead of the default one for this instance of
 	 * the transport.
 	 *

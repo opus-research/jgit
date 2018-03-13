@@ -143,7 +143,7 @@ public class TransportGitSsh extends SshTransport implements PackTransport {
 		initSshSessionFactory();
 	}
 
-	private void initSshSessionFactory() {
+    private void initSshSessionFactory() {
 		if (useExtSession()) {
 			setSshSessionFactory(new SshSessionFactory() {
 				@Override
