@@ -51,6 +51,7 @@ import org.eclipse.jgit.api.ListBranchCommand.ListMode;
 import org.eclipse.jgit.errors.RepositoryNotFoundException;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryTestCase;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -72,6 +73,14 @@ public class GitConstructionTest extends RepositoryTestCase {
 				.setDirectory(createUniqueTestGitDir(true)).call()
 				.getRepository();
 		addRepoToClose(bareRepo);
+	}
+
+	@Override
+	@After
+	public void tearDown() throws Exception {
+		db.close();
+		bareRepo.close();
+		super.tearDown();
 	}
 
 	@Test
