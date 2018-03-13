@@ -151,12 +151,6 @@ public class ResetCommand extends GitCommand<Ref> {
 			final ObjectId commitId;
 			try {
 				commitId = repo.resolve(ref);
-				if (commitId == null) {
-					// @TODO throw an InvalidRefNameException. We can't do that
-					// know because this would break the API
-					throw new JGitInternalException("Invalid ref " + ref
-							+ " specified");
-				}
 			} catch (IOException e) {
 				throw new JGitInternalException(
 						MessageFormat.format(JGitText.get().cannotRead, ref),
