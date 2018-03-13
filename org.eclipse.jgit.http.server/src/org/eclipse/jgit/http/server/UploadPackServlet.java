@@ -104,7 +104,6 @@ class UploadPackServlet extends HttpServlet {
 				ServiceNotEnabledException, ServiceNotAuthorizedException {
 			UploadPack up = (UploadPack) req.getAttribute(ATTRIBUTE_HANDLER);
 			try {
-				up.setBiDirectionalPipe(false);
 				up.sendAdvertisedRefs(pck);
 			} finally {
 				up.getRevWalk().release();
