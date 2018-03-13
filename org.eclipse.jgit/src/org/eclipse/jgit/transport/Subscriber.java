@@ -44,10 +44,13 @@
 package org.eclipse.jgit.transport;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
@@ -69,7 +72,7 @@ public class Subscriber {
 
 	private String restartToken;
 
-	private String restartSequence;
+	private String lastPackNumber;
 
 	private final Map<String, SubscribedRepository> repoSubscriptions;
 
@@ -102,9 +105,11 @@ public class Subscriber {
 	 * @return Map of repository name to list of SubscribeCommands required to
 	 *         sync the existing state to the state of the publisher config.
 	 * @throws IOException
+	 * @throws URISyntaxException
 	 */
 	public Map<String, List<SubscribeCommand>> sync(
-			PubSubConfig.Publisher publisher) throws IOException {
+			PubSubConfig.Publisher publisher)
+			throws IOException, URISyntaxException {
 		config = publisher;
 		Map<String, List<SubscribeCommand>> subscribeCommands = new HashMap<
 				String, List<SubscribeCommand>>();
@@ -129,13 +134,13 @@ public class Subscriber {
 				for (RefSpec rs : sr.getSubscribeSpecs())
 					oldSpecs.add(rs.getSource());
 
-				List<String> toAdd = new ArrayList<String>(newSpecs);
+				Set<String> toAdd = new LinkedHashSet<String>(newSpecs);
 				toAdd.removeAll(oldSpecs);
 				for (String subscribe : toAdd)
 					repoCommands.add(
 							new SubscribeCommand(Command.SUBSCRIBE, subscribe));
 
-				List<String> toRemove = new ArrayList<String>(oldSpecs);
+				Set<String> toRemove = new LinkedHashSet<String>(oldSpecs);
 				toRemove.removeAll(newSpecs);
 				for (String unsubscribe : toRemove)
 					repoCommands.add(new SubscribeCommand(
@@ -198,18 +203,18 @@ public class Subscriber {
 		restartToken = restart;
 	}
 
-	/** @return the restart sequence number. */
-	public String getRestartSequence() {
-		return restartSequence;
+	/** @return the last pack number. */
+	public String getLastPackNumber() {
+		return lastPackNumber;
 	}
 
 	/**
-	 * Set the restart sequence number.
+	 * Set the last pack number.
 	 *
-	 * @param sequence
+	 * @param number
 	 */
-	public void setRestartSequence(String sequence) {
-		restartSequence = sequence;
+	public void setLastPackNumber(String number) {
+		lastPackNumber = number;
 	}
 
 	/** Close this subscription. */
