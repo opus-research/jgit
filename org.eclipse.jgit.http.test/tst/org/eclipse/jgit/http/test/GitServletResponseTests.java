@@ -60,7 +60,6 @@ import org.eclipse.jgit.http.server.GitServlet;
 import org.eclipse.jgit.http.server.resolver.DefaultReceivePackFactory;
 import org.eclipse.jgit.junit.TestRepository;
 import org.eclipse.jgit.junit.http.HttpTestCase;
-import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectChecker;
@@ -222,9 +221,8 @@ public class GitServletResponseTests extends HttpTestCase {
 		preHook = null;
 		oc = new ObjectChecker() {
 			@Override
-			public void checkCommit(AnyObjectId id, byte[] raw)
-					throws CorruptObjectException {
-				throw new CorruptObjectException("refusing all commits");
+			public void checkCommit(byte[] raw) throws CorruptObjectException {
+				throw new IllegalStateException();
 			}
 		};
 

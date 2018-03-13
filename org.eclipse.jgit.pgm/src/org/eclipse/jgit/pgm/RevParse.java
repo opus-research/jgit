@@ -56,8 +56,7 @@ import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.Option;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.pgm.internal.CLIText;
-import org.eclipse.jgit.pgm.opt.CmdLineParser;
+import org.eclipse.jgit.pgm.internal.CLIText;;
 
 @Command(usage = "usage_RevParse")
 class RevParse extends TextBuiltin {
@@ -75,18 +74,11 @@ class RevParse extends TextBuiltin {
 		if (all) {
 			Map<String, Ref> allRefs = db.getRefDatabase().getRefs(ALL);
 			for (final Ref r : allRefs.values()) {
-				ObjectId objectId = r.getObjectId();
-				// getRefs skips dangling symrefs, so objectId should never be
-				// null.
-				if (objectId == null) {
-					throw new NullPointerException();
-				}
-				outw.println(objectId.name());
+				outw.println(r.getObjectId().name());
 			}
 		} else {
 			if (verify && commits.size() > 1) {
-				final CmdLineParser clp = new CmdLineParser(this);
-				throw new CmdLineException(clp, CLIText.get().needSingleRevision);
+				throw new CmdLineException(CLIText.get().needSingleRevision);
 			}
 
 			for (final ObjectId o : commits) {
