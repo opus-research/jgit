@@ -44,7 +44,6 @@ package org.eclipse.jgit.api;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -64,7 +63,6 @@ import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
-import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.Constants;
@@ -206,7 +204,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 						.call();
 				monitor.endTask();
 				if (newHead == null) {
-					return stop(commitToPick);
+					return new RebaseResult(commitToPick);
 				}
 				stepsToPop++;
 			}
@@ -227,27 +225,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		} catch (IOException ioe) {
 			throw new JGitInternalException(ioe.getMessage(), ioe);
 		}
-	}
-
-	private RebaseResult stop(RevCommit commitToPick) throws IOException {
-		StringBuilder sb = new StringBuilder(100);
-		sb.append("GIT_AUTHOR_NAME='");
-		sb.append(commitToPick.getAuthorIdent().getName());
-		sb.append("'\n");
-		sb.append("GIT_AUTHOR_EMAIL='");
-		sb.append(commitToPick.getAuthorIdent().getEmailAddress());
-		sb.append("'\n");
-		sb.append("GIT_AUTHOR_DATE='");
-		sb.append(commitToPick.getAuthorIdent().getWhen());
-		sb.append("'\n");
-		createFile(rebaseDir, "author-script", sb.toString());
-		createFile(rebaseDir, "message", commitToPick.getShortMessage());
-		ByteArrayOutputStream bos = new ByteArrayOutputStream();
-		DiffFormatter df = new DiffFormatter(bos);
-		df.setRepository(repo);
-		df.format(commitToPick.getParent(0), commitToPick);
-		createFile(rebaseDir, "patch", new String(bos.toByteArray(), "UTF-8"));
-		return new RebaseResult(commitToPick);
 	}
 
 	/**
