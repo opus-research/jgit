@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Chris Aniszczyk <caniszczyk@gmail.com>
+ * Copyright (C) 2011, Ketan Padegaonkar <ketanpadegaonkar@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,57 +43,62 @@
 package org.eclipse.jgit.api;
 
 import java.io.IOException;
-import java.text.MessageFormat;
-import java.util.Collection;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
 
-import org.eclipse.jgit.JGitText;
-import org.eclipse.jgit.api.errors.InvalidRemoteException;
+import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.storage.file.ReflogEntry;
-import org.eclipse.jgit.storage.file.ReflogReader;
+import org.eclipse.jgit.revwalk.RevTag;
+import org.eclipse.jgit.revwalk.RevWalk;
 
 /**
- * The reflog command
+ * Used to obtain a list of tags.
  *
- * @see <a
- *      href="http://www.kernel.org/pub/software/scm/git/docs/git-reflog.html"
- *      >Git documentation about reflog</a>
+ * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-tag.html"
+ *      >Git documentation about Tag</a>
  */
-public class ReflogCommand extends GitCommand<Collection<ReflogEntry>> {
-
-	private String ref = Constants.HEAD;
+public class ListTagCommand extends GitCommand<List<RevTag>> {
 
 	/**
 	 * @param repo
 	 */
-	public ReflogCommand(Repository repo) {
+	protected ListTagCommand(Repository repo) {
 		super(repo);
 	}
 
 	/**
-	 * The ref used for the reflog operation. If no ref is set, the default
-	 * value of HEAD will be used.
-	 *
-	 * @param ref
-	 * @return {@code this}
+	 * @throws JGitInternalException
+	 *             upon internal failure
+	 * @return the tags available
 	 */
-	public ReflogCommand setRef(String ref) {
+	public List<RevTag> call() throws JGitInternalException {
 		checkCallable();
-		this.ref = ref;
-		return this;
-	}
-
-	public Collection<ReflogEntry> call() throws Exception {
-		checkCallable();
-
+		Map<String, Ref> refList;
+		List<RevTag> tags = new ArrayList<RevTag>();
+		RevWalk revWalk = new RevWalk(repo);
 		try {
-			ReflogReader reader = new ReflogReader(repo, ref);
-			return reader.getReverseEntries();
+			refList = repo.getRefDatabase().getRefs(Constants.R_TAGS);
+			for (Ref ref : refList.values()) {
+				RevTag tag = revWalk.parseTag(ref.getObjectId());
+				tags.add(tag);
+			}
 		} catch (IOException e) {
-			throw new InvalidRemoteException(MessageFormat.format(
-					JGitText.get().cannotRead, ref));
+			throw new JGitInternalException(e.getMessage(), e);
+		} finally {
+			revWalk.release();
 		}
+		Collections.sort(tags, new Comparator<RevTag>() {
+			public int compare(RevTag o1, RevTag o2) {
+				return o1.getTagName().compareTo(o2.getTagName());
+			}
+		});
+		setCallable(false);
+		return tags;
 	}
 
 }
