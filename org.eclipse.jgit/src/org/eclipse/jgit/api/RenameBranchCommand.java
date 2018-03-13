@@ -58,7 +58,6 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefRename;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.StoredConfig;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 
 /**
@@ -145,28 +144,27 @@ public class RenameBranchCommand extends GitCommand<Ref> {
 					// move the upstream configuration over to the new branch
 					String shortOldName = fullOldName
 							.substring(Constants.R_HEADS.length());
-					final StoredConfig repoConfig = repo.getConfig();
-					String oldRemote = repoConfig.getString(
+					String oldRemote = repo.getConfig().getString(
 							ConfigConstants.CONFIG_BRANCH_SECTION,
 							shortOldName, ConfigConstants.CONFIG_KEY_REMOTE);
 					if (oldRemote != null) {
-						repoConfig.setString(
+						repo.getConfig().setString(
 								ConfigConstants.CONFIG_BRANCH_SECTION, newName,
 								ConfigConstants.CONFIG_KEY_REMOTE, oldRemote);
 					}
-					String oldMerge = repoConfig.getString(
+					String oldMerge = repo.getConfig().getString(
 							ConfigConstants.CONFIG_BRANCH_SECTION,
 							shortOldName, ConfigConstants.CONFIG_KEY_MERGE);
 					if (oldMerge != null) {
-						repoConfig.setString(
+						repo.getConfig().setString(
 								ConfigConstants.CONFIG_BRANCH_SECTION, newName,
 								ConfigConstants.CONFIG_KEY_MERGE, oldMerge);
 					}
-					repoConfig
+					repo.getConfig()
 							.unsetSection(
 									ConfigConstants.CONFIG_BRANCH_SECTION,
 									shortOldName);
-					repoConfig.save();
+					repo.getConfig().save();
 				}
 
 			} else
