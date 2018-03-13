@@ -518,6 +518,7 @@ public class WindowCache {
 		gc();
 	}
 
+	@SuppressWarnings("unchecked")
 	private void gc() {
 		Ref r;
 		while ((r = (Ref) queue.poll()) != null) {
