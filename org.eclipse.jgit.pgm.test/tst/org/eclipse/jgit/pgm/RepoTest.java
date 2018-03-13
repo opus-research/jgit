@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014, Google Inc.
+ * Copyright (C) 2014 Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,7 +40,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.gitrepo;
+package org.eclipse.jgit.pgm;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -51,17 +51,18 @@ import java.io.FileReader;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.junit.JGitTestUtil;
-import org.eclipse.jgit.junit.RepositoryTestCase;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
 import org.eclipse.jgit.lib.Repository;
+import org.junit.Before;
 import org.junit.Test;
 
-public class RepoCommandTest extends RepositoryTestCase {
-
+public class RepoTest extends CLIRepositoryTestCase {
 	private Repository remoteDb;
 
+	@Override
+	@Before
 	public void setUp() throws Exception {
 		super.setUp();
-
 		remoteDb = createWorkRepository();
 		Git git = new Git(remoteDb);
 		JGitTestUtil.writeTrashFile(remoteDb, "hello.txt", "world");
@@ -79,12 +80,14 @@ public class RepoCommandTest extends RepositoryTestCase {
 			.append("<project path=\"foo\" name=\".\" />")
 			.append("</manifest>");
 		writeTrashFile("manifest.xml", xmlContent.toString());
-		RepoCommand command = new RepoCommand(db);
-		command.setPath(db.getWorkTree().getAbsolutePath() + "/manifest.xml")
-			.setURI(remoteDb.getDirectory().toURI().toString())
-			.call();
+		StringBuilder cmd = new StringBuilder("git repo --base-uri=\"")
+			.append(remoteDb.getDirectory().toURI().toString())
+			.append("\" \"")
+			.append(db.getWorkTree().getAbsolutePath())
+			.append("/manifest.xml\"");
+		execute(cmd.toString());
 		File hello = new File(db.getWorkTree(), "foo/hello.txt");
-		assertTrue("submodule was checked out", hello.exists());
+		assertTrue("submodule was checked out.", hello.exists());
 		BufferedReader reader = new BufferedReader(new FileReader(hello));
 		String content = reader.readLine();
 		reader.close();
