@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2009-2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,26 +41,53 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.util.io;
+package org.eclipse.jgit.http.server;
+
+import static javax.servlet.http.HttpServletResponse.SC_FORBIDDEN;
+import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
+import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
 
 import java.io.IOException;
-import java.io.OutputStream;
 
-/** An OutputStream which always throws IllegalStateExeption during write. */
-public final class DisabledOutputStream extends OutputStream {
-	/** The canonical instance which always throws IllegalStateException. */
-	public static final DisabledOutputStream INSTANCE = new DisabledOutputStream();
+import javax.servlet.Filter;
+import javax.servlet.FilterChain;
+import javax.servlet.FilterConfig;
+import javax.servlet.ServletException;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
-	private DisabledOutputStream() {
-		// Do nothing, but we want to hide our constructor to prevent
-		// more than one instance from being created.
+import org.eclipse.jgit.http.server.resolver.AsIsFileService;
+import org.eclipse.jgit.http.server.resolver.ServiceNotAuthorizedException;
+import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
+import org.eclipse.jgit.lib.Repository;
+
+class AsIsFileFilter implements Filter {
+	private final AsIsFileService asIs;
+
+	AsIsFileFilter(final AsIsFileService getAnyFile) {
+		this.asIs = getAnyFile;
 	}
 
-	@Override
-	public void write(int b) throws IOException {
-		// We shouldn't be writing output at this stage, there
-		// is nobody listening to us.
-		//
-		throw new IllegalStateException("Writing not permitted");
+	public void init(FilterConfig config) throws ServletException {
+		// Do nothing.
+	}
+
+	public void destroy() {
+		// Do nothing.
+	}
+
+	public void doFilter(ServletRequest request, ServletResponse response,
+			FilterChain chain) throws IOException, ServletException {
+		try {
+			final Repository db = getRepository(request);
+			asIs.access((HttpServletRequest) request, db);
+			chain.doFilter(request, response);
+		} catch (ServiceNotAuthorizedException e) {
+			((HttpServletResponse) response).sendError(SC_UNAUTHORIZED);
+		} catch (ServiceNotEnabledException e) {
+			((HttpServletResponse) response).sendError(SC_FORBIDDEN);
+		}
 	}
 }

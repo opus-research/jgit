@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010, Google Inc.
+ * Copyright (C) 2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,44 +41,34 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.http.server;
+package org.eclipse.jgit.http.server.glue;
 
-import static javax.servlet.http.HttpServletResponse.SC_NOT_FOUND;
-import static org.eclipse.jgit.http.server.ServletUtils.getRepository;
-import static org.eclipse.jgit.http.server.ServletUtils.send;
-
-import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 
+import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.eclipse.jgit.util.IO;
-
-/** Sends a small text meta file from the repository. */
-class TextFileServlet extends HttpServlet {
+/** Sends a fixed status code to the client. */
+public class ErrorServlet extends HttpServlet {
 	private static final long serialVersionUID = 1L;
 
-	private final String fileName;
+	private final int status;
 
-	TextFileServlet(final String name) {
-		this.fileName = name;
+	/**
+	 * Sends a specific status code.
+	 *
+	 * @param status
+	 *            the HTTP status code to always send.
+	 */
+	public ErrorServlet(final int status) {
+		this.status = status;
 	}
 
-	public void doGet(final HttpServletRequest req,
-			final HttpServletResponse rsp) throws IOException {
-		try {
-			rsp.setContentType("text/plain");
-			send(read(req), req, rsp);
-		} catch (FileNotFoundException noFile) {
-			rsp.sendError(SC_NOT_FOUND);
-		}
-	}
-
-	private byte[] read(final HttpServletRequest req) throws IOException {
-		final File gitdir = getRepository(req).getDirectory();
-		return IO.readFully(new File(gitdir, fileName));
+	@Override
+	protected void doGet(HttpServletRequest req, HttpServletResponse rsp)
+			throws ServletException, IOException {
+		rsp.sendError(status);
 	}
 }

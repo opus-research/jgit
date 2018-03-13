@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2009-2010, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,27 +43,14 @@
 
 package org.eclipse.jgit.http.server.glue;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 import javax.servlet.Filter;
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 abstract class ServletBinderImpl implements ServletBinder {
-	private static final HttpServlet NOT_FOUND = new HttpServlet() {
-		private static final long serialVersionUID = 1L;
-
-		@Override
-		protected void service(HttpServletRequest req, HttpServletResponse rsp)
-				throws ServletException, IOException {
-			rsp.sendError(HttpServletResponse.SC_NOT_FOUND);
-		}
-	};
-
 	private final List<Filter> filters;
 
 	private HttpServlet httpServlet;
@@ -89,7 +76,10 @@ abstract class ServletBinderImpl implements ServletBinder {
 
 	/** @return the configured servlet, or singleton returning 404 if none. */
 	protected HttpServlet getServlet() {
-		return httpServlet != null ? httpServlet : NOT_FOUND;
+		if (httpServlet != null)
+			return httpServlet;
+		else
+			return new ErrorServlet(HttpServletResponse.SC_NOT_FOUND);
 	}
 
 	/** @return the configured filters; zero-length array if none. */
