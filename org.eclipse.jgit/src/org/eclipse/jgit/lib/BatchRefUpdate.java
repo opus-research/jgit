@@ -426,8 +426,15 @@ public class BatchRefUpdate {
 		for (ReceiveCommand cmd : commands) {
 			try {
 				if (cmd.getResult() == NOT_ATTEMPTED) {
-					if (isMissing(walk, cmd.getOldId())
-							|| isMissing(walk, cmd.getNewId())) {
+					try {
+						if (!cmd.getNewId().equals(ObjectId.zeroId())) {
+							walk.parseAny(cmd.getNewId());
+						}
+					} catch (MissingObjectException e) {
+						// ReceiveCommand#setResult(Result) converts REJECTED to
+						// REJECTED_NONFASTFORWARD, even though that result is also used for
+						// a missing object. Eagerly handle this case so we can set the
+						// right result.
 						cmd.setResult(ReceiveCommand.Result.REJECTED_MISSING_OBJECT);
 						continue;
 					}
@@ -500,19 +507,6 @@ public class BatchRefUpdate {
 			}
 		}
 		monitor.endTask();
-	}
-
-	private static boolean isMissing(RevWalk walk, ObjectId id)
-			throws IOException {
-		if (id.equals(ObjectId.zeroId())) {
-			return false; // Explicit add or delete is not missing.
-		}
-		try {
-			walk.parseAny(id);
-			return false;
-		} catch (MissingObjectException e) {
-			return true;
-		}
 	}
 
 	/**

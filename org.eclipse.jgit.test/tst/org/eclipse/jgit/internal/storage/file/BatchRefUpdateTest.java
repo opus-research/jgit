@@ -114,7 +114,7 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 	}
 
 	@Test
-	public void simpleNoForce() throws IOException {
+	public void batchRefUpdateSimpleNoForce() throws IOException {
 		writeLooseRef("refs/heads/master", A);
 		writeLooseRef("refs/heads/masters", B);
 		List<ReceiveCommand> commands = Arrays.asList(
@@ -144,7 +144,7 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 	}
 
 	@Test
-	public void simpleForce() throws IOException {
+	public void batchRefUpdateSimpleForce() throws IOException {
 		writeLooseRef("refs/heads/master", A);
 		writeLooseRef("refs/heads/masters", B);
 		List<ReceiveCommand> commands = Arrays.asList(
@@ -166,7 +166,8 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 	}
 
 	@Test
-	public void nonFastForwardDoesNotDoExpensiveMergeCheck() throws IOException {
+	public void batchRefUpdateNonFastForwardDoesNotDoExpensiveMergeCheck()
+			throws IOException {
 		writeLooseRef("refs/heads/master", B);
 		List<ReceiveCommand> commands = Arrays.asList(
 				new ReceiveCommand(B, A, "refs/heads/master",
@@ -186,7 +187,7 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 	}
 
 	@Test
-	public void fileDirectoryConflict() throws IOException {
+	public void batchRefUpdateFileDirectoryConflict() throws IOException {
 		writeLooseRef("refs/heads/master", A);
 		writeLooseRef("refs/heads/masters", B);
 		List<ReceiveCommand> commands = Arrays.asList(
@@ -230,7 +231,7 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 	}
 
 	@Test
-	public void conflictThanksToDelete() throws IOException {
+	public void batchRefUpdateConflictThanksToDelete() throws IOException {
 		writeLooseRef("refs/heads/master", A);
 		writeLooseRef("refs/heads/masters", B);
 		List<ReceiveCommand> commands = Arrays.asList(
@@ -254,7 +255,7 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 	}
 
 	@Test
-	public void updateToMissingObject() throws IOException {
+	public void batchRefUpdateUpdateToMissingObject() throws IOException {
 		writeLooseRef("refs/heads/master", A);
 		ObjectId bad =
 				ObjectId.fromString("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef");
@@ -286,7 +287,7 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 	}
 
 	@Test
-	public void addMissingObject() throws IOException {
+	public void batchRefUpdateAddMissingObject() throws IOException {
 		writeLooseRef("refs/heads/master", A);
 		ObjectId bad =
 				ObjectId.fromString("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef");
@@ -316,7 +317,7 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 	}
 
 	@Test
-	public void oneNonExistentRef() throws IOException {
+	public void batchRefUpdateOneNonExistentRef() throws IOException {
 		List<ReceiveCommand> commands = Arrays.asList(
 				new ReceiveCommand(A, B, "refs/heads/foo1",
 						ReceiveCommand.Type.UPDATE),
@@ -341,7 +342,7 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 	}
 
 	@Test
-	public void oneRefWrongOldValue() throws IOException {
+	public void batchRefUpdateOneRefWrongOldValue() throws IOException {
 		writeLooseRef("refs/heads/master", A);
 		List<ReceiveCommand> commands = Arrays.asList(
 				new ReceiveCommand(B, B, "refs/heads/master",
@@ -370,7 +371,7 @@ public class BatchRefUpdateTest extends LocalDiskRepositoryTestCase {
 	}
 
 	@Test
-	public void nonExistentRef() throws IOException {
+	public void batchRefDeleteNonExistentRef() throws IOException {
 		writeLooseRef("refs/heads/master", A);
 		List<ReceiveCommand> commands = Arrays.asList(
 				new ReceiveCommand(A, B, "refs/heads/master",
