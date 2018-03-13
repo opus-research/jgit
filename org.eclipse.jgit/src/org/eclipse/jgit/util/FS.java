@@ -949,7 +949,9 @@ public abstract class FS {
 	 * @param outRedirect
 	 *            An OutputStream on which to redirect the processes stdout. Can
 	 *            be <code>null</code>, in which case the processes standard
-	 *            output will be lost.
+	 *            output will be lost. If binary is set to <code>false</code>
+	 *            then it is expected that the process emits text data which
+	 *            should be processed line by line.
 	 * @param errRedirect
 	 *            An OutputStream on which to redirect the processes stderr. Can
 	 *            be <code>null</code>, in which case the processes standard
@@ -957,9 +959,9 @@ public abstract class FS {
 	 * @param inRedirect
 	 *            An InputStream from which to redirect the processes stdin. Can
 	 *            be <code>null</code>, in which case the process doesn't get
-	 *            any data over stdin. It is assumed that the whole InputStream
-	 *            will be consumed by the process. The method will close the
-	 *            inputstream after all bytes are read.
+	 *            any data over stdin. If binary is set to
+	 *            <code>false</code> then it is expected that the process
+	 *            expects text data which should be processed line by line.
 	 * @return the return code of this process.
 	 * @throws IOException
 	 *             if an I/O error occurs while executing this process.
@@ -1009,9 +1011,6 @@ public abstract class FS {
 				// A process doesn't clean its own resources even when destroyed
 				// Explicitly try and close all three streams, preserving the
 				// outer I/O exception if any.
-				if (inRedirect != null) {
-					inRedirect.close();
-				}
 				try {
 					process.getErrorStream().close();
 				} catch (IOException e) {
