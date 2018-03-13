@@ -43,35 +43,50 @@
 
 package org.eclipse.jgit.diff;
 
-import org.eclipse.jgit.diff.DiffPerformanceTest.CharArray;
-import org.eclipse.jgit.diff.DiffPerformanceTest.CharCmp;
-
-public class PatienceDiffTest extends AbstractDiffTestCase {
+/** Compares two sequences primarily based upon hash codes. */
+public abstract class LowLevelDiffAlgorithm extends DiffAlgorithm {
 	@Override
-	protected DiffAlgorithm algorithm() {
-		PatienceDiff pd = new PatienceDiff();
-		pd.setFallbackAlgorithm(null);
-		return pd;
+	public <S extends Sequence> EditList diffNonCommon(
+			SequenceComparator<? super S> cmp, S a, S b) {
+		HashedSequencePair<S> p = new HashedSequencePair<S>(cmp, a, b);
+		HashedSequenceComparator<S> hc = p.getComparator();
+		HashedSequence<S> ha = p.getA();
+		HashedSequence<S> hb = p.getB();
+		p = null;
+
+		EditList res = new EditList();
+		Edit region = new Edit(0, a.size(), 0, b.size());
+		diffNonCommon(res, hc, ha, hb, region);
+		return res;
 	}
 
-	public void testEdit_NoUniqueMiddleSideA() {
-		EditList r = diff(t("aRRSSz"), t("aSSRRz"));
-		assertEquals(1, r.size());
-		assertEquals(new Edit(1, 5, 1, 5), r.get(0));
-	}
-
-	public void testEdit_NoUniqueMiddleSideB() {
-		EditList r = diff(t("aRSz"), t("aSSRRz"));
-		assertEquals(1, r.size());
-		assertEquals(new Edit(1, 3, 1, 5), r.get(0));
-	}
-
-	public void testPerformanceTestDeltaLength() {
-		String a = DiffTestDataGenerator.generateSequence(40000, 971, 3);
-		String b = DiffTestDataGenerator.generateSequence(40000, 1621, 5);
-		CharArray ac = new CharArray(a);
-		CharArray bc = new CharArray(b);
-		EditList r = algorithm().diff(new CharCmp(), ac, bc);
-		assertEquals(25, r.size());
-	}
+	/**
+	 * Compare two sequences and identify a list of edits between them.
+	 *
+	 * This method should be invoked only after the two sequences have been
+	 * proven to have no common starting or ending elements. The expected
+	 * elimination of common starting and ending elements is automatically
+	 * performed by the {@link #diff(SequenceComparator, Sequence, Sequence)}
+	 * method, which invokes this method using {@link Subsequence}s.
+	 *
+	 * @param <S>
+	 *            type of sequence being compared.
+	 * @param edits
+	 *            result list to append the region's edits onto.
+	 * @param cmp
+	 *            the comparator supplying the element equivalence function.
+	 * @param a
+	 *            the first (also known as old or pre-image) sequence. Edits
+	 *            returned by this algorithm will reference indexes using the
+	 *            'A' side: {@link Edit#getBeginA()}, {@link Edit#getEndA()}.
+	 * @param b
+	 *            the second (also known as new or post-image) sequence. Edits
+	 *            returned by this algorithm will reference indexes using the
+	 *            'B' side: {@link Edit#getBeginB()}, {@link Edit#getEndB()}.
+	 * @param region
+	 *            the region being compared within the two sequences.
+	 */
+	public abstract <S extends Sequence> void diffNonCommon(EditList edits,
+			HashedSequenceComparator<S> cmp, HashedSequence<S> a,
+			HashedSequence<S> b, Edit region);
 }
