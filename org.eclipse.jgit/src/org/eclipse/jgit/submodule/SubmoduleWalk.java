@@ -68,8 +68,6 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.IO;
-import org.eclipse.jgit.util.RawParseUtils;
 
 /**
  * Walker that visits all submodule entries found in a tree
@@ -157,30 +155,12 @@ public class SubmoduleWalk {
 	 */
 	public static Repository getSubmoduleRepository(final Repository parent,
 			final String path) throws IOException {
-		return getSubmoduleRepository(parent.getWorkTree(), path);
-	}
-
-	/**
-	 * Get submodule repository at path
-	 *
-	 * @param parent
-	 * @param path
-	 * @return repository or null if repository doesn't exist
-	 * @throws IOException
-	 */
-	public static Repository getSubmoduleRepository(final File parent,
-			final String path) throws IOException {
-		File gitDir = getSubmoduleGitDirectory(parent, path);
-		if (!gitDir.isDirectory())
+		File directory = getSubmoduleGitDirectory(parent, path);
+		if (!directory.isDirectory())
 			return null;
-		File workTree = new File(parent, path);
 		try {
-			return new RepositoryBuilder() //
-					.setMustExist(true) //
-					.setFS(FS.DETECTED) //
-					.setGitDir(gitDir) //
-					.setWorkTree(workTree) //
-					.build();
+			return new RepositoryBuilder().setMustExist(true)
+					.setFS(FS.DETECTED).setGitDir(directory).build();
 		} catch (RepositoryNotFoundException e) {
 			return null;
 		}
@@ -192,56 +172,87 @@ public class SubmoduleWalk {
 	 * @param parent
 	 * @param path
 	 * @return .git for submodule repository
-	 * @throws IOException
-	 *             if locating the directory failed
 	 */
 	public static File getSubmoduleGitDirectory(final Repository parent,
-			final String path) throws IOException {
-		return getSubmoduleGitDirectory(parent.getWorkTree(), path);
+			final String path) {
+		return new File(getSubmoduleDirectory(parent, path), Constants.DOT_GIT);
 	}
 
 	/**
-	 * Get the .git directory for a repository submodule path
+	 * Resolve submodule repository URL.
+	 * <p>
+	 * This handles relative URLs that are typically specified in the
+	 * '.gitmodules' file by resolving them against the remote URL of the parent
+	 * repository.
+	 * <p>
+	 * Relative URLs will be resolved against the parent repository's working
+	 * directory if the parent repository has no configured remote URL.
 	 *
 	 * @param parent
-	 * @param path
-	 * @return .git for submodule repository
+	 *            parent repository
+	 * @param url
+	 *            absolute or relative URL of the submodule repository
+	 * @return resolved URL
 	 * @throws IOException
-	 *             if locating the directory failed
 	 */
-	public static File getSubmoduleGitDirectory(final File parent,
-			final String path) throws IOException {
-		File gitDir = new File(new File(parent, path), Constants.DOT_GIT);
-		if (gitDir.isFile()) {
-			byte[] content = IO.readFully(gitDir);
-			if (isSymRef(content)) {
-				int pathStart = 8;
-				int lineEnd = RawParseUtils.nextLF(content, pathStart);
-				if (content[lineEnd - 1] == '\n')
-					lineEnd--;
-				if (lineEnd == pathStart)
-					throw new IOException(MessageFormat.format(
-							JGitText.get().submoduleInvalidGitdirRef, path));
-				gitDir = new File(RawParseUtils.decode(content, pathStart,
-						lineEnd));
-			} else
-				throw new IOException(MessageFormat.format(
-						JGitText.get().submoduleInvalidGitdirRef, path));
-		}
-		return gitDir;
-	}
+	public static String getSubmoduleRemoteUrl(final Repository parent,
+			final String url) throws IOException {
+		if (!url.startsWith("./") && !url.startsWith("../"))
+			return url;
 
-	private static boolean isSymRef(byte[] ref) {
-		if (ref.length < 9)
-			return false;
-		return /**/ref[0] == 'g' //
-				&& ref[1] == 'i' //
-				&& ref[2] == 't' //
-				&& ref[3] == 'd' //
-				&& ref[4] == 'i' //
-				&& ref[5] == 'r' //
-				&& ref[6] == ':' //
-				&& ref[7] == ' ';
+		String remoteName = null;
+		// Look up remote URL associated wit HEAD ref
+		Ref ref = parent.getRef(Constants.HEAD);
+		if (ref != null) {
+			if (ref.isSymbolic())
+				ref = ref.getLeaf();
+			remoteName = parent.getConfig().getString(
+					ConfigConstants.CONFIG_BRANCH_SECTION,
+					Repository.shortenRefName(ref.getName()),
+					ConfigConstants.CONFIG_KEY_REMOTE);
+		}
+
+		// Fall back to 'origin' if current HEAD ref has no remote URL
+		if (remoteName == null)
+			remoteName = Constants.DEFAULT_REMOTE_NAME;
+
+		String remoteUrl = parent.getConfig().getString(
+				ConfigConstants.CONFIG_REMOTE_SECTION, remoteName,
+				ConfigConstants.CONFIG_KEY_URL);
+
+		// Fall back to parent repository's working directory if no remote URL
+		if (remoteUrl == null) {
+			remoteUrl = parent.getWorkTree().getAbsolutePath();
+			// Normalize slashes to '/'
+			if ('\\' == File.separatorChar)
+				remoteUrl = remoteUrl.replace('\\', '/');
+		}
+
+		// Remove trailing '/'
+		if (remoteUrl.charAt(remoteUrl.length() - 1) == '/')
+			remoteUrl = remoteUrl.substring(0, remoteUrl.length() - 1);
+
+		char separator = '/';
+		String submoduleUrl = url;
+		while (submoduleUrl.length() > 0) {
+			if (submoduleUrl.startsWith("./"))
+				submoduleUrl = submoduleUrl.substring(2);
+			else if (submoduleUrl.startsWith("../")) {
+				int lastSeparator = remoteUrl.lastIndexOf('/');
+				if (lastSeparator < 1) {
+					lastSeparator = remoteUrl.lastIndexOf(':');
+					separator = ':';
+				}
+				if (lastSeparator < 1)
+					throw new IOException(MessageFormat.format(
+							JGitText.get().submoduleParentRemoteUrlInvalid,
+							remoteUrl));
+				remoteUrl = remoteUrl.substring(0, lastSeparator);
+				submoduleUrl = submoduleUrl.substring(3);
+			} else
+				break;
+		}
+		return remoteUrl + separator + submoduleUrl;
 	}
 
 	private final Repository repository;
@@ -341,10 +352,8 @@ public class SubmoduleWalk {
 	 * Get the .git directory for the current submodule entry
 	 *
 	 * @return .git for submodule repository
-	 * @throws IOException
-	 *             if locating the directory failed
 	 */
-	public File getGitDirectory() throws IOException {
+	public File getGitDirectory() {
 		return getSubmoduleGitDirectory(repository, path);
 	}
 
@@ -458,16 +467,13 @@ public class SubmoduleWalk {
 	}
 
 	/**
-	 * Does the current submodule entry have a .git directory?
+	 * Does the current submodule entry have a .git directory in the parent
+	 * repository's working tree?
 	 *
 	 * @return true if .git directory exists, false otherwise
 	 */
 	public boolean hasGitDirectory() {
-		try {
-			return getGitDirectory().isDirectory();
-		} catch (IOException e) {
-			return false;
-		}
+		return getGitDirectory().isDirectory();
 	}
 
 	/**
@@ -504,5 +510,20 @@ public class SubmoduleWalk {
 			return null;
 		Ref head = subRepo.getRef(Constants.HEAD);
 		return head != null ? head.getLeaf().getName() : null;
+	}
+
+	/**
+	 * Get the resolved remote URL for the current submodule.
+	 * <p>
+	 * This method resolves the value of {@link #getModulesUrl()} to an absolute
+	 * URL
+	 *
+	 * @return resolved remote URL
+	 * @throws IOException
+	 * @throws ConfigInvalidException
+	 */
+	public String getRemoteUrl() throws IOException, ConfigInvalidException {
+		String url = getModulesUrl();
+		return url != null ? getSubmoduleRemoteUrl(repository, url) : null;
 	}
 }
