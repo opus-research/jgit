@@ -193,7 +193,6 @@ public class Repository {
 		cfg.setBoolean("core", null, "filemode", true);
 		if (bare)
 			cfg.setBoolean("core", null, "bare", true);
-		cfg.setBoolean("core", null, "logAllRefupdates", !bare);
 		cfg.save();
 	}
 
