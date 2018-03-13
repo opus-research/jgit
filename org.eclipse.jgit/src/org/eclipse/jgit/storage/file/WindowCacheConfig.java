@@ -43,8 +43,8 @@
 
 package org.eclipse.jgit.storage.file;
 
-import org.eclipse.jgit.lib.CoreConfig;
 import org.eclipse.jgit.lib.Config;
+import org.eclipse.jgit.storage.pack.PackConfig;
 
 /** Configuration parameters for {@link WindowCache}. */
 public class WindowCacheConfig {
@@ -73,7 +73,7 @@ public class WindowCacheConfig {
 		packedGitWindowSize = 8 * KB;
 		packedGitMMAP = false;
 		deltaBaseCacheLimit = 10 * MB;
-		streamFileThreshold = CoreConfig.getDefaultStreamFileThreshold();
+		streamFileThreshold = PackConfig.DEFAULT_BIG_FILE_THRESHOLD;
 	}
 
 	/**
@@ -196,7 +196,7 @@ public class WindowCacheConfig {
 		setDeltaBaseCacheLimit(rc.getInt("core", null, "deltabasecachelimit", getDeltaBaseCacheLimit()));
 
 		long maxMem = Runtime.getRuntime().maxMemory();
-		long sft = CoreConfig.KEY.parse(rc).getStreamFileThreshold();
+		long sft = rc.getLong("core", null, "streamfilethreshold", getStreamFileThreshold());
 		sft = Math.min(sft, maxMem / 4); // don't use more than 1/4 of the heap
 		sft = Math.min(sft, Integer.MAX_VALUE); // cannot exceed array length
 		setStreamFileThreshold((int) sft);

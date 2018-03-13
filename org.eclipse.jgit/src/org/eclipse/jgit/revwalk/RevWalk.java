@@ -95,6 +95,8 @@ import org.eclipse.jgit.treewalk.filter.TreeFilter;
  * {@link #next()} does not.
  */
 public class RevWalk implements Iterable<RevCommit> {
+	private static final int MB = 1 << 20;
+
 	/**
 	 * Set on objects whose important header data has been loaded.
 	 * <p>
@@ -856,7 +858,7 @@ public class RevWalk implements Iterable<RevCommit> {
 	byte[] getCachedBytes(RevObject obj, ObjectLoader ldr)
 			throws LargeObjectException, MissingObjectException, IOException {
 		try {
-			return ldr.getCachedBytes();
+			return ldr.getCachedBytes(5 * MB);
 		} catch (LargeObjectException tooBig) {
 			tooBig.setObjectId(obj);
 			throw tooBig;

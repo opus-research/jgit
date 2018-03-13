@@ -955,9 +955,11 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		static Action parse(String token) {
 			if (token.equals("pick") || token.equals("p"))
 				return PICK;
-			throw new JGitInternalException(MessageFormat.format(
-					JGitText.get().unknownOrUnsupportedCommand, token,
-					PICK.toToken()));
+			throw new JGitInternalException(
+					MessageFormat
+							.format(
+									"Unknown or unsupported command \"{0}\", only  \"pick\" is allowed",
+									token));
 		}
 	}
 
