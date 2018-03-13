@@ -69,7 +69,6 @@ import org.eclipse.jgit.revwalk.RevFlagSet;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.storage.pack.PackConfig;
 import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.transport.BasePackFetchConnection.MultiAck;
 import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
@@ -102,9 +101,6 @@ public class UploadPack {
 
 	/** Revision traversal support over {@link #db}. */
 	private final RevWalk walk;
-
-	/** Configuration to pass into the PackWriter. */
-	private PackConfig packConfig;
 
 	/** Timeout in seconds to wait for client interaction. */
 	private int timeout;
@@ -260,17 +256,6 @@ public class UploadPack {
 	 */
 	public void setRefFilter(final RefFilter refFilter) {
 		this.refFilter = refFilter != null ? refFilter : RefFilter.DEFAULT;
-	}
-
-	/**
-	 * Set the configuration used by the pack generator.
-	 *
-	 * @param pc
-	 *            configuration controlling packing parameters. If null the
-	 *            source repository's settings will be used.
-	 */
-	public void setPackConfig(PackConfig pc) {
-		this.packConfig = pc;
 	}
 
 	/**
@@ -581,10 +566,7 @@ public class UploadPack {
 						SideBandOutputStream.CH_PROGRESS, bufsz, rawOut));
 		}
 
-		PackConfig cfg = packConfig;
-		if (cfg == null)
-			cfg = new PackConfig(db);
-		final PackWriter pw = new PackWriter(cfg, walk.getObjectReader());
+		final PackWriter pw = new PackWriter(db, walk.getObjectReader());
 		try {
 			pw.setDeltaBaseAsOffset(options.contains(OPTION_OFS_DELTA));
 			pw.setThin(options.contains(OPTION_THIN_PACK));
