@@ -70,7 +70,7 @@ import org.eclipse.jgit.util.RawParseUtils;
  * they are converting from "line number" to "element index".
  */
 public class RawText extends Sequence {
-	/** A RawText of length 0 */
+	/** A Rawtext of length 0 */
 	public static final RawText EMPTY_TEXT = new RawText(new byte[0]);
 
 	/** Number of bytes to check for heuristics in {@link #isBinary(byte[])} */
@@ -107,8 +107,13 @@ public class RawText extends Sequence {
 
 	/**
 	 * Construct a new RawText if the line map is already known.
+	 *
+	 * @param data
+	 *   the blob data.
+	 * @param lineMap
+	 *   Indices of line starts, with indexed by base-1 linenumber.
 	 */
-	private RawText(final byte[] data, IntList lineMap) {
+	private RawText(final byte[] data, final IntList lineMap) {
 		content = data;
 		lines = lineMap;
 	}

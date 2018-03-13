@@ -632,8 +632,6 @@ public final class RawParseUtils {
 	 * @throws BinaryBlobException if any '\0' is found.
 	 */
 	public static final IntList lineMap(final byte[] buf, int ptr, int end) throws BinaryBlobException {
-		int start = ptr;
-
 		// Experimentally derived from multiple source repositories
 		// the average number of bytes/line is 36. Its a rough guess
 		// to initially size our map close to the target.
