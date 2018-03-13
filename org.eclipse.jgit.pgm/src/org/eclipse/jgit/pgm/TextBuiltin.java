@@ -56,6 +56,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
 import java.text.MessageFormat;
 import java.util.ResourceBundle;
 
@@ -105,6 +106,14 @@ public abstract class TextBuiltin {
 	 * @since 2.2
 	 */
 	protected OutputStream outs;
+
+	/**
+	 * Stream to output to, typically this is standard output.
+	 *
+	 * @deprecated Use outw instead
+	 */
+	@Deprecated
+	protected PrintWriter out;
 
 	/**
 	 * Error writer, typically this is standard error.
@@ -163,6 +172,7 @@ public abstract class TextBuiltin {
 						outputEncoding));
 			else
 				outbufw = new BufferedWriter(new OutputStreamWriter(outs));
+			out = new PrintWriter(outbufw);
 			outw = new ThrowingPrintWriter(outbufw);
 			BufferedWriter errbufw;
 			if (outputEncoding != null)

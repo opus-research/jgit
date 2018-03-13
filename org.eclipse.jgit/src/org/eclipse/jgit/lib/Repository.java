@@ -99,7 +99,7 @@ import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
  * <p>
  * This class is thread-safe.
  */
-public abstract class Repository implements AutoCloseable {
+public abstract class Repository {
 	private static final ListenerList globalListeners = new ListenerList();
 
 	/** @return the global listener list observing all events in this JVM. */
@@ -379,7 +379,8 @@ public abstract class Repository implements AutoCloseable {
 	public ObjectId resolve(final String revstr)
 			throws AmbiguousObjectException, IncorrectObjectTypeException,
 			RevisionSyntaxException, IOException {
-		try (RevWalk rw = new RevWalk(this)) {
+		RevWalk rw = new RevWalk(this);
+		try {
 			Object resolved = resolve(rw, revstr);
 			if (resolved instanceof String) {
 				final Ref ref = getRef((String)resolved);
@@ -387,6 +388,8 @@ public abstract class Repository implements AutoCloseable {
 			} else {
 				return (ObjectId) resolved;
 			}
+		} finally {
+			rw.release();
 		}
 	}
 
@@ -403,7 +406,8 @@ public abstract class Repository implements AutoCloseable {
 	 */
 	public String simplify(final String revstr)
 			throws AmbiguousObjectException, IOException {
-		try (RevWalk rw = new RevWalk(this)) {
+		RevWalk rw = new RevWalk(this);
+		try {
 			Object resolved = resolve(rw, revstr);
 			if (resolved != null)
 				if (resolved instanceof String)
@@ -411,6 +415,8 @@ public abstract class Repository implements AutoCloseable {
 				else
 					return ((AnyObjectId) resolved).getName();
 			return null;
+		} finally {
+			rw.release();
 		}
 	}
 
@@ -751,11 +757,8 @@ public abstract class Repository implements AutoCloseable {
 
 	private String resolveReflogCheckout(int checkoutNo)
 			throws IOException {
-		ReflogReader reader = getReflogReader(Constants.HEAD);
-		if (reader == null) {
-			return null;
-		}
-		List<ReflogEntry> reflogEntries = reader.getReverseEntries();
+		List<ReflogEntry> reflogEntries = getReflogReader(Constants.HEAD)
+				.getReverseEntries();
 		for (ReflogEntry entry : reflogEntries) {
 			CheckoutEntry checkout = entry.parseCheckout();
 			if (checkout != null)
@@ -776,11 +779,6 @@ public abstract class Repository implements AutoCloseable {
 		}
 		assert number >= 0;
 		ReflogReader reader = getReflogReader(ref.getName());
-		if (reader == null) {
-			throw new RevisionSyntaxException(
-					MessageFormat.format(JGitText.get().reflogEntryNotFound,
-							Integer.valueOf(number), ref.getName()));
-		}
 		ReflogEntry entry = reader.getReverseEntry(number);
 		if (entry == null)
 			throw new RevisionSyntaxException(MessageFormat.format(
@@ -793,7 +791,8 @@ public abstract class Repository implements AutoCloseable {
 	private ObjectId resolveAbbreviation(final String revstr) throws IOException,
 			AmbiguousObjectException {
 		AbbreviatedObjectId id = AbbreviatedObjectId.fromString(revstr);
-		try (ObjectReader reader = newObjectReader()) {
+		ObjectReader reader = newObjectReader();
+		try {
 			Collection<ObjectId> matches = reader.resolve(id);
 			if (matches.size() == 0)
 				return null;
@@ -801,6 +800,8 @@ public abstract class Repository implements AutoCloseable {
 				return matches.iterator().next();
 			else
 				throw new AmbiguousObjectException(id, matches);
+		} finally {
+			reader.release();
 		}
 	}
 
@@ -1348,40 +1349,6 @@ public abstract class Repository implements AutoCloseable {
 	public void writeMergeCommitMsg(String msg) throws IOException {
 		File mergeMsgFile = new File(gitDir, Constants.MERGE_MSG);
 		writeCommitMsg(mergeMsgFile, msg);
-	}
-
-	/**
-	 * Return the information stored in the file $GIT_DIR/COMMIT_EDITMSG. In
-	 * this file hooks triggered by an operation may read or modify the current
-	 * commit message.
-	 *
-	 * @return a String containing the content of the COMMIT_EDITMSG file or
-	 *         {@code null} if this file doesn't exist
-	 * @throws IOException
-	 * @throws NoWorkTreeException
-	 *             if this is bare, which implies it has no working directory.
-	 *             See {@link #isBare()}.
-	 * @since 4.0
-	 */
-	public String readCommitEditMsg() throws IOException, NoWorkTreeException {
-		return readCommitMsgFile(Constants.COMMIT_EDITMSG);
-	}
-
-	/**
-	 * Write new content to the file $GIT_DIR/COMMIT_EDITMSG. In this file hooks
-	 * triggered by an operation may read or modify the current commit message.
-	 * If {@code null} is specified as message the file will be deleted.
-	 *
-	 * @param msg
-	 *            the message which should be written or {@code null} to delete
-	 *            the file
-	 *
-	 * @throws IOException
-	 * @since 4.0
-	 */
-	public void writeCommitEditMsg(String msg) throws IOException {
-		File commiEditMsgFile = new File(gitDir, Constants.COMMIT_EDITMSG);
-		writeCommitMsg(commiEditMsgFile, msg);
 	}
 
 	/**

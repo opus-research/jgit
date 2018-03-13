@@ -55,7 +55,6 @@ import java.util.Set;
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.PackProtocolException;
-import org.eclipse.jgit.errors.TooLargePackException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.pack.PackWriter;
@@ -269,7 +268,6 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 					outputStream);
 			pckIn = new PacketLineIn(in);
 		}
-		addUserAgentCapability(line);
 
 		if (line.length() > 0)
 			line.setCharAt(0, '\0');
@@ -281,8 +279,9 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 		Set<ObjectId> remoteObjects = new HashSet<ObjectId>();
 		Set<ObjectId> newObjects = new HashSet<ObjectId>();
 
-		try (final PackWriter writer = new PackWriter(transport.getPackConfig(),
-				local.newObjectReader())) {
+		final PackWriter writer = new PackWriter(transport.getPackConfig(),
+				local.newObjectReader());
+		try {
 
 			for (final Ref r : getRefs()) {
 				// only add objects that we actually have
@@ -304,9 +303,10 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 			writer.setDeltaBaseAsOffset(capableOfsDelta);
 			writer.preparePack(monitor, newObjects, remoteObjects);
 			writer.writePack(monitor, monitor, out);
-
-			packTransferTime = writer.getStatistics().getTimeWriting();
+		} finally {
+			writer.release();
 		}
+		packTransferTime = writer.getStatistics().getTimeWriting();
 	}
 
 	private void readStatusReport(final Map<String, RemoteRefUpdate> refUpdates)
@@ -315,9 +315,6 @@ public abstract class BasePackPushConnection extends BasePackConnection implemen
 		if (!unpackLine.startsWith("unpack ")) //$NON-NLS-1$
 			throw new PackProtocolException(uri, MessageFormat.format(JGitText.get().unexpectedReportLine, unpackLine));
 		final String unpackStatus = unpackLine.substring("unpack ".length()); //$NON-NLS-1$
-		if (unpackStatus.startsWith("error Pack exceeds the limit of")) //$NON-NLS-1$
-			throw new TooLargePackException(uri,
-					unpackStatus.substring("error ".length())); //$NON-NLS-1$
 		if (!unpackStatus.equals("ok")) //$NON-NLS-1$
 			throw new TransportException(uri, MessageFormat.format(
 					JGitText.get().errorOccurredDuringUnpackingOnTheRemoteEnd, unpackStatus));

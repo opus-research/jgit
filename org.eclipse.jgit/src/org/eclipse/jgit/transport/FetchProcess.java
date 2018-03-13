@@ -136,7 +136,6 @@ class FetchProcess {
 		conn = transport.openFetch();
 		try {
 			result.setAdvertisedRefs(transport.getURI(), conn.getRefsMap());
-			result.peerUserAgent = conn.getPeerUserAgent();
 			final Set<Ref> matched = new HashSet<Ref>();
 			for (final RefSpec spec : toFetch) {
 				if (spec.getSource() == null)
@@ -197,7 +196,8 @@ class FetchProcess {
 				.newBatchUpdate()
 				.setAllowNonFastForwards(true)
 				.setRefLogMessage("fetch", true); //$NON-NLS-1$
-		try (final RevWalk walk = new RevWalk(transport.local)) {
+		final RevWalk walk = new RevWalk(transport.local);
+		try {
 			if (monitor instanceof BatchingProgressMonitor) {
 				((BatchingProgressMonitor) monitor).setDelayStart(
 						250, TimeUnit.MILLISECONDS);
@@ -226,6 +226,8 @@ class FetchProcess {
 			throw new TransportException(MessageFormat.format(
 					JGitText.get().failureUpdatingTrackingRef,
 					getFirstFailedRefName(batch), err.getMessage()), err);
+		} finally {
+			walk.release();
 		}
 
 		if (!fetchHeadUpdates.isEmpty()) {
@@ -336,12 +338,15 @@ class FetchProcess {
 
 	private boolean askForIsComplete() throws TransportException {
 		try {
-			try (final ObjectWalk ow = new ObjectWalk(transport.local)) {
+			final ObjectWalk ow = new ObjectWalk(transport.local);
+			try {
 				for (final ObjectId want : askFor.keySet())
 					ow.markStart(ow.parseAny(want));
 				for (final Ref ref : localRefs().values())
 					ow.markUninteresting(ow.parseAny(ref.getObjectId()));
 				ow.checkConnectivity();
+			} finally {
+				ow.release();
 			}
 			return true;
 		} catch (MissingObjectException e) {

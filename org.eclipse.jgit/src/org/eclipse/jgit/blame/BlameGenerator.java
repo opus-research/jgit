@@ -113,7 +113,7 @@ import org.eclipse.jgit.treewalk.filter.TreeFilter;
  * the ancestor, until there are no more lines to acquire information on, or the
  * file's creation point is discovered in history.
  */
-public class BlameGenerator implements AutoCloseable {
+public class BlameGenerator {
 	private final Repository repository;
 
 	private final PathFilter resultPath;
@@ -172,13 +172,14 @@ public class BlameGenerator implements AutoCloseable {
 			throw new IllegalStateException();
 
 		if (revPool != null)
-			revPool.close();
+			revPool.release();
 
 		if (reverse)
 			revPool = new ReverseWalk(getRepository());
 		else
 			revPool = new RevWalk(getRepository());
 
+		revPool.setRetainBody(true);
 		SEEN = revPool.newFlag("SEEN"); //$NON-NLS-1$
 		reader = revPool.getObjectReader();
 		treeWalk = new TreeWalk(reader);
@@ -450,7 +451,7 @@ public class BlameGenerator implements AutoCloseable {
 				r.computeAll();
 			return r;
 		} finally {
-			close();
+			release();
 		}
 	}
 
@@ -513,7 +514,7 @@ public class BlameGenerator implements AutoCloseable {
 	}
 
 	private boolean done() {
-		close();
+		release();
 		return false;
 	}
 
@@ -936,14 +937,9 @@ public class BlameGenerator implements AutoCloseable {
 		return queue != null ? queue.sourceText : null;
 	}
 
-	/**
-	 * Release the current blame session.
-	 *
-	 * @since 4.0
-	 */
-	@Override
-	public void close() {
-		revPool.close();
+	/** Release the current blame session. */
+	public void release() {
+		revPool.release();
 		queue = null;
 		outCandidate = null;
 		outRegion = null;

@@ -44,7 +44,6 @@
 
 package org.eclipse.jgit.util;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -79,9 +78,6 @@ public abstract class TemporaryBuffer extends OutputStream {
 	 */
 	private int inCoreLimit;
 
-	/** Initial size of block list. */
-	private int initialBlocks;
-
 	/** If {@link #inCoreLimit} has been reached, remainder goes here. */
 	private OutputStream overflow;
 
@@ -90,28 +86,10 @@ public abstract class TemporaryBuffer extends OutputStream {
 	 *
 	 * @param limit
 	 *            maximum number of bytes to store in memory before entering the
-	 *            overflow output path; also used as the estimated size.
+	 *            overflow output path.
 	 */
 	protected TemporaryBuffer(final int limit) {
-		this(limit, limit);
-	}
-
-	/**
-	 * Create a new empty temporary buffer.
-	 *
-	 * @param estimatedSize
-	 *            estimated size of storage used, to size the initial list of
-	 *            block pointers.
-	 * @param limit
-	 *            maximum number of bytes to store in memory before entering the
-	 *            overflow output path.
-	 * @since 4.0
-	 */
-	protected TemporaryBuffer(final int estimatedSize, final int limit) {
-		if (estimatedSize > limit)
-			throw new IllegalArgumentException();
-		this.inCoreLimit = limit;
-		this.initialBlocks = (estimatedSize - 1) / Block.SZ + 1;
+		inCoreLimit = limit;
 		reset();
 	}
 
@@ -292,11 +270,13 @@ public abstract class TemporaryBuffer extends OutputStream {
 		if (overflow != null) {
 			destroy();
 		}
-		if (blocks != null)
-			blocks.clear();
-		else
-			blocks = new ArrayList<Block>(initialBlocks);
-		blocks.add(new Block(Math.min(inCoreLimit, Block.SZ)));
+		if (inCoreLimit < Block.SZ) {
+			blocks = new ArrayList<Block>(1);
+			blocks.add(new Block(inCoreLimit));
+		} else {
+			blocks = new ArrayList<Block>(inCoreLimit / Block.SZ);
+			blocks.add(new Block());
+		}
 	}
 
 	/**
@@ -382,6 +362,29 @@ public abstract class TemporaryBuffer extends OutputStream {
 		private File onDiskFile;
 
 		/**
+		 * Create a new temporary buffer.
+		 *
+		 * @deprecated Use the {@code File} overload to supply a directory.
+		 */
+		@Deprecated
+		public LocalFile() {
+			this(null, DEFAULT_IN_CORE_LIMIT);
+		}
+
+		/**
+		 * Create a new temporary buffer, limiting memory usage.
+		 *
+		 * @param inCoreLimit
+		 *            maximum number of bytes to store in memory. Storage beyond
+		 *            this limit will use the local file.
+		 * @deprecated Use the {@code File,int} overload to supply a directory.
+		 */
+		@Deprecated
+		public LocalFile(final int inCoreLimit) {
+			this(null, inCoreLimit);
+		}
+
+		/**
 		 * Create a new temporary buffer, limiting memory usage.
 		 *
 		 * @param directory
@@ -413,7 +416,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 
 		protected OutputStream overflow() throws IOException {
 			onDiskFile = File.createTempFile("jgit_", ".buf", directory); //$NON-NLS-1$ //$NON-NLS-2$
-			return new BufferedOutputStream(new FileOutputStream(onDiskFile));
+			return new FileOutputStream(onDiskFile);
 		}
 
 		public long length() {
@@ -495,28 +498,12 @@ public abstract class TemporaryBuffer extends OutputStream {
 		 * Create a new heap buffer with a maximum storage limit.
 		 *
 		 * @param limit
-		 *            maximum number of bytes that can be stored in this buffer;
-		 *            also used as the estimated size. Storing beyond this many
-		 *            will cause an IOException to be thrown during write.
-		 */
-		public Heap(final int limit) {
-			super(limit);
-		}
-
-		/**
-		 * Create a new heap buffer with a maximum storage limit.
-		 *
-		 * @param estimatedSize
-		 *            estimated size of storage used, to size the initial list of
-		 *            block pointers.
-		 * @param limit
 		 *            maximum number of bytes that can be stored in this buffer.
 		 *            Storing beyond this many will cause an IOException to be
 		 *            thrown during write.
-		 * @since 4.0
 		 */
-		public Heap(final int estimatedSize, final int limit) {
-			super(estimatedSize, limit);
+		public Heap(final int limit) {
+			super(limit);
 		}
 
 		@Override

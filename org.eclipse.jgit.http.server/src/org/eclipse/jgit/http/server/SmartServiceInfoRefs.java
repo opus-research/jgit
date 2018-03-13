@@ -98,10 +98,10 @@ abstract class SmartServiceInfoRefs implements Filter {
 			try {
 				begin(req, db);
 			} catch (ServiceNotAuthorizedException e) {
-				res.sendError(SC_UNAUTHORIZED, e.getMessage());
+				res.sendError(SC_UNAUTHORIZED);
 				return;
 			} catch (ServiceNotEnabledException e) {
-				sendError(req, res, SC_FORBIDDEN, e.getMessage());
+				sendError(req, res, SC_FORBIDDEN);
 				return;
 			}
 
@@ -132,9 +132,11 @@ abstract class SmartServiceInfoRefs implements Filter {
 			advertise(req, new PacketLineOutRefAdvertiser(out));
 			buf.close();
 		} catch (ServiceNotAuthorizedException e) {
-			res.sendError(SC_UNAUTHORIZED, e.getMessage());
+			res.sendError(SC_UNAUTHORIZED);
+
 		} catch (ServiceNotEnabledException e) {
-			sendError(req, res, SC_FORBIDDEN, e.getMessage());
+			sendError(req, res, SC_FORBIDDEN);
+
 		} catch (ServiceMayNotContinueException e) {
 			if (e.isOutput())
 				buf.close();

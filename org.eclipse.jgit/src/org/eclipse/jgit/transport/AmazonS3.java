@@ -115,6 +115,8 @@ public class AmazonS3 {
 
 	private static final String HMAC = "HmacSHA1"; //$NON-NLS-1$
 
+	private static final String DOMAIN = "s3.amazonaws.com"; //$NON-NLS-1$
+
 	private static final String X_AMZ_ACL = "x-amz-acl"; //$NON-NLS-1$
 
 	private static final String X_AMZ_META = "x-amz-meta-"; //$NON-NLS-1$
@@ -183,9 +185,6 @@ public class AmazonS3 {
 	/** Directory for locally buffered content. */
 	private final File tmpDir;
 
-	/** S3 Bucket Domain. */
-	private final String domain;
-
 	/**
 	 * Create a new S3 client for the supplied user information.
 	 * <p>
@@ -202,10 +201,6 @@ public class AmazonS3 {
 	 * # PRIVATE, PUBLIC_READ (defaults to PRIVATE).
 	 * acl: PRIVATE
 	 *
-	 * # S3 Domain
-	 * # AWS S3 Region Domain (defaults to s3.amazonaws.com)
-	 * domain: s3.amazonaws.com
-	 *
 	 * # Number of times to retry after internal error from S3.
 	 * httpclient.retry-max: 3
 	 *
@@ -219,7 +214,6 @@ public class AmazonS3 {
 	 *
 	 */
 	public AmazonS3(final Properties props) {
-		domain = props.getProperty("domain", "s3.amazonaws.com"); //$NON-NLS-1$ //$NON-NLS-2$
 		publicKey = props.getProperty("accesskey"); //$NON-NLS-1$
 		if (publicKey == null)
 			throw new IllegalArgumentException(JGitText.get().missingAccesskey);
@@ -292,10 +286,10 @@ public class AmazonS3 {
 			case HttpURLConnection.HTTP_INTERNAL_ERROR:
 				continue;
 			default:
-				throw error(JGitText.get().s3ActionReading, key, c);
+				throw error("Reading", key, c);
 			}
 		}
-		throw maxAttempts(JGitText.get().s3ActionReading, key);
+		throw maxAttempts("Reading", key);
 	}
 
 	/**
@@ -365,10 +359,10 @@ public class AmazonS3 {
 			case HttpURLConnection.HTTP_INTERNAL_ERROR:
 				continue;
 			default:
-				throw error(JGitText.get().s3ActionDeletion, key, c);
+				throw error("Deletion", key, c);
 			}
 		}
-		throw maxAttempts(JGitText.get().s3ActionDeletion, key);
+		throw maxAttempts("Deletion", key);
 	}
 
 	/**
@@ -426,10 +420,10 @@ public class AmazonS3 {
 			case HttpURLConnection.HTTP_INTERNAL_ERROR:
 				continue;
 			default:
-				throw error(JGitText.get().s3ActionWriting, key, c);
+				throw error("Writing", key, c);
 			}
 		}
-		throw maxAttempts(JGitText.get().s3ActionWriting, key);
+		throw maxAttempts("Writing", key);
 	}
 
 	/**
@@ -489,14 +483,16 @@ public class AmazonS3 {
 
 		final String md5str = Base64.encodeBytes(csum);
 		final long len = buf.length();
+		final String lenstr = String.valueOf(len);
 		for (int curAttempt = 0; curAttempt < maxAttempts; curAttempt++) {
 			final HttpURLConnection c = open("PUT", bucket, key); //$NON-NLS-1$
-			c.setFixedLengthStreamingMode(len);
+			c.setRequestProperty("Content-Length", lenstr); //$NON-NLS-1$
 			c.setRequestProperty("Content-MD5", md5str); //$NON-NLS-1$
 			c.setRequestProperty(X_AMZ_ACL, acl);
 			encryption.request(c, X_AMZ_META);
 			authorize(c);
 			c.setDoOutput(true);
+			c.setFixedLengthStreamingMode((int) len);
 			monitor.beginTask(monitorTask, (int) (len / 1024));
 			final OutputStream os = c.getOutputStream();
 			try {
@@ -512,10 +508,10 @@ public class AmazonS3 {
 			case HttpURLConnection.HTTP_INTERNAL_ERROR:
 				continue;
 			default:
-				throw error(JGitText.get().s3ActionWriting, key, c);
+				throw error("Writing", key, c);
 			}
 		}
-		throw maxAttempts(JGitText.get().s3ActionWriting, key);
+		throw maxAttempts("Writing", key);
 	}
 
 	private IOException error(final String action, final String key,
@@ -562,7 +558,7 @@ public class AmazonS3 {
 		urlstr.append("http://"); //$NON-NLS-1$
 		urlstr.append(bucket);
 		urlstr.append('.');
-		urlstr.append(domain);
+		urlstr.append(DOMAIN);
 		urlstr.append('/');
 		if (key.length() > 0)
 			HttpSupport.encode(urlstr, key);
@@ -623,7 +619,7 @@ public class AmazonS3 {
 
 		final String host = c.getURL().getHost();
 		s.append('/');
-		s.append(host.substring(0, host.length() - domain.length() - 1));
+		s.append(host.substring(0, host.length() - DOMAIN.length() - 1));
 		s.append(c.getURL().getPath());
 
 		final String sec;

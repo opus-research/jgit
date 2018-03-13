@@ -228,9 +228,8 @@ public class ObjectId extends AnyObjectId implements Serializable {
 	 * @return the converted object id.
 	 */
 	public static ObjectId fromString(final String str) {
-		if (str.length() != Constants.OBJECT_ID_STRING_LENGTH) {
-			throw new InvalidObjectIdException(str);
-		}
+		if (str.length() != Constants.OBJECT_ID_STRING_LENGTH)
+			throw new IllegalArgumentException("Invalid id: " + str);
 		return fromHexString(Constants.encodeASCII(str), 0);
 	}
 

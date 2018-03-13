@@ -76,7 +76,7 @@ import org.eclipse.jgit.util.FS;
 /**
  * Walker that visits all submodule entries found in a tree
  */
-public class SubmoduleWalk implements AutoCloseable {
+public class SubmoduleWalk {
 
 	/**
 	 * The values for the config param submodule.<name>.ignore
@@ -122,7 +122,7 @@ public class SubmoduleWalk implements AutoCloseable {
 			DirCache index = repository.readDirCache();
 			generator.setTree(new DirCacheIterator(index));
 		} catch (IOException e) {
-			generator.close();
+			generator.release();
 			throw e;
 		}
 		return generator;
@@ -152,10 +152,10 @@ public class SubmoduleWalk implements AutoCloseable {
 				if (filter.isDone(generator.walk))
 					return generator;
 		} catch (IOException e) {
-			generator.close();
+			generator.release();
 			throw e;
 		}
-		generator.close();
+		generator.release();
 		return null;
 	}
 
@@ -183,10 +183,10 @@ public class SubmoduleWalk implements AutoCloseable {
 				if (filter.isDone(generator.walk))
 					return generator;
 		} catch (IOException e) {
-			generator.close();
+			generator.release();
 			throw e;
 		}
-		generator.close();
+		generator.release();
 		return null;
 	}
 
@@ -419,7 +419,8 @@ public class SubmoduleWalk implements AutoCloseable {
 			config.load();
 			modulesConfig = config;
 		} else {
-			try (TreeWalk configWalk = new TreeWalk(repository)) {
+			TreeWalk configWalk = new TreeWalk(repository);
+			try {
 				configWalk.addTree(rootTree);
 
 				// The root tree may be part of the submodule walk, so we need to revert
@@ -445,6 +446,8 @@ public class SubmoduleWalk implements AutoCloseable {
 					if (idx > 0)
 						rootTree.next(idx);
 				}
+			} finally {
+				configWalk.release();
 			}
 		}
 		return this;
@@ -726,13 +729,8 @@ public class SubmoduleWalk implements AutoCloseable {
 		return url != null ? getSubmoduleRemoteUrl(repository, url) : null;
 	}
 
-	/**
-	 * Release any resources used by this walker's reader.
-	 *
-	 * @since 4.0
-	 */
-	@Override
-	public void close() {
-		walk.close();
+	/** Release any resources used by this walker's reader. */
+	public void release() {
+		walk.release();
 	}
 }

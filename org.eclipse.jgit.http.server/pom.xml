@@ -52,7 +52,7 @@
   <parent>
     <groupId>org.eclipse.jgit</groupId>
     <artifactId>org.eclipse.jgit-parent</artifactId>
-    <version>4.1.0-SNAPSHOT</version>
+    <version>3.7.2-SNAPSHOT</version>
   </parent>
 
   <artifactId>org.eclipse.jgit.http.server</artifactId>
@@ -75,7 +75,7 @@
 
     <dependency>
       <groupId>javax.servlet</groupId>
-      <artifactId>javax.servlet-api</artifactId>
+      <artifactId>servlet-api</artifactId>
       <scope>provided</scope>
     </dependency>
   </dependencies>

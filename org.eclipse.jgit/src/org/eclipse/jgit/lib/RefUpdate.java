@@ -52,7 +52,6 @@ import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.transport.PushCertificate;
 
 /**
  * Creates, updates or deletes any reference.
@@ -165,9 +164,6 @@ public abstract class RefUpdate {
 
 	/** Result of the update operation. */
 	private Result result = Result.NOT_ATTEMPTED;
-
-	/** Push certificate associated with this update. */
-	private PushCertificate pushCert;
 
 	private final Ref ref;
 
@@ -418,31 +414,6 @@ public abstract class RefUpdate {
 	}
 
 	/**
-	 * Set a push certificate associated with this update.
-	 * <p>
-	 * This usually includes a command to update this ref, but is not required to.
-	 *
-	 * @param cert
-	 *            push certificate, may be null.
-	 * @since 4.1
-	 */
-	public void setPushCertificate(PushCertificate cert) {
-		pushCert = cert;
-	}
-
-	/**
-	 * Set the push certificate associated with this update.
-	 * <p>
-	 * This usually includes a command to update this ref, but is not required to.
-	 *
-	 * @return push certificate, may be null.
-	 * @since 4.1
-	 */
-	protected PushCertificate getPushCertificate() {
-		return pushCert;
-	}
-
-	/**
 	 * Get the status of this update.
 	 * <p>
 	 * The same value that was previously returned from an update method.
@@ -489,8 +460,11 @@ public abstract class RefUpdate {
 	 *             an unexpected IO error occurred while writing changes.
 	 */
 	public Result update() throws IOException {
-		try (RevWalk rw = new RevWalk(getRepository())) {
+		RevWalk rw = new RevWalk(getRepository());
+		try {
 			return update(rw);
+		} finally {
+			rw.release();
 		}
 	}
 
@@ -536,8 +510,11 @@ public abstract class RefUpdate {
 	 * @throws IOException
 	 */
 	public Result delete() throws IOException {
-		try (RevWalk rw = new RevWalk(getRepository())) {
+		RevWalk rw = new RevWalk(getRepository());
+		try {
 			return delete(rw);
+		} finally {
+			rw.release();
 		}
 	}
 

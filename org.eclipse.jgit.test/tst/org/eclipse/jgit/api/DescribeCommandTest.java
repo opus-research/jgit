@@ -49,32 +49,16 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.junit.RepositoryTestCase;
 import org.eclipse.jgit.lib.ObjectId;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameter;
-import org.junit.runners.Parameterized.Parameters;
 
-@RunWith(Parameterized.class)
 public class DescribeCommandTest extends RepositoryTestCase {
 
 	private Git git;
-
-	@Parameter
-	public boolean useAnnotatedTags;
-
-	@Parameters
-	public static Collection<Boolean[]> getUseAnnotatedTagsValues() {
-		return Arrays.asList(new Boolean[][] { { Boolean.TRUE },
-				{ Boolean.FALSE } });
-	}
 
 	@Override
 	public void setUp() throws Exception {
@@ -100,15 +84,12 @@ public class DescribeCommandTest extends RepositoryTestCase {
 		ObjectId c4 = modify("ddd");
 
 		assertNull(describe(c1));
-		assertNull(describe(c1, true));
 		assertEquals("t1", describe(c2));
 		assertEquals("t2", describe(c3));
-		assertEquals("t2-0-g44579eb", describe(c3, true));
 
 		assertNameStartsWith(c4, "3e563c5");
 		// the value verified with git-describe(1)
 		assertEquals("t2-1-g3e563c5", describe(c4));
-		assertEquals("t2-1-g3e563c5", describe(c4, true));
 
 		// test default target
 		assertEquals("t2-1-g3e563c5", git.describe().call());
@@ -141,7 +122,6 @@ public class DescribeCommandTest extends RepositoryTestCase {
 		assertNameStartsWith(c4, "119892b");
 		assertEquals("t-2-g119892b", describe(c4)); // 2 commits: c4 and c3
 		assertNull(describe(c3));
-		assertNull(describe(c3, true));
 	}
 
 	private void branch(String name, ObjectId base) throws GitAPIException {
@@ -249,11 +229,7 @@ public class DescribeCommandTest extends RepositoryTestCase {
 	}
 
 	private void tag(String tag) throws GitAPIException {
-		TagCommand tagCommand = git.tag().setName(tag)
-				.setAnnotated(useAnnotatedTags);
-		if (useAnnotatedTags)
-			tagCommand.setMessage(tag);
-		tagCommand.call();
+		git.tag().setName(tag).setMessage(tag).call();
 	}
 
 	private static void touch(File f, String contents) throws Exception {
@@ -262,13 +238,8 @@ public class DescribeCommandTest extends RepositoryTestCase {
 		w.close();
 	}
 
-	private String describe(ObjectId c1, boolean longDesc)
-			throws GitAPIException, IOException {
-		return git.describe().setTarget(c1).setLong(longDesc).call();
-	}
-
 	private String describe(ObjectId c1) throws GitAPIException, IOException {
-		return describe(c1, false);
+		return git.describe().setTarget(c1).call();
 	}
 
 	private static void assertNameStartsWith(ObjectId c4, String prefix) {
