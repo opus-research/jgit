@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2011, Robin Stocker <robin@nibor.org>
- * Copyright (C) 2012, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -72,32 +71,15 @@ public class BranchConfig {
 	}
 
 	/**
-	 * @return the full tracking branch name or <code>null</code> if it could
-	 *         not be determined
+	 * @return the full remote-tracking branch name or <code>null</code> if it
+	 *         could not be determined
 	 */
-	public String getTrackingBranch() {
+	public String getRemoteTrackingBranch() {
 		String remote = getRemote();
 		String mergeRef = getMergeBranch();
 		if (remote == null || mergeRef == null)
 			return null;
 
-		if (remote.equals("."))
-			return mergeRef;
-
-		return findRemoteTrackingBranch(remote, mergeRef);
-	}
-
-	/**
-	 * Finds the tracked remote tracking branch
-	 *
-	 * @param remote
-	 *            Remote name
-	 * @param mergeRef
-	 *            merge Ref of the local branch tracking the remote tracking
-	 *            branch
-	 * @return full remote tracking branch name or null
-	 */
-	private String findRemoteTrackingBranch(String remote, String mergeRef) {
 		RemoteConfig remoteConfig;
 		try {
 			remoteConfig = new RemoteConfig(config, remote);
@@ -113,18 +95,6 @@ public class BranchConfig {
 		return null;
 	}
 
-	/**
-	 * @return the full remote-tracking branch name or <code>null</code> if it
-	 *         could not be determined
-	 */
-	public String getRemoteTrackingBranch() {
-		String remote = getRemote();
-		String mergeRef = getMergeBranch();
-		if (remote == null || mergeRef == null)
-			return null;
-
-		return findRemoteTrackingBranch(remote, mergeRef);
-	}
 	private String getRemote() {
 		String remoteName = config.getString(
 				ConfigConstants.CONFIG_BRANCH_SECTION, branchName,
