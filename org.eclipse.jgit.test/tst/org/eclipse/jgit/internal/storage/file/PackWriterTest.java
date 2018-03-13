@@ -75,7 +75,6 @@ import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdSet;
 import org.eclipse.jgit.lib.ObjectInserter;
-import org.eclipse.jgit.lib.Sets;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.DepthWalk;
 import org.eclipse.jgit.revwalk.ObjectWalk;
@@ -528,7 +527,7 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 		RevBlob contentB = testRepo.blob("B");
 		RevCommit c2 = bb.commit().add("f", contentB).create();
 		testRepo.getRevWalk().parseHeaders(c2);
-		PackIndex pf2 = writePack(repo, wants(c2), Sets.of((ObjectIdSet) pf1));
+		PackIndex pf2 = writePack(repo, wants(c2), asSet((ObjectIdSet) pf1));
 		assertContent(
 				pf2,
 				Arrays.asList(c2.getId(), c2.getTree().getId(),
@@ -793,14 +792,23 @@ public class PackWriterTest extends SampleDataRepositoryTestCase {
 	}
 
 	private static Set<ObjectId> haves(ObjectId... objects) {
-		return Sets.of(objects);
+		return asSet(objects);
 	}
 
 	private static Set<ObjectId> wants(ObjectId... objects) {
-		return Sets.of(objects);
+		return asSet(objects);
 	}
 
 	private static Set<ObjectId> shallows(ObjectId... objects) {
-		return Sets.of(objects);
+		return asSet(objects);
+	}
+
+	private static <T> Set<T> asSet(
+			@SuppressWarnings("unchecked") T... objects) {
+		Set<T> set = new HashSet<>();
+		for (T o : objects) {
+			set.add(o);
+		}
+		return set;
 	}
 }

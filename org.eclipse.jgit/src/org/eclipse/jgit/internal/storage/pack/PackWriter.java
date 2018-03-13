@@ -1708,7 +1708,9 @@ public class PackWriter implements AutoCloseable {
 			for (RevObject obj : haveObjs) {
 				if (obj instanceof RevCommit) {
 					RevTree t = ((RevCommit) obj).getTree();
-					depthWalk.markUninteresting(t);
+					if (t != null) {
+						depthWalk.markUninteresting(t);
+					}
 				}
 			}
 
