@@ -65,7 +65,6 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.dfs.DfsObjDatabase.PackSource;
 import org.eclipse.jgit.storage.file.PackIndex;
 import org.eclipse.jgit.storage.pack.PackConfig;
-import org.eclipse.jgit.storage.pack.PackConstants;
 import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.util.io.CountingOutputStream;
 
@@ -319,14 +318,14 @@ public class DfsGarbageCollector {
 		DfsPackDescription pack = repo.getObjectDatabase().newPack(source);
 		newPackDesc.add(pack);
 
-		out = objdb.writeFile(pack, PackConstants.PACK_EXT);
+		out = objdb.writePackFile(pack);
 		try {
 			pw.writePack(pm, pm, out);
 		} finally {
 			out.close();
 		}
 
-		out = objdb.writeFile(pack, PackConstants.PACK_INDEX_EXT);
+		out = objdb.writePackIndex(pack);
 		try {
 			CountingOutputStream cnt = new CountingOutputStream(out);
 			pw.writeIndex(cnt);
