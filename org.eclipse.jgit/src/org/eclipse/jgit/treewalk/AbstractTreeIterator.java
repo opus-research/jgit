@@ -369,9 +369,6 @@ public abstract class AbstractTreeIterator {
 				otherIterator.idBuffer(), otherIterator.idOffset());
 	}
 
-	/** @return true if the entry has a valid ObjectId. */
-	public abstract boolean hasId();
-
 	/**
 	 * Get the object id of the current entry.
 	 *
@@ -497,22 +494,6 @@ public abstract class AbstractTreeIterator {
 			final ObjectReader reader, final MutableObjectId idBuffer)
 			throws IncorrectObjectTypeException, IOException {
 		return createSubtreeIterator(reader);
-	}
-
-	/**
-	 * Position this iterator on the first entry.
-	 *
-	 * The default implementation of this method uses {@code back(1)} until
-	 * {@code first()} is true. This is most likely not the most efficient
-	 * method of repositioning the iterator to its first entry, so subclasses
-	 * are strongly encouraged to override the method.
-	 *
-	 * @throws CorruptObjectException
-	 *             the tree is invalid.
-	 */
-	public void reset() throws CorruptObjectException {
-		while (!first())
-			back(1);
 	}
 
 	/**

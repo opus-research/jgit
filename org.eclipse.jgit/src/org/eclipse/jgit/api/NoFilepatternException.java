@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com> and
+ * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>,
+ * Copyright (C) 2010, Stefan Lay <stefan.lay@sap.com> and
  * other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available under the
@@ -35,29 +36,23 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.api.errors;
+
+package org.eclipse.jgit.api;
 
 /**
  * Exception thrown when the options given to a command don't include a
- * specification of a message text (e.g. a commit was called without explicitly
- * specifying a commit message (or other options telling where to take the
- * message from.
+ * file pattern which is mandatory for processing.
  */
-public class NoMessageException extends GitAPIException {
+public class NoFilepatternException extends GitAPIException {
+
 	private static final long serialVersionUID = 1L;
 
-	/**
-	 * @param message
-	 * @param cause
-	 */
-	public NoMessageException(String message, Throwable cause) {
+	NoFilepatternException(String message, Throwable cause) {
 		super(message, cause);
 	}
 
-	/**
-	 * @param message
-	 */
-	public NoMessageException(String message) {
+	NoFilepatternException(String message) {
 		super(message);
 	}
+
 }
