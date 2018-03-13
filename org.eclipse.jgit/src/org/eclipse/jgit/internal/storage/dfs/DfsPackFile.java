@@ -218,7 +218,7 @@ public final class DfsPackFile {
 		return idx(ctx);
 	}
 
-	PackIndex idx(DfsReader ctx) throws IOException {
+	private PackIndex idx(DfsReader ctx) throws IOException {
 		DfsBlockCache.Ref<PackIndex> idxref = index;
 		if (idxref != null) {
 			PackIndex idx = idxref.get();

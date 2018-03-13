@@ -518,7 +518,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 	private List<DfsObjectToPack> findAllFromPack(DfsPackFile pack,
 			Iterable<ObjectToPack> objects) throws IOException {
 		List<DfsObjectToPack> tmp = new BlockList<DfsObjectToPack>();
-		PackIndex idx = pack.idx(this);
+		PackIndex idx = pack.getPackIndex(this);
 		for (ObjectToPack otp : objects) {
 			long p = idx.findOffset(otp);
 			if (0 < p) {
