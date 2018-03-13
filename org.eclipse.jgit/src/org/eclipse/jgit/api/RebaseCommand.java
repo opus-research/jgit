@@ -640,7 +640,11 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		List<RevCommit> cherryPickList = new ArrayList<RevCommit>();
 		for (RevCommit commit : commitsToUse) {
 			if (commit.getParentCount() != 1)
-				continue;
+				throw new JGitInternalException(
+						MessageFormat.format(
+								JGitText.get().canOnlyCherryPickCommitsWithOneParent,
+								commit.name(),
+								Integer.valueOf(commit.getParentCount())));
 			cherryPickList.add(commit);
 		}
 

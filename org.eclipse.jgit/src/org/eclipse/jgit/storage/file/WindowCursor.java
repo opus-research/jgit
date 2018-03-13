@@ -62,13 +62,14 @@ import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
+import org.eclipse.jgit.lib.BitmapIndex;
+import org.eclipse.jgit.lib.BitmapIndex.BitmapBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.InflaterCache;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
-import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.storage.pack.CachedPack;
 import org.eclipse.jgit.storage.pack.ObjectReuseAsIs;
 import org.eclipse.jgit.storage.pack.ObjectToPack;
@@ -101,6 +102,27 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 	@Override
 	public ObjectReader newReader() {
 		return new WindowCursor(db);
+	}
+
+	@Override
+	public BitmapIndex getBitmapIndex() throws IOException {
+		for (PackFile pack : db.getPacks()) {
+			PackBitmapIndex index = pack.getBitmapIndex();
+			if (index != null)
+				return new BitmapIndexImpl(index);
+		}
+		return null;
+	}
+
+	public Collection<CachedPack> getCachedPacksAndUpdate(
+			BitmapBuilder needBitmap) throws IOException {
+		for (PackFile pack : db.getPacks()) {
+			PackBitmapIndex index = pack.getBitmapIndex();
+			if (needBitmap.removeAllOrNone(index))
+				return Collections.<CachedPack> singletonList(
+						new LocalCachedPack(Collections.singletonList(pack)));
+		}
+		return Collections.emptyList();
 	}
 
 	@Override
@@ -148,8 +170,8 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 		return sz;
 	}
 
-	public LocalObjectToPack newObjectToPack(RevObject obj) {
-		return new LocalObjectToPack(obj);
+	public LocalObjectToPack newObjectToPack(AnyObjectId objectId, int type) {
+		return new LocalObjectToPack(objectId, type);
 	}
 
 	public void selectObjectRepresentation(PackWriter packer,
