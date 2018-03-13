@@ -239,12 +239,20 @@ public class ReftableCompactor {
 					continue;
 				}
 
+				String refName = lc.getRefName();
 				ReflogEntry log = lc.getReflogEntry();
+				if (log == null) {
+					if (includeDeletes) {
+						writer.deleteLog(refName, updateIndex);
+					}
+					continue;
+				}
+
 				PersonIdent who = log.getWho();
 				if (who.getWhen().getTime() >= oldestReflogTimeMillis) {
 					writer.writeLog(
-							lc.getRefName(),
-							lc.getUpdateIndex(),
+							refName,
+							updateIndex,
 							who,
 							log.getOldId(),
 							log.getNewId(),

@@ -248,11 +248,28 @@ public class MergedReftable extends Reftable {
 				if (t == null) {
 					return false;
 				}
+
 				refName = t.lc.getRefName();
 				updateIndex = t.lc.getUpdateIndex();
 				entry = t.lc.getReflogEntry();
+				boolean include = includeDeletes || entry != null;
+				skipShadowed(refName, updateIndex);
 				add(t);
+				if (include) {
+					return true;
+				}
 				return true;
+			}
+		}
+
+		private void skipShadowed(String name, long index) throws IOException {
+			for (;;) {
+				LogQueueEntry t = queue.peek();
+				if (t != null && name.equals(t.name()) && index == t.index()) {
+					add(queue.remove());
+				} else {
+					break;
+				}
 			}
 		}
 
