@@ -398,8 +398,7 @@ public class DirCache {
 		if (ver == 3)
 			extended = true;
 		else if (ver != 2)
-			throw new CorruptObjectException(MessageFormat.format(
-					JGitText.get().unknownDIRCVersion, Integer.valueOf(ver)));
+			throw new CorruptObjectException(MessageFormat.format(JGitText.get().unknownDIRCVersion, ver));
 		entryCnt = NB.decodeInt32(hdr, 8);
 		if (entryCnt < 0)
 			throw new CorruptObjectException(JGitText.get().DIRCHasTooManyEntries);
@@ -434,9 +433,8 @@ public class DirCache {
 			switch (NB.decodeInt32(hdr, 0)) {
 			case EXT_TREE: {
 				if (Integer.MAX_VALUE < sz) {
-					throw new CorruptObjectException(MessageFormat.format(
-							JGitText.get().DIRCExtensionIsTooLargeAt,
-							formatExtensionName(hdr), Long.valueOf(sz)));
+					throw new CorruptObjectException(MessageFormat.format(JGitText.get().DIRCExtensionIsTooLargeAt
+							, formatExtensionName(hdr), sz));
 				}
 				final byte[] raw = new byte[(int) sz];
 				IO.readFully(in, raw, 0, raw.length);
@@ -476,10 +474,8 @@ public class DirCache {
 		while (0 < sz) {
 			int n = in.read(b, 0, (int) Math.min(b.length, sz));
 			if (n < 0) {
-				throw new EOFException(
-						MessageFormat.format(
-								JGitText.get().shortReadOfOptionalDIRCExtensionExpectedAnotherBytes,
-								formatExtensionName(hdr), Long.valueOf(sz)));
+				throw new EOFException(MessageFormat.format(JGitText.get().shortReadOfOptionalDIRCExtensionExpectedAnotherBytes
+						, formatExtensionName(hdr), sz));
 			}
 			md.update(b, 0, n);
 			sz -= n;

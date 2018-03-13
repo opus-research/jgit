@@ -1204,9 +1204,7 @@ public class Config {
 					value.append('"');
 					continue;
 				default:
-					throw new ConfigInvalidException(MessageFormat.format(
-							JGitText.get().badEscape,
-							Character.valueOf(((char) c))));
+					throw new ConfigInvalidException(MessageFormat.format(JGitText.get().badEscape, ((char) c)));
 				}
 			}
 

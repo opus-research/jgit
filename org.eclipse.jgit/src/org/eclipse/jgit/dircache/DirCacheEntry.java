@@ -562,6 +562,7 @@ public class DirCacheEntry {
 	 * @param sz
 	 *            new cached size of the file, as bytes.
 	 */
+	@SuppressWarnings("boxing")
 	public void setLength(final long sz) {
 		setLength((int) sz);
 	}
