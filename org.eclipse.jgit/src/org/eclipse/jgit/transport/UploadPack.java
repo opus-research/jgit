@@ -179,10 +179,6 @@ public class UploadPack {
 
 	private MultiAck multiAck = MultiAck.OFF;
 
-	private PackWriter.Statistics statistics;
-
-	private UploadPackLogger logger;
-
 	/**
 	 * Create a new pack upload for an open repository.
 	 *
@@ -288,16 +284,6 @@ public class UploadPack {
 	}
 
 	/**
-	 * Set the logger.
-	 *
-	 * @param logger
-	 *            the logger instance. If null, no logging occurs.
-	 */
-	public void setLogger(UploadPackLogger logger) {
-		this.logger = logger;
-	}
-
-	/**
 	 * Execute the upload task on the socket.
 	 *
 	 * @param input
@@ -344,17 +330,6 @@ public class UploadPack {
 				}
 			}
 		}
-	}
-
-	/**
-	 * Get the PackWriter's statistics if a pack was sent to the client.
-	 *
-	 * @return statistics about pack output, if a pack was sent. Null if no pack
-	 *         was sent, such as during the negotation phase of a smart HTTP
-	 *         connection, or if the client was already up-to-date.
-	 */
-	public PackWriter.Statistics getPackStatistics() {
-		return statistics;
 	}
 
 	private void service() throws IOException {
@@ -702,23 +677,34 @@ public class UploadPack {
 			}
 
 			if (options.contains(OPTION_INCLUDE_TAG)) {
-				for (final Ref r : refs.values()) {
-					final RevObject o;
-					try {
-						o = rw.parseAny(r.getObjectId());
-					} catch (IOException e) {
-						continue;
+				for (Ref ref : refs.values()) {
+					ObjectId objectId = ref.getObjectId();
+
+					// If the object was already requested, skip it.
+					if (wantAll.isEmpty()) {
+						if (wantIds.contains(objectId))
+							continue;
+					} else {
+						RevObject obj = rw.lookupOrNull(objectId);
+						if (obj != null && obj.has(WANT))
+							continue;
 					}
-					if (o.has(WANT) || !(o instanceof RevTag))
+
+					if (!ref.isPeeled())
+						ref = db.peel(ref);
+
+					ObjectId peeledId = ref.getPeeledObjectId();
+					if (peeledId == null)
 						continue;
-					final RevTag t = (RevTag) o;
-					if (!pw.willInclude(t) && pw.willInclude(t.getObject()))
-						pw.addObject(t);
+
+					objectId = ref.getObjectId();
+					if (pw.willInclude(peeledId) && !pw.willInclude(objectId))
+						pw.addObject(rw.parseAny(objectId));
 				}
 			}
 
 			pw.writePack(pm, NullProgressMonitor.INSTANCE, packOut);
-			statistics = pw.getStatistics();
+			packOut.flush();
 
 			if (msgOut != null) {
 				String msg = pw.getStatistics().getMessage() + '\n';
@@ -732,8 +718,5 @@ public class UploadPack {
 
 		if (sideband)
 			pckOut.end();
-
-		if (logger != null && statistics != null)
-			logger.onPackStatistics(statistics);
 	}
 }
