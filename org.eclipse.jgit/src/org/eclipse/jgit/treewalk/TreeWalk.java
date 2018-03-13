@@ -57,7 +57,7 @@ import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.ObjectReader;
+import org.eclipse.jgit.lib.WindowCursor;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
@@ -113,15 +113,11 @@ public class TreeWalk {
 			final AnyObjectId... trees) throws MissingObjectException,
 			IncorrectObjectTypeException, CorruptObjectException, IOException {
 		final TreeWalk r = new TreeWalk(db);
-		try {
-			r.setFilter(PathFilterGroup.createFromStrings(Collections
-					.singleton(path)));
-			r.setRecursive(r.getFilter().shouldBeRecursive());
-			r.reset(trees);
-			return r.next() ? r : null;
-		} finally {
-			r.release();
-		}
+		r.setFilter(PathFilterGroup.createFromStrings(Collections
+				.singleton(path)));
+		r.setRecursive(r.getFilter().shouldBeRecursive());
+		r.reset(trees);
+		return r.next() ? r : null;
 	}
 
 	/**
@@ -155,9 +151,11 @@ public class TreeWalk {
 		return forPath(db, path, new ObjectId[] { tree });
 	}
 
-	private final ObjectReader reader;
+	private final Repository db;
 
 	private final MutableObjectId idBuffer = new MutableObjectId();
+
+	private final WindowCursor curs = new WindowCursor();
 
 	private TreeFilter filter;
 
@@ -182,34 +180,18 @@ public class TreeWalk {
 	 *            the repository the walker will obtain data from.
 	 */
 	public TreeWalk(final Repository repo) {
-		this(repo.newObjectReader());
-	}
-
-	/**
-	 * Create a new tree walker for a given repository.
-	 *
-	 * @param or
-	 *            the reader the walker will obtain tree data from.
-	 */
-	public TreeWalk(final ObjectReader or) {
-		reader = or;
+		db = repo;
 		filter = TreeFilter.ALL;
 		trees = new AbstractTreeIterator[] { new EmptyTreeIterator() };
 	}
 
-	/** @return the reader this walker is using to load objects. */
-	public ObjectReader getObjectReader() {
-		return reader;
-	}
-
 	/**
-	 * Release any resources used by this walker's reader.
-	 * <p>
-	 * A walker that has been released can be used again, but may need to be
-	 * released after the subsequent usage.
+	 * Get the repository this tree walker is reading from.
+	 *
+	 * @return the repository configured when the walker was created.
 	 */
-	public void release() {
-		reader.release();
+	public Repository getRepository() {
+		return db;
 	}
 
 	/**
@@ -337,7 +319,7 @@ public class TreeWalk {
 			if (o instanceof CanonicalTreeParser) {
 				o.matches = null;
 				o.matchShift = 0;
-				((CanonicalTreeParser) o).reset(reader, id);
+				((CanonicalTreeParser) o).reset(db, id, curs);
 				trees[0] = o;
 			} else {
 				trees[0] = parserFor(id);
@@ -384,7 +366,7 @@ public class TreeWalk {
 				if (o instanceof CanonicalTreeParser && o.pathOffset == 0) {
 					o.matches = null;
 					o.matchShift = 0;
-					((CanonicalTreeParser) o).reset(reader, ids[i]);
+					((CanonicalTreeParser) o).reset(db, ids[i], curs);
 					r[i] = o;
 					continue;
 				}
@@ -854,7 +836,7 @@ public class TreeWalk {
 			final AbstractTreeIterator t = trees[i];
 			final AbstractTreeIterator n;
 			if (t.matches == ch && !t.eof() && FileMode.TREE.equals(t.mode))
-				n = t.createSubtreeIterator(reader, idBuffer);
+				n = t.createSubtreeIterator(db, idBuffer, curs);
 			else
 				n = t.createEmptyTreeIterator();
 			tmp[i] = n;
@@ -929,7 +911,7 @@ public class TreeWalk {
 	private CanonicalTreeParser parserFor(final AnyObjectId id)
 			throws IncorrectObjectTypeException, IOException {
 		final CanonicalTreeParser p = new CanonicalTreeParser();
-		p.reset(reader, id);
+		p.reset(db, id, curs);
 		return p;
 	}
 
