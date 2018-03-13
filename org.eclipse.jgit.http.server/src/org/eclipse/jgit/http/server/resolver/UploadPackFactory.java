@@ -50,9 +50,17 @@ import org.eclipse.jgit.transport.UploadPack;
 
 /** Create and configure {@link UploadPack} service instance. */
 public interface UploadPackFactory {
+	/** A factory disabling the UploadPack service for all repositories. */
+	public static final UploadPackFactory DISABLED = new UploadPackFactory() {
+		public UploadPack create(HttpServletRequest req, Repository db)
+				throws ServiceNotEnabledException {
+			throw new ServiceNotEnabledException();
+		}
+	};
+
 	/**
 	 * Create and configure a new UploadPack instance for a repository.
-	 * 
+	 *
 	 * @param req
 	 *            current HTTP request, in case information from the request may
 	 *            help configure the UploadPack instance.

@@ -64,11 +64,7 @@ import org.eclipse.jgit.http.server.resolver.DefaultUploadPackFactory;
 import org.eclipse.jgit.http.server.resolver.FileResolver;
 import org.eclipse.jgit.http.server.resolver.ReceivePackFactory;
 import org.eclipse.jgit.http.server.resolver.RepositoryResolver;
-import org.eclipse.jgit.http.server.resolver.ServiceNotEnabledException;
 import org.eclipse.jgit.http.server.resolver.UploadPackFactory;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.transport.ReceivePack;
-import org.eclipse.jgit.transport.UploadPack;
 
 /**
  * Routes requests which match Git repository access over HTTP.
@@ -120,20 +116,10 @@ public class RepositoryRouter implements Filter {
 			throw new NullPointerException("RepositoryResolver not supplied");
 
 		if (uploadPackFactory == null)
-			uploadPackFactory = new UploadPackFactory() {
-				public UploadPack create(HttpServletRequest req, Repository db)
-						throws ServiceNotEnabledException {
-					throw new ServiceNotEnabledException();
-				}
-			};
+			uploadPackFactory = UploadPackFactory.DISABLED;
 
 		if (receivePackFactory == null)
-			receivePackFactory = new ReceivePackFactory() {
-				public ReceivePack create(HttpServletRequest req, Repository db)
-						throws ServiceNotEnabledException {
-					throw new ServiceNotEnabledException();
-				}
-			};
+			receivePackFactory = ReceivePackFactory.DISABLED;
 
 		this.resolver = resolver;
 		this.uploadPackFactory = uploadPackFactory;
@@ -151,6 +137,10 @@ public class RepositoryRouter implements Filter {
 		context = filterConfig.getServletContext();
 		servlets = new ArrayList<ServletDefinition>();
 
+		// Each binding is evaluated in the order declared here, when
+		// adding a new binding please be careful to ensure it doesn't
+		// cause a collision with another existing binding.
+		//
 		bind("^/(.*)/(HEAD|refs/.*)$", new GetRefServlet());
 		bind("^/(.*)/info/refs$", new InfoRefsServlet(//
 				uploadPackFactory, //
