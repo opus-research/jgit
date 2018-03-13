@@ -1210,10 +1210,9 @@ public abstract class BaseReceivePack {
 			}
 
 			final StringBuilder r = new StringBuilder();
-			if (forClient)
-				r.append("ng ").append(cmd.getRefName()).append(" ");
-			else
-				r.append(" ! [").append(cmd.getRefName()).append("] ");
+			r.append("ng ");
+			r.append(cmd.getRefName());
+			r.append(" ");
 
 			switch (cmd.getResult()) {
 			case NOT_ATTEMPTED:
