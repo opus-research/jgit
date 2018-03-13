@@ -394,6 +394,7 @@ public abstract class ObjectInserter {
 	 *     without having to flush first. Should only be used from the same thread as
 	 *     this inserter; objects written by this inserter may not be visible to
 	 *     {@code this.newReader().newReader()}.
+	 * @since 4.0
 	 */
 	public abstract ObjectReader newReader();
 
