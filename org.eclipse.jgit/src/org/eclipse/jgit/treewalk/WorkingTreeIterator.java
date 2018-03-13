@@ -72,7 +72,6 @@ import org.eclipse.jgit.ignore.IgnoreNode;
 import org.eclipse.jgit.ignore.IgnoreRule;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.CoreConfig;
-import org.eclipse.jgit.lib.CoreConfig.AutoCRLF;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
@@ -403,7 +402,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		}
 	}
 
-	private InputStream filterClean(InputStream in) throws IOException {
+	private InputStream filterClean(InputStream in) {
 		return new EolCanonicalizingInputStream(in);
 	}
 
@@ -499,13 +498,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 	 *             the file could not be opened for reading.
 	 */
 	public InputStream openEntryStream() throws IOException {
-		InputStream rawis = current().openInputStream();
-		InputStream is;
-		if (getOptions().getAutoCRLF() != AutoCRLF.FALSE)
-			is = new EolCanonicalizingInputStream(rawis);
-		else
-			is = rawis;
-		return is;
+		return current().openInputStream();
 	}
 
 	/**
@@ -755,32 +748,6 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 			throw new IllegalStateException(MessageFormat.format(
 					JGitText.get().unexpectedCompareResult, diff.name()));
 		}
-	}
-
-	/**
-	 * Get the file mode to use for the current entry when it is to be updated
-	 * in the index.
-	 *
-	 * @param indexIter
-	 *            {@link DirCacheIterator} positioned at the same entry as this
-	 *            iterator or null if no {@link DirCacheIterator} is available
-	 *            at this iterator's current entry
-	 * @return index file mode
-	 */
-	public FileMode getIndexFileMode(final DirCacheIterator indexIter) {
-		final FileMode wtMode = getEntryFileMode();
-		if (indexIter == null)
-			return wtMode;
-		if (getOptions().isFileMode())
-			return wtMode;
-		final FileMode iMode = indexIter.getEntryFileMode();
-		if (FileMode.REGULAR_FILE == wtMode
-				&& FileMode.EXECUTABLE_FILE == iMode)
-			return iMode;
-		if (FileMode.EXECUTABLE_FILE == wtMode
-				&& FileMode.REGULAR_FILE == iMode)
-			return iMode;
-		return wtMode;
 	}
 
 	/**
