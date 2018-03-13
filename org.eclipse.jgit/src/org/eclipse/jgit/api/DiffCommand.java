@@ -44,27 +44,22 @@ package org.eclipse.jgit.api;
 
 import static org.eclipse.jgit.lib.Constants.HEAD;
 
-import java.io.BufferedOutputStream;
-import java.io.OutputStream;
+import java.io.IOException;
 import java.util.List;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.dircache.DirCacheIterator;
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
-import org.eclipse.jgit.util.io.NullOutputStream;
 
 /**
  * Show changes between commits, commit and working tree, etc.
@@ -81,17 +76,8 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 
 	private TreeFilter pathFilter = TreeFilter.ALL;
 
-	private boolean showNameAndStatusOnly;
-
-	private OutputStream out;
-
-	private int contextLines = -1;
-
-	private String sourcePrefix;
-
-	private String destinationPrefix;
-
-	private ProgressMonitor monitor = NullProgressMonitor.INSTANCE;
+	// TODO: fixed to true for now
+	private boolean showNameAndStatusOnly = true;
 
 	/**
 	 * @param repo
@@ -108,14 +94,9 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 	 *
 	 * @return a DiffEntry for each path which is different
 	 */
-	public List<DiffEntry> call() throws GitAPIException {
-		final DiffFormatter diffFmt;
-		if (out != null && !showNameAndStatusOnly)
-			diffFmt = new DiffFormatter(new BufferedOutputStream(out));
-		else
-			diffFmt = new DiffFormatter(NullOutputStream.INSTANCE);
+	public List<DiffEntry> call() throws GitAPIException, IOException {
+		final DiffFormatter diffFmt = new DiffFormatter(null);
 		diffFmt.setRepository(repo);
-		diffFmt.setProgressMonitor(monitor);
 		try {
 			if (cached) {
 				if (oldTree == null) {
@@ -141,22 +122,12 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 
 			diffFmt.setPathFilter(pathFilter);
 
-			List<DiffEntry> result = diffFmt.scan(oldTree, newTree);
-			if (showNameAndStatusOnly)
-				return result;
-			else {
-				if (contextLines >= 0)
-					diffFmt.setContext(contextLines);
-				if (destinationPrefix != null)
-					diffFmt.setNewPrefix(destinationPrefix);
-				if (sourcePrefix != null)
-					diffFmt.setOldPrefix(sourcePrefix);
-				diffFmt.format(result);
-				diffFmt.flush();
-				return result;
+			if (showNameAndStatusOnly) {
+				return diffFmt.scan(oldTree, newTree);
+			} else {
+				// TODO: not implemented yet
+				throw new UnsupportedOperationException();
 			}
-		} catch (Exception e) {
-			throw new JGitInternalException(e.getLocalizedMessage(), e);
 		} finally {
 			diffFmt.release();
 		}
@@ -209,68 +180,10 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 	 * @return this instance
 	 */
 	public DiffCommand setShowNameAndStatusOnly(boolean showNameAndStatusOnly) {
+		// TODO: not implemented yet
+		if (!showNameAndStatusOnly)
+			throw new UnsupportedOperationException();
 		this.showNameAndStatusOnly = showNameAndStatusOnly;
-		return this;
-	}
-
-	/**
-	 * @param out
-	 *            the stream to write line data
-	 * @return this instance
-	 */
-	public DiffCommand setOutputStream(OutputStream out) {
-		this.out = out;
-		return this;
-	}
-
-	/**
-	 * Set number of context lines instead of the usual three.
-	 *
-	 * @param contextLines
-	 *            the number of context lines
-	 * @return this instance
-	 */
-	public DiffCommand setContextLines(int contextLines) {
-		this.contextLines = contextLines;
-		return this;
-	}
-
-	/**
-	 * Set the given source prefix instead of "a/".
-	 *
-	 * @param sourcePrefix
-	 *            the prefix
-	 * @return this instance
-	 */
-	public DiffCommand setSourcePrefix(String sourcePrefix) {
-		this.sourcePrefix = sourcePrefix;
-		return this;
-	}
-
-	/**
-	 * Set the given destination prefix instead of "b/".
-	 *
-	 * @param destinationPrefix
-	 *            the prefix
-	 * @return this instance
-	 */
-	public DiffCommand setDestinationPrefix(String destinationPrefix) {
-		this.destinationPrefix = destinationPrefix;
-		return this;
-	}
-
-	/**
-	 * The progress monitor associated with the diff operation. By default, this
-	 * is set to <code>NullProgressMonitor</code>
-	 *
-	 * @see NullProgressMonitor
-	 *
-	 * @param monitor
-	 *            a progress monitor
-	 * @return this instance
-	 */
-	public DiffCommand setProgressMonitor(ProgressMonitor monitor) {
-		this.monitor = monitor;
 		return this;
 	}
 }

@@ -49,13 +49,12 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
-import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.api.errors.NoMessageException;
-import org.eclipse.jgit.api.errors.UnmergedPathsException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
@@ -65,7 +64,6 @@ import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.UnmergedPathException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -130,26 +128,27 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 * collected by the setter methods of this class. Each instance of this
 	 * class should only be used for one invocation of the command (means: one
 	 * call to {@link #call()})
-	 * 
+	 *
 	 * @return a {@link RevCommit} object representing the successful commit.
 	 * @throws NoHeadException
 	 *             when called on a git repo without a HEAD reference
 	 * @throws NoMessageException
 	 *             when called without specifying a commit message
-	 * @throws UnmergedPathsException
+	 * @throws UnmergedPathException
 	 *             when the current index contained unmerged paths (conflicts)
 	 * @throws WrongRepositoryStateException
 	 *             when repository is not in the right state for committing
 	 * @throws JGitInternalException
 	 *             a low-level exception of JGit has occurred. The original
 	 *             exception can be retrieved by calling
-	 *             {@link Exception#getCause()}. Expect {@code IOException's} to
-	 *             be wrapped.
+	 *             {@link Exception#getCause()}. Expect only
+	 *             {@code IOException's} to be wrapped. Subclasses of
+	 *             {@link IOException} (e.g. {@link UnmergedPathException}) are
+	 *             typically not wrapped here but thrown as original exception
 	 */
-	public RevCommit call() throws GitAPIException, NoHeadException,
-			NoMessageException, UnmergedPathsException,
-			ConcurrentRefUpdateException, JGitInternalException,
-			WrongRepositoryStateException {
+	public RevCommit call() throws NoHeadException, NoMessageException,
+			UnmergedPathException, ConcurrentRefUpdateException,
+			JGitInternalException, WrongRepositoryStateException {
 		checkCallable();
 
 		RepositoryState state = repo.getRepositoryState();
@@ -270,7 +269,10 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				index.unlock();
 			}
 		} catch (UnmergedPathException e) {
-			throw new UnmergedPathsException(e);
+			// since UnmergedPathException is a subclass of IOException
+			// which should not be wrapped by a JGitInternalException we
+			// have to catch and re-throw it here
+			throw e;
 		} catch (IOException e) {
 			throw new JGitInternalException(
 					JGitText.get().exceptionCaughtDuringExecutionOfCommitCommand, e);
@@ -341,7 +343,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 					long entryLength = fTree.getEntryLength();
 					dcEntry.setLength(entryLength);
 					dcEntry.setLastModified(fTree.getEntryLastModified());
-					dcEntry.setFileMode(fTree.getIndexFileMode(dcTree));
+					dcEntry.setFileMode(fTree.getEntryFileMode());
 
 					boolean objectExists = (dcTree != null && fTree
 							.idEqual(dcTree))
@@ -349,17 +351,20 @@ public class CommitCommand extends GitCommand<RevCommit> {
 					if (objectExists) {
 						dcEntry.setObjectId(fTree.getEntryObjectId());
 					} else {
-						if (FileMode.GITLINK.equals(dcEntry.getFileMode()))
-							dcEntry.setObjectId(fTree.getEntryObjectId());
-						else {
+						if (FileMode.GITLINK.equals(dcEntry.getFileMode())) {
+							// Do not check the content of submodule entries
+							// Use the old entry information instead.
+							dcEntry.copyMetaData(index.getEntry(dcEntry
+									.getPathString()));
+						} else {
 							// insert object
 							if (inserter == null)
 								inserter = repo.newObjectInserter();
-							long contentLength = fTree.getEntryContentLength();
+
 							InputStream inputStream = fTree.openEntryStream();
 							try {
 								dcEntry.setObjectId(inserter.insert(
-										Constants.OBJ_BLOB, contentLength,
+										Constants.OBJ_BLOB, entryLength,
 										inputStream));
 							} finally {
 								inputStream.close();
@@ -377,10 +382,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 					// add to temporary in-core index
 					dcBuilder.add(dcEntry);
 
-					if (emptyCommit
-							&& (hTree == null || !hTree.idEqual(fTree) || hTree
-									.getEntryRawMode() != fTree
-									.getEntryRawMode()))
+					if (emptyCommit && (hTree == null || !hTree.idEqual(fTree)))
 						// this is a change
 						emptyCommit = false;
 				} else {

@@ -46,6 +46,7 @@
 package org.eclipse.jgit.dircache;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
@@ -60,12 +61,11 @@ import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Comparator;
 
-import org.eclipse.jgit.errors.LockFailedException;
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.events.IndexChangedEvent;
 import org.eclipse.jgit.events.IndexChangedListener;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectInserter;
@@ -76,7 +76,6 @@ import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.MutableInteger;
 import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.TemporaryBuffer;
-import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
  * Support for the Git dircache (aka index file).
@@ -191,7 +190,7 @@ public class DirCache {
 			throws CorruptObjectException, IOException {
 		final DirCache c = new DirCache(indexLocation, fs);
 		if (!c.lock())
-			throw new LockFailedException(indexLocation);
+			throw new IOException(MessageFormat.format(JGitText.get().cannotLock, indexLocation));
 
 		try {
 			c.read();
@@ -398,8 +397,7 @@ public class DirCache {
 		if (ver == 3)
 			extended = true;
 		else if (ver != 2)
-			throw new CorruptObjectException(MessageFormat.format(
-					JGitText.get().unknownDIRCVersion, Integer.valueOf(ver)));
+			throw new CorruptObjectException(MessageFormat.format(JGitText.get().unknownDIRCVersion, ver));
 		entryCnt = NB.decodeInt32(hdr, 8);
 		if (entryCnt < 0)
 			throw new CorruptObjectException(JGitText.get().DIRCHasTooManyEntries);
@@ -434,9 +432,8 @@ public class DirCache {
 			switch (NB.decodeInt32(hdr, 0)) {
 			case EXT_TREE: {
 				if (Integer.MAX_VALUE < sz) {
-					throw new CorruptObjectException(MessageFormat.format(
-							JGitText.get().DIRCExtensionIsTooLargeAt,
-							formatExtensionName(hdr), Long.valueOf(sz)));
+					throw new CorruptObjectException(MessageFormat.format(JGitText.get().DIRCExtensionIsTooLargeAt
+							, formatExtensionName(hdr), sz));
 				}
 				final byte[] raw = new byte[(int) sz];
 				IO.readFully(in, raw, 0, raw.length);
@@ -476,10 +473,8 @@ public class DirCache {
 		while (0 < sz) {
 			int n = in.read(b, 0, (int) Math.min(b.length, sz));
 			if (n < 0) {
-				throw new EOFException(
-						MessageFormat.format(
-								JGitText.get().shortReadOfOptionalDIRCExtensionExpectedAnotherBytes,
-								formatExtensionName(hdr), Long.valueOf(sz)));
+				throw new EOFException(MessageFormat.format(JGitText.get().shortReadOfOptionalDIRCExtensionExpectedAnotherBytes
+						, formatExtensionName(hdr), sz));
 			}
 			md.update(b, 0, n);
 			sz -= n;
@@ -540,7 +535,7 @@ public class DirCache {
 		final LockFile tmp = myLock;
 		requireLocked(tmp);
 		try {
-			writeTo(new SafeBufferedOutputStream(tmp.getOutputStream()));
+			writeTo(new BufferedOutputStream(tmp.getOutputStream()));
 		} catch (IOException err) {
 			tmp.unlock();
 			throw err;

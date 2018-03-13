@@ -55,11 +55,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.CorruptObjectException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
@@ -118,44 +118,6 @@ public class UploadPack {
 		ANY;
 	}
 
-	/** Data in the first line of a request, the line itself plus options. */
-	public static class FirstLine {
-		private final String line;
-		private final Set<String> options;
-
-		/**
-		 * Parse the first line of a receive-pack request.
-		 *
-		 * @param line
-		 *            line from the client.
-		 */
-		public FirstLine(String line) {
-			if (line.length() > 45) {
-				final HashSet<String> opts = new HashSet<String>();
-				String opt = line.substring(45);
-				if (opt.startsWith(" "))
-					opt = opt.substring(1);
-				for (String c : opt.split(" "))
-					opts.add(c);
-				this.line = line.substring(0, 45);
-				this.options = Collections.unmodifiableSet(opts);
-			} else {
-				this.line = line;
-				this.options = Collections.emptySet();
-			}
-		}
-
-		/** @return non-capabilities part of the line. */
-		public String getLine() {
-			return line;
-		}
-
-		/** @return options parsed from the line. */
-		public Set<String> getOptions() {
-			return options;
-		}
-	}
-
 	/** Database we read the objects from. */
 	private final Repository db;
 
@@ -195,17 +157,14 @@ public class UploadPack {
 	/** The refs we advertised as existing at the start of the connection. */
 	private Map<String, Ref> refs;
 
-	/** Hook used while advertising the refs to the client. */
-	private AdvertiseRefsHook advertiseRefsHook = AdvertiseRefsHook.DEFAULT;
-
 	/** Filter used while advertising the refs to the client. */
-	private RefFilter refFilter = RefFilter.DEFAULT;
+	private RefFilter refFilter;
 
 	/** Hook handling the various upload phases. */
 	private PreUploadHook preUploadHook = PreUploadHook.NULL;
 
 	/** Capabilities requested by the client. */
-	private Set<String> options;
+	private final Set<String> options = new HashSet<String>();
 
 	/** Raw ObjectIds the client has asked for, before validating them. */
 	private final Set<ObjectId> wantIds = new HashSet<ObjectId>();
@@ -282,6 +241,7 @@ public class UploadPack {
 		SAVE.add(PEER_HAS);
 		SAVE.add(COMMON);
 		SAVE.add(SATISFIED);
+		refFilter = RefFilter.DEFAULT;
 	}
 
 	/** @return the repository this upload is reading from. */
@@ -294,34 +254,22 @@ public class UploadPack {
 		return walk;
 	}
 
-	/**
-	 * Get refs which were advertised to the client.
-	 *
-	 * @return all refs which were advertised to the client, or null if
-	 *         {@link #setAdvertisedRefs(Map)} has not been called yet.
-	 */
+	/** @return all refs which were advertised to the client. */
 	public final Map<String, Ref> getAdvertisedRefs() {
+		if (refs == null)
+			setAdvertisedRefs(db.getAllRefs());
 		return refs;
 	}
 
 	/**
-	 * Set the refs advertised by this UploadPack.
-	 * <p>
-	 * Intended to be called from a {@link PreUploadHook}.
-	 *
 	 * @param allRefs
 	 *            explicit set of references to claim as advertised by this
 	 *            UploadPack instance. This overrides any references that
 	 *            may exist in the source repository. The map is passed
-	 *            to the configured {@link #getRefFilter()}. If null, assumes
-	 *            all refs were advertised.
+	 *            to the configured {@link #getRefFilter()}.
 	 */
 	public void setAdvertisedRefs(Map<String, Ref> allRefs) {
-		if (allRefs != null)
-			refs = allRefs;
-		else
-			refs = db.getAllRefs();
-		refs = refFilter.filter(refs);
+		refs = refFilter.filter(allRefs);
 	}
 
 	/** @return timeout (in seconds) before aborting an IO operation. */
@@ -382,39 +330,18 @@ public class UploadPack {
 		requestPolicy = policy != null ? policy : RequestPolicy.ADVERTISED;
 	}
 
-	/** @return the hook used while advertising the refs to the client */
-	public AdvertiseRefsHook getAdvertiseRefsHook() {
-		return advertiseRefsHook;
-	}
-
 	/** @return the filter used while advertising the refs to the client */
 	public RefFilter getRefFilter() {
 		return refFilter;
 	}
 
 	/**
-	 * Set the hook used while advertising the refs to the client.
-	 * <p>
-	 * If the {@link AdvertiseRefsHook} chooses to call
-	 * {@link #setAdvertisedRefs(Map)}, only refs set by this hook <em>and</em>
-	 * selected by the {@link RefFilter} will be shown to the client.
-	 *
-	 * @param advertiseRefsHook
-	 *            the hook; may be null to show all refs.
-	 */
-	public void setAdvertiseRefsHook(final AdvertiseRefsHook advertiseRefsHook) {
-		if (advertiseRefsHook != null)
-			this.advertiseRefsHook = advertiseRefsHook;
-		else
-			this.advertiseRefsHook = AdvertiseRefsHook.DEFAULT;
-	}
-
-	/**
 	 * Set the filter used while advertising the refs to the client.
 	 * <p>
-	 * Only refs allowed by this filter will be sent to the client.
-	 * The filter is run against the refs specified by the
-	 * {@link AdvertiseRefsHook} (if applicable).
+	 * Only refs allowed by this filter will be sent to the client. This can
+	 * be used by a server to restrict the list of references the client can
+	 * obtain through clone or fetch, effectively limiting the access to only
+	 * certain refs.
 	 *
 	 * @param refFilter
 	 *            the filter; may be null to show all refs.
@@ -462,24 +389,6 @@ public class UploadPack {
 	 */
 	public void setLogger(UploadPackLogger logger) {
 		this.logger = logger;
-	}
-
-	/**
-	 * Check whether the client expects a side-band stream.
-	 *
-	 * @return true if the client has advertised a side-band capability, false
-	 *     otherwise.
-	 * @throws RequestNotYetReadException
-	 *             if the client's request has not yet been read from the wire, so
-	 *             we do not know if they expect side-band. Note that the client
-	 *             may have already written the request, it just has not been
-	 *             read.
-	 */
-	public boolean isSideBand() throws RequestNotYetReadException {
-		if (options == null)
-			throw new RequestNotYetReadException();
-		return (options.contains(OPTION_SIDE_BAND)
-				|| options.contains(OPTION_SIDE_BAND_64K));
 	}
 
 	/**
@@ -542,12 +451,6 @@ public class UploadPack {
 		return statistics;
 	}
 
-	private Map<String, Ref> getAdvertisedOrDefaultRefs() {
-		if (refs == null)
-			setAdvertisedRefs(null);
-		return refs;
-	}
-
 	private void service() throws IOException {
 		if (biDirectionalPipe)
 			sendAdvertisedRefs(new PacketLineOutRefAdvertiser(pckOut));
@@ -555,7 +458,7 @@ public class UploadPack {
 			advertised = Collections.emptySet();
 		else {
 			advertised = new HashSet<ObjectId>();
-			for (Ref ref : getAdvertisedOrDefaultRefs().values()) {
+			for (Ref ref : getAdvertisedRefs().values()) {
 				if (ref.getObjectId() != null)
 					advertised.add(ref.getObjectId());
 			}
@@ -585,7 +488,7 @@ public class UploadPack {
 			reportErrorDuringNegotiate(err.getMessage());
 			throw err;
 
-		} catch (ServiceMayNotContinueException err) {
+		} catch (UploadPackMayNotContinueException err) {
 			if (!err.isOutput() && err.getMessage() != null) {
 				try {
 					pckOut.writeString("ERR " + err.getMessage() + "\n");
@@ -659,14 +562,14 @@ public class UploadPack {
 	 *            the advertisement formatter.
 	 * @throws IOException
 	 *             the formatter failed to write an advertisement.
-	 * @throws ServiceMayNotContinueException
+	 * @throws UploadPackMayNotContinueException
 	 *             the hook denied advertisement.
 	 */
 	public void sendAdvertisedRefs(final RefAdvertiser adv) throws IOException,
-			ServiceMayNotContinueException {
+			UploadPackMayNotContinueException {
 		try {
-			advertiseRefsHook.advertiseRefs(this);
-		} catch (ServiceMayNotContinueException fail) {
+			preUploadHook.onPreAdvertiseRefs(this);
+		} catch (UploadPackMayNotContinueException fail) {
 			if (fail.getMessage() != null) {
 				adv.writeOne("ERR " + fail.getMessage());
 				fail.setOutput();
@@ -687,7 +590,7 @@ public class UploadPack {
 		if (!biDirectionalPipe)
 			adv.advertiseCapability(OPTION_NO_DONE);
 		adv.setDerefTags(true);
-		advertised = adv.send(getAdvertisedOrDefaultRefs());
+		advertised = adv.send(getAdvertisedRefs());
 		adv.end();
 	}
 
@@ -720,9 +623,12 @@ public class UploadPack {
 				throw new PackProtocolException(MessageFormat.format(JGitText.get().expectedGot, "want", line));
 
 			if (isFirst && line.length() > 45) {
-				final FirstLine firstLine = new FirstLine(line);
-				options = firstLine.getOptions();
-				line = firstLine.getLine();
+				String opt = line.substring(45);
+				if (opt.startsWith(" "))
+					opt = opt.substring(1);
+				for (String c : opt.split(" "))
+					options.add(c);
+				line = line.substring(0, 45);
 			}
 
 			wantIds.add(ObjectId.fromString(line.substring(5)));
@@ -1053,7 +959,7 @@ public class UploadPack {
 		if (sideband) {
 			try {
 				sendPack(true);
-			} catch (ServiceMayNotContinueException noPack) {
+			} catch (UploadPackMayNotContinueException noPack) {
 				// This was already reported on (below).
 				throw noPack;
 			} catch (IOException err) {
@@ -1117,7 +1023,7 @@ public class UploadPack {
 			} else {
 				preUploadHook.onSendPack(this, wantAll, commonBase);
 			}
-		} catch (ServiceMayNotContinueException noPack) {
+		} catch (UploadPackMayNotContinueException noPack) {
 			if (sideband && noPack.getMessage() != null) {
 				noPack.setOutput();
 				SideBandOutputStream err = new SideBandOutputStream(
