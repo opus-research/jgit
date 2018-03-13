@@ -105,8 +105,7 @@ public class FS_Win32_Java7Cygwin extends FS_Win32_Cygwin {
 
 	@Override
 	public boolean isFile(File path) {
-		Path nioPath = path.toPath();
-		return Files.isRegularFile(nioPath, LinkOption.NOFOLLOW_LINKS);
+		return FileUtil.isFile(path);
 	}
 
 	@Override

@@ -186,9 +186,6 @@ public class ConfigConstants {
 	/** The "indexversion" key */
 	public static final String CONFIG_KEY_INDEXVERSION = "indexversion";
 
-	/** The "hidedotfiles" key */
-	public static final String CONFIG_KEY_HIDEDOTFILES = "hidedotfiles";
-
 	/** The "precomposeunicode" key */
 	public static final String CONFIG_KEY_PRECOMPOSEUNICODE = "precomposeunicode";
 
@@ -197,4 +194,7 @@ public class ConfigConstants {
 
 	/** The "mergeoptions" key */
 	public static final String CONFIG_KEY_MERGEOPTIONS = "mergeoptions";
+
+	/** The "ff" key */
+	public static final String CONFIG_KEY_FF = "ff";
 }
