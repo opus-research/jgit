@@ -57,10 +57,8 @@ public class WorkDirCheckout_ReadTreeTest extends ReadTreeTest {
 	}
 
 	public void checkout() throws IOException {
-		GitIndex index = db.getIndex();
-		wdc = new WorkDirCheckout(db, db.getWorkTree(), theHead, index, theMerge);
+		wdc = new WorkDirCheckout(db, db.getWorkTree(), theHead, db.getIndex(), theMerge);
 		wdc.checkout();
-		index.write();
 	}
 
 	public ArrayList<String> getRemoved() {

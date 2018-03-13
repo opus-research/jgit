@@ -56,16 +56,10 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
@@ -77,7 +71,7 @@ import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.StoredObjectRepresentationNotAvailableException;
 import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.AsyncObjectSizeQueue;
+import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
@@ -87,7 +81,6 @@ import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.ThreadSafeProgressMonitor;
-import org.eclipse.jgit.revwalk.AsyncRevObjectQueue;
 import org.eclipse.jgit.revwalk.ObjectWalk;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevObject;
@@ -130,6 +123,70 @@ import org.eclipse.jgit.util.TemporaryBuffer;
  * </p>
  */
 public class PackWriter {
+	/**
+	 * Title of {@link ProgressMonitor} task used during counting objects to
+	 * pack.
+	 *
+	 * @see #preparePack(ProgressMonitor, Collection, Collection)
+	 */
+	public static final String COUNTING_OBJECTS_PROGRESS = JGitText.get().countingObjects;
+
+	/**
+	 * Title of {@link ProgressMonitor} task used during compression.
+	 *
+	 * @see #writePack(ProgressMonitor, ProgressMonitor, OutputStream)
+	 */
+	public static final String COMPRESSING_OBJECTS_PROGRESS = JGitText.get().compressingObjects;
+
+	/**
+	 * Title of {@link ProgressMonitor} task used during writing out pack
+	 * (objects)
+	 *
+	 * @see #writePack(ProgressMonitor, ProgressMonitor, OutputStream)
+	 */
+	public static final String WRITING_OBJECTS_PROGRESS = JGitText.get().writingObjects;
+
+	/**
+	 * Default value of deltas reuse option.
+	 *
+	 * @see #setReuseDeltas(boolean)
+	 */
+	public static final boolean DEFAULT_REUSE_DELTAS = true;
+
+	/**
+	 * Default value of objects reuse option.
+	 *
+	 * @see #setReuseObjects(boolean)
+	 */
+	public static final boolean DEFAULT_REUSE_OBJECTS = true;
+
+	/**
+	 * Default value of delta base as offset option.
+	 *
+	 * @see #setDeltaBaseAsOffset(boolean)
+	 */
+	public static final boolean DEFAULT_DELTA_BASE_AS_OFFSET = false;
+
+	/**
+	 * Default value of maximum delta chain depth.
+	 *
+	 * @see #setMaxDeltaDepth(int)
+	 */
+	public static final int DEFAULT_MAX_DELTA_DEPTH = 50;
+
+	/**
+	 * Default window size during packing.
+	 *
+	 * @see #setDeltaSearchWindowSize(int)
+	 */
+	public static final int DEFAULT_DELTA_SEARCH_WINDOW_SIZE = 10;
+
+	static final long DEFAULT_BIG_FILE_THRESHOLD = 50 * 1024 * 1024;
+
+	static final long DEFAULT_DELTA_CACHE_SIZE = 50 * 1024 * 1024;
+
+	static final int DEFAULT_DELTA_CACHE_LIMIT = 100;
+
 	private static final int PACK_VERSION_GENERATED = 2;
 
 	@SuppressWarnings("unchecked")
@@ -147,6 +204,8 @@ public class PackWriter {
 	// edge objects for thin packs
 	private final ObjectIdSubclassMap<ObjectToPack> edgeObjects = new ObjectIdSubclassMap<ObjectToPack>();
 
+	private int compressionLevel;
+
 	private Deflater myDeflater;
 
 	private final ObjectReader reader;
@@ -154,15 +213,33 @@ public class PackWriter {
 	/** {@link #reader} recast to the reuse interface, if it supports it. */
 	private final ObjectReuseAsIs reuseSupport;
 
-	private final PackConfig config;
-
 	private List<ObjectToPack> sortedByName;
 
 	private byte packcsum[];
 
-	private boolean deltaBaseAsOffset;
+	private boolean reuseDeltas = DEFAULT_REUSE_DELTAS;
 
-	private boolean reuseDeltas;
+	private boolean reuseObjects = DEFAULT_REUSE_OBJECTS;
+
+	private boolean deltaBaseAsOffset = DEFAULT_DELTA_BASE_AS_OFFSET;
+
+	private boolean deltaCompress = true;
+
+	private int maxDeltaDepth = DEFAULT_MAX_DELTA_DEPTH;
+
+	private int deltaSearchWindowSize = DEFAULT_DELTA_SEARCH_WINDOW_SIZE;
+
+	private long deltaSearchMemoryLimit;
+
+	private long deltaCacheSize = DEFAULT_DELTA_CACHE_SIZE;
+
+	private int deltaCacheLimit = DEFAULT_DELTA_CACHE_LIMIT;
+
+	private int indexVersion;
+
+	private long bigFileThreshold = DEFAULT_BIG_FILE_THRESHOLD;
+
+	private int threads = 1;
 
 	private boolean thin;
 
@@ -191,7 +268,7 @@ public class PackWriter {
 	 *            reader to read from the repository with.
 	 */
 	public PackWriter(final ObjectReader reader) {
-		this(new PackConfig(), reader);
+		this(null, reader);
 	}
 
 	/**
@@ -206,38 +283,105 @@ public class PackWriter {
 	 *            reader to read from the repository with.
 	 */
 	public PackWriter(final Repository repo, final ObjectReader reader) {
-		this(new PackConfig(repo), reader);
-	}
-
-	/**
-	 * Create writer with a specified configuration.
-	 * <p>
-	 * Objects for packing are specified in {@link #preparePack(Iterator)} or
-	 * {@link #preparePack(ProgressMonitor, Collection, Collection)}.
-	 *
-	 * @param config
-	 *            configuration for the pack writer.
-	 * @param reader
-	 *            reader to read from the repository with.
-	 */
-	public PackWriter(final PackConfig config, final ObjectReader reader) {
-		this.config = config;
 		this.reader = reader;
 		if (reader instanceof ObjectReuseAsIs)
 			reuseSupport = ((ObjectReuseAsIs) reader);
 		else
 			reuseSupport = null;
 
-		deltaBaseAsOffset = config.isDeltaBaseAsOffset();
-		reuseDeltas = config.isReuseDeltas();
+		final PackConfig pc = configOf(repo).get(PackConfig.KEY);
+		deltaSearchWindowSize = pc.deltaWindow;
+		deltaSearchMemoryLimit = pc.deltaWindowMemory;
+		deltaCacheSize = pc.deltaCacheSize;
+		deltaCacheLimit = pc.deltaCacheLimit;
+		maxDeltaDepth = pc.deltaDepth;
+		compressionLevel = pc.compression;
+		indexVersion = pc.indexVersion;
+		bigFileThreshold = pc.bigFileThreshold;
+		threads = pc.threads;
+	}
+
+	private static Config configOf(final Repository repo) {
+		if (repo == null)
+			return new Config();
+		return repo.getConfig();
+	}
+
+	/**
+	 * Check whether object is configured to reuse deltas existing in
+	 * repository.
+	 * <p>
+	 * Default setting: {@link #DEFAULT_REUSE_DELTAS}
+	 * </p>
+	 *
+	 * @return true if object is configured to reuse deltas; false otherwise.
+	 */
+	public boolean isReuseDeltas() {
+		return reuseDeltas;
+	}
+
+	/**
+	 * Set reuse deltas configuration option for this writer. When enabled,
+	 * writer will search for delta representation of object in repository and
+	 * use it if possible. Normally, only deltas with base to another object
+	 * existing in set of objects to pack will be used. Exception is however
+	 * thin-pack (see
+	 * {@link #preparePack(ProgressMonitor, Collection, Collection)} and
+	 * {@link #preparePack(Iterator)}) where base object must exist on other
+	 * side machine.
+	 * <p>
+	 * When raw delta data is directly copied from a pack file, checksum is
+	 * computed to verify data.
+	 * </p>
+	 * <p>
+	 * Default setting: {@link #DEFAULT_REUSE_DELTAS}
+	 * </p>
+	 *
+	 * @param reuseDeltas
+	 *            boolean indicating whether or not try to reuse deltas.
+	 */
+	public void setReuseDeltas(boolean reuseDeltas) {
+		this.reuseDeltas = reuseDeltas;
+	}
+
+	/**
+	 * Checks whether object is configured to reuse existing objects
+	 * representation in repository.
+	 * <p>
+	 * Default setting: {@link #DEFAULT_REUSE_OBJECTS}
+	 * </p>
+	 *
+	 * @return true if writer is configured to reuse objects representation from
+	 *         pack; false otherwise.
+	 */
+	public boolean isReuseObjects() {
+		return reuseObjects;
+	}
+
+	/**
+	 * Set reuse objects configuration option for this writer. If enabled,
+	 * writer searches for representation in a pack file. If possible,
+	 * compressed data is directly copied from such a pack file. Data checksum
+	 * is verified.
+	 * <p>
+	 * Default setting: {@link #DEFAULT_REUSE_OBJECTS}
+	 * </p>
+	 *
+	 * @param reuseObjects
+	 *            boolean indicating whether or not writer should reuse existing
+	 *            objects representation.
+	 */
+	public void setReuseObjects(boolean reuseObjects) {
+		this.reuseObjects = reuseObjects;
 	}
 
 	/**
 	 * Check whether writer can store delta base as an offset (new style
 	 * reducing pack size) or should store it as an object id (legacy style,
 	 * compatible with old readers).
-	 *
-	 * Default setting: {@value PackConfig#DEFAULT_DELTA_BASE_AS_OFFSET}
+	 * <p>
+	 * Default setting: {@link #DEFAULT_DELTA_BASE_AS_OFFSET}
+	 * </p>
 	 *
 	 * @return true if delta base is stored as an offset; false if it is stored
 	 *         as an object id.
@@ -250,8 +394,9 @@ public class PackWriter {
 	 * Set writer delta base format. Delta base can be written as an offset in a
 	 * pack file (new approach reducing file size) or as an object id (legacy
 	 * approach, compatible with old readers).
-	 *
-	 * Default setting: {@value PackConfig#DEFAULT_DELTA_BASE_AS_OFFSET}
+	 * <p>
+	 * Default setting: {@link #DEFAULT_DELTA_BASE_AS_OFFSET}
+	 * </p>
 	 *
 	 * @param deltaBaseAsOffset
 	 *            boolean indicating whether delta base can be stored as an
@@ -259,6 +404,235 @@ public class PackWriter {
 	 */
 	public void setDeltaBaseAsOffset(boolean deltaBaseAsOffset) {
 		this.deltaBaseAsOffset = deltaBaseAsOffset;
+	}
+
+	/**
+	 * Check whether the writer will create new deltas on the fly.
+	 * <p>
+	 * Default setting: true
+	 * </p>
+	 *
+	 * @return true if the writer will create a new delta when either
+	 *         {@link #isReuseDeltas()} is false, or no suitable delta is
+	 *         available for reuse.
+	 */
+	public boolean isDeltaCompress() {
+		return deltaCompress;
+	}
+
+	/**
+	 * Set whether or not the writer will create new deltas on the fly.
+	 *
+	 * @param deltaCompress
+	 *            true to create deltas when {@link #isReuseDeltas()} is false,
+	 *            or when a suitable delta isn't available for reuse. Set to
+	 *            false to write whole objects instead.
+	 */
+	public void setDeltaCompress(boolean deltaCompress) {
+		this.deltaCompress = deltaCompress;
+	}
+
+	/**
+	 * Get maximum depth of delta chain set up for this writer. Generated chains
+	 * are not longer than this value.
+	 * <p>
+	 * Default setting: {@link #DEFAULT_MAX_DELTA_DEPTH}
+	 * </p>
+	 *
+	 * @return maximum delta chain depth.
+	 */
+	public int getMaxDeltaDepth() {
+		return maxDeltaDepth;
+	}
+
+	/**
+	 * Set up maximum depth of delta chain for this writer. Generated chains are
+	 * not longer than this value. Too low value causes low compression level,
+	 * while too big makes unpacking (reading) longer.
+	 * <p>
+	 * Default setting: {@link #DEFAULT_MAX_DELTA_DEPTH}
+	 * </p>
+	 *
+	 * @param maxDeltaDepth
+	 *            maximum delta chain depth.
+	 */
+	public void setMaxDeltaDepth(int maxDeltaDepth) {
+		this.maxDeltaDepth = maxDeltaDepth;
+	}
+
+	/**
+	 * Get the number of objects to try when looking for a delta base.
+	 * <p>
+	 * This limit is per thread, if 4 threads are used the actual memory
+	 * used will be 4 times this value.
+	 *
+	 * @return the object count to be searched.
+	 */
+	public int getDeltaSearchWindowSize() {
+		return deltaSearchWindowSize;
+	}
+
+	/**
+	 * Set the number of objects considered when searching for a delta base.
+	 * <p>
+	 * Default setting: {@link #DEFAULT_DELTA_SEARCH_WINDOW_SIZE}
+	 * </p>
+	 *
+	 * @param objectCount
+	 *            number of objects to search at once.  Must be at least 2.
+	 */
+	public void setDeltaSearchWindowSize(int objectCount) {
+		if (objectCount <= 2)
+			setDeltaCompress(false);
+		else
+			deltaSearchWindowSize = objectCount;
+	}
+
+	/**
+	 * Get maximum number of bytes to put into the delta search window.
+	 * <p>
+	 * Default setting is 0, for an unlimited amount of memory usage. Actual
+	 * memory used is the lower limit of either this setting, or the sum of
+	 * space used by at most {@link #getDeltaSearchWindowSize()} objects.
+	 * <p>
+	 * This limit is per thread, if 4 threads are used the actual memory
+	 * limit will be 4 times this value.
+	 *
+	 * @return the memory limit.
+	 */
+	public long getDeltaSearchMemoryLimit() {
+		return deltaSearchMemoryLimit;
+	}
+
+	/**
+	 * Set the maximum number of bytes to put into the delta search window.
+	 * <p>
+	 * Default setting is 0, for an unlimited amount of memory usage. If the
+	 * memory limit is reached before {@link #getDeltaSearchWindowSize()} the
+	 * window size is temporarily lowered.
+	 *
+	 * @param memoryLimit
+	 *            Maximum number of bytes to load at once, 0 for unlimited.
+	 */
+	public void setDeltaSearchMemoryLimit(long memoryLimit) {
+		deltaSearchMemoryLimit = memoryLimit;
+	}
+
+	/**
+	 * Get the size of the in-memory delta cache.
+	 * <p>
+	 * This limit is for the entire writer, even if multiple threads are used.
+	 *
+	 * @return maximum number of bytes worth of delta data to cache in memory.
+	 *         If 0 the cache is infinite in size (up to the JVM heap limit
+	 *         anyway). A very tiny size such as 1 indicates the cache is
+	 *         effectively disabled.
+	 */
+	public long getDeltaCacheSize() {
+		return deltaCacheSize;
+	}
+
+	/**
+	 * Set the maximum number of bytes of delta data to cache.
+	 * <p>
+	 * During delta search, up to this many bytes worth of small or hard to
+	 * compute deltas will be stored in memory. This cache speeds up writing by
+	 * allowing the cached entry to simply be dumped to the output stream.
+	 *
+	 * @param size
+	 *            number of bytes to cache. Set to 0 to enable an infinite
+	 *            cache, set to 1 (an impossible size for any delta) to disable
+	 *            the cache.
+	 */
+	public void setDeltaCacheSize(long size) {
+		deltaCacheSize = size;
+	}
+
+	/**
+	 * Maximum size in bytes of a delta to cache.
+	 *
+	 * @return maximum size (in bytes) of a delta that should be cached.
+	 */
+	public int getDeltaCacheLimit() {
+		return deltaCacheLimit;
+	}
+
+	/**
+	 * Set the maximum size of a delta that should be cached.
+	 * <p>
+	 * During delta search, any delta smaller than this size will be cached, up
+	 * to the {@link #getDeltaCacheSize()} maximum limit. This speeds up writing
+	 * by allowing these cached deltas to be output as-is.
+	 *
+	 * @param size
+	 *            maximum size (in bytes) of a delta to be cached.
+	 */
+	public void setDeltaCacheLimit(int size) {
+		deltaCacheLimit = size;
+	}
+
+	/**
+	 * Get the maximum file size that will be delta compressed.
+	 * <p>
+	 * Files bigger than this setting will not be delta compressed, as they are
+	 * more than likely already highly compressed binary data files that do not
+	 * delta compress well, such as MPEG videos.
+	 *
+	 * @return the configured big file threshold.
+	 */
+	public long getBigFileThreshold() {
+		return bigFileThreshold;
+	}
+
+	/**
+	 * Set the maximum file size that should be considered for deltas.
+	 *
+	 * @param bigFileThreshold
+	 *            the limit, in bytes.
+	 */
+	public void setBigFileThreshold(long bigFileThreshold) {
+		this.bigFileThreshold = bigFileThreshold;
+	}
+
+	/**
+	 * Get the compression level applied to objects in the pack.
+	 *
+	 * @return current compression level, see {@link java.util.zip.Deflater}.
+	 */
+	public int getCompressionLevel() {
+		return compressionLevel;
+	}
+
+	/**
+	 * Set the compression level applied to objects in the pack.
+	 *
+	 * @param level
+	 *            compression level, must be a valid level recognized by the
+	 *            {@link java.util.zip.Deflater} class. Typically this setting
+	 *            is {@link java.util.zip.Deflater#BEST_SPEED}.
+	 */
+	public void setCompressionLevel(int level) {
+		compressionLevel = level;
+	}
+
+	/** @return number of threads used for delta compression. */
+	public int getThreads() {
+		return threads;
+	}
+
+	/**
+	 * Set the number of threads to use for delta compression.
+	 * <p>
+	 * During delta compression, if there are enough objects to be considered
+	 * the writer will start up concurrent threads and allow them to compress
+	 * different sections of the repository concurrently.
+	 *
+	 * @param threads
+	 *            number of threads to use. If <= 0 the number of available
+	 *            processors for this JVM is used.
+	 */
+	public void setThread(int threads) {
+		this.threads = threads;
 	}
 
 	/** @return true if this writer is producing a thin pack. */
@@ -298,6 +672,18 @@ public class PackWriter {
 	 */
 	public void setIgnoreMissingUninteresting(final boolean ignore) {
 		ignoreMissingUninteresting = ignore;
+	}
+
+	/**
+	 * Set the pack index file format version this instance will create.
+	 *
+	 * @param version
+	 *            the version to write. The special version 0 designates the
+	 *            oldest (most compatible) format available for the objects.
+	 * @see PackIndexWriter
+	 */
+	public void setIndexVersion(final int version) {
+		indexVersion = version;
 	}
 
 	/**
@@ -392,18 +778,7 @@ public class PackWriter {
 	 * @return true if the object will appear in the output pack file.
 	 */
 	public boolean willInclude(final AnyObjectId id) {
-		return get(id) != null;
-	}
-
-	/**
-	 * Lookup the ObjectToPack object for a given ObjectId.
-	 *
-	 * @param id
-	 *            the object to find in the pack.
-	 * @return the object we are packing, or null.
-	 */
-	public ObjectToPack get(AnyObjectId id) {
-		return objectsMap.get(id);
+		return objectsMap.get(id) != null;
 	}
 
 	/**
@@ -439,7 +814,6 @@ public class PackWriter {
 	public void writeIndex(final OutputStream indexStream) throws IOException {
 		final List<ObjectToPack> list = sortByName();
 		final PackIndexWriter iw;
-		int indexVersion = config.getIndexVersion();
 		if (indexVersion <= 0)
 			iw = PackIndexWriter.createOldestPossible(indexStream, list);
 		else
@@ -464,7 +838,9 @@ public class PackWriter {
 	 * <p>
 	 * At first, this method collects and sorts objects to pack, then deltas
 	 * search is performed if set up accordingly, finally pack stream is
-	 * written.
+	 * written. {@link ProgressMonitor} tasks {@link #COMPRESSING_OBJECTS_PROGRESS}
+	 * (only if reuseDeltas or reuseObjects is enabled) and
+	 * {@link #WRITING_OBJECTS_PROGRESS} are updated during packing.
 	 * </p>
 	 * <p>
 	 * All reused objects data checksum (Adler32/CRC32) is computed and
@@ -491,19 +867,17 @@ public class PackWriter {
 		if (writeMonitor == null)
 			writeMonitor = NullProgressMonitor.INSTANCE;
 
-		if ((reuseDeltas || config.isReuseObjects()) && reuseSupport != null)
-			searchForReuse(compressMonitor);
-		if (config.isDeltaCompress())
+		if ((reuseDeltas || reuseObjects) && reuseSupport != null)
+			searchForReuse();
+		if (deltaCompress)
 			searchForDeltas(compressMonitor);
 
 		final PackOutputStream out = new PackOutputStream(writeMonitor,
 				packStream, this);
 
-		int objCnt = getObjectsNumber();
-		writeMonitor.beginTask(JGitText.get().writingObjects, objCnt);
-		out.writeFileHeader(PACK_VERSION_GENERATED, objCnt);
-		out.flush();
-		writeObjects(out);
+		writeMonitor.beginTask(WRITING_OBJECTS_PROGRESS, getObjectsNumber());
+		out.writeFileHeader(PACK_VERSION_GENERATED, getObjectsNumber());
+		writeObjects(writeMonitor, out);
 		writeChecksum(out);
 
 		reader.release();
@@ -519,11 +893,11 @@ public class PackWriter {
 		}
 	}
 
-	private void searchForReuse(ProgressMonitor monitor) throws IOException {
-		monitor.beginTask(JGitText.get().searchForReuse, getObjectsNumber());
-		for (List<ObjectToPack> list : objectsLists)
-			reuseSupport.selectObjectRepresentation(this, monitor, list);
-		monitor.endTask();
+	private void searchForReuse() throws IOException {
+		for (List<ObjectToPack> list : objectsLists) {
+			for (ObjectToPack otp : list)
+				reuseSupport.selectObjectRepresentation(this, otp);
+		}
 	}
 
 	private void searchForDeltas(ProgressMonitor monitor)
@@ -548,66 +922,20 @@ public class PackWriter {
 		// them in the search phase below.
 		//
 		for (ObjectToPack eo : edgeObjects) {
-			eo.setWeight(0);
-			list[cnt++] = eo;
-		}
-
-		// Compute the sizes of the objects so we can do a proper sort.
-		// We let the reader skip missing objects if it chooses. For
-		// some readers this can be a huge win. We detect missing objects
-		// by having set the weights above to 0 and allowing the delta
-		// search code to discover the missing object and skip over it, or
-		// abort with an exception if we actually had to have it.
-		//
-		monitor.beginTask(JGitText.get().compressingObjects, cnt);
-		AsyncObjectSizeQueue<ObjectToPack> sizeQueue = reader.getObjectSize(
-				Arrays.<ObjectToPack> asList(list).subList(0, cnt), false);
-		try {
-			final long limit = config.getBigFileThreshold();
-			for (;;) {
-				monitor.update(1);
-
-				try {
-					if (!sizeQueue.next())
-						break;
-				} catch (MissingObjectException notFound) {
-					if (ignoreMissingUninteresting) {
-						ObjectToPack otp = sizeQueue.getCurrent();
-						if (otp != null && otp.isEdge()) {
-							otp.setDoNotDelta(true);
-							continue;
-						}
-
-						otp = edgeObjects.get(notFound.getObjectId());
-						if (otp != null) {
-							otp.setDoNotDelta(true);
-							continue;
-						}
-					}
-					throw notFound;
-				}
-
-				ObjectToPack otp = sizeQueue.getCurrent();
-				if (otp == null) {
-					otp = objectsMap.get(sizeQueue.getObjectId());
-					if (otp == null)
-						otp = edgeObjects.get(sizeQueue.getObjectId());
-				}
-
-				long sz = sizeQueue.getSize();
-				if (limit <= sz || Integer.MAX_VALUE <= sz)
-					otp.setDoNotDelta(true); // too big, avoid costly files
-
-				else if (sz <= DeltaIndex.BLKSZ)
-					otp.setDoNotDelta(true); // too small, won't work
-
-				else
-					otp.setWeight((int) sz);
+			try {
+				if (loadSize(eo))
+					list[cnt++] = eo;
+			} catch (IOException notAvailable) {
+				// Skip this object. Since we aren't going to write it out
+				// the only consequence of it being unavailable to us is we
+				// may produce a larger data stream than we could have.
+				//
+				if (!ignoreMissingUninteresting)
+					throw notAvailable;
 			}
-		} finally {
-			sizeQueue.release();
 		}
-		monitor.endTask();
+
+		monitor.beginTask(COMPRESSING_OBJECTS_PROGRESS, cnt);
 
 		// Sort the objects by path hash so like files are near each other,
 		// and then by size descending so that bigger files are first. This
@@ -616,68 +944,71 @@ public class PackWriter {
 		//
 		Arrays.sort(list, 0, cnt, new Comparator<ObjectToPack>() {
 			public int compare(ObjectToPack a, ObjectToPack b) {
-				int cmp = (a.isDoNotDelta() ? 1 : 0)
-						- (b.isDoNotDelta() ? 1 : 0);
-				if (cmp != 0)
-					return cmp;
-
-				cmp = a.getType() - b.getType();
-				if (cmp != 0)
-					return cmp;
-
-				cmp = (a.getPathHash() >>> 1) - (b.getPathHash() >>> 1);
-				if (cmp != 0)
-					return cmp;
-
-				cmp = (a.getPathHash() & 1) - (b.getPathHash() & 1);
-				if (cmp != 0)
-					return cmp;
-
-				return b.getWeight() - a.getWeight();
+				int cmp = a.getType() - b.getType();
+				if (cmp == 0)
+					cmp = (a.getPathHash() >>> 1) - (b.getPathHash() >>> 1);
+				if (cmp == 0)
+					cmp = (a.getPathHash() & 1) - (b.getPathHash() & 1);
+				if (cmp == 0)
+					cmp = b.getWeight() - a.getWeight();
+				return cmp;
 			}
 		});
-
-		// Above we stored the objects we cannot delta onto the end.
-		// Remove them from the list so we don't waste time on them.
-		while (0 < cnt && list[cnt - 1].isDoNotDelta())
-			cnt--;
-		if (cnt == 0)
-			return;
-
-		monitor.beginTask(JGitText.get().compressingObjects, cnt);
 		searchForDeltas(monitor, list, cnt);
 		monitor.endTask();
 	}
 
-	private int findObjectsNeedingDelta(ObjectToPack[] list, int cnt, int type) {
+	private int findObjectsNeedingDelta(ObjectToPack[] list, int cnt, int type)
+			throws MissingObjectException, IncorrectObjectTypeException,
+			IOException {
 		for (ObjectToPack otp : objectsLists[type]) {
 			if (otp.isDoNotDelta()) // delta is disabled for this path
 				continue;
 			if (otp.isDeltaRepresentation()) // already reusing a delta
 				continue;
-			otp.setWeight(0);
-			list[cnt++] = otp;
+			if (loadSize(otp))
+				list[cnt++] = otp;
 		}
 		return cnt;
+	}
+
+	private boolean loadSize(ObjectToPack e) throws MissingObjectException,
+			IncorrectObjectTypeException, IOException {
+		long sz = reader.getObjectSize(e, e.getType());
+
+		// If its too big for us to handle, skip over it.
+		//
+		if (bigFileThreshold <= sz || Integer.MAX_VALUE <= sz)
+			return false;
+
+		// If its too tiny for the delta compression to work, skip it.
+		//
+		if (sz <= DeltaIndex.BLKSZ)
+			return false;
+
+		e.setWeight((int) sz);
+		return true;
 	}
 
 	private void searchForDeltas(final ProgressMonitor monitor,
 			final ObjectToPack[] list, final int cnt)
 			throws MissingObjectException, IncorrectObjectTypeException,
 			LargeObjectException, IOException {
-		int threads = config.getThreads();
 		if (threads == 0)
 			threads = Runtime.getRuntime().availableProcessors();
 
-		if (threads <= 1 || cnt <= 2 * config.getDeltaSearchWindowSize()) {
-			DeltaCache dc = new DeltaCache(config);
-			DeltaWindow dw = new DeltaWindow(config, dc, reader);
+		if (threads <= 1 || cnt <= 2 * getDeltaSearchWindowSize()) {
+			DeltaCache dc = new DeltaCache(this);
+			DeltaWindow dw = new DeltaWindow(this, dc, reader);
 			dw.search(monitor, list, 0, cnt);
 			return;
 		}
 
-		final DeltaCache dc = new ThreadSafeDeltaCache(config);
+		final List<Throwable> errors = Collections
+				.synchronizedList(new ArrayList<Throwable>());
+		final DeltaCache dc = new ThreadSafeDeltaCache(this);
 		final ProgressMonitor pm = new ThreadSafeProgressMonitor(monitor);
+		final ExecutorService pool = Executors.newFixedThreadPool(threads);
 
 		// Guess at the size of batch we want. Because we don't really
 		// have a way for a thread to steal work from another thread if
@@ -685,10 +1016,9 @@ public class PackWriter {
 		// are a bit smaller.
 		//
 		int estSize = cnt / (threads * 2);
-		if (estSize < 2 * config.getDeltaSearchWindowSize())
-			estSize = 2 * config.getDeltaSearchWindowSize();
+		if (estSize < 2 * getDeltaSearchWindowSize())
+			estSize = 2 * getDeltaSearchWindowSize();
 
-		final List<DeltaTask> myTasks = new ArrayList<DeltaTask>(threads * 2);
 		for (int i = 0; i < cnt;) {
 			final int start = i;
 			final int batchSize;
@@ -713,67 +1043,39 @@ public class PackWriter {
 				batchSize = end - start;
 			}
 			i += batchSize;
-			myTasks.add(new DeltaTask(config, reader, dc, pm, batchSize, start, list));
-		}
 
-		final Executor executor = config.getExecutor();
-		final List<Throwable> errors = Collections
-				.synchronizedList(new ArrayList<Throwable>());
-		if (executor instanceof ExecutorService) {
-			// Caller supplied us a service, use it directly.
-			//
-			runTasks((ExecutorService) executor, myTasks, errors);
-
-		} else if (executor == null) {
-			// Caller didn't give us a way to run the tasks, spawn up a
-			// temporary thread pool and make sure it tears down cleanly.
-			//
-			ExecutorService pool = Executors.newFixedThreadPool(threads);
-			try {
-				runTasks(pool, myTasks, errors);
-			} finally {
-				pool.shutdown();
-				for (;;) {
+			pool.submit(new Runnable() {
+				public void run() {
 					try {
-						if (pool.awaitTermination(60, TimeUnit.SECONDS))
-							break;
-					} catch (InterruptedException e) {
-						throw new IOException(
-								JGitText.get().packingCancelledDuringObjectsWriting);
+						final ObjectReader or = reader.newReader();
+						try {
+							DeltaWindow dw;
+							dw = new DeltaWindow(PackWriter.this, dc, or);
+							dw.search(pm, list, start, batchSize);
+						} finally {
+							or.release();
+						}
+					} catch (Throwable err) {
+						errors.add(err);
 					}
 				}
-			}
-		} else {
-			// The caller gave us an executor, but it might not do
-			// asynchronous execution.  Wrap everything and hope it
-			// can schedule these for us.
-			//
-			final CountDownLatch done = new CountDownLatch(myTasks.size());
-			for (final DeltaTask task : myTasks) {
-				executor.execute(new Runnable() {
-					public void run() {
-						try {
-							task.call();
-						} catch (Throwable failure) {
-							errors.add(failure);
-						} finally {
-							done.countDown();
-						}
-					}
-				});
-			}
+			});
+		}
+
+		// Tell the pool to stop.
+		//
+		pool.shutdown();
+		for (;;) {
 			try {
-				done.await();
-			} catch (InterruptedException ie) {
-				// We can't abort the other tasks as we have no handle.
-				// Cross our fingers and just break out anyway.
-				//
+				if (pool.awaitTermination(60, TimeUnit.SECONDS))
+					break;
+			} catch (InterruptedException e) {
 				throw new IOException(
 						JGitText.get().packingCancelledDuringObjectsWriting);
 			}
 		}
 
-		// If any task threw an error, try to report it back as
+		// If any thread threw an error, try to report it back as
 		// though we weren't using a threaded search algorithm.
 		//
 		if (!errors.isEmpty()) {
@@ -791,41 +1093,21 @@ public class PackWriter {
 		}
 	}
 
-	private void runTasks(ExecutorService pool, List<DeltaTask> tasks,
-			List<Throwable> errors) throws IOException {
-		List<Future<?>> futures = new ArrayList<Future<?>>(tasks.size());
-		for (DeltaTask task : tasks)
-			futures.add(pool.submit(task));
-
-		try {
-			for (Future<?> f : futures) {
-				try {
-					f.get();
-				} catch (ExecutionException failed) {
-					errors.add(failed.getCause());
-				}
-			}
-		} catch (InterruptedException ie) {
-			for (Future<?> f : futures)
-				f.cancel(true);
-			throw new IOException(
-					JGitText.get().packingCancelledDuringObjectsWriting);
-		}
-	}
-
-	private void writeObjects(PackOutputStream out) throws IOException {
-		if (reuseSupport != null) {
-			for (List<ObjectToPack> list : objectsLists)
-				reuseSupport.writeObjects(out, list);
-		} else {
-			for (List<ObjectToPack> list : objectsLists) {
-				for (ObjectToPack otp : list)
-					out.writeObject(otp);
+	private void writeObjects(ProgressMonitor writeMonitor, PackOutputStream out)
+			throws IOException {
+		for (List<ObjectToPack> list : objectsLists) {
+			for (ObjectToPack otp : list) {
+				if (writeMonitor.isCancelled())
+					throw new IOException(
+							JGitText.get().packingCancelledDuringObjectsWriting);
+				if (!otp.isWritten())
+					writeObject(out, otp);
 			}
 		}
 	}
 
-	void writeObject(PackOutputStream out, ObjectToPack otp) throws IOException {
+	private void writeObject(PackOutputStream out, final ObjectToPack otp)
+			throws IOException {
 		if (otp.isWritten())
 			return; // We shouldn't be here.
 
@@ -898,8 +1180,7 @@ public class PackWriter {
 			MissingObjectException {
 		otp.clearDeltaBase();
 		otp.clearReuseAsIs();
-		reuseSupport.selectObjectRepresentation(this,
-				NullProgressMonitor.INSTANCE, Collections.singleton(otp));
+		reuseSupport.selectObjectRepresentation(this, otp);
 	}
 
 	private void writeWholeObjectDeflate(PackOutputStream out,
@@ -939,8 +1220,8 @@ public class PackWriter {
 
 	private TemporaryBuffer.Heap delta(final ObjectToPack otp)
 			throws IOException {
-		DeltaIndex index = new DeltaIndex(buffer(otp.getDeltaBaseId()));
-		byte[] res = buffer(otp);
+		DeltaIndex index = new DeltaIndex(buffer(reader, otp.getDeltaBaseId()));
+		byte[] res = buffer(reader, otp);
 
 		// We never would have proposed this pair if the delta would be
 		// larger than the unpacked version of the object. So using it
@@ -951,12 +1232,7 @@ public class PackWriter {
 		return delta;
 	}
 
-	private byte[] buffer(AnyObjectId objId) throws IOException {
-		return buffer(config, reader, objId);
-	}
-
-	static byte[] buffer(PackConfig config, ObjectReader or, AnyObjectId objId)
-			throws IOException {
+	byte[] buffer(ObjectReader or, AnyObjectId objId) throws IOException {
 		ObjectLoader ldr = or.open(objId);
 		if (!ldr.isLarge())
 			return ldr.getCachedBytes();
@@ -969,7 +1245,7 @@ public class PackWriter {
 		// If it really is too big to work with, abort out now.
 		//
 		long sz = ldr.getSize();
-		if (config.getBigFileThreshold() <= sz || Integer.MAX_VALUE < sz)
+		if (getBigFileThreshold() <= sz || Integer.MAX_VALUE < sz)
 			throw new LargeObjectException(objId.copy());
 
 		// Its considered to be large by the loader, but we really
@@ -996,7 +1272,7 @@ public class PackWriter {
 
 	private Deflater deflater() {
 		if (myDeflater == null)
-			myDeflater = new Deflater(config.getCompressionLevel());
+			myDeflater = new Deflater(compressionLevel);
 		return myDeflater;
 	}
 
@@ -1010,45 +1286,28 @@ public class PackWriter {
 			final Collection<? extends ObjectId> uninterestingObjects)
 			throws MissingObjectException, IOException,
 			IncorrectObjectTypeException {
-		List<ObjectId> all = new ArrayList<ObjectId>(interestingObjects.size());
-		for (ObjectId id : interestingObjects)
-			all.add(id.copy());
-
-		final Set<ObjectId> not;
-		if (uninterestingObjects != null && !uninterestingObjects.isEmpty()) {
-			not = new HashSet<ObjectId>();
-			for (ObjectId id : uninterestingObjects)
-				not.add(id.copy());
-			all.addAll(not);
-		} else
-			not = Collections.emptySet();
-
 		final ObjectWalk walker = new ObjectWalk(reader);
 		walker.setRetainBody(false);
 		walker.sort(RevSort.COMMIT_TIME_DESC);
-		if (thin && !not.isEmpty())
+		if (thin)
 			walker.sort(RevSort.BOUNDARY, true);
 
-		AsyncRevObjectQueue q = walker.parseAny(all, true);
-		try {
-			for (;;) {
+		for (ObjectId id : interestingObjects) {
+			RevObject o = walker.parseAny(id);
+			walker.markStart(o);
+		}
+		if (uninterestingObjects != null) {
+			for (ObjectId id : uninterestingObjects) {
+				final RevObject o;
 				try {
-					RevObject o = q.next();
-					if (o == null)
-						break;
-					if (not.contains(o.copy()))
-						walker.markUninteresting(o);
-					else
-						walker.markStart(o);
-				} catch (MissingObjectException e) {
-					if (ignoreMissingUninteresting
-							&& not.contains(e.getObjectId()))
+					o = walker.parseAny(id);
+				} catch (MissingObjectException x) {
+					if (ignoreMissingUninteresting)
 						continue;
-					throw e;
+					throw x;
 				}
+				walker.markUninteresting(o);
 			}
-		} finally {
-			q.release();
 		}
 		return walker;
 	}
@@ -1056,7 +1315,7 @@ public class PackWriter {
 	private void findObjectsToPack(final ProgressMonitor countingMonitor,
 			final ObjectWalk walker) throws MissingObjectException,
 			IncorrectObjectTypeException,			IOException {
-		countingMonitor.beginTask(JGitText.get().countingObjects,
+		countingMonitor.beginTask(COUNTING_OBJECTS_PROGRESS,
 				ProgressMonitor.UNKNOWN);
 		RevObject o;
 
@@ -1096,7 +1355,7 @@ public class PackWriter {
 			case Constants.OBJ_BLOB:
 				ObjectToPack otp = new ObjectToPack(object);
 				otp.setPathHash(pathHashCode);
-				otp.setEdge();
+				otp.setDoNotDelta(true);
 				edgeObjects.add(otp);
 				thin = true;
 				break;
@@ -1169,7 +1428,7 @@ public class PackWriter {
 				otp.clearDeltaBase();
 				otp.clearReuseAsIs();
 			}
-		} else if (nFmt == PACK_WHOLE && config.isReuseObjects()) {
+		} else if (nFmt == PACK_WHOLE && reuseObjects) {
 			otp.clearDeltaBase();
 			otp.setReuseAsIs();
 			otp.setWeight(nWeight);

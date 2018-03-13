@@ -231,8 +231,7 @@ class BasePackPushConnection extends BasePackConnection implements
 		List<ObjectId> newObjects = new ArrayList<ObjectId>(refUpdates.size());
 
 		final long start;
-		final PackWriter writer = new PackWriter(transport.getPackConfig(),
-				local.newObjectReader());
+		final PackWriter writer = new PackWriter(local);
 		try {
 
 			for (final Ref r : getRefs())
