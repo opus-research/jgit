@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2012, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2014, Obeo.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -52,8 +51,6 @@ import java.io.IOException;
  */
 public class FS_Win32_Java7 extends FS_Win32 {
 
-	private volatile Boolean dectedSupportSymlinks;
-
 	FS_Win32_Java7(FS src) {
 		super(src);
 	}
@@ -67,45 +64,8 @@ public class FS_Win32_Java7 extends FS_Win32 {
 	}
 
 	@Override
-	public boolean supportsExecute() {
-		return true;
-	}
-
-	@Override
-	public boolean canExecute(File f) {
-		return FileUtil.canExecute(f);
-	}
-
-	@Override
-	public boolean setExecute(File f, boolean canExecute) {
-		return FileUtil.setExecute(f, canExecute);
-	}
-
-	@Override
 	public boolean supportsSymlinks() {
-		if (dectedSupportSymlinks == null)
-			dectedSymlinkSupport();
-		return Boolean.TRUE.equals(dectedSupportSymlinks);
-	}
-
-	private void dectedSymlinkSupport() {
-		File tempFile = null;
-		try {
-			tempFile = File.createTempFile("tempsymlinktarget", ""); //$NON-NLS-1$ //$NON-NLS-2$
-			File linkName = new File(tempFile.getParentFile(), "tempsymlink"); //$NON-NLS-1$
-			FileUtil.createSymLink(linkName, tempFile.getPath());
-			dectedSupportSymlinks = Boolean.TRUE;
-			linkName.delete();
-		} catch (IOException e) {
-			dectedSupportSymlinks = Boolean.FALSE;
-		} finally {
-			if (tempFile != null)
-				try {
-					FileUtils.delete(tempFile);
-				} catch (IOException e) {
-					throw new RuntimeException(e); // panic
-				}
-		}
+		return true;
 	}
 
 	@Override
@@ -121,11 +81,6 @@ public class FS_Win32_Java7 extends FS_Win32 {
 	@Override
 	public void setLastModified(File path, long time) throws IOException {
 		FileUtil.setLastModified(path, time);
-	}
-
-	@Override
-	public void delete(File path) throws IOException {
-		FileUtil.delete(path);
 	}
 
 	@Override
@@ -166,10 +121,5 @@ public class FS_Win32_Java7 extends FS_Win32 {
 	@Override
 	public void createSymLink(File path, String target) throws IOException {
 		FileUtil.createSymLink(path, target);
-	}
-
-	@Override
-	public Attributes getAttributes(File path) {
-		return FileUtil.getFileAttributesBasic(this, path);
 	}
 }
