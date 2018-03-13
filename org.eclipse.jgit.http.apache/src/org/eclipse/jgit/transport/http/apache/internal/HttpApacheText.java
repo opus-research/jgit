@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014, SAP AG
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,78 +41,22 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.util;
+package org.eclipse.jgit.transport.http.apache.internal;
 
-import java.util.Comparator;
-import java.util.List;
+import org.eclipse.jgit.nls.NLS;
+import org.eclipse.jgit.nls.TranslationBundle;
 
 /**
- * @author keunhong
- *
- * @param <T>
+ * Translation bundle for archivers
  */
-public abstract class MinFinder<T> {
+public class HttpApacheText extends TranslationBundle {
 	/**
-	 * Lists to find minimum in
+	 * @return an instance of this translation bundle
 	 */
-	protected List<List<T>> lists;
-
-	/**
-	 * Number of elements
-	 */
-	protected int size;
-
-	/**
-	 * Comparator for finding minimum
-	 */
-	protected Comparator<T> comparator;
-
-	/**
-	 * @param lists
-	 * @param comparator
-	 * @param size
-	 */
-	public MinFinder(List<List<T>> lists, Comparator<T> comparator, int size) {
-		this.comparator = comparator;
-		this.size = size;
-		update(lists, size);
+	public static HttpApacheText get() {
+		return NLS.getBundleFor(HttpApacheText.class);
 	}
 
-	/**
-	 * @return minimum
-	 */
-	public abstract T peek();
-
-	/**
-	 * @return minimum and remove from list
-	 */
-	public abstract T pop();
-
-	/**
-	 * Updates lists
-	 *
-	 * @param lists
-	 */
-	public void update(List<List<T>> lists) {
-		update(lists, 10 * lists.size());
-	}
-
-	/**
-	 * Updates lists
-	 *
-	 * @param lists
-	 * @param size
-	 */
-	public void update(List<List<T>> lists, int size) {
-		this.lists = lists;
-		this.size = size;
-	}
-
-	/**
-	 * Clears the min finder
-	 */
-	public void clear() {
-		this.lists.clear();
-		this.size = 0;
-	}
+	// @formatter:off
+	/***/ public String unexpectedSSLContextException;
 }

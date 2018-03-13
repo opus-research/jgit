@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2014 Christian Halstrick <christian.halstrick@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,71 +40,70 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.transport.http.apache;
 
-package org.eclipse.jgit.util;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
-import java.util.Comparator;
-import java.util.Iterator;
-import java.util.List;
+import org.apache.http.HttpEntity;
+import org.apache.http.entity.AbstractHttpEntity;
+import org.eclipse.jgit.util.TemporaryBuffer;
 
 /**
- * @author keunhong
+ * A {@link HttpEntity} which takes it's content from a {@link TemporaryBuffer}
  *
- * @param <T>
+ * @since 3.3
  */
-public class LinearMinFinder<T> extends MinFinder<T> {
+public class TemporaryBufferEntity extends AbstractHttpEntity {
+	private TemporaryBuffer buffer;
+
+	private Integer contentLength;
 
 	/**
-	 * @param lists
-	 * @param comparator
-	 * @param size
+	 * Construct a new {@link HttpEntity} which will contain the content stored
+	 * in the specified buffer
+	 *
+	 * @param buffer
 	 */
-	public LinearMinFinder(List<List<T>> lists, Comparator<T> comparator,
-			int size) {
-		super(lists, comparator, size);
-	}
-
-	public T peek() {
-		List<T> minList = findMinList();
-
-		if (minList == null)
-			return null;
-
-		return minList.get(minList.size() - 1);
-	}
-
-	public T pop() {
-		List<T> minList = findMinList();
-
-		if (minList == null)
-			return null;
-
-		T retval = minList.remove(minList.size() - 1);
-		if (minList.size() <= 0)
-			lists.remove(minList);
-
-		return retval;
+	public TemporaryBufferEntity(TemporaryBuffer buffer) {
+		this.buffer = buffer;
 	}
 
 	/**
-	 * @return min list
+	 * @return buffer containing the content
 	 */
-	protected List<T> findMinList() {
-		if (lists.isEmpty()) {
-			return null;
-		}
+	public TemporaryBuffer getBuffer() {
+		return buffer;
+	}
 
-		Iterator<List<T>> it = lists.iterator();
-		List<T> minList = it.next();
-		T minValue = minList.get(minList.size() - 1);
-		while (it.hasNext()) {
-			List<T> list = it.next();
-			if (comparator.compare(minValue, list.get(list.size() - 1)) >= 0) {
-				minList = list;
-				minValue = list.get(minList.size() - 1);
-			}
-		}
+	public boolean isRepeatable() {
+		return true;
+	}
 
-		return minList;
+	public long getContentLength() {
+		if (contentLength != null)
+			return contentLength.intValue();
+		return buffer.length();
+	}
+
+	public InputStream getContent() throws IOException, IllegalStateException {
+		return buffer.openInputStream();
+	}
+
+	public void writeTo(OutputStream outstream) throws IOException {
+		// TODO: dont we need a progressmonitor
+		buffer.writeTo(outstream, null);
+	}
+
+	public boolean isStreaming() {
+		return false;
+	}
+
+	/**
+	 * @param contentLength
+	 */
+	public void setContentLength(int contentLength) {
+		this.contentLength = new Integer(contentLength);
 	}
 }
