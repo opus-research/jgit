@@ -44,6 +44,8 @@ package org.eclipse.jgit.util;
 
 import java.io.File;
 import java.nio.charset.Charset;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -56,7 +58,7 @@ abstract class FS_POSIX extends FS {
 		if (gitExe != null)
 			return gitExe.getParentFile().getParentFile();
 
-		if (SystemReader.getInstance().isMacOS()) {
+		if (isMacOS()) {
 			// On MacOSX, PATH is shorter when Eclipse is launched from the
 			// Finder than from a terminal. Therefore try to launch bash as a
 			// login shell and search using that.
@@ -84,11 +86,6 @@ abstract class FS_POSIX extends FS {
 	}
 
 	@Override
-	public boolean isCaseSensitive() {
-		return !SystemReader.getInstance().isMacOS();
-	}
-
-	@Override
 	public ProcessBuilder runInShell(String cmd, String[] args) {
 		List<String> argv = new ArrayList<String>(4 + args.length);
 		argv.add("sh");
@@ -99,5 +96,15 @@ abstract class FS_POSIX extends FS {
 		ProcessBuilder proc = new ProcessBuilder();
 		proc.command(argv);
 		return proc;
+	}
+
+	private static boolean isMacOS() {
+		final String osDotName = AccessController
+				.doPrivileged(new PrivilegedAction<String>() {
+					public String run() {
+						return System.getProperty("os.name");
+					}
+				});
+		return "Mac OS X".equals(osDotName) || "Darwin".equals(osDotName);
 	}
 }
