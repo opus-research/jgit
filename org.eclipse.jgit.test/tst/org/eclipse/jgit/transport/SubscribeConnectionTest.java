@@ -155,8 +155,9 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 		fc = db.getConfig();
 		fc.load();
 		rc = new RemoteConfig(fc, "origin");
-		rc.addFetchRefSpec(new RefSpec("refs/heads/master"));
-		rc.addFetchRefSpec(new RefSpec("refs/tags/*:refs/doesntmatter/*"));
+		rc.addFetchRefSpec(
+				new RefSpec("refs/heads/master:refs/remotes/origin/master"));
+		rc.addFetchRefSpec(new RefSpec("refs/tags/*:refs/tags/*"));
 		rc.addURI(new URIish("http://example.com/testrepository"));
 		rc.update(fc);
 		fc.save();
@@ -227,21 +228,30 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 		}
 
 		// Check subscribe output
-		assertEquals("fast-restart badtoken 0", testLineIn.readString());
-		assertEquals("repo testrepository", testLineIn.readString());
-		assertEquals("subscribe refs/heads/master", testLineIn.readString());
-		assertEquals("subscribe refs/tags/*", testLineIn.readString());
+		assertEquals("restart badtoken", testLineIn.readString());
+		assertEquals("last-pack 0", testLineIn.readString());
 		assertEquals(PacketLineIn.END, testLineIn.readString());
-		assertEquals("repo testrepository", testLineIn.readString());
-		// Ref sha1s after this
+		assertEquals("repository testrepository", testLineIn.readString());
+		assertEquals("want refs/heads/master", testLineIn.readString());
+		assertEquals("want refs/tags/*", testLineIn.readString());
+		String line;
+		while ((line = testLineIn.readString()) != PacketLineIn.END) {
+			assertTrue(line.startsWith("have "));
+		}
+		assertEquals("done", testLineIn.readString());
 	}
 
 	@Test
 	public void testCleanStart() throws Exception {
 		// Setup server response
-		publisherLineOut.writeString("fast-restart server-token");
+		publisherLineOut.writeString("restart-token server-token");
+		publisherLineOut.writeString("heartbeat-interval 10");
+		publisherLineOut.end();
+		writeHeartbeat();
 		try {
 			executeSubscribe();
+		} catch (TransportException e) {
+			throw e;
 		} catch (IOException e) {
 			// Stream timeout
 		}
@@ -250,9 +260,29 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 	}
 
 	@Test
+	public void testChangeToken() throws Exception {
+		// Setup server response
+		publisherLineOut.writeString("restart-token server-token");
+		publisherLineOut.writeString("heartbeat-interval 10");
+		publisherLineOut.end();
+		writeHeartbeat();
+		publisherLineOut.writeString("change-restart-token new-server-token");
+		try {
+			executeSubscribe();
+		} catch (TransportException e) {
+			throw e;
+		} catch (IOException e) {
+			// Stream timeout
+		}
+		assertEquals("new-server-token", subscriber.getRestartToken());
+		assertTrue(null == subscriber.getLastPackNumber());
+	}
+
+	@Test
 	public void testSingleUpdate() throws Exception {
 		// Setup server response
-		publisherLineOut.writeString("fast-restart server-token");
+		publisherLineOut.writeString("restart-token server-token");
+		publisherLineOut.writeString("heartbeat-interval 10");
 		publisherLineOut.end();
 		writeHeartbeat();
 		// Add refs/tags/pubsubtest
@@ -273,7 +303,8 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 	@Test
 	public void testMultiUpdate() throws Exception {
 		// Setup server response
-		publisherLineOut.writeString("fast-restart server-token");
+		publisherLineOut.writeString("restart-token server-token");
+		publisherLineOut.writeString("heartbeat-interval 10");
 		publisherLineOut.end();
 		// Create refs/heads/pubsub1
 		ObjectId id1 = db.getRef("refs/heads/master").getLeaf().getObjectId();
@@ -302,7 +333,6 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 
 	private void writeHeartbeat() throws IOException {
 		publisherLineOut.writeString("heartbeat");
-		publisherLineOut.end();
 	}
 
 	private void writeUpdate(
@@ -321,7 +351,6 @@ public class SubscribeConnectionTest extends SampleDataRepositoryTestCase {
 				publisherOut);
 		pw.release();
 		publisherLineOut.writeString("sequence " + sequence);
-		publisherLineOut.end();
 	}
 
 	private void executeSubscribe() throws Exception {
