@@ -348,10 +348,7 @@ java_library(
     'resources/org/eclipse/jgit/internal/JGitText.properties',
   ],
   deps = [':nls'],
-  visibility = [
-    '//org.eclipse.jgit.test:test_util',
-    '//org.eclipse.jgit.http.test:test_util',
-  ]
+  visibility = ['//org.eclipse.jgit.http.test:test_util']
 )
 
 genrule(

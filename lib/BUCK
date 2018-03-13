@@ -23,8 +23,8 @@ maven_jar(
 
 maven_jar(
   name = 'jsch',
-  id = 'com.jcraft:jsch:0.1.50',
-  sha1 = 'fae4a0b1f2a96cb8f58f38da2650814c991cea01',
+  id = 'com.jcraft:jsch:0.1.46',
+  sha1 = '0f3a38fd1d65c32bd627b1389e7181eb294cc8a8',
   license = 'BSD',
 )
 
@@ -66,7 +66,7 @@ maven_jar(
 
 maven_jar(
   name = 'xz',
-  id = 'org.tukaani:xz:1.3',
-  sha1 = '66db21c8484120cb6a51b5b3ea47b6f383942bec',
+  id = 'org.tukaani:xz:1.0',
+  sha1 = 'ecff5cb8b1189514c9d1d8d68eb77ac372e000c9',
   license = 'PublicDomain',
 )
