@@ -95,7 +95,7 @@ public class KetchPreReceive implements PreReceiveHook {
 				.setPushCertificate(rp.getPushCertificate())
 				.setAuthor(rp.getRefLogIdent())
 				.setMessage("push"); //$NON-NLS-1$
-			leader.executeAsync(proposal);
+			leader.queueProposal(proposal);
 			if (proposal.isDone()) {
 				// This failed fast, e.g. conflict or bad precondition.
 				return;

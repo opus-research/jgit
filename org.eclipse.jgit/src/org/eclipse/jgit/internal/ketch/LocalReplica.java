@@ -46,7 +46,6 @@ package org.eclipse.jgit.internal.ketch;
 import static org.eclipse.jgit.internal.ketch.KetchReplica.CommitMethod.ALL_REFS;
 import static org.eclipse.jgit.internal.ketch.KetchReplica.CommitMethod.TXN_COMMITTED;
 import static org.eclipse.jgit.lib.RefDatabase.ALL;
-import static org.eclipse.jgit.transport.ReceiveCommand.Result.NOT_ATTEMPTED;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.OK;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.REJECTED_OTHER_REASON;
 
@@ -57,7 +56,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
-import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.storage.reftree.RefTreeDatabase;
 import org.eclipse.jgit.lib.BatchRefUpdate;
 import org.eclipse.jgit.lib.NullProgressMonitor;
@@ -117,7 +115,7 @@ public class LocalReplica extends KetchReplica {
 	}
 
 	@Override
-	protected void start(final ReplicaPushRequest req) {
+	protected void startPush(final ReplicaPushRequest req) {
 		getSystem().getExecutor().execute(new Runnable() {
 			@Override
 			public void run() {
@@ -173,7 +171,7 @@ public class LocalReplica extends KetchReplica {
 		}
 		if (committed != null && method == ALL_REFS) {
 			Map<String, Ref> refs = refdb.getRefs(ALL);
-			batch.addCommand(commit(git, refs, committed.getNewId()));
+			batch.addCommand(prepareCommit(git, refs, committed.getNewId()));
 		}
 		if (accepted != null) {
 			batch.addCommand(accepted);
@@ -187,7 +185,8 @@ public class LocalReplica extends KetchReplica {
 		}
 
 		// KetchReplica only cares about accepted and committed in
-		// advertisement. If they failed, read the current value.
+		// advertisement. If they failed, store the current values
+		// back in the ReplicaPushRequest.
 		List<String> failed = new ArrayList<>(2);
 		checkFailed(failed, accepted);
 		checkFailed(failed, committed);
@@ -214,19 +213,10 @@ public class LocalReplica extends KetchReplica {
 						MessageFormat.format(
 								KetchText.get().outsideTxnNamespace,
 								cmd.getRefName(), txnNamespace));
-				abort(cmdList);
+				ReceiveCommand.abort(cmdList);
 				return false;
 			}
 		}
 		return true;
-	}
-
-	private static void abort(Collection<ReceiveCommand> cmdList) {
-		for (ReceiveCommand c : cmdList) {
-			if (c.getResult() == NOT_ATTEMPTED) {
-				c.setResult(REJECTED_OTHER_REASON,
-						JGitText.get().transactionAborted);
-			}
-		}
 	}
 }

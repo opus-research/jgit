@@ -46,7 +46,7 @@ package org.eclipse.jgit.internal.ketch;
 import org.eclipse.jgit.lib.ObjectId;
 
 /**
- * Snapshot of a replica.
+ * A snapshot of a replica.
  *
  * @see LeaderSnapshot
  */

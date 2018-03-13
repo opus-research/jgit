@@ -67,14 +67,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Leader managing consensus across remote followers.
+ * A leader managing consensus across remote followers.
  * <p>
  * A leader instance starts up in {@link State#CANDIDATE} and tries to begin a
  * new term by sending an {@link ElectionRound} to all replicas. Its term starts
  * if a majority of replicas have accepted this leader instance for the term.
  * <p>
  * Once elected by a majority the instance enters {@link State#LEADER} and runs
- * proposals offered to {@link #executeAsync(Proposal)}. This continues until
+ * proposals offered to {@link #queueProposal(Proposal)}. This continues until
  * the leader is timed out for inactivity, or is deposed by a competing leader
  * gaining its own majority.
  * <p>
@@ -84,6 +84,33 @@ import org.slf4j.LoggerFactory;
  * Each leader instance coordinates a group of {@link KetchReplica}s. Replica
  * instances are owned by the leader instance and must be discarded when the
  * leader is discarded.
+ * <p>
+ * In Ketch all push requests are issued through the leader. The steps are as
+ * follows (see {@link KetchPreReceive} for an example):
+ * <ul>
+ * <li>Create a {@link Proposal} with the
+ * {@link org.eclipse.jgit.transport.ReceiveCommand}s that represent the push.
+ * <li>Invoke {@link #queueProposal(Proposal)} on the leader instance.
+ * <li>Wait for consensus with {@link Proposal#await()}.
+ * <li>To examine the status of the push, check {@link Proposal#getCommands()},
+ * looking at
+ * {@link org.eclipse.jgit.internal.storage.reftree.Command#getResult()}.
+ * </ul>
+ * <p>
+ * The leader gains consensus by first pushing the needed objects and a
+ * {@link RefTree} representing the desired target repository state to the
+ * {@code refs/txn/accepted} branch on each of the replicas. Once a majority has
+ * succeeded, the leader commits the state by either pushing the
+ * {@code refs/txn/accepted} value to {@code refs/txn/committed} (for
+ * Ketch-aware replicas) or by pushing updates to {@code refs/heads/master},
+ * etc. for stock Git replicas.
+ * <p>
+ * Internally, the actual transport to replicas is performed on background
+ * threads via the {@link KetchSystem}'s executor service. For performance, the
+ * {@link KetchLeader}, {@link KetchReplica} and {@link Proposal} objects share
+ * some state, and may invoke each other's methods on different threads. This
+ * access is protected by the leader's {@link #lock} object. Care must be taken
+ * to prevent concurrent access by correctly obtaining the leader's lock.
  */
 public abstract class KetchLeader {
 	private static final Logger log = LoggerFactory.getLogger(KetchLeader.class);
@@ -124,28 +151,37 @@ public abstract class KetchLeader {
 	/**
 	 * State of the repository's RefTree after applying all entries in
 	 * {@link #queued}. New proposals must be consistent with this tree to be
-	 * appended to the end of {@code queued}.
+	 * appended to the end of {@link #queued}.
+	 * <p>
+	 * Must be deep-copied with {@link RefTree#copy()} if
+	 * {@link #roundHoldsReferenceToRefTree} is {@code true}.
 	 */
 	private RefTree refTree;
 
 	/**
-	 * If true {@link #refTree} must be duplicated before queuing the next
-	 * proposal. This is set {@code true} when a proposal begins execution and
-	 * {@code false} once tree objects are persisted in the local repository.
+	 * If {@code true} {@link #refTree} must be duplicated before queuing the
+	 * next proposal. The {@link #refTree} was passed into the constructor of a
+	 * {@link ProposalRound}, and that external reference to the {@link RefTree}
+	 * object is held by the proposal until it materializes the tree object in
+	 * the object store. This field is set {@code true} when the proposal begins
+	 * execution and set {@code false} once tree objects are persisted in the
+	 * local repository's object store or {@link #refTree} is replaced with a
+	 * copy to isolate it from any running rounds
 	 * <p>
 	 * If proposals arrive less frequently than the {@code RefTree} is written
-	 * out to the repository the {@code copyOnQueue} behavior avoids duplicating
-	 * {@code refTree}, reducing both time and memory used. However if proposals
-	 * arrive more frequently {@link #refTree} must be duplicated to prevent
-	 * newly queued proposals from corrupting the {@link #runningRound}.
+	 * out to the repository the {@link #roundHoldsReferenceToRefTree} behavior
+	 * avoids duplicating {@link #refTree}, reducing both time and memory used.
+	 * However if proposals arrive more frequently {@link #refTree} must be
+	 * duplicated to prevent newly queued proposals from corrupting the
+	 * {@link #runningRound}.
 	 */
-	volatile boolean copyOnQueue;
+	volatile boolean roundHoldsReferenceToRefTree;
 
-	/** Top of the leader's log. */
-	private LogId head;
+	/** End of the leader's log. */
+	private LogIndex head;
 
 	/** Leader knows this (and all prior) states are committed. */
-	private LogId committed;
+	private LogIndex committed;
 
 	/**
 	 * A {@link Round} is in progress, attempting to push one or more
@@ -249,11 +285,11 @@ public abstract class KetchLeader {
 	protected abstract Repository openRepository() throws IOException;
 
 	/**
-	 * Queue a reference update proposal for later consensus.
+	 * Queue a reference update proposal for consensus.
 	 * <p>
 	 * This method does not wait for consensus to be reached. The proposal is
-	 * preflighted to look for risks of conflicts, and then submitted into the
-	 * queue for a future execution round.
+	 * checked to look for risks of conflicts, and then submitted into the queue
+	 * for distribution as soon as possible.
 	 * <p>
 	 * Callers must use {@link Proposal#await()} to see if the proposal is done.
 	 *
@@ -268,7 +304,7 @@ public abstract class KetchLeader {
 	 *             unrecoverable error preventing proposals from being attempted
 	 *             by this leader.
 	 */
-	public void executeAsync(Proposal proposal)
+	public void queueProposal(Proposal proposal)
 			throws InterruptedException, IOException {
 		try {
 			lock.lockInterruptibly();
@@ -282,9 +318,9 @@ public abstract class KetchLeader {
 				for (Proposal p : queued) {
 					refTree.apply(p.getCommands());
 				}
-			} else if (copyOnQueue) {
+			} else if (roundHoldsReferenceToRefTree) {
 				refTree = refTree.copy();
-				copyOnQueue = false;
+				roundHoldsReferenceToRefTree = false;
 			}
 
 			if (!refTree.apply(proposal.getCommands())) {
@@ -311,10 +347,10 @@ public abstract class KetchLeader {
 			ObjectId accepted = self.getTxnAccepted();
 			if (!ObjectId.zeroId().equals(accepted)) {
 				RevCommit c = rw.parseCommit(accepted);
-				head = LogId.unknown(accepted);
+				head = LogIndex.unknown(accepted);
 				refTree = RefTree.read(rw.getObjectReader(), c.getTree());
 			} else {
-				head = LogId.unknown(ObjectId.zeroId());
+				head = LogIndex.unknown(ObjectId.zeroId());
 				refTree = RefTree.newEmptyTree();
 			}
 		}
@@ -373,10 +409,10 @@ public abstract class KetchLeader {
 		queued.clear();
 
 		if (todo.size() == 1) {
-			copyOnQueue = true;
+			roundHoldsReferenceToRefTree = true;
 			return new ProposalRound(this, head, todo, refTree);
 		} else {
-			copyOnQueue = false;
+			roundHoldsReferenceToRefTree = false;
 			return new ProposalRound(this, head, todo, null);
 		}
 	}
@@ -387,14 +423,14 @@ public abstract class KetchLeader {
 	}
 
 	/** @return top of the leader's log. */
-	LogId getHead() {
+	LogIndex getHead() {
 		return head;
 	}
 
 	/**
 	 * @return state leader knows it has committed across a quorum of replicas.
 	 */
-	LogId getCommitted() {
+	LogIndex getCommitted() {
 		return committed;
 	}
 
@@ -408,14 +444,14 @@ public abstract class KetchLeader {
 			// Top of the log is this round. Once transport begins it is
 			// reasonable to assume at least one replica will eventually get
 			// this, and there is reasonable probability it commits.
-			head = round.acceptedNew;
+			head = round.acceptedNewIndex;
 			runningRound = round;
 
 			for (KetchReplica r : voters) {
-				r.acceptAsync(round);
+				r.pushTxnAcceptedAsync(round);
 			}
 			for (KetchReplica r : followers) {
-				r.acceptAsync(round);
+				r.pushTxnAcceptedAsync(round);
 			}
 		} finally {
 			lock.unlock();
@@ -444,7 +480,7 @@ public abstract class KetchLeader {
 			return;
 		}
 
-		assert head.equals(runningRound.acceptedNew);
+		assert head.equals(runningRound.acceptedNewIndex);
 		int matching = 0;
 		for (KetchReplica r : voters) {
 			if (r.hasAccepted(head)) {
@@ -485,16 +521,16 @@ public abstract class KetchLeader {
 	}
 
 	private void commitAsync(KetchReplica caller) {
-		LogId c = committed;
+		LogIndex c = committed;
 		boolean idle = isIdle();
 		for (KetchReplica r : voters) {
 			if (r != caller && r.hasAccepted(c)) {
-				r.commitAsync(c, idle);
+				r.pushCommitAsync(c, idle);
 			}
 		}
 		for (KetchReplica r : followers) {
 			if (r != caller && r.hasAccepted(c)) {
-				r.commitAsync(c, idle);
+				r.pushCommitAsync(c, idle);
 			}
 		}
 	}
