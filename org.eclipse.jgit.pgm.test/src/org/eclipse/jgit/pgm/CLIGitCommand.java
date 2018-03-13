@@ -43,7 +43,6 @@
 package org.eclipse.jgit.pgm;
 
 import java.io.ByteArrayOutputStream;
-import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -92,8 +91,7 @@ public class CLIGitCommand {
 			cmd.execute(bean.getArguments().toArray(
 					new String[bean.getArguments().size()]));
 		} catch (Die e) {
-			return IO.readLines(MessageFormat.format(CLIText.get().fatalError,
-					e.getMessage()));
+			return IO.readLines(e.getMessage());
 		} finally {
 			if (cmd.outw != null)
 				cmd.outw.flush();

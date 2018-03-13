@@ -66,7 +66,6 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.notes.NoteMap;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
@@ -80,7 +79,8 @@ class Log extends RevWalkTextBuiltin {
 	private GitDateFormatter dateFormatter = new GitDateFormatter(
 			Format.DEFAULT);
 
-	private DiffFormatter diffFmt;
+	private final DiffFormatter diffFmt = new DiffFormatter( //
+			new BufferedOutputStream(outs));
 
 	private Map<AnyObjectId, Set<Ref>> allRefsByPeeledObjectId;
 
@@ -180,12 +180,6 @@ class Log extends RevWalkTextBuiltin {
 
 	Log() {
 		dateFormatter = new GitDateFormatter(Format.DEFAULT);
-	}
-
-	@Override
-	protected void init(final Repository repository, final String gitDir) {
-		super.init(repository, gitDir);
-		diffFmt = new DiffFormatter(new BufferedOutputStream(outs));
 	}
 
 	@Override

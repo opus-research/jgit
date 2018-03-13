@@ -51,13 +51,15 @@ import org.eclipse.jgit.api.errors.CheckoutConflictException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.dircache.DirCacheBuildIterator;
-import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheCheckout;
+import org.eclipse.jgit.dircache.DirCacheEditor;
+import org.eclipse.jgit.dircache.DirCacheEditor.DeletePath;
+import org.eclipse.jgit.dircache.DirCacheEditor.PathEdit;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
@@ -274,30 +276,44 @@ public class ResetCommand extends GitCommand<Ref> {
 
 	private void resetIndexForPaths(RevCommit commit) {
 		DirCache dc = null;
+		final DirCacheEditor edit;
 		try {
 			dc = repo.lockDirCache();
-			DirCacheBuilder builder = dc.builder();
+			edit = dc.editor();
 
 			final TreeWalk tw = new TreeWalk(repo);
-			tw.addTree(new DirCacheBuildIterator(builder));
+			tw.addTree(new DirCacheIterator(dc));
 			tw.addTree(commit.getTree());
 			tw.setFilter(PathFilterGroup.createFromStrings(filepaths));
 			tw.setRecursive(true);
 
 			while (tw.next()) {
+				final String path = tw.getPathString();
+				// DirCacheIterator dci = tw.getTree(0, DirCacheIterator.class);
 				final CanonicalTreeParser tree = tw.getTree(1,
 						CanonicalTreeParser.class);
-				// only keep file in index if it's in the commit
-				if (tree != null) {
-				    // revert index to commit
-					DirCacheEntry entry = new DirCacheEntry(tw.getRawPath());
-					entry.setFileMode(tree.getEntryFileMode());
-					entry.setObjectId(tree.getEntryObjectId());
-					builder.add(entry);
+				if (tree == null)
+					// file is not in the commit, remove from index
+					edit.add(new DirCacheEditor.DeletePath(path));
+				else { // revert index to commit
+					// it seams that there is concurrent access to tree
+					// variable, therefore we need to keep references to
+					// entryFileMode and entryObjectId in local
+					// variables
+					final FileMode entryFileMode = tree.getEntryFileMode();
+					final ObjectId entryObjectId = tree.getEntryObjectId();
+					edit.add(new DirCacheEditor.PathEdit(path) {
+						@Override
+						public void apply(DirCacheEntry ent) {
+							ent.setFileMode(entryFileMode);
+							ent.setObjectId(entryObjectId);
+							ent.setLastModified(0);
+						}
+					});
 				}
 			}
 
-			builder.commit();
+			edit.commit();
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		} finally {
@@ -310,7 +326,7 @@ public class ResetCommand extends GitCommand<Ref> {
 		DirCache dc = repo.lockDirCache();
 		TreeWalk walk = null;
 		try {
-			DirCacheBuilder builder = dc.builder();
+			DirCacheEditor editor = dc.editor();
 
 			walk = new TreeWalk(repo);
 			walk.addTree(commit.getTree());
@@ -321,7 +337,7 @@ public class ResetCommand extends GitCommand<Ref> {
 				AbstractTreeIterator cIter = walk.getTree(0,
 						AbstractTreeIterator.class);
 				if (cIter == null) {
-					// Not in commit, don't add to new index
+					editor.add(new DeletePath(walk.getPathString()));
 					continue;
 				}
 
@@ -337,10 +353,16 @@ public class ResetCommand extends GitCommand<Ref> {
 					entry.setLength(indexEntry.getLength());
 				}
 
-				builder.add(entry);
+				editor.add(new PathEdit(entry) {
+
+					@Override
+					public void apply(DirCacheEntry ent) {
+						ent.copyMetaData(entry);
+					}
+				});
 			}
 
-			builder.commit();
+			editor.commit();
 		} finally {
 			dc.unlock();
 			if (walk != null)
