@@ -332,17 +332,15 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 
 		OBJECT_SCAN: for (Iterator<T> it = pending.iterator(); it.hasNext();) {
 			T t = it.next();
-			if (!skipGarbagePack(lastPack)) {
-				try {
-					long p = lastPack.findOffset(this, t);
-					if (0 < p) {
-						r.add(new FoundObject<T>(t, lastIdx, lastPack, p));
-						it.remove();
-						continue;
-					}
-				} catch (IOException e) {
-					// Fall though and try to examine other packs.
+			try {
+				long p = lastPack.findOffset(this, t);
+				if (0 < p) {
+					r.add(new FoundObject<T>(t, lastIdx, lastPack, p));
+					it.remove();
+					continue;
 				}
+			} catch (IOException e) {
+				// Fall though and try to examine other packs.
 			}
 
 			for (int i = 0; i < packs.length; i++) {
