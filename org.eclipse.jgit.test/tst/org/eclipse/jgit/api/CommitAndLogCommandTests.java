@@ -43,18 +43,13 @@
 package org.eclipse.jgit.api;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.text.MessageFormat;
-import java.util.Iterator;
 
-import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
@@ -75,6 +70,7 @@ import org.eclipse.jgit.util.FileUtils;
 import org.junit.Test;
 
 public class CommitAndLogCommandTests extends RepositoryTestCase {
+	@Test
 	public void testSomeCommits() throws NoHeadException, NoMessageException,
 			UnmergedPathException, ConcurrentRefUpdateException,
 			JGitInternalException, WrongRepositoryStateException {
@@ -109,6 +105,7 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 	}
 
 	// try to do a commit without specifying a message. Should fail!
+	@Test
 	public void testWrongParams() throws UnmergedPathException,
 			NoHeadException, ConcurrentRefUpdateException,
 			JGitInternalException, WrongRepositoryStateException {
@@ -123,6 +120,7 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 
 	// try to work with Commands after command has been invoked. Should throw
 	// exceptions
+	@Test
 	public void testMultipleInvocations() throws NoHeadException,
 			ConcurrentRefUpdateException, NoMessageException,
 			UnmergedPathException, JGitInternalException,
@@ -148,6 +146,7 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 		}
 	}
 
+	@Test
 	public void testMergeEmptyBranches() throws IOException, NoHeadException,
 			NoMessageException, ConcurrentRefUpdateException,
 			JGitInternalException, WrongRepositoryStateException {
@@ -171,6 +170,7 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 		assertTrue(parents.length==2);
 	}
 
+	@Test
 	public void testAddUnstagedChanges() throws IOException, NoHeadException,
 			NoMessageException, ConcurrentRefUpdateException,
 			JGitInternalException, WrongRepositoryStateException,
@@ -203,6 +203,7 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 				tw.getObjectId(0).getName());
 	}
 
+	@Test
 	public void testCommitRange() throws NoHeadException, NoMessageException,
 			UnmergedPathException, ConcurrentRefUpdateException,
 			JGitInternalException, WrongRepositoryStateException,
@@ -239,141 +240,19 @@ public class CommitAndLogCommandTests extends RepositoryTestCase {
 	}
 
 	@Test
-	public void testOnlyOptionWithTrackedFile() throws IOException,
-			NoFilepatternException, NoHeadException, NoMessageException,
-			ConcurrentRefUpdateException, JGitInternalException,
-			WrongRepositoryStateException {
-		final File fileA = new File(db.getWorkTree(), "a.txt");
-		FileUtils.createNewFile(fileA);
-		PrintWriter writer = new PrintWriter(fileA);
-		writer.print("contentA");
-		writer.close();
+	public void testCommitAmend() throws NoHeadException, NoMessageException,
+			UnmergedPathException, ConcurrentRefUpdateException,
+			JGitInternalException, WrongRepositoryStateException {
+		Git git = new Git(db);
+		git.commit().setMessage("first comit").call(); // typo
+		git.commit().setAmend(true).setMessage("first commit").call();
 
-		final File fileB = new File(db.getWorkTree(), "b.txt");
-		FileUtils.createNewFile(fileB);
-		writer = new PrintWriter(fileB);
-		writer.print("contentB");
-		writer.close();
-
-		final Git git = new Git(db);
-		git.add().addFilepattern(".").call();
-
-		// index shall contain a.txt and b.txt
-		assertEquals("[a.txt, mode:100644, content:contentA]"
-				+ "[b.txt, mode:100644, content:contentB]", indexState(CONTENT));
-
-		// commit -o b.txt
-		git.commit().setOnly("b.txt").setMessage("commit").call();
-
-		final Iterator<RevCommit> commits = git.log().call().iterator();
-		final TreeWalk walk = new TreeWalk(git.getRepository());
-		walk.addTree(commits.next().getTree());
-
-		// there shall be only one commit in the log
-		assertFalse(commits.hasNext());
-
-		// b.txt shall be committed
-		assertTrue(walk.next());
-		assertEquals("b.txt", walk.getNameString());
-
-		// a.txt shall not be committed
-		assertFalse(walk.next());
-
-		// index shall contain a.txt
-		assertEquals("[a.txt, mode:100644, content:contentA]",
-				indexState(CONTENT));
-	}
-
-	@Test
-	@SuppressWarnings("null")
-	public void testOnlyOptionWithUntrackedFile() throws IOException,
-			NoFilepatternException, NoHeadException, NoMessageException,
-			ConcurrentRefUpdateException, JGitInternalException,
-			WrongRepositoryStateException {
-		final File fileA = new File(db.getWorkTree(), "a.txt");
-		FileUtils.createNewFile(fileA);
-		PrintWriter writer = new PrintWriter(fileA);
-		writer.print("contentA");
-		writer.close();
-
-		final Git git = new Git(db);
-		git.add().addFilepattern(".").call();
-
-		final File fileB = new File(db.getWorkTree(), "b.txt");
-		FileUtils.createNewFile(fileB);
-		writer = new PrintWriter(fileB);
-		writer.print("contentB");
-		writer.close();
-
-		// index shall contain a.txt
-		assertEquals("[a.txt, mode:100644, content:contentA]",
-				indexState(CONTENT));
-
-		JGitInternalException exception = null;
-		try {
-			// commit -o b.txt
-			git.commit().setOnly("b.txt").setMessage("first commit").call();
-		} catch (JGitInternalException e) {
-			exception = e;
+		Iterable<RevCommit> commits = git.log().call();
+		int c = 0;
+		for (RevCommit commit : commits) {
+			assertEquals("first commit", commit.getFullMessage());
+			c++;
 		}
-		// an exception shall be thrown by the commit command
-		assertNotNull(exception);
-		assertEquals(MessageFormat.format(JGitText.get().entryNotFoundByPath,
-				"b.txt"), exception.getMessage());
-
-		// index shall only contain a.txt
-		assertEquals("[a.txt, mode:100644, content:contentA]",
-				indexState(CONTENT));
-	}
-
-	@Test
-	public void testOnlyOptionWithModifiedFile() throws IOException,
-			NoFilepatternException, NoHeadException, NoMessageException,
-			ConcurrentRefUpdateException, JGitInternalException,
-			WrongRepositoryStateException {
-		final File fileA = new File(db.getWorkTree(), "a.txt");
-		FileUtils.createNewFile(fileA);
-		PrintWriter writer = new PrintWriter(fileA);
-		writer.print("contentA");
-		writer.close();
-
-		final File fileB = new File(db.getWorkTree(), "b.txt");
-		FileUtils.createNewFile(fileB);
-		writer = new PrintWriter(fileB);
-		writer.print("contentB");
-		writer.close();
-
-		final Git git = new Git(db);
-		git.add().addFilepattern(".").call();
-
-		writer = new PrintWriter(fileB);
-		writer.print("modified contentB");
-		writer.close();
-
-		// index shall contain a.txt and b.txt
-		assertEquals("[a.txt, mode:100644, content:contentA]"
-				+ "[b.txt, mode:100644, content:contentB]", indexState(CONTENT));
-
-		// commit -o b.txt
-		git.commit().setOnly("b.txt").setMessage("first commit").call();
-
-		final Iterator<RevCommit> commits = git.log().call().iterator();
-		final TreeWalk walk = new TreeWalk(git.getRepository());
-		walk.addTree(commits.next().getTree());
-
-		// there shall be only one commit in the log
-		assertFalse(commits.hasNext());
-
-		// b.txt shall be committed
-		assertTrue(walk.next());
-		assertEquals("b.txt", walk.getNameString());
-		assertEquals("modified contentB", read(fileB));
-
-		// a.txt shall not be committed
-		assertFalse(walk.next());
-
-		// index shall only contain a.txt
-		assertEquals("[a.txt, mode:100644, content:contentA]",
-				indexState(CONTENT));
+		assertEquals(1, c);
 	}
 }

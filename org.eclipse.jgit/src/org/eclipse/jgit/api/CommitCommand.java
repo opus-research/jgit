@@ -44,7 +44,6 @@ package org.eclipse.jgit.api;
 
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -56,10 +55,6 @@ import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.api.errors.NoMessageException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.dircache.DirCacheBuilder;
-import org.eclipse.jgit.dircache.DirCacheEditor;
-import org.eclipse.jgit.dircache.DirCacheEditor.DeletePath;
-import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.errors.UnmergedPathException;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
@@ -92,7 +87,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 
 	private boolean all;
 
-	private List<String> only = new ArrayList<String>();
+	private boolean amend;
 
 	/**
 	 * parents this commit should have. The current HEAD will be in this list
@@ -162,40 +157,19 @@ public class CommitCommand extends GitCommand<RevCommit> {
 			// determine the current HEAD and the commit it is referring to
 			ObjectId headId = repo.resolve(Constants.HEAD + "^{commit}");
 			if (headId != null)
-				parents.add(0, headId);
+				if (amend) {
+					RevCommit previousCommit = new RevWalk(repo)
+							.parseCommit(headId);
+					RevCommit[] p = previousCommit.getParents();
+					for (int i = 0; i < p.length; i++)
+						parents.add(0, p[i].getId());
+				} else {
+					parents.add(0, headId);
+				}
 
 			// lock the index
 			DirCache index = repo.lockDirCache();
 			try {
-				if (only != null && !only.isEmpty()) {
-					// get editor for DirCache
-					DirCacheEditor editor = index.editor();
-
-					// get second, in-core DirCache and corresponding builder
-					DirCache onlyIndex = DirCache.newInCore();
-					DirCacheBuilder builder = onlyIndex.builder();
-
-					for (String s : only) {
-						DirCacheEntry entry = index.getEntry(s);
-						if (entry == null)
-							throw new JGitInternalException(
-									MessageFormat.format(
-											JGitText.get().entryNotFoundByPath,
-											s));
-						// delete entry from DirCache
-						editor.add(new DeletePath(entry));
-						// add entry to second, in-core DirCache
-						builder.add(entry);
-					}
-					// write DirCache and release lock
-					editor.commit();
-					// finish second, in-core DirCache
-					builder.finish();
-
-					// use second, in-core DirCache for updating
-					index = onlyIndex;
-				}
-
 				ObjectInserter odi = repo.newObjectInserter();
 				try {
 					// Write the index as tree to the object database. This may
@@ -223,9 +197,10 @@ public class CommitCommand extends GitCommand<RevCommit> {
 								+ revCommit.getShortMessage(), false);
 
 						ru.setExpectedOldObjectId(headId);
-						Result rc = ru.update();
+						Result rc = ru.forceUpdate();
 						switch (rc) {
 						case NEW:
+						case FORCED:
 						case FAST_FORWARD: {
 							setCallable(false);
 							if (state == RepositoryState.MERGING_RESOLVED) {
@@ -424,17 +399,16 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	}
 
 	/**
-	 * Commit dedicated path only
+	 * Used to amend the tip of the current branch. If set to true, the previous
+	 * commit will be amended. This is equivalent to --amend on the command
+	 * line.
 	 *
-	 * This method can be called several times to add multiple paths.
-	 *
-	 * @param only
-	 *            path to commit
+	 * @param amend
 	 * @return {@code this}
 	 */
-	public CommitCommand setOnly(String only) {
-		checkCallable();
-		this.only.add(only);
+	public CommitCommand setAmend(boolean amend) {
+		this.amend = amend;
 		return this;
 	}
+
 }
