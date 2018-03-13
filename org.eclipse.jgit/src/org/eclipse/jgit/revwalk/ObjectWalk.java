@@ -91,8 +91,7 @@ public class ObjectWalk extends RevWalk {
 
 	private List<RevObject> rootObjects;
 
-	/** A queue of objects to try to produce */
-	protected BlockObjQueue pendingObjects;
+	private BlockObjQueue pendingObjects;
 
 	/** The tree currently being walked */
 	protected RevTree currentTree;
