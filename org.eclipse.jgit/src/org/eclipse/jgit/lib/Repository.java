@@ -727,7 +727,7 @@ public abstract class Repository implements AutoCloseable {
 			return ObjectId.fromString(revstr);
 
 		if (Repository.isValidRefName("x/" + revstr)) { //$NON-NLS-1$
-			Ref r = getRefDatabase().findRef(revstr);
+			Ref r = getRefDatabase().getRef(revstr);
 			if (r != null)
 				return r.getObjectId();
 		}
@@ -849,8 +849,9 @@ public abstract class Repository implements AutoCloseable {
 	 * Except when HEAD is detached, in which case this method returns the
 	 * current ObjectId in hexadecimal string format.
 	 *
-	 * @return name of current branch (for example {@code refs/heads/master}) or
-	 *         an ObjectId in hex format if the current branch is detached.
+	 * @return name of current branch (for example {@code refs/heads/master}),
+	 *         an ObjectId in hex format if the current branch is detached,
+	 *         or null if the repository is corrupt and has no HEAD reference.
 	 * @throws IOException
 	 */
 	public String getFullBranch() throws IOException {
@@ -871,8 +872,9 @@ public abstract class Repository implements AutoCloseable {
 	 * leading prefix {@code refs/heads/} is removed from the reference before
 	 * it is returned to the caller.
 	 *
-	 * @return name of current branch (for example {@code master}), or an
-	 *         ObjectId in hex format if the current branch is detached.
+	 * @return name of current branch (for example {@code master}), an
+	 *         ObjectId in hex format if the current branch is detached,
+	 *         or null if the repository is corrupt and has no HEAD reference.
 	 * @throws IOException
 	 */
 	public String getBranch() throws IOException {
@@ -905,41 +907,9 @@ public abstract class Repository implements AutoCloseable {
 	 *            "refs/heads/master" if "refs/heads/master" already exists.
 	 * @return the Ref with the given name, or null if it does not exist
 	 * @throws IOException
-	 * @deprecated Use {@link #exactRef} or {@link #findRef} instead.
 	 */
-	@Deprecated
 	public Ref getRef(final String name) throws IOException {
-		return getRefDatabase().findRef(name);
-	}
-
-	/**
-	 * Get a ref by name.
-	 *
-	 * @param name
-	 *            the name of the ref to lookup. Must not be a short-hand
-	 *            form; e.g., "master" is not automatically expanded to
-	 *            "refs/heads/master".
-	 * @return the Ref with the given name, or null if it does not exist
-	 * @throws IOException
-	 * @since 4.1
-	 */
-	public Ref exactRef(String name) throws IOException {
-		return getRefDatabase().exactRef(name);
-	}
-
-	/**
-	 * Search for a ref by (possibly abbreviated) name.
-	 *
-	 * @param name
-	 *            the name of the ref to lookup. May be a short-hand form, e.g.
-	 *            "master" which is is automatically expanded to
-	 *            "refs/heads/master" if "refs/heads/master" already exists.
-	 * @return the Ref with the given name, or null if it does not exist
-	 * @throws IOException
-	 * @since 4.1
-	 */
-	public Ref findRef(String name) throws IOException {
-		return getRefDatabase().findRef(name);
+		return getRefDatabase().getRef(name);
 	}
 
 	/**

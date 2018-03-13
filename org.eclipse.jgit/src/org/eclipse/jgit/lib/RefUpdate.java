@@ -52,6 +52,7 @@ import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.transport.PushCertificate;
 
 /**
  * Creates, updates or deletes any reference.
@@ -164,6 +165,9 @@ public abstract class RefUpdate {
 
 	/** Result of the update operation. */
 	private Result result = Result.NOT_ATTEMPTED;
+
+	/** Push certificate associated with this update. */
+	private PushCertificate pushCert;
 
 	private final Ref ref;
 
@@ -414,6 +418,31 @@ public abstract class RefUpdate {
 	}
 
 	/**
+	 * Set a push certificate associated with this update.
+	 * <p>
+	 * This usually includes a command to update this ref, but is not required to.
+	 *
+	 * @param cert
+	 *            push certificate, may be null.
+	 * @since 4.1
+	 */
+	public void setPushCertificate(PushCertificate cert) {
+		pushCert = cert;
+	}
+
+	/**
+	 * Set the push certificate associated with this update.
+	 * <p>
+	 * This usually includes a command to update this ref, but is not required to.
+	 *
+	 * @return push certificate, may be null.
+	 * @since 4.1
+	 */
+	protected PushCertificate getPushCertificate() {
+		return pushCert;
+	}
+
+	/**
 	 * Get the status of this update.
 	 * <p>
 	 * The same value that was previously returned from an update method.
@@ -524,7 +553,7 @@ public abstract class RefUpdate {
 	public Result delete(final RevWalk walk) throws IOException {
 		final String myName = getRef().getLeaf().getName();
 		if (myName.startsWith(Constants.R_HEADS)) {
-			Ref head = getRefDatabase().exactRef(Constants.HEAD);
+			Ref head = getRefDatabase().getRef(Constants.HEAD);
 			while (head != null && head.isSymbolic()) {
 				head = head.getTarget();
 				if (myName.equals(head.getName()))
@@ -566,7 +595,7 @@ public abstract class RefUpdate {
 			if (!tryLock(false))
 				return Result.LOCK_FAILURE;
 
-			final Ref old = getRefDatabase().exactRef(getName());
+			final Ref old = getRefDatabase().getRef(getName());
 			if (old != null && old.isSymbolic()) {
 				final Ref dst = old.getTarget();
 				if (target.equals(dst.getName()))
@@ -576,7 +605,7 @@ public abstract class RefUpdate {
 			if (old != null && old.getObjectId() != null)
 				setOldObjectId(old.getObjectId());
 
-			final Ref dst = getRefDatabase().exactRef(target);
+			final Ref dst = getRefDatabase().getRef(target);
 			if (dst != null && dst.getObjectId() != null)
 				setNewObjectId(dst.getObjectId());
 

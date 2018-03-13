@@ -98,6 +98,8 @@ import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.RefList;
 import org.eclipse.jgit.util.RefMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Traditional file system based {@link RefDatabase}.
@@ -115,6 +117,9 @@ import org.eclipse.jgit.util.RefMap;
  * overall size of a Git repository on disk.
  */
 public class RefDirectory extends RefDatabase {
+	private final static Logger LOG = LoggerFactory
+			.getLogger(RefDirectory.class);
+
 	/** Magic string denoting the start of a symbolic reference file. */
 	public static final String SYMREF = "ref: "; //$NON-NLS-1$
 
@@ -256,45 +261,49 @@ public class RefDirectory extends RefDatabase {
 		return loose;
 	}
 
-	@Override
-	public Ref exactRef(String name) throws IOException {
-		RefList<Ref> packed = getPackedRefs();
-		Ref ref = null;
+	private Ref readAndResolve(String name, RefList<Ref> packed) throws IOException {
 		try {
-			ref = readRef(name, packed);
+			Ref ref = readRef(name, packed);
 			if (ref != null) {
 				ref = resolve(ref, 0, null, null, packed);
 			}
+			return ref;
 		} catch (IOException e) {
 			if (name.contains("/") //$NON-NLS-1$
-				|| !(e.getCause() instanceof InvalidObjectIdException)) {
+					|| !(e.getCause() instanceof InvalidObjectIdException)) {
 				throw e;
 			}
+
+			// While looking for a ref outside of refs/ (e.g., 'config'), we
+			// found a non-ref file (e.g., a config file) instead.  Treat this
+			// as a ref-not-found condition.
+			return null;
 		}
-		fireRefsChanged();
-		return ref;
+	}
+
+	@Override
+	public Ref exactRef(String name) throws IOException {
+		try {
+			return readAndResolve(name, getPackedRefs());
+		} finally {
+			fireRefsChanged();
+		}
 	}
 
 	@Override
 	public Ref getRef(final String needle) throws IOException {
-		final RefList<Ref> packed = getPackedRefs();
-		Ref ref = null;
-		for (String prefix : SEARCH_PATH) {
-			try {
-				ref = readRef(prefix + needle, packed);
+		try {
+			RefList<Ref> packed = getPackedRefs();
+			for (String prefix : SEARCH_PATH) {
+				Ref ref = readAndResolve(prefix + needle, packed);
 				if (ref != null) {
-					ref = resolve(ref, 0, null, null, packed);
-					break;
-				}
-			} catch (IOException e) {
-				if (!(!needle.contains("/") && "".equals(prefix) && e //$NON-NLS-1$ //$NON-NLS-2$
-						.getCause() instanceof InvalidObjectIdException)) {
-					throw e;
+					return ref;
 				}
 			}
+			return null;
+		} finally {
+			fireRefsChanged();
 		}
-		fireRefsChanged();
-		return ref;
 	}
 
 	@Override
@@ -341,7 +350,7 @@ public class RefDirectory extends RefDatabase {
 	public List<Ref> getAdditionalRefs() throws IOException {
 		List<Ref> ret = new LinkedList<Ref>();
 		for (String name : additionalRefsNames) {
-			Ref r = exactRef(name);
+			Ref r = getRef(name);
 			if (r != null)
 				ret.add(r);
 		}
@@ -765,22 +774,37 @@ public class RefDirectory extends RefDatabase {
 	}
 
 	private PackedRefList readPackedRefs() throws IOException {
-		final FileSnapshot snapshot = FileSnapshot.save(packedRefsFile);
-		final BufferedReader br;
-		final MessageDigest digest = Constants.newMessageDigest();
-		try {
-			br = new BufferedReader(new InputStreamReader(
-					new DigestInputStream(new FileInputStream(packedRefsFile),
-							digest), CHARSET));
-		} catch (FileNotFoundException noPackedRefs) {
-			// Ignore it and leave the new list empty.
-			return PackedRefList.NO_PACKED_REFS;
-		}
-		try {
-			return new PackedRefList(parsePackedRefs(br), snapshot,
-					ObjectId.fromRaw(digest.digest()));
-		} finally {
-			br.close();
+		int maxStaleRetries = 5;
+		int retries = 0;
+		while (true) {
+			final FileSnapshot snapshot = FileSnapshot.save(packedRefsFile);
+			final BufferedReader br;
+			final MessageDigest digest = Constants.newMessageDigest();
+			try {
+				br = new BufferedReader(new InputStreamReader(
+						new DigestInputStream(new FileInputStream(packedRefsFile),
+								digest), CHARSET));
+			} catch (FileNotFoundException noPackedRefs) {
+				// Ignore it and leave the new list empty.
+				return PackedRefList.NO_PACKED_REFS;
+			}
+			try {
+				return new PackedRefList(parsePackedRefs(br), snapshot,
+						ObjectId.fromRaw(digest.digest()));
+			} catch (IOException e) {
+				if (FileUtils.isStaleFileHandle(e) && retries < maxStaleRetries) {
+					if (LOG.isDebugEnabled()) {
+						LOG.debug(MessageFormat.format(
+								JGitText.get().packedRefsHandleIsStale,
+								Integer.valueOf(retries)), e);
+					}
+					retries++;
+					continue;
+				}
+				throw e;
+			} finally {
+				br.close();
+			}
 		}
 	}
 
@@ -900,7 +924,6 @@ public class RefDirectory extends RefDatabase {
 		return n;
 	}
 
-	@SuppressWarnings("null")
 	private LooseRef scanRef(LooseRef ref, String name) throws IOException {
 		final File path = fileFor(name);
 		FileSnapshot currentSnapshot = null;
@@ -939,6 +962,7 @@ public class RefDirectory extends RefDatabase {
 			final String target = RawParseUtils.decode(buf, 5, n);
 			if (ref != null && ref.isSymbolic()
 					&& ref.getTarget().getName().equals(target)) {
+				assert(currentSnapshot != null);
 				currentSnapshot.setClean(otherSnapshot);
 				return ref;
 			}
@@ -953,6 +977,7 @@ public class RefDirectory extends RefDatabase {
 			id = ObjectId.fromString(buf, 0);
 			if (ref != null && !ref.isSymbolic()
 					&& ref.getTarget().getObjectId().equals(id)) {
+				assert(currentSnapshot != null);
 				currentSnapshot.setClean(otherSnapshot);
 				return ref;
 			}
