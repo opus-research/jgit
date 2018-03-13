@@ -94,8 +94,6 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 
 	private ProgressMonitor monitor = NullProgressMonitor.INSTANCE;
 
-	private boolean binary = true;
-
 	/**
 	 * @param repo
 	 */
@@ -117,7 +115,6 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 			diffFmt = new DiffFormatter(new BufferedOutputStream(out));
 		else
 			diffFmt = new DiffFormatter(NullOutputStream.INSTANCE);
-		diffFmt.setBinary(binary);
 		diffFmt.setRepository(repo);
 		diffFmt.setProgressMonitor(monitor);
 		try {
@@ -182,26 +179,6 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 	public DiffCommand setPathFilter(TreeFilter pathFilter) {
 		this.pathFilter = pathFilter;
 		return this;
-	}
-
-	/**
-	 * @param name
-	 *            tag or branch to use as first commit
-	 * @throws NoHeadException
-	 * @throws IOException
-	 */
-	public void setNewName(String name) throws NoHeadException, IOException {
-		newTree = getRevision(name);
-	}
-
-	/**
-	 * @param name
-	 *            tag or branch to use as second commit
-	 * @throws NoHeadException
-	 * @throws IOException
-	 */
-	public void setOldName(String name) throws NoHeadException, IOException {
-		oldTree = getRevision(name);
 	}
 
 	/**
@@ -296,29 +273,5 @@ public class DiffCommand extends GitCommand<List<DiffEntry>> {
 		}
 		this.monitor = monitor;
 		return this;
-	}
-
-	/**
-	 * Specify if binary diff should be generated
-	 *
-	 * @param binary
-	 *            - If set to true then binary diff is generated that can be
-	 *            applied with git-apply
-	 */
-	public void setBinary(boolean binary) {
-		this.binary = binary;
-	}
-
-	private AbstractTreeIterator getRevision(String name)
-			throws IOException, NoHeadException {
-		ObjectId head = repo.resolve(name + "^{tree}"); //$NON-NLS-1$
-		if (head == null) {
-			throw new NoHeadException(JGitText.get().cannotReadTree);
-		}
-		CanonicalTreeParser p = new CanonicalTreeParser();
-		try (ObjectReader reader = repo.newObjectReader()) {
-			p.reset(reader, head);
-		}
-		return p;
 	}
 }

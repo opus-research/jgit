@@ -44,9 +44,6 @@
 
 package org.eclipse.jgit.lib;
 
-import org.eclipse.jgit.annotations.NonNull;
-import org.eclipse.jgit.annotations.Nullable;
-
 /** A {@link Ref} that points directly at an {@link ObjectId}. */
 public abstract class ObjectIdRef implements Ref {
 	/** Any reference whose peeled value is not yet known. */
@@ -59,15 +56,13 @@ public abstract class ObjectIdRef implements Ref {
 		 * @param name
 		 *            name of this ref.
 		 * @param id
-		 *            current value of the ref. May be {@code null} to indicate
-		 *            a ref that does not exist yet.
+		 *            current value of the ref. May be null to indicate a ref
+		 *            that does not exist yet.
 		 */
-		public Unpeeled(@NonNull Storage st, @NonNull String name,
-				@Nullable ObjectId id) {
+		public Unpeeled(Storage st, String name, ObjectId id) {
 			super(st, name, id);
 		}
 
-		@Nullable
 		public ObjectId getPeeledObjectId() {
 			return null;
 		}
@@ -93,13 +88,11 @@ public abstract class ObjectIdRef implements Ref {
 		 * @param p
 		 *            the first non-tag object that tag {@code id} points to.
 		 */
-		public PeeledTag(@NonNull Storage st, @NonNull String name,
-				@Nullable ObjectId id, @NonNull ObjectId p) {
+		public PeeledTag(Storage st, String name, ObjectId id, ObjectId p) {
 			super(st, name, id);
 			peeledObjectId = p;
 		}
 
-		@NonNull
 		public ObjectId getPeeledObjectId() {
 			return peeledObjectId;
 		}
@@ -119,15 +112,13 @@ public abstract class ObjectIdRef implements Ref {
 		 * @param name
 		 *            name of this ref.
 		 * @param id
-		 *            current value of the ref. May be {@code null} to indicate
-		 *            a ref that does not exist yet.
+		 *            current value of the ref. May be null to indicate a ref
+		 *            that does not exist yet.
 		 */
-		public PeeledNonTag(@NonNull Storage st, @NonNull String name,
-				@Nullable ObjectId id) {
+		public PeeledNonTag(Storage st, String name, ObjectId id) {
 			super(st, name, id);
 		}
 
-		@Nullable
 		public ObjectId getPeeledObjectId() {
 			return null;
 		}
@@ -151,17 +142,15 @@ public abstract class ObjectIdRef implements Ref {
 	 * @param name
 	 *            name of this ref.
 	 * @param id
-	 *            current value of the ref. May be {@code null} to indicate a
-	 *            ref that does not exist yet.
+	 *            current value of the ref. May be null to indicate a ref that
+	 *            does not exist yet.
 	 */
-	protected ObjectIdRef(@NonNull Storage st, @NonNull String name,
-			@Nullable ObjectId id) {
+	protected ObjectIdRef(Storage st, String name, ObjectId id) {
 		this.name = name;
 		this.storage = st;
 		this.objectId = id;
 	}
 
-	@NonNull
 	public String getName() {
 		return name;
 	}
@@ -170,27 +159,22 @@ public abstract class ObjectIdRef implements Ref {
 		return false;
 	}
 
-	@NonNull
 	public Ref getLeaf() {
 		return this;
 	}
 
-	@NonNull
 	public Ref getTarget() {
 		return this;
 	}
 
-	@Nullable
 	public ObjectId getObjectId() {
 		return objectId;
 	}
 
-	@NonNull
 	public Storage getStorage() {
 		return storage;
 	}
 
-	@NonNull
 	@Override
 	public String toString() {
 		StringBuilder r = new StringBuilder();

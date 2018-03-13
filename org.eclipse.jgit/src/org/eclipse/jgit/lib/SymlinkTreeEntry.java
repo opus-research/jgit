@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2015, Google Inc.
+ * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -44,21 +45,41 @@
 package org.eclipse.jgit.lib;
 
 /**
- * Simple set of ObjectIds.
- * <p>
- * Usually backed by a read-only data structure such as
- * {@link org.eclipse.jgit.internal.storage.file.PackIndex}. Mutable types like
- * {@link ObjectIdOwnerMap} also implement the interface by checking keys.
+ * A tree entry representing a symbolic link.
  *
- * @since 4.2
+ * Note. Java cannot really handle these as file system objects.
+ *
+ * @deprecated To look up information about a single path, use
+ * {@link org.eclipse.jgit.treewalk.TreeWalk#forPath(Repository, String, org.eclipse.jgit.revwalk.RevTree)}.
+ * To lookup information about multiple paths at once, use a
+ * {@link org.eclipse.jgit.treewalk.TreeWalk} and obtain the current entry's
+ * information from its getter methods.
  */
-public interface ObjectIdSet {
+@Deprecated
+public class SymlinkTreeEntry extends TreeEntry {
+
 	/**
-	 * Returns true if the objectId is contained within the collection.
+	 * Construct a {@link SymlinkTreeEntry} with the specified name and SHA-1 in
+	 * the specified parent
 	 *
-	 * @param objectId
-	 *            the objectId to find
-	 * @return whether the collection contains the objectId.
+	 * @param parent
+	 * @param id
+	 * @param nameUTF8
 	 */
-	boolean contains(AnyObjectId objectId);
+	public SymlinkTreeEntry(final Tree parent, final ObjectId id,
+			final byte[] nameUTF8) {
+		super(parent, id, nameUTF8);
+	}
+
+	public FileMode getMode() {
+		return FileMode.SYMLINK;
+	}
+
+	public String toString() {
+		final StringBuilder r = new StringBuilder();
+		r.append(ObjectId.toString(getId()));
+		r.append(" S "); //$NON-NLS-1$
+		r.append(getFullName());
+		return r.toString();
+	}
 }

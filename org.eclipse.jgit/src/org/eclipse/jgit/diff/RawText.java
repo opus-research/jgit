@@ -191,20 +191,20 @@ public class RawText extends Sequence {
 	}
 
 	/**
-	 * Decode a region of the buffer under the ISO-8859-1 encoding.
+	 * Decode a region of the text into a String.
 	 *
-	 * Each byte is treated as a single character in the 8859-1 character
-	 * encoding, performing a raw binary-&gt;char conversion.
+	 * The default implementation of this method tries to guess the character
+	 * set by considering UTF-8, the platform default, and falling back on
+	 * ISO-8859-1 if neither of those can correctly decode the region given.
 	 *
 	 * @param start
-	 *            first position within the buffer to take data from.
+	 *            first byte of the content to decode.
 	 * @param end
-	 *            one position past the last location within the buffer to take
-	 *            data from.
-	 * @return a string representation of the range <code>[start,end)</code>.
+	 *            one past the last byte of the content to decode.
+	 * @return the region {@code [start, end)} decoded as a String.
 	 */
 	protected String decode(int start, int end) {
-		return RawParseUtils.extractBinaryString(content, start, end);
+		return RawParseUtils.decode(content, start, end);
 	}
 
 	private int getStart(final int i) {

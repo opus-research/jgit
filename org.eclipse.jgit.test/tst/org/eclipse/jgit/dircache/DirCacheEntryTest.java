@@ -69,17 +69,15 @@ public class DirCacheEntryTest {
 		assertFalse(isValidPath("a\u0000b"));
 	}
 
-	@SuppressWarnings("unused")
-	private static boolean isValidPath(String path) {
+	private static boolean isValidPath(final String path) {
 		try {
-			new DirCacheEntry(path);
+			DirCacheCheckout.checkValidPath(path);
 			return true;
 		} catch (InvalidPathException e) {
 			return false;
 		}
 	}
 
-	@SuppressWarnings("unused")
 	@Test
 	public void testCreate_ByStringPath() {
 		assertEquals("a", new DirCacheEntry("a").getPathString());
@@ -93,7 +91,6 @@ public class DirCacheEntryTest {
 		}
 	}
 
-	@SuppressWarnings("unused")
 	@Test
 	public void testCreate_ByStringPathAndStage() {
 		DirCacheEntry e;

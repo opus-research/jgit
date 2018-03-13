@@ -42,22 +42,14 @@
  */
 package org.eclipse.jgit.api;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
 import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.zip.InflaterInputStream;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.PatchApplyException;
@@ -65,15 +57,10 @@ import org.eclipse.jgit.api.errors.PatchFormatException;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.pack.BinaryDelta;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.patch.BinaryHunk;
 import org.eclipse.jgit.patch.FileHeader;
-import org.eclipse.jgit.patch.FileHeader.PatchType;
 import org.eclipse.jgit.patch.HunkHeader;
 import org.eclipse.jgit.patch.Patch;
-import org.eclipse.jgit.patch.binary.GitBinaryPatchInputStream;
-import org.eclipse.jgit.patch.binary.SkipFirstLineInputStream;
 import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.IO;
 
@@ -154,13 +141,9 @@ public class ApplyCommand extends GitCommand<ApplyResult> {
 				case RENAME:
 					f = getFile(fh.getOldPath(), false);
 					File dest = getFile(fh.getNewPath(), false);
-					try {
-						FileUtils.rename(f, dest,
-								StandardCopyOption.ATOMIC_MOVE);
-					} catch (IOException e) {
+					if (!f.renameTo(dest))
 						throw new PatchApplyException(MessageFormat.format(
-								JGitText.get().renameFileFailed, f, dest), e);
-					}
+								JGitText.get().renameFileFailed, f, dest));
 					break;
 				case COPY:
 					f = getFile(fh.getOldPath(), false);
@@ -207,23 +190,16 @@ public class ApplyCommand extends GitCommand<ApplyResult> {
 	 */
 	private void apply(File f, FileHeader fh)
 			throws IOException, PatchApplyException {
-		if (fh.getPatchType() == PatchType.GIT_BINARY) {
-			applyBinary(f, fh);
-		} else {
-			applyText(f, fh);
-		}
-	}
-
-	private void applyText(File f, FileHeader fh)
-			throws IOException, PatchApplyException {
 		RawText rt = new RawText(f);
 		List<String> oldLines = new ArrayList<String>(rt.size());
 		for (int i = 0; i < rt.size(); i++)
 			oldLines.add(rt.getString(i));
 		List<String> newLines = new ArrayList<String>(oldLines);
 		for (HunkHeader hh : fh.getHunks()) {
-			RawText hrt = new RawText(Arrays.copyOfRange(hh.getBuffer(),
-					hh.getStartOffset(), hh.getEndOffset()));
+			StringBuilder hunk = new StringBuilder();
+			for (int j = hh.getStartOffset(); j < hh.getEndOffset(); j++)
+				hunk.append((char) hh.getBuffer()[j]);
+			RawText hrt = new RawText(hunk.toString().getBytes());
 			List<String> hunkLines = new ArrayList<String>(hrt.size());
 			for (int i = 0; i < hrt.size(); i++)
 				hunkLines.add(hrt.getString(i));
@@ -262,51 +238,15 @@ public class ApplyCommand extends GitCommand<ApplyResult> {
 		if (!isChanged(oldLines, newLines))
 			return; // don't touch the file
 		StringBuilder sb = new StringBuilder();
-		for (int i = 0; i < newLines.size(); i++) {
-			String l = newLines.get(i);
-			sb.append(l);
-			if (i != newLines.size() - 1) {
-				sb.append(System.lineSeparator());
-			}
+		for (String l : newLines) {
+			// don't bother handling line endings - if it was windows, the \r is
+			// still there!
+			sb.append(l).append('\n');
 		}
-		try (FileOutputStream fos = new FileOutputStream(f)) {
-			fos.write(sb.toString().getBytes(StandardCharsets.ISO_8859_1));
-		}
-	}
-
-	private void applyBinary(File f, FileHeader fh)
-			throws IOException, PatchApplyException {
-        BinaryHunk binaryHunk = fh.getForwardBinaryHunk();
-        switch (binaryHunk.getType())
-        {
-            case LITERAL_DEFLATED:
-
-                try (InputStream inputStream = new InflaterInputStream(new GitBinaryPatchInputStream(new SkipFirstLineInputStream(new ByteArrayInputStream(binaryHunk.getBuffer(), binaryHunk.getStartOffset(), binaryHunk.getEndOffset())))))
-                {
-				Files.copy(inputStream, f.toPath(),
-						StandardCopyOption.REPLACE_EXISTING);
-                }
-                break;
-
-            case DELTA_DEFLATED:
-
-                byte[] delta;
-                try (InputStream inputStream = new InflaterInputStream(new GitBinaryPatchInputStream(new SkipFirstLineInputStream(new ByteArrayInputStream(binaryHunk.getBuffer(), binaryHunk.getStartOffset(), binaryHunk.getEndOffset())))))
-                {
-                    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-				copyStreams(inputStream, outputStream);
-                    delta = outputStream.toByteArray();
-                    if (delta.length != binaryHunk.getSize())
-                    {
-                        throw new PatchApplyException(MessageFormat.format(JGitText.get().patchApplyException, binaryHunk));
-                    }
-                }
-                byte[] base = Files.readAllBytes(f.toPath());
-                byte[] result = BinaryDelta.apply(base, delta);
-			Files.write(f.toPath(), result,
-					StandardOpenOption.TRUNCATE_EXISTING);
-                break;
-        }
+		sb.deleteCharAt(sb.length() - 1);
+		FileWriter fw = new FileWriter(f);
+		fw.write(sb.toString());
+		fw.close();
 	}
 
 	private static boolean isChanged(List<String> ol, List<String> nl) {
@@ -319,31 +259,9 @@ public class ApplyCommand extends GitCommand<ApplyResult> {
 	}
 
 	private boolean isNoNewlineAtEndOfFile(FileHeader fh) {
-		if (fh.getHunks().size() == 0) {
-			return false;
-		}
 		HunkHeader lastHunk = fh.getHunks().get(fh.getHunks().size() - 1);
-		byte[] lastHunkBuffer = Arrays.copyOfRange(lastHunk.getBuffer(),
-				lastHunk.getStartOffset(), lastHunk.getEndOffset());
-		RawText lhrt = new RawText(lastHunkBuffer);
-		return lhrt.getString(lhrt.size() - 1)
-				.equals("\\ No newline at end of file"); //$NON-NLS-1$
-
-	}
-
-	// TODO replace with some common IO utils like apache commons IO
-	private static long copyStreams(InputStream from, OutputStream to)
-			throws IOException {
-		byte[] buf = new byte[4 * 1024];
-		long total = 0;
-		while (true) {
-			int r = from.read(buf);
-			if (r == -1) {
-				break;
-			}
-			to.write(buf, 0, r);
-			total += r;
-		}
-		return total;
+		RawText lhrt = new RawText(lastHunk.getBuffer());
+		return lhrt.getString(lhrt.size() - 1).equals(
+				"\\ No newline at end of file"); //$NON-NLS-1$
 	}
 }

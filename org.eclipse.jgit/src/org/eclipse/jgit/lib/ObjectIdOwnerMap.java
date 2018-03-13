@@ -67,8 +67,8 @@ import java.util.NoSuchElementException;
  * @param <V>
  *            type of subclass of ObjectId that will be stored in the map.
  */
-public class ObjectIdOwnerMap<V extends ObjectIdOwnerMap.Entry>
-		implements Iterable<V>, ObjectIdSet {
+public class ObjectIdOwnerMap<V extends ObjectIdOwnerMap.Entry> implements
+		Iterable<V> {
 	/** Size of the initial directory, will grow as necessary. */
 	private static final int INITIAL_DIRECTORY = 1024;
 
@@ -83,16 +83,16 @@ public class ObjectIdOwnerMap<V extends ObjectIdOwnerMap.Entry>
 	 * The low {@link #bits} of the SHA-1 are used to select the segment from
 	 * this directory. Each segment is constant sized at 2^SEGMENT_BITS.
 	 */
-	V[][] directory;
+	private V[][] directory;
 
 	/** Total number of objects in this map. */
-	int size;
+	private int size;
 
 	/** The map doubles in capacity when {@link #size} reaches this target. */
 	private int grow;
 
 	/** Number of low bits used to form the index into {@link #directory}. */
-	int bits;
+	private int bits;
 
 	/** Low bit mask to index into {@link #directory}, {@code 2^bits-1}. */
 	private int mask;

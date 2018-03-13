@@ -61,7 +61,6 @@ import java.io.OutputStream;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.zip.DeflaterOutputStream;
 
 import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
@@ -72,7 +71,6 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.LargeObjectException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.internal.storage.pack.DeltaIndex;
 import org.eclipse.jgit.lib.AbbreviatedObjectId;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.ConfigConstants;
@@ -86,7 +84,6 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.patch.FileHeader;
 import org.eclipse.jgit.patch.FileHeader.PatchType;
 import org.eclipse.jgit.patch.HunkHeader;
-import org.eclipse.jgit.patch.binary.GitBinaryPatchOutputStream;
 import org.eclipse.jgit.revwalk.FollowFilter;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -148,8 +145,6 @@ public class DiffFormatter implements AutoCloseable {
 
 	private ContentSource.Pair source;
 
-	private boolean binary;
-
 	/**
 	 * Create a new formatter with a default level of context.
 	 *
@@ -160,17 +155,6 @@ public class DiffFormatter implements AutoCloseable {
 	 */
 	public DiffFormatter(OutputStream out) {
 		this.out = out;
-	}
-
-	/**
-	 * Specify if binary diff should be generated
-	 *
-	 * @param binary
-	 *            - If set to true then binary diff is generated that can be
-	 *            applied with git-apply
-	 */
-	public void setBinary(boolean binary) {
-		this.binary = binary;
 	}
 
 	/** @return the stream we are outputting data to. */
@@ -945,9 +929,10 @@ public class DiffFormatter implements AutoCloseable {
 		final EditList editList;
 		final FileHeader.PatchType type;
 
+		formatHeader(buf, ent);
+
 		if (ent.getOldId() == null || ent.getNewId() == null) {
 			// Content not changed (e.g. only mode, pure rename)
-			formatHeader(buf, ent, false);
 			editList = new EditList();
 			type = PatchType.UNIFIED;
 
@@ -966,14 +951,12 @@ public class DiffFormatter implements AutoCloseable {
 
 			if (aRaw == BINARY || bRaw == BINARY //
 					|| RawText.isBinary(aRaw) || RawText.isBinary(bRaw)) {
-				formatHeader(buf, ent, binary);
 				formatOldNewPaths(buf, ent);
-				writeGitBinaryPatch(buf, aRaw, bRaw);
+				buf.write(encodeASCII("Binary files differ\n")); //$NON-NLS-1$
 				editList = new EditList();
 				type = PatchType.BINARY;
 
 			} else {
-				formatHeader(buf, ent, false);
 				res.a = new RawText(aRaw);
 				res.b = new RawText(bRaw);
 				editList = diff(res.a, res.b);
@@ -1077,8 +1060,7 @@ public class DiffFormatter implements AutoCloseable {
 		o.write('\n');
 	}
 
-	private void formatHeader(ByteArrayOutputStream o, DiffEntry ent,
-			boolean isBinary)
+	private void formatHeader(ByteArrayOutputStream o, DiffEntry ent)
 			throws IOException {
 		final ChangeType type = ent.getChangeType();
 		final String oldp = ent.getOldPath();
@@ -1144,7 +1126,7 @@ public class DiffFormatter implements AutoCloseable {
 		}
 
 		if (ent.getOldId() != null && !ent.getOldId().equals(ent.getNewId())) {
-			formatIndexLine(o, ent, isBinary);
+			formatIndexLine(o, ent);
 		}
 	}
 
@@ -1153,22 +1135,15 @@ public class DiffFormatter implements AutoCloseable {
 	 *            the stream the formatter will write line data to
 	 * @param ent
 	 *            the DiffEntry to create the FileHeader for
-	 * @param isBinary
-	 *            use true for binary patch and false for text patch
 	 * @throws IOException
 	 *             writing to the supplied stream failed.
 	 */
-	protected void formatIndexLine(OutputStream o, DiffEntry ent,
-			boolean isBinary)
+	protected void formatIndexLine(OutputStream o, DiffEntry ent)
 			throws IOException {
-		String oldId = isBinary ? ent.getOldId().name()
-				: format(ent.getOldId());
-		String newId = isBinary ? ent.getNewId().name()
-				: format(ent.getNewId());
 		o.write(encodeASCII("index " // //$NON-NLS-1$
-				+ oldId //
+				+ format(ent.getOldId()) //
 				+ ".." // //$NON-NLS-1$
-				+ newId));
+				+ format(ent.getNewId())));
 		if (ent.getOldMode().equals(ent.getNewMode())) {
 			o.write(' ');
 			ent.getNewMode().copyTo(o);
@@ -1223,69 +1198,5 @@ public class DiffFormatter implements AutoCloseable {
 
 	private static boolean end(final Edit edit, final int a, final int b) {
 		return edit.getEndA() <= a && edit.getEndB() <= b;
-	}
-
-	private void writeGitBinaryPatch(ByteArrayOutputStream buf, byte[] aRaw,
-			byte[] bRaw) throws IOException {
-		if (binary) {
-			buf.write(encodeASCII("GIT binary patch\n")); //$NON-NLS-1$
-			emitBinaryDiffBody(buf, aRaw, bRaw);
-			emitBinaryDiffBody(buf, bRaw, aRaw);
-		} else {
-			buf.write(encodeASCII("Binary files differ\n")); //$NON-NLS-1$
-		}
-	}
-
-	private void emitBinaryDiffBody(ByteArrayOutputStream buf, byte[] aRaw,
-			byte[] bRaw) throws IOException {
-		/*
-		 * We could do deflated delta, or we could do just deflated bRaw,
-		 * whichever is smaller.
-		 */
-
-		byte[] data;
-		byte[] deflatedB = deflate(bRaw);
-		byte[] deflatedDelta = null;
-		byte[] delta = null;
-
-		if (aRaw.length > 0 && bRaw.length > 0
-				&& !Boolean.getBoolean("jgit.binary.patch.literal.only")) //$NON-NLS-1$
-		{
-			delta = diff_delta(aRaw, bRaw, deflatedB.length);
-			if (delta != null) {
-				deflatedDelta = deflate(delta);
-			}
-		}
-
-		if (deflatedDelta != null && delta != null
-				&& deflatedDelta.length < deflatedB.length) {
-			buf.write(encodeASCII(String.format("delta %s\n", //$NON-NLS-1$
-					Integer.valueOf(delta.length))));
-			data = deflatedDelta;
-		} else {
-			buf.write(encodeASCII(String.format("literal %s\n", //$NON-NLS-1$
-					Integer.valueOf(bRaw.length))));
-			data = deflatedB;
-		}
-
-		try (OutputStream outputStream = new GitBinaryPatchOutputStream(buf)) {
-			outputStream.write(data);
-		}
-	}
-
-	private byte[] diff_delta(byte[] src, byte[] dst, int deltaSizeLimit)
-			throws IOException {
-		DeltaIndex deltaIndex = new DeltaIndex(src);
-		ByteArrayOutputStream result = new ByteArrayOutputStream();
-		boolean encoded = deltaIndex.encode(result, dst, deltaSizeLimit);
-		return encoded ? result.toByteArray() : null;
-	}
-
-	private byte[] deflate(byte[] bRaw) throws IOException {
-		ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		try (OutputStream outputStream = new DeflaterOutputStream(baos)) {
-			outputStream.write(bRaw);
-		}
-		return baos.toByteArray();
 	}
 }

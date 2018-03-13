@@ -60,17 +60,16 @@ import java.util.NoSuchElementException;
  * @param <V>
  *            type of subclass of ObjectId that will be stored in the map.
  */
-public class ObjectIdSubclassMap<V extends ObjectId>
-		implements Iterable<V>, ObjectIdSet {
+public class ObjectIdSubclassMap<V extends ObjectId> implements Iterable<V> {
 	private static final int INITIAL_TABLE_SIZE = 2048;
 
-	int size;
+	private int size;
 
 	private int grow;
 
 	private int mask;
 
-	V[] table;
+	private V[] table;
 
 	/** Create an empty map. */
 	public ObjectIdSubclassMap() {

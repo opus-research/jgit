@@ -293,20 +293,18 @@ public abstract class BaseReceivePack {
 		db = into;
 		walk = new RevWalk(db);
 
-		TransferConfig tc = db.getConfig().get(TransferConfig.KEY);
-		objectChecker = tc.newReceiveObjectChecker();
-
-		ReceiveConfig rc = db.getConfig().get(ReceiveConfig.KEY);
-		allowCreates = rc.allowCreates;
+		final ReceiveConfig cfg = db.getConfig().get(ReceiveConfig.KEY);
+		objectChecker = cfg.newObjectChecker();
+		allowCreates = cfg.allowCreates;
 		allowAnyDeletes = true;
-		allowBranchDeletes = rc.allowDeletes;
-		allowNonFastForwards = rc.allowNonFastForwards;
-		allowOfsDelta = rc.allowOfsDelta;
+		allowBranchDeletes = cfg.allowDeletes;
+		allowNonFastForwards = cfg.allowNonFastForwards;
+		allowOfsDelta = cfg.allowOfsDelta;
 		advertiseRefsHook = AdvertiseRefsHook.DEFAULT;
 		refFilter = RefFilter.DEFAULT;
 		advertisedHaves = new HashSet<ObjectId>();
 		clientShallowCommits = new HashSet<ObjectId>();
-		signedPushConfig = rc.signedPush;
+		signedPushConfig = cfg.signedPush;
 	}
 
 	/** Configuration for receive operations. */
@@ -317,13 +315,32 @@ public abstract class BaseReceivePack {
 			}
 		};
 
+		final boolean checkReceivedObjects;
+		final boolean allowLeadingZeroFileMode;
+		final boolean allowInvalidPersonIdent;
+		final boolean safeForWindows;
+		final boolean safeForMacOS;
+
 		final boolean allowCreates;
 		final boolean allowDeletes;
 		final boolean allowNonFastForwards;
 		final boolean allowOfsDelta;
+
 		final SignedPushConfig signedPush;
 
 		ReceiveConfig(final Config config) {
+			checkReceivedObjects = config.getBoolean(
+					"receive", "fsckobjects", //$NON-NLS-1$ //$NON-NLS-2$
+					config.getBoolean("transfer", "fsckobjects", false)); //$NON-NLS-1$ //$NON-NLS-2$
+			allowLeadingZeroFileMode = checkReceivedObjects
+					&& config.getBoolean("fsck", "allowLeadingZeroFileMode", false); //$NON-NLS-1$ //$NON-NLS-2$
+			allowInvalidPersonIdent = checkReceivedObjects
+					&& config.getBoolean("fsck", "allowInvalidPersonIdent", false); //$NON-NLS-1$ //$NON-NLS-2$
+			safeForWindows = checkReceivedObjects
+					&& config.getBoolean("fsck", "safeForWindows", false); //$NON-NLS-1$ //$NON-NLS-2$
+			safeForMacOS = checkReceivedObjects
+					&& config.getBoolean("fsck", "safeForMacOS", false); //$NON-NLS-1$ //$NON-NLS-2$
+
 			allowCreates = true;
 			allowDeletes = !config.getBoolean("receive", "denydeletes", false); //$NON-NLS-1$ //$NON-NLS-2$
 			allowNonFastForwards = !config.getBoolean("receive", //$NON-NLS-1$
@@ -331,6 +348,16 @@ public abstract class BaseReceivePack {
 			allowOfsDelta = config.getBoolean("repack", "usedeltabaseoffset", //$NON-NLS-1$ //$NON-NLS-2$
 					true);
 			signedPush = SignedPushConfig.KEY.parse(config);
+		}
+
+		ObjectChecker newObjectChecker() {
+			if (!checkReceivedObjects)
+				return null;
+			return new ObjectChecker()
+				.setAllowLeadingZeroFileMode(allowLeadingZeroFileMode)
+				.setAllowInvalidPersonIdent(allowInvalidPersonIdent)
+				.setSafeForWindows(safeForWindows)
+				.setSafeForMacOS(safeForMacOS);
 		}
 	}
 
@@ -1345,21 +1372,16 @@ public abstract class BaseReceivePack {
 				}
 			}
 
-			if (cmd.getType() == ReceiveCommand.Type.DELETE && ref != null) {
-				ObjectId id = ref.getObjectId();
-				if (id == null) {
-					id = ObjectId.zeroId();
-				}
-				if (!ObjectId.zeroId().equals(cmd.getOldId())
-						&& !id.equals(cmd.getOldId())) {
-					// Delete commands can be sent with the old id matching our
-					// advertised value, *OR* with the old id being 0{40}. Any
-					// other requested old id is invalid.
-					//
-					cmd.setResult(Result.REJECTED_OTHER_REASON,
-							JGitText.get().invalidOldIdSent);
-					continue;
-				}
+			if (cmd.getType() == ReceiveCommand.Type.DELETE && ref != null
+					&& !ObjectId.zeroId().equals(cmd.getOldId())
+					&& !ref.getObjectId().equals(cmd.getOldId())) {
+				// Delete commands can be sent with the old id matching our
+				// advertised value, *OR* with the old id being 0{40}. Any
+				// other requested old id is invalid.
+				//
+				cmd.setResult(Result.REJECTED_OTHER_REASON,
+						JGitText.get().invalidOldIdSent);
+				continue;
 			}
 
 			if (cmd.getType() == ReceiveCommand.Type.UPDATE) {
@@ -1369,15 +1391,8 @@ public abstract class BaseReceivePack {
 					cmd.setResult(Result.REJECTED_OTHER_REASON, JGitText.get().noSuchRef);
 					continue;
 				}
-				ObjectId id = ref.getObjectId();
-				if (id == null) {
-					// We cannot update unborn branch
-					cmd.setResult(Result.REJECTED_OTHER_REASON,
-							JGitText.get().cannotUpdateUnbornBranch);
-					continue;
-				}
 
-				if (!id.equals(cmd.getOldId())) {
+				if (!ref.getObjectId().equals(cmd.getOldId())) {
 					// A properly functioning client will send the same
 					// object id we advertised.
 					//
@@ -1453,7 +1468,10 @@ public abstract class BaseReceivePack {
 	 * @since 3.6
 	 */
 	protected void failPendingCommands() {
-		ReceiveCommand.abort(commands);
+		for (ReceiveCommand cmd : commands) {
+			if (cmd.getResult() == Result.NOT_ATTEMPTED)
+				cmd.setResult(Result.REJECTED_OTHER_REASON, JGitText.get().transactionAborted);
+		}
 	}
 
 	/**
