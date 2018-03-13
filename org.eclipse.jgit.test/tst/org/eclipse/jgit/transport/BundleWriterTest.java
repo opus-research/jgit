@@ -166,10 +166,8 @@ public class BundleWriterTest extends SampleDataRepositoryTestCase {
 		final ByteArrayInputStream in = new ByteArrayInputStream(bundle);
 		final RefSpec rs = new RefSpec("refs/heads/*:refs/heads/*");
 		final Set<RefSpec> refs = Collections.singleton(rs);
-		try (TransportBundleStream transport = new TransportBundleStream(
-				newRepo, uri, in)) {
-			return transport.fetch(NullProgressMonitor.INSTANCE, refs);
-		}
+		return new TransportBundleStream(newRepo, uri, in).fetch(
+				NullProgressMonitor.INSTANCE, refs);
 	}
 
 	private byte[] makeBundle(final String name,

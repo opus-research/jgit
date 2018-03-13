@@ -116,9 +116,12 @@ public class ReceivePackAdvertiseRefsHookTest extends LocalDiskRepositoryTestCas
 
 		// Clone from dst into src
 		//
-		try (Transport t = Transport.open(src, uriOf(dst))) {
+		Transport t = Transport.open(src, uriOf(dst));
+		try {
 			t.fetch(PM, Collections.singleton(new RefSpec("+refs/*:refs/*")));
 			assertEquals(B, src.resolve(R_MASTER));
+		} finally {
+			t.close();
 		}
 
 		// Now put private stuff into dst.
@@ -141,8 +144,7 @@ public class ReceivePackAdvertiseRefsHookTest extends LocalDiskRepositoryTestCas
 	@Test
 	public void testFilterHidesPrivate() throws Exception {
 		Map<String, Ref> refs;
-		try (TransportLocal t = new TransportLocal(src, uriOf(dst),
-				dst.getDirectory()) {
+		TransportLocal t = new TransportLocal(src, uriOf(dst), dst.getDirectory()) {
 			@Override
 			ReceivePack createReceivePack(final Repository db) {
 				db.close();
@@ -152,10 +154,16 @@ public class ReceivePackAdvertiseRefsHookTest extends LocalDiskRepositoryTestCas
 				rp.setAdvertiseRefsHook(new HidePrivateHook());
 				return rp;
 			}
-		}) {
-			try (PushConnection c = t.openPush()) {
+		};
+		try {
+			PushConnection c = t.openPush();
+			try {
 				refs = c.getRefsMap();
+			} finally {
+				c.close();
 			}
+		} finally {
+			t.close();
 		}
 
 		assertNotNull(refs);
