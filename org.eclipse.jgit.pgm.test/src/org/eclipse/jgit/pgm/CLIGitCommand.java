@@ -189,7 +189,7 @@ public class CLIGitCommand extends Main {
 	 * @return the array
 	 */
 	static String[] split(String commandLine) {
-		final List<String> list = new ArrayList<>();
+		final List<String> list = new ArrayList<String>();
 		boolean inquote = false;
 		boolean inDblQuote = false;
 		StringBuilder r = new StringBuilder();

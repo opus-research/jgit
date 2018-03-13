@@ -76,7 +76,7 @@ public class SubmoduleInitCommand extends GitCommand<Collection<String>> {
 	 */
 	public SubmoduleInitCommand(final Repository repo) {
 		super(repo);
-		paths = new ArrayList<>();
+		paths = new ArrayList<String>();
 	}
 
 	/**
@@ -99,7 +99,7 @@ public class SubmoduleInitCommand extends GitCommand<Collection<String>> {
 			if (!paths.isEmpty())
 				generator.setFilter(PathFilterGroup.createFromStrings(paths));
 			StoredConfig config = repo.getConfig();
-			List<String> initialized = new ArrayList<>();
+			List<String> initialized = new ArrayList<String>();
 			while (generator.next()) {
 				// Ignore entry if URL is already present in config file
 				if (generator.getConfigUrl() != null)

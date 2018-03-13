@@ -96,7 +96,7 @@ public class AddCommand extends GitCommand<DirCache> {
 	 */
 	public AddCommand(Repository repo) {
 		super(repo);
-		filepatterns = new LinkedList<>();
+		filepatterns = new LinkedList<String>();
 	}
 
 	/**

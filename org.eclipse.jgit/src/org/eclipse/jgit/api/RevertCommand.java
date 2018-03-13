@@ -85,11 +85,11 @@ import org.eclipse.jgit.treewalk.FileTreeIterator;
  *      >Git documentation about revert</a>
  */
 public class RevertCommand extends GitCommand<RevCommit> {
-	private List<Ref> commits = new LinkedList<>();
+	private List<Ref> commits = new LinkedList<Ref>();
 
 	private String ourCommitName = null;
 
-	private List<Ref> revertedRefs = new LinkedList<>();
+	private List<Ref> revertedRefs = new LinkedList<Ref>();
 
 	private MergeResult failingResult;
 

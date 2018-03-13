@@ -53,7 +53,7 @@ import java.util.List;
  */
 public class ApplyResult {
 
-	private List<File> updatedFiles = new ArrayList<>();
+	private List<File> updatedFiles = new ArrayList<File>();
 
 	/**
 	 * @param f

@@ -78,7 +78,7 @@ public class SubmoduleSyncCommand extends GitCommand<Map<String, String>> {
 	 */
 	public SubmoduleSyncCommand(final Repository repo) {
 		super(repo);
-		paths = new ArrayList<>();
+		paths = new ArrayList<String>();
 	}
 
 	/**
@@ -115,7 +115,7 @@ public class SubmoduleSyncCommand extends GitCommand<Map<String, String>> {
 		try (SubmoduleWalk generator = SubmoduleWalk.forIndex(repo)) {
 			if (!paths.isEmpty())
 				generator.setFilter(PathFilterGroup.createFromStrings(paths));
-			Map<String, String> synced = new HashMap<>();
+			Map<String, String> synced = new HashMap<String, String>();
 			StoredConfig config = repo.getConfig();
 			while (generator.next()) {
 				String remoteUrl = generator.getRemoteUrl();

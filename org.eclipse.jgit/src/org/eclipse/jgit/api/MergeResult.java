@@ -416,7 +416,7 @@ public class MergeResult {
 	 */
 	public void addConflict(String path, int[][] conflictingRanges) {
 		if (conflicts == null)
-			conflicts = new HashMap<>();
+			conflicts = new HashMap<String, int[][]>();
 		conflicts.put(path, conflictingRanges);
 	}
 
@@ -428,7 +428,7 @@ public class MergeResult {
 		if (!lowLevelResult.containsConflicts())
 			return;
 		if (conflicts == null)
-			conflicts = new HashMap<>();
+			conflicts = new HashMap<String, int[][]>();
 		int nrOfConflicts = 0;
 		// just counting
 		for (MergeChunk mergeChunk : lowLevelResult) {
