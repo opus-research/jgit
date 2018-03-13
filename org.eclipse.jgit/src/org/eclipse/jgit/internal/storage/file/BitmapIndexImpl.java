@@ -507,7 +507,7 @@ public class BitmapIndexImpl implements BitmapIndex {
 				true, sizeInBits / EWAHCompressedBitmap.WORD_IN_BITS);
 		int remaining = sizeInBits % EWAHCompressedBitmap.WORD_IN_BITS;
 		if (remaining > 0)
-			mask.addWord((1L << remaining) - 1, remaining);
+			mask.add((1L << remaining) - 1, remaining);
 		return mask;
 	}
 }
