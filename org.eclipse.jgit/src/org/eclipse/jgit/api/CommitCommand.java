@@ -42,6 +42,7 @@
  */
 package org.eclipse.jgit.api;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
@@ -51,13 +52,13 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.eclipse.jgit.api.errors.AbortedByHookException;
 import org.eclipse.jgit.api.errors.ConcurrentRefUpdateException;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoFilepatternException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.api.errors.NoMessageException;
+import org.eclipse.jgit.api.errors.RejectCommitException;
 import org.eclipse.jgit.api.errors.UnmergedPathsException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
 import org.eclipse.jgit.dircache.DirCache;
@@ -66,7 +67,6 @@ import org.eclipse.jgit.dircache.DirCacheBuilder;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.UnmergedPathException;
-import org.eclipse.jgit.hooks.Hooks;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.CommitBuilder;
 import org.eclipse.jgit.lib.Constants;
@@ -87,6 +87,9 @@ import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.util.ChangeIdUtil;
+import org.eclipse.jgit.util.FS;
+import org.eclipse.jgit.util.Hook;
+import org.eclipse.jgit.util.ProcessResult;
 
 /**
  * A class used to execute a {@code Commit} command. It has setters for all
@@ -123,7 +126,8 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	private String reflogComment;
 
 	/**
-	 * Setting this option bypasses the pre-commit and commit-msg hooks.
+	 * Setting this option bypasses the {@link Hook#PRE_COMMIT pre-commit} and
+	 * {@link Hook#COMMIT_MSG commit-msg} hooks.
 	 */
 	private boolean noVerify;
 
@@ -134,6 +138,7 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 */
 	protected CommitCommand(Repository repo) {
 		super(repo);
+		hookOutRedirect = System.out;
 	}
 
 	/**
@@ -154,14 +159,14 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	 *             else
 	 * @throws WrongRepositoryStateException
 	 *             when repository is not in the right state for committing
-	 * @throws AbortedByHookException
+	 * @throws RejectCommitException
 	 *             if there are either pre-commit or commit-msg hooks present in
-	 *             the repository and one of them rejects the commit.
+	 *             the repository and at least one of them rejects the commit.
 	 */
 	public RevCommit call() throws GitAPIException, NoHeadException,
 			NoMessageException, UnmergedPathsException,
 			ConcurrentRefUpdateException, WrongRepositoryStateException,
-			AbortedByHookException {
+			RejectCommitException {
 		checkCallable();
 		Collections.sort(only);
 
@@ -175,7 +180,19 @@ public class CommitCommand extends GitCommand<RevCommit> {
 						state.name()));
 
 			if (!noVerify) {
-				Hooks.preCommit(repo, hookOutRedirect).call();
+				final ByteArrayOutputStream errorByteArray = new ByteArrayOutputStream();
+				final PrintStream hookErrRedirect = new PrintStream(
+						errorByteArray);
+				ProcessResult preCommitHookResult = FS.DETECTED.runIfPresent(
+						repo, Hook.PRE_COMMIT, new String[0], hookOutRedirect,
+						hookErrRedirect, null);
+				if (preCommitHookResult.getStatus() == ProcessResult.Status.OK
+						&& preCommitHookResult.getExitCode() != 0) {
+					String errorMessage = MessageFormat.format(
+							JGitText.get().commitRejectedByHook, Hook.PRE_COMMIT.getName(),
+							errorByteArray.toString());
+					throw new RejectCommitException(errorMessage);
+				}
 			}
 
 			processOptions(state, rw);
@@ -213,11 +230,6 @@ public class CommitCommand extends GitCommand<RevCommit> {
 				} else {
 					parents.add(0, headId);
 				}
-
-			if (!noVerify) {
-				message = Hooks.commitMsg(repo, hookOutRedirect)
-						.setCommitMessage(message).call();
-			}
 
 			// lock the index
 			DirCache index = repo.lockDirCache();
@@ -759,9 +771,9 @@ public class CommitCommand extends GitCommand<RevCommit> {
 	/**
 	 * Sets the {@link #noVerify} option on this commit command.
 	 * <p>
-	 * Both the pre-commit and commit-msg hooks can block a commit by their
-	 * return value; setting this option to <code>true</code> will bypass these
-	 * two hooks.
+	 * Both the {@link Hook#PRE_COMMIT pre-commit} and {@link Hook#COMMIT_MSG
+	 * commit-msg} hooks can block a commit by their return value; setting this
+	 * option to <code>true</code> will bypass these two hooks.
 	 * </p>
 	 *
 	 * @param noVerify

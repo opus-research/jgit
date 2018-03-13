@@ -158,12 +158,12 @@ public class JGitText extends TranslationBundle {
 	/***/ public String classCastNotA;
 	/***/ public String cloneNonEmptyDirectory;
 	/***/ public String collisionOn;
-	/***/ public String commandRejectedByHook;
 	/***/ public String commandWasCalledInTheWrongState;
 	/***/ public String commitAlreadyExists;
 	/***/ public String commitMessageNotSpecified;
 	/***/ public String commitOnRepoWithoutHEADCurrentlyNotSupported;
 	/***/ public String commitAmendOnInitialNotPossible;
+	/***/ public String commitRejectedByHook;
 	/***/ public String compressingObjects;
 	/***/ public String connectionFailed;
 	/***/ public String connectionTimeOut;
@@ -248,7 +248,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String errorEncodingFromFile;
 	/***/ public String errorInBase64CodeReadingStream;
 	/***/ public String errorInPackedRefs;
-	/***/ public String errorInvalidPushCert;
 	/***/ public String errorInvalidProtocolWantedOldNewRef;
 	/***/ public String errorListing;
 	/***/ public String errorOccurredDuringUnpackingOnTheRemoteEnd;
@@ -449,7 +448,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String packfileCorruptionDetected;
 	/***/ public String packFileInvalid;
 	/***/ public String packfileIsTruncated;
-	/***/ public String packfileIsTruncatedNoParam;
 	/***/ public String packHasUnresolvedDeltas;
 	/***/ public String packingCancelledDuringObjectsWriting;
 	/***/ public String packObjectCountMismatch;
@@ -584,7 +582,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String transportProtoLocal;
 	/***/ public String transportProtoSFTP;
 	/***/ public String transportProtoSSH;
-	/***/ public String transportProtoTest;
 	/***/ public String transportSSHRetryInterrupt;
 	/***/ public String treeEntryAlreadyExists;
 	/***/ public String treeFilterMarkerTooManyFilters;

@@ -126,13 +126,13 @@ public abstract class FS_POSIX extends FS {
 	}
 
 	/**
-	 * @since 4.0
+	 * @since 3.7
 	 */
 	@Override
-	public ProcessResult runHookIfPresent(Repository repository, String hookName,
+	public ProcessResult runIfPresent(Repository repository, Hook hook,
 			String[] args, PrintStream outRedirect, PrintStream errRedirect,
 			String stdinArgs) throws JGitInternalException {
-		return internalRunHookIfPresent(repository, hookName, args, outRedirect,
+		return internalRunIfPresent(repository, hook, args, outRedirect,
 				errRedirect, stdinArgs);
 	}
 }
