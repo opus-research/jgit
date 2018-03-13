@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, Robin Rosenberg
+ * Copyright (C) 2013, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,93 +40,60 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.pgm;
 
-package org.eclipse.jgit.util;
+import static org.junit.Assert.assertArrayEquals;
 
-import static org.junit.Assert.assertEquals;
-
-import org.eclipse.jgit.junit.MockSystemReader;
-import org.eclipse.jgit.lib.PersonIdent;
-import org.eclipse.jgit.util.GitDateFormatter.Format;
-import org.junit.After;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
 import org.junit.Before;
 import org.junit.Test;
 
-public class GitDateFormatterTest {
+public class DescribeTest extends CLIRepositoryTestCase {
 
-	private MockSystemReader mockSystemReader;
+	private Git git;
 
-	private PersonIdent ident;
-
+	@Override
 	@Before
-	public void setUp() {
-		mockSystemReader = new MockSystemReader() {
-			@Override
-			public long getCurrentTime() {
-				return 1318125997291L;
-			}
-		};
-		SystemReader.setInstance(mockSystemReader);
-		ident = RawParseUtils
-				.parsePersonIdent("A U Thor <author@example.com> 1316560165 -0400");
+	public void setUp() throws Exception {
+		super.setUp();
+		git = new Git(db);
 	}
 
-	@After
-	public void tearDown() {
-		SystemReader.setInstance(null);
+	private void initialCommitAndTag() throws Exception {
+		git.commit().setMessage("initial commit").call();
+		git.tag().setName("v1.0").call();
 	}
 
 	@Test
-	public void DEFAULT() {
-		assertEquals("Tue Sep 20 19:09:25 2011 -0400", new GitDateFormatter(
-				Format.DEFAULT).formatDate(ident));
+	public void testNoHead() throws Exception {
+		assertArrayEquals(
+				new String[] { "fatal: No names found, cannot describe anything." },
+				execute("git describe"));
 	}
 
 	@Test
-	public void RELATIVE() {
-		assertEquals("3 weeks ago",
-				new GitDateFormatter(Format.RELATIVE).formatDate(ident));
+	public void testHeadNoTag() throws Exception {
+		git.commit().setMessage("initial commit").call();
+		assertArrayEquals(
+				new String[] { "fatal: No names found, cannot describe anything." },
+				execute("git describe"));
 	}
 
 	@Test
-	public void LOCAL() {
-		assertEquals("Tue Sep 20 19:39:25 2011", new GitDateFormatter(
-				Format.LOCAL).formatDate(ident));
+	public void testDescribeTag() throws Exception {
+		initialCommitAndTag();
+		assertArrayEquals(new String[] { "v1.0", "" },
+				execute("git describe HEAD"));
 	}
 
 	@Test
-	public void ISO() {
-		assertEquals("2011-09-20 19:09:25 -0400", new GitDateFormatter(
-				Format.ISO).formatDate(ident));
-	}
-
-	@Test
-	public void RFC() {
-		assertEquals("Tue, 20 Sep 2011 19:09:25 -0400", new GitDateFormatter(
-				Format.RFC).formatDate(ident));
-	}
-
-	@Test
-	public void SHORT() {
-		assertEquals("2011-09-20",
-				new GitDateFormatter(Format.SHORT).formatDate(ident));
-	}
-
-	@Test
-	public void RAW() {
-		assertEquals("1316560165 -0400",
-				new GitDateFormatter(Format.RAW).formatDate(ident));
-	}
-
-	@Test
-	public void LOCALE() {
-		assertEquals("Sep 20, 2011 7:09:25 PM -0400", new GitDateFormatter(
-				Format.LOCALE).formatDate(ident));
-	}
-
-	@Test
-	public void LOCALELOCAL() {
-		assertEquals("Sep 20, 2011 7:39:25 PM", new GitDateFormatter(
-				Format.LOCALELOCAL).formatDate(ident));
+	public void testDescribeCommit() throws Exception {
+		initialCommitAndTag();
+		writeTrashFile("greeting", "Hello, world!");
+		git.add().addFilepattern("greeting").call();
+		git.commit().setMessage("2nd commit").call();
+		assertArrayEquals(new String[] { "v1.0-1-g56f6ceb", "" },
+				execute("git describe"));
 	}
 }

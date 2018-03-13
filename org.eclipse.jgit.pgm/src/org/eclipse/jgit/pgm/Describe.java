@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2012, Google Inc.
+ * Copyright (C) 2013, Matthias Sohn <matthias.sohn@sap.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,68 +40,36 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.pgm;
 
-package org.eclipse.jgit.transport;
+import org.eclipse.jgit.api.DescribeCommand;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.RefNotFoundException;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.pgm.internal.CLIText;
+import org.kohsuke.args4j.Argument;
 
-import java.io.IOException;
+@Command(common = true, usage = "usage_Describe")
+class Describe extends TextBuiltin {
 
-import org.eclipse.jgit.internal.JGitText;
+	@Argument(index = 0, metaVar = "metaVar_treeish")
+	private ObjectId tree;
 
-/**
- * Indicates a transport service may not continue execution.
- *
- * @since 2.0
- */
-public class ServiceMayNotContinueException extends IOException {
-	private static final long serialVersionUID = 1L;
+	@Override
+	protected void run() throws Exception {
+		DescribeCommand cmd = new Git(db).describe();
+		if (tree != null)
+			cmd.setTarget(tree);
+		String result = null;
+		try {
+			result = cmd.call();
+		} catch (RefNotFoundException e) {
+			throw die(CLIText.get().noNamesFound, e);
+		}
+		if (result == null)
+			throw die(CLIText.get().noNamesFound);
 
-	private boolean output;
-
-	/** Initialize with no message. */
-	public ServiceMayNotContinueException() {
-		// Do not set a message.
+		outw.println(result);
 	}
 
-	/**
-	 * @param msg
-	 *            a message explaining why it cannot continue. This message may
-	 *            be shown to an end-user.
-	 */
-	public ServiceMayNotContinueException(String msg) {
-		super(msg);
-	}
-
-	/**
-	 * @param msg
-	 *            a message explaining why it cannot continue. This message may
-	 *            be shown to an end-user.
-	 * @param cause
-	 *            the cause of the exception.
-	 * @since 3.2
-	 */
-	public ServiceMayNotContinueException(String msg, Throwable cause) {
-		super(msg);
-		initCause(cause);
-	}
-
-	/**
-	 * Initialize with an "internal server error" message and a cause.
-	 *
-	 * @param cause
-	 *            the cause of the exception.
-	 * @since 3.2
-	 */
-	public ServiceMayNotContinueException(Throwable cause) {
-		this(JGitText.get().internalServerError, cause);
-	}
-
-	/** @return true if the message was already output to the client. */
-	public boolean isOutput() {
-		return output;
-	}
-
-	/** Mark this message has being sent to the client. */
-	public void setOutput() {
-		output = true;
-	}
 }

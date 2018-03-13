@@ -139,10 +139,7 @@
         <includes>
           <include>plugin.properties</include>
           <include>META-INF/services/org.eclipse.jgit.pgm.TextBuiltin</include>
-          <include>META-INF/p2.inf</include>
           <include>about.html</include>
-          <include>git</include>
-          <include>git.bat</include>
         </includes>
       </resource>
       <resource>
@@ -210,7 +207,7 @@
             <configuration>
               <tasks>
                 <concat destfile="${basedir}/target/jgit" force="yes" binary="true">
-                  <fileset file="${basedir}/git" />
+                  <fileset file="${basedir}/jgit.sh" />
                   <fileset file="${basedir}/target/jgit-cli.jar" />
                 </concat>
                 <chmod file="${basedir}/target/jgit" perm="a+x"/>
