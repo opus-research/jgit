@@ -57,7 +57,6 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.BitmapIndex;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
@@ -69,7 +68,6 @@ import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.BitmapIndexImpl;
 import org.eclipse.jgit.storage.file.PackBitmapIndexBuilder;
-import org.eclipse.jgit.storage.file.PackBitmapIndexRemapper;
 import org.eclipse.jgit.util.BlockList;
 
 /** Helper class for the PackWriter to select commits for pack index bitmaps. */
@@ -90,8 +88,6 @@ class PackWriterBitmapPreparer {
 
 	private final PackBitmapIndexBuilder writeBitmaps;
 
-	private final BitmapIndexImpl commitBitmapIndex;
-
 	private final BitmapIndexImpl bitmapIndex;
 
 	private final int minCommits = 100;
@@ -100,14 +96,12 @@ class PackWriterBitmapPreparer {
 
 	PackWriterBitmapPreparer(ObjectReader reader,
 			PackBitmapIndexBuilder writeBitmaps, ProgressMonitor pm,
-			Set<? extends ObjectId> want) throws IOException {
+			Set<? extends ObjectId> want) {
 		this.reader = reader;
 		this.writeBitmaps = writeBitmaps;
 		this.pm = pm;
 		this.want = want;
-		this.commitBitmapIndex = new BitmapIndexImpl(writeBitmaps);
-		this.bitmapIndex = new BitmapIndexImpl(PackBitmapIndexRemapper
-				.newPackBitmapIndex(reader.getBitmapIndex(), writeBitmaps));
+		this.bitmapIndex = new BitmapIndexImpl(writeBitmaps);
 	}
 
 	Collection<BitmapCommit> doCommitSelection(int expectedNumCommits)
@@ -156,7 +150,7 @@ class PackWriterBitmapPreparer {
 
 				nextIn = nextSelectionDistance(index, cardinality);
 
-				BitmapBuilder fullBitmap = commitBitmapIndex.newBitmapBuilder();
+				BitmapBuilder fullBitmap = bitmapIndex.newBitmapBuilder();
 				rw.reset();
 				rw.markStart(c);
 				rw.setRevFilter(
@@ -217,7 +211,7 @@ class PackWriterBitmapPreparer {
 				peeledWant.add(rc);
 				rw.markStart(rc);
 
-				BitmapBuilder bitmap = commitBitmapIndex.newBitmapBuilder();
+				BitmapBuilder bitmap = bitmapIndex.newBitmapBuilder();
 				bitmap.add(rc, Constants.OBJ_COMMIT);
 				paths.add(bitmap);
 			}

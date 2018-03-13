@@ -182,7 +182,7 @@ public class PackBitmapIndexBuilder extends BasePackBitmapIndex {
 	public int findPosition(AnyObjectId objectId) {
 		PositionEntry entry = positionEntries.get(objectId);
 		if (entry == null)
-			return -1;
+			throw new IllegalStateException();
 		return entry.offsetPosition;
 	}
 
