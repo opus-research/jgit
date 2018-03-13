@@ -205,7 +205,7 @@ public class ManifestParser extends DefaultHandler {
 				throw new SAXException(RepoText.get().invalidManifest);
 			currentProject.addCopyFile(new CopyFile(
 						rootRepo,
-						currentProject.getPath(),
+						currentProject.path,
 						attributes.getValue("src"), //$NON-NLS-1$
 						attributes.getValue("dest"))); //$NON-NLS-1$
 		} else if ("include".equals(qName)) { //$NON-NLS-1$
@@ -266,7 +266,7 @@ public class ManifestParser extends DefaultHandler {
 			throw new SAXException(e);
 		}
 		for (RepoProject proj : projects) {
-			String remote = proj.getRemote();
+			String remote = proj.remote;
 			if (remote == null) {
 				if (defaultRemote == null) {
 					if (filename != null)
@@ -286,7 +286,7 @@ public class ManifestParser extends DefaultHandler {
 					remoteUrl = remoteUrl + "/"; //$NON-NLS-1$
 				remoteUrls.put(remote, remoteUrl);
 			}
-			proj.setUrl(remoteUrl + proj.getName())
+			proj.setUrl(remoteUrl + proj.name)
 					.setDefaultRevision(defaultRevision);
 		}
 
@@ -339,7 +339,7 @@ public class ManifestParser extends DefaultHandler {
 
 	boolean inGroups(RepoProject proj) {
 		for (String group : minusGroups) {
-			if (proj.inGroup(group)) {
+			if (proj.groups.contains(group)) {
 				// minus groups have highest priority.
 				return false;
 			}
@@ -349,7 +349,7 @@ public class ManifestParser extends DefaultHandler {
 			return true;
 		}
 		for (String group : plusGroups) {
-			if (proj.inGroup(group))
+			if (proj.groups.contains(group))
 				return true;
 		}
 		return false;
