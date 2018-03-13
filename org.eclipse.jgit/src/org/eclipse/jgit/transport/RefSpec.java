@@ -44,7 +44,6 @@
 package org.eclipse.jgit.transport;
 
 import java.text.MessageFormat;
-import java.io.Serializable;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.lib.Constants;
@@ -56,10 +55,8 @@ import org.eclipse.jgit.lib.Ref;
  * A ref specification provides matching support and limited rules to rewrite a
  * reference in one repository to another reference in another repository.
  */
-public class RefSpec implements Serializable {
-	private static final long serialVersionUID = 1L;
-
-        /**
+public class RefSpec {
+	/**
 	 * Suffix for wildcard ref spec component, that indicate matching all refs
 	 * with specified prefix.
 	 */
