@@ -54,7 +54,6 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
 import java.io.Reader;
 import java.io.Writer;
 import java.util.List;
@@ -72,7 +71,6 @@ import org.eclipse.jgit.lfs.errors.LfsValidationError;
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonIOException;
 
 /**
  * LFS protocol handler implementing the LFS batch API [1]
@@ -137,6 +135,9 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 	@Override
 	protected void doPost(HttpServletRequest req, HttpServletResponse res)
 			throws ServletException, IOException {
+		Writer w = new BufferedWriter(
+				new OutputStreamWriter(res.getOutputStream(), UTF_8));
+
 		Reader r = new BufferedReader(
 				new InputStreamReader(req.getInputStream(), UTF_8));
 		LfsRequest request = gson.fromJson(r, LfsRequest.class);
@@ -148,23 +149,22 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 			if (repo == null) {
 				res.setStatus(SC_SERVICE_UNAVAILABLE);
 			} else {
-				Writer w = new BufferedWriter(
-						new OutputStreamWriter(res.getOutputStream(), UTF_8));
 				res.setStatus(SC_OK);
 				res.setContentType(CONTENTTYPE_VND_GIT_LFS_JSON);
 				TransferHandler handler = TransferHandler
 						.forOperation(request.operation, repo, request.objects);
 				gson.toJson(handler.process(), w);
-				w.flush();
 			}
 		} catch (LfsValidationError e) {
-			sendError(res, SC_UNPROCESSABLE_ENTITY, e.getMessage());
+			sendError(res, w, SC_UNPROCESSABLE_ENTITY, e.getMessage());
 		} catch (LfsRepositoryNotFound e) {
-			sendError(res, SC_NOT_FOUND, e.getMessage());
+			sendError(res, w, SC_NOT_FOUND, e.getMessage());
 		} catch (LfsRepositoryReadOnly e) {
-			sendError(res, SC_FORBIDDEN, e.getMessage());
+			sendError(res, w, SC_FORBIDDEN, e.getMessage());
 		} catch (LfsException e) {
-			sendError(res, SC_SERVICE_UNAVAILABLE, e.getMessage());
+			sendError(res, w, SC_SERVICE_UNAVAILABLE, e.getMessage());
+		} finally {
+			w.flush();
 		}
 	}
 
@@ -176,11 +176,10 @@ public abstract class LfsProtocolServlet extends HttpServlet {
 		}
 	}
 
-	private void sendError(HttpServletResponse rsp, int status, String message)
-			throws JsonIOException, IOException {
+	private void sendError(HttpServletResponse rsp, Writer writer, int status,
+			String message) {
 		rsp.setStatus(status);
-		PrintWriter writer = rsp.getWriter();
-		writer.println(gson.toJson(new Error(message)));
+		gson.toJson(new Error(message), writer);
 	}
 
 	private Gson createGson() {
