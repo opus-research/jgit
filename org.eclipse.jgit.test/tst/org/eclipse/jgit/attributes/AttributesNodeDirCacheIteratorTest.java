@@ -243,23 +243,23 @@ public class AttributesNodeDirCacheIteratorTest extends RepositoryTestCase {
 		DirCacheIterator itr = walk.getTree(0, DirCacheIterator.class);
 		assertNotNull("has tree", itr);
 
-		AttributesNode attributesNode = itr.getEntryAttributesNode(db
+		AttributesNode attributeNode = itr.getEntryAttributesNode(db
 				.newObjectReader());
-		assertAttributesNode(pathName, attributesNode, nodeAttrs);
+		assertAttributeNode(pathName, attributeNode, nodeAttrs);
 
 		if (D.equals(type))
 			walk.enterSubtree();
 
 	}
 
-	private void assertAttributesNode(String pathName,
-			AttributesNode attributesNode, List<Attribute> nodeAttrs) {
-		if (attributesNode == null)
+	private void assertAttributeNode(String pathName,
+			AttributesNode attributeNode, List<Attribute> nodeAttrs) {
+		if (attributeNode == null)
 			assertTrue(nodeAttrs == null || nodeAttrs.isEmpty());
 		else {
 
 			Map<String, Attribute> entryAttributes = new LinkedHashMap<String, Attribute>();
-			attributesNode.getAttributes(pathName, false, entryAttributes);
+			attributeNode.getAttributes(pathName, false, entryAttributes);
 
 			if (nodeAttrs != null && !nodeAttrs.isEmpty()) {
 				for (Attribute attribute : nodeAttrs) {

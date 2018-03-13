@@ -67,7 +67,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.eclipse.jgit.api.errors.JGitInternalException;
-import org.eclipse.jgit.errors.SymlinksNotSupportedException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
@@ -248,7 +247,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public long lastModified(File f) throws IOException {
-		return f.lastModified();
+		return FileUtils.lastModified(f);
 	}
 
 	/**
@@ -261,7 +260,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public void setLastModified(File f, long time) throws IOException {
-		f.setLastModified(time);
+		FileUtils.setLastModified(f, time);
 	}
 
 	/**
@@ -274,7 +273,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public long length(File path) throws IOException {
-		return path.length();
+		return FileUtils.getLength(path);
 	}
 
 	/**
@@ -286,9 +285,7 @@ public abstract class FS {
 	 * @since 3.3
 	 */
 	public void delete(File f) throws IOException {
-		if (!f.delete())
-			throw new IOException(MessageFormat.format(
-					JGitText.get().deleteFileFailed, f.getAbsolutePath()));
+		FileUtils.delete(f);
 	}
 
 	/**
@@ -623,8 +620,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public String readSymLink(File path) throws IOException {
-		throw new SymlinksNotSupportedException(
-				JGitText.get().errorSymlinksNotSupported);
+		return FileUtils.readSymLink(path);
 	}
 
 	/**
@@ -634,7 +630,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public boolean isSymLink(File path) throws IOException {
-		return false;
+		return FileUtils.isSymlink(path);
 	}
 
 	/**
@@ -646,7 +642,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public boolean exists(File path) {
-		return path.exists();
+		return FileUtils.exists(path);
 	}
 
 	/**
@@ -658,7 +654,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public boolean isDirectory(File path) {
-		return path.isDirectory();
+		return FileUtils.isDirectory(path);
 	}
 
 	/**
@@ -670,7 +666,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public boolean isFile(File path) {
-		return path.isFile();
+		return FileUtils.isFile(path);
 	}
 
 	/**
@@ -681,7 +677,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public boolean isHidden(File path) throws IOException {
-		return path.isHidden();
+		return FileUtils.isHidden(path);
 	}
 
 	/**
@@ -693,9 +689,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public void setHidden(File path, boolean hidden) throws IOException {
-		if (!path.getName().startsWith(".")) //$NON-NLS-1$
-			throw new IllegalArgumentException(
-					JGitText.get().hiddenFilesStartWithDot);
+		FileUtils.setHidden(path, hidden);
 	}
 
 	/**
@@ -707,8 +701,7 @@ public abstract class FS {
 	 * @since 3.0
 	 */
 	public void createSymLink(File path, String target) throws IOException {
-		throw new SymlinksNotSupportedException(
-				JGitText.get().errorSymlinksNotSupported);
+		FileUtils.createSymLink(path, target);
 	}
 
 	/**
