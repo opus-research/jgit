@@ -129,11 +129,7 @@ public class MergeResult {
 	public MergeResult(ObjectId newHead, ObjectId base,
 			ObjectId[] mergedCommits, MergeStatus mergeStatus,
 			MergeStrategy mergeStrategy) {
-		this.newHead = newHead;
-		this.mergedCommits = mergedCommits;
-		this.base = base;
-		this.mergeStatus = mergeStatus;
-		this.mergeStrategy = mergeStrategy;
+		this(newHead, base, mergedCommits, mergeStatus, mergeStrategy, null);
 	}
 
 	/**
@@ -195,10 +191,19 @@ public class MergeResult {
 
 	@Override
 	public String toString() {
+		boolean first = true;
+		StringBuilder commits = new StringBuilder();
+		for (ObjectId commit : mergedCommits) {
+			if (!first)
+				commits.append(", ");
+			else
+				first = false;
+			commits.append(ObjectId.toString(commit));
+		}
 		return MessageFormat.format(
 				JGitText.get().mergeUsingStrategyResultedInDescription,
-				mergeStrategy.getName(), mergeStatus, (description == null ? ""
-						: ", " + description));
+				commits, ObjectId.toString(base), mergeStrategy.getName(),
+				mergeStatus, (description == null ? "" : ", " + description));
 	}
 
 	/**
@@ -218,10 +223,10 @@ public class MergeResult {
 	 * If the returned value contains a mapping "path"->[x][y]=z then this means
 	 * <ul>
 	 * <li>the file with path "path" contains conflicts</li>
-	 * <li>if y<"number of merged commits": for conflict number x in this file
+	 * <li>if y < "number of merged commits": for conflict number x in this file
 	 * the chunk which was copied from commit number y starts on line number z.
 	 * All numberings and line numbers start with 0.</li>
-	 * <li>if y=="number of merged commits": the first non-conflicting line
+	 * <li>if y == "number of merged commits": the first non-conflicting line
 	 * after conflict number x starts at line number z</li>
 	 * </ul>
 	 * <p>
