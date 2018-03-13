@@ -44,6 +44,7 @@
 package org.eclipse.jgit.internal.storage.reftable;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.FILE_HEADER_LEN;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.INDEX_BLOCK_TYPE;
 import static org.eclipse.jgit.internal.storage.reftable.ReftableConstants.LOG_BLOCK_TYPE;
 import static org.eclipse.jgit.lib.Constants.OBJECT_ID_LENGTH;
@@ -175,6 +176,14 @@ class ReftableOutputStream extends OutputStream {
 		if (cur + cnt > blockBuf.length) {
 			int n = Math.max(cur + cnt, blockBuf.length * 2);
 			blockBuf = Arrays.copyOf(blockBuf, n);
+		}
+	}
+
+	void flushFileHeader() throws IOException {
+		if (cur == FILE_HEADER_LEN && out.getCount() == 0) {
+			// If the file will be a log only file, flush the file header.
+			out.write(blockBuf, 0, cur);
+			cur = 0;
 		}
 	}
 

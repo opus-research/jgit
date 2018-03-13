@@ -41,35 +41,54 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.internal.storage.reftable;
+package org.eclipse.jgit.errors;
 
-import java.io.IOException;
+import org.eclipse.jgit.annotations.Nullable;
 
-import org.eclipse.jgit.lib.ReflogEntry;
+/**
+ * Exception thrown when encounters a corrupt pack index file.
+ *
+ * @since 4.9
+ */
+public class CorruptPackIndexException extends Exception {
+	private static final long serialVersionUID = 1L;
 
-class EmptyLogCursor extends LogCursor {
-	@Override
-	public boolean next() throws IOException {
-		return false;
+	/** The error type of a corrupt index file. */
+	public enum ErrorType {
+		/** Offset does not match index in pack file. */
+		MISMATCH_OFFSET,
+		/** CRC does not match CRC of the object data in pack file. */
+		MISMATCH_CRC,
+		/** CRC is not present in index file. */
+		MISSING_CRC,
+		/** Object in pack is not present in index file. */
+		MISSING_OBJ,
+		/** Object in index file is not present in pack file. */
+		UNKNOWN_OBJ,
 	}
 
-	@Override
-	public String getRefName() {
-		return null;
+	private ErrorType errorType;
+
+	/**
+	 * Report a specific error condition discovered in an index file.
+	 *
+	 * @param message
+	 *            the error message.
+	 * @param errorType
+	 *            the error type of corruption.
+	 */
+	public CorruptPackIndexException(String message, ErrorType errorType) {
+		super(message);
+		this.errorType = errorType;
 	}
 
-	@Override
-	public long getReflogTimeUsec() {
-		return 0;
-	}
-
-	@Override
-	public ReflogEntry getReflogEntry() {
-		return null;
-	}
-
-	@Override
-	public void close() {
-		// Do nothing.
+	/**
+	 * Specific the reason of the corrupt index file.
+	 *
+	 * @return error condition or null.
+	 */
+	@Nullable
+	public ErrorType getErrorType() {
+		return errorType;
 	}
 }
