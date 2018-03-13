@@ -1,5 +1,4 @@
 /*
- * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
  * Copyright (C) 2009, Christian Halstrick <christian.halstrick@sap.com>
  * Copyright (C) 2009, Google Inc.
  * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
@@ -80,15 +79,12 @@ public class CoreConfig {
 
 	private final boolean logAllRefUpdates;
 
-	private final boolean fileMode;
-
 	private final AutoCRLF autoCRLF;
 
 	private CoreConfig(final Config rc) {
 		compression = rc.getInt("core", "compression", DEFAULT_COMPRESSION);
 		packIndexVersion = rc.getInt("pack", "indexversion", 2);
 		logAllRefUpdates = rc.getBoolean("core", "logallrefupdates", true);
-		fileMode = rc.getBoolean("core", "filemode", true);
 		autoCRLF = rc.getEnum("core", null, "autocrlf", AutoCRLF.FALSE);
 	}
 
@@ -112,13 +108,6 @@ public class CoreConfig {
 	 */
 	public boolean isLogAllRefUpdates() {
 		return logAllRefUpdates;
-	}
-
-	/**
-	 * @return whether to trust file modes
-	 */
-	public boolean isFileMode() {
-		return fileMode;
 	}
 
 	/**
