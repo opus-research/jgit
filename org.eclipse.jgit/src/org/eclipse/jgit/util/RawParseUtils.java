@@ -674,12 +674,12 @@ public final class RawParseUtils {
 			Charset aliased = charsetForAlias(decoded);
 			if (aliased != null)
 				return aliased;
-			return InvalidCharset.INSTANCE;
+			throw badName;
 		} catch (UnsupportedCharsetException badName) {
 			Charset aliased = charsetForAlias(decoded);
 			if (aliased != null)
 				return aliased;
-			return InvalidCharset.INSTANCE;
+			throw badName;
 		}
 	}
 
