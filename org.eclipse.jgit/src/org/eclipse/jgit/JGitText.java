@@ -483,9 +483,8 @@ public class JGitText extends TranslationBundle {
 	/***/ public String startingReadStageWithoutWrittenRequestDataPendingIsNotSupported;
 	/***/ public String statelessRPCRequiresOptionToBeEnabled;
 	/***/ public String submoduleExists;
-	/***/ public String submoduleInvalidGitdirRef;
-	/***/ public String submoduleParentRemoteUrlInvalid;
 	/***/ public String submodulesNotSupported;
+	/***/ public String submoduleParentRemoteUrlInvalid;
 	/***/ public String symlinkCannotBeWrittenAsTheLinkTarget;
 	/***/ public String systemConfigFileInvalid;
 	/***/ public String tagNameInvalid;
