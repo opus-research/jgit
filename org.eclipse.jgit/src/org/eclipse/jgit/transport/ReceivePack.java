@@ -43,20 +43,13 @@
 
 package org.eclipse.jgit.transport;
 
-import static org.eclipse.jgit.transport.BasePackPushConnection.CAPABILITY_DELETE_REFS;
-import static org.eclipse.jgit.transport.BasePackPushConnection.CAPABILITY_OFS_DELTA;
-import static org.eclipse.jgit.transport.BasePackPushConnection.CAPABILITY_REPORT_STATUS;
-import static org.eclipse.jgit.transport.BasePackPushConnection.CAPABILITY_SIDE_BAND_64K;
-import static org.eclipse.jgit.transport.SideBandOutputStream.CH_DATA;
-import static org.eclipse.jgit.transport.SideBandOutputStream.CH_PROGRESS;
-import static org.eclipse.jgit.transport.SideBandOutputStream.MAX_BUF;
-
+import java.io.BufferedWriter;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-import java.io.Writer;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -91,6 +84,12 @@ import org.eclipse.jgit.util.io.TimeoutOutputStream;
  * Implements the server side of a push connection, receiving objects.
  */
 public class ReceivePack {
+	static final String CAPABILITY_REPORT_STATUS = BasePackPushConnection.CAPABILITY_REPORT_STATUS;
+
+	static final String CAPABILITY_DELETE_REFS = BasePackPushConnection.CAPABILITY_DELETE_REFS;
+
+	static final String CAPABILITY_OFS_DELTA = BasePackPushConnection.CAPABILITY_OFS_DELTA;
+
 	/** Database we write the stored objects into. */
 	private final Repository db;
 
@@ -152,7 +151,7 @@ public class ReceivePack {
 
 	private PacketLineOut pckOut;
 
-	private Writer msgs;
+	private PrintWriter msgs;
 
 	/** The refs we advertised as existing at the start of the connection. */
 	private Map<String, Ref> refs;
@@ -166,11 +165,8 @@ public class ReceivePack {
 	/** An exception caught while unpacking and fsck'ing the objects. */
 	private Throwable unpackError;
 
-	/** If {@link BasePackPushConnection#CAPABILITY_REPORT_STATUS} is enabled. */
+	/** if {@link #enabledCapablities} has {@link #CAPABILITY_REPORT_STATUS} */
 	private boolean reportStatus;
-
-	/** If {@link BasePackPushConnection#CAPABILITY_SIDE_BAND_64K} is enabled. */
-	private boolean sideBand;
 
 	/** Lock around the received pack file, while updating refs. */
 	private PackLock packLock;
@@ -444,12 +440,7 @@ public class ReceivePack {
 	 *            string must not end with an LF, and must not contain an LF.
 	 */
 	public void sendError(final String what) {
-		try {
-			if (msgs != null)
-				msgs.write("error: " + what + "\n");
-		} catch (IOException e) {
-			// Ignore write failures.
-		}
+		sendMessage("error", what);
 	}
 
 	/**
@@ -463,12 +454,12 @@ public class ReceivePack {
 	 *            string must not end with an LF, and must not contain an LF.
 	 */
 	public void sendMessage(final String what) {
-		try {
-			if (msgs != null)
-				msgs.write(what + "\n");
-		} catch (IOException e) {
-			// Ignore write failures.
-		}
+		sendMessage("remote", what);
+	}
+
+	private void sendMessage(final String type, final String what) {
+		if (msgs != null)
+			msgs.println(type + ": " + what);
 	}
 
 	/**
@@ -508,8 +499,16 @@ public class ReceivePack {
 
 			pckIn = new PacketLineIn(rawIn);
 			pckOut = new PacketLineOut(rawOut);
-			if (messages != null)
-				msgs = new OutputStreamWriter(messages, Constants.CHARSET);
+			if (messages != null) {
+				msgs = new PrintWriter(new BufferedWriter(
+						new OutputStreamWriter(messages, Constants.CHARSET),
+						8192)) {
+					@Override
+					public void println() {
+						print('\n');
+					}
+				};
+			}
 
 			enabledCapablities = new HashSet<String>();
 			commands = new ArrayList<ReceiveCommand>();
@@ -517,19 +516,8 @@ public class ReceivePack {
 			service();
 		} finally {
 			try {
-				if (pckOut != null)
-					pckOut.flush();
-				if (msgs != null)
+				if (msgs != null) {
 					msgs.flush();
-
-				if (sideBand) {
-					// If we are using side band, we need to send a final
-					// flush-pkt to tell the remote peer the side band is
-					// complete and it should stop decoding. We need to
-					// use the original output stream as rawOut is now the
-					// side band data channel.
-					//
-					new PacketLineOut(output).end();
 				}
 			} finally {
 				unlockPack();
@@ -593,9 +581,10 @@ public class ReceivePack {
 			} else if (msgs != null) {
 				sendStatusReport(false, new Reporter() {
 					void sendString(final String s) throws IOException {
-						msgs.write(s + "\n");
+						msgs.println(s);
 					}
 				});
+				msgs.flush();
 			}
 
 			postReceive.onPostReceive(this, filterCommands(Result.OK));
@@ -620,7 +609,6 @@ public class ReceivePack {
 	public void sendAdvertisedRefs(final RefAdvertiser adv) throws IOException {
 		final RevFlag advertised = walk.newFlag("ADVERTISED");
 		adv.init(walk, advertised);
-		adv.advertiseCapability(CAPABILITY_SIDE_BAND_64K);
 		adv.advertiseCapability(CAPABILITY_DELETE_REFS);
 		adv.advertiseCapability(CAPABILITY_REPORT_STATUS);
 		if (allowOfsDelta)
@@ -679,16 +667,6 @@ public class ReceivePack {
 
 	private void enableCapabilities() {
 		reportStatus = enabledCapablities.contains(CAPABILITY_REPORT_STATUS);
-
-		sideBand = enabledCapablities.contains(CAPABILITY_SIDE_BAND_64K);
-		if (sideBand) {
-			OutputStream out = rawOut;
-
-			rawOut = new SideBandOutputStream(CH_DATA, MAX_BUF, out);
-			pckOut = new PacketLineOut(rawOut);
-			msgs = new OutputStreamWriter(new SideBandOutputStream(CH_PROGRESS,
-					MAX_BUF, out), Constants.CHARSET);
-		}
 	}
 
 	private boolean needPack() {
