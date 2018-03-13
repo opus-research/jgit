@@ -63,7 +63,7 @@ public class DirCacheCheckoutTest extends ReadTreeTest {
 			throws IllegalStateException, IOException {
 		DirCache dc = db.lockDirCache();
 		try {
-			dco = new DirCacheCheckout(db, head.getId(), dc, merge.getId());
+			dco = new DirCacheCheckout(db, head.getTreeId(), dc, merge.getTreeId());
 			dco.preScanTwoTrees();
 		} finally {
 			dc.unlock();
@@ -74,7 +74,7 @@ public class DirCacheCheckoutTest extends ReadTreeTest {
 	public void checkout() throws IOException {
 		DirCache dc = db.lockDirCache();
 		try {
-			dco = new DirCacheCheckout(db, theHead.getId(), dc, theMerge.getId());
+			dco = new DirCacheCheckout(db, theHead.getTreeId(), dc, theMerge.getTreeId());
 			dco.checkout();
 		} finally {
 			dc.unlock();

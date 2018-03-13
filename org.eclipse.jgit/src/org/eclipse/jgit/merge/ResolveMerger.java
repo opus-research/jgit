@@ -59,10 +59,10 @@ import java.util.Map;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.diff.DiffAlgorithm;
-import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.diff.RawTextComparator;
 import org.eclipse.jgit.diff.Sequence;
+import org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheBuildIterator;
 import org.eclipse.jgit.dircache.DirCacheBuilder;
@@ -351,7 +351,7 @@ public class ResolveMerger extends ThreeWayMerger {
 	 *            the file in the working tree
 	 * @return <code>false</code> if the merge will fail because the index entry
 	 *         didn't match ours or the working-dir file was dirty and a
-	 *         conflict occurred
+	 *         conflict occured
 	 * @throws MissingObjectException
 	 * @throws IncorrectObjectTypeException
 	 * @throws CorruptObjectException
@@ -364,46 +364,42 @@ public class ResolveMerger extends ThreeWayMerger {
 			CorruptObjectException, IOException {
 		enterSubtree = true;
 		final int modeO = tw.getRawMode(T_OURS);
-		final int modeT = tw.getRawMode(T_THEIRS);
-		final int modeB = tw.getRawMode(T_BASE);
+		final int modeI = tw.getRawMode(T_INDEX);
 
-		if (modeO == 0 && modeT == 0 && modeB == 0)
-			// File is either untracked or new, staged but uncommitted
-			return true;
-
-		if (isIndexDirty())
+		// Each index entry has to match ours, means: it has to be clean
+		if (nonTree(modeI)
+				&& !(tw.idEqual(T_INDEX, T_OURS) && modeO == modeI)) {
+			failingPaths.put(tw.getPathString(), MergeFailureReason.DIRTY_INDEX);
 			return false;
+		}
 
+		final int modeT = tw.getRawMode(T_THEIRS);
 		if (nonTree(modeO) && modeO == modeT && tw.idEqual(T_OURS, T_THEIRS)) {
-			// OURS and THEIRS are equal: it doesn't matter which one we choose.
-			// OURS is chosen.
+			// ours and theirs are equal: it doesn'nt matter
+			// which one we choose. OURS is choosen here.
 			add(tw.getRawPath(), ours, DirCacheEntry.STAGE_0);
 			// no checkout needed!
 			return true;
 		}
 
+		final int modeB = tw.getRawMode(T_BASE);
 		if (nonTree(modeO) && modeB == modeT && tw.idEqual(T_BASE, T_THEIRS)) {
-			// THEIRS was not changed compared to BASE. All changes must be in
-			// OURS. OURS is chosen.
+			// THEIRS was not changed compared to base. All changes must be in
+			// OURS. Choose OURS.
 			add(tw.getRawPath(), ours, DirCacheEntry.STAGE_0);
-			// no checkout needed!
 			return true;
 		}
 
 		if (modeB == modeO && tw.idEqual(T_BASE, T_OURS)) {
-			// OURS was not changed compared to BASE. All changes must be in
-			// THEIRS. THEIRS is chosen.
-
-			// Check worktree before checking out THEIRS
-			if (isWorktreeDirty())
-				return false;
+			// OURS was not changed compared to base. All changes must be in
+			// THEIRS. Choose THEIRS.
 			if (nonTree(modeT)) {
 				DirCacheEntry e = add(tw.getRawPath(), theirs,
 						DirCacheEntry.STAGE_0);
 				if (e != null)
 					toBeCheckedOut.put(tw.getPathString(), e);
 				return true;
-			} else if (modeT == 0 && modeB != 0) {
+			} else if ((modeT == 0) && (modeB != 0)) {
 				// we want THEIRS ... but THEIRS contains the deletion of the
 				// file
 				toBeCheckedOut.put(tw.getPathString(), null);
@@ -445,44 +441,24 @@ public class ResolveMerger extends ThreeWayMerger {
 		}
 
 		if (nonTree(modeO) && nonTree(modeT)) {
-			// Check worktree before modifying files
-			if (isWorktreeDirty())
-				return false;
+			if (!inCore) {
+				// We are going to update the worktree. Make sure the worktree
+				// is not modified
+				if (work != null
+						&& (!nonTree(work.getEntryRawMode()) || work
+								.isModified(index.getDirCacheEntry(), true))) {
+					failingPaths.put(tw.getPathString(),
+							MergeFailureReason.DIRTY_WORKTREE);
+					return false;
+				}
+			}
+
 			if (!contentMerge(base, ours, theirs)) {
 				unmergedPaths.add(tw.getPathString());
 			}
 			modifiedFiles.add(tw.getPathString());
 		}
 		return true;
-	}
-
-	private boolean isIndexDirty() {
-		final int modeI = tw.getRawMode(T_INDEX);
-		final int modeO = tw.getRawMode(T_OURS);
-
-		// Index entry has to match ours to be considered clean
-		final boolean isDirty = nonTree(modeI)
-				&& !(tw.idEqual(T_INDEX, T_OURS) && modeO == modeI);
-		if (isDirty)
-			failingPaths
-					.put(tw.getPathString(), MergeFailureReason.DIRTY_INDEX);
-		return isDirty;
-	}
-
-	private boolean isWorktreeDirty() {
-		if (inCore)
-			return false;
-
-		final int modeF = tw.getRawMode(T_FILE);
-		final int modeO = tw.getRawMode(T_OURS);
-
-		// Worktree entry has to match ours to be considered clean
-		final boolean isDirty = nonTree(modeF)
-				&& !(tw.idEqual(T_FILE, T_OURS) && modeO == modeF);
-		if (isDirty)
-			failingPaths.put(tw.getPathString(),
-					MergeFailureReason.DIRTY_WORKTREE);
-		return isDirty;
 	}
 
 	private boolean contentMerge(CanonicalTreeParser base,
@@ -531,7 +507,7 @@ public class ResolveMerger extends ThreeWayMerger {
 		}
 
 		if (result.containsConflicts()) {
-			// a conflict occurred, the file will contain conflict markers
+			// a conflict occured, the file will contain conflict markers
 			// the index will be populated with the three stages and only the
 			// workdir (if used) contains the halfways merged content
 			add(tw.getRawPath(), base, DirCacheEntry.STAGE_1);
@@ -540,7 +516,7 @@ public class ResolveMerger extends ThreeWayMerger {
 			mergeResults.put(tw.getPathString(), result);
 			return false;
 		} else {
-			// no conflict occurred, the file will contain fully merged content.
+			// no conflict occured, the file will contain fully merged content.
 			// the index will be populated with the new merged version
 			DirCacheEntry dce = new DirCacheEntry(tw.getPathString());
 			dce.setFileMode(tw.getFileMode(0));
@@ -638,8 +614,7 @@ public class ResolveMerger extends ThreeWayMerger {
 	}
 
 	/**
-	 * Returns whether this merge failed abnormally (i.e. not because of a
-	 * conflict)
+	 * Returns whether this merge failed abnormally
 	 *
 	 * @return <code>true</code> if an abnormal failure occurred,
 	 *         <code>false</code> otherwise
