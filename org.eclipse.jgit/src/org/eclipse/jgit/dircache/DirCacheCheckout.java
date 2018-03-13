@@ -1202,9 +1202,8 @@ public class DirCacheCheckout {
 			// Space or period at end of file name is ignored by Windows.
 			// Treat this as a bad path for now. We may want to handle
 			// this as case insensitivity in the future.
-			if (ptr > 0)
-				if (raw[ptr - 1] == '.' || raw[ptr - 1] == ' ')
-					return false;
+			if (raw[ptr - 1] == '.' || raw[ptr - 1] == ' ')
+				return false;
 			int i;
 			// Bad names, eliminate suffix first
 			for (i = start; i < ptr; ++i)
