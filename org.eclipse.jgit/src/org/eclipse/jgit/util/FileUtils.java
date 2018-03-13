@@ -391,25 +391,20 @@ public class FileUtils {
 	 *
 	 * @param path
 	 * @param target
-	 * @return path to the created link
 	 * @throws IOException
-	 * @since 4.1
+	 * @since 3.0
 	 */
-	public static Path createSymLink(File path, String target)
+	public static void createSymLink(File path, String target)
 			throws IOException {
 		Path nioPath = path.toPath();
 		if (Files.exists(nioPath, LinkOption.NOFOLLOW_LINKS)) {
-			if (Files.isRegularFile(nioPath)) {
-				delete(path);
-			} else {
-				delete(path, EMPTY_DIRECTORIES_ONLY | RECURSIVE);
-			}
+			Files.delete(nioPath);
 		}
 		if (SystemReader.getInstance().isWindows()) {
 			target = target.replace('/', '\\');
 		}
 		Path nioTarget = new File(target).toPath();
-		return Files.createSymbolicLink(nioPath, nioTarget);
+		Files.createSymbolicLink(nioPath, nioTarget);
 	}
 
 	/**
