@@ -50,6 +50,7 @@
 
 package org.eclipse.jgit.lib;
 
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -59,6 +60,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.util.StringUtils;
 
@@ -210,8 +212,8 @@ public class Config {
 		final long val = getLong(section, subsection, name, defaultValue);
 		if (Integer.MIN_VALUE <= val && val <= Integer.MAX_VALUE)
 			return (int) val;
-		throw new IllegalArgumentException("Integer value " + section + "."
-				+ name + " out of range");
+		throw new IllegalArgumentException(MessageFormat.format(JGitText.get().integerValueOutOfRange
+				, section, name));
 	}
 
 	/**
@@ -257,8 +259,8 @@ public class Config {
 		try {
 			return mul * Long.parseLong(n);
 		} catch (NumberFormatException nfe) {
-			throw new IllegalArgumentException("Invalid integer value: "
-					+ section + "." + name + "=" + str);
+			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidIntegerValue
+					, section, name, str));
 		}
 	}
 
@@ -303,8 +305,8 @@ public class Config {
 		try {
 			return StringUtils.toBoolean(n);
 		} catch (IllegalArgumentException err) {
-			throw new IllegalArgumentException("Invalid boolean value: "
-					+ section + "." + name + "=" + n);
+			throw new IllegalArgumentException(MessageFormat.format(JGitText.get().invalidBooleanValue
+					, section, name, n));
 		}
 	}
 
@@ -367,6 +369,33 @@ public class Config {
 	 */
 	public Set<String> getSubsections(final String section) {
 		return get(new SubsectionNames(section));
+	}
+
+	/**
+	 * @return the sections defined in this {@link Config}
+	 */
+	public Set<String> getSections() {
+		return get(new SectionNames());
+	}
+
+	/**
+	 * @param section
+	 *            the section
+	 * @return the list of names defined for this section
+	 */
+	public Set<String> getNames(String section) {
+		return getNames(section, null);
+	}
+
+	/**
+	 * @param section
+	 *            the section
+	 * @param subsection
+	 *            the subsection
+	 * @return the list of names defined for this subsection
+	 */
+	public Set<String> getNames(String section, String subsection) {
+		return get(new NamesInSection(section, subsection));
 	}
 
 	/**
@@ -819,7 +848,7 @@ public class Config {
 					input = in.read();
 				}
 				if (']' != input)
-					throw new ConfigInvalidException("Bad group header");
+					throw new ConfigInvalidException(JGitText.get().badGroupHeader);
 				e.suffix = "";
 
 			} else if (last != null) {
@@ -835,7 +864,7 @@ public class Config {
 					e.value = readValue(in, false, -1);
 
 			} else
-				throw new ConfigInvalidException("Invalid line in config file");
+				throw new ConfigInvalidException(JGitText.get().invalidLineInConfigFile);
 		}
 
 		state.set(newState(newEntries));
@@ -862,7 +891,7 @@ public class Config {
 		for (;;) {
 			int c = in.read();
 			if (c < 0)
-				throw new ConfigInvalidException("Unexpected end of config file");
+				throw new ConfigInvalidException(JGitText.get().unexpectedEndOfConfigFile);
 
 			if (']' == c) {
 				in.reset();
@@ -873,7 +902,7 @@ public class Config {
 				for (;;) {
 					c = in.read();
 					if (c < 0)
-						throw new ConfigInvalidException("Unexpected end of config file");
+						throw new ConfigInvalidException(JGitText.get().unexpectedEndOfConfigFile);
 
 					if ('"' == c) {
 						in.reset();
@@ -882,7 +911,7 @@ public class Config {
 
 					if (' ' == c || '\t' == c)
 						continue; // Skipped...
-					throw new ConfigInvalidException("Bad section entry: " + name);
+					throw new ConfigInvalidException(MessageFormat.format(JGitText.get().badSectionEntry, name));
 				}
 				break;
 			}
@@ -890,7 +919,7 @@ public class Config {
 			if (Character.isLetterOrDigit((char) c) || '.' == c || '-' == c)
 				name.append((char) c);
 			else
-				throw new ConfigInvalidException("Bad section entry: " + name);
+				throw new ConfigInvalidException(MessageFormat.format(JGitText.get().badSectionEntry, name));
 		}
 		return name.toString();
 	}
@@ -901,7 +930,7 @@ public class Config {
 		for (;;) {
 			int c = in.read();
 			if (c < 0)
-				throw new ConfigInvalidException("Unexpected end of config file");
+				throw new ConfigInvalidException(JGitText.get().unexpectedEndOfConfigFile);
 
 			if ('=' == c)
 				break;
@@ -910,7 +939,7 @@ public class Config {
 				for (;;) {
 					c = in.read();
 					if (c < 0)
-						throw new ConfigInvalidException("Unexpected end of config file");
+						throw new ConfigInvalidException(JGitText.get().unexpectedEndOfConfigFile);
 
 					if ('=' == c)
 						break;
@@ -922,7 +951,7 @@ public class Config {
 
 					if (' ' == c || '\t' == c)
 						continue; // Skipped...
-					throw new ConfigInvalidException("Bad entry delimiter");
+					throw new ConfigInvalidException(JGitText.get().badEntryDelimiter);
 				}
 				break;
 			}
@@ -937,7 +966,7 @@ public class Config {
 				name.append((char) c);
 				break;
 			} else
-				throw new ConfigInvalidException("Bad entry name: " + name);
+				throw new ConfigInvalidException(MessageFormat.format(JGitText.get().badEntryName, name));
 		}
 		return name.toString();
 	}
@@ -950,13 +979,13 @@ public class Config {
 			int c = in.read();
 			if (c < 0) {
 				if (value.length() == 0)
-					throw new ConfigInvalidException("Unexpected end of config file");
+					throw new ConfigInvalidException(JGitText.get().unexpectedEndOfConfigFile);
 				break;
 			}
 
 			if ('\n' == c) {
 				if (quote)
-					throw new ConfigInvalidException("Newline in quotes not allowed");
+					throw new ConfigInvalidException(JGitText.get().newlineInQuotesNotAllowed);
 				in.reset();
 				break;
 			}
@@ -985,7 +1014,7 @@ public class Config {
 				c = in.read();
 				switch (c) {
 				case -1:
-					throw new ConfigInvalidException("End of file in escape");
+					throw new ConfigInvalidException(JGitText.get().endOfFileInEscape);
 				case '\n':
 					continue;
 				case 't':
@@ -1004,7 +1033,7 @@ public class Config {
 					value.append('"');
 					continue;
 				default:
-					throw new ConfigInvalidException("Bad escape: " + ((char) c));
+					throw new ConfigInvalidException(MessageFormat.format(JGitText.get().badEscape, ((char) c)));
 				}
 			}
 
@@ -1074,6 +1103,80 @@ public class Config {
 			return Collections.unmodifiableSet(result);
 		}
 	}
+
+	private static class NamesInSection implements SectionParser<Set<String>> {
+		private final String section;
+
+		private final String subsection;
+
+		NamesInSection(final String sectionName, final String subSectionName) {
+			section = sectionName;
+			subsection = subSectionName;
+		}
+
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + section.hashCode();
+			result = prime * result
+					+ ((subsection == null) ? 0 : subsection.hashCode());
+			return result;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			NamesInSection other = (NamesInSection) obj;
+			if (!section.equals(other.section))
+				return false;
+			if (subsection == null) {
+				if (other.subsection != null)
+					return false;
+			} else if (!subsection.equals(other.subsection))
+				return false;
+			return true;
+		}
+
+		public Set<String> parse(Config cfg) {
+			final Set<String> result = new HashSet<String>();
+			while (cfg != null) {
+				for (final Entry e : cfg.state.get().entryList) {
+					if (e.name != null
+							&& StringUtils.equalsIgnoreCase(e.section, section)) {
+						if (subsection == null && e.subsection == null)
+							result.add(StringUtils.toLowerCase(e.name));
+						else if (e.subsection != null
+								&& e.subsection.equals(subsection))
+							result.add(StringUtils.toLowerCase(e.name));
+
+					}
+				}
+				cfg = cfg.baseConfig;
+			}
+			return Collections.unmodifiableSet(result);
+		}
+	}
+
+	private static class SectionNames implements SectionParser<Set<String>> {
+		public Set<String> parse(Config cfg) {
+			final Set<String> result = new HashSet<String>();
+			while (cfg != null) {
+				for (final Entry e : cfg.state.get().entryList) {
+					if (e.section != null)
+						result.add(StringUtils.toLowerCase(e.section));
+				}
+				cfg = cfg.baseConfig;
+			}
+			return Collections.unmodifiableSet(result);
+		}
+	}
+
 
 	private static class State {
 		final List<Entry> entryList;
