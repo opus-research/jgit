@@ -67,9 +67,9 @@ class Rm extends TextBuiltin {
 
 	@Override
 	protected void run() throws Exception {
-		root = db.getWorkTree();
+		root = db.getWorkDir();
 
-		final DirCache dirc = db.lockDirCache();
+		final DirCache dirc = DirCache.lock(db);
 		final DirCacheBuilder edit = dirc.builder();
 
 		final TreeWalk walk = new TreeWalk(db);
