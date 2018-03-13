@@ -44,6 +44,7 @@
 package org.eclipse.jgit.util;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -165,6 +166,59 @@ public class FS_Win32_Cygwin extends FS_Win32 {
 	@Override
 	public boolean supportsSymlinks() {
 		return true;
+	}
+
+	@Override
+	public boolean isSymLink(File path) throws IOException {
+		return FileUtil.isSymlink(path);
+	}
+
+	@Override
+	public long lastModified(File path) throws IOException {
+		return FileUtil.lastModified(path);
+	}
+
+	@Override
+	public void setLastModified(File path, long time) throws IOException {
+		FileUtil.setLastModified(path, time);
+	}
+
+	@Override
+	public long length(File f) throws IOException {
+		return FileUtil.getLength(f);
+	}
+
+	@Override
+	public boolean exists(File path) {
+		return FileUtil.exists(path);
+	}
+
+	@Override
+	public boolean isDirectory(File path) {
+		return FileUtil.isDirectory(path);
+	}
+
+	@Override
+	public boolean isFile(File path) {
+		return FileUtil.isFile(path);
+	}
+
+	@Override
+	public boolean isHidden(File path) throws IOException {
+		return FileUtil.isHidden(path);
+	}
+
+	@Override
+	public void setHidden(File path, boolean hidden) throws IOException {
+		FileUtil.setHidden(path, hidden);
+	}
+
+	/**
+	 * @since 3.3
+	 */
+	@Override
+	public Attributes getAttributes(File path) {
+		return FileUtil.getFileAttributesBasic(this, path);
 	}
 
 	/**
