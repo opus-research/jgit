@@ -60,7 +60,6 @@ public class SafeBufferedOutputStream extends BufferedOutputStream {
 	/**
 	 * @see BufferedOutputStream#BufferedOutputStream(OutputStream)
 	 * @param out
-	 *            underlying output stream
 	 */
 	public SafeBufferedOutputStream(OutputStream out) {
 		super(out);
@@ -69,12 +68,10 @@ public class SafeBufferedOutputStream extends BufferedOutputStream {
 	/**
 	 * @see BufferedOutputStream#BufferedOutputStream(OutputStream, int)
 	 * @param out
-	 *            underlying output stream
 	 * @param size
-	 *            buffer size
 	 */
 	public SafeBufferedOutputStream(OutputStream out, int size) {
-		super(out, size);
+		super(out);
 	}
 
 	@Override

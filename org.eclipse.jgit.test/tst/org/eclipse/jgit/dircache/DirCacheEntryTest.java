@@ -167,16 +167,7 @@ public class DirCacheEntryTest {
 	}
 
 	@Test
-	public void testCopyMetaDataWithStage() {
-		copyMetaDataHelper(false);
-	}
-
-	@Test
-	public void testCopyMetaDataWithoutStage() {
-		copyMetaDataHelper(true);
-	}
-
-	private void copyMetaDataHelper(final boolean keepStage) {
+	public void testCopyMetaData() {
 		DirCacheEntry e = new DirCacheEntry("some/path", DirCacheEntry.STAGE_2);
 		e.setAssumeValid(false);
 		e.setCreationTime(2L);
@@ -198,7 +189,7 @@ public class DirCacheEntryTest {
 				.fromString("1234567890123456789012345678901234567890"));
 		f.setUpdateNeeded(true);
 
-		e.copyMetaData(f, keepStage);
+		e.copyMetaData(f);
 		assertTrue(e.isAssumeValid());
 		assertEquals(10L, e.getCreationTime());
 		assertEquals(
@@ -207,10 +198,7 @@ public class DirCacheEntryTest {
 		assertEquals(FileMode.SYMLINK, e.getFileMode());
 		assertEquals(20L, e.getLastModified());
 		assertEquals(100000000L, e.getLength());
-		if (keepStage)
-			assertEquals(DirCacheEntry.STAGE_2, e.getStage());
-		else
-			assertEquals(DirCacheEntry.STAGE_1, e.getStage());
+		assertEquals(DirCacheEntry.STAGE_2, e.getStage());
 		assertTrue(e.isUpdateNeeded());
 		assertEquals("some/path", e.getPathString());
 	}
