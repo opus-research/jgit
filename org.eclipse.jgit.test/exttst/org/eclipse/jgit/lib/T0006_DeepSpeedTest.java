@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2009, Google Inc.
- * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2007-2008, Robin Rosenberg <robin.rosenberg@dewire.com>
+ * Copyright (C) 2007, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,35 +42,53 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.pgm;
+package org.eclipse.jgit.lib;
 
-import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.IOException;
 
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
-import org.eclipse.jgit.lib.TextProgressMonitor;
+import junit.textui.TestRunner;
 
-class IndexPack extends TextBuiltin {
-	@Option(name = "--fix-thin", usage = "usage_fixAThinPackToBeComplete")
-	private boolean fixThin;
+public class T0006_DeepSpeedTest extends SpeedTestBase {
 
-	@Option(name = "--index-version", usage = "usage_indexFileFormatToCreate")
-	private int indexVersion = -1;
+	protected void setUp() throws Exception {
+		prepare(new String[] { "git", "rev-list", "365bbe0d0caaf2ba74d56556827babf0bc66965d","--","net/netfilter/nf_queue.c" });
+	}
 
-	@Argument(index = 0, required = true, metaVar = "metaVar_base")
-	private File base;
+	public void testDeepHistoryScan() throws IOException {
+		long start = System.currentTimeMillis();
+		Repository db = new Repository(new File(kernelrepo));
+		Commit commit = db.mapCommit("365bbe0d0caaf2ba74d56556827babf0bc66965d");
+		int n = 1;
+		for (;;) {
+			ObjectId[] parents = commit.getParentIds();
+			if (parents.length == 0)
+				break;
+			ObjectId parentId = parents[0];
+			commit = db.mapCommit(parentId);
+			TreeEntry m = commit.getTree().findBlobMember("net/netfilter/nf_queue.c");
+			if (m != null)
+				commit.getCommitId().name();
+			++n;
+		}
 
-	@Override
-	protected void run() throws Exception {
-		if (indexVersion == -1)
-			indexVersion = db.getConfig().getCore().getPackIndexVersion();
-		final BufferedInputStream in;
-		final org.eclipse.jgit.transport.IndexPack ip;
-		in = new BufferedInputStream(System.in);
-		ip = new org.eclipse.jgit.transport.IndexPack(db, in, base);
-		ip.setFixThin(fixThin);
-		ip.setIndexVersion(indexVersion);
-		ip.index(new TextProgressMonitor());
+		assertEquals(12275, n);
+		long stop = System.currentTimeMillis();
+		long time = stop - start;
+		System.out.println("native="+nativeTime);
+		System.out.println("jgit="+time);
+		/*
+		native=1355
+		jgit=5449
+		 */
+		// This is not an exact factor, but we'd expect native git to perform this
+		// about 4 times quicker. If for some reason we find jgit to be faster than
+		// this the cause should be found and secured.
+		long factor = (time*110/nativeTime+50)/100;
+		assertEquals(4, factor);
+	}
+
+	public static void main(String[] args) {
+		TestRunner.run(T0006_DeepSpeedTest.class);
 	}
 }
