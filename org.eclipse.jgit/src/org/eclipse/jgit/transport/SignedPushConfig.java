@@ -52,12 +52,7 @@ import org.eclipse.jgit.lib.Config.SectionParser;
  * @since 4.1
  */
 public class SignedPushConfig {
-	/**
-	 * Key for {@link Config#get(SectionParser)}.
-	 *
-	 * @since 4.1
-	 */
-	public static final SectionParser<SignedPushConfig> KEY =
+	static final SectionParser<SignedPushConfig> KEY =
 			new SectionParser<SignedPushConfig>() {
 		public SignedPushConfig parse(Config cfg) {
 			return new SignedPushConfig(cfg);
@@ -116,7 +111,7 @@ public class SignedPushConfig {
 
 	/**
 	 * @return the configured nonce slop limit.
-	 * @since 4.1
+	 * @since 4.
 	 */
 	public int getCertNonceSlopLimit() {
 		return certNonceSlopLimit;

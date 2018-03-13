@@ -1090,8 +1090,8 @@ public abstract class BaseReceivePack {
 
 				if (line.equals(GitProtocolConstants.OPTION_PUSH_CERT)) {
 					certParser.receiveHeader(pckIn, !isBiDirectionalPipe());
-					continue;
 				}
+				continue;
 			}
 
 			if (rawLine.equals(PushCertificateParser.BEGIN_SIGNATURE)) {
