@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017, David Pursehouse <david.pursehouse@gmail.com>
+ * Copyright (C) 2017, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,55 +41,68 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.transport;
+package org.eclipse.jgit.internal.storage.dfs;
 
-import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.util.StringUtils;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
-/**
- * Push section of a Git configuration file.
- *
- * @since 4.9
- */
-public class PushConfig {
+import org.eclipse.jgit.internal.storage.reftable.Reftable;
+
+/** Tracks multiple open {@link Reftable} instances. */
+public class ReftableStack implements AutoCloseable {
 	/**
-	 * Config values for push.recurseSubmodules.
+	 * Opens a stack of tables for reading.
+	 *
+	 * @param ctx
+	 *            context to read the tables with. This {@code ctx} will be
+	 *            retained by the stack and each of the table readers.
+	 * @param tables
+	 *            the tables to open.
+	 * @return stack reference to close the tables.
+	 * @throws IOException
+	 *             a table could not be opened
 	 */
-	public enum PushRecurseSubmodulesMode implements Config.ConfigEnum {
-		/**
-		 * Verify that all submodule commits that changed in the revisions to be
-		 * pushed are available on at least one remote of the submodule.
-		 */
-		CHECK("check"), //$NON-NLS-1$
-
-		/**
-		 * All submodules that changed in the revisions to be pushed will be
-		 * pushed.
-		 */
-		ON_DEMAND("on-demand"), //$NON-NLS-1$
-
-		/** Default behavior of ignoring submodules when pushing is retained. */
-		NO("false"); //$NON-NLS-1$
-
-		private final String configValue;
-
-		private PushRecurseSubmodulesMode(String configValue) {
-			this.configValue = configValue;
-		}
-
-		@Override
-		public String toConfigValue() {
-			return configValue;
-		}
-
-		@Override
-		public boolean matchConfigValue(String s) {
-			if (StringUtils.isEmptyOrNull(s)) {
-				return false;
+	public static ReftableStack open(DfsReader ctx, List<DfsReftable> tables)
+			throws IOException {
+		ReftableStack stack = new ReftableStack(tables.size());
+		boolean close = true;
+		try {
+			for (DfsReftable t : tables) {
+				stack.tables.add(t.open(ctx));
 			}
-			s = s.replace('-', '_');
-			return name().equalsIgnoreCase(s)
-					|| configValue.equalsIgnoreCase(s);
+			close = false;
+			return stack;
+		} finally {
+			if (close) {
+				stack.close();
+			}
+		}
+	}
+
+	private final List<Reftable> tables;
+
+	private ReftableStack(int tableCnt) {
+		this.tables = new ArrayList<>(tableCnt);
+	}
+
+	/**
+	 * @return unmodifiable list of tables, in the same order the files were
+	 *         passed to {@link #open(DfsReader, List)}.
+	 */
+	public List<Reftable> readers() {
+		return Collections.unmodifiableList(tables);
+	}
+
+	@Override
+	public void close() {
+		for (Reftable t : tables) {
+			try {
+				t.close();
+			} catch (IOException e) {
+				// Ignore close failures.
+			}
 		}
 	}
 }

@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2017, David Pursehouse <david.pursehouse@gmail.com>
- * and other copyright owners as documented in the project's IP log.
+ * Copyright (C) 2013 Robin Stocker <robin@nibor.org> and others.
  *
  * This program and the accompanying materials are made available
  * under the terms of the Eclipse Distribution License v1.0 which
@@ -40,47 +39,42 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package org.eclipse.jgit.pgm;
 
-package org.eclipse.jgit.lib;
-
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertNull;
 
-import org.eclipse.jgit.transport.PushConfig.PushRecurseSubmodulesMode;
+import java.io.File;
+
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.dircache.DirCache;
+import org.eclipse.jgit.lib.CLIRepositoryTestCase;
+import org.junit.Before;
 import org.junit.Test;
 
-public class PushConfigTest {
-	@Test
-	public void pushRecurseSubmoduleMatch() throws Exception {
-		assertTrue(PushRecurseSubmodulesMode.CHECK.matchConfigValue("check"));
-		assertTrue(PushRecurseSubmodulesMode.CHECK.matchConfigValue("CHECK"));
+public class RmTest extends CLIRepositoryTestCase {
+	private Git git;
 
-		assertTrue(PushRecurseSubmodulesMode.ON_DEMAND
-				.matchConfigValue("on-demand"));
-		assertTrue(PushRecurseSubmodulesMode.ON_DEMAND
-				.matchConfigValue("ON-DEMAND"));
-		assertTrue(PushRecurseSubmodulesMode.ON_DEMAND
-				.matchConfigValue("on_demand"));
-		assertTrue(PushRecurseSubmodulesMode.ON_DEMAND
-				.matchConfigValue("ON_DEMAND"));
-
-		assertTrue(PushRecurseSubmodulesMode.NO.matchConfigValue("no"));
-		assertTrue(PushRecurseSubmodulesMode.NO.matchConfigValue("NO"));
-		assertTrue(PushRecurseSubmodulesMode.NO.matchConfigValue("false"));
-		assertTrue(PushRecurseSubmodulesMode.NO.matchConfigValue("FALSE"));
+	@Override
+	@Before
+	public void setUp() throws Exception {
+		super.setUp();
+		git = new Git(db);
 	}
 
 	@Test
-	public void pushRecurseSubmoduleNoMatch() throws Exception {
-		assertFalse(PushRecurseSubmodulesMode.NO.matchConfigValue("N"));
-		assertFalse(PushRecurseSubmodulesMode.ON_DEMAND
-				.matchConfigValue("ONDEMAND"));
-	}
+	public void multiplePathsShouldBeRemoved() throws Exception {
+		File a = writeTrashFile("a", "Hello");
+		File b = writeTrashFile("b", "world!");
+		git.add().addFilepattern("a").addFilepattern("b").call();
 
-	@Test
-	public void pushRecurseSubmoduleToConfigValue() {
-		assertEquals("on-demand",
-				PushRecurseSubmodulesMode.ON_DEMAND.toConfigValue());
+		String[] result = execute("git rm a b");
+		assertArrayEquals(new String[] { "" }, result);
+		DirCache cache = db.readDirCache();
+		assertNull(cache.getEntry("a"));
+		assertNull(cache.getEntry("b"));
+		assertFalse(a.exists());
+		assertFalse(b.exists());
 	}
 }
