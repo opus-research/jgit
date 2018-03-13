@@ -519,7 +519,8 @@ public class PackWriter {
 	}
 
 	/**
-	 * Returns the object ids in the pack file that was created by this writer.
+	 * Returns the object ids in the pack file that was created by this writer,
+	 * sorted by name.
 	 *
 	 * This method can only be invoked after
 	 * {@link #writePack(ProgressMonitor, ProgressMonitor, OutputStream)} has
@@ -529,23 +530,13 @@ public class PackWriter {
 	 * @throws IOException
 	 *             a cached pack cannot supply its object ids.
 	 */
-	public ObjectIdOwnerMap<ObjectIdOwnerMap.Entry> getObjectSet()
-			throws IOException {
+	public List<ObjectId> getObjectList() throws IOException {
 		if (!cachedPacks.isEmpty())
 			throw new IOException(
 					JGitText.get().cachedPacksPreventsListingObjects);
 
-		ObjectIdOwnerMap<ObjectIdOwnerMap.Entry> objs = new ObjectIdOwnerMap<
-				ObjectIdOwnerMap.Entry>();
-		for (BlockList<ObjectToPack> objList : objectsLists) {
-			if (objList != null) {
-				for (ObjectToPack otp : objList)
-					objs.add(new ObjectIdOwnerMap.Entry(otp) {
-						// A new entry that copies the ObjectId
-					});
-			}
-		}
-		return objs;
+		return Collections.unmodifiableList(
+				(List<? extends ObjectId>) sortByName());
 	}
 
 	/**
