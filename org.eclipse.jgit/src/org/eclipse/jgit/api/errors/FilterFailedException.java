@@ -97,7 +97,7 @@ public class FilterFailedException extends GitAPIException {
 	public FilterFailedException(int rc, String filterCommand, String path,
 			byte[] stdout, String stderr) {
 		super(MessageFormat.format(JGitText.get().filterExecutionFailedRc,
-				filterCommand, path, rc));
+				filterCommand, path, rc, stderr));
 		this.rc = rc;
 		this.filterCommand = filterCommand;
 		this.path = path;

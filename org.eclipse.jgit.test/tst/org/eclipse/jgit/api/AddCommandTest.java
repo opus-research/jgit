@@ -119,7 +119,7 @@ public class AddCommandTest extends RepositoryTestCase {
 		writeTrashFile(".gitattributes", "*.txt filter=tstFilter");
 		writeTrashFile("src/a.tmp", "foo");
 		writeTrashFile("src/a.txt", "foo");
-		File script = writeTempFile("sed s/o/e/ -");
+		File script = writeTempFile("tr o e");
 
 		Git git = new Git(db);
 		StoredConfig config = git.getRepository().getConfig();
@@ -131,7 +131,7 @@ public class AddCommandTest extends RepositoryTestCase {
 				.call();
 
 		assertEquals(
-				"[src/a.tmp, mode:100644, content:foo][src/a.txt, mode:100644, content:feo]",
+				"[src/a.tmp, mode:100644, content:foo][src/a.txt, mode:100644, content:fee]",
 				indexState(CONTENT));
 	}
 
@@ -141,8 +141,8 @@ public class AddCommandTest extends RepositoryTestCase {
 				"*.txt filter=tstFilter\n*.tmp filter=tstFilter2");
 		writeTrashFile("src/a.tmp", "foo");
 		writeTrashFile("src/a.txt", "foo");
-		File script = writeTempFile("sed s/o/e/ -");
-		File script2 = writeTempFile("sed s/f/e/ -");
+		File script = writeTempFile("tr o e");
+		File script2 = writeTempFile("tr f x");
 
 		Git git = new Git(db);
 		StoredConfig config = git.getRepository().getConfig();
@@ -156,7 +156,7 @@ public class AddCommandTest extends RepositoryTestCase {
 				.call();
 
 		assertEquals(
-				"[src/a.tmp, mode:100644, content:eoo][src/a.txt, mode:100644, content:feo]",
+				"[src/a.tmp, mode:100644, content:xoo][src/a.txt, mode:100644, content:fee]",
 				indexState(CONTENT));
 
 		// TODO: multiple clean filters for one file???
@@ -173,7 +173,7 @@ public class AddCommandTest extends RepositoryTestCase {
 	@Test
 	public void testCommandInjection() throws IOException, GitAPIException {
 		writeTrashFile("; echo virus", "foo");
-		File script = writeTempFile("sed s/o/e/ -");
+		File script = writeTempFile("tr o e");
 
 		Git git = new Git(db);
 		StoredConfig config = git.getRepository().getConfig();
@@ -184,14 +184,14 @@ public class AddCommandTest extends RepositoryTestCase {
 		git.add().addFilepattern("; echo virus").call();
 		// Without proper escaping the content would be "feovirus". The sed
 		// command and the "echo virus" would contribute to the content
-		assertEquals("[; echo virus, mode:100644, content:feo]",
+		assertEquals("[; echo virus, mode:100644, content:fee]",
 				indexState(CONTENT));
 	}
 
 	@Test
 	public void testBadCleanFilter() throws IOException, GitAPIException {
 		writeTrashFile("a.txt", "foo");
-		File script = writeTempFile("sedfoo s/o/e/ -");
+		File script = writeTempFile("sedfoo s/o/e/");
 
 		Git git = new Git(db);
 		StoredConfig config = git.getRepository().getConfig();
@@ -211,7 +211,7 @@ public class AddCommandTest extends RepositoryTestCase {
 	@Test
 	public void testBadCleanFilter2() throws IOException, GitAPIException {
 		writeTrashFile("a.txt", "foo");
-		File script = writeTempFile("sed s/o/e/ -");
+		File script = writeTempFile("sed s/o/e/");
 
 		Git git = new Git(db);
 		StoredConfig config = git.getRepository().getConfig();
@@ -252,7 +252,7 @@ public class AddCommandTest extends RepositoryTestCase {
 	@Test
 	public void testNotApplicableFilter() throws IOException, GitAPIException {
 		writeTrashFile("a.txt", "foo");
-		File script = writeTempFile("sed s/o/e/ -");
+		File script = writeTempFile("sed s/o/e/");
 
 		Git git = new Git(db);
 		StoredConfig config = git.getRepository().getConfig();
