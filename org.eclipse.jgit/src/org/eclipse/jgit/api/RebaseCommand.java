@@ -47,7 +47,6 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -72,7 +71,6 @@ import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.api.errors.NoMessageException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
-import org.eclipse.jgit.api.errors.RejectRebaseException;
 import org.eclipse.jgit.api.errors.StashApplyFailureException;
 import org.eclipse.jgit.api.errors.UnmergedPathsException;
 import org.eclipse.jgit.api.errors.WrongRepositoryStateException;
@@ -104,11 +102,8 @@ import org.eclipse.jgit.revwalk.filter.RevFilter;
 import org.eclipse.jgit.submodule.SubmoduleWalk.IgnoreSubmoduleMode;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
-import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
-import org.eclipse.jgit.util.Hook;
 import org.eclipse.jgit.util.IO;
-import org.eclipse.jgit.util.ProcessResult;
 import org.eclipse.jgit.util.RawParseUtils;
 
 /**
@@ -242,20 +237,12 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 	private boolean preserveMerges = false;
 
 	/**
-	 * Setting this option bypasses the {@link Hook#PRE_REBASE pre-rebase} hook.
-	 */
-	private boolean noVerify;
-
-	private PrintStream hookOutRedirect;
-
-	/**
 	 * @param repo
 	 */
 	protected RebaseCommand(Repository repo) {
 		super(repo);
 		walk = new RevWalk(repo);
 		rebaseState = new RebaseState(repo.getDirectory());
-		hookOutRedirect = System.out;
 	}
 
 	/**
@@ -315,9 +302,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 						return RebaseResult.uncommittedChanges(list);
 					}
 				}
-
-				executePreRebaseHookIfVerifyOn();
-
 				RebaseResult res = initFilesAndRewind();
 				if (stopAfterInitialization)
 					return RebaseResult.INTERACTIVE_PREPARED_RESULT;
@@ -390,35 +374,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			return RebaseResult.conflicts(cce.getConflictingPaths());
 		} catch (IOException ioe) {
 			throw new JGitInternalException(ioe.getMessage(), ioe);
-		}
-	}
-
-	private void executePreRebaseHookIfVerifyOn() throws RejectRebaseException {
-		if (noVerify) {
-			return;
-		}
-
-		final ByteArrayOutputStream errorByteArray = new ByteArrayOutputStream();
-		final PrintStream hookErrRedirect = new PrintStream(errorByteArray);
-
-		final String upstreamName = Repository
-				.shortenRefName(upstreamCommitName);
-
-		// TODO for now, the rebase command only supports rebasing
-		// 'HEAD' onto something else, so the second argument of the
-		// pre-rebase hook needn't be set. see Hook#PRE_REBASE on
-		// what to pass as argument once we support more complex
-		// rebases.
-
-		ProcessResult preRebaseHookResult = FS.DETECTED.runIfPresent(repo,
-				Hook.PRE_REBASE, new String[] { upstreamName, },
-				hookOutRedirect, hookErrRedirect, null);
-
-		if (preRebaseHookResult.isExecutedWithError()) {
-			String errorMessage = MessageFormat.format(
-					JGitText.get().rebaseRejectedByHook,
-					Hook.PRE_REBASE.getName(), errorByteArray.toString());
-			throw new RejectRebaseException(errorMessage);
 		}
 	}
 
@@ -507,7 +462,7 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			String newMessage = interactiveHandler
 					.modifyCommitMessage(oldMessage);
 			newHead = new Git(repo).commit().setMessage(newMessage)
-					.setAmend(true).setNoVerify(true).call();
+					.setAmend(true).call();
 			return null;
 		case EDIT:
 			rebaseState.createFile(AMEND, commitToPick.name());
@@ -813,14 +768,15 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 			}
 			retNewHead = new Git(repo).commit()
 					.setMessage(stripCommentLines(commitMessage))
-					.setAmend(true).setNoVerify(true).call();
+					.setAmend(true).call();
 			rebaseState.getFile(MESSAGE_SQUASH).delete();
 			rebaseState.getFile(MESSAGE_FIXUP).delete();
 
 		} else {
 			// Next step is either Squash or Fixup
-			retNewHead = new Git(repo).commit().setMessage(commitMessage)
-					.setAmend(true).setNoVerify(true).call();
+			retNewHead = new Git(repo).commit()
+					.setMessage(commitMessage).setAmend(true)
+					.call();
 		}
 		return retNewHead;
 	}
@@ -1647,38 +1603,6 @@ public class RebaseCommand extends GitCommand<RebaseResult> {
 		if (name != null && email != null)
 			return new PersonIdent(name, email, when, tz);
 		return null;
-	}
-
-	/**
-	 * Sets the {@link #noVerify} option on this rebase command.
-	 * <p>
-	 * The {@link Hook#PRE_REBASE pre-rebase} hook can prevent a rebase from
-	 * happening through its exit code. Setting this option to <code>true</code>
-	 * will bypass the hook.
-	 * </p>
-	 *
-	 * @param noVerify
-	 *            Whether this rebase should be verified by the pre-rebase hook.
-	 * @return {@code this}
-	 * @since 3.6
-	 */
-	public RebaseCommand setNoVerify(boolean noVerify) {
-		this.noVerify = noVerify;
-		return this;
-	}
-
-	/**
-	 * Set the output stream for hook scripts executed by this command. If not
-	 * set it defaults to {@code System.out}.
-	 *
-	 * @param hookStdOut
-	 *            the output stream for hook scripts executed by this command
-	 * @return {@code this}
-	 * @since 4.0
-	 */
-	public RebaseCommand setHookOutputStream(PrintStream hookStdOut) {
-		this.hookOutRedirect = hookStdOut;
-		return this;
 	}
 
 	private static class RebaseState {

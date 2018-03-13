@@ -77,6 +77,7 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.IndexWriteException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
+import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.ConfigConstants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
@@ -89,6 +90,7 @@ import org.eclipse.jgit.treewalk.NameConflictTreeWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.treewalk.WorkingTreeIterator;
 import org.eclipse.jgit.util.FS;
+import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.TemporaryBuffer;
 
 /**
@@ -307,6 +309,13 @@ public class ResolveMerger extends ThreeWayMerger {
 	}
 
 	private void checkout() throws NoWorkTreeException, IOException {
+		for (Map.Entry<String, DirCacheEntry> entry : toBeCheckedOut
+				.entrySet()) {
+			File f = new File(db.getWorkTree(), entry.getKey());
+			createDir(f.getParentFile());
+			DirCacheCheckout.checkoutEntry(db, f, entry.getValue(), reader);
+			modifiedFiles.add(entry.getKey());
+		}
 		// Iterate in reverse so that "folder/file" is deleted before
 		// "folder". Otherwise this could result in a failing path because
 		// of a non-empty directory, for which delete() would fail.
@@ -319,10 +328,18 @@ public class ResolveMerger extends ThreeWayMerger {
 							MergeFailureReason.COULD_NOT_DELETE);
 			modifiedFiles.add(fileName);
 		}
-		for (Map.Entry<String, DirCacheEntry> entry : toBeCheckedOut
-				.entrySet()) {
-			DirCacheCheckout.checkoutEntry(db, entry.getValue(), reader);
-			modifiedFiles.add(entry.getKey());
+	}
+
+	private void createDir(File f) throws IOException {
+		if (!db.getFS().isDirectory(f) && !f.mkdirs()) {
+			File p = f;
+			while (p != null && !db.getFS().exists(p))
+				p = p.getParentFile();
+			if (p == null || db.getFS().isDirectory(p))
+				throw new IOException(JGitText.get().cannotCreateDirectory);
+			FileUtils.delete(p);
+			if (!f.mkdirs())
+				throw new IOException(JGitText.get().cannotCreateDirectory);
 		}
 	}
 
@@ -350,8 +367,15 @@ public class ResolveMerger extends ThreeWayMerger {
 		while(mpathsIt.hasNext()) {
 			String mpath=mpathsIt.next();
 			DirCacheEntry entry = dc.getEntry(mpath);
-			if (entry != null)
-				DirCacheCheckout.checkoutEntry(db, entry, reader);
+			if (entry == null)
+				continue;
+			FileOutputStream fos = new FileOutputStream(new File(
+					db.getWorkTree(), mpath));
+			try {
+				reader.open(entry.getObjectId()).copyTo(fos);
+			} finally {
+				fos.close();
+			}
 			mpathsIt.remove();
 		}
 	}

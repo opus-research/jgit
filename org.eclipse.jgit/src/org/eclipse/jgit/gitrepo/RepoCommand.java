@@ -193,7 +193,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 			try {
 				return readFileFromRepo(repo, ref, path);
 			} finally {
-				repo.close();
 				FileUtils.delete(dir, FileUtils.RECURSIVE);
 			}
 		}
@@ -428,8 +427,8 @@ public class RepoCommand extends GitCommand<RevCommit> {
 							currentProject.path,
 							attributes.getValue("src"), //$NON-NLS-1$
 							attributes.getValue("dest"))); //$NON-NLS-1$
-			} else if ("include".equals(qName)) { //$NON-NLS-1$
-				String name = attributes.getValue("name"); //$NON-NLS-1$
+			} else if ("include".equals(qName)) { //$NON_NLS-1$
+				String name = attributes.getValue("name");
 				InputStream is = null;
 				if (includedReader != null) {
 					try {
@@ -505,8 +504,8 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				String remoteUrl = remoteUrls.get(remote);
 				if (remoteUrl == null) {
 					remoteUrl = baseUri.resolve(remotes.get(remote)).toString();
-					if (!remoteUrl.endsWith("/")) //$NON-NLS-1$
-						remoteUrl = remoteUrl + "/"; //$NON-NLS-1$
+					if (!remoteUrl.endsWith("/"))
+						remoteUrl = remoteUrl + "/";
 					remoteUrls.put(remote, remoteUrl);
 				}
 
@@ -861,7 +860,6 @@ public class RepoCommand extends GitCommand<RevCommit> {
 				if (revision != null) {
 					Git sub = new Git(subRepo);
 					sub.checkout().setName(findRef(revision, subRepo)).call();
-					subRepo.close();
 					git.add().addFilepattern(name).call();
 				}
 				for (CopyFile copyfile : copyfiles) {
