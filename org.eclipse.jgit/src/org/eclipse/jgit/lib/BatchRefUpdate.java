@@ -58,7 +58,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
-import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -324,11 +323,9 @@ public class BatchRefUpdate {
 	/**
 	 * Gets the list of option strings associated with this update.
 	 *
-	 * @return push options that were passed to {@link #execute}; prior to calling
-	 *         {@link #execute}, always returns null.
+	 * @return pushOptions
 	 * @since 4.5
 	 */
-	@Nullable
 	public List<String> getPushOptions() {
 		return pushOptions;
 	}
@@ -465,7 +462,7 @@ public class BatchRefUpdate {
 								break SWITCH;
 							}
 							ru.setCheckConflicting(false);
-							takenPrefixes.addAll(getPrefixes(cmd.getRefName()));
+							addRefToPrefixes(takenPrefixes, cmd.getRefName());
 							takenNames.add(cmd.getRefName());
 							cmd.setResult(ru.update(walk));
 						}
@@ -526,26 +523,29 @@ public class BatchRefUpdate {
 		execute(walk, monitor, null);
 	}
 
-	private static Collection<String> getTakenPrefixes(Collection<String> names) {
+	private static Collection<String> getTakenPrefixes(
+			final Collection<String> names) {
 		Collection<String> ref = new HashSet<>();
-		for (String name : names) {
-			addPrefixesTo(name, ref);
-		}
+		for (String name : names)
+			ref.addAll(getPrefixes(name));
 		return ref;
+	}
+
+	private static void addRefToPrefixes(Collection<String> prefixes,
+			String name) {
+		for (String prefix : getPrefixes(name)) {
+			prefixes.add(prefix);
+		}
 	}
 
 	static Collection<String> getPrefixes(String s) {
 		Collection<String> ret = new HashSet<>();
-		addPrefixesTo(s, ret);
-		return ret;
-	}
-
-	static void addPrefixesTo(String s, Collection<String> out) {
 		int p1 = s.indexOf('/');
 		while (p1 > 0) {
-			out.add(s.substring(0, p1));
+			ret.add(s.substring(0, p1));
 			p1 = s.indexOf('/', p1 + 1);
 		}
+		return ret;
 	}
 
 	/**
