@@ -65,8 +65,6 @@ public class PacketLineOut {
 
 	private final byte[] lenbuffer;
 
-	private boolean flushOnEnd;
-
 	/**
 	 * Create a new packet line writer.
 	 *
@@ -76,18 +74,6 @@ public class PacketLineOut {
 	public PacketLineOut(final OutputStream outputStream) {
 		out = outputStream;
 		lenbuffer = new byte[5];
-		flushOnEnd = true;
-	}
-
-	/**
-	 * Set the flush behavior during {@link #end()}.
-	 *
-	 * @param flushOnEnd
-	 *            if true, a flush-pkt written during {@link #end()} also
-	 *            flushes the underlying stream.
-	 */
-	public void setFlushOnEnd(boolean flushOnEnd) {
-		this.flushOnEnd = flushOnEnd;
 	}
 
 	/**
@@ -135,8 +121,7 @@ public class PacketLineOut {
 	public void end() throws IOException {
 		formatLength(0);
 		out.write(lenbuffer, 0, 4);
-		if (flushOnEnd)
-			flush();
+		flush();
 	}
 
 	/**

@@ -66,27 +66,14 @@ import java.net.MalformedURLException;
 import java.net.Proxy;
 import java.net.ProxySelector;
 import java.net.URL;
-import java.net.URLConnection;
-import java.security.KeyManagementException;
-import java.security.NoSuchAlgorithmException;
-import java.security.cert.X509Certificate;
 import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
-
-import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
 
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.NoRemoteRepositoryException;
@@ -94,7 +81,6 @@ import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.PackProtocolException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Config;
-import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
@@ -102,6 +88,7 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.SymbolicRef;
+import org.eclipse.jgit.lib.Config.SectionParser;
 import org.eclipse.jgit.storage.file.RefDirectory;
 import org.eclipse.jgit.util.HttpSupport;
 import org.eclipse.jgit.util.IO;
@@ -134,69 +121,12 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 
 	private static final String userAgent = computeUserAgent();
 
-	static final TransportProtocol PROTO_HTTP = new TransportProtocol() {
-		private final String[] schemeNames = { "http", "https" }; //$NON-NLS-1$ //$NON-NLS-2$
-
-		private final Set<String> schemeSet = Collections
-				.unmodifiableSet(new LinkedHashSet<String>(Arrays
-						.asList(schemeNames)));
-
-		public String getName() {
-			return JGitText.get().transportProtoHTTP;
-		}
-
-		public Set<String> getSchemes() {
-			return schemeSet;
-		}
-
-		public Set<URIishField> getRequiredFields() {
-			return Collections.unmodifiableSet(EnumSet.of(URIishField.HOST,
-					URIishField.PATH));
-		}
-
-		public Set<URIishField> getOptionalFields() {
-			return Collections.unmodifiableSet(EnumSet.of(URIishField.USER,
-					URIishField.PASS, URIishField.PORT));
-		}
-
-		public int getDefaultPort() {
-			return 80;
-		}
-
-		public Transport open(URIish uri, Repository local, String remoteName)
-				throws NotSupportedException {
-			return new TransportHttp(local, uri);
-		}
-	};
-
-	static final TransportProtocol PROTO_FTP = new TransportProtocol() {
-		public String getName() {
-			return JGitText.get().transportProtoFTP;
-		}
-
-		public Set<String> getSchemes() {
-			return Collections.singleton("ftp"); //$NON-NLS-1$
-		}
-
-		public Set<URIishField> getRequiredFields() {
-			return Collections.unmodifiableSet(EnumSet.of(URIishField.HOST,
-					URIishField.PATH));
-		}
-
-		public Set<URIishField> getOptionalFields() {
-			return Collections.unmodifiableSet(EnumSet.of(URIishField.USER,
-					URIishField.PASS, URIishField.PORT));
-		}
-
-		public int getDefaultPort() {
-			return 21;
-		}
-
-		public Transport open(URIish uri, Repository local, String remoteName)
-				throws NotSupportedException {
-			return new TransportHttp(local, uri);
-		}
-	};
+	static boolean canHandle(final URIish uri) {
+		if (!uri.isRemote())
+			return false;
+		final String s = uri.getScheme();
+		return "http".equals(s) || "https".equals(s) || "ftp".equals(s); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+	}
 
 	private static String computeUserAgent() {
 		String version;
@@ -218,11 +148,8 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 	private static class HttpConfig {
 		final int postBuffer;
 
-		final boolean sslVerify;
-
 		HttpConfig(final Config rc) {
 			postBuffer = rc.getInt("http", "postbuffer", 1 * 1024 * 1024); //$NON-NLS-1$  //$NON-NLS-2$
-			sslVerify = rc.getBoolean("http", "sslVerify", true);
 		}
 	}
 
@@ -474,11 +401,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 	final HttpURLConnection httpOpen(String method, URL u) throws IOException {
 		final Proxy proxy = HttpSupport.proxyFor(proxySelector, u);
 		HttpURLConnection conn = (HttpURLConnection) u.openConnection(proxy);
-
-		if (!http.sslVerify && "https".equals(u.getProtocol())) {
-			disableSslVerify(conn);
-		}
-
 		conn.setRequestMethod(method);
 		conn.setUseCaches(false);
 		conn.setRequestProperty(HDR_ACCEPT_ENCODING, ENCODING_GZIP);
@@ -488,21 +410,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		conn.setReadTimeout(getTimeout() * 1000);
 		authMethod.configureRequest(conn);
 		return conn;
-	}
-
-	private void disableSslVerify(URLConnection conn)
-			throws IOException {
-		final TrustManager[] trustAllCerts = new TrustManager[] { new DummyX509TrustManager() };
-		try {
-			SSLContext ctx = SSLContext.getInstance("SSL");
-			ctx.init(null, trustAllCerts, null);
-			final HttpsURLConnection sslConn = (HttpsURLConnection) conn;
-			sslConn.setSSLSocketFactory(ctx.getSocketFactory());
-		} catch (KeyManagementException e) {
-			throw new IOException(e.getMessage());
-		} catch (NoSuchAlgorithmException e) {
-			throw new IOException(e.getMessage());
-		}
 	}
 
 	final InputStream openInputStream(HttpURLConnection conn)
@@ -870,20 +777,6 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 				execute();
 				return 0;
 			}
-		}
-	}
-
-	private static class DummyX509TrustManager implements X509TrustManager {
-		public X509Certificate[] getAcceptedIssuers() {
-			return null;
-		}
-
-		public void checkClientTrusted(X509Certificate[] certs, String authType) {
-			// no check
-		}
-
-		public void checkServerTrusted(X509Certificate[] certs, String authType) {
-			// no check
 		}
 	}
 }

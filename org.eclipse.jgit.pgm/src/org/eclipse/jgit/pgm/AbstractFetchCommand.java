@@ -77,8 +77,8 @@ abstract class AbstractFetchCommand extends TextBuiltin {
 				final String dst = abbreviateRef(u.getLocalName(), true);
 
 				if (!shownURI) {
-					out.println(MessageFormat.format(CLIText.get().fromURI,
-							r.getURI()));
+					out.format(CLIText.get().fromURI, r.getURI());
+					out.println();
 					shownURI = true;
 				}
 

@@ -97,7 +97,6 @@ import org.eclipse.jgit.revwalk.RevObject;
 import org.eclipse.jgit.revwalk.RevTag;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 import org.eclipse.jgit.util.RefList;
@@ -130,8 +129,7 @@ public class RefDirectory extends RefDatabase {
 
 	/** The names of the additional refs supported by this class */
 	private static final String[] additionalRefsNames = new String[] {
-			Constants.MERGE_HEAD, Constants.FETCH_HEAD, Constants.ORIG_HEAD,
-			Constants.CHERRY_PICK_HEAD };
+			Constants.MERGE_HEAD, Constants.FETCH_HEAD, Constants.ORIG_HEAD };
 
 	private final FileRepository parent;
 
@@ -192,14 +190,13 @@ public class RefDirectory extends RefDatabase {
 	}
 
 	public void create() throws IOException {
-		FileUtils.mkdir(refsDir);
-		FileUtils.mkdir(logsDir);
-		FileUtils.mkdir(logsRefsDir);
+		refsDir.mkdir();
+		logsDir.mkdir();
+		logsRefsDir.mkdir();
 
-		FileUtils.mkdir(new File(refsDir, R_HEADS.substring(R_REFS.length())));
-		FileUtils.mkdir(new File(refsDir, R_TAGS.substring(R_REFS.length())));
-		FileUtils.mkdir(new File(logsRefsDir,
-				R_HEADS.substring(R_REFS.length())));
+		new File(refsDir, R_HEADS.substring(R_REFS.length())).mkdir();
+		new File(refsDir, R_TAGS.substring(R_REFS.length())).mkdir();
+		new File(logsRefsDir, R_HEADS.substring(R_REFS.length())).mkdir();
 	}
 
 	@Override
@@ -210,12 +207,6 @@ public class RefDirectory extends RefDatabase {
 	void rescan() {
 		looseRefs.set(RefList.<LooseRef> emptyList());
 		packedRefs.set(PackedRefList.NO_PACKED_REFS);
-	}
-
-	@Override
-	public void refresh() {
-		super.refresh();
-		rescan();
 	}
 
 	@Override
@@ -288,7 +279,6 @@ public class RefDirectory extends RefDatabase {
 
 		RefList<LooseRef> loose;
 		if (scan.newLoose != null) {
-			scan.newLoose.sort();
 			loose = scan.newLoose.toRefList();
 			if (looseRefs.compareAndSet(oldLoose, loose))
 				modCnt.incrementAndGet();
@@ -298,22 +288,19 @@ public class RefDirectory extends RefDatabase {
 
 		RefList.Builder<Ref> symbolic = scan.symbolic;
 		for (int idx = 0; idx < symbolic.size();) {
-			final Ref symbolicRef = symbolic.get(idx);
-			final Ref resolvedRef = resolve(symbolicRef, 0, prefix, loose, packed);
-			if (resolvedRef != null && resolvedRef.getObjectId() != null) {
-				symbolic.set(idx, resolvedRef);
+			Ref ref = symbolic.get(idx);
+			ref = resolve(ref, 0, prefix, loose, packed);
+			if (ref != null && ref.getObjectId() != null) {
+				symbolic.set(idx, ref);
 				idx++;
 			} else {
 				// A broken symbolic reference, we have to drop it from the
 				// collections the client is about to receive. Should be a
 				// rare occurrence so pay a copy penalty.
+				loose = loose.remove(idx);
 				symbolic.remove(idx);
-				final int toRemove = loose.find(symbolicRef.getName());
-				if (0 <= toRemove)
-					loose = loose.remove(toRemove);
 			}
 		}
-		symbolic.sort();
 
 		return new RefMap(prefix, packed, upcast(loose), symbolic.toRefList());
 	}
@@ -500,22 +487,15 @@ public class RefDirectory extends RefDatabase {
 
 	public RefDirectoryUpdate newUpdate(String name, boolean detach)
 			throws IOException {
-		boolean detachingSymbolicRef = false;
 		final RefList<Ref> packed = getPackedRefs();
 		Ref ref = readRef(name, packed);
 		if (ref != null)
 			ref = resolve(ref, 0, null, null, packed);
 		if (ref == null)
 			ref = new ObjectIdRef.Unpeeled(NEW, name, null);
-		else {
-			detachingSymbolicRef = detach && ref.isSymbolic();
-			if (detachingSymbolicRef)
-				ref = new ObjectIdRef.Unpeeled(LOOSE, name, ref.getObjectId());
-		}
-		RefDirectoryUpdate refDirUpdate = new RefDirectoryUpdate(this, ref);
-		if (detachingSymbolicRef)
-			refDirUpdate.setDetachingSymbolicRef();
-		return refDirUpdate;
+		else if (detach && ref.isSymbolic())
+			ref = new ObjectIdRef.Unpeeled(LOOSE, name, ref.getObjectId());
+		return new RefDirectoryUpdate(this, ref);
 	}
 
 	@Override
@@ -557,7 +537,7 @@ public class RefDirectory extends RefDatabase {
 				throw new IOException(MessageFormat.format(
 					JGitText.get().cannotLockFile, packedRefsFile));
 			try {
-				PackedRefList cur = readPackedRefs();
+				PackedRefList cur = readPackedRefs(0, 0);
 				int idx = cur.find(name);
 				if (0 <= idx)
 					commitPackedRefs(lck, cur.remove(idx), packed);
@@ -699,19 +679,21 @@ public class RefDirectory extends RefDatabase {
 	}
 
 	private PackedRefList getPackedRefs() throws IOException {
+		long size = packedRefsFile.length();
+		long mtime = size != 0 ? packedRefsFile.lastModified() : 0;
+
 		final PackedRefList curList = packedRefs.get();
-		if (!curList.snapshot.isModified(packedRefsFile))
+		if (size == curList.lastSize && mtime == curList.lastModified)
 			return curList;
 
-		final PackedRefList newList = readPackedRefs();
+		final PackedRefList newList = readPackedRefs(size, mtime);
 		if (packedRefs.compareAndSet(curList, newList))
 			modCnt.incrementAndGet();
 		return newList;
 	}
 
-	private PackedRefList readPackedRefs()
+	private PackedRefList readPackedRefs(long size, long mtime)
 			throws IOException {
-		final FileSnapshot snapshot = FileSnapshot.save(packedRefsFile);
 		final BufferedReader br;
 		try {
 			br = new BufferedReader(new InputStreamReader(new FileInputStream(
@@ -721,7 +703,7 @@ public class RefDirectory extends RefDatabase {
 			return PackedRefList.NO_PACKED_REFS;
 		}
 		try {
-			return new PackedRefList(parsePackedRefs(br), snapshot);
+			return new PackedRefList(parsePackedRefs(br), size, mtime);
 		} finally {
 			br.close();
 		}
@@ -787,7 +769,7 @@ public class RefDirectory extends RefDatabase {
 			protected void writeFile(String name, byte[] content)
 					throws IOException {
 				lck.setFSync(true);
-				lck.setNeedSnapshot(true);
+				lck.setNeedStatInformation(true);
 				try {
 					lck.write(content);
 				} catch (IOException ioe) {
@@ -802,8 +784,8 @@ public class RefDirectory extends RefDatabase {
 				if (!lck.commit())
 					throw new ObjectWritingException(MessageFormat.format(JGitText.get().unableToWrite, name));
 
-				packedRefs.compareAndSet(oldPackedList, new PackedRefList(
-						refs, lck.getCommitSnapshot()));
+				packedRefs.compareAndSet(oldPackedList, new PackedRefList(refs,
+						content.length, lck.getCommitLastModified()));
 			}
 		}.writePackedRefs();
 	}
@@ -853,10 +835,9 @@ public class RefDirectory extends RefDatabase {
 		} else if (modified == 0)
 			return null;
 
-		final int limit = 4096;
 		final byte[] buf;
 		try {
-			buf = IO.readSome(path, limit);
+			buf = IO.readFully(path, 4096);
 		} catch (FileNotFoundException noFile) {
 			return null; // doesn't exist; not a reference.
 		}
@@ -866,9 +847,6 @@ public class RefDirectory extends RefDatabase {
 			return null; // empty file; not a reference.
 
 		if (isSymRef(buf, n)) {
-			if (n == limit)
-				return null; // possibly truncated ref
-
 			// trim trailing whitespace
 			while (0 < n && Character.isWhitespace(buf[n - 1]))
 				n--;
@@ -979,14 +957,19 @@ public class RefDirectory extends RefDatabase {
 	}
 
 	private static class PackedRefList extends RefList<Ref> {
-		static final PackedRefList NO_PACKED_REFS = new PackedRefList(
-				RefList.emptyList(), FileSnapshot.MISSING_FILE);
+		static final PackedRefList NO_PACKED_REFS = new PackedRefList(RefList
+				.emptyList(), 0, 0);
 
-		final FileSnapshot snapshot;
+		/** Last length of the packed-refs file when we read it. */
+		final long lastSize;
 
-		PackedRefList(RefList<Ref> src, FileSnapshot s) {
+		/** Last modified time of the packed-refs file when we read it. */
+		final long lastModified;
+
+		PackedRefList(RefList<Ref> src, long size, long mtime) {
 			super(src);
-			snapshot = s;
+			lastSize = size;
+			lastModified = mtime;
 		}
 	}
 

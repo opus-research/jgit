@@ -52,7 +52,6 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.eclipse.jgit.dircache.DirCache;
-import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -77,14 +76,13 @@ import org.eclipse.jgit.treewalk.filter.TreeFilter;
  * <li>removed files</li>
  * <li>missing files</li>
  * <li>modified files</li>
- * <li>conflicting files</li>
  * <li>untracked files</li>
  * <li>files with assume-unchanged flag</li>
  * </ul>
  */
 public class IndexDiff {
 
-	private static final class ProgressReportingFilter extends TreeFilter {
+	private final class ProgressReportingFilter extends TreeFilter {
 
 		private final ProgressMonitor monitor;
 
@@ -154,8 +152,6 @@ public class IndexDiff {
 	private Set<String> modified = new HashSet<String>();
 
 	private Set<String> untracked = new HashSet<String>();
-
-	private Set<String> conflicts = new HashSet<String>();
 
 	private Set<String> assumeUnchanged;
 
@@ -324,12 +320,6 @@ public class IndexDiff {
 						modified.add(treeWalk.getPathString());
 					}
 				}
-
-				final DirCacheEntry dirCacheEntry = dirCacheIterator
-						.getDirCacheEntry();
-				if (dirCacheEntry != null && dirCacheEntry.getStage() > 0) {
-					conflicts.add(treeWalk.getPathString());
-				}
 			}
 		}
 
@@ -385,13 +375,6 @@ public class IndexDiff {
 	 */
 	public Set<String> getUntracked() {
 		return untracked;
-	}
-
-	/**
-	 * @return list of files that are in conflict
-	 */
-	public Set<String> getConflicting() {
-		return conflicts;
 	}
 
 	/**

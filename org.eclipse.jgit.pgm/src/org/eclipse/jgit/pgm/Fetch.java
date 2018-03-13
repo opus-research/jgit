@@ -93,18 +93,13 @@ class Fetch extends AbstractFetchCommand {
 	protected void run() throws Exception {
 		Git git = new Git(db);
 		FetchCommand fetch = git.fetch();
-		if (fsck != null)
-			fetch.setCheckFetchedObjects(fsck.booleanValue());
-		if (prune != null)
-			fetch.setRemoveDeletedRefs(prune.booleanValue());
-		if (toget != null)
-			fetch.setRefSpecs(toget);
-		if (0 <= timeout)
-			fetch.setTimeout(timeout);
+		fetch.setCheckFetchedObjects(fsck.booleanValue());
+		fetch.setRemoveDeletedRefs(prune.booleanValue());
+		fetch.setRefSpecs(toget);
+		fetch.setTimeout(timeout);
 		fetch.setDryRun(dryRun);
 		fetch.setRemote(remote);
-		if (thin != null)
-			fetch.setThin(thin.booleanValue());
+		fetch.setThin(thin.booleanValue());
 		fetch.setProgressMonitor(new TextProgressMonitor());
 
 		FetchResult result = fetch.call();

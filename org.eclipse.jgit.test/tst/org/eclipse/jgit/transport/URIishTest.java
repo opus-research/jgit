@@ -55,7 +55,6 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 
-import org.junit.Ignore;
 import org.junit.Test;
 
 public class URIishTest {
@@ -90,8 +89,8 @@ public class URIishTest {
 		URIish u = new URIish(str);
 		assertNull(u.getScheme());
 		assertFalse(u.isRemote());
-		assertEquals("D:\\m y", u.getPath());
-		assertEquals("D:\\m y", u.toString());
+		assertEquals("D:/m y", u.getPath());
+		assertEquals("D:/m y", u.toString());
 		assertEquals(u, new URIish(str));
 	}
 
@@ -112,8 +111,8 @@ public class URIishTest {
 		URIish u = new URIish(str);
 		assertNull(u.getScheme());
 		assertFalse(u.isRemote());
-		assertEquals("\\\\some\\place", u.getPath());
-		assertEquals("\\\\some\\place", u.toString());
+		assertEquals("//some/place", u.getPath());
+		assertEquals("//some/place", u.toString());
 		assertEquals(u, new URIish(str));
 	}
 
@@ -316,8 +315,8 @@ public class URIishTest {
 		assertEquals(u, new URIish(str));
 	}
 
+	/* Resolving ~user is beyond standard Java API and need more support
 	@Test
-	@Ignore("Resolving ~user is beyond standard Java API and need more support")
 	public void testFileWithUserHome() throws Exception {
 		final String str = "~some/p ath";
 		URIish u = new URIish(str);
@@ -332,6 +331,7 @@ public class URIishTest {
 		assertEquals(u.setPass(null).toPrivateString(), u.toString());
 		assertEquals(u, new URIish(str));
 	}
+	*/
 
 	@Test
 	public void testFileWithNoneUserHomeWithTilde() throws Exception {
@@ -549,6 +549,6 @@ public class URIishTest {
 	public void testMissingPort() throws URISyntaxException {
 		final String incorrectSshUrl = "ssh://some-host:/path/to/repository.git";
 		URIish u = new URIish(incorrectSshUrl);
-		assertFalse(TransportGitSsh.PROTO_SSH.canHandle(u));
+		assertFalse(TransportGitSsh.canHandle(u));
 	}
 }

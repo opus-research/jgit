@@ -69,7 +69,6 @@ import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.storage.file.WindowCache;
 import org.eclipse.jgit.storage.file.WindowCacheConfig;
 import org.eclipse.jgit.util.FS;
-import org.eclipse.jgit.util.FileUtils;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.SystemReader;
 import org.junit.After;
@@ -293,29 +292,15 @@ public abstract class LocalDiskRepositoryTestCase {
 	 *             the repository could not be created in the temporary area
 	 */
 	private FileRepository createRepository(boolean bare) throws IOException {
-		File gitdir = createUniqueTestGitDir(bare);
+		String uniqueId = System.currentTimeMillis() + "_" + (testCount++);
+		String gitdirName = "test" + uniqueId + (bare ? "" : "/") + Constants.DOT_GIT;
+		File gitdir = new File(trash, gitdirName).getCanonicalFile();
 		FileRepository db = new FileRepository(gitdir);
+
 		assertFalse(gitdir.exists());
 		db.create();
 		toClose.add(db);
 		return db;
-	}
-
-	/**
-	 * Creates a new unique directory for a test repository
-	 *
-	 * @param bare
-	 *            true for a bare repository; false for a repository with a
-	 *            working directory
-	 * @return a unique directory for a test repository
-	 * @throws IOException
-	 */
-	protected File createUniqueTestGitDir(boolean bare) throws IOException {
-		String uniqueId = System.currentTimeMillis() + "_" + (testCount++);
-		String gitdirName = "test" + uniqueId + (bare ? "" : "/")
-				+ Constants.DOT_GIT;
-		File gitdir = new File(trash, gitdirName).getCanonicalFile();
-		return gitdir;
 	}
 
 	/**
@@ -404,7 +389,7 @@ public abstract class LocalDiskRepositoryTestCase {
 	 *             the file could not be written.
 	 */
 	protected void write(final File f, final String body) throws IOException {
-		FileUtils.mkdirs(f.getParentFile(), true);
+		f.getParentFile().mkdirs();
 		Writer w = new OutputStreamWriter(new FileOutputStream(f), "UTF-8");
 		try {
 			w.write(body);
