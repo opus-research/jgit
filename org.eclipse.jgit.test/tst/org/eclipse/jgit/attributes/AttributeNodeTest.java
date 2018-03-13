@@ -50,6 +50,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -165,10 +166,10 @@ public class AttributeNodeTest {
 	}
 
 	private void assertAttribute(String path, AttributesNode node,
-			Set<Attribute> attrs) throws IOException {
-		AttributeSet attributes = new AttributeSet();
-		node.getAttributes(null, path, false, attributes);
-		assertEquals(attrs, new HashSet<Attribute>(attributes.getAttributes()));
+			Set<Attribute> attrs) {
+		HashMap<String, Attribute> attributes = new HashMap<String, Attribute>();
+		node.getAttributes(path, false, attributes);
+		assertEquals(attrs, new HashSet<Attribute>(attributes.values()));
 	}
 
 	static Set<Attribute> asSet(Attribute... attrs) {

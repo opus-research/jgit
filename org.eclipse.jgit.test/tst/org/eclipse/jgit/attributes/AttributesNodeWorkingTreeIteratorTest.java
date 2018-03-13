@@ -43,6 +43,8 @@
 package org.eclipse.jgit.attributes;
 
 import static java.util.Arrays.asList;
+import static org.hamcrest.CoreMatchers.hasItem;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -50,7 +52,10 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.eclipse.jgit.attributes.Attribute.State;
 import org.eclipse.jgit.errors.CorruptObjectException;
@@ -103,7 +108,6 @@ public class AttributesNodeWorkingTreeIteratorTest extends RepositoryTestCase {
 		writeTrashFile("src/config/readme.txt", "");
 		writeTrashFile("src/config/windows.file", "");
 		writeTrashFile("src/config/windows.txt", "");
-		db.refreshConfig();
 
 		walk = beginWalk();
 
@@ -117,13 +121,11 @@ public class AttributesNodeWorkingTreeIteratorTest extends RepositoryTestCase {
 
 		assertIteration(D, "src/config");
 		assertIteration(F, "src/config/.gitattributes");
-		assertIteration(F, "src/config/readme.txt", asList(DELTA_UNSET, EOL_LF),
-				null,
+		assertIteration(F, "src/config/readme.txt", asList(DELTA_UNSET), null,
 				asList(CUSTOM_VALUE));
 		assertIteration(F, "src/config/windows.file", null, asList(EOL_CRLF),
 				null);
-		assertIteration(F, "src/config/windows.txt",
-				asList(DELTA_UNSET, EOL_LF),
+		assertIteration(F, "src/config/windows.txt", asList(DELTA_UNSET),
 				asList(EOL_CRLF), asList(CUSTOM_VALUE));
 
 		assertIteration(F, "windows.file", null, asList(EOL_CRLF), null);
@@ -210,7 +212,9 @@ public class AttributesNodeWorkingTreeIteratorTest extends RepositoryTestCase {
 
 	private void assertIteration(FileMode type, String pathName)
 			throws IOException {
-		assertIteration(type, pathName, null, null, null);
+		assertIteration(type, pathName, Collections.<Attribute> emptyList(),
+				Collections.<Attribute> emptyList(),
+				Collections.<Attribute> emptyList());
 	}
 
 	private void assertIteration(FileMode type, String pathName,
@@ -223,37 +227,39 @@ public class AttributesNodeWorkingTreeIteratorTest extends RepositoryTestCase {
 		WorkingTreeIterator itr = walk.getTree(0, WorkingTreeIterator.class);
 		assertNotNull("has tree", itr);
 
-		AttributeSet expectedAttrs = new AttributeSet();
-		if (nodeAttrs != null) {
-			for (Attribute a : nodeAttrs) {
-				if (!expectedAttrs.containsKey(a.getKey()))
-					expectedAttrs.putAttribute(a);
-			}
-		}
-		if (globalAttrs != null) {
-			for (Attribute a : globalAttrs) {
-				if (!expectedAttrs.containsKey(a.getKey()))
-					expectedAttrs.putAttribute(a);
-			}
-		}
-		if (infoAttrs != null) {
-			for (Attribute a : infoAttrs) {
-				// override
-				expectedAttrs.putAttribute(a);
-			}
-		}
-
-		AttributeSet actualAttrs = db.getAttributesHierarchy()
-				.getAttributes(pathName, type);
-		assertAttributes(expectedAttrs, actualAttrs);
+		AttributesNode attributeNode = itr.getEntryAttributesNode();
+		assertAttributeNode(pathName, attributeNode, nodeAttrs);
+		AttributesNode infoAttributeNode = itr.getInfoAttributesNode();
+		assertAttributeNode(pathName, infoAttributeNode, infoAttrs);
+		AttributesNode globalAttributeNode = itr.getGlobalAttributesNode();
+		assertAttributeNode(pathName, globalAttributeNode, globalAttrs);
 		if (D.equals(type))
 			walk.enterSubtree();
 
 	}
 
-	private void assertAttributes(AttributeSet expectedAttrs,
-			AttributeSet actualAttrs) {
-		assertEquals(expectedAttrs, actualAttrs);
+	private void assertAttributeNode(String pathName,
+			AttributesNode attributeNode, List<Attribute> nodeAttrs) {
+		if (attributeNode == null)
+			assertTrue(nodeAttrs == null || nodeAttrs.isEmpty());
+		else {
+
+			Map<String, Attribute> entryAttributes = new LinkedHashMap<String, Attribute>();
+			attributeNode.getAttributes(pathName, false, entryAttributes);
+
+			if (nodeAttrs != null && !nodeAttrs.isEmpty()) {
+				for (Attribute attribute : nodeAttrs) {
+					assertThat(entryAttributes.values(), hasItem(attribute));
+				}
+			} else {
+				assertTrue(
+						"The entry "
+								+ pathName
+								+ " should not have any attributes. Instead, the following attributes are applied to this file "
+								+ entryAttributes.toString(),
+						entryAttributes.isEmpty());
+			}
+		}
 	}
 
 	private void writeAttributesFile(String name, String... rules)

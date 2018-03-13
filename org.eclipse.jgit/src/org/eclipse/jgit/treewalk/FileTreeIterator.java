@@ -238,7 +238,7 @@ public class FileTreeIterator extends WorkingTreeIterator {
 
 	@Override
 	protected byte[] idSubmodule(final Entry e) {
-		if (getRepository() == null)
+		if (repository == null)
 			return idSubmodule(getDirectory(), e);
 		return super.idSubmodule(e);
 	}

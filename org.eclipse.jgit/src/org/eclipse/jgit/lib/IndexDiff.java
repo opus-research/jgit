@@ -315,7 +315,6 @@ public class IndexDiff {
 		else
 			tree = null;
 		this.initialWorkingTreeIterator = workingTreeIterator;
-		repository.refreshConfig();
 	}
 
 	/**
@@ -402,6 +401,7 @@ public class IndexDiff {
 			int estIndexSize, final String title)
 			throws IOException {
 		dirCache = repository.readDirCache();
+
 		try (TreeWalk treeWalk = new TreeWalk(repository)) {
 			treeWalk.setRecursive(true);
 			// add the trees (tree, dirchache, workdir)

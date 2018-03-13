@@ -70,7 +70,6 @@ public class GcReflogTest extends GcTestCase {
 		gc.setExpireAgeMillis(0);
 		fsTick();
 		gc.prune(Collections.<ObjectId> emptySet());
-		fsTick();
 		stats = gc.getStatistics();
 		assertEquals(8, stats.numberOfLooseObjects);
 		tr.blob("x");
@@ -78,7 +77,6 @@ public class GcReflogTest extends GcTestCase {
 		assertEquals(9, stats.numberOfLooseObjects);
 		fsTick();
 		gc.prune(Collections.<ObjectId> emptySet());
-		fsTick();
 		stats = gc.getStatistics();
 		assertEquals(8, stats.numberOfLooseObjects);
 	}

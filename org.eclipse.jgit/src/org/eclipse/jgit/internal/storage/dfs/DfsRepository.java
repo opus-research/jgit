@@ -112,7 +112,6 @@ public abstract class DfsRepository extends Repository {
 
 	@Override
 	public void scanForRepoChanges() throws IOException {
-		refreshConfig();
 		getRefDatabase().clearCache();
 		getObjectDatabase().clearCache();
 	}

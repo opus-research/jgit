@@ -107,9 +107,6 @@ public class ConfigConstants {
 	/** The "autocrlf" key */
 	public static final String CONFIG_KEY_AUTOCRLF = "autocrlf";
 
-	/** The "eol" key */
-	public static final String CONFIG_KEY_EOL = "eol";
-
 	/** The "bare" key */
 	public static final String CONFIG_KEY_BARE = "bare";
 
