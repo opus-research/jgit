@@ -116,7 +116,7 @@ public class SignedPushConfig {
 
 	/**
 	 * @return the configured nonce slop limit.
-	 * @since 4.
+	 * @since 4.1
 	 */
 	public int getCertNonceSlopLimit() {
 		return certNonceSlopLimit;
