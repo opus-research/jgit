@@ -58,7 +58,13 @@ import org.eclipse.jgit.transport.PushCertificate;
  * Creates, updates or deletes any reference.
  */
 public abstract class RefUpdate {
-	/** Status of an update request. */
+	/**
+	 * Status of an update request.
+	 * <p>
+	 * New values may be added to this enum in the future. Callers may assume that
+	 * unknown values are failures, and may generally treat them the same as
+	 * {@link #REJECTED_OTHER_REASON}.
+	 */
 	public static enum Result {
 		/** The ref update/delete has not been attempted by the caller. */
 		NOT_ATTEMPTED,
@@ -115,8 +121,9 @@ public abstract class RefUpdate {
 		 * update/delete to take place, so ref still contains the old value. No
 		 * previous history was lost.
 		 * <p>
-		 * Also used when the new value of the ref is not a valid object (although a
-		 * full connectivity check is not performed).
+		 * <em>Note:</em> Despite the general name, this result only refers to the
+		 * non-fast-forward case. For more general errors, see {@link
+		 * #REJECTED_OTHER_REASON}.
 		 */
 		REJECTED,
 
@@ -142,7 +149,25 @@ public abstract class RefUpdate {
 		 * The ref was renamed from another name
 		 * <p>
 		 */
-		RENAMED
+		RENAMED,
+
+		/**
+		 * One or more objects aren't in the repository.
+		 * <p>
+		 * This is severe indication of either repository corruption on the
+		 * server side, or a bug in the client wherein the client did not supply
+		 * all required objects during the pack transfer.
+		 *
+		 * @since 4.9
+		 */
+		REJECTED_MISSING_OBJECT,
+
+		/**
+		 * Rejected for some other reason not covered by another enum value.
+		 *
+		 * @since 4.9
+		 */
+		REJECTED_OTHER_REASON;
 	}
 
 	/** New value the caller wants this ref to have. */
@@ -661,7 +686,7 @@ public abstract class RefUpdate {
 			try {
 				newObj = safeParseNew(walk, newValue);
 			} catch (MissingObjectException e) {
-				return Result.REJECTED;
+				return Result.REJECTED_MISSING_OBJECT;
 			}
 
 			if (oldValue == null) {
