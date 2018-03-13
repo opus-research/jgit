@@ -259,12 +259,7 @@ public abstract class WorkingTreeIterator extends AbstractTreeIterator {
 		if (contentIdFromPtr == ptr)
 			return contentId;
 
-		// The metadata comparison of submodules are not reliable because of the
-		// last modified timestamp. The submodule timestamp is the timestamp of
-		// submodule directory, not the timestamp of submodule index. Even if the
-		// submodule has changed the index, it's not reflected in the metadata.
-		if (state.walk != null
-				&& (mode & FileMode.TYPE_MASK) != FileMode.TYPE_GITLINK) {
+		if (state.walk != null) {
 			// If there is a matching DirCacheIterator, we can reuse
 			// its idBuffer, but only if we appear to be clean against
 			// the cached index information for the path.
