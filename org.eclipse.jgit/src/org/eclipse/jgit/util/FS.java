@@ -66,6 +66,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.errors.SymlinksNotSupportedException;
 import org.eclipse.jgit.internal.JGitText;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.util.ProcessResult.Status;
 
@@ -626,18 +627,35 @@ public abstract class FS {
 	}
 
 	/**
+	 * See {@link FileUtils#relativize(String, String)}.
+	 *
+	 * @param base
+	 *            The path against which <code>other</code> should be
+	 *            relativized.
+	 * @param other
+	 *            The path that will be made relative to <code>base</code>.
+	 * @return A relative path that, when resolved against <code>base</code>,
+	 *         will yield the original <code>other</code>.
+	 * @see FileUtils#relativize(String, String)
+	 * @since 3.7
+	 */
+	public String relativize(String base, String other) {
+		return FileUtils.relativize(base, other);
+	}
+
+	/**
 	 * Checks whether the given hook is defined for the given repository, then
 	 * runs it with the given arguments.
 	 * <p>
-	 * The hook's standard output and error will be redirected to
+	 * The hook's standard output and error streams will be redirected to
 	 * <code>System.out</code> and <code>System.err</code> respectively. The
 	 * hook will have no stdin.
 	 * </p>
 	 *
 	 * @param repository
-	 *            The repository from which a hook should be run.
+	 *            The repository for which a hook should be run.
 	 * @param hook
-	 *            The particular hook we wish to execute.
+	 *            The hook to be executed.
 	 * @param args
 	 *            Arguments to pass to this hook. Cannot be <code>null</code>,
 	 *            but can be an empty array.
@@ -645,7 +663,7 @@ public abstract class FS {
 	 * @throws JGitInternalException
 	 *             if we fail to run the hook somehow. Causes may include an
 	 *             interrupted process or I/O errors.
-	 * @since 3.6
+	 * @since 3.7
 	 */
 	public ProcessResult runIfPresent(Repository repository, final Hook hook,
 			String[] args) throws JGitInternalException {
@@ -658,9 +676,9 @@ public abstract class FS {
 	 * runs it with the given arguments.
 	 *
 	 * @param repository
-	 *            The repository from which a hook should be run.
+	 *            The repository for which a hook should be run.
 	 * @param hook
-	 *            The particular hook we wish to execute.
+	 *            The hook to be executed.
 	 * @param args
 	 *            Arguments to pass to this hook. Cannot be <code>null</code>,
 	 *            but can be an empty array.
@@ -679,7 +697,7 @@ public abstract class FS {
 	 * @throws JGitInternalException
 	 *             if we fail to run the hook somehow. Causes may include an
 	 *             interrupted process or I/O errors.
-	 * @since 3.6
+	 * @since 3.7
 	 */
 	public ProcessResult runIfPresent(Repository repository, final Hook hook,
 			String[] args, PrintStream outRedirect, PrintStream errRedirect,
@@ -688,7 +706,69 @@ public abstract class FS {
 	}
 
 	/**
-	 * Tries and find a hook matching the given one in the given repository.
+	 * See
+	 * {@link #runIfPresent(Repository, Hook, String[], PrintStream, PrintStream, String)}
+	 * . Should only be called by FS supporting shell scripts execution.
+	 *
+	 * @param repository
+	 *            The repository for which a hook should be run.
+	 * @param hook
+	 *            The hook to be executed.
+	 * @param args
+	 *            Arguments to pass to this hook. Cannot be <code>null</code>,
+	 *            but can be an empty array.
+	 * @param outRedirect
+	 *            A print stream on which to redirect the hook's stdout. Can be
+	 *            <code>null</code>, in which case the hook's standard output
+	 *            will be lost.
+	 * @param errRedirect
+	 *            A print stream on which to redirect the hook's stderr. Can be
+	 *            <code>null</code>, in which case the hook's standard error
+	 *            will be lost.
+	 * @param stdinArgs
+	 *            A string to pass on to the standard input of the hook. May be
+	 *            <code>null</code>.
+	 * @return The ProcessResult describing this hook's execution.
+	 * @throws JGitInternalException
+	 *             if we fail to run the hook somehow. Causes may include an
+	 *             interrupted process or I/O errors.
+	 * @since 3.7
+	 */
+	protected ProcessResult internalRunIfPresent(Repository repository,
+			final Hook hook, String[] args, PrintStream outRedirect,
+			PrintStream errRedirect, String stdinArgs)
+			throws JGitInternalException {
+		final File hookFile = findHook(repository, hook);
+		if (hookFile == null)
+			return new ProcessResult(Status.NOT_PRESENT);
+
+		final String hookPath = hookFile.getAbsolutePath();
+		final File runDirectory;
+		if (repository.isBare())
+			runDirectory = repository.getDirectory();
+		else
+			runDirectory = repository.getWorkTree();
+		final String cmd = relativize(runDirectory.getAbsolutePath(),
+				hookPath);
+		ProcessBuilder hookProcess = runInShell(cmd, args);
+		hookProcess.directory(runDirectory);
+		try {
+			return new ProcessResult(runProcess(hookProcess, outRedirect,
+					errRedirect, stdinArgs), Status.OK);
+		} catch (IOException e) {
+			throw new JGitInternalException(MessageFormat.format(
+					JGitText.get().exceptionCaughtDuringExecutionOfHook,
+					hook.getName()), e);
+		} catch (InterruptedException e) {
+			throw new JGitInternalException(MessageFormat.format(
+					JGitText.get().exceptionHookExecutionInterrupted,
+					hook.getName()), e);
+		}
+	}
+
+
+	/**
+	 * Tries to find a hook matching the given one in the given repository.
 	 *
 	 * @param repository
 	 *            The repository within which to find a hook.
@@ -696,11 +776,11 @@ public abstract class FS {
 	 *            The hook we're trying to find.
 	 * @return The {@link File} containing this particular hook if it exists in
 	 *         the given repository, <code>null</code> otherwise.
-	 * @since 3.6
+	 * @since 3.7
 	 */
-	public File tryFindHook(Repository repository, final Hook hook) {
+	public File findHook(Repository repository, final Hook hook) {
 		final File hookFile = new File(new File(repository.getDirectory(),
-				"hooks"), hook.getName()); //$NON-NLS-1$
+				Constants.HOOKS), hook.getName());
 		return hookFile.isFile() ? hookFile : null;
 	}
 
@@ -727,7 +807,7 @@ public abstract class FS {
 	 * @throws InterruptedException
 	 *             if the current thread is interrupted while waiting for the
 	 *             process to end.
-	 * @since 3.6
+	 * @since 3.7
 	 */
 	protected int runProcess(ProcessBuilder hookProcessBuilder,
 			OutputStream outRedirect, OutputStream errRedirect, String stdinArgs)

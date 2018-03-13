@@ -150,7 +150,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String commitDoesNotHaveGivenParent;
 	/***/ public String cantFindObjectInReversePackIndexForTheSpecifiedOffset;
 	/***/ public String cantPassMeATree;
-	/***/ public String channelMustBeInRange0_255;
+	/***/ public String channelMustBeInRange1_255;
 	/***/ public String characterClassIsNotSupported;
 	/***/ public String checkoutConflictWithFile;
 	/***/ public String checkoutConflictWithFiles;
@@ -191,6 +191,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String corruptObjectNotree;
 	/***/ public String corruptObjectNoType;
 	/***/ public String corruptObjectPackfileChecksumIncorrect;
+	/***/ public String corruptPack;
 	/***/ public String couldNotCheckOutBecauseOfConflicts;
 	/***/ public String couldNotDeleteLockFileShouldNotHappen;
 	/***/ public String couldNotDeleteTemporaryIndexFileShouldNotHappen;
@@ -269,6 +270,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String exceptionHookExecutionInterrupted;
 	/***/ public String exceptionOccurredDuringAddingOfOptionToALogCommand;
 	/***/ public String exceptionOccurredDuringReadingOfGIT_DIR;
+	/***/ public String exceptionWhileReadingPack;
 	/***/ public String expectedACKNAKFoundEOF;
 	/***/ public String expectedACKNAKGot;
 	/***/ public String expectedBooleanStringValue;
@@ -311,6 +313,8 @@ public class JGitText extends TranslationBundle {
 	/***/ public String indexFileIsTooLargeForJgit;
 	/***/ public String indexSignatureIsInvalid;
 	/***/ public String indexWriteException;
+	/***/ public String initFailedBareRepoDifferentDirs;
+	/***/ public String initFailedNonBareRepoSameDirs;
 	/***/ public String inMemoryBufferLimitExceeded;
 	/***/ public String inputStreamMustSupportMark;
 	/***/ public String integerValueOutOfRange;
@@ -450,6 +454,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String packRefs;
 	/***/ public String packSizeNotSetYet;
 	/***/ public String packTooLargeForIndexVersion1;
+	/***/ public String packWasDeleted;
 	/***/ public String packWriterStatistics;
 	/***/ public String panicCantRenameIndexFile;
 	/***/ public String patchApplyException;
@@ -559,6 +564,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String tagAlreadyExists;
 	/***/ public String tagNameInvalid;
 	/***/ public String tagOnRepoWithoutHEADCurrentlyNotSupported;
+	/***/ public String transactionAborted;
 	/***/ public String theFactoryMustNotBeNull;
 	/***/ public String timerAlreadyTerminated;
 	/***/ public String topologicalSortRequired;
