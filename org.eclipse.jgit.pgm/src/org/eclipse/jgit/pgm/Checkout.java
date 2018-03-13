@@ -83,25 +83,21 @@ class Checkout extends TextBuiltin {
 		try {
 			String oldBranch = db.getBranch();
 			Ref ref = command.call();
-			if (ref == null)
-				return;
 			if (Repository.shortenRefName(ref.getName()).equals(oldBranch)) {
-				outw.println(MessageFormat.format(
-						CLIText.get().alreadyOnBranch,
+				out.println(MessageFormat.format(CLIText.get().alreadyOnBranch,
 						name));
 				return;
 			}
 			if (createBranch)
-				outw.println(MessageFormat.format(
+				out.println(MessageFormat.format(
 						CLIText.get().switchedToNewBranch,
 						Repository.shortenRefName(ref.getName())));
 			else
-				outw.println(MessageFormat.format(
+				out.println(MessageFormat.format(
 						CLIText.get().switchedToBranch,
 						Repository.shortenRefName(ref.getName())));
 		} catch (RefNotFoundException e) {
-			outw.println(MessageFormat.format(
-					CLIText.get().pathspecDidNotMatch,
+			out.println(MessageFormat.format(CLIText.get().pathspecDidNotMatch,
 					name));
 		} catch (RefAlreadyExistsException e) {
 			throw die(MessageFormat.format(CLIText.get().branchAlreadyExists,
