@@ -171,13 +171,13 @@ final class WindowCursor extends ObjectReader implements ObjectReuseAsIs {
 			int dstoff) throws IOException, DataFormatException {
 		prepareInflater();
 		pin(pack, position);
-		position += window.setInput(position, inf);
+		position += window.inflate(position, inf);
 		do {
 			int n = inf.inflate(dstbuf, dstoff, dstbuf.length - dstoff);
 			if (n == 0) {
 				if (inf.needsInput()) {
 					pin(pack, position);
-					position += window.setInput(position, inf);
+					position += window.inflate(position, inf);
 				} else if (inf.finished())
 					return dstoff;
 				else
