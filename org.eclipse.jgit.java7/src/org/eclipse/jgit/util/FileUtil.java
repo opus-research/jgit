@@ -180,7 +180,9 @@ class FileUtil {
 					readAttributes.isRegularFile(), //
 					readAttributes.creationTime().toMillis(), //
 					readAttributes.lastModifiedTime().toMillis(),
-					readAttributes.size());
+					readAttributes.isSymbolicLink() ? Constants
+							.encode(FileUtils.readSymLink(path)).length
+							: readAttributes.size());
 			return attributes;
 		} catch (NoSuchFileException e) {
 			return new FileUtil.Java7BasicAttributes(fs, path, false, false,
@@ -218,26 +220,6 @@ class FileUtil {
 		} catch (IOException e) {
 			return new Attributes(path, fs);
 		}
-	}
-
-	public static File normalize(File file) {
-		if (SystemReader.getInstance().isMacOS()) {
-			// TODO: Would it be faster to check with isNormalized first
-			// assuming normalized paths are much more common
-			String normalized = Normalizer.normalize(file.getPath(),
-					Normalizer.Form.NFC);
-			return new File(normalized);
-		}
-		return file;
-	}
-
-	public static String normalize(String name) {
-		if (SystemReader.getInstance().isMacOS()) {
-			if (name == null)
-				return null;
-			return Normalizer.normalize(name, Normalizer.Form.NFC);
-		}
-		return name;
 	}
 
 }
