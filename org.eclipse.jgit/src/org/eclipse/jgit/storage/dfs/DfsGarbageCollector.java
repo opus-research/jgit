@@ -61,7 +61,6 @@ import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectIdOwnerMap;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -333,16 +332,10 @@ public class DfsGarbageCollector {
 			out.close();
 		}
 
-		final ObjectIdOwnerMap<ObjectIdOwnerMap.Entry> packedObjs = new ObjectIdOwnerMap<
-				ObjectIdOwnerMap.Entry>();
-		for (ObjectId obj : pw.getObjectList()) {
-			packedObjs.add(new ObjectIdOwnerMap.Entry(obj) {
-				// A new entry that copies the ObjectId
-			});
-		}
+		final List<ObjectId> packedObjs = pw.getObjectList();
 		newPackObj.add(new PackWriter.ObjectIdSet() {
 			public boolean contains(AnyObjectId objectId) {
-				return packedObjs.contains(objectId);
+				return 0 <= Collections.binarySearch(packedObjs, objectId);
 			}
 		});
 
