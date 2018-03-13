@@ -244,32 +244,6 @@ public class Git {
 	}
 
 	/**
-	 * Returns a command object to execute a {@code Rebase} command
-	 *
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-rebase.html"
-	 *      >Git documentation about rebase</a>
-	 * @return a {@link RebaseCommand} used to collect all optional parameters
-	 *         and to finally execute the {@code rebase} command
-	 */
-	public RebaseCommand rebase() {
-		return new RebaseCommand(repo);
-	}
-
-	/**
-	 * Returns a command object to execute a {@code rm} command
-	 * 
-	 * @see <a
-	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-rm.html"
-	 *      >Git documentation about rm</a>
-	 * @return a {@link RmCommand} used to collect all optional parameters and
-	 *         to finally execute the {@code rm} command
-	 */
-	public RmCommand rm() {
-		return new RmCommand(repo);
-	}
-
-	/**
 	 * @return the git repository this class is interacting with
 	 */
 	public Repository getRepository() {
