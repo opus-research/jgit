@@ -85,7 +85,7 @@ public class BlameResult {
 		String path = gen.getResultPath();
 		RawText contents = gen.getResultContents();
 		if (contents == null) {
-			gen.close();
+			gen.release();
 			return null;
 		}
 		return new BlameResult(gen, path, contents);
@@ -239,7 +239,7 @@ public class BlameResult {
 			while (gen.next())
 				loadFrom(gen);
 		} finally {
-			gen.close();
+			gen.release();
 			generator = null;
 		}
 	}
@@ -265,7 +265,7 @@ public class BlameResult {
 			lastLength = gen.getRegionLength();
 			return gen.getResultStart();
 		} else {
-			gen.close();
+			gen.release();
 			generator = null;
 			return -1;
 		}
@@ -300,7 +300,7 @@ public class BlameResult {
 				return;
 
 			if (!gen.next()) {
-				gen.close();
+				gen.release();
 				generator = null;
 				return;
 			}
