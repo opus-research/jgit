@@ -49,15 +49,12 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.security.DigestOutputStream;
 import java.text.MessageFormat;
-import java.util.List;
 
 import javaewah.EWAHCompressedBitmap;
 
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.storage.file.PackBitmapIndexBuilder.StoredEntry;
-import org.eclipse.jgit.transport.PackedObjectInfo;
-import org.eclipse.jgit.util.NB;
 import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
 
 /**
@@ -65,11 +62,11 @@ import org.eclipse.jgit.util.io.SafeBufferedOutputStream;
  *
  * @see PackBitmapIndexV1
  */
-public class PackBitmapIndexWriterV1 {
+class PackBitmapIndexWriterV1 {
 	private final DigestOutputStream out;
 	private final DataOutput dataOutput;
 
-	public PackBitmapIndexWriterV1(final OutputStream dst) {
+	PackBitmapIndexWriterV1(final OutputStream dst) {
 		out = new DigestOutputStream(dst instanceof BufferedOutputStream ? dst
 				: new SafeBufferedOutputStream(dst),
 				Constants.newMessageDigest());
