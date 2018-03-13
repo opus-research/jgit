@@ -142,11 +142,9 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 	 * Set the person to use as the author and committer in the commits made
 	 *
 	 * @param person
-	 * @return {@code this}
 	 */
-	public StashCreateCommand setPerson(PersonIdent person) {
+	public void setPerson(PersonIdent person) {
 		this.person = person;
-		return this;
 	}
 
 	/**
@@ -155,11 +153,9 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 	 * This value defaults to {@link Constants#R_STASH}
 	 *
 	 * @param ref
-	 * @return {@code this}
 	 */
-	public StashCreateCommand setRef(String ref) {
+	public void setRef(String ref) {
 		this.ref = ref;
-		return this;
 	}
 
 	private RevCommit parseCommit(final ObjectReader reader,
@@ -180,13 +176,10 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 		return builder;
 	}
 
-	private void updateStashRef(ObjectId commitId, PersonIdent refLogIdent,
-			String refLogMessage) throws IOException {
+	private void updateStashRef(ObjectId commitId) throws IOException {
 		Ref currentRef = repo.getRef(ref);
 		RefUpdate refUpdate = repo.updateRef(ref);
 		refUpdate.setNewObjectId(commitId);
-		refUpdate.setRefLogIdent(refLogIdent);
-		refUpdate.setRefLogMessage(refLogMessage, false);
 		if (currentRef != null)
 			refUpdate.setExpectedOldObjectId(currentRef.getObjectId());
 		else
@@ -303,8 +296,7 @@ public class StashCreateCommand extends GitCommand<RevCommit> {
 				commitId = inserter.insert(builder);
 				inserter.flush();
 
-				updateStashRef(commitId, builder.getAuthor(),
-						builder.getMessage());
+				updateStashRef(commitId);
 			} finally {
 				inserter.release();
 				cache.unlock();
