@@ -51,20 +51,13 @@ import java.text.MessageFormat;
 
 import org.eclipse.jgit.util.CachedAuthenticator;
 
-import org.eclipse.jgit.pgm.internal.CLIText;
-
-/**
- * Basic network prompt for username/password when using the console.
- *
- * @since 4.0
- */
+/** Basic network prompt for username/password when using the console. */
 public class ConsoleAuthenticator extends CachedAuthenticator {
 	/** Install this authenticator implementation into the JVM. */
 	public static void install() {
 		final ConsoleAuthenticator c = new ConsoleAuthenticator();
 		if (c.cons == null)
-			throw new NoClassDefFoundError(
-					CLIText.get().noSystemConsoleAvailable);
+			throw new NoClassDefFoundError(ConsoleText.get().noSystemConsoleAvailable);
 		Authenticator.setDefault(c);
 	}
 
@@ -73,12 +66,11 @@ public class ConsoleAuthenticator extends CachedAuthenticator {
 	@Override
 	protected PasswordAuthentication promptPasswordAuthentication() {
 		final String realm = formatRealm();
-		String username = cons.readLine(MessageFormat.format(
-				CLIText.get().usernameFor + " ", realm)); //$NON-NLS-1$
+		String username = cons.readLine(MessageFormat.format(ConsoleText.get().usernameFor + " ", realm)); //$NON-NLS-1$
 		if (username == null || username.isEmpty()) {
 			return null;
 		}
-		char[] password = cons.readPassword(CLIText.get().password + " "); //$NON-NLS-1$
+		char[] password = cons.readPassword(ConsoleText.get().password + " "); //$NON-NLS-1$
 		if (password == null) {
 			password = new char[0];
 		}
