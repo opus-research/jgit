@@ -747,12 +747,12 @@ public class DirCacheCheckout {
 				// in the index there is nothing (e.g. 'git rm ...' was
 				// called before). Ignore the cached deletion and use what we
 				// find in Merge. Potentially updates the file.
-				if (equalIdAndMode(hId, hMode, mId, mMode))
+				if (equalIdAndMode(hId, hMode, mId, mMode)) {
 					if (emptyDirCache)
 						update(name, mId, mMode);
 					else
 						keep(dce);
-				else
+				} else
 					conflict(name, dce, h, m);
 			}
 		} else {
