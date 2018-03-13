@@ -86,7 +86,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String configFileNotFound;
 	/***/ public String cannotBeRenamed;
 	/***/ public String cannotChekoutNoHeadsAdvertisedByRemote;
-	/***/ public String cannotCombineSquashWithNoff;
 	/***/ public String cannotCreateCommand;
 	/***/ public String cannotCreateOutputStream;
 	/***/ public String cannotDeatchHEAD;
@@ -226,6 +225,5 @@ public class CLIText extends TranslationBundle {
 	/***/ public String unmergedPaths;
 	/***/ public String unsupportedOperation;
 	/***/ public String untrackedFiles;
-	/***/ public String updating;
 	/***/ public String warningNoCommitGivenOnCommandLine;
 }

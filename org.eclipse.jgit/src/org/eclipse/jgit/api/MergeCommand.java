@@ -99,8 +99,6 @@ public class MergeCommand extends GitCommand<MergeResult> {
 
 	private boolean squash;
 
-	private boolean fastForward = true;
-
 	/**
 	 * @param repo
 	 */
@@ -120,7 +118,14 @@ public class MergeCommand extends GitCommand<MergeResult> {
 			ConcurrentRefUpdateException, CheckoutConflictException,
 			InvalidMergeHeadsException, WrongRepositoryStateException, NoMessageException {
 		checkCallable();
-		checkParameters();
+
+		if (commits.size() != 1)
+			throw new InvalidMergeHeadsException(
+					commits.isEmpty() ? JGitText.get().noMergeHeadSpecified
+							: MessageFormat.format(
+									JGitText.get().mergeStrategyDoesNotSupportHeads,
+									mergeStrategy.getName(),
+									Integer.valueOf(commits.size())));
 
 		RevWalk revWalk = null;
 		DirCacheCheckout dco = null;
@@ -174,8 +179,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 				return new MergeResult(headCommit, srcCommit, new ObjectId[] {
 						headCommit, srcCommit },
 						MergeStatus.ALREADY_UP_TO_DATE, mergeStrategy, null, null);
-			} else if (revWalk.isMergedInto(headCommit, srcCommit)
-					&& fastForward) {
+			} else if (revWalk.isMergedInto(headCommit, srcCommit)) {
 				// FAST_FORWARD detected: skip doing a real merge but only
 				// update HEAD
 				refLogMessage.append(": " + MergeStatus.FAST_FORWARD);
@@ -237,10 +241,7 @@ public class MergeCommand extends GitCommand<MergeResult> {
 				} else
 					noProblems = merger.merge(headCommit, srcCommit);
 				refLogMessage.append(": Merge made by ");
-				if (!revWalk.isMergedInto(headCommit, srcCommit))
-					refLogMessage.append(mergeStrategy.getName());
-				else
-					refLogMessage.append("recursive");
+				refLogMessage.append(mergeStrategy.getName());
 				refLogMessage.append('.');
 				if (noProblems) {
 					dco = new DirCacheCheckout(repo,
@@ -302,21 +303,6 @@ public class MergeCommand extends GitCommand<MergeResult> {
 			if (revWalk != null)
 				revWalk.release();
 		}
-	}
-
-	private void checkParameters() throws InvalidMergeHeadsException {
-		if (squash && !fastForward) {
-			throw new JGitInternalException(
-					JGitText.get().cannotCombineSquashWithNoff);
-		}
-
-		if (commits.size() != 1)
-			throw new InvalidMergeHeadsException(
-					commits.isEmpty() ? JGitText.get().noMergeHeadSpecified
-							: MessageFormat.format(
-									JGitText.get().mergeStrategyDoesNotSupportHeads,
-									mergeStrategy.getName(),
-									Integer.valueOf(commits.size())));
 	}
 
 	private void updateHead(StringBuilder refLogMessage, ObjectId newHeadId,
@@ -404,23 +390,6 @@ public class MergeCommand extends GitCommand<MergeResult> {
 	public MergeCommand setSquash(boolean squash) {
 		checkCallable();
 		this.squash = squash;
-		return this;
-	}
-
-	/**
-	 * If <code>true</code> and the merge resolves as a fast-forward, only
-	 * update the branch pointer, without creating a merge commit. Otherwise,
-	 * create the merge commit.
-	 *
-	 * @param fastForward
-	 *            whether to create a new commit when the merge resolves as a
-	 *            fast-forward or not
-	 * @return {@code this}
-	 * @since 2.1
-	 */
-	public MergeCommand setFastForward(boolean fastForward) {
-		checkCallable();
-		this.fastForward = fastForward;
 		return this;
 	}
 }
