@@ -44,6 +44,9 @@
  */
 package org.eclipse.jgit.merge;
 
+import static org.eclipse.jgit.diff.DiffAlgorithm.SupportedAlgorithm.HISTOGRAM;
+import static org.eclipse.jgit.lib.ConfigConstants.CONFIG_DIFF_SECTION;
+import static org.eclipse.jgit.lib.ConfigConstants.CONFIG_KEY_ALGORITHM;
 import static org.eclipse.jgit.lib.Constants.CHARACTER_ENCODING;
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
 
@@ -79,9 +82,10 @@ import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.IndexWriteException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NoWorkTreeException;
-import org.eclipse.jgit.lib.ConfigConstants;
+import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.ObjectInserter;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevTree;
@@ -180,14 +184,14 @@ public class ResolveMerger extends ThreeWayMerger {
 	 *
 	 * @since 3.4
 	 */
-	protected List<String> unmergedPaths = new ArrayList<String>();
+	protected List<String> unmergedPaths = new ArrayList<>();
 
 	/**
 	 * Files modified during this merge operation.
 	 *
 	 * @since 3.4
 	 */
-	protected List<String> modifiedFiles = new LinkedList<String>();
+	protected List<String> modifiedFiles = new LinkedList<>();
 
 	/**
 	 * If the merger has nothing to do for a file but check it out at the end of
@@ -195,7 +199,7 @@ public class ResolveMerger extends ThreeWayMerger {
 	 *
 	 * @since 3.4
 	 */
-	protected Map<String, DirCacheEntry> toBeCheckedOut = new HashMap<String, DirCacheEntry>();
+	protected Map<String, DirCacheEntry> toBeCheckedOut = new HashMap<>();
 
 	/**
 	 * Paths in this list will be deleted from the local copy at the end of the
@@ -203,7 +207,7 @@ public class ResolveMerger extends ThreeWayMerger {
 	 *
 	 * @since 3.4
 	 */
-	protected List<String> toBeDeleted = new ArrayList<String>();
+	protected List<String> toBeDeleted = new ArrayList<>();
 
 	/**
 	 * Low-level textual merge results. Will be passed on to the callers in case
@@ -211,14 +215,14 @@ public class ResolveMerger extends ThreeWayMerger {
 	 *
 	 * @since 3.4
 	 */
-	protected Map<String, MergeResult<? extends Sequence>> mergeResults = new HashMap<String, MergeResult<? extends Sequence>>();
+	protected Map<String, MergeResult<? extends Sequence>> mergeResults = new HashMap<>();
 
 	/**
 	 * Paths for which the merge failed altogether.
 	 *
 	 * @since 3.4
 	 */
-	protected Map<String, MergeFailureReason> failingPaths = new HashMap<String, MergeFailureReason>();
+	protected Map<String, MergeFailureReason> failingPaths = new HashMap<>();
 
 	/**
 	 * Updated as we merge entries of the tree walk. Tells us whether we should
@@ -266,18 +270,25 @@ public class ResolveMerger extends ThreeWayMerger {
 	 */
 	protected MergeAlgorithm mergeAlgorithm;
 
+	private static MergeAlgorithm getMergeAlgorithm(Config config) {
+		SupportedAlgorithm diffAlg = config.getEnum(
+				CONFIG_DIFF_SECTION, null, CONFIG_KEY_ALGORITHM,
+				HISTOGRAM);
+		return new MergeAlgorithm(DiffAlgorithm.getAlgorithm(diffAlg));
+	}
+
+	private static String[] defaultCommitNames() {
+		return new String[] { "BASE", "OURS", "THEIRS" }; //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+	}
+
 	/**
 	 * @param local
 	 * @param inCore
 	 */
 	protected ResolveMerger(Repository local, boolean inCore) {
 		super(local);
-		SupportedAlgorithm diffAlg = local.getConfig().getEnum(
-				ConfigConstants.CONFIG_DIFF_SECTION, null,
-				ConfigConstants.CONFIG_KEY_ALGORITHM,
-				SupportedAlgorithm.HISTOGRAM);
-		mergeAlgorithm = new MergeAlgorithm(DiffAlgorithm.getAlgorithm(diffAlg));
-		commitNames = new String[] { "BASE", "OURS", "THEIRS" }; //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+		mergeAlgorithm = getMergeAlgorithm(local.getConfig());
+		commitNames = defaultCommitNames();
 		this.inCore = inCore;
 
 		if (inCore) {
@@ -295,10 +306,24 @@ public class ResolveMerger extends ThreeWayMerger {
 		this(local, false);
 	}
 
+	/**
+	 * @param inserter
+	 * @param config
+	 * @since 4.8
+	 */
+	protected ResolveMerger(ObjectInserter inserter, Config config) {
+		super(inserter);
+		mergeAlgorithm = getMergeAlgorithm(config);
+		commitNames = defaultCommitNames();
+		inCore = true;
+		implicitDirCache = false;
+		dircache = DirCache.newInCore();
+	}
+
 	@Override
 	protected boolean mergeImpl() throws IOException {
 		if (implicitDirCache)
-			dircache = getRepository().lockDirCache();
+			dircache = nonNullRepo().lockDirCache();
 
 		try {
 			return mergeTrees(mergeBase(), sourceTrees[0], sourceTrees[1],
@@ -315,7 +340,7 @@ public class ResolveMerger extends ThreeWayMerger {
 		// of a non-empty directory, for which delete() would fail.
 		for (int i = toBeDeleted.size() - 1; i >= 0; i--) {
 			String fileName = toBeDeleted.get(i);
-			File f = new File(db.getWorkTree(), fileName);
+			File f = new File(nonNullRepo().getWorkTree(), fileName);
 			if (!f.delete())
 				if (!f.isDirectory())
 					failingPaths.put(fileName,
@@ -348,7 +373,7 @@ public class ResolveMerger extends ThreeWayMerger {
 			return;
 		}
 
-		DirCache dc = db.readDirCache();
+		DirCache dc = nonNullRepo().readDirCache();
 		Iterator<String> mpathsIt=modifiedFiles.iterator();
 		while(mpathsIt.hasNext()) {
 			String mpath=mpathsIt.next();
@@ -518,7 +543,7 @@ public class ResolveMerger extends ThreeWayMerger {
 					unmergedPaths.add(tw.getPathString());
 					mergeResults.put(
 							tw.getPathString(),
-							new MergeResult<RawText>(Collections
+							new MergeResult<>(Collections
 									.<RawText> emptyList()));
 				}
 				return true;
@@ -785,8 +810,8 @@ public class ResolveMerger extends ThreeWayMerger {
 	 */
 	private File writeMergedFile(MergeResult<RawText> result)
 			throws FileNotFoundException, IOException {
-		File workTree = db.getWorkTree();
-		FS fs = db.getFS();
+		File workTree = nonNullRepo().getWorkTree();
+		FS fs = nonNullRepo().getFS();
 		File of = new File(workTree, tw.getPathString());
 		File parentFolder = of.getParentFile();
 		if (!fs.exists(parentFolder))
@@ -802,7 +827,7 @@ public class ResolveMerger extends ThreeWayMerger {
 	private ObjectId insertMergeResult(MergeResult<RawText> result)
 			throws IOException {
 		TemporaryBuffer.LocalFile buf = new TemporaryBuffer.LocalFile(
-				db.getDirectory(), 10 << 20);
+				db != null ? nonNullRepo().getDirectory() : null, 10 << 20);
 		try {
 			new MergeFormatter().formatMerge(buf, result,
 					Arrays.asList(commitNames), CHARACTER_ENCODING);

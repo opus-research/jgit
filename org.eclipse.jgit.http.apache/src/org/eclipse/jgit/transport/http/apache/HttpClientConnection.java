@@ -80,19 +80,21 @@ import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpHead;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.client.params.ClientPNames;
-import org.apache.http.conn.params.ConnRoutePNames;
-import org.apache.http.conn.scheme.Scheme;
-import org.apache.http.conn.ssl.SSLSocketFactory;
+import org.apache.http.config.Registry;
+import org.apache.http.config.RegistryBuilder;
+import org.apache.http.conn.socket.ConnectionSocketFactory;
+import org.apache.http.conn.socket.PlainConnectionSocketFactory;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
 import org.apache.http.conn.ssl.X509HostnameVerifier;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.params.CoreConnectionPNames;
-import org.apache.http.params.HttpParams;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.conn.BasicHttpClientConnectionManager;
 import org.eclipse.jgit.transport.http.HttpConnection;
 import org.eclipse.jgit.transport.http.apache.internal.HttpApacheText;
 import org.eclipse.jgit.util.TemporaryBuffer;
@@ -131,29 +133,39 @@ public class HttpClientConnection implements HttpConnection {
 	SSLContext ctx;
 
 	private HttpClient getClient() {
-		if (client == null)
-			client = new DefaultHttpClient();
-		HttpParams params = client.getParams();
-		if (proxy != null && !Proxy.NO_PROXY.equals(proxy)) {
-			isUsingProxy = true;
-			InetSocketAddress adr = (InetSocketAddress) proxy.address();
-			params.setParameter(ConnRoutePNames.DEFAULT_PROXY,
-					new HttpHost(adr.getHostName(), adr.getPort()));
-		}
-		if (timeout != null)
-			params.setIntParameter(CoreConnectionPNames.CONNECTION_TIMEOUT,
-					timeout.intValue());
-		if (readTimeout != null)
-			params.setIntParameter(CoreConnectionPNames.SO_TIMEOUT,
-					readTimeout.intValue());
-		if (followRedirects != null)
-			params.setBooleanParameter(ClientPNames.HANDLE_REDIRECTS,
-					followRedirects.booleanValue());
-		if (hostnameverifier != null) {
-			SSLSocketFactory sf;
-			sf = new SSLSocketFactory(getSSLContext(), hostnameverifier);
-			Scheme https = new Scheme("https", 443, sf); //$NON-NLS-1$
-			client.getConnectionManager().getSchemeRegistry().register(https);
+		if (client == null) {
+			HttpClientBuilder clientBuilder = HttpClients.custom();
+			RequestConfig.Builder configBuilder = RequestConfig.custom();
+			if (proxy != null && !Proxy.NO_PROXY.equals(proxy)) {
+				isUsingProxy = true;
+				InetSocketAddress adr = (InetSocketAddress) proxy.address();
+				clientBuilder.setProxy(
+						new HttpHost(adr.getHostName(), adr.getPort()));
+			}
+			if (timeout != null) {
+				configBuilder.setConnectTimeout(timeout.intValue());
+			}
+			if (readTimeout != null) {
+				configBuilder.setSocketTimeout(readTimeout.intValue());
+			}
+			if (followRedirects != null) {
+				configBuilder
+						.setRedirectsEnabled(followRedirects.booleanValue());
+			}
+			if (hostnameverifier != null) {
+				SSLConnectionSocketFactory sslConnectionFactory = new SSLConnectionSocketFactory(
+						getSSLContext(), hostnameverifier);
+				clientBuilder.setSSLSocketFactory(sslConnectionFactory);
+				Registry<ConnectionSocketFactory> registry = RegistryBuilder
+						.<ConnectionSocketFactory> create()
+						.register("https", sslConnectionFactory)
+						.register("http", PlainConnectionSocketFactory.INSTANCE)
+						.build();
+				clientBuilder.setConnectionManager(
+						new BasicHttpClientConnectionManager(registry));
+			}
+			clientBuilder.setDefaultRequestConfig(configBuilder.build());
+			client = clientBuilder.build();
 		}
 
 		return client;
@@ -211,15 +223,18 @@ public class HttpClientConnection implements HttpConnection {
 		this.proxy = proxy;
 	}
 
+	@Override
 	public int getResponseCode() throws IOException {
 		execute();
 		return resp.getStatusLine().getStatusCode();
 	}
 
+	@Override
 	public URL getURL() {
 		return url;
 	}
 
+	@Override
 	public String getResponseMessage() throws IOException {
 		execute();
 		return resp.getStatusLine().getReasonPhrase();
@@ -247,10 +262,11 @@ public class HttpClientConnection implements HttpConnection {
 		}
 	}
 
+	@Override
 	public Map<String, List<String>> getHeaderFields() {
-		Map<String, List<String>> ret = new HashMap<String, List<String>>();
+		Map<String, List<String>> ret = new HashMap<>();
 		for (Header hdr : resp.getAllHeaders()) {
-			List<String> list = new LinkedList<String>();
+			List<String> list = new LinkedList<>();
 			for (HeaderElement hdrElem : hdr.getElements())
 				list.add(hdrElem.toString());
 			ret.put(hdr.getName(), list);
@@ -258,10 +274,12 @@ public class HttpClientConnection implements HttpConnection {
 		return ret;
 	}
 
+	@Override
 	public void setRequestProperty(String name, String value) {
 		req.addHeader(name, value);
 	}
 
+	@Override
 	public void setRequestMethod(String method) throws ProtocolException {
 		this.method = method;
 		if (METHOD_GET.equalsIgnoreCase(method)) {
@@ -278,18 +296,22 @@ public class HttpClientConnection implements HttpConnection {
 		}
 	}
 
+	@Override
 	public void setUseCaches(boolean usecaches) {
 		// not needed
 	}
 
+	@Override
 	public void setConnectTimeout(int timeout) {
-		this.timeout = new Integer(timeout);
+		this.timeout = Integer.valueOf(timeout);
 	}
 
+	@Override
 	public void setReadTimeout(int readTimeout) {
-		this.readTimeout = new Integer(readTimeout);
+		this.readTimeout = Integer.valueOf(readTimeout);
 	}
 
+	@Override
 	public String getContentType() {
 		HttpEntity responseEntity = resp.getEntity();
 		if (responseEntity != null) {
@@ -300,29 +322,44 @@ public class HttpClientConnection implements HttpConnection {
 		return null;
 	}
 
+	@Override
 	public InputStream getInputStream() throws IOException {
 		return resp.getEntity().getContent();
 	}
 
 	// will return only the first field
+	@Override
 	public String getHeaderField(String name) {
 		Header header = resp.getFirstHeader(name);
 		return (header == null) ? null : header.getValue();
 	}
 
+	@Override
 	public int getContentLength() {
-		return Integer.parseInt(resp.getFirstHeader("content-length") //$NON-NLS-1$
-				.getValue());
+		Header contentLength = resp.getFirstHeader("content-length"); //$NON-NLS-1$
+		if (contentLength == null) {
+			return -1;
+		}
+
+		try {
+			int l = Integer.parseInt(contentLength.getValue());
+			return l < 0 ? -1 : l;
+		} catch (NumberFormatException e) {
+			return -1;
+		}
 	}
 
+	@Override
 	public void setInstanceFollowRedirects(boolean followRedirects) {
-		this.followRedirects = new Boolean(followRedirects);
+		this.followRedirects = Boolean.valueOf(followRedirects);
 	}
 
+	@Override
 	public void setDoOutput(boolean dooutput) {
 		// TODO: check whether we can really ignore this.
 	}
 
+	@Override
 	public void setFixedLengthStreamingMode(int contentLength) {
 		if (entity != null)
 			throw new IllegalArgumentException();
@@ -330,52 +367,63 @@ public class HttpClientConnection implements HttpConnection {
 		entity.setContentLength(contentLength);
 	}
 
+	@Override
 	public OutputStream getOutputStream() throws IOException {
 		if (entity == null)
 			entity = new TemporaryBufferEntity(new LocalFile(null));
 		return entity.getBuffer();
 	}
 
+	@Override
 	public void setChunkedStreamingMode(int chunklen) {
 		if (entity == null)
 			entity = new TemporaryBufferEntity(new LocalFile(null));
 		entity.setChunked(true);
 	}
 
+	@Override
 	public String getRequestMethod() {
 		return method;
 	}
 
+	@Override
 	public boolean usingProxy() {
 		return isUsingProxy;
 	}
 
+	@Override
 	public void connect() throws IOException {
 		execute();
 	}
 
+	@Override
 	public void setHostnameVerifier(final HostnameVerifier hostnameverifier) {
 		this.hostnameverifier = new X509HostnameVerifier() {
+			@Override
 			public boolean verify(String hostname, SSLSession session) {
 				return hostnameverifier.verify(hostname, session);
 			}
 
+			@Override
 			public void verify(String host, String[] cns, String[] subjectAlts)
 					throws SSLException {
 				throw new UnsupportedOperationException(); // TODO message
 			}
 
+			@Override
 			public void verify(String host, X509Certificate cert)
 					throws SSLException {
 				throw new UnsupportedOperationException(); // TODO message
 			}
 
+			@Override
 			public void verify(String host, SSLSocket ssl) throws IOException {
 				hostnameverifier.verify(host, ssl.getSession());
 			}
 		};
 	}
 
+	@Override
 	public void configure(KeyManager[] km, TrustManager[] tm,
 			SecureRandom random) throws KeyManagementException {
 		getSSLContext().init(km, tm, random);
