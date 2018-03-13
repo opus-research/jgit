@@ -40,93 +40,62 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs.server;
+package org.eclipse.jgit.lfs.server.fs;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.MessageFormat;
 
-import org.apache.http.client.ClientProtocolException;
 import org.eclipse.jgit.lfs.lib.AnyLongObjectId;
+import org.eclipse.jgit.lfs.lib.LongObjectId;
 import org.eclipse.jgit.lfs.test.LongObjectIdTestUtils;
-import org.eclipse.jgit.util.FileUtils;
 import org.junit.Test;
 
-public class DownloadTest extends LfsServerTest {
+public class UploadTest extends LfsServerTest {
 
 	@Test
-	public void testDownload() throws Exception {
+	public void testUpload() throws Exception {
 		String TEXT = "test";
 		AnyLongObjectId id = putContent(TEXT);
-		Path f = Paths.get(getTempDirectory().toString(), "download");
-		long len = getContent(id, f);
-		assertEquals(TEXT.length(), len);
-		FileUtils.delete(f.toFile(), FileUtils.RETRY);
+		assertTrue("expect object " + id.name() + " to exist",
+				repository.getSize(id) >= 0);
+		assertEquals("expected object length " + TEXT.length(), TEXT.length(),
+				repository.getSize(id));
 	}
 
 	@Test
-	public void testDownloadInvalidPathInfo()
-			throws ClientProtocolException, IOException {
+	public void testCorruptUpload() throws Exception {
 		String TEXT = "test";
-		AnyLongObjectId id = putContent(TEXT);
-		Path f = Paths.get(getTempDirectory().toString(), "download");
+		AnyLongObjectId id = LongObjectIdTestUtils.hash("wrongHash");
 		try {
-			getContent(id.name().substring(0, 60), f);
-			fail("expected RuntimeException");
+			putContent(id, TEXT);
+			fail("expected RuntimeException(\"Status 400\")");
 		} catch (RuntimeException e) {
-			assertEquals("Status: 400 Bad Request",
-					e.getMessage());
+			assertEquals("Status: 400. Bad Request", e.getMessage());
 		}
-	}
-
-	@Test
-	public void testDownloadInvalidId()
-			throws ClientProtocolException, IOException {
-		String TEXT = "test";
-		AnyLongObjectId id = putContent(TEXT);
-		Path f = Paths.get(getTempDirectory().toString(), "download");
-		try {
-			getContent(id.name().replace('f', 'z'), f);
-			fail("expected RuntimeException");
-		} catch (RuntimeException e) {
-			assertEquals("Status: 400 Bad Request",
-					e.getMessage());
-		}
-	}
-
-	@Test
-	public void testDownloadNotFound()
-			throws ClientProtocolException, IOException {
-		String TEXT = "test";
-		AnyLongObjectId id = LongObjectIdTestUtils.hash(TEXT);
-		Path f = Paths.get(getTempDirectory().toString(), "download");
-		try {
-			getContent(id, f);
-			fail("expected RuntimeException");
-		} catch (RuntimeException e) {
-			assertEquals("Status: 404 Not Found",
-					e.getMessage());
-		}
+		assertFalse("expect object " + id.name() + " not to exist",
+				repository.getSize(id) >= 0);
 	}
 
 	@SuppressWarnings("boxing")
 	@Test
-	public void testLargeFileDownload() throws Exception {
+	public void testLargeFileUpload() throws Exception {
 		Path f = Paths.get(getTempDirectory().toString(), "largeRandomFile");
-		long expectedLen = createPseudoRandomContentFile(f, 10 * MiB);
-		AnyLongObjectId id = putContent(f);
-		Path f2 = Paths.get(getTempDirectory().toString(), "download");
+		createPseudoRandomContentFile(f, 10 * MiB);
 		long start = System.nanoTime();
-		long len = getContent(id, f2);
+		LongObjectId id = putContent(f);
 		System.out.println(
-				MessageFormat.format("dowloaded 10 MiB random data in {0}ms",
+				MessageFormat.format("uploaded 10 MiB random data in {0}ms",
 						(System.nanoTime() - start) / 1e6));
-		assertEquals(expectedLen, len);
-		FileUtils.delete(f.toFile(), FileUtils.RETRY);
-
+		assertTrue("expect object " + id.name() + " to exist",
+				repository.getSize(id) >= 0);
+		assertEquals("expected object length " + Files.size(f), Files.size(f),
+				repository.getSize(id));
 	}
 }

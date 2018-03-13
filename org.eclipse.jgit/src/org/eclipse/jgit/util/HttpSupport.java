@@ -70,10 +70,12 @@ public class HttpSupport {
 	/** The {@code GET} HTTP method. */
 	public static final String METHOD_GET = "GET"; //$NON-NLS-1$
 
-	/** The {@code HEAD} HTTP method. @since 4.2 */
+	/** The {@code HEAD} HTTP method.
+	 * @since 4.3 */
 	public static final String METHOD_HEAD = "HEAD"; //$NON-NLS-1$
 
-	/** The {@code POST} HTTP method. @since 4.2 */
+	/** The {@code POST} HTTP method.
+	 * @since 4.3 */
 	public static final String METHOD_PUT = "PUT"; //$NON-NLS-1$
 
 	/** The {@code POST} HTTP method. */
@@ -253,6 +255,7 @@ public class HttpSupport {
 	 *
 	 * @param conn
 	 * @throws IOException
+	 * @since 4.3
 	 */
 	public static void disableSslVerify(HttpConnection conn)
 			throws IOException {

@@ -44,12 +44,13 @@ package org.eclipse.jgit.lfs.server;
 
 import java.io.IOException;
 
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.lfs.lib.AnyLongObjectId;
 
 /**
  * Abstraction of a repository for storing large objects
  *
- * @since 4.2
+ * @since 4.3
  */
 public interface LargeFileRepository {
 
@@ -71,9 +72,11 @@ public interface LargeFileRepository {
 
 	/**
 	 * @param id
-	 * @return Action for verifying the object
+	 *            id of the object to be verified
+	 * @return Action for verifying the object, or {@code null} if the server
+	 *         doesn't support or require verification
 	 */
-	public Response.Action getVerifyAction(AnyLongObjectId id);
+	public @Nullable Response.Action getVerifyAction(AnyLongObjectId id);
 
 	/**
 	 * @param id

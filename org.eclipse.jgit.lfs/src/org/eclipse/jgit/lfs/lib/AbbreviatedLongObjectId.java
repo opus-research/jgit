@@ -67,7 +67,7 @@ import org.eclipse.jgit.util.RawParseUtils;
  *
  * Ported to SHA-256 from {@link AbbreviatedObjectId}
  *
- * @since 4.2
+ * @since 4.3
  */
 public final class AbbreviatedLongObjectId implements Serializable {
 	private static final long serialVersionUID = 1L;

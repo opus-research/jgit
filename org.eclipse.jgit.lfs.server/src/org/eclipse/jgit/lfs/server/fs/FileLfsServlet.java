@@ -40,7 +40,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.lfs.server;
+package org.eclipse.jgit.lfs.server.fs;
 
 import java.io.IOException;
 import java.text.MessageFormat;
@@ -65,14 +65,14 @@ import org.eclipse.jgit.lfs.server.internal.LfsServerText;
  * storage of large files
  * (https://github.com/github/git-lfs/tree/master/docs/api).
  *
- * @since 4.2
+ * @since 4.3
  */
 @WebServlet(asyncSupported = true)
-public class LargeObjectServlet extends HttpServlet {
+public class FileLfsServlet extends HttpServlet {
 
 	private static final long serialVersionUID = 1L;
 
-	private final PlainFSRepository repository;
+	private final FileLfsRepository repository;
 
 	private final long timeout;
 
@@ -82,7 +82,7 @@ public class LargeObjectServlet extends HttpServlet {
 	 * @param timeout
 	 *            timeout for object upload / download in milliseconds
 	 */
-	public LargeObjectServlet(PlainFSRepository repository, long timeout) {
+	public FileLfsServlet(FileLfsRepository repository, long timeout) {
 		this.repository = repository;
 		this.timeout = timeout;
 	}

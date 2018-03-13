@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2009, Jonas Fonseca <fonseca@diku.dk>
- * Copyright (C) 2007, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2007, Shawn O. Pearce <spearce@spearce.org>
+ * Copyright (C) 2016, Google Inc.
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -43,45 +41,42 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.lib;
+package org.eclipse.jgit.internal.ketch;
 
-/**
- * A tree entry representing a gitlink entry used for submodules.
- *
- * Note. Java cannot really handle these as file system objects.
- *
- * @deprecated To look up information about a single path, use
- * {@link org.eclipse.jgit.treewalk.TreeWalk#forPath(Repository, String, org.eclipse.jgit.revwalk.RevTree)}.
- * To lookup information about multiple paths at once, use a
- * {@link org.eclipse.jgit.treewalk.TreeWalk} and obtain the current entry's
- * information from its getter methods.
- */
-@Deprecated
-public class GitlinkTreeEntry extends TreeEntry {
+import org.eclipse.jgit.revwalk.FooterKey;
 
+/** Frequently used constants in a Ketch system. */
+public class KetchConstants {
 	/**
-	 * Construct a {@link GitlinkTreeEntry} with the specified name and SHA-1 in
-	 * the specified parent
-	 *
-	 * @param parent
-	 * @param id
-	 * @param nameUTF8
+	 * Default reference namespace holding {@link #ACCEPTED} and
+	 * {@link #COMMITTED} references and the {@link #STAGE} sub-namespace.
 	 */
-	public GitlinkTreeEntry(final Tree parent, final ObjectId id,
-			final byte[] nameUTF8) {
-		super(parent, id, nameUTF8);
-	}
+	public static final String DEFAULT_TXN_NAMESPACE = "refs/txn/"; //$NON-NLS-1$
 
-	public FileMode getMode() {
-		return FileMode.GITLINK;
-	}
+	/** Reference name holding the RefTree accepted by a follower. */
+	public static final String ACCEPTED = "accepted"; //$NON-NLS-1$
 
-	@Override
-	public String toString() {
-		final StringBuilder r = new StringBuilder();
-		r.append(ObjectId.toString(getId()));
-		r.append(" G "); //$NON-NLS-1$
-		r.append(getFullName());
-		return r.toString();
+	/** Reference name holding the RefTree known to be committed. */
+	public static final String COMMITTED = "committed"; //$NON-NLS-1$
+
+	/** Reference subdirectory holding proposed heads. */
+	public static final String STAGE = "stage/"; //$NON-NLS-1$
+
+	/** Footer containing the current term. */
+	public static final FooterKey TERM = new FooterKey("Term"); //$NON-NLS-1$
+
+	/** Section for Ketch configuration ({@code ketch}). */
+	public static final String CONFIG_SECTION_KETCH = "ketch"; //$NON-NLS-1$
+
+	/** Behavior for a replica ({@code remote.$name.ketch-type}) */
+	public static final String CONFIG_KEY_TYPE = "ketch-type"; //$NON-NLS-1$
+
+	/** Behavior for a replica ({@code remote.$name.ketch-commit}) */
+	public static final String CONFIG_KEY_COMMIT = "ketch-commit"; //$NON-NLS-1$
+
+	/** Behavior for a replica ({@code remote.$name.ketch-speed}) */
+	public static final String CONFIG_KEY_SPEED = "ketch-speed"; //$NON-NLS-1$
+
+	private KetchConstants() {
 	}
 }
