@@ -42,16 +42,21 @@
  */
 package org.eclipse.jgit.api;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 
+import org.eclipse.jgit.api.CheckoutResult.Status;
 import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.RepositoryTestCase;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.util.FileUtils;
 
 public class CheckoutCommandTest extends RepositoryTestCase {
 	private Git git;
@@ -93,9 +98,12 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 			git.checkout().setName("test").call();
 			assertEquals("[Test.txt, mode:100644, content:Some change]",
 					indexState(CONTENT));
-			git.checkout().setName("master").call();
+			Ref result = git.checkout().setName("master").call();
 			assertEquals("[Test.txt, mode:100644, content:Hello world]",
 					indexState(CONTENT));
+			assertEquals("refs/heads/master", result.getName());
+			assertEquals("refs/heads/master", git.getRepository()
+					.getFullBranch());
 		} catch (Exception e) {
 			fail(e.getMessage());
 		}
@@ -120,4 +128,64 @@ public class CheckoutCommandTest extends RepositoryTestCase {
 		}
 	}
 
+	public void testCheckoutWithConflict() {
+		CheckoutCommand co = git.checkout();
+		try {
+			writeTrashFile("Test.txt", "Another change");
+			assertEquals(Status.NOT_TRIED, co.getResult().getStatus());
+			co.setName("master").call();
+			fail("Should have failed");
+		} catch (Exception e) {
+			assertEquals(Status.CONFLICTS, co.getResult().getStatus());
+			assertTrue(co.getResult().getConflictList().contains("Test.txt"));
+		}
+	}
+
+	public void testCheckoutWithNonDeletedFiles() throws Exception {
+		File testFile = writeTrashFile("temp", "");
+		FileInputStream fis = new FileInputStream(testFile);
+		try {
+			FileUtils.delete(testFile);
+			return;
+		} catch (IOException e) {
+			// the test makes only sense if deletion of
+			// a file with open stream fails
+		}
+		fis.close();
+		FileUtils.delete(testFile);
+		CheckoutCommand co = git.checkout();
+		// delete Test.txt in branch test
+		testFile = new File(db.getWorkTree(), "Test.txt");
+		assertTrue(testFile.exists());
+		FileUtils.delete(testFile);
+		assertFalse(testFile.exists());
+		git.add().addFilepattern("Test.txt");
+		git.commit().setMessage("Delete Test.txt").setAll(true).call();
+		git.checkout().setName("master").call();
+		assertTrue(testFile.exists());
+		// lock the file so it can't be deleted (in Windows, that is)
+		fis = new FileInputStream(testFile);
+		try {
+			assertEquals(Status.NOT_TRIED, co.getResult().getStatus());
+			co.setName("test").call();
+			assertTrue(testFile.exists());
+			assertEquals(Status.NONDELETED, co.getResult().getStatus());
+			assertTrue(co.getResult().getUndeletedList().contains("Test.txt"));
+		} finally {
+			fis.close();
+		}
+	}
+
+	public void testCheckoutCommit() {
+		try {
+			Ref result = git.checkout().setName(initialCommit.name()).call();
+			assertEquals("[Test.txt, mode:100644, content:Hello world]",
+					indexState(CONTENT));
+			assertNull(result);
+			assertEquals(initialCommit.name(), git.getRepository()
+					.getFullBranch());
+		} catch (Exception e) {
+			fail(e.getMessage());
+		}
+	}
 }
