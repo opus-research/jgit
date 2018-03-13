@@ -62,17 +62,8 @@ import org.eclipse.jgit.merge.ResolveMerger.MergeFailureReason;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.util.FileUtils;
 import org.junit.Test;
-import org.junit.experimental.theories.DataPoints;
-import org.junit.experimental.theories.Theories;
-import org.junit.experimental.theories.Theory;
-import org.junit.runner.RunWith;
 
-@RunWith(Theories.class)
 public class MergeCommandTest extends RepositoryTestCase {
-
-	public static @DataPoints
-	MergeStrategy[] mergeStrategies = MergeStrategy.get();
-
 	@Test
 	public void testMergeInItself() throws Exception {
 		Git git = new Git(db);
@@ -168,28 +159,6 @@ public class MergeCommandTest extends RepositoryTestCase {
 		} catch (InvalidMergeHeadsException e) {
 			// expected this exception
 		}
-	}
-
-	@Theory
-	public void testMergeSuccessAllStrategies(MergeStrategy mergeStrategy)
-			throws Exception {
-		Git git = new Git(db);
-
-		RevCommit first = git.commit().setMessage("first").call();
-		createBranch(first, "refs/heads/side");
-
-		writeTrashFile("a", "a");
-		git.add().addFilepattern("a").call();
-		git.commit().setMessage("second").call();
-
-		checkoutBranch("refs/heads/side");
-		writeTrashFile("b", "b");
-		git.add().addFilepattern("b").call();
-		git.commit().setMessage("third").call();
-
-		MergeResult result = git.merge().setStrategy(mergeStrategy)
-				.include(db.getRef(Constants.MASTER)).call();
-		assertEquals(MergeStatus.MERGED, result.getMergeStatus());
 	}
 
 	@Test
