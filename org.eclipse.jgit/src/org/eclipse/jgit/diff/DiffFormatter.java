@@ -757,7 +757,7 @@ public class DiffFormatter {
 		writeLine(' ', text, line);
 	}
 
-	private static boolean isEndOfLineMissing(final RawText text, final int line) {
+	private static boolean isEndOfLineMissing(RawText text, int line) {
 		return line + 1 == text.size() && text.isMissingNewlineAtEnd();
 	}
 
