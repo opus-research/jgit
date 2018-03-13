@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014, Andrey Loskutov <loskutov@gmx.de>
+ * Copyright (C) 2017 Two Sigma Open Source
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -40,34 +40,60 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package org.eclipse.jgit.ignore.internal;
+
+package org.eclipse.jgit.transport;
+
+import java.io.Serializable;
 
 /**
- * Wildmatch matcher for "double star" (<code>**</code>) pattern only. This
- * matcher matches any path.
- * <p>
- * This class is immutable and thread safe.
+ * Describes the expected value for a ref being pushed.
+ * @since 4.7
  */
-public final class WildMatcher extends AbstractMatcher {
+public class RefLeaseSpec implements Serializable {
+	private static final long serialVersionUID = 1L;
 
-	static final String WILDMATCH = "**"; //$NON-NLS-1$
+	/** Name of the ref whose value we want to check. */
+	private final String ref;
 
-	// double star for the beginning of pattern
-	static final String WILDMATCH2 = "/**"; //$NON-NLS-1$
+	/** Local commitish to get expected value from. */
+	private final String expected;
 
-	static final WildMatcher INSTANCE = new WildMatcher();
-
-	private WildMatcher() {
-		super(WILDMATCH, false);
+	/**
+	 *
+	 * @param ref
+	 *            ref being pushed
+	 * @param expected
+	 *            the expected value of the ref
+	 */
+	public RefLeaseSpec(String ref, String expected) {
+		this.ref = ref;
+		this.expected = expected;
 	}
 
-	public final boolean matches(String path, boolean assumeDirectory) {
-		return true;
+	/**
+	 * Get the ref to protect.
+	 *
+	 * @return name of ref to check.
+	 */
+	public String getRef() {
+		return ref;
 	}
 
-	public final boolean matches(String segment, int startIncl, int endExcl,
-			boolean assumeDirectory) {
-		return true;
+	/**
+	 * Get the expected value of the ref, in the form
+	 * of a local committish
+	 *
+	 * @return expected ref value.
+	 */
+	public String getExpected() {
+		return expected;
 	}
 
+	public String toString() {
+		final StringBuilder r = new StringBuilder();
+		r.append(getRef());
+		r.append(':');
+		r.append(getExpected());
+		return r.toString();
+	}
 }
