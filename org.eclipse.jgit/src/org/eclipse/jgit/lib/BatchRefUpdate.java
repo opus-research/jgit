@@ -58,6 +58,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
+import org.eclipse.jgit.annotations.Nullable;
+import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.RefUpdate.Result;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -81,7 +83,7 @@ public class BatchRefUpdate {
 	 * the same LAN should be under 5 seconds. 5 seconds is also not that long
 	 * for a large `git push` operation to complete.
 	 */
-	protected static final Duration MAX_WAIT = Duration.ofSeconds(5);
+	private static final Duration MAX_WAIT = Duration.ofSeconds(5);
 
 	private final RefDatabase refdb;
 
@@ -322,28 +324,14 @@ public class BatchRefUpdate {
 
 	/**
 	 * Gets the list of option strings associated with this update.
-	 * <p>
-	 * Always returns null before {@link #execute} is called; afterwards, returns
-	 * the options that were passed to that method.
 	 *
-	 * @return pushOptions
+	 * @return push options that were passed to {@link #execute}; prior to calling
+	 *         {@link #execute}, always returns null.
 	 * @since 4.5
 	 */
+	@Nullable
 	public List<String> getPushOptions() {
 		return pushOptions;
-	}
-
-	/**
-	 * Set push options associated with this update.
-	 * <p>
-	 * Implementations must call this at the top of {@link #execute(RevWalk,
-	 * ProgressMonitor, List)}.
-	 *
-	 * @param options options passed to {@code execute}.
-	 * @since 4.9
-	 */
-	protected void setPushOptions(List<String> options) {
-		pushOptions = options;
 	}
 
 	/**
@@ -412,7 +400,7 @@ public class BatchRefUpdate {
 		}
 
 		if (options != null) {
-			setPushOptions(options);
+			pushOptions = options;
 		}
 
 		monitor.beginTask(JGitText.get().updatingReferences, commands.size());
@@ -423,6 +411,18 @@ public class BatchRefUpdate {
 		for (ReceiveCommand cmd : commands) {
 			try {
 				if (cmd.getResult() == NOT_ATTEMPTED) {
+					try {
+						if (!cmd.getNewId().equals(ObjectId.zeroId())) {
+							walk.parseAny(cmd.getNewId());
+						}
+					} catch (MissingObjectException e) {
+						// ReceiveCommand#setResult(Result) converts REJECTED to
+						// REJECTED_NONFASTFORWARD, even though that result is also used for
+						// a missing object. Eagerly handle this case so we can set the
+						// right result.
+						cmd.setResult(ReceiveCommand.Result.REJECTED_MISSING_OBJECT);
+						continue;
+					}
 					cmd.updateType(walk);
 					switch (cmd.getType()) {
 					case CREATE:
@@ -547,36 +547,17 @@ public class BatchRefUpdate {
 		return ref;
 	}
 
-	/**
-	 * Get all path prefixes of a ref name.
-	 *
-	 * @param name
-	 *            ref name.
-	 * @return path prefixes of the ref name. For {@code refs/heads/foo}, returns
-	 *         {@code refs} and {@code refs/heads}.
-	 * @since 4.9
-	 */
-	protected static Collection<String> getPrefixes(String name) {
+	static Collection<String> getPrefixes(String s) {
 		Collection<String> ret = new HashSet<>();
-		addPrefixesTo(name, ret);
+		addPrefixesTo(s, ret);
 		return ret;
 	}
 
-	/**
-	 * Add prefixes of a ref name to an existing collection.
-	 *
-	 * @param name
-	 *            ref name.
-	 * @param out
-	 *            path prefixes of the ref name. For {@code refs/heads/foo},
-	 *            returns {@code refs} and {@code refs/heads}.
-	 * @since 4.9
-	 */
-	protected static void addPrefixesTo(String name, Collection<String> out) {
-		int p1 = name.indexOf('/');
+	static void addPrefixesTo(String s, Collection<String> out) {
+		int p1 = s.indexOf('/');
 		while (p1 > 0) {
-			out.add(name.substring(0, p1));
-			p1 = name.indexOf('/', p1 + 1);
+			out.add(s.substring(0, p1));
+			p1 = s.indexOf('/', p1 + 1);
 		}
 	}
 

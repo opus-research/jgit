@@ -303,6 +303,7 @@ public class JGitText extends TranslationBundle {
 	/***/ public String encryptionOnlyPBE;
 	/***/ public String endOfFileInEscape;
 	/***/ public String entryNotFoundByPath;
+	/***/ public String enumValueNotSupported0;
 	/***/ public String enumValueNotSupported2;
 	/***/ public String enumValueNotSupported3;
 	/***/ public String enumValuesNotAvailable;
