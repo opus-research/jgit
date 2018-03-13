@@ -75,6 +75,14 @@ public class GitConstructionTest extends RepositoryTestCase {
 		addRepoToClose(bareRepo);
 	}
 
+	@Override
+	@After
+	public void tearDown() throws Exception {
+		db.close();
+		bareRepo.close();
+		super.tearDown();
+	}
+
 	@Test
 	public void testWrap() {
 		Git git = Git.wrap(db);
