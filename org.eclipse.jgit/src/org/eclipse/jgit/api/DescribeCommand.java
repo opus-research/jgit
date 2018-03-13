@@ -47,13 +47,11 @@ import static org.eclipse.jgit.lib.Constants.R_TAGS;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
@@ -199,32 +197,15 @@ public class DescribeCommand extends GitCommand<String> {
 		return this;
 	}
 
-	private Optional<Ref> getBestMatch(List<Ref> tags) {
-		if (tags == null || tags.size() == 0) {
-			return Optional.empty();
+	private boolean tagMatches(Ref tag) {
+		if (tag == null) {
+			return false;
 		} else if (matchers.size() == 0) {
-			// No matchers, simply return the first tag entry
-			return Optional.of(tags.get(0));
+			return true;
 		} else {
-			// Find the first tag that matches one of the matchers; precedence according to matcher definition order
-			for (IMatcher matcher : matchers) {
-				Optional<Ref> match = tags.stream()
-						.filter(tag -> matcher.matches(tag.getName(), false))
-						.findFirst();
-				if (match.isPresent()) {
-					return match;
-				}
-			}
-			return Optional.empty();
+			return matchers.stream()
+					.anyMatch(m -> m.matches(tag.getName(), false));
 		}
-	}
-
-	private ObjectId getObjectIdFromRef(Ref r) {
-		ObjectId key = repo.peel(r).getPeeledObjectId();
-		if (key == null) {
-			key = r.getObjectId();
-		}
-		return key;
 	}
 
 	/**
@@ -247,9 +228,14 @@ public class DescribeCommand extends GitCommand<String> {
 			if (target == null)
 				setTarget(Constants.HEAD);
 
-			Collection<Ref> tagList = repo.getRefDatabase().getRefs(R_TAGS).values();
-			Map<ObjectId, List<Ref>> tags = tagList.stream()
-					.collect(Collectors.groupingBy(this::getObjectIdFromRef));
+			Map<ObjectId, Ref> tags = new HashMap<>();
+
+			for (Ref r : repo.getRefDatabase().getRefs(R_TAGS).values()) {
+				ObjectId key = repo.peel(r).getPeeledObjectId();
+				if (key == null)
+					key = r.getObjectId();
+				tags.put(key, r);
+			}
 
 			// combined flags of all the candidate instances
 			final RevFlagSet allFlags = new RevFlagSet();
@@ -295,11 +281,11 @@ public class DescribeCommand extends GitCommand<String> {
 			}
 			List<Candidate> candidates = new ArrayList<>();    // all the candidates we find
 
-			// is the target already pointing to a suitable tag? if so, we are done!
-			Optional<Ref> bestMatchingTagOnTarget = getBestMatch(tags.get(target));
-			if (bestMatchingTagOnTarget.isPresent()) {
-				return longDesc ? longDescription(bestMatchingTagOnTarget.get(), 0, target) :
-						bestMatchingTagOnTarget.get().getName().substring(R_TAGS.length());
+			// is the target already pointing to a tag? if so, we are done!
+			Ref tagOnTarget = tags.get(target);
+			if (tagMatches(tagOnTarget)) {
+				return longDesc ? longDescription(tagOnTarget, 0, target) : tagOnTarget
+						.getName().substring(R_TAGS.length());
 			}
 
 			w.markStart(target);
@@ -311,9 +297,9 @@ public class DescribeCommand extends GitCommand<String> {
 					// if a tag already dominates this commit,
 					// then there's no point in picking a tag on this commit
 					// since the one that dominates it is always more preferable
-					Optional<Ref> bestMatchingTagOnCommit = getBestMatch(tags.get(c));
-					if (bestMatchingTagOnCommit.isPresent()) {
-						Candidate cd = new Candidate(c, bestMatchingTagOnCommit.get());
+					Ref t = tags.get(c);
+					if (tagMatches(t)) {
+						Candidate cd = new Candidate(c, t);
 						candidates.add(cd);
 						cd.depth = seen;
 					}
