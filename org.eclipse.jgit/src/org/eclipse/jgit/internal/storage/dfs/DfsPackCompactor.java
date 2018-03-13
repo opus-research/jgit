@@ -247,13 +247,7 @@ public class DfsPackCompactor {
 			}
 			compactPacks(ctx, pm);
 
-			List<DfsPackDescription> commit;
-			if (outDesc != null) {
-				commit = Collections.singletonList(outDesc);
-			} else {
-				commit = Collections.emptyList();
-			}
-
+			List<DfsPackDescription> commit = getNewPacks();
 			Collection<DfsPackDescription> remove = toPrune();
 			if (!commit.isEmpty() || !remove.isEmpty()) {
 				objdb.commitPack(commit, remove);
@@ -511,14 +505,11 @@ public class DfsPackCompactor {
 
 	static ReftableConfig configureReftable(ReftableConfig cfg,
 			DfsOutputStream out) {
-		cfg = new ReftableConfig(cfg);
-		if (out.blockSize() >= 256) {
-			cfg.setRefBlockSize(out.blockSize());
-		} else {
-			int sz = DfsBlockCache.getInstance().getBlockSize();
-			if (cfg.getRefBlockSize() < sz) {
-				cfg.setRefBlockSize(sz);
-			}
+		int bs = out.blockSize();
+		if (bs > 0) {
+			cfg = new ReftableConfig(cfg);
+			cfg.setRefBlockSize(bs);
+			cfg.setAlignBlocks(true);
 		}
 		return cfg;
 	}
