@@ -45,7 +45,6 @@ package org.eclipse.jgit.http.server;
 
 import java.io.IOException;
 
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
@@ -57,31 +56,13 @@ import org.eclipse.jgit.lib.PackFile;
 class InfoPacksServlet extends RepositoryServlet {
 	private static final long serialVersionUID = 1L;
 
-	private static final String ENCODING = "UTF-8";
-
-	@Override
 	public void doGet(final HttpServletRequest req,
 			final HttpServletResponse rsp) throws IOException {
-		serve(req, rsp, true);
+		nocache(rsp);
+		sendPlainText(packList(req), req, rsp);
 	}
 
-	@Override
-	protected void doHead(final HttpServletRequest req,
-			final HttpServletResponse rsp) throws ServletException, IOException {
-		serve(req, rsp, false);
-	}
-
-	private void serve(final HttpServletRequest req,
-			final HttpServletResponse rsp, final boolean sendBody)
-			throws IOException {
-		final byte[] raw = packList(req);
-		rsp.setContentType("text/plain");
-		rsp.setCharacterEncoding(ENCODING);
-		send(raw, req, rsp, sendBody);
-	}
-
-	private static byte[] packList(final HttpServletRequest req)
-			throws IOException {
+	private static String packList(final HttpServletRequest req) {
 		final StringBuilder out = new StringBuilder();
 		final ObjectDatabase db = getRepository(req).getObjectDatabase();
 		if (db instanceof ObjectDirectory) {
@@ -92,6 +73,6 @@ class InfoPacksServlet extends RepositoryServlet {
 			}
 		}
 		out.append('\n');
-		return out.toString().getBytes(ENCODING);
+		return out.toString();
 	}
 }

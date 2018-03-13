@@ -66,7 +66,7 @@ public abstract class RepositoryServlet extends HttpServlet {
 
 	/**
 	 * Get the selected repository from the request.
-	 * 
+	 *
 	 * @param req
 	 *            the HTTP request.
 	 * @return the repository; never null.
@@ -84,7 +84,7 @@ public abstract class RepositoryServlet extends HttpServlet {
 
 	/**
 	 * Set the repository selected by this request.
-	 * 
+	 *
 	 * @param req
 	 *            the request.
 	 * @param db
@@ -97,14 +97,14 @@ public abstract class RepositoryServlet extends HttpServlet {
 
 	/**
 	 * Disallow caching of the HTTP response.
-	 * 
+	 *
 	 * @param rsp
 	 *            the response whose content must not be cached.
 	 */
 	protected void nocache(final HttpServletResponse rsp) {
 		rsp.setHeader("Expires", "Fri, 01 Jan 1980 00:00:00 GMT");
 		rsp.setHeader("Pragma", "no-cache");
-		rsp.setHeader("Cache-Control", "no-cache, must-revalidate");
+		rsp.setHeader("Cache-Control", "no-cache, max-age=0, must-revalidate");
 	}
 
 	/**
@@ -113,15 +113,49 @@ public abstract class RepositoryServlet extends HttpServlet {
 	 * The server will set cache control headers such that the content may be
 	 * cached by any proxy server for a very long period of time, potentially
 	 * for many years.
-	 * 
+	 *
 	 * @param rsp
 	 *            the response whose content can be cached for a long time.
 	 */
 	protected void cacheForever(final HttpServletResponse rsp) {
 		final long now = System.currentTimeMillis();
-		rsp.setHeader("Cache-Control", "max-age=31536000,public");
+		rsp.setHeader("Cache-Control", "public, max-age=31536000");
 		rsp.setDateHeader("Expires", now + 31536000000L);
 		rsp.setDateHeader("Date", now);
+	}
+
+	/**
+	 * Send a plain text response to a {@code GET} or {@code HEAD} HTTP request.
+	 * <p>
+	 * The text response is encoded in the Git character encoding, UTF-8.
+	 * <p>
+	 * If the user agent supports a compressed transfer encoding and the content
+	 * is large enough, the content may be compressed before sending.
+	 * <p>
+	 * The {@code ETag} and {@code Content-Length} headers are automatically set
+	 * by this method. {@code Content-Encoding} is conditionally set if the user
+	 * agent supports a compressed transfer. Callers are responsible for setting
+	 * any cache control headers (
+	 * {@link RepositoryServlet#cacheForever(HttpServletResponse)} or
+	 * {@link RepositoryServlet#nocache(HttpServletResponse)}).
+	 *
+	 * @param content
+	 *            to return to the user agent as this entity's body.
+	 * @param req
+	 *            the incoming request.
+	 * @param rsp
+	 *            the outgoing response.
+	 * @throws IOException
+	 *             the servlet API rejected sending the body.
+	 */
+	protected void sendPlainText(final String content,
+			final HttpServletRequest req, final HttpServletResponse rsp)
+			throws IOException {
+		final String enc = Constants.CHARACTER_ENCODING;
+		final byte[] raw = content.getBytes(enc);
+		rsp.setContentType("text/plain");
+		rsp.setCharacterEncoding(enc);
+		send(raw, req, rsp);
 	}
 
 	/**
@@ -134,32 +168,27 @@ public abstract class RepositoryServlet extends HttpServlet {
 	 * by this method. {@code Content-Encoding} is conditionally set if the user
 	 * agent supports a compressed transfer. Callers are responsible for setting
 	 * {@code Content-Type} and any cache control headers (
-	 * {@link #cacheForever(HttpServletResponse)} or
-	 * {@link #nocache(HttpServletResponse)}).
-	 * 
+	 * {@link RepositoryServlet#cacheForever(HttpServletResponse)} or
+	 * {@link RepositoryServlet#nocache(HttpServletResponse)}).
+	 *
 	 * @param content
 	 *            to return to the user agent as this entity's body.
 	 * @param req
 	 *            the incoming request.
 	 * @param rsp
 	 *            the outgoing response.
-	 * @param sendBody
-	 *            true if this is a {@code GET} request, false if this is a
-	 *            {@code HEAD} request and the body should not be sent.
 	 * @throws IOException
 	 *             the servlet API rejected sending the body.
 	 */
 	protected void send(byte[] content, final HttpServletRequest req,
-			final HttpServletResponse rsp, final boolean sendBody)
+			final HttpServletResponse rsp)
 			throws IOException {
 		content = sendInit(content, req, rsp);
-		if (sendBody) {
-			final OutputStream out = rsp.getOutputStream();
-			try {
-				out.write(content);
-			} finally {
-				out.close();
-			}
+		final OutputStream out = rsp.getOutputStream();
+		try {
+			out.write(content);
+		} finally {
+			out.close();
 		}
 	}
 
@@ -180,7 +209,8 @@ public abstract class RepositoryServlet extends HttpServlet {
 	}
 
 	private static byte[] compress(final byte[] raw) throws IOException {
-		final ByteArrayOutputStream out = new ByteArrayOutputStream();
+		final int maxLen = raw.length + 32;
+		final ByteArrayOutputStream out = new ByteArrayOutputStream(maxLen);
 		final GZIPOutputStream gz = new GZIPOutputStream(out);
 		gz.write(raw);
 		gz.finish();
