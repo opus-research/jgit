@@ -108,54 +108,7 @@ public abstract class FS {
 		}
 	}
 
-	/**
-	 * Result of an executed process. The caller is responsible to close the
-	 * contained {@link TemporaryBuffer}s
-	 *
-	 * @since 4.2
-	 */
-	public static class ExecutionResult {
-		private TemporaryBuffer stdout;
-
-		private TemporaryBuffer stderr;
-
-		private int rc;
-
-		/**
-		 * @param stdout
-		 * @param stderr
-		 * @param rc
-		 */
-		public ExecutionResult(TemporaryBuffer stdout, TemporaryBuffer stderr,
-				int rc) {
-			this.stdout = stdout;
-			this.stderr = stderr;
-			this.rc = rc;
-		}
-
-		/**
-		 * @return buffered standard output stream
-		 */
-		public TemporaryBuffer getStdout() {
-			return stdout;
-		}
-
-		/**
-		 * @return buffered standard error stream
-		 */
-		public TemporaryBuffer getStderr() {
-			return stderr;
-		}
-
-		/**
-		 * @return the return code of the process
-		 */
-		public int getRc() {
-			return rc;
-		}
-	}
-
-	private final static Logger LOG = LoggerFactory.getLogger(FS.class);
+	final static Logger LOG = LoggerFactory.getLogger(FS.class);
 
 	/** The auto-detected implementation selected for this operating system and JRE. */
 	public static final FS DETECTED = detect();
@@ -605,7 +558,7 @@ public abstract class FS {
 		String v = readPipe(gitExe.getParentFile(),
 				new String[] { "git", "--version" }, //$NON-NLS-1$ //$NON-NLS-2$
 				Charset.defaultCharset().name());
-		if (v.startsWith("jgit")) { //$NON-NLS-1$
+		if (v != null && v.startsWith("jgit")) { //$NON-NLS-1$
 			return null;
 		}
 
@@ -1093,32 +1046,6 @@ public abstract class FS {
 	 *         populating directory, environment, and then start the process.
 	 */
 	public abstract ProcessBuilder runInShell(String cmd, String[] args);
-
-	/**
-	 * Execute a command defined by a {@link ProcessBuilder}.
-	 *
-	 * @param pb
-	 *            The command to be executed
-	 * @param in
-	 *            The standard input stream passed to the process
-	 * @return The result of the executed command
-	 * @throws InterruptedException
-	 * @throws IOException
-	 * @since 4.2
-	 */
-	public ExecutionResult execute(ProcessBuilder pb, InputStream in)
-			throws IOException, InterruptedException {
-		TemporaryBuffer stdout = new TemporaryBuffer.LocalFile(null);
-		TemporaryBuffer stderr = new TemporaryBuffer.Heap(1024, 1024 * 1024);
-		try {
-			int rc = runProcess(pb, stdout, stderr, in);
-			return new ExecutionResult(stdout, stderr, rc);
-		} catch (Exception e) {
-			stdout.close();
-			stderr.close();
-			throw e;
-		}
-	}
 
 	private static class Holder<V> {
 		final V value;
