@@ -85,7 +85,7 @@ import org.eclipse.jgit.treewalk.TreeWalk;
  * <pre>
  * try {
  *	cmd.setTree(db.resolve(&quot;master&quot;))
- *		.setFormat(ArchiveCommand.Format.ZIP)
+ *		.setFormat("zip")
  *		.setOutputStream(out).call();
  * } finally {
  *	cmd.release();
@@ -106,7 +106,7 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	 *	ArchiveOutputStream out = format.createArchiveOutputStream(System.out);
 	 *	try {
 	 *		for (...) {
-	 *			format.putEntry(out, path, mode, repo.open(objectId));
+	 *			format.putEntry(path, mode, repo.open(objectId), out);
 	 *		}
 	 *	} finally {
 	 *		out.close();
@@ -114,8 +114,9 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 	 */
 	public static interface Format {
 		ArchiveOutputStream createArchiveOutputStream(OutputStream s);
-		void putEntry(ArchiveOutputStream out, String path, FileMode mode,
-				ObjectLoader loader) throws IOException;
+		void putEntry(String path, FileMode mode, //
+				ObjectLoader loader, ArchiveOutputStream out) //
+				throws IOException;
 	}
 
 	/**
@@ -203,7 +204,7 @@ public class ArchiveCommand extends GitCommand<OutputStream> {
 						continue;
 
 					walk.getObjectId(idBuf, 0);
-					fmt.putEntry(outa, name, mode, reader.open(idBuf));
+					fmt.putEntry(name, mode, reader.open(idBuf), outa);
 				}
 			} finally {
 				outa.close();
