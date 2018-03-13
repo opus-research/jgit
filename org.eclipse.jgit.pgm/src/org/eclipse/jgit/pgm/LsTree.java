@@ -45,17 +45,12 @@
 
 package org.eclipse.jgit.pgm;
 
-import java.util.ArrayList;
-import java.util.List;
-
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.Option;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.treewalk.filter.PathFilterGroup;
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
-import org.kohsuke.args4j.spi.StopOptionHandler;
 
 class LsTree extends TextBuiltin {
 	@Option(name = "--recursive", usage = "usage_recurseIntoSubtrees", aliases = { "-r" })
@@ -64,16 +59,9 @@ class LsTree extends TextBuiltin {
 	@Argument(index = 0, required = true, metaVar = "metaVar_treeish")
 	private AbstractTreeIterator tree;
 
-	@Argument(index = 1)
-	@Option(name = "--", metaVar = "metaVar_paths", multiValued = true, handler = StopOptionHandler.class)
-	private List<String> paths = new ArrayList<String>();
-
 	@Override
 	protected void run() throws Exception {
 		final TreeWalk walk = new TreeWalk(db);
-		walk.reset(); // drop the first empty tree, which we do not need here
-		if (paths.size() > 0)
-			walk.setFilter(PathFilterGroup.createFromStrings(paths));
 		walk.setRecursive(recursive);
 		walk.addTree(tree);
 

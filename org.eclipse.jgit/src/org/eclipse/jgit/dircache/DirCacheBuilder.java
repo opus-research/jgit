@@ -244,7 +244,7 @@ public class DirCacheBuilder extends BaseDirCacheEditor {
 
 	private static IllegalStateException bad(final DirCacheEntry a,
 			final String msg) {
-		return new IllegalStateException(msg + ": " + a.getStage() + " " //$NON-NLS-1$ //$NON-NLS-2$
+		return new IllegalStateException(msg + ": " + a.getStage() + " "
 				+ a.getPathString());
 	}
 }

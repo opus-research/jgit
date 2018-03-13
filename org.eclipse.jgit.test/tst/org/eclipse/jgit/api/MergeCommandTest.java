@@ -1328,17 +1328,17 @@ public class MergeCommandTest extends RepositoryTestCase {
 		assertEquals(StatusCommandTest.set("file2"), stat.getConflicting());
 	}
 
-	private static void setExecutable(Git git, String path, boolean executable) {
+	private void setExecutable(Git git, String path, boolean executable) {
 		FS.DETECTED.setExecute(
 				new File(git.getRepository().getWorkTree(), path), executable);
 	}
 
-	private static boolean canExecute(Git git, String path) {
+	private boolean canExecute(Git git, String path) {
 		return FS.DETECTED.canExecute(new File(git.getRepository()
 				.getWorkTree(), path));
 	}
 
-	private static RevCommit addAllAndCommit(final Git git) throws Exception {
+	private RevCommit addAllAndCommit(final Git git) throws Exception {
 		git.add().addFilepattern(".").call();
 		return git.commit().setMessage("message").call();
 	}

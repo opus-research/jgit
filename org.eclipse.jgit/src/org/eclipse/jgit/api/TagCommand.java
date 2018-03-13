@@ -50,7 +50,6 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.InvalidTagNameException;
 import org.eclipse.jgit.api.errors.JGitInternalException;
 import org.eclipse.jgit.api.errors.NoHeadException;
-import org.eclipse.jgit.api.errors.RefAlreadyExistsException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
@@ -120,7 +119,7 @@ public class TagCommand extends GitCommand<Ref> {
 
 			// if no id is set, we should attempt to use HEAD
 			if (id == null) {
-				ObjectId objectId = repo.resolve(Constants.HEAD + "^{commit}"); //$NON-NLS-1$
+				ObjectId objectId = repo.resolve(Constants.HEAD + "^{commit}");
 				if (objectId == null)
 					throw new NoHeadException(
 							JGitText.get().tagOnRepoWithoutHEADCurrentlyNotSupported);
@@ -142,7 +141,7 @@ public class TagCommand extends GitCommand<Ref> {
 					RefUpdate tagRef = repo.updateRef(refName);
 					tagRef.setNewObjectId(tagId);
 					tagRef.setForceUpdate(forceUpdate);
-					tagRef.setRefLogMessage("tagged " + name, false); //$NON-NLS-1$
+					tagRef.setRefLogMessage("tagged " + name, false);
 					Result updateResult = tagRef.update(revWalk);
 					switch (updateResult) {
 					case NEW:
@@ -152,11 +151,6 @@ public class TagCommand extends GitCommand<Ref> {
 						throw new ConcurrentRefUpdateException(
 								JGitText.get().couldNotLockHEAD,
 								tagRef.getRef(), updateResult);
-					case REJECTED:
-						throw new RefAlreadyExistsException(
-								MessageFormat.format(
-										JGitText.get().tagAlreadyExists,
-										newTag.toString()));
 					default:
 						throw new JGitInternalException(MessageFormat.format(
 								JGitText.get().updatingRefFailed, refName,

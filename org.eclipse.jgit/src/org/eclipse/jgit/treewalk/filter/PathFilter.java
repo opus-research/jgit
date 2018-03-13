@@ -44,7 +44,6 @@
 
 package org.eclipse.jgit.treewalk.filter;
 
-import org.eclipse.jgit.errors.StopWalkException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.treewalk.TreeWalk;
@@ -75,7 +74,7 @@ public class PathFilter extends TreeFilter {
 	 *             the path supplied was the empty string.
 	 */
 	public static PathFilter create(String path) {
-		while (path.endsWith("/")) //$NON-NLS-1$
+		while (path.endsWith("/"))
 			path = path.substring(0, path.length() - 1);
 		if (path.length() == 0)
 			throw new IllegalArgumentException(JGitText.get().emptyPathNotPermitted);
@@ -98,10 +97,7 @@ public class PathFilter extends TreeFilter {
 
 	@Override
 	public boolean include(final TreeWalk walker) {
-		int cmp = walker.isPathPrefix(pathRaw, pathRaw.length);
-		if (cmp > 0)
-			throw StopWalkException.INSTANCE;
-		return cmp == 0;
+		return walker.isPathPrefix(pathRaw, pathRaw.length) == 0;
 	}
 
 	@Override
@@ -117,7 +113,6 @@ public class PathFilter extends TreeFilter {
 		return this;
 	}
 
-	@SuppressWarnings("nls")
 	public String toString() {
 		return "PATH(\"" + pathStr + "\")";
 	}

@@ -3,7 +3,6 @@
  * Copyright (C) 2008-2010, Google Inc.
  * Copyright (C) 2006-2010, Robin Rosenberg <robin.rosenberg@dewire.com>
  * Copyright (C) 2006-2012, Shawn O. Pearce <spearce@spearce.org>
- * Copyright (C) 2012, Daniel Megert <daniel_megert@ch.ibm.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -378,8 +377,7 @@ public abstract class Repository {
 	 *             on serious errors
 	 */
 	public ObjectId resolve(final String revstr)
-			throws AmbiguousObjectException, IncorrectObjectTypeException,
-			RevisionSyntaxException, IOException {
+			throws AmbiguousObjectException, IOException {
 		RevWalk rw = new RevWalk(this);
 		try {
 			Object resolved = resolve(rw, revstr);
@@ -491,16 +489,16 @@ public abstract class Repository {
 						}
 						i = k;
 						if (item != null)
-							if (item.equals("tree")) { //$NON-NLS-1$
+							if (item.equals("tree")) {
 								rev = rw.parseTree(rev);
-							} else if (item.equals("commit")) { //$NON-NLS-1$
+							} else if (item.equals("commit")) {
 								rev = rw.parseCommit(rev);
-							} else if (item.equals("blob")) { //$NON-NLS-1$
+							} else if (item.equals("blob")) {
 								rev = rw.peel(rev);
 								if (!(rev instanceof RevBlob))
 									throw new IncorrectObjectTypeException(rev,
 											Constants.TYPE_BLOB);
-							} else if (item.equals("")) { //$NON-NLS-1$
+							} else if (item.equals("")) {
 								rev = rw.peel(rev);
 							} else
 								throw new RevisionSyntaxException(revstr);
@@ -596,14 +594,14 @@ public abstract class Repository {
 					}
 				}
 				if (time != null) {
-					if (time.equals("upstream")) { //$NON-NLS-1$
+					if (time.equals("upstream")) {
 						if (name == null)
 							name = new String(revChars, done, i);
-						if (name.equals("")) //$NON-NLS-1$
+						if (name.equals(""))
 							// Currently checked out branch, HEAD if
 							// detached
 							name = Constants.HEAD;
-						if (!Repository.isValidRefName("x/" + name)) //$NON-NLS-1$
+						if (!Repository.isValidRefName("x/" + name))
 							throw new RevisionSyntaxException(revstr);
 						Ref ref = getRef(name);
 						name = null;
@@ -616,7 +614,7 @@ public abstract class Repository {
 						RemoteConfig remoteConfig;
 						try {
 							remoteConfig = new RemoteConfig(getConfig(),
-									"origin"); //$NON-NLS-1$
+									"origin");
 						} catch (URISyntaxException e) {
 							throw new RevisionSyntaxException(revstr);
 						}
@@ -637,7 +635,7 @@ public abstract class Repository {
 						}
 						if (name == null)
 							throw new RevisionSyntaxException(revstr);
-					} else if (time.matches("^-\\d+$")) { //$NON-NLS-1$
+					} else if (time.matches("^-\\d+$")) {
 						if (name != null)
 							throw new RevisionSyntaxException(revstr);
 						else {
@@ -651,9 +649,9 @@ public abstract class Repository {
 					} else {
 						if (name == null)
 							name = new String(revChars, done, i);
-						if (name.equals("")) //$NON-NLS-1$
+						if (name.equals(""))
 							name = Constants.HEAD;
-						if (!Repository.isValidRefName("x/" + name)) //$NON-NLS-1$
+						if (!Repository.isValidRefName("x/" + name))
 							throw new RevisionSyntaxException(revstr);
 						Ref ref = getRef(name);
 						name = null;
@@ -674,7 +672,7 @@ public abstract class Repository {
 				if (rev == null) {
 					if (name == null)
 						name = new String(revChars, done, i);
-					if (name.equals("")) //$NON-NLS-1$
+					if (name.equals(""))
 						name = Constants.HEAD;
 					rev = parseSimple(rw, name);
 					name = null;
@@ -699,10 +697,10 @@ public abstract class Repository {
 			return rev.copy();
 		if (name != null)
 			return name;
-		if (done == revstr.length())
+		if (rev == null && done == revstr.length())
 			return null;
 		name = revstr.substring(done);
-		if (!Repository.isValidRefName("x/" + name)) //$NON-NLS-1$
+		if (!Repository.isValidRefName("x/" + name))
 			throw new RevisionSyntaxException(revstr);
 		if (getRef(name) != null)
 			return name;
@@ -732,7 +730,7 @@ public abstract class Repository {
 		if (ObjectId.isId(revstr))
 			return ObjectId.fromString(revstr);
 
-		if (Repository.isValidRefName("x/" + revstr)) { //$NON-NLS-1$
+		if (Repository.isValidRefName("x/" + revstr)) {
 			Ref r = getRefDatabase().getRef(revstr);
 			if (r != null)
 				return r.getObjectId();
@@ -741,7 +739,7 @@ public abstract class Repository {
 		if (AbbreviatedObjectId.isId(revstr))
 			return resolveAbbreviation(revstr);
 
-		int dashg = revstr.indexOf("-g"); //$NON-NLS-1$
+		int dashg = revstr.indexOf("-g");
 		if ((dashg + 5) < revstr.length() && 0 <= dashg
 				&& isHex(revstr.charAt(dashg + 2))
 				&& isHex(revstr.charAt(dashg + 3))
@@ -827,15 +825,14 @@ public abstract class Repository {
 		getRefDatabase().close();
 	}
 
-	@SuppressWarnings("nls")
 	public String toString() {
 		String desc;
 		if (getDirectory() != null)
 			desc = getDirectory().getPath();
 		else
-			desc = getClass().getSimpleName() + "-" //$NON-NLS-1$
+			desc = getClass().getSimpleName() + "-"
 					+ System.identityHashCode(this);
-		return "Repository[" + desc + "]"; //$NON-NLS-1$
+		return "Repository[" + desc + "]";
 	}
 
 	/**
@@ -1069,22 +1066,22 @@ public abstract class Repository {
 			return RepositoryState.BARE;
 
 		// Pre Git-1.6 logic
-		if (new File(getWorkTree(), ".dotest").exists()) //$NON-NLS-1$
+		if (new File(getWorkTree(), ".dotest").exists())
 			return RepositoryState.REBASING;
-		if (new File(getDirectory(), ".dotest-merge").exists()) //$NON-NLS-1$
+		if (new File(getDirectory(), ".dotest-merge").exists())
 			return RepositoryState.REBASING_INTERACTIVE;
 
 		// From 1.6 onwards
-		if (new File(getDirectory(),"rebase-apply/rebasing").exists()) //$NON-NLS-1$
+		if (new File(getDirectory(),"rebase-apply/rebasing").exists())
 			return RepositoryState.REBASING_REBASING;
-		if (new File(getDirectory(),"rebase-apply/applying").exists()) //$NON-NLS-1$
+		if (new File(getDirectory(),"rebase-apply/applying").exists())
 			return RepositoryState.APPLY;
-		if (new File(getDirectory(),"rebase-apply").exists()) //$NON-NLS-1$
+		if (new File(getDirectory(),"rebase-apply").exists())
 			return RepositoryState.REBASING;
 
-		if (new File(getDirectory(),"rebase-merge/interactive").exists()) //$NON-NLS-1$
+		if (new File(getDirectory(),"rebase-merge/interactive").exists())
 			return RepositoryState.REBASING_INTERACTIVE;
-		if (new File(getDirectory(),"rebase-merge").exists()) //$NON-NLS-1$
+		if (new File(getDirectory(),"rebase-merge").exists())
 			return RepositoryState.REBASING_MERGE;
 
 		// Both versions
@@ -1103,7 +1100,7 @@ public abstract class Repository {
 			return RepositoryState.MERGING;
 		}
 
-		if (new File(getDirectory(), "BISECT_LOG").exists()) //$NON-NLS-1$
+		if (new File(getDirectory(), "BISECT_LOG").exists())
 			return RepositoryState.BISECTING;
 
 		if (new File(getDirectory(), Constants.CHERRY_PICK_HEAD).exists()) {
@@ -1117,19 +1114,6 @@ public abstract class Repository {
 			}
 
 			return RepositoryState.CHERRY_PICKING;
-		}
-
-		if (new File(getDirectory(), Constants.REVERT_HEAD).exists()) {
-			try {
-				if (!readDirCache().hasUnmergedPaths()) {
-					// no unmerged paths
-					return RepositoryState.REVERTING_RESOLVED;
-				}
-			} catch (IOException e) {
-				// fall through to REVERTING
-			}
-
-			return RepositoryState.REVERTING;
 		}
 
 		return RepositoryState.SAFE;
@@ -1150,7 +1134,7 @@ public abstract class Repository {
 		final int len = refName.length();
 		if (len == 0)
 			return false;
-		if (refName.endsWith(".lock")) //$NON-NLS-1$
+		if (refName.endsWith(".lock"))
 			return false;
 
 		int components = 1;
@@ -1208,7 +1192,7 @@ public abstract class Repository {
 			File absWd = workDir.isAbsolute() ? workDir : workDir.getAbsoluteFile();
 			File absFile = file.isAbsolute() ? file : file.getAbsoluteFile();
 			if (absWd == workDir && absFile == file)
-				return ""; //$NON-NLS-1$
+				return "";
 			return stripWorkDir(absWd, absFile);
 		}
 
@@ -1376,27 +1360,6 @@ public abstract class Repository {
 	}
 
 	/**
-	 * Return the information stored in the file $GIT_DIR/REVERT_HEAD.
-	 *
-	 * @return object id from REVERT_HEAD file or {@code null} if this file
-	 *         doesn't exist. Also if the file exists but is empty {@code null}
-	 *         will be returned
-	 * @throws IOException
-	 * @throws NoWorkTreeException
-	 *             if this is bare, which implies it has no working directory.
-	 *             See {@link #isBare()}.
-	 */
-	public ObjectId readRevertHead() throws IOException, NoWorkTreeException {
-		if (isBare() || getDirectory() == null)
-			throw new NoWorkTreeException();
-
-		byte[] raw = readGitDirectoryFile(Constants.REVERT_HEAD);
-		if (raw == null)
-			return null;
-		return ObjectId.fromString(raw, 0);
-	}
-
-	/**
 	 * Write cherry pick commit into $GIT_DIR/CHERRY_PICK_HEAD. This is used in
 	 * case of conflicts to store the cherry which was tried to be picked.
 	 *
@@ -1409,21 +1372,6 @@ public abstract class Repository {
 		List<ObjectId> heads = (head != null) ? Collections.singletonList(head)
 				: null;
 		writeHeadsFile(heads, Constants.CHERRY_PICK_HEAD);
-	}
-
-	/**
-	 * Write revert commit into $GIT_DIR/REVERT_HEAD. This is used in case of
-	 * conflicts to store the revert which was tried to be picked.
-	 *
-	 * @param head
-	 *            an object id of the revert commit or <code>null</code> to
-	 *            delete the file
-	 * @throws IOException
-	 */
-	public void writeRevertHead(ObjectId head) throws IOException {
-		List<ObjectId> heads = (head != null) ? Collections.singletonList(head)
-				: null;
-		writeHeadsFile(heads, Constants.REVERT_HEAD);
 	}
 
 	/**
@@ -1563,5 +1511,4 @@ public abstract class Repository {
 			FileUtils.delete(headsFile, FileUtils.SKIP_MISSING);
 		}
 	}
-
 }

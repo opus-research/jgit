@@ -97,7 +97,7 @@ public abstract class DfsRepository extends Repository {
 	public void create(boolean bare) throws IOException {
 		if (exists())
 			throw new IOException(MessageFormat.format(
-					JGitText.get().repositoryAlreadyExists, "")); //$NON-NLS-1$
+					JGitText.get().repositoryAlreadyExists, ""));
 
 		String master = Constants.R_HEADS + Constants.MASTER;
 		RefUpdate.Result result = updateRef(Constants.HEAD, true).link(master);

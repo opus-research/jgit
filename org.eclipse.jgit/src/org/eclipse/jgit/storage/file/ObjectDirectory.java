@@ -127,12 +127,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	private final UnpackedObjectCache unpackedObjectCache;
 
-	private final File shallowFile;
-
-	private FileSnapshot shallowFileSnapshot = FileSnapshot.DIRTY;
-
-	private Set<ObjectId> shallowCommitsIds;
-
 	/**
 	 * Initialize a reference to an on-disk object directory.
 	 *
@@ -145,25 +139,21 @@ public class ObjectDirectory extends FileObjectDatabase {
 	 * @param fs
 	 *            the file system abstraction which will be necessary to perform
 	 *            certain file system operations.
-	 * @param shallowFile
-	 *            file which contains IDs of shallow commits, null if shallow
-	 *            commits handling should be turned off
 	 * @throws IOException
 	 *             an alternate object cannot be opened.
 	 */
 	public ObjectDirectory(final Config cfg, final File dir,
-			File[] alternatePaths, FS fs, File shallowFile) throws IOException {
+			File[] alternatePaths, FS fs) throws IOException {
 		config = cfg;
 		objects = dir;
-		infoDirectory = new File(objects, "info"); //$NON-NLS-1$
-		packDirectory = new File(objects, "pack"); //$NON-NLS-1$
-		alternatesFile = new File(infoDirectory, "alternates"); //$NON-NLS-1$
-		cachedPacksFile = new File(infoDirectory, "cached-packs"); //$NON-NLS-1$
+		infoDirectory = new File(objects, "info");
+		packDirectory = new File(objects, "pack");
+		alternatesFile = new File(infoDirectory, "alternates");
+		cachedPacksFile = new File(infoDirectory, "cached-packs");
 		packList = new AtomicReference<PackList>(NO_PACKS);
 		cachedPacks = new AtomicReference<CachedPackList>();
 		unpackedObjectCache = new UnpackedObjectCache();
 		this.fs = fs;
-		this.shallowFile = shallowFile;
 
 		alternates = new AtomicReference<AlternateHandle[]>();
 		if (alternatePaths != null) {
@@ -339,10 +329,10 @@ public class ObjectDirectory extends FileObjectDatabase {
 		final String p = pack.getName();
 		final String i = idx.getName();
 
-		if (p.length() != 50 || !p.startsWith("pack-") || !p.endsWith(".pack")) //$NON-NLS-1$
+		if (p.length() != 50 || !p.startsWith("pack-") || !p.endsWith(".pack"))
 			throw new IOException(MessageFormat.format(JGitText.get().notAValidPack, pack));
 
-		if (i.length() != 49 || !i.startsWith("pack-") || !i.endsWith(".idx")) //$NON-NLS-1$
+		if (i.length() != 49 || !i.startsWith("pack-") || !i.endsWith(".idx"))
 			throw new IOException(MessageFormat.format(JGitText.get().notAValidPack, idx));
 
 		if (!p.substring(0, 45).equals(i.substring(0, 45)))
@@ -355,7 +345,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 
 	@Override
 	public String toString() {
-		return "ObjectDirectory[" + getDirectory() + "]"; //$NON-NLS-1$
+		return "ObjectDirectory[" + getDirectory() + "]";
 	}
 
 	boolean hasObject1(final AnyObjectId objectId) {
@@ -624,30 +614,6 @@ public class ObjectDirectory extends FileObjectDatabase {
 		return fs;
 	}
 
-	@Override
-	Set<ObjectId> getShallowCommits() throws IOException {
-		if (shallowFile == null || !shallowFile.isFile())
-			return Collections.emptySet();
-
-		if (shallowFileSnapshot == null
-				|| shallowFileSnapshot.isModified(shallowFile)) {
-			shallowCommitsIds = new HashSet<ObjectId>();
-
-			final BufferedReader reader = open(shallowFile);
-			try {
-				String line;
-				while ((line = reader.readLine()) != null)
-					shallowCommitsIds.add(ObjectId.fromString(line));
-			} finally {
-				reader.close();
-			}
-
-			shallowFileSnapshot = FileSnapshot.save(shallowFile);
-		}
-
-		return shallowCommitsIds;
-	}
-
 	private void insertPack(final PackFile pf) {
 		PackList o, n;
 		do {
@@ -727,11 +693,11 @@ public class ObjectDirectory extends FileObjectDatabase {
 		for (final String indexName : names) {
 			// Must match "pack-[0-9a-f]{40}.idx" to be an index.
 			//
-			if (indexName.length() != 49 || !indexName.endsWith(".idx")) //$NON-NLS-1$
+			if (indexName.length() != 49 || !indexName.endsWith(".idx"))
 				continue;
 
 			final String base = indexName.substring(0, indexName.length() - 4);
-			final String packName = base + ".pack"; //$NON-NLS-1$
+			final String packName = base + ".pack";
 			if (!names.contains(packName)) {
 				// Sometimes C Git's HTTP fetch transport leaves a
 				// .idx file behind and does not download the .pack.
@@ -806,7 +772,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 			return Collections.emptySet();
 		final Set<String> nameSet = new HashSet<String>(nameList.length << 1);
 		for (final String name : nameList) {
-			if (name.startsWith("pack-")) //$NON-NLS-1$
+			if (name.startsWith("pack-"))
 				nameSet.add(name);
 		}
 		return nameSet;
@@ -863,7 +829,7 @@ public class ObjectDirectory extends FileObjectDatabase {
 			return new AlternateRepository(db);
 		}
 
-		ObjectDirectory db = new ObjectDirectory(config, objdir, null, fs, null);
+		ObjectDirectory db = new ObjectDirectory(config, objdir, null, fs);
 		return new AlternateHandle(db);
 	}
 
