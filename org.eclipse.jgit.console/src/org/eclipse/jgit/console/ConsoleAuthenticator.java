@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2010, Sasa Zivkov <sasa.zivkov@sap.com>
+ * Copyright (C) 2009, Google Inc.
+ * Copyright (C) 2008, Shawn O. Pearce <spearce@spearce.org>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -41,38 +42,54 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package org.eclipse.jgit.nls;
+package org.eclipse.jgit.console;
 
-import org.eclipse.jgit.awtui.UIText;
-import org.eclipse.jgit.console.ConsoleText;
-import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.pgm.internal.CLIText;
-import org.junit.Before;
-import org.junit.Test;
+import java.io.Console;
+import java.net.Authenticator;
+import java.net.PasswordAuthentication;
+import java.text.MessageFormat;
 
-public class RootLocaleTest {
-	@Before
-	public void setUp() {
-		NLS.setLocale(NLS.ROOT_LOCALE);
+import org.eclipse.jgit.util.CachedAuthenticator;
+
+/** Basic network prompt for username/password when using the console. */
+public class ConsoleAuthenticator extends CachedAuthenticator {
+	/** Install this authenticator implementation into the JVM. */
+	public static void install() {
+		final ConsoleAuthenticator c = new ConsoleAuthenticator();
+		if (c.cons == null)
+			throw new NoClassDefFoundError(ConsoleText.get().noSystemConsoleAvailable);
+		Authenticator.setDefault(c);
 	}
 
-	@Test
-	public void testJGitText() {
-		NLS.getBundleFor(JGitText.class);
+	private final Console cons = System.console();
+
+	@Override
+	protected PasswordAuthentication promptPasswordAuthentication() {
+		final String realm = formatRealm();
+		String username = cons.readLine(MessageFormat.format(ConsoleText.get().usernameFor + " ", realm)); //$NON-NLS-1$
+		if (username == null || username.isEmpty()) {
+			return null;
+		}
+		char[] password = cons.readPassword(ConsoleText.get().password + " "); //$NON-NLS-1$
+		if (password == null) {
+			password = new char[0];
+		}
+		return new PasswordAuthentication(username, password);
 	}
 
-	@Test
-	public void testConsoleText() {
-		NLS.getBundleFor(ConsoleText.class);
-	}
-
-	@Test
-	public void testCLIText() {
-		NLS.getBundleFor(CLIText.class);
-	}
-
-	@Test
-	public void testUIText() {
-		NLS.getBundleFor(UIText.class);
+	private String formatRealm() {
+		final StringBuilder realm = new StringBuilder();
+		if (getRequestorType() == RequestorType.PROXY) {
+			realm.append(getRequestorType());
+			realm.append(" "); //$NON-NLS-1$
+			realm.append(getRequestingHost());
+			if (getRequestingPort() > 0) {
+				realm.append(":"); //$NON-NLS-1$
+				realm.append(getRequestingPort());
+			}
+		} else {
+			realm.append(getRequestingURL());
+		}
+		return realm.toString();
 	}
 }
