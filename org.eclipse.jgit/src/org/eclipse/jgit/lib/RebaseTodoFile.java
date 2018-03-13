@@ -75,7 +75,7 @@ public class RebaseTodoFile {
 	 * .git/rebase-merge/ or .git/rebase-append/ folders.
 	 *
 	 * @param path
-	 *            path to the file relative to the repositories git-dir. E.g.
+	 *            path to the file relative to the repository's git-dir. E.g.
 	 *            "rebase-merge/git-rebase-todo" or "rebase-append/done"
 	 * @param includeComments
 	 *            <code>true</code> if also comments should be reported
@@ -97,9 +97,8 @@ public class RebaseTodoFile {
 				lineEnd--;
 			// Handle comments
 			if (buf[tokenBegin] == '#') {
-				if (includeComments) {
+				if (includeComments)
 					parseComments(buf, tokenBegin, r, lineEnd);
-				}
 			} else {
 				// skip leading spaces+tabs+cr
 				tokenBegin = nextParsableToken(buf, tokenBegin, lineEnd);
