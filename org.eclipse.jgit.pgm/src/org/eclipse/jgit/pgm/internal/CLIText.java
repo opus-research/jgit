@@ -187,6 +187,7 @@ public class CLIText extends TranslationBundle {
 	/***/ public String metaVar_version;
 	/***/ public String mostCommonlyUsedCommandsAre;
 	/***/ public String needApprovalToDestroyCurrentRepository;
+	/***/ public String needSingleRevision;
 	/***/ public String noGitRepositoryConfigured;
 	/***/ public String noNamesFound;
 	/***/ public String noSuchFile;
@@ -201,7 +202,6 @@ public class CLIText extends TranslationBundle {
 	/***/ public String notARevision;
 	/***/ public String notATree;
 	/***/ public String notAValidRefName;
-	/***/ public String notAValidCommitName;
 	/***/ public String notAnIndexFile;
 	/***/ public String notAnObject;
 	/***/ public String notFound;
