@@ -66,6 +66,7 @@ public abstract class SshTransport extends TcpTransport {
 
 	/**
 	 * Create a new transport instance.
+	 *
 	 * @param local
 	 *            the repository this instance will fetch into, or push out of.
 	 *            This must be the repository passed to
@@ -82,6 +83,7 @@ public abstract class SshTransport extends TcpTransport {
 	/**
 	 * Set SSH session factory instead of the default one for this instance of
 	 * the transport.
+	 *
 	 * @param factory
 	 *            a factory to set, must not be null
 	 * @throws IllegalStateException
@@ -107,8 +109,9 @@ public abstract class SshTransport extends TcpTransport {
 
 	/**
 	 * Get the default SSH session
-	 * 
+	 *
 	 * @return a remote session
+	 * 
 	 * @throws TransportException
 	 *             in case of error with opening SSH session
 	 */
