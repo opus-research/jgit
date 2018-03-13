@@ -66,15 +66,16 @@ java_binary(
   ],
 )
 
-genrule2(
+genrule(
   name = 'binary_manifest',
   cmd = ';'.join(['echo "%s: %s" >>$OUT' % e for e in [
     ('Manifest-Version', '1.0'),
     ('Main-Class', 'org.eclipse.jgit.pgm.Main'),
+    ('Bundle-Version', git_version()),
     ('Implementation-Title', 'JGit Command Line Interface'),
     ('Implementation-Vendor', 'Eclipse.org - JGit'),
     ('Implementation-Vendor-URL', 'http://www.eclipse.org/jgit/'),
     ('Implementation-Vendor-Id', 'org.eclipse.jgit'),
   ]] + ['echo >>$OUT']),
-  outs = ['MANIFEST.MF',],
+  out = 'MANIFEST.MF',
 )
