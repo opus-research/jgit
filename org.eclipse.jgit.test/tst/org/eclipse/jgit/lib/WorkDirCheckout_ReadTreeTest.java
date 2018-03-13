@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2007-2009, Robin Rosenberg <robin.rosenberg@dewire.com>
- * Copyright (C) 2006-2007, Shawn O. Pearce <spearce@spearce.org>
- * Copyright (C) 2009, Vasyl' Vavrychuk <vvavrychuk@gmail.com>
+ * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.om>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -42,41 +40,37 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 package org.eclipse.jgit.lib;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 /**
- * Abstract TreeVisitor for visiting all files known by a Tree.
- *
- * @deprecated Use {@link org.eclipse.jgit.treewalk.TreeWalk} instead, with a
- * {@link org.eclipse.jgit.treewalk.FileTreeIterator} as one of its members.
+ * Test cases for ReadTree operations as implemented in WorkDirCheckout
  */
-@Deprecated
-public abstract class TreeVisitorWithCurrentDirectory implements TreeVisitor {
-	private final ArrayList<File> stack = new ArrayList<File>(16);
-
-	private File currentDirectory;
-
-	TreeVisitorWithCurrentDirectory(final File rootDirectory) {
-		currentDirectory = rootDirectory;
+public class WorkDirCheckout_ReadTreeTest extends ReadTreeTest {
+	private WorkDirCheckout wdc;
+	public void prescanTwoTrees(Tree head, Tree merge) throws IllegalStateException, IOException {
+		wdc = new WorkDirCheckout(db, db.getWorkDir(), head, db.getIndex(), merge);
+		wdc.prescanTwoTrees();
 	}
 
-	File getCurrentDirectory() {
-		return currentDirectory;
+	public void checkout() throws IOException {
+		wdc = new WorkDirCheckout(db, db.getWorkDir(), theHead, db.getIndex(), theMerge);
+		wdc.checkout();
 	}
 
-	public void startVisitTree(final Tree t) throws IOException {
-		stack.add(currentDirectory);
-		if (!t.isRoot()) {
-			currentDirectory = new File(currentDirectory, t.getName());
-		}
+	public ArrayList<String> getRemoved() {
+		return wdc.getRemoved();
 	}
 
-	public void endVisitTree(final Tree t) throws IOException {
-		currentDirectory = stack.remove(stack.size() - 1);
+	public HashMap<String, ObjectId> getUpdated() {
+		return wdc.updated;
+	}
+
+	public ArrayList<String> getConflicts() {
+		return wdc.getConflicts();
 	}
 }
+
