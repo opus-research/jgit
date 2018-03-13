@@ -73,7 +73,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jgit.errors.InvalidObjectIdException;
 import org.eclipse.jgit.errors.LockFailedException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -882,11 +881,14 @@ public class RefDirectory extends RefDatabase {
 		return n;
 	}
 
+	@SuppressWarnings("null")
 	private LooseRef scanRef(LooseRef ref, String name) throws IOException {
 		final File path = fileFor(name);
+		FileSnapshot currentSnapshot = null;
 
 		if (ref != null) {
-			if (!ref.getSnapShot().isModified(path))
+			currentSnapshot = ref.getSnapShot();
+			if (!currentSnapshot.isModified(path))
 				return ref;
 			name = ref.getName();
 		}
@@ -918,7 +920,7 @@ public class RefDirectory extends RefDatabase {
 			final String target = RawParseUtils.decode(buf, 5, n);
 			if (ref != null && ref.isSymbolic()
 					&& ref.getTarget().getName().equals(target)) {
-				ref.getSnapShot().setClean(otherSnapshot);
+				currentSnapshot.setClean(otherSnapshot);
 				return ref;
 			}
 			return newSymbolicRef(otherSnapshot, name, target);
@@ -932,7 +934,7 @@ public class RefDirectory extends RefDatabase {
 			id = ObjectId.fromString(buf, 0);
 			if (ref != null && !ref.isSymbolic()
 					&& ref.getTarget().getObjectId().equals(id)) {
-				ref.getSnapShot().setClean(otherSnapshot);
+				currentSnapshot.setClean(otherSnapshot);
 				return ref;
 			}
 
@@ -1039,7 +1041,6 @@ public class RefDirectory extends RefDatabase {
 	}
 
 	private static interface LooseRef extends Ref {
-		@NonNull
 		FileSnapshot getSnapShot();
 
 		LooseRef peel(ObjectIdRef newLeaf);
@@ -1068,8 +1069,7 @@ public class RefDirectory extends RefDatabase {
 			implements LooseRef {
 		private final FileSnapshot snapShot;
 
-		LooseNonTag(@NonNull FileSnapshot snapshot, String refName,
-				ObjectId id) {
+		LooseNonTag(FileSnapshot snapshot, String refName, ObjectId id) {
 			super(LOOSE, refName, id);
 			this.snapShot = snapshot;
 		}
@@ -1087,8 +1087,7 @@ public class RefDirectory extends RefDatabase {
 			implements LooseRef {
 		private FileSnapshot snapShot;
 
-		LooseUnpeeled(@NonNull FileSnapshot snapShot, String refName,
-				ObjectId id) {
+		LooseUnpeeled(FileSnapshot snapShot, String refName, ObjectId id) {
 			super(LOOSE, refName, id);
 			this.snapShot = snapShot;
 		}
@@ -1111,8 +1110,7 @@ public class RefDirectory extends RefDatabase {
 			LooseRef {
 		private final FileSnapshot snapShot;
 
-		LooseSymbolicRef(@NonNull FileSnapshot snapshot, String refName,
-				Ref target) {
+		LooseSymbolicRef(FileSnapshot snapshot, String refName, Ref target) {
 			super(refName, target);
 			this.snapShot = snapshot;
 		}

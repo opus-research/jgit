@@ -55,7 +55,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import java.util.zip.CRC32;
 import java.util.zip.DataFormatException;
 import java.util.zip.Inflater;
 
@@ -489,9 +488,7 @@ public final class DfsReader extends ObjectReader implements ObjectReuseAsIs {
 			boolean validate) throws IOException,
 			StoredObjectRepresentationNotAvailableException {
 		DfsObjectToPack src = (DfsObjectToPack) otp;
-		final CRC32 crc1 = validate ? new CRC32() : null;
-		final CRC32 crc2 = validate ? new CRC32() : null;
-		src.pack.copyAsIs(out, src, validate, crc1, crc2, this);
+		src.pack.copyAsIs(out, src, validate, this);
 	}
 
 	public void writeObjects(PackOutputStream out, List<ObjectToPack> list)
