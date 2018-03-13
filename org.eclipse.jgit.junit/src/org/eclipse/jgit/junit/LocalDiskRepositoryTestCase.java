@@ -58,12 +58,13 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import org.eclipse.jgit.internal.storage.file.FileRepository;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.RepositoryCache;
 import org.eclipse.jgit.storage.file.FileBasedConfig;
+import org.eclipse.jgit.storage.file.FileRepository;
+import org.eclipse.jgit.storage.file.WindowCache;
 import org.eclipse.jgit.storage.file.WindowCacheConfig;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.FileUtils;
@@ -149,7 +150,7 @@ public abstract class LocalDiskRepositoryTestCase {
 		c.setPackedGitWindowSize(8 * WindowCacheConfig.KB);
 		c.setPackedGitMMAP(useMMAP);
 		c.setDeltaBaseCacheLimit(8 * WindowCacheConfig.KB);
-		c.install();
+		WindowCache.reconfigure(c);
 	}
 
 
@@ -284,10 +285,6 @@ public abstract class LocalDiskRepositoryTestCase {
 	 */
 	private FileRepository createRepository(boolean bare) throws IOException {
 		File gitdir = createUniqueTestGitDir(bare);
-		return createRepository(gitdir);
-	}
-
-	protected FileRepository createRepository(File gitdir) throws IOException {
 		FileRepository db = new FileRepository(gitdir);
 		assertFalse(gitdir.exists());
 		db.create();

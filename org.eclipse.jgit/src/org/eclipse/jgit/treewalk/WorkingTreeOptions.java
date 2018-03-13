@@ -85,7 +85,7 @@ public class WorkingTreeOptions {
 
 	/**
 	 * @return how stat data is compared
-	 * @since 3.0
+	 * @since 2.3
 	 */
 	public CheckStat getCheckStat() {
 		return checkStat;

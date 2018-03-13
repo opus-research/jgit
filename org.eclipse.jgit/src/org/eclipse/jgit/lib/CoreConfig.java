@@ -77,7 +77,7 @@ public class CoreConfig {
 	/**
 	 * Permissible values for {@code core.checkstat}
 	 *
-	 * @since 3.0
+	 * @since 2.3
 	 */
 	public static enum CheckStat {
 		/**
