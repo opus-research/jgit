@@ -116,7 +116,7 @@ public class SubmoduleSyncCommand extends GitCommand<Map<String, String>> {
 			Map<String, String> synced = new HashMap<String, String>();
 			StoredConfig config = repo.getConfig();
 			while (generator.next()) {
-				String remoteUrl = generator.getRemoteUrl();
+				String remoteUrl = generator.getModulesUrl();
 				if (remoteUrl == null)
 					continue;
 
