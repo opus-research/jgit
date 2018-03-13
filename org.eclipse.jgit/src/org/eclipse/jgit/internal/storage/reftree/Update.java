@@ -44,6 +44,7 @@
 package org.eclipse.jgit.internal.storage.reftree;
 
 import static org.eclipse.jgit.lib.Ref.Storage.LOOSE;
+import static org.eclipse.jgit.lib.Ref.Storage.NEW;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -53,7 +54,6 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.Ref.Storage;
 import org.eclipse.jgit.lib.RefDatabase;
 import org.eclipse.jgit.lib.RefUpdate;
 import org.eclipse.jgit.lib.Repository;
@@ -66,14 +66,13 @@ import org.eclipse.jgit.transport.ReceiveCommand;
 /** Single reference update to {@link RefTreeDb}. */
 class Update extends RefUpdate {
 	private final RefTreeDb refdb;
-
 	private Ref oldRef;
 	private Batch batch;
 
 	Update(RefTreeDb refdb, Ref ref) {
 		super(ref);
-		setCheckConflicting(false); // Done automatically by doUpdate.
 		this.refdb = refdb;
+		setCheckConflicting(false); // Done automatically by doUpdate.
 	}
 
 	@Override
@@ -93,7 +92,7 @@ class Update extends RefUpdate {
 			batch.init(rw);
 		}
 
-		oldRef = batch.getRef(getName());
+		oldRef = batch.exactRef(getName());
 		if (oldRef != null && oldRef.getObjectId() != null) {
 			setOldObjectId(oldRef.getObjectId());
 		} else {
@@ -119,9 +118,8 @@ class Update extends RefUpdate {
 			if (o instanceof RevTag) {
 				RevObject p = rw.peel(o);
 				return new ObjectIdRef.PeeledTag(LOOSE, name, id, p.copy());
-			} else {
-				return new ObjectIdRef.PeeledNonTag(LOOSE, name, id);
 			}
+			return new ObjectIdRef.PeeledNonTag(LOOSE, name, id);
 		}
 	}
 
@@ -132,9 +130,9 @@ class Update extends RefUpdate {
 
 	@Override
 	protected Result doLink(String target) throws IOException {
-		Ref dst = new ObjectIdRef.Unpeeled(LOOSE, target, null);
+		Ref dst = new ObjectIdRef.Unpeeled(NEW, target, null);
 		SymbolicRef n = new SymbolicRef(getName(), dst);
-		Result result = getRef().getStorage() == Storage.NEW
+		Result result = getRef().getStorage() == NEW
 			? Result.NEW
 			: Result.FORCED;
 		return run(n, result);

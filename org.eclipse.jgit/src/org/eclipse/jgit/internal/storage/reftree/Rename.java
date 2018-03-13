@@ -77,8 +77,8 @@ class Rename extends RefRename {
 			batch.setRefLogMessage(getRefLogMessage(), false);
 			batch.init(rw);
 
-			Ref head = batch.getRef(HEAD);
-			Ref oldRef = batch.getRef(source.getName());
+			Ref head = batch.exactRef(HEAD);
+			Ref oldRef = batch.exactRef(source.getName());
 			if (oldRef == null) {
 				return REJECTED;
 			}

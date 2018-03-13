@@ -45,7 +45,6 @@ package org.eclipse.jgit.internal.storage.reftree;
 
 import static org.eclipse.jgit.internal.storage.reftree.RefTreeDb.MAX_SYMREF_DEPTH;
 import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
-import static org.eclipse.jgit.lib.Constants.OBJ_COMMIT;
 import static org.eclipse.jgit.lib.Constants.R_REFS;
 import static org.eclipse.jgit.lib.Constants.encode;
 import static org.eclipse.jgit.lib.FileMode.TYPE_GITLINK;
@@ -59,13 +58,14 @@ import java.io.IOException;
 import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.lib.AnyObjectId;
-import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.SymbolicRef;
+import org.eclipse.jgit.revwalk.RevTree;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.util.RawParseUtils;
@@ -116,18 +116,9 @@ class Scanner {
 			String prefix, boolean recursive,
 			RefList.Builder<Ref> all, RefList.Builder<Ref> sym)
 					throws IncorrectObjectTypeException, IOException {
-		MutableObjectId root = commitToTree(reader, srcId);
-		CanonicalTreeParser p;
-		if (prefix.isEmpty()) {
-			p = new CanonicalTreeParser(BINARY_R_REFS, reader, root);
-		} else {
-			TreeWalk tw = TreeWalk.forPath(reader, prefix, root);
-			if (tw == null || !tw.isSubtree()) {
-				return;
-			}
-
-			tw.getObjectId(root, 0);
-			p = new CanonicalTreeParser(encode(prefix), reader, root);
+		CanonicalTreeParser p = createParserAtPath(reader, srcId, prefix);
+		if (p == null) {
+			return;
 		}
 
 		while (!p.eof()) {
@@ -156,6 +147,22 @@ class Scanner {
 		}
 	}
 
+	private static CanonicalTreeParser createParserAtPath(ObjectReader reader,
+			AnyObjectId srcId, String prefix) throws IOException {
+		ObjectId root = toTree(reader, srcId);
+		if (prefix.isEmpty()) {
+			return new CanonicalTreeParser(BINARY_R_REFS, reader, root);
+		}
+
+		TreeWalk tw = TreeWalk.forPath(reader, prefix, root);
+		if (tw == null || !tw.isSubtree()) {
+			return null;
+		}
+
+		ObjectId id = tw.getObjectId(0);
+		return new CanonicalTreeParser(encode(prefix), reader, id);
+	}
+
 	private static Ref resolve(Ref ref, int depth, RefList<Ref> refs)
 			throws IOException {
 		if (ref != null && ref.isSymbolic() && depth < MAX_SYMREF_DEPTH) {
@@ -168,12 +175,10 @@ class Scanner {
 		return ref;
 	}
 
-	private static MutableObjectId commitToTree(ObjectReader reader,
-			AnyObjectId id) throws IOException {
-		byte[] raw = reader.open(id, OBJ_COMMIT).getCachedBytes();
-		MutableObjectId idBuf = new MutableObjectId();
-		idBuf.fromString(raw, 5);
-		return idBuf;
+	@SuppressWarnings("resource")
+	private static RevTree toTree(ObjectReader reader, AnyObjectId id)
+			throws IOException {
+		return new RevWalk(reader).parseTree(id);
 	}
 
 	private static boolean isPeelSuffix(CanonicalTreeParser t) {

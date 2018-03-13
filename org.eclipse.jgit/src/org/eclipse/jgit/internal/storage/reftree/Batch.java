@@ -43,7 +43,9 @@
 
 package org.eclipse.jgit.internal.storage.reftree;
 
+import static org.eclipse.jgit.internal.storage.reftree.RefTreeDb.R_TXN;
 import static org.eclipse.jgit.internal.storage.reftree.RefTreeDb.R_TXN_COMMITTED;
+import static org.eclipse.jgit.transport.ReceiveCommand.Result.NOT_ATTEMPTED;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.OK;
 import static org.eclipse.jgit.transport.ReceiveCommand.Result.REJECTED_OTHER_REASON;
 
@@ -75,6 +77,8 @@ class Batch extends BatchRefUpdate {
 	private ObjectId parentId;
 	private ObjectId parentTree;
 	private RefTree tree;
+	private PersonIdent author;
+	private ObjectId nextId;
 
 	Batch(RefTreeDb refdb) {
 		super(refdb);
@@ -84,12 +88,61 @@ class Batch extends BatchRefUpdate {
 	@Override
 	public void execute(RevWalk rw, ProgressMonitor monitor)
 			throws IOException {
-		List<Command> todo = new ArrayList<>(getCommands().size());
+		List<Command> forTree = new ArrayList<>(getCommands().size());
+		List<ReceiveCommand> forStore = new ArrayList<>();
 		for (ReceiveCommand c : getCommands()) {
-			todo.add(new Command(rw, c));
+			if (c.getRefName().startsWith(R_TXN)) {
+				forStore.add(c);
+			} else {
+				forTree.add(new Command(rw, c));
+			}
 		}
-		init(rw);
-		execute(rw, todo);
+
+		ReceiveCommand commit = null;
+		if (!forTree.isEmpty()) {
+			init(rw);
+			if (!apply(forTree)) {
+				reject(JGitText.get().transactionAborted);
+				return;
+			} else if (nextId != null) {
+				commit = new ReceiveCommand(parentId, nextId, R_TXN_COMMITTED);
+				forStore.add(commit);
+			}
+		}
+
+		if (!forStore.isEmpty()) {
+			BatchRefUpdate u = newBootstrapBatch();
+			u.addCommand(forStore);
+			u.execute(rw, monitor);
+			if (commit != null) {
+				if (commit.getResult() == OK) {
+					for (Command c : forTree) {
+						c.setResult(OK);
+					}
+				} else {
+					String msg = commit.getMessage();
+					if (msg != null) {
+						msg = commit.getResult().name();
+					}
+					reject(msg);
+				}
+			}
+		}
+	}
+
+	private BatchRefUpdate newBootstrapBatch() {
+		BatchRefUpdate u = refdb.getBootstrap().newBatchUpdate();
+		u.setAllowNonFastForwards(isAllowNonFastForwards());
+		u.setPushCertificate(getPushCertificate());
+		if (isRefLogDisabled()) {
+			u.disableRefLog();
+		} else {
+			u.setRefLogIdent(author != null ? author : getRefLogIdent());
+			u.setRefLogMessage(
+					getRefLogMessage(),
+					isRefLogIncludingResult());
+		}
+		return u;
 	}
 
 	void init(RevWalk rw) throws IOException {
@@ -108,23 +161,23 @@ class Batch extends BatchRefUpdate {
 	}
 
 	@Nullable
-	Ref getRef(String name) throws IOException {
+	Ref exactRef(String name) throws IOException {
 		return tree.exactRef(name);
 	}
 
 	void execute(RevWalk rw, List<Command> todo) throws IOException {
+		if (apply(todo) && nextId != null) {
+			commit(rw);
+		}
+	}
+
+	private boolean apply(List<Command> todo) throws IOException {
 		if (!tree.apply(todo)) {
 			// apply set rejection information on commands.
-			return;
+			return false;
 		}
 
 		Repository repo = refdb.getRepository();
-		PersonIdent who = getRefLogIdent();
-		if (who == null) {
-			who = new PersonIdent(repo);
-		}
-
-		ObjectId next;
 		try (ObjectInserter ins = repo.newObjectInserter()) {
 			CommitBuilder b = new CommitBuilder();
 			b.setTreeId(tree.writeTree(ins));
@@ -132,43 +185,53 @@ class Batch extends BatchRefUpdate {
 				for (Command c : todo) {
 					c.setResult(OK);
 				}
-				return;
+				return true;
 			}
 			if (!parentId.equals(ObjectId.zeroId())) {
 				b.setParentId(parentId);
 			}
-			b.setAuthor(who);
-			b.setCommitter(who);
+
+			author = getRefLogIdent();
+			if (author == null) {
+				author = new PersonIdent(repo);
+			}
+			b.setAuthor(author);
+			b.setCommitter(author);
 			b.setMessage(getRefLogMessage());
-			next = ins.insert(b);
+			nextId = ins.insert(b);
 			ins.flush();
 		}
+		return true;
+	}
 
+	private void commit(RevWalk rw) throws IOException {
 		RefUpdate u = refdb.newUpdate(R_TXN_COMMITTED, false);
 		u.setExpectedOldObjectId(parentId);
-		u.setNewObjectId(next);
-		u.setRefLogIdent(who);
+		u.setNewObjectId(nextId);
+		u.setRefLogIdent(author);
 		u.setRefLogMessage("commit", false); //$NON-NLS-1$
 		Result result = u.update(rw);
 		switch (result) {
 		case NEW:
 		case FAST_FORWARD:
 		case NO_CHANGE:
-			for (Command c : todo) {
+			for (ReceiveCommand c : getCommands()) {
 				c.setResult(OK);
 			}
 			break;
 
 		default:
-			reject(todo, result.name());
+			reject(result.name());
 			break;
 		}
 	}
 
-	private void reject(List<Command> cmds, String msg) {
-		for (Command c : cmds) {
-			c.setResult(REJECTED_OTHER_REASON, msg);
-			msg = JGitText.get().transactionAborted;
+	private void reject(String msg) {
+		for (ReceiveCommand c : getCommands()) {
+			if (c.getResult() == NOT_ATTEMPTED) {
+				c.setResult(REJECTED_OTHER_REASON, msg);
+				msg = JGitText.get().transactionAborted;
+			}
 		}
 	}
 }

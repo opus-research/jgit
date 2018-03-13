@@ -73,7 +73,7 @@ import org.eclipse.jgit.util.RefMap;
  * @since 4.2
  */
 public class RefTreeDb extends RefDatabase {
-	private static final String R_TXN = "refs/txn/"; //$NON-NLS-1$
+	static final String R_TXN = "refs/txn/"; //$NON-NLS-1$
 	static final String R_TXN_COMMITTED = "refs/txn/committed"; //$NON-NLS-1$
 	static final int MAX_SYMREF_DEPTH = MAX_SYMBOLIC_REF_DEPTH;
 
@@ -94,6 +94,10 @@ public class RefTreeDb extends RefDatabase {
 
 	Repository getRepository() {
 		return repo;
+	}
+
+	RefDatabase getBootstrap() {
+		return bootstrap;
 	}
 
 	@Override
@@ -222,7 +226,6 @@ public class RefTreeDb extends RefDatabase {
 
 	@Override
 	public void refresh() {
-		refs = null;
 		bootstrap.refresh();
 	}
 
