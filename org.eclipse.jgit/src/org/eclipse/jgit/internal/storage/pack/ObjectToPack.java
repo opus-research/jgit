@@ -57,28 +57,16 @@ import org.eclipse.jgit.transport.PackedObjectInfo;
  * each object as they are written to the output stream.
  */
 public class ObjectToPack extends PackedObjectInfo {
-	private static final int WANT_WRITE = 1 << 0;
-
-	private static final int REUSE_AS_IS = 1 << 1;
-
+	private static final int REUSE_AS_IS = 1 << 0;
+	private static final int DELTA_ATTEMPTED = 1 << 1;
 	private static final int DO_NOT_DELTA = 1 << 2;
-
 	private static final int EDGE = 1 << 3;
-
-	private static final int DELTA_ATTEMPTED = 1 << 4;
-
 	private static final int ATTEMPT_DELTA_MASK = REUSE_AS_IS | DELTA_ATTEMPTED;
-
 	private static final int TYPE_SHIFT = 5;
-
 	private static final int EXT_SHIFT = 8;
-
 	private static final int EXT_MASK = 0xf;
-
 	private static final int DELTA_SHIFT = 12;
-
 	private static final int NON_EXT_MASK = ~(EXT_MASK << EXT_SHIFT);
-
 	private static final int NON_DELTA_MASK = 0xfff;
 
 	/** Other object being packed that this will delta against. */
@@ -87,11 +75,11 @@ public class ObjectToPack extends PackedObjectInfo {
 	/**
 	 * Bit field, from bit 0 to bit 31:
 	 * <ul>
-	 * <li>1 bit: wantWrite</li>
 	 * <li>1 bit: canReuseAsIs</li>
+	 * <li>1 bit: deltaAttempted</li>
 	 * <li>1 bit: doNotDelta</li>
 	 * <li>1 bit: edgeObject</li>
-	 * <li>1 bit: deltaAttempted</li>
+	 * <li>1 bit: unused</li>
 	 * <li>3 bits: type</li>
 	 * <li>4 bits: subclass flags (if any)</li>
 	 * <li>--</li>
@@ -190,7 +178,7 @@ public class ObjectToPack extends PackedObjectInfo {
 	 * @return true if object is already written; false otherwise.
 	 */
 	public final boolean isWritten() {
-		return getOffset() != 0;
+		return 1 < getOffset(); // markWantWrite sets 1.
 	}
 
 	/** @return the type of this object. */
@@ -206,20 +194,12 @@ public class ObjectToPack extends PackedObjectInfo {
 		flags = (d << DELTA_SHIFT) | (flags & NON_DELTA_MASK);
 	}
 
-	final int getChainLength() {
-		return getDeltaDepth();
-	}
-
-	final void setChainLength(int len) {
-		setDeltaDepth(len);
-	}
-
 	final boolean wantWrite() {
-		return (flags & WANT_WRITE) != 0;
+		return getOffset() == 1;
 	}
 
 	final void markWantWrite() {
-		flags |= WANT_WRITE;
+		setOffset(1);
 	}
 
 	/**
