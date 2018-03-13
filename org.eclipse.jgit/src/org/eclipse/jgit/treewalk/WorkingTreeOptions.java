@@ -59,12 +59,9 @@ public class WorkingTreeOptions {
 
 	private final AutoCRLF autoCRLF;
 
-	private boolean safeCRLF;
-
 	private WorkingTreeOptions(final Config rc) {
 		fileMode = rc.getBoolean("core", "filemode", true);
 		autoCRLF = rc.getEnum("core", null, "autocrlf", AutoCRLF.FALSE);
-		safeCRLF = rc.getBoolean("core", "safecrlf", false);
 	}
 
 	/** @return true if the execute bit on working files should be trusted. */
@@ -75,10 +72,5 @@ public class WorkingTreeOptions {
 	/** @return how automatic CRLF conversion has been configured. */
 	public AutoCRLF getAutoCRLF() {
 		return autoCRLF;
-	}
-
-	/** @return whether CRLF conversion must be reversible. */
-	public boolean getSafeCRLF() {
-		return safeCRLF;
 	}
 }

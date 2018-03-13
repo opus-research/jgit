@@ -531,8 +531,6 @@ public class JGitText extends TranslationBundle {
 	/***/ public String unpackException;
 	/***/ public String unreadablePackIndex;
 	/***/ public String unrecognizedRef;
-	/***/ public String unsafeCrlfConversion;
-	/***/ public String unsafeCrlfConversionIn;
 	/***/ public String unsupportedCommand0;
 	/***/ public String unsupportedEncryptionAlgorithm;
 	/***/ public String unsupportedEncryptionVersion;
